@@ -367,34 +367,42 @@ export default function KRMALine({
     });
   }, []);
 
-  // Handle node position change (for drag and drop) - store normalized coordinates
+  // Handle node position change (for drag and drop) - store absolute world coordinates
   const handleNodePositionChange = useCallback((nodeId: string, x: number, y: number) => {
-    // Convert absolute SVG coordinates to normalized coordinates (0-1 scale)
-    // This makes positions independent of zoom level
-    const normalizedX = (x - viewBox.x) / viewBox.width;
-    const normalizedY = (y - viewBox.y) / viewBox.height;
+    // Store absolute world coordinates - this makes positions independent of viewport/camera
+    console.log(`🎯 Node ${nodeId} position updated to absolute world coordinates: (${x}, ${y})`);
 
     setNodePositions(prev => {
       const newMap = new Map(prev);
-      newMap.set(nodeId, { x: normalizedX, y: normalizedY });
+      newMap.set(nodeId, { x, y });
       return newMap;
     });
-  }, [viewBox]);
 
-  // Get current position for a node - convert from normalized to absolute coordinates
+    // Also update the database for character nodes
+    if (campaignId && nodeId.startsWith('cm')) { // Character IDs start with 'cm'
+      fetch(`/api/characters/${nodeId}/position`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x, y })
+      }).catch(error => console.error('Failed to save position:', error));
+    }
+  }, [campaignId]);
+
+  // Get current position for a node - return absolute world coordinates
   const getNodePosition = useCallback((nodeId: string, fallbackX: number, fallbackY: number) => {
-    const normalizedPosition = nodePositions.get(nodeId);
+    const absolutePosition = nodePositions.get(nodeId);
 
-    if (normalizedPosition) {
-      // Convert normalized coordinates back to absolute SVG coordinates
+    if (absolutePosition) {
+      // Return absolute world coordinates - these don't change with viewport/camera movement
       return {
-        x: viewBox.x + normalizedPosition.x * viewBox.width,
-        y: viewBox.y + normalizedPosition.y * viewBox.height
+        x: absolutePosition.x,
+        y: absolutePosition.y
       };
     }
 
+    // Use fallback coordinates from database/props as absolute world coordinates
     return { x: fallbackX, y: fallbackY };
-  }, [nodePositions, viewBox]);
+  }, [nodePositions]);
 
   return (
     <div
