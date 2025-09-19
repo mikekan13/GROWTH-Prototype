@@ -1,0 +1,236 @@
+/* GROWTH Design System - Based on Google Sheets Template */
+
+:root {
+  /* GROWTH Color Palette */
+  --growth-primary: #4C1D95;        /* Deep Purple - Primary brand */
+  --growth-primary-light: #6D28D9;  /* Lighter Purple */
+  --growth-secondary: #7C3AED;      /* Medium Purple - Secondary brand */
+  --growth-accent: #A855F7;         /* Light Purple - Accents */
+  --growth-accent-light: #C084FC;   /* Very Light Purple */
+  
+  /* KRMA-specific colors */
+  --krma-primary: #6366F1;          /* Indigo for KRMA displays */
+  --krma-secondary: #8B5CF6;        /* Purple-indigo gradient */
+  
+  /* Attribute colors (from existing system) */
+  --attr-body: #EF4444;             /* Red for Body attributes */
+  --attr-soul: #A855F7;             /* Purple for Soul attributes */
+  --attr-spirit: #3B82F6;           /* Blue for Spirit attributes */
+  
+  /* Neutral palette */
+  --growth-white: #FFFFFF;
+  --growth-gray-50: #F9FAFB;
+  --growth-gray-100: #F3F4F6;
+  --growth-gray-200: #E5E7EB;
+  --growth-gray-300: #D1D5DB;
+  --growth-gray-400: #9CA3AF;
+  --growth-gray-500: #6B7280;
+  --growth-gray-600: #4B5563;
+  --growth-gray-700: #374151;
+  --growth-gray-800: #1F2937;
+  --growth-gray-900: #111827;
+
+  /* Success/Warning/Error */
+  --growth-success: #10B981;
+  --growth-warning: #F59E0B;
+  --growth-error: #EF4444;
+
+  /* Shadows */
+  --growth-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --growth-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --growth-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --growth-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Border radius */
+  --growth-radius-sm: 0.25rem;
+  --growth-radius: 0.375rem;
+  --growth-radius-md: 0.5rem;
+  --growth-radius-lg: 0.75rem;
+  --growth-radius-xl: 1rem;
+
+  /* Typography */
+  --growth-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* GROWTH Component Classes */
+
+/* Primary buttons */
+.btn-growth-primary {
+  background: linear-gradient(135deg, var(--growth-primary) 0%, var(--growth-primary-light) 100%);
+  color: var(--growth-white);
+  border: none;
+  border-radius: var(--growth-radius-md);
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease-in-out;
+  box-shadow: var(--growth-shadow);
+}
+
+.btn-growth-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--growth-shadow-md);
+  background: linear-gradient(135deg, var(--growth-primary-light) 0%, var(--growth-secondary) 100%);
+}
+
+/* Secondary buttons */
+.btn-growth-secondary {
+  background: var(--growth-white);
+  color: var(--growth-primary);
+  border: 2px solid var(--growth-primary);
+  border-radius: var(--growth-radius-md);
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-growth-secondary:hover {
+  background: var(--growth-primary);
+  color: var(--growth-white);
+}
+
+/* KRMA display badge */
+.krma-badge {
+  background: linear-gradient(135deg, var(--krma-primary) 0%, var(--krma-secondary) 100%);
+  color: var(--growth-white);
+  border-radius: var(--growth-radius-lg);
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  box-shadow: var(--growth-shadow);
+  text-align: center;
+}
+
+.krma-badge-large {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.25rem;
+}
+
+/* GROWTH cards */
+.growth-card {
+  background: var(--growth-white);
+  border-radius: var(--growth-radius-xl);
+  box-shadow: var(--growth-shadow);
+  border: 1px solid var(--growth-gray-200);
+  transition: all 0.2s ease-in-out;
+}
+
+.growth-card:hover {
+  box-shadow: var(--growth-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.growth-card-header {
+  background: linear-gradient(135deg, var(--growth-primary) 0%, var(--growth-primary-light) 100%);
+  color: var(--growth-white);
+  padding: 1.5rem;
+  border-radius: var(--growth-radius-xl) var(--growth-radius-xl) 0 0;
+}
+
+/* Character attribute bars */
+.attr-bar-body {
+  background: linear-gradient(180deg, var(--attr-body) 0%, #DC2626 100%);
+}
+
+.attr-bar-soul {
+  background: linear-gradient(180deg, var(--attr-soul) 0%, #9333EA 100%);
+}
+
+.attr-bar-spirit {
+  background: linear-gradient(180deg, var(--attr-spirit) 0%, #2563EB 100%);
+}
+
+/* Budget indicators */
+.budget-healthy {
+  background: linear-gradient(135deg, var(--growth-success) 0%, #059669 100%);
+}
+
+.budget-warning {
+  background: linear-gradient(135deg, var(--growth-warning) 0%, #D97706 100%);
+}
+
+.budget-danger {
+  background: linear-gradient(135deg, var(--growth-error) 0%, #DC2626 100%);
+}
+
+/* Page headers with GROWTH branding */
+.growth-page-header {
+  background: linear-gradient(135deg, var(--growth-primary) 0%, var(--growth-primary-light) 100%);
+  color: var(--growth-white);
+  padding: 2rem 0;
+  margin-bottom: 2rem;
+}
+
+.growth-section-header {
+  background: var(--growth-gray-50);
+  border-left: 4px solid var(--growth-primary);
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0 var(--growth-radius) var(--growth-radius) 0;
+}
+
+/* Typography classes */
+.growth-title {
+  font-family: var(--growth-font-family);
+  font-weight: 700;
+  color: var(--growth-gray-900);
+  line-height: 1.25;
+}
+
+.growth-subtitle {
+  font-family: var(--growth-font-family);
+  font-weight: 600;
+  color: var(--growth-gray-700);
+  line-height: 1.375;
+}
+
+.growth-body {
+  font-family: var(--growth-font-family);
+  font-weight: 400;
+  color: var(--growth-gray-600);
+  line-height: 1.5;
+}
+
+/* Form inputs */
+.growth-input {
+  border: 2px solid var(--growth-gray-200);
+  border-radius: var(--growth-radius-md);
+  padding: 0.75rem 1rem;
+  font-family: var(--growth-font-family);
+  color: var(--growth-gray-900);
+  background: var(--growth-white);
+  transition: all 0.2s ease-in-out;
+}
+
+.growth-input:focus {
+  outline: none;
+  border-color: var(--growth-primary);
+  box-shadow: 0 0 0 3px rgb(76 29 149 / 0.1);
+}
+
+/* Progress bars */
+.growth-progress {
+  background: var(--growth-gray-200);
+  border-radius: var(--growth-radius);
+  overflow: hidden;
+}
+
+.growth-progress-bar {
+  height: 0.75rem;
+  border-radius: var(--growth-radius);
+  transition: width 0.3s ease-in-out;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .growth-card {
+    border-radius: var(--growth-radius-lg);
+  }
+  
+  .growth-page-header {
+    padding: 1.5rem 0;
+  }
+  
+  .krma-badge-large {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+  }
+}

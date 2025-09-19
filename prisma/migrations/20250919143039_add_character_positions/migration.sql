@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Character" ADD COLUMN "x" REAL DEFAULT 0;
+ALTER TABLE "Character" ADD COLUMN "y" REAL DEFAULT 0;

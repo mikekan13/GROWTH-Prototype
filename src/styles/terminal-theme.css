@@ -1,0 +1,388 @@
+/* Dark Terminal Theme - Override for GROWTH Design System */
+
+:root {
+  /* Terminal Color Palette */
+  --terminal-black: #000000;
+  --terminal-dark-gray: #0a0a0a;
+  --terminal-gray: #1a1a1a;
+  --terminal-light-gray: #2a2a2a;
+  --terminal-border: #333333;
+  --terminal-green: #00ff00;
+  --terminal-green-dim: #00cc00;
+  --terminal-cyan: #00ffff;
+  --terminal-cyan-dim: #00cccc;
+  --terminal-yellow: #ffff00;
+  --terminal-yellow-dim: #cccc00;
+  --terminal-white: #ffffff;
+  --terminal-light-white: #f0f0f0;
+  --terminal-amber: #ff8800;
+  --terminal-red: #ff4444;
+
+  /* Override existing GROWTH colors with terminal colors */
+  --growth-primary: var(--terminal-green);
+  --growth-primary-light: var(--terminal-green-dim);
+  --growth-secondary: var(--terminal-cyan);
+  --growth-accent: var(--terminal-yellow);
+  --growth-accent-light: var(--terminal-yellow-dim);
+
+  /* Override grays with terminal palette */
+  --growth-white: var(--terminal-black);
+  --growth-gray-50: var(--terminal-dark-gray);
+  --growth-gray-100: var(--terminal-gray);
+  --growth-gray-200: var(--terminal-light-gray);
+  --growth-gray-300: var(--terminal-border);
+  --growth-gray-400: #444444;
+  --growth-gray-500: #555555;
+  --growth-gray-600: #aaaaaa;
+  --growth-gray-700: #cccccc;
+  --growth-gray-800: var(--terminal-light-white);
+  --growth-gray-900: var(--terminal-white);
+
+  /* Terminal Typography */
+  --terminal-font-family: 'Courier New', 'Monaco', 'Menlo', 'Source Code Pro', monospace;
+}
+
+/* Global body override for terminal theme */
+body {
+  background: var(--terminal-black) !important;
+  color: var(--terminal-white) !important;
+  font-family: var(--terminal-font-family) !important;
+  min-height: 100vh;
+}
+
+/* Override GROWTH Component Classes for Terminal Theme */
+
+/* Terminal Cards */
+.growth-card {
+  background: var(--terminal-gray) !important;
+  border: 2px solid var(--terminal-border) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.1) !important;
+  position: relative;
+}
+
+.growth-card::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, var(--terminal-green), var(--terminal-cyan), var(--terminal-green));
+  z-index: -1;
+  border-radius: 6px;
+  opacity: 0.3;
+}
+
+.growth-card:hover {
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3) !important;
+  transform: none !important;
+  border-color: var(--terminal-green) !important;
+}
+
+/* Terminal Card Headers */
+.growth-card-header {
+  background: var(--terminal-dark-gray) !important;
+  color: var(--terminal-green) !important;
+  border-bottom: 2px solid var(--terminal-green) !important;
+  padding: 1rem !important;
+  font-family: var(--terminal-font-family) !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  position: relative;
+}
+
+.growth-card-header::before {
+  content: '> ';
+  color: var(--terminal-cyan);
+  font-weight: bold;
+}
+
+.growth-card-header::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--terminal-green), var(--terminal-cyan));
+  animation: terminal-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes terminal-glow {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* Page Headers */
+.growth-page-header {
+  background: var(--terminal-black) !important;
+  border-bottom: 3px solid var(--terminal-green) !important;
+  color: var(--terminal-white) !important;
+  font-family: var(--terminal-font-family) !important;
+  position: relative;
+}
+
+.growth-page-header::before {
+  content: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+  display: block;
+  color: var(--terminal-green);
+  font-size: 0.5rem;
+  line-height: 0.5;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Typography */
+.growth-title {
+  font-family: var(--terminal-font-family) !important;
+  color: var(--terminal-green) !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+}
+
+.growth-card-header .growth-title {
+  color: var(--terminal-cyan) !important;
+}
+
+.growth-subtitle {
+  font-family: var(--terminal-font-family) !important;
+  color: var(--terminal-yellow) !important;
+  font-weight: normal !important;
+}
+
+.growth-body {
+  font-family: var(--terminal-font-family) !important;
+  color: var(--terminal-light-white) !important;
+  line-height: 1.4 !important;
+}
+
+/* Form Labels */
+.growth-label {
+  font-family: var(--terminal-font-family) !important;
+  color: var(--terminal-cyan) !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.5px !important;
+  margin-bottom: 0.5rem !important;
+  display: block !important;
+}
+
+.growth-label::before {
+  content: '» ';
+  color: var(--terminal-green);
+}
+
+/* Form Inputs */
+.growth-input {
+  background: var(--terminal-dark-gray) !important;
+  border: 2px solid var(--terminal-border) !important;
+  color: var(--terminal-white) !important;
+  font-family: var(--terminal-font-family) !important;
+  border-radius: 2px !important;
+  padding: 0.75rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.growth-input:focus {
+  border-color: var(--terminal-green) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3) !important;
+  outline: none !important;
+}
+
+.growth-input::placeholder {
+  color: #666666 !important;
+  font-style: italic;
+}
+
+/* Buttons */
+.btn-growth-primary {
+  background: linear-gradient(135deg, var(--terminal-dark-gray), var(--terminal-gray)) !important;
+  color: var(--terminal-green) !important;
+  border: 2px solid var(--terminal-green) !important;
+  font-family: var(--terminal-font-family) !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  border-radius: 2px !important;
+  transition: all 0.2s ease !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-growth-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-growth-primary:hover {
+  background: var(--terminal-dark-gray) !important;
+  color: var(--terminal-cyan) !important;
+  border-color: var(--terminal-cyan) !important;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3) !important;
+  transform: none !important;
+}
+
+.btn-growth-primary:hover::before {
+  left: 100%;
+}
+
+.btn-growth-secondary {
+  background: transparent !important;
+  color: var(--terminal-yellow) !important;
+  border: 2px solid var(--terminal-yellow) !important;
+  font-family: var(--terminal-font-family) !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  border-radius: 2px !important;
+}
+
+.btn-growth-secondary:hover {
+  background: var(--terminal-yellow) !important;
+  color: var(--terminal-black) !important;
+}
+
+/* Accent Button (AI Button) */
+.btn-growth-accent {
+  background: linear-gradient(135deg, var(--terminal-green), var(--terminal-cyan)) !important;
+  color: var(--terminal-black) !important;
+  border: none !important;
+  border-radius: 2px !important;
+}
+
+.btn-growth-accent:hover {
+  background: linear-gradient(135deg, var(--terminal-cyan), var(--terminal-green)) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.5) !important;
+}
+
+/* Radio buttons and checkboxes */
+input[type="radio"], input[type="checkbox"] {
+  accent-color: var(--terminal-green) !important;
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+/* Links */
+a {
+  color: var(--terminal-cyan) !important;
+  text-decoration: none !important;
+}
+
+a:hover {
+  color: var(--terminal-green) !important;
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5) !important;
+}
+
+/* Breadcrumb navigation */
+nav a {
+  color: var(--terminal-yellow) !important;
+}
+
+nav a:hover {
+  color: var(--terminal-green) !important;
+}
+
+/* Selection styling */
+::selection {
+  background: var(--terminal-green) !important;
+  color: var(--terminal-black) !important;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 12px;
+  background: var(--terminal-dark-gray);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--terminal-gray);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--terminal-green);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-cyan);
+}
+
+/* Loading spinner override */
+.animate-spin {
+  border-color: var(--terminal-green) !important;
+  border-top-color: transparent !important;
+}
+
+/* Special terminal effects */
+.terminal-scan-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.terminal-scan-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--terminal-green), transparent);
+  animation: scan-line 3s linear infinite;
+  opacity: 0.3;
+}
+
+@keyframes scan-line {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+
+/* Terminal prompt styling for titles */
+.terminal-prompt::before {
+  content: 'root@growth:~$ ';
+  color: var(--terminal-yellow);
+  font-weight: bold;
+}
+
+/* Matrix-style background effect for cards */
+.matrix-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.matrix-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.05;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--terminal-green) 0px,
+      transparent 1px,
+      transparent 20px,
+      var(--terminal-green) 21px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--terminal-green) 0px,
+      transparent 1px,
+      transparent 20px,
+      var(--terminal-green) 21px
+    );
+  pointer-events: none;
+  z-index: -1;
+}

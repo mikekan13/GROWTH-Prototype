@@ -1,0 +1,470 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  gmUserId    String   // Reference to the GM's User ID
+  folderId    String?   // Google Drive subfolder ID for this campaign
+  genre       String?   // Campaign genre (e.g., "Fantasy", "Sci-Fi", "Horror")
+  themes      Json?     // Array of campaign themes
+  description String?   // Campaign description
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  gmUser      User     @relation(fields: [gmUserId], references: [id])
+  sheets      SheetRef[]
+  characters  Character[]
+  sessions    SessionLog[]
+  decisions   Decision[]
+  worldAssets WorldAsset[]
+  worlds      World[]   // Worlds/Planes within this campaign
+  characterBackstories CharacterBackstory[]
+}
+
+model SheetRef {
+  id               String   @id @default(cuid())
+  campaignId       String
+  kind             SheetKind
+  spreadsheetId    String
+  title            String?
+  lastModifiedTime DateTime?
+  Campaign         Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+enum SheetKind { 
+  GM 
+  PC 
+  NPC 
+  DATA 
+}
+
+enum UserRole {
+  ADMIN
+  WATCHER
+  TRAILBLAZER
+  GODHEAD
+}
+
+enum HolderType {
+  TERMINAL
+  GODHEAD
+  WATCHER
+  TRAILBLAZER
+}
+
+enum KrmaTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  PAYMENT
+  REWARD
+  FEE
+}
+
+model Character {
+  id            String   @id @default(cuid())
+  campaignId    String
+  name          String
+  playerEmail   String?
+  spreadsheetId String
+  json          Json
+  revId         String?
+  updatedAt     DateTime @updatedAt
+  Campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  krmaData      CharacterKrma?
+
+  @@unique([campaignId, spreadsheetId])
+}
+
+model Decision {
+  id        String   @id @default(cuid())
+  scope     String   // "GLOBAL" | "CAMPAIGN:<id>"
+  key       String   // e.g. map.header.Strength
+  value     Json
+  createdAt DateTime @default(now())
+  Campaign  Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  campaignId String?
+
+  @@unique([scope, key])
+}
+
+model Issue {
+  id        String   @id @default(cuid())
+  severity  String   // info | warn | error
+  source    Json     // { spreadsheetId, sheetTitle, a1Range, namedRange? }
+  sample    Json
+  proposed  Json
+  status    String   // open | queued | resolved
+  createdAt DateTime @default(now())
+}
+
+model SessionLog {
+  id         String   @id @default(cuid())
+  campaignId String
+  startedAt  DateTime @default(now())
+  endedAt    DateTime?
+  logMd      String
+  Campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+// Additional models for better data structure
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state            String?
+  refresh_token_expires_in Int?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(WATCHER)
+  krmaBalance   BigInt    @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  campaigns     Campaign[] // Campaigns where this user is the GM
+  krmaTransactions KrmaTransaction[]
+  gmProfile     GMProfile?
+  playerProfile PlayerProfile?
+  playerBackstories CharacterBackstory[] @relation("PlayerBackstories")
+  gmBackstories     CharacterBackstory[] @relation("GMBackstories")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model KrmaTransaction {
+  id          String              @id @default(cuid())
+  userId      String
+  type        KrmaTransactionType
+  amount      BigInt
+  balance     BigInt              // Balance after this transaction
+  description String?
+  metadata    Json?               // Additional context (campaign, character, etc.)
+  createdAt   DateTime            @default(now())
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// KRMA Tokenomics Models
+model Wallet {
+  id        String     @id @default(cuid())
+  ownerType HolderType
+  ownerRef  String     // e.g., gmId, godheadId, userId
+  liquid      BigInt   @default(0) // usable/circulating KRMA
+  crystalized BigInt   @default(0) // crystalized KRMA (bound)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([ownerType, ownerRef])
+}
+
+model GMProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  signupMonth    Int      // months since world start
+  baselineActive Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entities       EntityProfile[]
+  playerInvitations PlayerInvitation[] @relation("GMInvitations")
+  players        PlayerProfile[] @relation("GMPlayers")
+}
+
+model EntityProfile {
+  id        String    @id @default(cuid())
+  gmId      String    
+  name      String?
+  // Hidden composition (sum = 1.0); gated from GM until meta year 2
+  bodyPct   Float     @default(0.33)    // Body percentage
+  spiritPct Float     @default(0.33)    // Spirit percentage  
+  soulPct   Float     @default(0.34)    // Soul percentage
+  // On-entity KRMA stores
+  frequency BigInt    @default(0)       // Lady Death takes on death
+  mana      BigInt    @default(0)       // converts to frequency then taken
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  gm        GMProfile @relation(fields: [gmId], references: [id], onDelete: Cascade)
+
+  @@index([gmId])
+}
+
+model SystemPools {
+  id                    String   @id @default(cuid())
+  gmId                  String   @unique
+  gmBodyPoolId          String   // world/env pool for "Body stays in GM's world"  
+  gmSpiritPoolId        String   // world/env pool for "half Spirit stays in world"
+  spiritOtherHalfHoldId String   // conserved until routing decided
+  itemRemainderHoldId   String   // conserved until routing decided
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model BaselineParams {
+  id           String   @id @default(cuid())
+  lifetimeTotal BigInt  // same for all GMs (TBD)
+  windowMonths  Int     // ends after this window (TBD)
+  muMonths      Float   // bell peak (TBD)
+  sigmaMonths   Float   // bell spread (TBD) 
+  ceaseFloor    BigInt  // monthly < floor → 0 (TBD)
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CreativitySignal {
+  id         String   @id @default(cuid())
+  gmId       String
+  scoreDelta Float
+  domain     String
+  createdAt  DateTime @default(now())
+
+  @@index([gmId, createdAt])
+}
+
+model WorldAsset {
+  id          String   @id @default(cuid())
+  campaignId  String
+  gmId        String
+  type        String   // NPC, ITEM, LOCATION, ENVIRONMENT, QUEST, ARTIFACT
+  name        String
+  description String?
+  krmaValue   BigInt   // Amount of KRMA crystallized into this asset
+  isActive    Boolean  @default(true) // False when dissolved/destroyed
+  metadata    Json     // Additional properties specific to asset type
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, type])
+  @@index([gmId, isActive])
+}
+
+model TemplateVersion {
+  id          String   @id @default(cuid())
+  templateId  String   // Google Sheets template ID
+  version     String   // Auto-generated version hash
+  namedRanges Json     // All named ranges detected in template
+  krmaMapping Json     // KRMA field mapping configuration
+  isActive    Boolean  @default(true)
+  detectedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([templateId, version])
+  @@index([templateId, isActive])
+}
+
+model CharacterKrma {
+  id              String   @id @default(cuid())
+  characterId     String   @unique
+  totalKrmaValue  BigInt   // Total KRMA allocated to this character
+  krmaBreakdown   Json     // Detailed breakdown by category (frequency, abilities, etc.)
+  lastCalculated  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  character       Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([totalKrmaValue])
+  @@index([lastCalculated])
+}
+
+model PlayerInvitation {
+  id            String   @id @default(cuid())
+  gmId          String
+  playerEmail   String
+  status        String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED, CANCELLED
+  inviteToken   String   @unique
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  gm            GMProfile @relation("GMInvitations", fields: [gmId], references: [id], onDelete: Cascade)
+
+  @@index([inviteToken])
+  @@unique([gmId, playerEmail])
+}
+
+model PlayerProfile {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  gmId      String
+  joinedAt  DateTime  @default(now())
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gm        GMProfile @relation("GMPlayers", fields: [gmId], references: [id], onDelete: Cascade)
+
+  @@index([gmId, isActive])
+}
+
+// World/Plane Creation System
+model World {
+  id                String   @id @default(cuid())
+  campaignId        String
+  name              String
+  description       String?
+  liquidKrmaInvested BigInt  @default(0) // Liquid KRMA invested to create world lushness
+  totalKrmaInvested  BigInt  @default(0) // Total KRMA ever invested (including crystalized)
+  lushnessFactor     Float   @default(1.0) // Calculated based on liquid vs crystalized KRMA ratio
+  worldType         String  @default("MATERIAL") // MATERIAL, ETHEREAL, SHADOW, DREAM, etc.
+  isActive          Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  campaign          Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  regions           WorldRegion[]
+  factions          WorldFaction[]
+  npcs              WorldNPC[]
+  characterBackstories CharacterBackstory[]
+
+  @@index([campaignId, isActive])
+}
+
+model WorldRegion {
+  id          String   @id @default(cuid())
+  worldId     String
+  name        String
+  description String?
+  regionType  String   @default("LAND") // LAND, OCEAN, SKY, UNDERGROUND, etc.
+  krmaValue   BigInt   @default(0) // KRMA crystalized into this region
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, isActive])
+}
+
+model WorldFaction {
+  id          String   @id @default(cuid())
+  worldId     String
+  name        String
+  description String?
+  factionType String   @default("ORGANIZATION") // ORGANIZATION, GUILD, GOVERNMENT, CULT, etc.
+  krmaValue   BigInt   @default(0) // KRMA crystalized into this faction
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, isActive])
+}
+
+model WorldNPC {
+  id          String   @id @default(cuid())
+  worldId     String
+  name        String
+  description String?
+  npcType     String   @default("HUMANOID") // HUMANOID, CREATURE, CONSTRUCT, SPIRIT, etc.
+  krmaValue   BigInt   @default(0) // KRMA crystalized into this NPC
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, isActive])
+}
+
+// Character Creation System
+enum BackstoryStatus {
+  DRAFT            // Trailblazer is working on it
+  SUBMITTED        // Submitted to GM for review
+  UNDER_REVIEW     // GM is reviewing
+  REVISION_NEEDED  // GM sent back for changes
+  APPROVED         // GM approved, ready for mechanical conversion
+  MECHANICAL       // GM is converting to mechanics
+  COMPLETE         // Ready for character sheet creation
+}
+
+model CharacterBackstory {
+  id          String         @id @default(cuid())
+  campaignId  String
+  worldId     String?        // Primary world this character is from
+  playerId    String         // Player creating this character
+  gmId        String         // GM who will review this
+
+  // Character Identity
+  characterName    String?
+  hair            String?
+  eyes            String?
+  physicalFeatures String?
+
+  // Background Story
+  childhood       String?
+  significantEvent String?
+  motivation      String?
+  fears           String?
+  relationships   String?
+  goals           String?
+
+  // AI-Generated Narrative
+  narrativeBackstory String?
+
+  // Mechanical Conversion (filled by GM)
+  seedType        String?    // Character creation seed
+  rootType        String?    // Character creation root
+  branches        Json?      // Character creation branches
+  startingItems   Json?      // Starting inventory
+  krmaAllocated   BigInt     @default(0) // KRMA allocated to this character
+
+  // Workflow
+  status          BackstoryStatus @default(DRAFT)
+  gmNotes         String?    // GM's private notes
+  revisionNotes   String?    // Notes for player revisions
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  submittedAt     DateTime?  // When player submitted to GM
+  reviewedAt      DateTime?  // When GM last reviewed
+
+  campaign        Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  world           World?     @relation(fields: [worldId], references: [id], onDelete: SetNull)
+  player          User       @relation("PlayerBackstories", fields: [playerId], references: [id], onDelete: Cascade)
+  gm              User       @relation("GMBackstories", fields: [gmId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+  @@index([playerId, status])
+  @@index([gmId, status])
+}

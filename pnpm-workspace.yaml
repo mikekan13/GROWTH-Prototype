@@ -1,0 +1,4 @@
+packages:
+  - 'mcp/growth-rules-mcp'
+  - 'mcp/campaign-mcp'
+  - 'shared'

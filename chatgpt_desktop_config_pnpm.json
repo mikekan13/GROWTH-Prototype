@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "growth-rules-mcp": {
+      "command": "pnpm",
+      "args": [
+        "--filter",
+        "growth-rules-mcp",
+        "run",
+        "dev"
+      ],
+      "cwd": "C:/Users/Mikek/Desktop/GROWTH/GROWTH Prototype",
+      "env": {
+        "GROWTH_REPO": "C:/Users/Mikek/Desktop/GROWTH/GROWTH_Repository",
+        "CAMPAIGN_REPO": "C:/Users/Mikek/Desktop/GROWTH/Campaign_Data"
+      }
+    },
+    "campaign-mcp": {
+      "command": "pnpm",
+      "args": [
+        "--filter", 
+        "campaign-mcp",
+        "run",
+        "dev"
+      ],
+      "cwd": "C:/Users/Mikek/Desktop/GROWTH/GROWTH Prototype",
+      "env": {
+        "GROWTH_REPO": "C:/Users/Mikek/Desktop/GROWTH/GROWTH_Repository",
+        "CAMPAIGN_REPO": "C:/Users/Mikek/Desktop/GROWTH/Campaign_Data"
+      }
+    }
+  }
+}
