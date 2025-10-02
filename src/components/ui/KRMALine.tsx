@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import CharacterCard, { CharacterData as CharacterNodeData } from "@/components/nodes/CharacterCard";
 import { ToolsCard } from "./ToolsCard";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface KRMANode {
   id: string;
@@ -72,6 +73,8 @@ export default function KRMALine({
   const [animationTime, setAnimationTime] = useState(0);
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [dragOffsets, setDragOffsets] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [deleteConfirm, setDeleteConfirm] = useState<{ nodeId: string; nodeName: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const animationRafRef = useRef<number>(0);
   const panRafRef = useRef<number>(0);
 
@@ -438,6 +441,50 @@ export default function KRMALine({
     // Use fallback coordinates from database/props as absolute world coordinates
     return { x: fallbackX, y: fallbackY };
   }, [nodePositions]);
+
+  // Handle character delete request
+  const handleDeleteRequest = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      setDeleteConfirm({
+        nodeId: node.id,
+        nodeName: node.name
+      });
+    }
+  }, [nodes]);
+
+  // Confirm and execute delete
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteConfirm) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/characters/${deleteConfirm.nodeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+      });
+
+      if (response.ok) {
+        console.log(`✅ Character ${deleteConfirm.nodeId} deleted successfully`);
+        // Close dialog
+        setDeleteConfirm(null);
+        // Trigger refresh in parent
+        onCharacterCreated?.();
+      } else {
+        const error = await response.json();
+        console.error(`❌ Failed to delete character:`, error);
+        alert(`Failed to delete character: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error deleting character:`, error);
+      alert('Failed to delete character. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteConfirm, onCharacterCreated]);
 
   return (
     <div
@@ -823,6 +870,7 @@ export default function KRMALine({
                 onToggleExpand={handleToggleExpand}
                 onPositionChange={handleNodePositionChange}
                 onDragOffsetChange={handleDragOffsetChange}
+                onDelete={handleDeleteRequest}
               />
             </foreignObject>
           );
@@ -1077,6 +1125,19 @@ export default function KRMALine({
           })()}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Character"
+        message={`Are you sure you want to delete "${deleteConfirm?.nodeName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        isLoading={isDeleting}
+        variant="danger"
+      />
     </div>
   );
 }

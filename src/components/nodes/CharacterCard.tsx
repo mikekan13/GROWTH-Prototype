@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 
 // Interface for GROWTH attribute structure
@@ -93,6 +94,7 @@ interface CharacterCardProps {
   onToggleExpand?: (nodeId: string) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
+  onDelete?: (nodeId: string) => void;
   className?: string;
 }
 
@@ -102,13 +104,17 @@ const CharacterCard: React.FC<CharacterCardProps> = React.memo(({
   isExpanded = false,
   onToggleExpand,
   onPositionChange,
-  onDragOffsetChange
+  onDragOffsetChange,
+  onDelete
 }) => {
   const [sheetData, setSheetData] = useState<SheetCharacterData | null>(null);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch character card data from database
   useEffect(() => {
@@ -147,6 +153,20 @@ const CharacterCard: React.FC<CharacterCardProps> = React.memo(({
     fetchSheetData();
   }, [node?.id]);
 
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setShowContextMenu(false);
+      }
+    };
+
+    if (showContextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showContextMenu]);
+
   console.log('🎯 ULTRA DEBUG - CharacterCard rendering:', {
     nodeId: node?.id,
     nodeName: node?.name,
@@ -167,8 +187,24 @@ const CharacterCard: React.FC<CharacterCardProps> = React.memo(({
   const levels = character?.levels;
   const attributes = character?.attributes;
 
+  // Context menu handler
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Only show context menu if onDelete is provided
+    if (!onDelete) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Use pageX/pageY which include scroll offsets
+    setContextMenuPos({ x: e.pageX, y: e.pageY });
+    setShowContextMenu(true);
+  };
+
   // DRAG: Update parent with SVG coordinate offsets during drag
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Only handle left mouse button clicks (button 0)
+    if (e.button !== 0) return;
+
     if (!onPositionChange || !onDragOffsetChange) return;
 
     e.preventDefault();
@@ -258,6 +294,7 @@ const CharacterCard: React.FC<CharacterCardProps> = React.memo(({
             userSelect: 'none',
           }}
           onMouseDown={handleMouseDown}
+          onContextMenu={handleContextMenu}
         >
           {/* Profile Picture Section - Left */}
           <div className="flex-shrink-0 w-20 h-20 mr-3">
@@ -510,42 +547,99 @@ const CharacterCard: React.FC<CharacterCardProps> = React.memo(({
             </button>
           )}
         </div>
+
+        {/* Context Menu - Rendered via Portal */}
+        {showContextMenu && typeof window !== 'undefined' && createPortal(
+          <div
+            ref={contextMenuRef}
+            className="fixed bg-gray-800 border border-gray-700 rounded-lg shadow-2xl py-1 z-50"
+            style={{
+              left: `${contextMenuPos.x}px`,
+              top: `${contextMenuPos.y}px`,
+              minWidth: '160px'
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowContextMenu(false);
+                onDelete?.(node.id);
+              }}
+              className="w-full px-4 py-2 text-left text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete Character
+            </button>
+          </div>,
+          document.body
+        )}
       </div>
     );
   }
 
   // Expanded view - simple for now
   return (
-    <div
-      className={`bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-6 text-white shadow-lg hover:border-gray-600 transition-shadow select-none ${
-        isDragging ? 'cursor-grabbing shadow-2xl' : 'cursor-grab'
-      }`}
-      style={{
-        width: '400px',
-        minHeight: '600px',
-        willChange: 'transform',
-        userSelect: 'none',
-        transform: isDragging ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : 'none',
-        transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-      }}
-      onMouseDown={handleMouseDown}
-    >
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-lg font-bold">{node.name}</h3>
-        {onToggleExpand && (
+    <div className="relative">
+      <div
+        className={`bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-6 text-white shadow-lg hover:border-gray-600 transition-shadow select-none ${
+          isDragging ? 'cursor-grabbing shadow-2xl' : 'cursor-grab'
+        }`}
+        style={{
+          width: '400px',
+          minHeight: '600px',
+          willChange: 'transform',
+          userSelect: 'none',
+        }}
+        onMouseDown={handleMouseDown}
+        onContextMenu={handleContextMenu}
+      >
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-lg font-bold">{node.name}</h3>
+          {onToggleExpand && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand(node.id);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="text-gray-400 hover:text-white cursor-pointer"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <p className="text-gray-300">Expanded character sheet - TODO</p>
+      </div>
+
+      {/* Context Menu - Rendered via Portal */}
+      {showContextMenu && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-gray-800 border border-gray-700 rounded-lg shadow-2xl py-1 z-50"
+          style={{
+            left: `${contextMenuPos.x}px`,
+            top: `${contextMenuPos.y}px`,
+            minWidth: '160px'
+          }}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onToggleExpand(node.id);
+              setShowContextMenu(false);
+              onDelete?.(node.id);
             }}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="text-gray-400 hover:text-white cursor-pointer"
+            className="w-full px-4 py-2 text-left text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
           >
-            ✕
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Character
           </button>
-        )}
-      </div>
-      <p className="text-gray-300">Expanded character sheet - TODO</p>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }, (prevProps, nextProps) => {
