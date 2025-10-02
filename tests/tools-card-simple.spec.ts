@@ -46,10 +46,10 @@ test.describe('ToolsCard Design Validation', () => {
     await page.goto('/');
 
     // Look for elements with the #22ab94 color scheme
-    const allElements = page.locator('*');
+    const _allElements = page.locator('*');
 
     // Check that at least some elements have proper color styling
-    const hasColorStyling = await page.evaluate(() => {
+    const _hasColorStyling = await page.evaluate(() => {
       const elements = document.querySelectorAll('*');
       let hasValidColors = false;
 

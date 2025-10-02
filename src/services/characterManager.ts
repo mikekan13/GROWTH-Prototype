@@ -5,8 +5,10 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { GrowthCharacter } from '@/types/growth';
-import { sheetsMapper } from './sheetsMapping';
+// TODO: sheetsMapper may be used in future for direct sheet manipulation
+// import { sheetsMapper } from './sheetsMapping';
 
 export interface CharacterLoadOptions {
   preferSheets?: boolean;
@@ -18,7 +20,7 @@ export interface CharacterSource {
   id: string;
   name: string;
   source: 'database' | 'sheets';
-  character?: any; // Database character data
+  character?: Record<string, unknown>; // Database character data
   sheetsData?: Partial<GrowthCharacter>; // Google Sheets character data
   spreadsheetId?: string;
   lastSynced?: Date;
@@ -110,7 +112,7 @@ export class CharacterManager {
       character: {
         id: char.id,
         name: char.name,
-        ...char.json as any
+        ...(char.json as Record<string, unknown>)
       },
       spreadsheetId: char.spreadsheetId || undefined,
       lastSynced: char.updatedAt
@@ -120,7 +122,7 @@ export class CharacterManager {
   /**
    * Load characters from Google Sheets (campaign folder)
    */
-  private async loadSheetsCharacters(campaignId: string): Promise<CharacterSource[]> {
+  private async loadSheetsCharacters(_campaignId: string): Promise<CharacterSource[]> {
     // TODO: Implement Google Sheets character discovery
     // This would involve:
     // 1. Finding the campaign folder
@@ -154,7 +156,7 @@ export class CharacterManager {
 
         const characterData = {
           name: sheetChar.sheetsData.identity?.name || sheetChar.name,
-          json: sheetChar.sheetsData,
+          json: sheetChar.sheetsData as unknown as Prisma.InputJsonValue,
           spreadsheetId: sheetChar.spreadsheetId
         };
 
@@ -184,45 +186,15 @@ export class CharacterManager {
   /**
    * Generate sample characters for display when no real characters exist
    */
-  private generateSampleCharacters(campaignId: string): CharacterSource[] {
-    return [
-      {
-        id: 'sample-1',
-        name: 'Zara Nightwhisper',
-        source: 'database',
-        character: this.createSampleCharacter('Zara Nightwhisper', {
-          clout: 12, celerity: 14, constitution: 11,
-          flow: 13, frequency: 15, focus: 10,
-          willpower: 16, wisdom: 12, wit: 9
-        })
-      },
-      {
-        id: 'sample-2',
-        name: 'Marcus Ironheart',
-        source: 'database',
-        character: this.createSampleCharacter('Marcus Ironheart', {
-          clout: 16, celerity: 10, constitution: 14,
-          flow: 8, frequency: 12, focus: 13,
-          willpower: 11, wisdom: 10, wit: 14
-        })
-      },
-      {
-        id: 'sample-3',
-        name: 'Luna Starweaver',
-        source: 'database',
-        character: this.createSampleCharacter('Luna Starweaver', {
-          clout: 9, celerity: 13, constitution: 10,
-          flow: 16, frequency: 14, focus: 15,
-          willpower: 12, wisdom: 17, wit: 11
-        })
-      }
-    ];
+  private generateSampleCharacters(_campaignId: string): CharacterSource[] {
+    // No longer generating sample characters - return empty array
+    return [];
   }
 
   /**
    * Create a sample character with proper GROWTH structure
    */
-  private createSampleCharacter(name: string, attributes: Record<string, number>): any {
+  private createSampleCharacter(name: string, attributes: Record<string, number>): Record<string, unknown> {
     return {
       identity: { name },
       levels: {
@@ -356,7 +328,7 @@ export class CharacterManager {
             clout: 10, celerity: 10, constitution: 10,
             flow: 10, frequency: 10, focus: 10,
             willpower: 10, wisdom: 10, wit: 10
-          })
+          }) as unknown as Prisma.InputJsonValue
         }
       });
 
@@ -369,7 +341,7 @@ export class CharacterManager {
         character: {
           id: character.id,
           name: character.name,
-          ...character.json as any
+          ...(character.json as Record<string, unknown>)
         },
         spreadsheetId: character.spreadsheetId || undefined,
         lastSynced: character.updatedAt

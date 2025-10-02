@@ -7,7 +7,7 @@ export const GET = withAuth(async (session, request: NextRequest) => {
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get("limit") || "50");
     
-    const transactions = await KrmaService.getTransactionHistory((session as { user: { id: string } }).user.id, limit);
+    const transactions = await KrmaService.getTransactionHistory(session.id, limit);
     
     return NextResponse.json({ 
       transactions: transactions.map(tx => ({
@@ -41,10 +41,10 @@ export const POST = withAuth(async (session, request: NextRequest) => {
     let result;
     switch (type) {
       case 'DEPOSIT':
-        result = await KrmaService.deposit((session as { user: { id: string } }).user.id, krmaAmount, description, metadata);
+        result = await KrmaService.deposit(session.id, krmaAmount, description, metadata);
         break;
       case 'WITHDRAWAL':
-        result = await KrmaService.withdraw((session as { user: { id: string } }).user.id, krmaAmount, description, metadata);
+        result = await KrmaService.withdraw(session.id, krmaAmount, description, metadata);
         break;
       default:
         return NextResponse.json(

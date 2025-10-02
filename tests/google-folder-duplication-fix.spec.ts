@@ -45,7 +45,7 @@ test.describe('Google Drive Folder Duplication Fix', () => {
     console.log('✅ Campaign created without immediate folder creation');
   });
 
-  test('getOrCreateCampaignFolder should create folder only once', async ({ request }) => {
+  test('getOrCreateCampaignFolder should create folder only once', async ({ request: _request }) => {
     // This test would need to be implemented with proper authentication and mock Google API
     // For now, we're documenting the expected behavior
 

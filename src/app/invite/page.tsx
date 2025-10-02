@@ -47,7 +47,7 @@ function InvitePageContent() {
   }, [inviteToken]);
 
   const handleAcceptInvitation = async () => {
-    if (!session?.user?.id) {
+    if (!session) {
       // User needs to sign in first
       signIn('google');
       return;

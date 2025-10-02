@@ -18,7 +18,7 @@ export function transformCharacterData(character: Character): CharacterWithSourc
     campaignId: character.campaignId,
     name: character.name,
     playerEmail: character.playerEmail || undefined,
-    spreadsheetId: character.spreadsheetId,
+    spreadsheetId: character.spreadsheetId || '',
     revId: character.revId || undefined,
     updatedAt: character.updatedAt,
   };

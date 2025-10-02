@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import KRMALine from "@/components/ui/KRMALine";
@@ -19,7 +19,18 @@ interface Campaign {
 type TabType = 'relations' | 'forge' | 'essence';
 
 // Legacy sample nodes - DELETED to prevent fallback issues
-const legacySampleNodes: any[] = [];
+interface LegacyNode {
+  id: string;
+  type: 'character' | 'goal' | 'godhead' | 'npc' | 'quest' | 'location';
+  name: string;
+  krmaValue: number;
+  x: number;
+  y: number;
+  connections: string[];
+  color: string;
+}
+
+const legacySampleNodes: LegacyNode[] = [];
 
 const sampleConnections = [
   {
@@ -39,15 +50,28 @@ export default function CampaignPage() {
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({
+  // TODO: Implement field editing functionality - these will be used for inline editing
+  // const [editingField, setEditingField] = useState<string | null>(null);
+  const [_editValues, setEditValues] = useState({
     name: "",
     genre: "",
     themes: "",
     description: ""
   });
-  const [characters, setCharacters] = useState<any[]>([]);
+  interface CampaignCharacter {
+    id: string;
+    name: string;
+    source: string;
+    character?: Record<string, unknown>;
+    sheetsData?: Record<string, unknown>;
+    data?: { x?: number; y?: number };
+  }
+
+  const [characters, setCharacters] = useState<CampaignCharacter[]>([]);
   const [charactersLoading, setCharactersLoading] = useState(false);
+
+  // Debounce timer for position updates
+  const positionSaveTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Tab management
   const currentTab = (searchParams.get('tab') as TabType) || 'relations';
@@ -103,31 +127,52 @@ export default function CampaignPage() {
   }, [campaignId]);
 
   const handleCharacterPositionChange = useCallback(async (characterId: string, x: number, y: number) => {
-    try {
-      console.log(`🎯 Saving character ${characterId} position to (${x}, ${y})`);
-      const response = await fetch(`/api/characters/${characterId}/position`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({ x, y }),
-      });
-
-      if (response.ok) {
-        console.log(`✅ Character ${characterId} position saved successfully`);
-      } else {
-        console.error(`❌ Failed to save character ${characterId} position:`, response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error(`❌ Error saving character ${characterId} position:`, error);
+    // Skip saving for sample characters (they don't exist in database)
+    if (characterId.startsWith('sample-') || characterId.startsWith('char-fallback-')) {
+      console.log(`⚠️ Skipping save for sample character: ${characterId}`);
+      return;
     }
+
+    // Clear existing timer for this character
+    const existingTimer = positionSaveTimerRef.current.get(characterId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // Store position in state immediately for responsive UI
+    // Debounce the actual save to database
+    const timer = setTimeout(async () => {
+      try {
+        console.log(`🎯 Saving character ${characterId} position to (${x}, ${y})`);
+        const response = await fetch(`/api/characters/${characterId}/position`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ x, y }),
+        });
+
+        if (response.ok) {
+          console.log(`✅ Character ${characterId} position saved successfully`);
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ Failed to save character ${characterId} position:`, response.status, errorText);
+        }
+      } catch (error) {
+        console.error(`❌ Error saving character ${characterId} position:`, error);
+      } finally {
+        positionSaveTimerRef.current.delete(characterId);
+      }
+    }, 500); // 500ms debounce
+
+    positionSaveTimerRef.current.set(characterId, timer);
   }, []);
 
   useEffect(() => {
     fetchCampaign();
     fetchCharacters();
-  }, [campaignId]); // Only depend on campaignId, not the functions themselves
+  }, [fetchCampaign, fetchCharacters]);
 
   // Transform character data for KRMA Line - memoized to prevent position resets
   const transformCharactersToNodes = useMemo(() => {
@@ -136,14 +181,14 @@ export default function CampaignPage() {
 
     const transformedNodes = characters.map((char, index) => {
       console.log('🔍 Processing character:', { charId: char.id, index, char });
-      const character = char.source === 'sheets' ? char.sheetsData : char.character;
+      const character = (char.source === 'sheets' ? char.sheetsData : char.character) as Record<string, unknown> | undefined;
 
       // Extract the actual character ID from the data structure
       // Priority: char.character.id (database), character.id (sheets), char.id (wrapper), fallback
-      const characterId = char.character?.id || character?.id || char.id || `char-fallback-${index}`;
+      const characterId = (char.character?.id || ((character as Record<string, unknown>)?.id as string) || char.id || `char-fallback-${index}`) as string;
       console.log('🆔 Character ID extraction debug:', {
         'char.character?.id': char.character?.id,
-        'character?.id': character?.id,
+        'character?.id': (character as Record<string, unknown>)?.id,
         'char.id': char.id,
         'final characterId': characterId,
         'char source': char.source
@@ -200,51 +245,47 @@ export default function CampaignPage() {
       }
 
       // Extract position with fallback logic
-      // Check all possible sources: char.character (db), character.data (fallback), character (processed data)
-      let characterX = char.character?.x ?? char.data?.x ?? character?.x ?? 0;
-      let characterY = char.character?.y ?? char.data?.y ?? character?.y ?? 0;
+      // Position is stored in json.position.x/y, not at root level
+      const charData = character as Record<string, unknown>;
+      const position = (charData?.position as { x?: number; y?: number }) || { x: 0, y: 0 };
+      const characterX = position.x ?? 0;
+      const characterY = position.y ?? 0;
 
       // Debug position extraction
       console.log('🎯 Position extraction for', characterId, ':', {
-        'char.character?.x': char.character?.x,
-        'char.character?.y': char.character?.y,
-        'char.data?.x': char.data?.x,
-        'char.data?.y': char.data?.y,
-        'character?.x': character?.x,
-        'character?.y': character?.y,
+        'position object': position,
         'final x': characterX,
         'final y': characterY,
-        'char structure': Object.keys(char),
         'character structure': character ? Object.keys(character) : 'null'
       });
 
       const transformedChar = {
         id: characterId,
         type: 'character' as const,
-        name: character?.identity?.name || character?.name || 'Unnamed Character',
+        name: (charData?.identity as Record<string, unknown>)?.name as string ||(charData?.name as string) || 'Unnamed Character',
         krmaValue: 0,
         x: characterX,
         y: characterY,
         connections: [], // TODO: Add relationship connections
         color: '#00FF7F',
         details: {
-          resistance: character?.attributes?.constitution?.current || 0,
-          opportunity: character?.attributes?.clout?.current || 0,
+          resistance: ((charData?.attributes as Record<string, unknown>)?.constitution as Record<string, unknown>)?.current as number || 0,
+          opportunity: ((charData?.attributes as Record<string, unknown>)?.clout as Record<string, unknown>)?.current as number || 0,
           status: char.source === 'sheets' ? 'Sheet Synced' : 'Database'
         },
         characterDetails: {
           playerEmail: '',
-          characterImage: character?.image || '',
+          characterImage: (charData?.image as string) || '',
           // Map GROWTH data to the interface
           identity: {
-            name: character?.identity?.name || character?.name || 'Unnamed Character'
+            name: (charData?.identity as Record<string, unknown>)?.name as string || (charData?.name as string) || 'Unnamed Character'
           },
           levels: {
-            healthLevel: character?.levels?.healthLevel || 1,
-            wealthLevel: character?.levels?.wealthLevel || 1,
-            techLevel: character?.levels?.techLevel || 1
+            healthLevel: ((charData?.levels as Record<string, unknown>)?.healthLevel as number) || 1,
+            wealthLevel: ((charData?.levels as Record<string, unknown>)?.wealthLevel as number) || 1,
+            techLevel: ((charData?.levels as Record<string, unknown>)?.techLevel as number) || 1
           },
-          conditions: character?.conditions || {
+          conditions: charData?.conditions || {
             weak: false,
             clumsy: false,
             exhausted: false,
@@ -255,7 +296,7 @@ export default function CampaignPage() {
             confused: false,
             incoherent: false
           },
-          attributes: character?.attributes || {
+          attributes: charData?.attributes || {
             clout: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },
             celerity: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },
             constitution: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },
@@ -266,21 +307,21 @@ export default function CampaignPage() {
             wisdom: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },
             wit: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 }
           },
-          creation: character?.creation || {
+          creation: charData?.creation || {
             seed: { baseFateDie: 'd6' }
           },
-          skills: character?.skills || { skills: [] },
-          magic: character?.magic || { mercy: { schools: [], knownSpells: [] }, severity: { schools: [], knownSpells: [] }, balance: { schools: [], knownSpells: [] } },
-          nectars: character?.nectars || { combat: [], learning: [], magic: [], social: [], utility: [], supernatural: [], supertech: [], negative: [], natural: [] },
-          vitals: character?.vitals || {
+          skills: charData?.skills || { skills: [] },
+          magic: charData?.magic || { mercy: { schools: [], knownSpells: [] }, severity: { schools: [], knownSpells: [] }, balance: { schools: [], knownSpells: [] } },
+          nectars: charData?.nectars || { combat: [], learning: [], magic: [], social: [], utility: [], supernatural: [], supertech: [], negative: [], natural: [] },
+          vitals: charData?.vitals || {
             bodyParts: { HEAD: 0, NECK: 0, TORSO: 0, RIGHTARM: 0, LEFTARM: 0, RIGHTUPPERLEG: 0, LEFTUPPERLEG: 0, RIGHTLOWERLEG: 0, LEFTLOWERLEG: 0 },
             baseResist: 10,
             restRate: 1,
             carryLevel: 2,
             weightStatus: 'Fine'
           },
-          inventory: character?.inventory || { weight: 0, items: [] },
-          notes: character?.notes || ''
+          inventory: charData?.inventory || { weight: 0, items: [] },
+          notes: charData?.notes || ''
         }
       };
 

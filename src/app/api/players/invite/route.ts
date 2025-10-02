@@ -15,7 +15,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
     }
 
     // SECURITY: Only allow mikekan13@gmail.com to send invitations during testing
-    if (session.user.email !== 'mikekan13@gmail.com') {
+    if (session.email !== 'mikekan13@gmail.com') {
       return NextResponse.json(
         { error: "Player invitations are currently restricted to authorized users only" },
         { status: 403 }
@@ -23,12 +23,12 @@ export const POST = withAuth(async (session, request: NextRequest) => {
     }
 
     console.log('🎲 Starting Gmail-powered player invitation...');
-    console.log('📧 From:', session.user.email);
+    console.log('📧 From:', session.email);
     console.log('📧 To:', playerEmail);
 
     // Get GM profile
     const gmProfile = await prisma.gMProfile.findUnique({
-      where: { userId: (session as { user: { id: string } }).user.id },
+      where: { userId: session.id },
       include: { user: true }
     });
 

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionUser } from "@/lib/sessionManager";
 import { prisma } from "@/lib/prisma";
-import { google } from "googleapis";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getSessionUser();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -28,7 +26,7 @@ export async function POST(request: NextRequest) {
       // Find user's most recent campaign or create a default one
       const recentCampaign = await prisma.campaign.findFirst({
         where: {
-          gmUserId: session.user.id,
+          gmUserId: user.id,
         },
         orderBy: {
           updatedAt: 'desc'
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
           data: {
             name: "My Campaign",
             description: "Default campaign for character creation",
-            gmUserId: session.user.id,
+            gmUserId: user.id,
           }
         });
         targetCampaignId = newCampaign.id;
@@ -62,78 +60,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (campaign.gmUserId !== session.user.id) {
+    if (campaign.gmUserId !== user.id) {
       return NextResponse.json(
         { error: "Access denied to campaign" },
         { status: 403 }
       );
     }
 
-    // Create Google Sheet from template using the working copySpreadsheet function
-    const templateId = process.env.CHARACTER_TEMPLATE_ID;
+    // Create initial character data structure
+    const initialCharacterData = {
+      name: characterName.trim(),
+      attributes: {
+        body: { value: 10, max: 10 },
+        mind: { value: 10, max: 10 },
+        soul: { value: 10, max: 10 },
+        sight: { value: 10, max: 10 },
+        sound: { value: 10, max: 10 },
+        scent: { value: 10, max: 10 },
+        taste: { value: 10, max: 10 },
+        touch: { value: 10, max: 10 },
+        sixth: { value: 10, max: 10 }
+      },
+      skills: [],
+      abilities: [],
+      items: [],
+      background: "",
+      notes: ""
+    };
 
-    if (!templateId) {
-      throw new Error("CHARACTER_TEMPLATE_ID environment variable is required");
-    }
-
-    console.log(`🔄 Copying template: ${templateId}`);
-
-    // Get or create campaign folder and characters subfolder
-    let parentFolderId = null;
-    try {
-      const { getOrCreateCampaignFolder, createFolder, listFolderContents } = await import("@/services/google");
-      const campaignFolder = await getOrCreateCampaignFolder(targetCampaignId, campaign.name);
-      console.log(`📁 Found campaign folder: ${campaignFolder.id}`);
-
-      // Check if "characters" subfolder exists
-      console.log(`📁 Looking for characters subfolder in campaign folder: ${campaignFolder.id}`);
-      const folderContents = await listFolderContents(campaignFolder.id);
-      console.log(`📁 Found ${folderContents.length} items in campaign folder:`, folderContents.map(f => `${f.name} (${f.mimeType})`));
-
-      const existingCharactersFolder = folderContents.find(
-        file => file.name === "characters" && file.mimeType === "application/vnd.google-apps.folder"
-      );
-
-      if (existingCharactersFolder) {
-        console.log(`📁 Found existing characters folder: ${existingCharactersFolder.id}`);
-        parentFolderId = existingCharactersFolder.id;
-      } else {
-        // Create characters subfolder
-        console.log(`📁 No existing characters folder found, creating new one...`);
-        const charactersFolder = await createFolder("characters", campaignFolder.id);
-        console.log(`📁 Created characters folder: ${charactersFolder.id}`);
-        parentFolderId = charactersFolder.id;
-      }
-    } catch (folderError) {
-      console.log(`⚠️ Could not create characters folder:`, folderError);
-    }
-
-    // Use the working copySpreadsheet function from services/google.ts
-    const { copySpreadsheet } = await import("@/services/google");
-    const copiedSheet = await copySpreadsheet(
-      templateId,
-      `${characterName.trim()} - Character Sheet`,
-      parentFolderId || undefined
-    );
-
-    console.log(`✅ Template copied successfully: ${copiedSheet.id}`);
-
-    if (!copiedSheet.id) {
-      throw new Error("Failed to copy template spreadsheet");
-    }
-
-    const spreadsheetId = copiedSheet.id;
-    console.log(`✅ Successfully copied template to: ${spreadsheetId}`);
-
-    // Create the character in the database
+    // Create the character in the database (without Google Sheets)
     const character = await prisma.character.create({
       data: {
         name: characterName.trim(),
         campaignId: targetCampaignId,
-        spreadsheetId,
-        playerEmail: session.user.email || null,
-        json: {}, // Empty JSON object for character data
-        revId: null, // Will be set when sheet is first synced
+        spreadsheetId: null, // No spreadsheet by default
+        playerEmail: user.email || null,
+        json: initialCharacterData,
+        revId: null,
       },
     });
 
@@ -145,8 +108,7 @@ export async function POST(request: NextRequest) {
         id: character.id,
         name: character.name,
         campaignId: character.campaignId,
-        spreadsheetId: character.spreadsheetId,
-        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${character.spreadsheetId}/edit`,
+        json: character.json,
       },
       campaign: {
         id: campaign.id,

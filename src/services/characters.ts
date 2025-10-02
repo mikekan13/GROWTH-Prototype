@@ -80,29 +80,37 @@ export async function createOrUpdateCharacter(
     // Extract character name from parsed data
     const characterName = parsingResult.data.identity.name || "Unknown Character";
     
+    // Try to find existing character by spreadsheetId
+    const existingCharacter = spreadsheetId
+      ? await prisma.character.findFirst({
+          where: {
+            campaignId,
+            spreadsheetId,
+          },
+        })
+      : null;
+
     // Create or update character record
-    const character = await prisma.character.upsert({
-      where: {
-        campaignId_spreadsheetId: {
-          campaignId,
-          spreadsheetId,
-        },
-      },
-      create: {
-        campaignId,
-        name: characterName,
-        playerEmail,
-        spreadsheetId,
-        json: JSON.parse(JSON.stringify(parsingResult.data)),
-        revId: metadata.version,
-      },
-      update: {
-        name: characterName,
-        json: JSON.parse(JSON.stringify(parsingResult.data)),
-        revId: metadata.version,
-        ...(playerEmail && { playerEmail }),
-      },
-    });
+    const character = existingCharacter
+      ? await prisma.character.update({
+          where: { id: existingCharacter.id },
+          data: {
+            name: characterName,
+            json: JSON.parse(JSON.stringify(parsingResult.data)),
+            revId: metadata.version,
+            ...(playerEmail && { playerEmail }),
+          },
+        })
+      : await prisma.character.create({
+          data: {
+            campaignId,
+            name: characterName,
+            playerEmail,
+            spreadsheetId,
+            json: JSON.parse(JSON.stringify(parsingResult.data)),
+            revId: metadata.version,
+          },
+        });
 
     return transformCharacterData({
       ...character,
@@ -156,6 +164,7 @@ export async function listCampaignCharacters(campaignId: string, validateSheets:
       const syncResult = await syncCharacterSheet({
         ...character,
         playerEmail: character.playerEmail || undefined,
+        spreadsheetId: character.spreadsheetId || '',
         json: character.json as Record<string, unknown> || {}
       }, {
         createIfMissing: true,
@@ -191,7 +200,7 @@ export async function listCampaignCharacters(campaignId: string, validateSheets:
             decisionMap[decision.key] = decision.value;
           });
           
-          const parsingResult = await parseCharacterSheet(updatedCharacter.spreadsheetId, decisionMap);
+          const parsingResult = await parseCharacterSheet(updatedCharacter.spreadsheetId || '', decisionMap);
           
           // Update the character with fresh data from the sheet
           const updatedCharacterWithData = await prisma.character.update({
@@ -238,7 +247,7 @@ export async function refreshCharacter(id: string): Promise<CharacterWithSources
 
   return createOrUpdateCharacter(
     character.campaignId,
-    character.spreadsheetId,
+    character.spreadsheetId || '',
     character.playerEmail || undefined
   );
 }

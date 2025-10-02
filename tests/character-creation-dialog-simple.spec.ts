@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('Character Creation Dialog - Design Analysis', () => {
   test('should navigate to campaigns and find tools card without authentication', async ({ page }) => {
@@ -76,7 +76,7 @@ test.describe('Character Creation Dialog - Design Analysis', () => {
     console.log('Theme Information:', JSON.stringify(themeInfo, null, 2));
 
     // Check for any teal/green color scheme usage
-    const tealPatterns = Object.entries(themeInfo.cssVariables).filter(([key, value]) =>
+    const tealPatterns = Object.entries(themeInfo.cssVariables).filter(([_key, value]) =>
       value.includes('teal') || value.includes('#22ab94') || value.includes('#1e9b82') ||
       value.includes('22, 171, 148') || value.includes('green')
     );

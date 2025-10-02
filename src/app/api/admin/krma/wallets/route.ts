@@ -6,7 +6,7 @@ import { KrmaTokenomics } from "@/lib/krmaTokenomics";
 export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
     // Admin access only for mikekan13@gmail.com (case-insensitive)
-    if ((session as { user: { email: string } }).user?.email?.toLowerCase() !== "mikekan13@gmail.com") {
+    if (session.email?.toLowerCase() !== "mikekan13@gmail.com") {
       return NextResponse.json(
         { error: "Unauthorized - Admin access required" },
         { status: 403 }

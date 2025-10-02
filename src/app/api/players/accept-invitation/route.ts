@@ -15,7 +15,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
 
     await PlayerInvitationService.acceptInvitation({
       inviteToken,
-      userId: (session as { user: { id: string } }).user.id
+      userId: session.id
     });
 
     return NextResponse.json({

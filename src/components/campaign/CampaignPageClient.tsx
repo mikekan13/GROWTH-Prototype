@@ -16,10 +16,35 @@ interface Campaign {
   updatedAt: string;
 }
 
+interface CampaignCharacter {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
 type TabType = 'relations' | 'forge' | 'essence';
 
-const legacySampleNodes: any[] = [];
-const sampleConnections: any[] = [];
+interface LegacyNode {
+  id: string;
+  type: 'character' | 'goal' | 'godhead' | 'npc' | 'quest' | 'location';
+  name: string;
+  krmaValue: number;
+  x: number;
+  y: number;
+  connections: string[];
+  color: string;
+}
+
+interface Connection {
+  from: string;
+  to: string;
+  type: 'goal' | 'resistance' | 'opportunity' | 'alliance' | 'conflict';
+  krmaFlow: number;
+  strength: number;
+}
+
+const legacySampleNodes: LegacyNode[] = [];
+const sampleConnections: Connection[] = [];
 
 export default function CampaignPageClient() {
   console.log('🚀 CLIENT COMPONENT LOADED - NO SSR');
@@ -40,7 +65,7 @@ export default function CampaignPageClient() {
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
-  const [characters, setCharacters] = useState<any[]>([]);
+  const [characters, setCharacters] = useState<CampaignCharacter[]>([]);
   const [charactersLoading, setCharactersLoading] = useState(false);
   const [charactersFetched, setCharactersFetched] = useState(false);
 
@@ -99,9 +124,16 @@ export default function CampaignPageClient() {
 
           const loadedCharacters = data.characters || [];
 
+          interface LoadedCharacter {
+            id: string;
+            name: string;
+            source: string;
+            character?: { id: string; name: string };
+          }
+
           console.log('✅ Character fetch successful:', {
             totalCharacters: loadedCharacters.length,
-            characters: loadedCharacters.map((c: any) => ({
+            characters: (loadedCharacters as LoadedCharacter[]).map((c) => ({
               id: c.character?.id || c.id,
               name: c.character?.name || c.name,
               source: c.source,
@@ -141,46 +173,53 @@ export default function CampaignPageClient() {
     }
 
     return characters.map((char, index) => {
-      const character = char.source === 'sheets' ? char.sheetsData : char.character;
+      const character = (char.source === 'sheets' ? char.sheetsData : char.character) as Record<string, unknown> | undefined;
 
       console.log('🔍 Processing character:', {
         index,
         charId: char.id,
         source: char.source,
         hasCharacterData: !!character,
-        characterName: character?.name || character?.identity?.name || 'No name'
+        characterName: (character as Record<string, unknown>)?.name || ((character as Record<string, unknown>)?.identity as Record<string, unknown>)?.name || 'No name'
       });
+
+      const charData = character as Record<string, unknown>;
+
+      // Read saved position from character.json.position, or use calculated default
+      const savedPosition = charData?.position as { x?: number; y?: number } | undefined;
+      const defaultX = 100 + (index * 200);
+      const defaultY = 200 + (index * 100);
 
       const transformedCharacter = {
         id: char.id || `char-${index}`,
         type: 'character' as const,
-        name: character?.identity?.name || character?.name || char.name || 'Unnamed Character',
+        name: ((charData?.identity as Record<string, unknown>)?.name as string) || (charData?.name as string) || char.name || 'Unnamed Character',
         krmaValue: 0,
-        x: 100 + (index * 200),
-        y: character?.y || 200 + (index * 100),
+        x: savedPosition?.x ?? defaultX,
+        y: savedPosition?.y ?? defaultY,
         connections: [],
         color: '#00FF7F',
         details: {
-          resistance: character?.attributes?.constitution?.current || 0,
-          opportunity: character?.attributes?.clout?.current || 0,
+          resistance: (((charData?.attributes as Record<string, unknown>)?.constitution as Record<string, unknown>)?.current as number) || 0,
+          opportunity: (((charData?.attributes as Record<string, unknown>)?.clout as Record<string, unknown>)?.current as number) || 0,
           status: char.source === 'sheets' ? 'Sheet Synced' : 'Database'
         },
         characterDetails: {
           playerEmail: '',
-          characterImage: character?.image || '',
+          characterImage: (charData?.image as string) || '',
           identity: {
-            name: character?.identity?.name || character?.name || char.name || 'Unnamed Character'
+            name: ((charData?.identity as Record<string, unknown>)?.name as string) || (charData?.name as string) || char.name || 'Unnamed Character'
           },
           levels: {
-            healthLevel: character?.levels?.healthLevel || 1,
-            wealthLevel: character?.levels?.wealthLevel || 1,
-            techLevel: character?.levels?.techLevel || 1
+            healthLevel: ((charData?.levels as Record<string, unknown>)?.healthLevel as number) || 1,
+            wealthLevel: ((charData?.levels as Record<string, unknown>)?.wealthLevel as number) || 1,
+            techLevel: ((charData?.levels as Record<string, unknown>)?.techLevel as number) || 1
           },
-          conditions: character?.conditions || {
+          conditions: charData?.conditions || {
             weak: false, clumsy: false, exhausted: false, muted: false, deathsDoor: false,
             deafened: false, overwhelmed: false, confused: false, incoherent: false
           },
-          attributes: character?.attributes || {
+          attributes: charData?.attributes || {
             clout: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },
             celerity: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },
             constitution: { current: 10, level: 10, modifier: 0, augmentPositive: 0, augmentNegative: 0 },

@@ -174,7 +174,7 @@ export class TestHelpers {
     return storage;
   }
 
-  static async mockApiResponse(page: Page, url: string, response: any) {
+  static async mockApiResponse(page: Page, url: string, response: unknown) {
     await page.route(url, async (route) => {
       await route.fulfill({
         status: 200,

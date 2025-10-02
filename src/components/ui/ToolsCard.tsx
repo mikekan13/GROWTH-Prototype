@@ -97,18 +97,19 @@ export function ToolsCard({ campaignId, onCreateCharacter, className = "" }: Too
     }
   };
 
-  const formatKrmaValue = (value: string | undefined) => {
-    if (!value || value === '') {
-      return '0';
-    }
-    try {
-      const num = BigInt(value);
-      return num.toLocaleString();
-    } catch (error) {
-      console.warn('Failed to format KRMA value:', value, error);
-      return '0';
-    }
-  };
+  // TODO: This function may be used for displaying KRMA values in the future
+  // const formatKrmaValue = (value: string | undefined) => {
+  //   if (!value || value === '') {
+  //     return '0';
+  //   }
+  //   try {
+  //     const num = BigInt(value);
+  //     return num.toLocaleString();
+  //   } catch (error) {
+  //     console.warn('Failed to format KRMA value:', value, error);
+  //     return '0';
+  //   }
+  // };
 
   return (
     <>

@@ -8,7 +8,8 @@ export default function GmailSetupPage() {
   const [diagnostics, setDiagnostics] = useState<{
     success: boolean;
     message: string;
-    steps?: { message: string; success: boolean }[];
+    steps?: { message: string; success: boolean; status: string; step: number; name: string; details: string | Record<string, unknown> }[];
+    summary?: { overall: string; recommendation: string };
   } | null>(null);
   const [testing, setTesting] = useState(false);
 
@@ -86,7 +87,7 @@ export default function GmailSetupPage() {
               <div className="bg-gray-800 p-6 rounded">
                 <h2 className="text-xl font-bold mb-4">📊 Diagnostic Results</h2>
                 <div className="space-y-4">
-                  {diagnostics.steps?.map((step: { message: string; success: boolean }, index: number) => (
+                  {diagnostics.steps?.map((step: { message: string; success: boolean; status: string; step: number; name: string; details: string | Record<string, unknown> }, index: number) => (
                     <div
                       key={index}
                       className={`p-4 rounded ${

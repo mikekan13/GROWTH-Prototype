@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionUser } from "@/lib/sessionManager";
 import { prisma } from "@/lib/prisma";
 
 type UserRole = "ADMIN" | "WATCHER" | "TRAILBLAZER" | "GODHEAD";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getSessionUser();
 
     // Only allow your account to use this dev feature
-    if (!session?.user?.email || session.user.email !== "mikekan13@gmail.com") {
+    if (!user?.email || user.email !== "mikekan13@gmail.com") {
       return NextResponse.json(
         { error: "Unauthorized - Dev feature only" },
         { status: 403 }
@@ -28,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Update user role in database
     await prisma.user.update({

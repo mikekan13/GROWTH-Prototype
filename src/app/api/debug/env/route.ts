@@ -3,7 +3,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   return NextResponse.json({
     NODE_ENV: process.env.NODE_ENV,
     allEnvKeys: Object.keys(process.env).filter(key =>

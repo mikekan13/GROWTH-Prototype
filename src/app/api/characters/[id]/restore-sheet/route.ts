@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionUser } from "@/lib/sessionManager";
 import { prisma } from "@/lib/prisma";
 import { copySpreadsheet, shareSpreadsheet, getOrCreateCampaignFolder } from "@/services/google";
 
@@ -9,9 +8,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await getSessionUser();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -48,7 +47,7 @@ export async function POST(
           character.Campaign.id,
           character.Campaign.name
         );
-        targetFolderId = campaignFolder.id;
+        targetFolderId = campaignFolder.id ?? null;
       } catch (error) {
         console.warn("Failed to get campaign folder:", error);
       }
@@ -58,7 +57,7 @@ export async function POST(
     const newSpreadsheet = await copySpreadsheet(
       templateId,
       `${character.name} - Character Sheet (Restored)`,
-      targetFolderId
+      targetFolderId || undefined
     );
 
     if (!newSpreadsheet.id) {

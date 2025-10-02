@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
     // Admin access only for Mikekan13@gmail.com
-    if ((session as { user: { email: string } }).user?.email !== "Mikekan13@gmail.com") {
+    if (session.email !== "Mikekan13@gmail.com") {
       return NextResponse.json(
         { error: "Unauthorized - Admin access required" },
         { status: 403 }
@@ -23,7 +23,6 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
         krmaBalance: true,
         _count: {
           select: {
-            accounts: true,
             sessions: true,
           }
         }

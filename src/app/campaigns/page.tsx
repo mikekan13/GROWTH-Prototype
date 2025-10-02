@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -22,8 +21,8 @@ interface Campaign {
 }
 
 export default function CampaignsPage() {
-  const { data: session } = useSession();
   const router = useRouter();
+  const [session, setSession] = useState<{ user?: { id: string; name?: string; email: string; role: string } } | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -57,24 +56,48 @@ export default function CampaignsPage() {
     }
   };
 
-  const fetchUserRole = useCallback(async () => {
-    if (session?.user) {
-      const userRole = (session.user as { role?: string })?.role || "WATCHER";
-      setUserRole(userRole);
-
-      // Redirect non-GMs to trailblazer interface
-      if (userRole !== "WATCHER") {
-        router.push("/trailblazer");
-        return;
-      }
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/');
+    } catch (error) {
+      console.error("Logout error:", error);
+      router.push('/');
     }
-  }, [session, router]);
+  };
+
+  const fetchSession = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/session');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user) {
+          setSession(data);
+          const role = data.user.role || "WATCHER";
+          setUserRole(role);
+
+          // Redirect non-GMs to trailblazer interface
+          if (role !== "WATCHER" && role !== "ADMIN") {
+            router.push("/trailblazer");
+            return;
+          }
+        } else {
+          router.push("/login");
+        }
+      } else {
+        router.push("/login");
+      }
+    } catch (error) {
+      console.error("Failed to fetch session:", error);
+      router.push("/login");
+    }
+  }, [router]);
 
   useEffect(() => {
+    fetchSession();
     fetchCampaigns();
     fetchKrmaBalance();
-    fetchUserRole();
-  }, [session, fetchUserRole]);
+  }, [fetchSession]);
 
   const fetchPlayers = async () => {
     if (userRole !== "WATCHER") return;
@@ -278,18 +301,14 @@ export default function CampaignsPage() {
               >
                 Settings
               </Link>
-              <Link
-                href="/admin"
-                className="text-sm text-white hover:text-growth-accent-light transition-colors"
-              >
-                Admin
-              </Link>
-              <Link
-                href="/queues/decisions"
-                className="text-sm text-white hover:text-growth-accent-light transition-colors"
-              >
-                Decision Queue
-              </Link>
+              {userRole === "ADMIN" && (
+                <Link
+                  href="/admin"
+                  className="text-sm text-white hover:text-growth-accent-light transition-colors"
+                >
+                  Admin
+                </Link>
+              )}
               {userRole === "WATCHER" && (
                 <button
                   onClick={() => {
@@ -302,13 +321,7 @@ export default function CampaignsPage() {
                 </button>
               )}
               <button
-                onClick={() => setShowCreateForm(true)}
-                className="btn-growth-primary"
-              >
-                New Campaign
-              </button>
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={handleLogout}
                 className="text-sm text-white hover:text-growth-error px-3 py-2 border border-white border-opacity-30 rounded-md hover:bg-white hover:bg-opacity-10 transition-all"
               >
                 Sign Out
@@ -572,11 +585,11 @@ export default function CampaignsPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => removePlayer(player.user.id, player.user.name || player.user.email)}
-                        disabled={removingPlayer === player.user.id}
+                        onClick={() => removePlayer(player.id, player.user.name || player.user.email)}
+                        disabled={removingPlayer === player.id}
                         className="text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded disabled:opacity-50"
                       >
-                        {removingPlayer === player.user.id ? "Removing..." : "Remove"}
+                        {removingPlayer === player.id ? "Removing..." : "Remove"}
                       </button>
                     </div>
                   ))}

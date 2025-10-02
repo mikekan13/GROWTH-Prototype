@@ -8,10 +8,10 @@ export const GET = withAuth(async (session, request: NextRequest, { params }: { 
     const { id: campaignId } = await params;
     
     // Get detailed budget validation
-    const validation = await KrmaBudgetManager.validateCampaignBudget(campaignId, (session as { user: { id: string } }).user.id);
+    const validation = await KrmaBudgetManager.validateCampaignBudget(campaignId, session.id);
     
     // Get summary for UI display
-    const summary = await KrmaBudgetManager.getCampaignBudgetSummary(campaignId, (session as { user: { id: string } }).user.id);
+    const summary = await KrmaBudgetManager.getCampaignBudgetSummary(campaignId, session.id);
     
     return NextResponse.json({
       validation: {
@@ -54,7 +54,7 @@ export const POST = withAuth(async (session, request: NextRequest, { params }: {
       const validation = await KrmaBudgetManager.validateCharacterCreation(
         campaignId,
         characterData,
-        (session as { user: { id: string } }).user.id
+        session.id
       );
       
       return NextResponse.json({
@@ -69,7 +69,7 @@ export const POST = withAuth(async (session, request: NextRequest, { params }: {
       const { strategy } = await request.json();
       const healing = await KrmaBudgetManager.autoHealBudgetViolations(
         campaignId,
-        (session as { user: { id: string } }).user.id,
+        session.id,
         strategy || 'proportional'
       );
       

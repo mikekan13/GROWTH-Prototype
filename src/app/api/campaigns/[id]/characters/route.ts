@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOrUpdateCharacter, listCampaignCharacters } from "@/services/characters";
 import { withAuth, validateRequired, createApiError, API_ERRORS } from "@/lib/apiHelpers";
-import { CharacterFallbackService } from "@/services/characterFallback";
 import { characterManager } from "@/services/characterManager";
 
 export const GET = withAuth(async (
@@ -16,8 +15,9 @@ export const GET = withAuth(async (
   const useFallback = url.searchParams.get('useFallback') === 'true';
   const preferSheets = url.searchParams.get('preferSheets') === 'true';
   const autoSync = url.searchParams.get('autoSync') !== 'false'; // Default true
-  const createMissingSheets = url.searchParams.get('createMissingSheets') !== 'false'; // Default true
-  const fallbackOnError = url.searchParams.get('fallbackOnError') !== 'false'; // Default true
+  // TODO: These parameters may be used in future fallback logic
+  // const createMissingSheets = url.searchParams.get('createMissingSheets') !== 'false'; // Default true
+  // const fallbackOnError = url.searchParams.get('fallbackOnError') !== 'false'; // Default true
 
   if (useFallback) {
     console.log(`🔄 Using character manager for campaign ${id} characters`);

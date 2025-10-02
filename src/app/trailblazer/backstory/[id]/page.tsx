@@ -591,7 +591,7 @@ export default function BackstoryPage() {
                 <textarea
                   name="narrativeBackstory"
                   value={formData.narrativeBackstory || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handleInputChange("narrativeBackstory", e.target.value)}
                   className="growth-input"
                   rows={12}
                   placeholder="Write your character's complete backstory here, or use the AI generator above to create one based on your details..."

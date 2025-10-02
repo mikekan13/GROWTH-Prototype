@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 
 interface NamedRange {
@@ -16,7 +16,7 @@ interface NamedRange {
     startColumnLetter?: string;
     endColumnLetter?: string;
   };
-  rawRange: any;
+  rawRange: unknown;
 }
 
 interface NamedRangesResponse {

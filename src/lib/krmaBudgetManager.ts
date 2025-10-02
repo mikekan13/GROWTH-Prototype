@@ -42,7 +42,7 @@ export class KrmaBudgetManager {
     const gmWallet = await prisma.wallet.findUnique({
       where: {
         ownerType_ownerRef: {
-          ownerType: "GM",
+          ownerType: "WATCHER",
           ownerRef: gmUserId
         }
       }

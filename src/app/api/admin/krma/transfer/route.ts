@@ -13,7 +13,7 @@ interface TransferRequest {
 export const POST = withAuth(async (session, request: NextRequest) => {
   try {
     // Admin access only for Mikekan13@gmail.com
-    if ((session as { user: { email: string } }).user?.email !== "Mikekan13@gmail.com") {
+    if (session.email !== "Mikekan13@gmail.com") {
       return NextResponse.json(
         { error: "Unauthorized - Admin access required" },
         { status: 403 }
@@ -97,7 +97,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
 
       // Log the transaction for audit trail (using admin user ID)
       const adminUser = await tx.user.findUnique({
-        where: { email: (session as { user: { email: string } }).user.email },
+        where: { email: session.email },
         select: { id: true }
       });
 
@@ -121,7 +121,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
                 ownerRef: toWallet.ownerRef
               },
               transferType,
-              adminEmail: (session as { user: { email: string } }).user.email
+              adminEmail: session.email
             }
           }
         });

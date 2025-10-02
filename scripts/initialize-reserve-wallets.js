@@ -3,59 +3,40 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function initializeReserveWallets() {
-  console.log('🏦 Initializing KRMA Reserve Wallets...');
+  console.log('🏦 Initializing KRMA Reserve Wallet - The Terminal...');
 
   try {
-    // Create reserve wallets with proper amounts
-    const reserves = [
-      {
-        ownerType: 'TERMINAL',
-        ownerRef: 'TERMINAL',
-        liquid: BigInt(50000000), // 50M KRMA
-        crystalized: BigInt(0),
-      },
-      {
-        ownerType: 'TERMINAL',
-        ownerRef: 'MERCY',
-        liquid: BigInt(20000000), // 20M KRMA
-        crystalized: BigInt(0),
-      },
-      {
-        ownerType: 'TERMINAL',
-        ownerRef: 'BALANCE',
-        liquid: BigInt(20000000), // 20M KRMA
-        crystalized: BigInt(0),
-      },
-      {
-        ownerType: 'TERMINAL',
-        ownerRef: 'SEVERITY',
-        liquid: BigInt(10000000), // 10M KRMA
-        crystalized: BigInt(0),
-      }
-    ];
+    // Create The Terminal reserve wallet with all 100 billion KRMA
+    const terminalReserve = {
+      ownerType: 'TERMINAL',
+      ownerRef: 'The Terminal',
+      liquid: BigInt(100000000000), // 100B KRMA (100 billion - total supply)
+      crystalized: BigInt(0),
+    };
 
-    for (const reserve of reserves) {
-      // Check if wallet already exists
-      const existing = await prisma.wallet.findFirst({
-        where: {
-          ownerType: reserve.ownerType,
-          ownerRef: reserve.ownerRef,
-        },
+    // Check if wallet already exists
+    const existing = await prisma.wallet.findFirst({
+      where: {
+        ownerType: terminalReserve.ownerType,
+        ownerRef: terminalReserve.ownerRef,
+      },
+    });
+
+    if (existing) {
+      console.log(`💰 The Terminal wallet already exists with ${existing.liquid.toLocaleString()} KRMA`);
+      console.log(`   Crystalized: ${existing.crystalized.toLocaleString()} KRMA`);
+      console.log(`   Total: ${(existing.liquid + existing.crystalized).toLocaleString()} KRMA`);
+    } else {
+      await prisma.wallet.create({
+        data: terminalReserve,
       });
-
-      if (existing) {
-        console.log(`💰 ${reserve.ownerRef} wallet already exists with ${existing.liquid} KRMA`);
-      } else {
-        await prisma.wallet.create({
-          data: reserve,
-        });
-        console.log(`✅ Created ${reserve.ownerRef} reserve wallet with ${reserve.liquid} KRMA`);
-      }
+      console.log(`✅ Created The Terminal reserve wallet with ${terminalReserve.liquid.toLocaleString()} KRMA`);
+      console.log(`   This is the complete KRMA supply - 100 billion tokens`);
     }
 
-    console.log('🎉 Reserve wallets initialization complete!');
+    console.log('🎉 Reserve wallet initialization complete!');
   } catch (error) {
-    console.error('❌ Error initializing reserve wallets:', error);
+    console.error('❌ Error initializing reserve wallet:', error);
   } finally {
     await prisma.$disconnect();
   }

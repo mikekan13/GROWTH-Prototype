@@ -19,13 +19,13 @@ interface MCPRequest {
   jsonrpc: '2.0';
   id: string | number;
   method: string;
-  params?: any;
+  params?: Record<string, unknown>;
 }
 
 interface MCPResponse {
   jsonrpc: '2.0';
   id: string | number;
-  result?: any;
+  result?: Record<string, unknown> | string | number | boolean | null;
   error?: {
     code: number;
     message: string;
@@ -235,7 +235,7 @@ class GrowthRulesMCPServer {
             const request = JSON.parse(line.trim()) as MCPRequest;
             const response = await this.handleRequest(request);
             console.log(JSON.stringify(response));
-          } catch (error) {
+          } catch (_error) {
             console.log(JSON.stringify({
               jsonrpc: '2.0',
               id: null,

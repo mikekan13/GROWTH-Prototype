@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionUser, SessionUser } from "@/lib/sessionManager";
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -23,23 +22,23 @@ export function createApiError(message: string, statusCode: number = 500): ApiEr
 }
 
 export function withAuth<T extends unknown[]>(
-  handler: (session: NonNullable<Awaited<ReturnType<typeof getServerSession>>>, ...args: T) => Promise<NextResponse>
+  handler: (user: SessionUser, ...args: T) => Promise<NextResponse>
 ): (...args: T) => Promise<NextResponse> {
   return async (...args: T): Promise<NextResponse> => {
     try {
-      const session = await getServerSession(authOptions);
-      
-      if (!session?.user) {
+      const user = await getSessionUser();
+
+      if (!user) {
         return NextResponse.json(
-          { error: API_ERRORS.UNAUTHORIZED.message }, 
+          { error: API_ERRORS.UNAUTHORIZED.message },
           { status: API_ERRORS.UNAUTHORIZED.status }
         );
       }
 
-      return await handler(session, ...args);
+      return await handler(user, ...args);
     } catch (error) {
       console.error("API Error:", error);
-      
+
       if (error instanceof Error && 'statusCode' in error) {
         const apiError = error as ApiError;
         return NextResponse.json(
@@ -65,7 +64,7 @@ export function validateRequired<T extends Record<string, unknown>>(
     return value === undefined || value === null || (typeof value === 'string' && !value.trim());
   });
 
-  return missing.length > 0 
+  return missing.length > 0
     ? { isValid: false, missing: missing.map(String) }
     : { isValid: true };
 }
@@ -80,7 +79,7 @@ export async function handleApiRequest<T extends unknown[]>(
     return NextResponse.json(result);
   } catch (error) {
     console.error(`${errorContext} error:`, error);
-    
+
     if (error instanceof Error && 'statusCode' in error) {
       const apiError = error as ApiError;
       return NextResponse.json(

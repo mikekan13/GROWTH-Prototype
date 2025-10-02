@@ -9,8 +9,7 @@ export async function GET() {
       select: {
         id: true,
         name: true,
-        x: true,
-        y: true,
+        json: true,
         campaignId: true,
         updatedAt: true
       },
@@ -19,12 +18,20 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      characters: characters.map(char => ({
-        ...char,
-        x: char.x,
-        y: char.y,
-        hasPosition: char.x !== null && char.y !== null
-      }))
+      characters: characters.map(char => {
+        const characterData = char.json as Record<string, unknown>;
+        const position = characterData?.position as { x: number; y: number } | undefined;
+
+        return {
+          id: char.id,
+          name: char.name,
+          campaignId: char.campaignId,
+          updatedAt: char.updatedAt,
+          x: position?.x ?? null,
+          y: position?.y ?? null,
+          hasPosition: !!position
+        };
+      })
     });
 
   } catch (error) {

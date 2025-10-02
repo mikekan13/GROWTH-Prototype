@@ -7,7 +7,7 @@ export const GET = withAuth(async (session) => {
   try {
     // Get GM profile
     const gmProfile = await prisma.gMProfile.findUnique({
-      where: { userId: (session as { user: { id: string } }).user.id }
+      where: { userId: session.id }
     });
 
     if (!gmProfile) {

@@ -76,14 +76,14 @@ model Character {
   campaignId    String
   name          String
   playerEmail   String?
-  spreadsheetId String
+  spreadsheetId String?  // Optional - only if exported to Google Sheets
   json          Json
   revId         String?
   updatedAt     DateTime @updatedAt
   Campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   krmaData      CharacterKrma?
 
-  @@unique([campaignId, spreadsheetId])
+  @@index([campaignId])
 }
 
 model Decision {
@@ -117,24 +117,19 @@ model SessionLog {
   Campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 }
 
-// Additional models for better data structure
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state            String?
-  refresh_token_expires_in Int?
-  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+// GM Invite Codes (simulating QR codes from rulebook)
+model GMInviteCode {
+  id           String    @id @default(cuid())
+  code         String    @unique // Format: GM-XXXX-XXXX-XXXX
+  usedBy       String?   // User ID who used this code
+  usedAt       DateTime?
+  createdBy    String    // Admin who created it
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime?
+  isActive     Boolean   @default(true)
 
-  @@unique([provider, providerAccountId])
+  @@index([code])
+  @@index([isActive])
 }
 
 model Session {
@@ -147,15 +142,14 @@ model Session {
 
 model User {
   id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
+  username      String    @unique
+  email         String    @unique
+  password      String    // Hashed with bcryptjs
+  name          String?   // Display name
   role          UserRole  @default(WATCHER)
   krmaBalance   BigInt    @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt @default(now())
-  accounts      Account[]
   sessions      Session[]
   campaigns     Campaign[] // Campaigns where this user is the GM
   krmaTransactions KrmaTransaction[]
@@ -163,14 +157,9 @@ model User {
   playerProfile PlayerProfile?
   playerBackstories CharacterBackstory[] @relation("PlayerBackstories")
   gmBackstories     CharacterBackstory[] @relation("GMBackstories")
-}
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
+  @@index([username])
+  @@index([email])
 }
 
 model KrmaTransaction {
@@ -205,12 +194,19 @@ model GMProfile {
   userId         String   @unique
   signupMonth    Int      // months since world start
   baselineActive Boolean  @default(true)
+
+  // Subscription & Seats
+  subscriptionExpiresAt DateTime? // Track subscription expiration (not enforced in prototype)
+  maxPlayerSeats        Int       @default(5) // 5 seats for prototype testing
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   entities       EntityProfile[]
   playerInvitations PlayerInvitation[] @relation("GMInvitations")
   players        PlayerProfile[] @relation("GMPlayers")
+
+  @@index([subscriptionExpiresAt])
 }
 
 model EntityProfile {

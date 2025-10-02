@@ -7,7 +7,7 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
     // Get characters assigned to this player (user)
     const characters = await prisma.character.findMany({
       where: {
-        playerEmail: session.user.email
+        playerEmail: session.email
       },
       orderBy: {
         updatedAt: 'desc'
@@ -19,7 +19,7 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
       where: {
         characters: {
           some: {
-            playerEmail: session.user.email
+            playerEmail: session.email
           }
         }
       },

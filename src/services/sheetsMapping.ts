@@ -7,10 +7,11 @@
 import {
   GrowthCharacter,
   GrowthAttributes,
-  GrowthSkills,
-  GrowthNectars,
   SheetsNamedRanges,
-  SheetsMappingConfig
+  // TODO: These types may be used in future sheet mapping features
+  // GrowthSkills,
+  // GrowthNectars,
+  // SheetsMappingConfig
 } from '@/types/growth';
 import { getSheetsService } from './google';
 
@@ -19,12 +20,13 @@ const CHARACTER_TEMPLATE_ID = process.env.CHARACTER_TEMPLATE_ID || '1-4O9-hSkGf8
 
 // Named ranges mapping (extracted by sub-agent)
 export const SHEETS_NAMED_RANGES: SheetsNamedRanges = {
-  // Character Information (13 ranges)
+  // Character Information (14 ranges)
   CharacterName: 'Main!B1:C2',
   CharacterImage: 'Main!D1:E2',
   HealthLevel: 'Main!T1:V2',
   TechLevel: 'Main!W1:Y2',
   WealthLevel: 'Main!Z1:AB2',
+  TKV: 'TKV',
 
   // Attributes (24 ranges) - 8 main attributes with levels/current/modifiers
   CloutLevel: 'Main!_5:_6',
@@ -109,8 +111,10 @@ export const SHEETS_NAMED_RANGES: SheetsNamedRanges = {
   SkillBonus: 'DiceRoller!B11:B11'
 };
 
+import { sheets_v4 } from 'googleapis';
+
 export class SheetsCharacterMapper {
-  private sheets: any;
+  private sheets: sheets_v4.Sheets | null = null;
   private templateId: string;
 
   constructor(templateId: string = CHARACTER_TEMPLATE_ID) {
@@ -127,7 +131,7 @@ export class SheetsCharacterMapper {
   /**
    * Read values from multiple named ranges in a single batch request
    */
-  async batchReadNamedRanges(spreadsheetId: string, ranges: string[]): Promise<Record<string, any>> {
+  async batchReadNamedRanges(spreadsheetId: string, ranges: string[]): Promise<Record<string, unknown>> {
     const sheets = await this.initSheets();
 
     try {
@@ -138,8 +142,12 @@ export class SheetsCharacterMapper {
         dateTimeRenderOption: 'FORMATTED_STRING'
       });
 
-      const result: Record<string, any> = {};
-      response.data.valueRanges?.forEach((valueRange: any, index: number) => {
+      interface ValueRange {
+        values?: unknown[][];
+      }
+
+      const result: Record<string, unknown> = {};
+      (response.data.valueRanges as ValueRange[] | undefined)?.forEach((valueRange, index: number) => {
         const rangeName = ranges[index];
         const values = valueRange.values;
 
@@ -165,7 +173,7 @@ export class SheetsCharacterMapper {
   /**
    * Write values to multiple named ranges in a single batch request
    */
-  async batchWriteNamedRanges(spreadsheetId: string, updates: Record<string, any>): Promise<void> {
+  async batchWriteNamedRanges(spreadsheetId: string, updates: Record<string, unknown>): Promise<void> {
     const sheets = await this.initSheets();
 
     const data = Object.entries(updates).map(([range, value]) => ({
@@ -190,7 +198,7 @@ export class SheetsCharacterMapper {
   /**
    * Map GROWTH attributes to Google Sheets ranges
    */
-  mapAttributesToRanges(attributes: GrowthAttributes): Record<string, any> {
+  mapAttributesToRanges(attributes: GrowthAttributes): Record<string, unknown> {
     return {
       [SHEETS_NAMED_RANGES.CloutLevel]: attributes.clout.level,
       [SHEETS_NAMED_RANGES.currentClout]: attributes.clout.current,
@@ -233,7 +241,7 @@ export class SheetsCharacterMapper {
   /**
    * Map Google Sheets ranges back to GROWTH attributes
    */
-  mapRangesToAttributes(ranges: Record<string, any>): Partial<GrowthAttributes> {
+  mapRangesToAttributes(ranges: Record<string, unknown>): Partial<GrowthAttributes> {
     return {
       clout: {
         level: ranges[SHEETS_NAMED_RANGES.CloutLevel] || 10,
@@ -314,6 +322,7 @@ export class SheetsCharacterMapper {
       SHEETS_NAMED_RANGES.HealthLevel,
       SHEETS_NAMED_RANGES.TechLevel,
       SHEETS_NAMED_RANGES.WealthLevel,
+      SHEETS_NAMED_RANGES.TKV,
 
       // All attribute ranges
       ...Object.entries(SHEETS_NAMED_RANGES)
@@ -350,6 +359,8 @@ export class SheetsCharacterMapper {
         techLevel: ranges[SHEETS_NAMED_RANGES.TechLevel] || 1,
         wealthLevel: ranges[SHEETS_NAMED_RANGES.WealthLevel] || 1
       },
+
+      tkv: ranges[SHEETS_NAMED_RANGES.TKV] || 0,
 
       attributes: this.mapRangesToAttributes(ranges) as GrowthAttributes,
 
@@ -392,7 +403,7 @@ export class SheetsCharacterMapper {
   async writeCharacterToSheet(spreadsheetId: string, character: GrowthCharacter): Promise<void> {
     console.log('📝 Writing character data to sheet:', spreadsheetId);
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       // Character identity
       [SHEETS_NAMED_RANGES.CharacterName]: character.identity.name,
       [SHEETS_NAMED_RANGES.CharacterImage]: character.identity.image || '',

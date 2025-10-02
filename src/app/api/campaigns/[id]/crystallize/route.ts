@@ -24,7 +24,7 @@ export const POST = withAuth(async (session, request: NextRequest, { params }: {
       throw createApiError("KRMA amount must be positive", API_ERRORS.BAD_REQUEST.status);
     }
 
-    const result = await KrmaController.crystallizeKrma((session as { user: { id: string } }).user.id, {
+    const result = await KrmaController.crystallizeKrma(session.id, {
       campaignId,
       type,
       name,

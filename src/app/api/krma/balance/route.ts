@@ -4,7 +4,7 @@ import { KrmaService } from "@/lib/krma";
 
 export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
-    const balance = await KrmaService.getBalance((session as { user: { id: string } }).user.id);
+    const balance = await KrmaService.getBalance(session.id);
     
     return NextResponse.json({ 
       balance: balance?.toString() || "0",

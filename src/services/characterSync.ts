@@ -207,6 +207,7 @@ export async function syncAllCampaignCharacters(
     const result = await syncCharacterSheet({
       ...character,
       playerEmail: character.playerEmail || undefined,
+      spreadsheetId: character.spreadsheetId || '',
       json: character.json as Record<string, unknown> || {}
     }, {
       ...options,

@@ -6,7 +6,7 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
     const backstories = await prisma.characterBackstory.findMany({
       where: {
-        playerId: session.user.id
+        playerId: session.id
       },
       include: {
         campaign: {
@@ -93,7 +93,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
       data: {
         campaignId,
         worldId,
-        playerId: session.user.id,
+        playerId: session.id,
         gmId: gmProfile.userId,
         characterName,
         hair,

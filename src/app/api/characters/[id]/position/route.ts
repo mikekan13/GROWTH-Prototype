@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { withAuth, validateRequired, createApiError, API_ERRORS } from "@/lib/apiHelpers";
+import { withAuth, validateRequired } from "@/lib/apiHelpers";
 
 const prisma = new PrismaClient();
 
@@ -21,15 +21,35 @@ export const PATCH = withAuth(async (
 
     // Ensure x and y are valid numbers
     if (typeof x !== 'number' || typeof y !== 'number') {
-      return createApiError(API_ERRORS.VALIDATION_ERROR, 'Position coordinates must be numbers');
+      return NextResponse.json(
+        { error: 'Position coordinates must be numbers' },
+        { status: 400 }
+      );
     }
 
-    // Update character position
+    // Get current character to access JSON data
+    const currentCharacter = await prisma.character.findUnique({
+      where: { id }
+    });
+
+    if (!currentCharacter) {
+      return NextResponse.json(
+        { error: 'Character not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update character position in JSON field
+    const characterData = currentCharacter.json as Record<string, unknown>;
+    const updatedJson = {
+      ...characterData,
+      position: { x, y }
+    };
+
     const character = await prisma.character.update({
       where: { id },
       data: {
-        x: x,
-        y: y
+        json: updatedJson
       }
     });
 
@@ -39,19 +59,25 @@ export const PATCH = withAuth(async (
       success: true,
       character: {
         id: character.id,
-        x: character.x,
-        y: character.y
+        x,
+        y
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Failed to update character position:', error);
 
-    if (error.code === 'P2025') {
-      return createApiError(API_ERRORS.NOT_FOUND, 'Character not found');
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Character not found' },
+        { status: 404 }
+      );
     }
 
-    return createApiError(API_ERRORS.INTERNAL_ERROR, 'Failed to update character position');
+    return NextResponse.json(
+      { error: 'Failed to update character position' },
+      { status: 500 }
+    );
   } finally {
     await prisma.$disconnect();
   }

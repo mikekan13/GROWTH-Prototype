@@ -5,7 +5,7 @@ import { withAuth } from "@/lib/apiHelpers";
 export const POST = withAuth(async (session, request: NextRequest) => {
   try {
     console.log('🧪 Starting email test...');
-    console.log('👤 Authenticated user:', session.user.email);
+    console.log('👤 Authenticated user:', session.email);
 
     const { to, testMode: _testMode } = await request.json();
 
@@ -16,12 +16,12 @@ export const POST = withAuth(async (session, request: NextRequest) => {
       );
     }
 
-    console.log(`📧 Testing email send from ${session.user.email} to ${to}`);
+    console.log(`📧 Testing email send from ${session.email} to ${to}`);
 
     // Test the email service directly
     const result = await EmailService.sendPlayerInvitation(
       to,
-      session.user.name || 'Test GM',
+      session.name || 'Test GM',
       'test-token-' + Date.now(),
       'Test Campaign'
     );
@@ -32,7 +32,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
       success: true,
       result,
       timestamp: new Date().toISOString(),
-      from: session.user.email,
+      from: session.email,
       to
     });
   } catch (error: unknown) {

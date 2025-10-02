@@ -27,7 +27,7 @@ interface GoalCardProps {
   node: GoalData;
   isSelected?: boolean;
   isExpanded?: boolean;
-  onNodeClick?: (node: GoalData) => void;
+  onNodeClick?: (node: BaseNodeData) => void;
   onToggleExpand?: (nodeId: string) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   className?: string;

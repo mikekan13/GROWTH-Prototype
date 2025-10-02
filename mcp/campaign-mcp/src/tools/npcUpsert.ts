@@ -8,7 +8,7 @@ export interface NPCCard {
   firstSeen: string;
   summary: string;
   tags: string[];
-  stats: Record<string, any>;
+  stats: Record<string, unknown>;
   notes: string;
   __dir?: string;
 }

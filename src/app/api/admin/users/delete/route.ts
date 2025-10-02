@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export const POST = withAuth(async (session, request: NextRequest) => {
   try {
     // Admin access only for Mikekan13@gmail.com
-    if ((session as { user: { email: string } }).user?.email !== "Mikekan13@gmail.com") {
+    if (session.email !== "Mikekan13@gmail.com") {
       return NextResponse.json(
         { error: "Unauthorized - Admin access required" },
         { status: 403 }
@@ -49,13 +49,8 @@ export const POST = withAuth(async (session, request: NextRequest) => {
     await prisma.$transaction(async (tx) => {
       // Delete related records first (due to foreign key constraints)
 
-      // Delete sessions
+      // Delete sessions (new auth system)
       await tx.session.deleteMany({
-        where: { userId: userId }
-      });
-
-      // Delete accounts (OAuth connections)
-      await tx.account.deleteMany({
         where: { userId: userId }
       });
 

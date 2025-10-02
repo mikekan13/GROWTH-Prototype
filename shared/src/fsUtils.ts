@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import { createHash } from 'crypto';
 
 export async function ensureDir(dirPath: string): Promise<void> {

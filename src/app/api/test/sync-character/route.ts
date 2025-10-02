@@ -33,7 +33,7 @@ export async function GET() {
         campaignId: character.campaignId,
         name: character.name,
         playerEmail: character.playerEmail || undefined,
-        spreadsheetId: character.spreadsheetId,
+        spreadsheetId: character.spreadsheetId || '',
         json: character.json as Record<string, unknown> || {},
       },
       {

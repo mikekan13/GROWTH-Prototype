@@ -7,14 +7,14 @@ export interface GROWTHCharacterFromSheet {
   image?: string;
   attributes: {
     clout: GROWTHAttribute;
-    presence: GROWTHAttribute;
-    flesh: GROWTHAttribute;
-    vitality: GROWTHAttribute;
-    finesse: GROWTHAttribute;
-    reflexes: GROWTHAttribute;
-    clarity: GROWTHAttribute;
-    logic: GROWTHAttribute;
-    mysticism: GROWTHAttribute;
+    celerity: GROWTHAttribute;
+    constitution: GROWTHAttribute;
+    focus: GROWTHAttribute;
+    frequency: GROWTHAttribute;
+    flow: GROWTHAttribute;
+    willpower: GROWTHAttribute;
+    wisdom: GROWTHAttribute;
+    wit: GROWTHAttribute;
   };
   creation: {
     seed: { name: string; baseFateDie: string; frequencyBudget: number };
@@ -42,48 +42,48 @@ const NAMED_RANGE_MAP = {
   characterName: 'CharacterName',
   characterImage: 'CharacterImage',
 
-  // Attribute Current Values (0/level format)
+  // Attribute Current Values
   currentClout: 'currentClout',
-  currentPresence: 'currentPresence',
-  currentFlesh: 'currentFlesh',
-  currentVitality: 'currentVitality',
-  currentFinesse: 'currentFinesse',
-  currentReflexes: 'currentReflexes',
-  currentClarity: 'currentClarity',
-  currentLogic: 'currentLogic',
-  currentMysticism: 'currentMysticism',
+  currentCelerity: 'currentCelerity',
+  currentConstitution: 'currentConstitution',
+  currentFocus: 'currentFocus',
+  currentFrequency: 'currentFrequency',
+  currentFlow: 'currentFlow',
+  currentWillpower: 'currentWillpower',
+  currentWisdom: 'currentWisdom',
+  currentWit: 'currentWit',
 
-  // Attribute Levels
+  // Attribute Levels (not used for Frequency)
   cloutLevel: 'CloutLevel',
-  presenceLevel: 'PresenceLevel',
-  fleshLevel: 'FleshLevel',
-  vitalityLevel: 'VitalityLevel',
-  finesseLevel: 'FinesseLevel',
-  reflexesLevel: 'ReflexesLevel',
-  clarityLevel: 'ClarityLevel',
-  logicLevel: 'LogicLevel',
-  mysticismLevel: 'MysticismLevel',
+  celerityLevel: 'CelerityLevel',
+  constitutionLevel: 'ConstitutionLevel',
+  focusLevel: 'FocusLevel',
+  frequency: 'Frequency', // Special: Frequency is just a raw value
+  flowLevel: 'FlowLevel',
+  willpowerLevel: 'WillpowerLevel',
+  wisdomLevel: 'WisdomLevel',
+  witLevel: 'WitLevel',
 
   // Attribute Augments (Equipment/Magic)
   cloutAugmentPositive: 'CloutAugmentPositive',
-  presenceAugmentPositive: 'PresenceAugmentPositive',
-  fleshAugmentPositive: 'FleshAugmentPositive',
-  vitalityAugmentPositive: 'VitalityAugmentPositive',
-  finesseAugmentPositive: 'FinesseAugmentPositive',
-  reflexesAugmentPositive: 'ReflexesAugmentPositive',
-  clarityAugmentPositive: 'ClarityAugmentPositive',
-  logicAugmentPositive: 'LogicAugmentPositive',
-  mysticismAugmentPositive: 'MysticismAugmentPositive',
+  celerityAugmentPositive: 'CelerityAugmentPositive',
+  constitutionAugmentPositive: 'ConstitutionAugmentPositive',
+  focusAugmentPositive: 'FocusAugmentPositive',
+  // Frequency has no augments
+  flowAugmentPositive: 'FlowAugmentPositive',
+  willpowerAugmentPositive: 'WillpowerAugmentPositive',
+  wisdomAugmentPositive: 'WisdomAugmentPositive',
+  witAugmentPositive: 'WitAugmentPositive',
 
   cloutAugmentNegative: 'CloutAugmentNegative',
-  presenceAugmentNegative: 'PresenceAugmentNegative',
-  fleshAugmentNegative: 'FleshAugmentNegative',
-  vitalityAugmentNegative: 'VitalityAugmentNegative',
-  finesseAugmentNegative: 'FinesseAugmentNegative',
-  reflexesAugmentNegative: 'ReflexesAugmentNegative',
-  clarityAugmentNegative: 'ClarityAugmentNegative',
-  logicAugmentNegative: 'LogicAugmentNegative',
-  mysticismAugmentNegative: 'MysticismAugmentNegative',
+  celerityAugmentNegative: 'CelerityAugmentNegative',
+  constitutionAugmentNegative: 'ConstitutionAugmentNegative',
+  focusAugmentNegative: 'FocusAugmentNegative',
+  // Frequency has no augments
+  flowAugmentNegative: 'FlowAugmentNegative',
+  willpowerAugmentNegative: 'WillpowerAugmentNegative',
+  wisdomAugmentNegative: 'WisdomAugmentNegative',
+  witAugmentNegative: 'WitAugmentNegative',
 
   // Creation System
   seedName: 'SeedName',
@@ -146,13 +146,33 @@ export async function readCharacterFromSheet(
     const valueRanges = await batchGetSheetData(spreadsheetId, availableRanges);
 
     // Create a map of range name to value for easy lookup
+    // Map uses the KEYS from NAMED_RANGE_MAP (code-friendly names like 'cloutLevel')
+    // instead of the VALUES (Google Sheets names like 'CloutLevel')
     const dataMap = new Map<string, unknown>();
     valueRanges.forEach((range, index) => {
-      const rangeName = availableRanges[index];
-      const value = range.values?.[0]?.[0];
-      if (value !== undefined && value !== null && value !== '') {
-        dataMap.set(rangeName, value);
+      const sheetRangeName = availableRanges[index]; // e.g., 'CloutLevel'
+      // Find the key that maps to this sheet range name
+      const mapKey = Object.keys(NAMED_RANGE_MAP).find(
+        key => NAMED_RANGE_MAP[key as keyof typeof NAMED_RANGE_MAP] === sheetRangeName
+      );
+      if (mapKey) {
+        const value = range.values?.[0]?.[0];
+        if (value !== undefined && value !== null && value !== '') {
+          dataMap.set(mapKey, value); // FIX: Use the map key (e.g., 'cloutLevel')
+          // Debug logging for critical attributes
+          if (sheetRangeName.includes('Clout') || sheetRangeName.includes('Celerity')) {
+            console.log(`📝 DEBUG: ${sheetRangeName} -> ${mapKey} = ${value}`);
+          }
+        }
       }
+    });
+
+    // Debug: Show what we have for clout
+    console.log(`🔍 DEBUG clout data:`, {
+      cloutLevel: dataMap.get('cloutLevel'),
+      currentClout: dataMap.get('currentClout'),
+      cloutAugmentPositive: dataMap.get('cloutAugmentPositive'),
+      cloutAugmentNegative: dataMap.get('cloutAugmentNegative'),
     });
 
     // Helper function to get numeric value with default
@@ -199,6 +219,20 @@ export async function readCharacterFromSheet(
       };
     };
 
+    // Build Frequency attribute (special case - no level/augments, just raw value)
+    const buildFrequencyAttribute = (): GROWTHAttribute => {
+      const frequencyValue = getNumeric('frequency', 0); // Fixed: use lowercase key
+      const current = getNumeric('currentFrequency', frequencyValue);
+
+      return {
+        current,
+        level: frequencyValue, // Frequency itself is the "level"
+        modifier: 0, // No modifier for Frequency
+        augmentPositive: 0,
+        augmentNegative: 0,
+      };
+    };
+
     // Parse skills from sheet data
     const parseSkills = (): Array<{ name: string; level: number; pillar: string }> => {
       const skillsData = getString('Skills');
@@ -223,14 +257,14 @@ export async function readCharacterFromSheet(
 
       attributes: {
         clout: buildAttribute('clout'),
-        presence: buildAttribute('presence'),
-        flesh: buildAttribute('flesh'),
-        vitality: buildAttribute('vitality'),
-        finesse: buildAttribute('finesse'),
-        reflexes: buildAttribute('reflexes'),
-        clarity: buildAttribute('clarity'),
-        logic: buildAttribute('logic'),
-        mysticism: buildAttribute('mysticism'),
+        celerity: buildAttribute('celerity'),
+        constitution: buildAttribute('constitution'),
+        focus: buildAttribute('focus'),
+        frequency: buildFrequencyAttribute(), // Special handling
+        flow: buildAttribute('flow'),
+        willpower: buildAttribute('willpower'),
+        wisdom: buildAttribute('wisdom'),
+        wit: buildAttribute('wit'),
       },
 
       creation: {

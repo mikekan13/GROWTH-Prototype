@@ -11,7 +11,7 @@ interface DestroyRequest {
 export const POST = withAuth(async (session, request: NextRequest) => {
   try {
     // Admin access only for Mikekan13@gmail.com
-    if ((session as { user: { email: string } }).user?.email !== "Mikekan13@gmail.com") {
+    if (session.email !== "Mikekan13@gmail.com") {
       return NextResponse.json(
         { error: "Unauthorized - Admin access required" },
         { status: 403 }
@@ -95,12 +95,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
             where: { userId: userId }
           });
 
-          // Delete user accounts
-          await tx.account.deleteMany({
-            where: { userId: userId }
-          });
-
-          // Delete user sessions
+          // Delete user sessions (new auth system)
           await tx.session.deleteMany({
             where: { userId: userId }
           });
@@ -126,7 +121,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
 
       // Log the destruction for audit trail
       const adminUser = await tx.user.findUnique({
-        where: { email: (session as { user: { email: string } }).user.email },
+        where: { email: session.email },
         select: { id: true }
       });
 
@@ -154,7 +149,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
                 role: deletedUser.role
               } : null,
               returnedToTerminal: totalKrmaToReturn.toString(),
-              adminEmail: (session as { user: { email: string } }).user.email
+              adminEmail: session.email
             }
           }
         });

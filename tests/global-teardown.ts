@@ -4,7 +4,7 @@
  */
 import { FullConfig } from '@playwright/test';
 
-async function globalTeardown(config: FullConfig) {
+async function globalTeardown(_config: FullConfig) {
   console.log('🧪 Playwright Global Teardown: Cleaning up test environment');
 
   // Reset NODE_ENV back to development

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface AttributePool {
@@ -82,21 +83,21 @@ export function CharacterCard({ character, campaignId, className, onDelete }: Ch
   // Check if Google Sheet exists
   useEffect(() => {
     const checkSheet = async () => {
-      console.log(`🔍 Checking sheet existence for character: ${character.name} (${character.id})`);
+      console.log(`🔍 Checking sheet existence for character: ${characterName} (${character.id})`);
       setCheckingSheet(true);
       try {
         const response = await fetch(`/api/characters/${character.id}/check-sheet`);
         if (response.ok) {
           const result = await response.json();
-          console.log(`📊 Sheet check result for ${character.name}:`, result);
+          console.log(`📊 Sheet check result for ${characterName}:`, result);
           setSheetExists(result.exists);
           if (!result.exists) {
-            console.warn(`⚠️ Sheet missing for character ${character.name}:`, result.error);
+            console.warn(`⚠️ Sheet missing for character ${characterName}:`, result.error);
           } else {
-            console.log(`✅ Sheet exists for character ${character.name}`);
+            console.log(`✅ Sheet exists for character ${characterName}`);
           }
         } else {
-          console.error(`❌ Sheet check failed for ${character.name}:`, response.status);
+          console.error(`❌ Sheet check failed for ${characterName}:`, response.status);
           setSheetExists(false);
         }
       } catch (error) {
@@ -108,7 +109,7 @@ export function CharacterCard({ character, campaignId, className, onDelete }: Ch
     };
 
     checkSheet();
-  }, [character.id]);
+  }, [character.id, characterName]);
 
   // Fetch character card data from Google Sheets
   useEffect(() => {
@@ -242,11 +243,13 @@ export function CharacterCard({ character, campaignId, className, onDelete }: Ch
           <div className="relative mr-6 flex-shrink-0">
             <div className="w-32 h-32 rounded-lg overflow-hidden bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center relative">
               {!imageError && characterImageUrl ? (
-                <img
+                <Image
                   src={characterImageUrl}
                   alt={`${sheetData?.name || characterName} avatar`}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
                   onError={() => setImageError(true)}
+                  sizes="128px"
                 />
               ) : (
                 <span className="text-2xl font-bold text-white">

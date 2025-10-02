@@ -29,7 +29,7 @@ interface NPCCardProps {
   node: NPCData;
   isSelected?: boolean;
   isExpanded?: boolean;
-  onNodeClick?: (node: NPCData) => void;
+  onNodeClick?: (node: BaseNodeData) => void;
   onToggleExpand?: (nodeId: string) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   className?: string;

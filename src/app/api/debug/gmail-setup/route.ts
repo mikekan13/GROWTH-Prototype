@@ -10,7 +10,7 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
 
     const diagnostics = {
       timestamp: new Date().toISOString(),
-      user: (session as { user: { email: string } }).user.email,
+      user: session.email,
       steps: [] as Array<Record<string, unknown>>
     };
 
@@ -58,7 +58,7 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
           // Create a test email message
           const testEmail = [
             'From: "GROWTH RPG System" <' + (process.env.GMAIL_EMAIL || 'noreply@gmail.com') + '>',
-            'To: ' + (session as { user: { email: string } }).user.email,
+            'To: ' + session.email,
             'Subject: Gmail API Test - Success!',
             'MIME-Version: 1.0',
             'Content-Type: text/plain; charset=utf-8',
@@ -88,7 +88,7 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
             status: "success",
             details: {
               messageId: result.data.id,
-              message: "✅ Test email sent successfully to " + (session as { user: { email: string } }).user.email
+              message: "✅ Test email sent successfully to " + session.email
             }
           });
 

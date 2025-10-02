@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cleanupTestUsers } from "@/lib/testAuth";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   // Only allow in test environment or when PLAYWRIGHT_TEST is set
   if (process.env.NODE_ENV !== "test" && !process.env.PLAYWRIGHT_TEST) {
     return NextResponse.json(

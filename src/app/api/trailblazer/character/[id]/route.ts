@@ -14,7 +14,7 @@ export const GET = withAuth(async (
     const character = await prisma.character.findUnique({
       where: { id },
       include: {
-        campaign: {
+        Campaign: {
           select: {
             id: true,
             name: true
@@ -28,7 +28,7 @@ export const GET = withAuth(async (
     }
 
     // Verify this character belongs to the current user
-    if (character.playerEmail !== session.user.email) {
+    if (character.playerEmail !== session.email) {
       throw createApiError("Access denied - this character is not assigned to you", API_ERRORS.FORBIDDEN.status);
     }
 

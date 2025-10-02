@@ -144,7 +144,7 @@ test.describe('Character Position Persistence', () => {
     expect(positionRestored).toBeTruthy();
   });
 
-  test('multiple character positions are tracked independently', async ({ page, request }) => {
+  test('multiple character positions are tracked independently', async ({ page, request: _request }) => {
     // Navigate to Relations tab
     await page.click('button:text("Relations")');
     await page.waitForTimeout(1000);

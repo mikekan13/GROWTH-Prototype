@@ -9,7 +9,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
     
     const { signupMonth } = await request.json();
     
-    await KrmaTokenomics.onGMSignup((session as { user: { id: string } }).user.id, signupMonth || 1);
+    await KrmaTokenomics.onGMSignup(session.id, signupMonth || 1);
     
     return NextResponse.json({ 
       success: true, 

@@ -15,6 +15,7 @@ export async function GET(_request: NextRequest) {
     try {
       // Use service account authentication (doesn't require user login)
       const auth = await getServiceAccountAuth();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sheets = google.sheets({ version: "v4", auth: auth as any });
 
       // Get spreadsheet info with named ranges
@@ -29,13 +30,31 @@ export async function GET(_request: NextRequest) {
       console.log(`✅ Found ${namedRanges.length} named ranges in template`);
 
       // Enhanced named ranges with more details
-      const enhancedNamedRanges = namedRanges.map((namedRange: any) => {
+      interface NamedRange {
+        name: string;
+        range?: {
+          sheetId?: number;
+          startRowIndex?: number;
+          startColumnIndex?: number;
+          endRowIndex?: number;
+          endColumnIndex?: number;
+        };
+      }
+
+      interface SheetProperties {
+        properties?: {
+          sheetId?: number;
+          title?: string;
+        };
+      }
+
+      const enhancedNamedRanges = (namedRanges as NamedRange[]).map((namedRange) => {
         const range = namedRange.range;
         const sheetId = range?.sheetId;
 
         // Find the sheet name
-        const sheet = spreadsheetData.sheets?.find(
-          (s: any) => s.properties?.sheetId === sheetId
+        const sheet = (spreadsheetData.sheets as SheetProperties[] | undefined)?.find(
+          (s) => s.properties?.sheetId === sheetId
         );
         const sheetName = sheet?.properties?.title || "Unknown";
 
@@ -71,22 +90,38 @@ export async function GET(_request: NextRequest) {
         };
       });
 
+      interface EnhancedNamedRange {
+        name: string;
+        sheetName: string;
+        sheetId?: number;
+        a1Notation: string;
+        range: {
+          startRow?: number;
+          endRow?: number;
+          startColumn?: number;
+          endColumn?: number;
+          startColumnLetter?: string;
+          endColumnLetter?: string;
+        };
+        rawRange?: unknown;
+      }
+
       // Group by category based on naming patterns
       const categorizedRanges = {
-        attributes: enhancedNamedRanges.filter((nr: any) =>
+        attributes: (enhancedNamedRanges as EnhancedNamedRange[]).filter((nr) =>
           nr.name.toLowerCase().includes('attribute') ||
           nr.name.toLowerCase().includes('stat') ||
           nr.name.toLowerCase().includes('ability')
         ),
-        skills: enhancedNamedRanges.filter((nr: any) =>
+        skills: (enhancedNamedRanges as EnhancedNamedRange[]).filter((nr) =>
           nr.name.toLowerCase().includes('skill')
         ),
-        inventory: enhancedNamedRanges.filter((nr: any) =>
+        inventory: (enhancedNamedRanges as EnhancedNamedRange[]).filter((nr) =>
           nr.name.toLowerCase().includes('inventory') ||
           nr.name.toLowerCase().includes('item') ||
           nr.name.toLowerCase().includes('equipment')
         ),
-        character: enhancedNamedRanges.filter((nr: any) =>
+        character: (enhancedNamedRanges as EnhancedNamedRange[]).filter((nr) =>
           nr.name.toLowerCase().includes('name') ||
           nr.name.toLowerCase().includes('character') ||
           nr.name.toLowerCase().includes('player') ||
@@ -94,7 +129,7 @@ export async function GET(_request: NextRequest) {
           nr.name.toLowerCase().includes('class') ||
           nr.name.toLowerCase().includes('race')
         ),
-        combat: enhancedNamedRanges.filter((nr: any) =>
+        combat: (enhancedNamedRanges as EnhancedNamedRange[]).filter((nr) =>
           nr.name.toLowerCase().includes('hp') ||
           nr.name.toLowerCase().includes('health') ||
           nr.name.toLowerCase().includes('ac') ||
@@ -102,7 +137,7 @@ export async function GET(_request: NextRequest) {
           nr.name.toLowerCase().includes('attack') ||
           nr.name.toLowerCase().includes('damage')
         ),
-        other: enhancedNamedRanges.filter((nr: any) => {
+        other: (enhancedNamedRanges as EnhancedNamedRange[]).filter((nr) => {
           const name = nr.name.toLowerCase();
           return !name.includes('attribute') &&
                  !name.includes('stat') &&
@@ -133,7 +168,7 @@ export async function GET(_request: NextRequest) {
         totalNamedRanges: namedRanges.length,
         categorizedRanges,
         allNamedRanges: enhancedNamedRanges,
-        sheets: spreadsheetData.sheets?.map((s: any) => ({
+        sheets: (spreadsheetData.sheets as SheetProperties[] | undefined)?.map((s) => ({
           name: s.properties?.title,
           sheetId: s.properties?.sheetId,
         })),

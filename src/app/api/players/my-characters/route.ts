@@ -4,13 +4,13 @@ import { prisma } from "@/lib/prisma";
 
 export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
-    const userId = (session as { user: { id: string } }).user.id;
+    const playerEmail = session.email;
 
     // Get all characters owned by the user
     const characters = await prisma.character.findMany({
-      where: { userId },
+      where: { playerEmail },
       include: {
-        campaign: {
+        Campaign: {
           select: {
             id: true,
             name: true,
@@ -18,15 +18,18 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        updatedAt: 'desc'
       }
     });
 
     // Format the response
     const formattedCharacters = characters.map(character => ({
-      ...character,
-      createdAt: character.createdAt.toISOString(),
+      id: character.id,
+      name: character.name,
+      playerEmail: character.playerEmail,
+      spreadsheetId: character.spreadsheetId,
       updatedAt: character.updatedAt.toISOString(),
+      campaign: character.Campaign
     }));
 
     return NextResponse.json({

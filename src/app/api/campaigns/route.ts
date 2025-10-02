@@ -31,7 +31,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
   // Create campaign folder if root folder is configured
   // Note: We defer folder creation to when it's actually needed (e.g., during sheet creation)
   // This prevents duplicate folder creation and ensures proper coordination
-  let folderId = null;
+  const folderId = null;
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -40,7 +40,7 @@ export const POST = withAuth(async (session, request: NextRequest) => {
       themes: themes ? (Array.isArray(themes) ? themes : [themes]) : undefined,
       description: description?.trim() || null,
       folderId,
-      gmUserId: session.user.id
+      gmUserId: session.id
     },
     include: {
       _count: {

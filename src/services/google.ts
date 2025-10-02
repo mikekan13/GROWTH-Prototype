@@ -1,12 +1,44 @@
+/**
+ * Google Sheets Integration Service
+ *
+ * STATUS: NEEDS REFACTORING FOR CUSTOM AUTH
+ *
+ * This service handles Google Sheets API integration for character sheet
+ * import/export functionality. It is currently NON-FUNCTIONAL after removing
+ * Google OAuth/NextAuth in favor of custom username/password authentication.
+ *
+ * WHEN TO USE:
+ * - Manual "Export to Google Sheets" button for character sheets
+ * - Manual "Import from Google Sheets" button to sync character data
+ *
+ * TODO FOR FUTURE IMPLEMENTATION:
+ * 1. Remove dependency on old `Account` model (NextAuth OAuth tokens)
+ * 2. Implement new OAuth flow specifically for Google Sheets API:
+ *    - Create a separate "Connect Google Account" button in settings
+ *    - Store Google OAuth tokens in User model or new GoogleConnection model
+ *    - Only request `https://www.googleapis.com/auth/drive.file` scope
+ * 3. Update all functions to use new token storage method
+ * 4. Add per-user Google connection status tracking
+ *
+ * PRESERVED FUNCTIONS (need OAuth token updates):
+ * - getGoogleAuth() - Get authenticated Google API client
+ * - getGoogleDrive() - Get Google Drive API
+ * - getGoogleSheets() - Get Google Sheets API
+ * - createFolder() - Create folder in Google Drive
+ * - copyTemplate() - Copy sheet template
+ * - getAllNamedRanges() - Get named ranges from sheet
+ *
+ * NOTE: Database is primary source of truth. Google Sheets is OPTIONAL backup/export.
+ */
+
 import { google, Auth } from "googleapis";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionUser } from "@/lib/sessionManager";
 import { prisma } from "@/lib/prisma";
 
 export async function getGoogleAuth() {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user) {
+  const user = await getSessionUser();
+
+  if (!user) {
     throw new Error("No authenticated user");
   }
 
@@ -19,7 +51,7 @@ export async function getGoogleAuth() {
   // Set credentials from session
   const account = await prisma.account.findFirst({
     where: {
-      userId: session.user.id,
+      userId: user.id,
       provider: "google",
     },
   });
@@ -205,8 +237,19 @@ export async function copySpreadsheet(
           fields: "namedRanges",
         });
 
+        interface TemplateNamedRange {
+          name?: string;
+          range?: {
+            sheetId?: number;
+            startRowIndex?: number;
+            startColumnIndex?: number;
+            endRowIndex?: number;
+            endColumnIndex?: number;
+          };
+        }
+
         // Filter out invalid named ranges with detailed logging
-        const validNamedRanges = (templateNamedRanges.data.namedRanges || []).filter((namedRange: any, index: number) => {
+        const validNamedRanges = ((templateNamedRanges.data.namedRanges || []) as TemplateNamedRange[]).filter((namedRange, index: number) => {
           // Named range names must be valid according to Google Sheets rules
           const name = namedRange.name;
 

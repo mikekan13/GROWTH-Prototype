@@ -184,6 +184,9 @@ export interface GrowthCharacter {
   // Character Levels (WTH System)
   levels: GrowthLevels;
 
+  // Total KRMA Value (read from Google Sheets)
+  tkv?: number;
+
   // Attribute Depletion States
   conditions: GrowthConditions;
 
@@ -214,12 +217,13 @@ export interface GrowthCharacter {
 
 // Google Sheets Named Ranges Mapping (based on sub-agent extraction)
 export interface SheetsNamedRanges {
-  // Character Information (13 ranges)
+  // Character Information (14 ranges)
   CharacterName: string;
   CharacterImage: string;
   HealthLevel: string;
   TechLevel: string;
   WealthLevel: string;
+  TKV: string;
 
   // Attributes (24 ranges) - 8 main attributes with levels/current/modifiers
   CloutLevel: string;
@@ -310,12 +314,12 @@ export interface SheetsMappingConfig {
   namedRanges: SheetsNamedRanges;
 
   // Mapping functions for complex data transformations
-  mapAttributesToRanges: (attributes: GrowthAttributes) => Record<string, any>;
-  mapRangesToAttributes: (ranges: Record<string, any>) => Partial<GrowthAttributes>;
-  mapSkillsToRanges: (skills: GrowthSkills) => Record<string, any>;
-  mapRangesToSkills: (ranges: Record<string, any>) => Partial<GrowthSkills>;
-  mapNectarsToRanges: (nectars: GrowthNectars) => Record<string, any>;
-  mapRangesToNectars: (ranges: Record<string, any>) => Partial<GrowthNectars>;
+  mapAttributesToRanges: (attributes: GrowthAttributes) => Record<string, unknown>;
+  mapRangesToAttributes: (ranges: Record<string, unknown>) => Partial<GrowthAttributes>;
+  mapSkillsToRanges: (skills: GrowthSkills) => Record<string, unknown>;
+  mapRangesToSkills: (ranges: Record<string, unknown>) => Partial<GrowthSkills>;
+  mapNectarsToRanges: (nectars: GrowthNectars) => Record<string, unknown>;
+  mapRangesToNectars: (ranges: Record<string, unknown>) => Partial<GrowthNectars>;
 }
 
 // Validation Rules (based on GROWTH mechanics research)

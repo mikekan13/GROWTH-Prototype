@@ -60,10 +60,10 @@ export async function createTestUser(userType: keyof typeof TEST_USERS): Promise
       data: {
         id: testUser.id,
         email: testUser.email,
+        username: testUser.email.split('@')[0], // Use email prefix as username
+        password: 'test-password-bypass', // Playwright tests bypass login
         name: testUser.name,
-        role: testUser.role,
-        emailVerified: new Date(),
-        image: null
+        role: testUser.role
       }
     });
 

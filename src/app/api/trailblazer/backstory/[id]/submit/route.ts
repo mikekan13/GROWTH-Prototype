@@ -27,7 +27,7 @@ export const POST = withAuth(async (
     }
 
     // Verify this backstory belongs to the current user
-    if (backstory.playerId !== session.user.id) {
+    if (backstory.playerId !== session.id) {
       throw createApiError("Access denied - this backstory is not assigned to you", API_ERRORS.FORBIDDEN.status);
     }
 

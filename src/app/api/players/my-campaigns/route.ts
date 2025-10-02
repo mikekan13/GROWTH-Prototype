@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
-    const userId = (session as { user: { id: string } }).user.id;
+    const userId = session.id;
 
     // Get campaigns where the user is a player
     const playerProfile = await prisma.playerProfile.findUnique({
@@ -12,12 +12,16 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
       include: {
         gm: {
           include: {
-            campaigns: {
+            user: {
               include: {
-                _count: {
-                  select: {
-                    characters: true,
-                    sessions: true,
+                campaigns: {
+                  include: {
+                    _count: {
+                      select: {
+                        characters: true,
+                        sessions: true,
+                      }
+                    }
                   }
                 }
               }
@@ -27,16 +31,28 @@ export const GET = withAuth(async (session, _request: NextRequest) => {
       }
     });
 
-    if (!playerProfile || !playerProfile.gm) {
+    if (!playerProfile || !playerProfile.gm || !playerProfile.gm.user) {
       return NextResponse.json({
         campaigns: []
       });
     }
 
+    interface CampaignWithCounts {
+      id: string;
+      name: string;
+      description: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      _count: {
+        characters: number;
+        sessions: number;
+      };
+    }
+
     // Format campaigns with GM name
-    const campaigns = playerProfile.gm.campaigns.map(campaign => ({
+    const campaigns = (playerProfile.gm.user.campaigns as CampaignWithCounts[]).map((campaign) => ({
       ...campaign,
-      gmName: playerProfile.gm.name || playerProfile.gm.email,
+      gmName: playerProfile.gm.user.name || playerProfile.gm.user.email,
       createdAt: campaign.createdAt.toISOString(),
       updatedAt: campaign.updatedAt.toISOString(),
     }));

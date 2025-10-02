@@ -5,7 +5,7 @@ import { prisma as _prisma } from "@/lib/prisma"; // TODO: Use for campaign owne
 
 export const GET = withAuth(async (session, _request: NextRequest) => {
   try {
-    const userId = (session as { user: { id: string } }).user.id;
+    const userId = session.id;
     console.log("🔍 Getting KRMA breakdown for user:", userId);
 
     // Get total KRMA balance

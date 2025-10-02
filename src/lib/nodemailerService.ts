@@ -31,7 +31,9 @@ export class NodemailerService {
       
       // Create transporter
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
           type: 'OAuth2',
           user: process.env.GMAIL_EMAIL || 'mikekan13@gmail.com',
@@ -40,7 +42,7 @@ export class NodemailerService {
           refreshToken: oauth2Client.credentials.refresh_token,
           accessToken: accessToken,
         },
-      });
+      } as unknown as nodemailer.TransportOptions);
       
       console.log('🚀 Sending email with Nodemailer...');
       
@@ -72,7 +74,7 @@ export class NodemailerService {
       
       return {
         success: false,
-        error: error?.message || 'Unknown nodemailer error',
+        error: err?.message || 'Unknown nodemailer error',
       };
     }
   }

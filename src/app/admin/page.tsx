@@ -82,6 +82,22 @@ export default function AdminPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Admin Navigation */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Link href="/admin/invite-codes" className="block">
+            <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                    <span className="text-red-600 font-bold text-lg">🎫</span>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-medium text-gray-900">GM Invite Codes</h3>
+                  <p className="text-sm text-gray-500">Generate and manage GM invitation codes</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+
           <Link href="/admin/krma" className="block">
             <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
               <div className="flex items-center">
@@ -149,6 +165,7 @@ export default function AdminPage() {
               <h3 className="text-sm font-medium text-blue-800">Admin Features</h3>
               <div className="mt-2 text-sm text-blue-700">
                 <ul className="list-disc list-inside space-y-1">
+                  <li><strong>GM Invite Codes:</strong> Generate and manage invite codes for new Game Masters</li>
                   <li><strong>KRMA Administration:</strong> Monitor token distribution, wallet balances, and conservation laws</li>
                   <li><strong>User Management:</strong> View and manage user accounts, roles, and permissions</li>
                   <li><strong>App Settings:</strong> Regular app settings are available in the <Link href="/settings" className="underline">Settings page</Link></li>

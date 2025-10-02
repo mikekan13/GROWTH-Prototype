@@ -50,7 +50,7 @@ export class KrmaController {
       const gmWallet = await tx.wallet.findUnique({
         where: {
           ownerType_ownerRef: {
-            ownerType: HolderType.GM,
+            ownerType: HolderType.WATCHER,
             ownerRef: gmUserId
           }
         }
@@ -77,7 +77,7 @@ export class KrmaController {
       await tx.wallet.update({
         where: {
           ownerType_ownerRef: {
-            ownerType: HolderType.GM,
+            ownerType: HolderType.WATCHER,
             ownerRef: gmUserId
           }
         },
@@ -133,7 +133,7 @@ export class KrmaController {
     return await prisma.$transaction(async (tx) => {
       const asset = await tx.worldAsset.findUnique({
         where: { id: assetId },
-        include: { Campaign: true }
+        include: { campaign: true }
       });
 
       if (!asset) {
@@ -161,7 +161,7 @@ export class KrmaController {
       await tx.wallet.update({
         where: {
           ownerType_ownerRef: {
-            ownerType: HolderType.GM,
+            ownerType: HolderType.WATCHER,
             ownerRef: gmProfile.userId
           }
         },
@@ -183,12 +183,12 @@ export class KrmaController {
           await tx.wallet.upsert({
             where: {
               ownerType_ownerRef: {
-                ownerType: HolderType.GM,
+                ownerType: HolderType.WATCHER,
                 ownerRef: systemPools.itemRemainderHoldId
               }
             },
             create: {
-              ownerType: HolderType.GM,
+              ownerType: HolderType.WATCHER,
               ownerRef: systemPools.itemRemainderHoldId,
               liquid: krmaLost,
               crystalized: BigInt(0)

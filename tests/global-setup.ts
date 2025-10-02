@@ -4,7 +4,7 @@
  */
 import { FullConfig } from '@playwright/test';
 
-async function globalSetup(config: FullConfig) {
+async function globalSetup(_config: FullConfig) {
   // Set NODE_ENV to test for the duration of tests
   process.env.NODE_ENV = 'test';
 

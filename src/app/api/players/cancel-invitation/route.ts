@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/apiHelpers";
 import { PlayerInvitationService } from "@/lib/playerInvitations";
 import { prisma } from "@/lib/prisma";
 
-export const POST = withAuth(async (session, req: { json: () => Promise<{ invitationId: string }> }) => {
+export const POST = withAuth(async (session, req: NextRequest) => {
   try {
     const { invitationId } = await req.json();
 
@@ -16,7 +16,7 @@ export const POST = withAuth(async (session, req: { json: () => Promise<{ invita
 
     // Get GM profile
     const gmProfile = await prisma.gMProfile.findUnique({
-      where: { userId: (session as { user: { id: string } }).user.id }
+      where: { userId: session.id }
     });
 
     if (!gmProfile) {

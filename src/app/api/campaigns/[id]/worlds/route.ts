@@ -62,7 +62,7 @@ export const POST = withAuth(async (session, request: NextRequest, { params }: {
     const krmaAmount = BigInt(liquidKrmaInvested || 0);
     if (krmaAmount > 0) {
       const user = await prisma.user.findUnique({
-        where: { id: (session as { user: { id: string } }).user.id }
+        where: { id: session.id }
       });
 
       if (!user || user.krmaBalance < krmaAmount) {
@@ -74,14 +74,14 @@ export const POST = withAuth(async (session, request: NextRequest, { params }: {
 
       // Deduct KRMA from user balance
       await prisma.user.update({
-        where: { id: (session as { user: { id: string } }).user.id },
+        where: { id: session.id },
         data: { krmaBalance: { decrement: krmaAmount } }
       });
 
       // Record KRMA transaction
       await prisma.krmaTransaction.create({
         data: {
-          userId: (session as { user: { id: string } }).user.id,
+          userId: session.id,
           type: "PAYMENT",
           amount: krmaAmount,
           balance: user.krmaBalance - krmaAmount,

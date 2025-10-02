@@ -122,7 +122,7 @@ test.describe('Character Creation Dialog - Visual Design Analysis', () => {
     console.log('Modal Dimensions:', modalBox);
 
     // Check if modal matches tools card design theme
-    const toolsCard = page.locator('[data-testid="tools-card"]');
+    const _toolsCard = page.locator('[data-testid="tools-card"]');
     const toolsCardStyles = await page.evaluate(() => {
       const card = document.querySelector('[data-testid="tools-card"]');
       return card ? {

@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+
+# playwright
+/playwright-report/
+/test-results/
+
+# mcp node_modules
+/mcp/*/node_modules/
+/shared/node_modules/
+
+# temp files
+nul
