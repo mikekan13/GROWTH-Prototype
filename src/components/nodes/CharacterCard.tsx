@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 
 // Interface for GROWTH attribute structure
 export interface GROWTHAttribute {
@@ -25,6 +26,12 @@ interface SheetCharacterData {
     flow: { current: number; max: number };
     willpower: { current: number; max: number };
     wisdom: { current: number; max: number };
+    wit: { current: number; max: number };
+  };
+  levels?: {
+    healthLevel: number;
+    techLevel: number;
+    wealthLevel: number;
   };
 }
 
@@ -35,7 +42,7 @@ export interface CharacterData {
   krmaValue: number;
   x: number;
   y: number;
-  connections: any[];
+  connections: string[];
   color: string;
   details?: {
     resistance?: number;
@@ -85,37 +92,25 @@ interface CharacterCardProps {
   onNodeClick?: (node: CharacterData) => void;
   onToggleExpand?: (nodeId: string) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
+  onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
   className?: string;
 }
 
-const CharacterCard: React.FC<CharacterCardProps> = ({
+const CharacterCard: React.FC<CharacterCardProps> = React.memo(({
   node,
-  isSelected = false,
+  isSelected: _isSelected = false,
   isExpanded = false,
   onToggleExpand,
-  onPositionChange
+  onPositionChange,
+  onDragOffsetChange
 }) => {
   const [sheetData, setSheetData] = useState<SheetCharacterData | null>(null);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  console.log('🎯 ULTRA DEBUG - CharacterCard rendering:', {
-    nodeId: node?.id,
-    nodeName: node?.name,
-    hasCharacterDetails: !!node?.characterDetails,
-    hasSheetData: !!sheetData,
-    isExpanded,
-    sheetLoading,
-    characterDetailsKeys: node?.characterDetails ? Object.keys(node.characterDetails) : 'none'
-  });
-
-  // Early return if no valid node data
-  if (!node?.id || !node?.name) {
-    console.warn('⚠️ CharacterCard: Invalid node data, not rendering');
-    return null;
-  }
-
-  // Fetch character card data from Google Sheets
+  // Fetch character card data from database
   useEffect(() => {
     const fetchSheetData = async () => {
       if (!node?.id) {
@@ -132,7 +127,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           const result = await response.json();
           if (result.success && result.data) {
             setSheetData(result.data);
-            console.log("📊 Loaded character data from Google Sheets:", result.data);
+            console.log(`📊 Loaded character data (source: ${result.source})`, result.data);
           } else if (result.fallback) {
             setSheetData(result.fallback);
             console.log("⚠️ Using fallback character data");
@@ -152,53 +147,96 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     fetchSheetData();
   }, [node?.id]);
 
+  console.log('🎯 ULTRA DEBUG - CharacterCard rendering:', {
+    nodeId: node?.id,
+    nodeName: node?.name,
+    hasCharacterDetails: !!node?.characterDetails,
+    hasSheetData: !!sheetData,
+    isExpanded,
+    sheetLoading,
+    characterDetailsKeys: node?.characterDetails ? Object.keys(node.characterDetails) : 'none'
+  });
+
+  // Early return if no valid node data
+  if (!node?.id || !node?.name) {
+    console.warn('⚠️ CharacterCard: Invalid node data, not rendering');
+    return null;
+  }
+
   const character = node.characterDetails;
   const levels = character?.levels;
   const attributes = character?.attributes;
 
-  // Drag functionality for SVG coordinate system
+  // DRAG: Update parent with SVG coordinate offsets during drag
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!onPositionChange) return;
+    if (!onPositionChange || !onDragOffsetChange) return;
 
     e.preventDefault();
     e.stopPropagation(); // Prevent canvas panning
 
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startNodeX = node.x;
-    const startNodeY = node.y;
+    setIsDragging(true);
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
+    // Get SVG element
+    const foreignObject = (e.target as Element).closest('foreignObject');
+    const svg = foreignObject?.closest('svg') as SVGSVGElement | null;
 
-      // Get the SVG element to calculate proper scaling
-      const foreignObject = (e.target as Element).closest('foreignObject');
-      const svg = foreignObject?.closest('svg');
+    if (!svg) return;
 
-      if (svg) {
-        const rect = svg.getBoundingClientRect();
-        const viewBox = svg.viewBox.baseVal;
+    // Create SVG point for accurate coordinate conversion
+    const svgPoint = svg.createSVGPoint();
 
-        // Calculate scaling factor based on viewBox vs container size (same as KRMALine)
-        const scaleX = viewBox.width / rect.width;
-        const scaleY = viewBox.height / rect.height;
-
-        const newX = startNodeX + (deltaX * scaleX);
-        const newY = startNodeY + (deltaY * scaleY);
-
-        onPositionChange(node.id, newX, newY);
-      } else {
-        // Fallback without scaling if SVG not found
-        const newX = startNodeX + deltaX;
-        const newY = startNodeY + deltaY;
-        onPositionChange(node.id, newX, newY);
-      }
+    // Helper function to convert screen coordinates to SVG coordinates
+    const screenToSVG = (clientX: number, clientY: number) => {
+      svgPoint.x = clientX;
+      svgPoint.y = clientY;
+      const transformed = svgPoint.matrixTransform(svg.getScreenCTM()!.inverse());
+      return { x: transformed.x, y: transformed.y };
     };
 
-    const handleMouseUp = () => {
+    // Get initial SVG coordinates
+    const startSVGCoords = screenToSVG(e.clientX, e.clientY);
+    dragStartPosRef.current = { x: node.x, y: node.y };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartPosRef.current) return;
+
+      // Convert current mouse position to SVG coordinates
+      const currentSVGCoords = screenToSVG(moveEvent.clientX, moveEvent.clientY);
+
+      // Calculate SVG delta
+      const svgDeltaX = currentSVGCoords.x - startSVGCoords.x;
+      const svgDeltaY = currentSVGCoords.y - startSVGCoords.y;
+
+      // Update parent with SVG offset - parent will update foreignObject position
+      onDragOffsetChange(node.id, svgDeltaX, svgDeltaY);
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+
+      if (!dragStartPosRef.current) return;
+
+      // Convert final mouse position to SVG coordinates
+      const finalSVGCoords = screenToSVG(upEvent.clientX, upEvent.clientY);
+
+      // Calculate SVG delta
+      const svgDeltaX = finalSVGCoords.x - startSVGCoords.x;
+      const svgDeltaY = finalSVGCoords.y - startSVGCoords.y;
+
+      // Calculate final position
+      const finalX = dragStartPosRef.current.x + svgDeltaX;
+      const finalY = dragStartPosRef.current.y + svgDeltaY;
+
+      // Clear drag offset
+      onDragOffsetChange(node.id, 0, 0);
+
+      // COMMIT final position to state/database
+      onPositionChange(node.id, finalX, finalY);
+
+      // Reset drag state
+      setIsDragging(false);
+      dragStartPosRef.current = null;
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -211,19 +249,27 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     return (
       <div className="relative">
         <div
-          className="flex bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-3 text-white shadow-lg cursor-move hover:border-gray-600"
-          style={{ width: '500px', height: '200px' }}
+          className={`flex bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-3 text-white shadow-lg hover:border-gray-600 transition-shadow select-none ${
+            isDragging ? 'cursor-grabbing shadow-2xl' : 'cursor-grab'
+          }`}
+          style={{
+            width: '500px',
+            height: '200px',
+            userSelect: 'none',
+          }}
           onMouseDown={handleMouseDown}
         >
           {/* Profile Picture Section - Left */}
           <div className="flex-shrink-0 w-20 h-20 mr-3">
-            <div className="w-full h-full bg-gray-600 rounded border border-gray-500 flex items-center justify-center text-xs text-gray-300">
+            <div className="w-full h-full bg-gray-600 rounded border border-gray-500 flex items-center justify-center text-xs text-gray-300 relative">
               {!imageError && (sheetData?.portrait || character?.characterImage) ? (
-                <img
-                  src={sheetData?.portrait || character?.characterImage}
+                <Image
+                  src={sheetData?.portrait || character?.characterImage || ''}
                   alt={sheetData?.name || node.name}
-                  className="w-full h-full object-cover rounded"
+                  fill
+                  className="object-cover rounded"
                   onError={() => setImageError(true)}
+                  sizes="80px"
                 />
               ) : (
                 <span className="text-xl font-bold">
@@ -244,17 +290,17 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             {/* WTH Levels Row */}
             <div className="flex gap-3 mb-3">
               <div className="text-xs">
-                <span className="text-green-400">W:</span> {levels?.wealthLevel || 1}
+                <span className="text-green-400">W:</span> {sheetData?.levels?.wealthLevel || levels?.wealthLevel || 1}
               </div>
               <div className="text-xs">
-                <span className="text-blue-400">T:</span> {levels?.techLevel || 1}
+                <span className="text-blue-400">T:</span> {sheetData?.levels?.techLevel || levels?.techLevel || 1}
               </div>
               <div className="text-xs">
-                <span className="text-red-400">H:</span> {levels?.healthLevel || 1}
+                <span className="text-red-400">H:</span> {sheetData?.levels?.healthLevel || levels?.healthLevel || 1}
               </div>
             </div>
 
-            {/* 8 Attribute Bars in 3x3 Grid (Body: 3, Soul: 3, Spirit: 2) */}
+            {/* 9 Attribute Bars in 3x3 Grid (Body: 3, Soul: 3, Spirit: 3) */}
             <div className="grid grid-cols-3 gap-2 flex-1">
               {/* Body Pillar - Orange */}
               <div className="flex flex-col">
@@ -374,7 +420,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 </div>
               </div>
 
-              {/* Spirit Pillar - Purple (2 attributes only) */}
+              {/* Spirit Pillar - Purple (3 attributes) */}
               <div className="flex flex-col">
                 <div className="text-xs text-purple-400 mb-1">WIL</div>
                 <div className="flex-1 bg-gray-700 rounded mb-1">
@@ -413,25 +459,40 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   }
                 </div>
               </div>
-              {/* Empty slot for 8-attribute layout */}
-              <div className="flex flex-col opacity-30">
-                <div className="text-xs text-gray-500 mb-1">---</div>
+              {/* Wit - Third Spirit attribute */}
+              <div className="flex flex-col">
+                <div className="text-xs text-purple-400 mb-1">WIT</div>
                 <div className="flex-1 bg-gray-700 rounded mb-1">
-                  <div className="h-2 bg-gray-600 rounded" style={{ width: '0%' }} />
+                  <div
+                    className="h-2 bg-purple-500 rounded"
+                    style={{
+                      width: `${sheetData?.attributes?.wit ?
+                        (sheetData.attributes.wit.current / sheetData.attributes.wit.max) * 100 :
+                        ((attributes?.wit?.current || 0) / 20) * 100}%`
+                    }}
+                  />
                 </div>
-                <div className="text-xs text-center text-gray-500">--</div>
+                <div className="text-xs text-center">
+                  {sheetData?.attributes?.wit ?
+                    `${sheetData.attributes.wit.current}/${sheetData.attributes.wit.max}` :
+                    (attributes?.wit?.current || 0)
+                  }
+                </div>
               </div>
             </div>
           </div>
 
           {/* TKV Box - Right */}
-          <div className="flex-shrink-0 w-16 h-20 ml-3 bg-gray-700 rounded border border-gray-500 p-1">
-            <div className="text-xs text-gray-300 mb-1">TKV</div>
-            <div className="text-xs text-center text-yellow-400">
-              {sheetData?.tkv || (node.krmaValue ? node.krmaValue.toLocaleString() : '0')}
-            </div>
-            <div className="text-xs text-center text-green-400 mt-1">
-              {sheetData ? '📊' : 'DB'}
+          <div className="flex-shrink-0 w-16 ml-3">
+            {/* TKV Display */}
+            <div className="bg-gray-700 rounded border border-gray-500 p-1">
+              <div className="text-xs text-gray-300 mb-1">TKV</div>
+              <div className="text-xs text-center text-yellow-400">
+                {sheetData?.tkv || (node.krmaValue ? node.krmaValue.toLocaleString() : '0')}
+              </div>
+              <div className="text-xs text-center text-green-400 mt-1">
+                {sheetData ? '📊' : 'DB'}
+              </div>
             </div>
           </div>
 
@@ -456,8 +517,17 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   // Expanded view - simple for now
   return (
     <div
-      className="bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-6 text-white shadow-lg cursor-move hover:border-gray-600"
-      style={{ width: '400px', minHeight: '600px' }}
+      className={`bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-6 text-white shadow-lg hover:border-gray-600 transition-shadow select-none ${
+        isDragging ? 'cursor-grabbing shadow-2xl' : 'cursor-grab'
+      }`}
+      style={{
+        width: '400px',
+        minHeight: '600px',
+        willChange: 'transform',
+        userSelect: 'none',
+        transform: isDragging ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : 'none',
+        transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+      }}
       onMouseDown={handleMouseDown}
     >
       <div className="flex justify-between items-start mb-4">
@@ -478,6 +548,17 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       <p className="text-gray-300">Expanded character sheet - TODO</p>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for memo - only re-render if these change
+  return (
+    prevProps.node.id === nextProps.node.id &&
+    prevProps.node.x === nextProps.node.x &&
+    prevProps.node.y === nextProps.node.y &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.isExpanded === nextProps.isExpanded
+  );
+});
+
+CharacterCard.displayName = 'CharacterCard';
 
 export default CharacterCard;

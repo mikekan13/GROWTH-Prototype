@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import CharacterCard, { CharacterData } from "@/components/nodes/CharacterCard";
+import CharacterCard, { CharacterData as CharacterNodeData } from "@/components/nodes/CharacterCard";
 import { ToolsCard } from "./ToolsCard";
 
 interface KRMANode {
@@ -19,7 +19,14 @@ interface KRMANode {
     opportunity?: number;
     status?: string;
   };
-  characterDetails?: any; // GROWTH character data for character nodes
+  characterDetails?: {
+    playerEmail?: string;
+    characterImage?: string;
+    identity?: { name: string };
+    levels?: { healthLevel: number; wealthLevel: number; techLevel: number };
+    attributes?: Record<string, unknown>;
+    conditions?: Record<string, boolean>;
+  }; // GROWTH character data for character nodes
 }
 
 interface KRMAConnection {
@@ -38,6 +45,7 @@ interface KRMALineProps {
   onNodeClick?: (node: KRMANode) => void;
   onConnectionClick?: (connection: KRMAConnection) => void;
   onCharacterCreated?: () => void;
+  onCharacterPositionChange?: (characterId: string, x: number, y: number) => Promise<void>;
 }
 
 export default function KRMALine({
@@ -47,7 +55,8 @@ export default function KRMALine({
   campaignId,
   onNodeClick,
   onConnectionClick,
-  onCharacterCreated
+  onCharacterCreated,
+  onCharacterPositionChange
 }: KRMALineProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,13 +71,23 @@ export default function KRMALine({
   const [isDragging, setIsDragging] = useState(false);
   const [animationTime, setAnimationTime] = useState(0);
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [dragOffsets, setDragOffsets] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const animationRafRef = useRef<number>(0);
+  const panRafRef = useRef<number>(0);
 
-  // Animation timer for flowing particles
+  // Animation timer using RAF for 60fps - more efficient than setInterval
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAnimationTime(prev => prev + 0.05);
-    }, 50);
-    return () => clearInterval(interval);
+    let lastTime = performance.now();
+    const animate = (currentTime: number) => {
+      const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+      lastTime = currentTime;
+
+      setAnimationTime(prev => prev + deltaTime * 2); // Adjust multiplier for speed
+      animationRafRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationRafRef.current);
   }, []);
 
   // Memoized color calculation for neon/bright theme to match mockup
@@ -180,19 +199,24 @@ export default function KRMALine({
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
 
-    // Improved scaling calculation - ensure both axes work correctly
+    // Use cached viewBox dimensions for consistent scaling
     const scaleX = viewBox.width / rect.width;
     const scaleY = viewBox.height / rect.height;
 
     const newX = panStart.viewBoxX - (dx * scaleX);
     const newY = panStart.viewBoxY - (dy * scaleY);
 
-
-    setViewBox(prev => ({
-      ...prev,
-      x: newX,
-      y: newY
-    }));
+    // Use RAF to throttle updates to 60fps
+    if (!panRafRef.current) {
+      panRafRef.current = requestAnimationFrame(() => {
+        setViewBox(prev => ({
+          ...prev,
+          x: newX,
+          y: newY
+        }));
+        panRafRef.current = 0;
+      });
+    }
   }, [isPanning, isDragging, panStart, viewBox]);
 
   const handleMouseUp = useCallback(() => {
@@ -378,15 +402,26 @@ export default function KRMALine({
       return newMap;
     });
 
-    // Also update the database for character nodes
-    if (campaignId && nodeId.startsWith('cm')) { // Character IDs start with 'cm'
-      fetch(`/api/characters/${nodeId}/position`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x, y })
-      }).catch(error => console.error('Failed to save position:', error));
+    // Update the database using the callback from parent (supports debouncing)
+    if (onCharacterPositionChange) {
+      onCharacterPositionChange(nodeId, x, y).catch(error =>
+        console.error('Failed to save position:', error)
+      );
     }
-  }, [campaignId]);
+  }, [onCharacterPositionChange]);
+
+  // Handle drag offset change (temporary visual offset during drag)
+  const handleDragOffsetChange = useCallback((nodeId: string, offsetX: number, offsetY: number) => {
+    setDragOffsets(prev => {
+      const newMap = new Map(prev);
+      if (offsetX === 0 && offsetY === 0) {
+        newMap.delete(nodeId); // Clear offset when drag ends
+      } else {
+        newMap.set(nodeId, { x: offsetX, y: offsetY });
+      }
+      return newMap;
+    });
+  }, []);
 
   // Get current position for a node - return absolute world coordinates
   const getNodePosition = useCallback((nodeId: string, fallbackX: number, fallbackY: number) => {
@@ -604,11 +639,11 @@ export default function KRMALine({
             );
           })()}
 
-          {/* Flowing energy particles - mix of circles and KRMA symbols */}
+          {/* Flowing energy particles - OPTIMIZED: reduced count from 40 to 20 */}
           <g>
-            {Array.from({ length: 40 }, (_, i) => {
+            {Array.from({ length: 20 }, (_, i) => {
               const flowSpeed = 100; // Speed of flow
-              const spacing = viewBox.width / 30;
+              const spacing = viewBox.width / 15;
               const xPos = viewBox.x + ((animationTime * flowSpeed + i * spacing) % (viewBox.width * 2)) - viewBox.width * 0.5;
               const yOffset = Math.sin(animationTime * 2 + i * 0.5) * 6;
               const isKrmaSymbol = i % 4 === 0; // Every 4th particle is a Ҝ symbol
@@ -646,11 +681,11 @@ export default function KRMALine({
             })}
           </g>
 
-          {/* Additional KRMA symbol particles - slower flow */}
+          {/* Additional KRMA symbol particles - OPTIMIZED: reduced from 15 to 8 */}
           <g>
-            {Array.from({ length: 15 }, (_, i) => {
+            {Array.from({ length: 8 }, (_, i) => {
               const flowSpeed = 60; // Slower speed
-              const spacing = viewBox.width / 12;
+              const spacing = viewBox.width / 6;
               const xPos = viewBox.x + ((animationTime * flowSpeed + i * spacing) % (viewBox.width * 2)) - viewBox.width * 0.5;
               const yOffset = Math.sin(animationTime * 1.5 + i * 0.8) * 8;
               const scale = 0.8 + Math.sin(animationTime * 3 + i) * 0.3;
@@ -674,10 +709,10 @@ export default function KRMALine({
             })}
           </g>
 
-          {/* Energy sparks - twinkling along the line */}
+          {/* Energy sparks - OPTIMIZED: reduced from 20 to 12 */}
           <g>
-            {Array.from({ length: 20 }, (_, i) => {
-              const sparkX = viewBox.x + (i * viewBox.width / 20) + Math.sin(animationTime + i) * 50;
+            {Array.from({ length: 12 }, (_, i) => {
+              const sparkX = viewBox.x + (i * viewBox.width / 12) + Math.sin(animationTime + i) * 50;
               const sparkY = Math.sin(animationTime * 3 + i * 0.8) * 6;
               const opacity = 0.3 + Math.abs(Math.sin(animationTime * 4 + i * 1.2)) * 0.7;
               return (
@@ -694,7 +729,7 @@ export default function KRMALine({
             })}
           </g>
 
-          {/* Larger energy nodes - pulsing power points */}
+          {/* Larger energy nodes - kept at 7 for visual balance */}
           <g>
             {Array.from({ length: 7 }, (_, i) => {
               const nodeX = viewBox.x + (viewBox.width * (i + 1)) / 8;
@@ -721,14 +756,33 @@ export default function KRMALine({
         {/* Render connections first (behind nodes) */}
         {connections.map(connection => renderConnection(connection))}
 
-        {/* Render character cards as SVG foreignObjects */}
+        {/* Render character cards as SVG foreignObjects - WITH VIEWPORT CULLING */}
         {nodes.filter(node => node.type === 'character' && node.id).map(node => {
           const position = getNodePosition(node.id, node.x, node.y);
           const isSelected = selectedNode === node.id;
           const isExpanded = expandedNodes.has(node.id);
 
+          // VIEWPORT CULLING: Skip rendering if node is far outside viewport
+          const cardWidth = isExpanded ? 400 : 500;
+          const cardHeight = isExpanded ? 600 : 200;
+
+          // Add margin for smooth appearance/disappearance
+          const margin = 200;
+
+          const isInViewport = (
+            position.x + cardWidth / 2 + margin > viewBox.x &&
+            position.x - cardWidth / 2 - margin < viewBox.x + viewBox.width &&
+            position.y + cardHeight / 2 + margin > viewBox.y &&
+            position.y - cardHeight / 2 - margin < viewBox.y + viewBox.height
+          );
+
+          // Always render selected nodes, otherwise only if in viewport
+          if (!isSelected && !isInViewport) {
+            return null;
+          }
+
           // Use the node directly - it already has the correct structure
-          const characterData = node;
+          const characterData = node as unknown as CharacterNodeData;
 
           // Ensure we have a valid character before rendering
           if (!characterData.id || !characterData.name) {
@@ -736,29 +790,30 @@ export default function KRMALine({
             return null;
           }
 
-          // DEBUG: Log what we're about to pass to CharacterCard
-          console.log('🎯 KRMALine character node debug:', {
-            nodeId: node.id,
-            nodeName: node.name,
-            hasCharacterDetails: !!node.characterDetails,
-            characterDataKeys: Object.keys(characterData),
-            nodeType: node.type
-          });
+          // Create updated node with current position from state
+          const nodeWithCurrentPosition = {
+            ...characterData,
+            x: position.x,
+            y: position.y
+          };
 
-          const cardWidth = isExpanded ? 400 : 500;
-          const cardHeight = isExpanded ? 600 : 200;
+          // Apply drag offset to position (SVG units)
+          const dragOffset = dragOffsets.get(node.id) || { x: 0, y: 0 };
+          const visualX = position.x + dragOffset.x;
+          const visualY = position.y + dragOffset.y;
 
           return (
             <foreignObject
               key={node.id}
-              x={position.x - cardWidth / 2}
-              y={position.y - cardHeight / 2}
+              x={visualX - cardWidth / 2}
+              y={visualY - cardHeight / 2}
               width={cardWidth}
               height={cardHeight}
               style={{ overflow: 'visible' }}
+              data-node-id={node.id}
             >
               <CharacterCard
-                node={characterData}
+                node={nodeWithCurrentPosition}
                 isSelected={isSelected}
                 isExpanded={isExpanded}
                 onNodeClick={(clickedNode) => {
@@ -767,6 +822,7 @@ export default function KRMALine({
                 }}
                 onToggleExpand={handleToggleExpand}
                 onPositionChange={handleNodePositionChange}
+                onDragOffsetChange={handleDragOffsetChange}
               />
             </foreignObject>
           );
@@ -790,12 +846,28 @@ export default function KRMALine({
           />
         </foreignObject>
 
-        {/* Render non-character nodes as simple circles */}
+        {/* Render non-character nodes as simple circles - WITH VIEWPORT CULLING */}
         {nodes.filter(node => node.type !== 'character').map(node => {
           const isSelected = selectedNode === node.id;
           const isHovered = hoveredNode === node.id;
           const strokeColor = getNodeStroke(node.type, isSelected, isHovered);
           const position = getNodePosition(node.id, node.x, node.y);
+
+          // VIEWPORT CULLING: Skip rendering if node is far outside viewport
+          const nodeRadius = 30;
+          const margin = 100;
+
+          const isInViewport = (
+            position.x + nodeRadius + margin > viewBox.x &&
+            position.x - nodeRadius - margin < viewBox.x + viewBox.width &&
+            position.y + nodeRadius + margin > viewBox.y &&
+            position.y - nodeRadius - margin < viewBox.y + viewBox.height
+          );
+
+          // Always render selected/hovered nodes, otherwise only if in viewport
+          if (!isSelected && !isHovered && !isInViewport) {
+            return null;
+          }
 
           return (
             <g key={node.id}>
