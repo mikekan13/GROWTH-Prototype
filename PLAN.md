@@ -165,7 +165,9 @@ The core product. Everything else is secondary.
 - [x] Campaign CRUD API routes (GET list, POST create with invite code)
 - [x] Demo page (/demo) with sample character "Kael Ashenmire"
 - [ ] Portrait section (needs image upload/display)
-- [ ] GM Character Builder: form/wizard for Seeds, Roots, Branches
+- [x] GM Character Builder: 4-step wizard (Identity -> Origin -> Attributes -> WTH)
+- [x] Campaign creator on Watcher dashboard with invite codes
+- [x] Watcher Console with campaign list and character management links
 - [ ] Character sheet JSON validation against GrowthCharacter type
 - [ ] Skills display section
 - [ ] Magic/Spells display section
