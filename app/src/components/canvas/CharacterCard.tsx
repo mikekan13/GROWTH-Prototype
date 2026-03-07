@@ -766,7 +766,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           </div>
 
           {/* ── TKV Box (positioned absolute on GRO.VINES separator) ── */}
-          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: 'calc(50% - 140px)', top: '402px', border: '3px solid #ffcc78', zIndex: 10 }}>
+          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: 'calc(50% - 140px)', top: '407px', border: '3px solid #ffcc78', zIndex: 10 }}>
             <div className="w-full flex items-center justify-center" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', height: '28px' }}>T&#x049C;V</div>
             <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#582a72', height: '34px' }}>{tkv}</div>
           </div>
