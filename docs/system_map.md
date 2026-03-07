@@ -57,6 +57,15 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - Player submits → GM reviews (approve/revision with notes)
 - Files: `services/backstory.ts`
 
+### Relations Canvas (Watcher Console)
+- SVG infinite canvas with pan, zoom, node dragging, viewport culling
+- CharacterCard: expanded (full sheet) / compact views, drag-to-move, dynamic name sizing
+- InventoryCard: draggable sub-panel with gold tether line, 2000px max distance
+- ComplexTooltip: 500ms lock-on-hover, nested tooltips via createPortal
+- All canvas state persisted to localStorage per campaign (debounced 300ms)
+- Persisted state: viewBox, zoom, positions, z-indices, expanded/collapsed, inventory panels, offsets
+- Files: `components/canvas/RelationsCanvas.tsx`, `CharacterCard.tsx`, `InventoryCard.tsx`, `ui/ComplexTooltip.tsx`
+
 ### AI Systems (planned)
 - Portrait pipeline: ComfyUI + FLUX.2 Dev + PuLID (see PORTRAIT-PIPELINE.md)
 - Oracle (future): AI co-GM, separate service

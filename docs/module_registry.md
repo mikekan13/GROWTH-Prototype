@@ -29,9 +29,15 @@ Last updated: 2026-03-07
 |-------|-----------|---------|
 | Character Display | CharacterSheet, AttributeBlock, MagicSection, SkillsSection, VitalsSection, InventorySection | Full character sheet rendering |
 | Character Builder | CharacterBuilder | 4-step wizard (Identity → Origin → Attributes → WTH) |
+| Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, localStorage persistence |
+| Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
+| Canvas Cards | InventoryCard | Draggable inventory sub-panel with filter tabs, quick stats, ComplexTooltip items |
+| Canvas Cards | CampaignCanvas | Campaign page wrapper that loads characters and renders RelationsCanvas |
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |
 | Auth | AuthForm, RedeemCode | Login/register with access code, post-registration upgrade |
+| UI | ComplexTooltip | 500ms lock-on-hover tooltip with nested tooltip support via createPortal |
+| UI | ConfirmDialog, Modal | Reusable dialog/modal primitives |
 | Branding | GrowthLogo | Canonical logo rendering, scalable via `scale` prop. DO NOT modify without Mike's approval |
 | Layout | DashboardShell | Role-aware page wrapper with header |
 
