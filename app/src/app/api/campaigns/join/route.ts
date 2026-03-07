@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { registerSchema, registerUser } from '@/services/auth';
+import { joinCampaign, joinCampaignSchema } from '@/services/campaign';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await requireAuth();
     const body = await request.json();
-    const input = registerSchema.parse(body);
-    const result = await registerUser(input);
+    const { inviteCode } = joinCampaignSchema.parse(body);
+    const result = await joinCampaign(session.user.id, inviteCode);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     return errorResponse(error);

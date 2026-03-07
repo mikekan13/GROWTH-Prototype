@@ -3,6 +3,7 @@ import { prisma } from './db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import type { UserRole } from '@/types/growth';
+import { AuthError, ForbiddenError } from './errors';
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -66,7 +67,7 @@ export async function destroySession() {
 export async function requireAuth() {
   const session = await getSession();
   if (!session) {
-    throw new Error('Unauthorized');
+    throw new AuthError();
   }
   return session;
 }
@@ -74,7 +75,7 @@ export async function requireAuth() {
 export async function requireRole(role: UserRole) {
   const session = await requireAuth();
   if (session.user.role !== role && session.user.role !== 'ADMIN' && session.user.role !== 'GODHEAD') {
-    throw new Error('Forbidden');
+    throw new ForbiddenError();
   }
   return session;
 }

@@ -1,7 +1,7 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-06
-Current phase: Phase 0 (Clean Slate Setup)
+Last updated: 2026-03-07
+Current phase: Phase 2 (Campaign Flow)
 
 ---
 
@@ -36,9 +36,9 @@ Current phase: Phase 0 (Clean Slate Setup)
 
 ## Tech Stack
 
-- **Next.js 15** + React 19 + TypeScript
-- **Tailwind CSS 4**
-- **Prisma + SQLite** (beta) -> PostgreSQL (production)
+- **Next.js 16** + React 19 + TypeScript
+- **Tailwind CSS 4** + **Zod 4** (validation)
+- **Prisma 7 + SQLite** (beta) -> PostgreSQL (production)
 - **bcrypt auth** with session tokens (no OAuth)
 - Zero external service dependencies
 
@@ -61,17 +61,31 @@ model User {
 }
 
 model Campaign {
-  id          String   @id @default(cuid())
-  name        String
-  genre       String?
-  themes      String?  // JSON array
-  description String?
-  gmUser      User     @relation("GMCampaigns", fields: [gmUserId], references: [id])
-  gmUserId    String
-  inviteCode  String?  @unique
-  status      CampaignStatus @default(ACTIVE)
-  characters  Character[]
-  createdAt   DateTime @default(now())
+  id              String           @id @default(cuid())
+  name            String
+  genre           String?
+  themes          String?          // JSON array
+  description     String?
+  worldContext    String?          // World description for AI context
+  customPrompts   String?          // JSON array of GM-defined backstory prompts
+  gmUser          User             @relation("GMCampaigns", fields: [gmUserId], references: [id])
+  gmUserId        String
+  inviteCode      String?          @unique
+  status          CampaignStatus @default(ACTIVE)
+  maxTrailblazers Int              @default(5)
+  characters      Character[]
+  members         CampaignMember[]
+  createdAt       DateTime @default(now())
+}
+
+model CampaignMember {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  joinedAt   DateTime @default(now())
+  @@unique([campaignId, userId])
 }
 
 model Character {
@@ -93,7 +107,8 @@ model CharacterBackstory {
   id          String   @id @default(cuid())
   character   Character @relation(fields: [characterId], references: [id])
   characterId String   @unique
-  narrative   String
+  responses   String   // JSON: array of { prompt: string, response: string }
+  narrative   String?  // Compiled narrative (generated from responses)
   gmNotes     String?
   status      BackstoryStatus @default(DRAFT) // DRAFT, SUBMITTED, APPROVED, REVISION
   createdAt   DateTime @default(now())
@@ -149,7 +164,7 @@ Status: COMPLETE
 **Ship condition**: Can register, login, see empty dashboard per role — ACHIEVED
 
 ### Phase 1: The Character Sheet
-Status: IN PROGRESS
+Status: COMPLETE (portrait and JSON validation deferred)
 
 The core product. Everything else is secondary.
 
@@ -164,26 +179,32 @@ The core product. Everything else is secondary.
 - [x] Character CRUD API routes (GET list, GET detail, POST create, PATCH update)
 - [x] Campaign CRUD API routes (GET list, POST create with invite code)
 - [x] Demo page (/demo) with sample character "Kael Ashenmire"
-- [ ] Portrait section (needs image upload/display)
+- [ ] Portrait section (needs image upload/display — waiting on Mike's input)
 - [x] GM Character Builder: 4-step wizard (Identity -> Origin -> Attributes -> WTH)
 - [x] Campaign creator on Watcher dashboard with invite codes
 - [x] Watcher Console with campaign list and character management links
-- [ ] Character sheet JSON validation against GrowthCharacter type
-- [ ] Skills display section
-- [ ] Magic/Spells display section
-- [ ] Inventory display section
-- [ ] Body damage/vitals display
+- [ ] Character sheet JSON validation against GrowthCharacter type (future)
+- [x] Skills display section (SkillsSection.tsx — combat/general split)
+- [x] Magic/Spells display section (MagicSection.tsx — mercy/severity/balance pillars)
+- [x] Inventory display section (InventorySection.tsx)
+- [x] Body damage/vitals display (VitalsSection.tsx — body part grid)
 
-**Ship condition**: GM can create a character with all GROWTH attributes, view it as the full character sheet
+**Ship condition**: GM can create a character with all GROWTH attributes, view it as the full character sheet — ACHIEVED
 
 ### Phase 2: Campaign Flow
-Status: NOT STARTED
+Status: IN PROGRESS
 
-- [ ] Campaign CRUD
-- [ ] Invite code system (GM generates code, player enters it to join)
-- [ ] Backstory submission workflow (player writes -> GM reviews -> GM builds mechanical character)
-- [ ] Campaign character list view
-- [ ] Player dashboard showing their characters across campaigns
+- [x] Campaign CRUD (create with invite code, list by GM, WATCHER+ only)
+- [x] Campaign detail page with character list + pending members (/watcher/campaign/[id])
+- [x] CampaignMember model — players enroll without getting placeholder characters
+- [x] Invite code join system with seat limits (POST /api/campaigns/join)
+- [x] Backstory submission API with structured prompts (POST/PATCH /api/characters/[id]/backstory)
+- [x] Trailblazer Portal with campaign memberships, characters, backstory status
+- [x] Structured backstory editor — 8 default prompts + GM custom prompts per campaign
+- [x] GM backstory review UI (/watcher/review/[id] — structured responses, approve/revision with notes)
+- [x] Campaign creator with world context and custom backstory prompts
+- [ ] Campaign settings/edit page (rename, change status, regenerate invite code)
+- [ ] Collaborative character creation (GM creates character after backstory approval)
 
 **Ship condition**: Full loop from campaign creation to player seeing their completed sheet
 
@@ -253,13 +274,69 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - Visit http://localhost:3000/demo to see the character sheet
 - **Next**: Skills/Magic/Inventory/Vitals display, GM character builder form, portrait upload
 
+### 2026-03-07: Phase 1 Complete + Phase 2 Campaign Flow
+- Magic display section (MagicSection.tsx — mercy/severity/balance pillars with spell cards)
+- Campaign detail page (/watcher/campaign/[id]) — GM views characters + pending members
+- Player invite code join with seat limits (CampaignMember model, no placeholder characters)
+- Structured backstory system: 8 default prompts + GM custom prompts per campaign
+- BackstoryEditor with save draft / submit for review flow
+- BackstoryReview with structured response display, approve/revision with notes
+- CampaignCreator expanded with world context and custom backstory prompts
+- Trailblazer Portal shows campaign memberships + characters with action links
+- Campaign creation restricted to WATCHER+ (no more auto-promote from TRAILBLAZER)
+- Prisma migration: CampaignMember model, campaign worldContext/customPrompts/maxTrailblazers, structured backstory responses
+- Mike answered 7 design questions: AI portraits, WATCHER-only campaigns, collaborative character creation, structured backstory, AI rule arbiter (future), manual-first dev priority, KRMA balance enforcement
+- 20 routes total, all compiling clean
+- **Next**: Campaign settings page, collaborative character creation after backstory approval
+
+### 2026-03-07: WATCHER Access Codes + Portrait Research
+- AccessCode model — QR/invite codes that grant WATCHER role on registration or redemption
+- Registration now accepts optional access code at signup (AuthForm field + API validation)
+- POST /api/access-codes — Admin generates batch codes with labels and expiration
+- POST /api/access-codes/redeem — Existing users upgrade role with a code
+- RedeemCode component on Trailblazer dashboard for post-registration upgrade
+- Script: `scripts/generate-access-codes.ts` for CLI code generation
+- Portrait pipeline research complete — PORTRAIT-PIPELINE.md written
+  - Recommended: ComfyUI + FLUX.2 Dev (GGUF quantized) + PuLID v2 for identity preservation
+  - RTX 4060 8GB VRAM confirmed viable with Nunchaku or GGUF quantization
+  - Phased implementation: basic gen → identity consistency → steering → dynamic state updates
+  - Prompt template system designed: identity + state + equipment assembled from character data
+- 22 routes total, all compiling clean
+
+### Decisions Made (2026-03-07, Mike's answers)
+1. **Portraits**: AI-generated locally. Must maintain identity consistency + style consistency across characters. Dynamic updates based on injuries, equipment, aging. Pipeline TBD.
+2. **Campaign creation**: WATCHER only. Subscription model: 5 Trailblazer seats per Watcher (adjustable later).
+3. **Join flow**: No placeholder characters. Players join campaign → collaborate with Watcher on backstory → mechanics created from backstory. Multi-step collaborative workflow.
+4. **Backstory**: Structured prompts (childhood, parents, culture, appearance, formative events, goals, fears). GMs can add custom prompts per campaign. AI can assist expansion with campaign context. NEVER single open field.
+5. **Character editing**: Manual control always available. AI Rule Arbiter (future) acts as copilot, not authority. Players/GMs can correct AI mistakes. Future: always-on mic → AI interprets events → auto-adjusts stats.
+6. **Dev priority**: Manual systems first → AI-assisted → full AI co-pilot.
+7. **KRMA balance**: GM's KRMA pool limits character power creation. Prevents power inflation across the network.
+
+### Decisions Made (2026-03-07, Mike's second round)
+1. **WATCHER access**: Tied to physical rulebook QR code during alpha/beta. Admin can manually create tester/demo accounts. Future: normal SaaS subscription.
+2. **Portrait pipeline**: Major system, not minor feature. Research complete — see PORTRAIT-PIPELINE.md. Recommended: ComfyUI + FLUX.2 Dev (quantized) + PuLID for identity consistency on RTX 4060 8GB. Phased: basic gen → identity → steering → dynamic updates.
+3. **Backstory → mechanics pre-population**: Needs more precise definition before implementation. The backstory should influence mechanics but automation level TBD. Collaborative process between player and GM with AI assistance.
+
+### 2026-03-07: Engineering Protocol + Service Layer Refactor
+- Reviewed and adapted engineering protocol for Next.js solo-developer alpha project
+- Created infrastructure layer: `lib/errors.ts` (typed error classes), `lib/permissions.ts` (reusable permission helpers), `lib/api.ts` (error-to-HTTP conversion)
+- Extracted 5 service modules from all API routes: `services/auth.ts`, `services/campaign.ts`, `services/character.ts`, `services/backstory.ts`, `services/access-code.ts`
+- All services use Zod schemas for input validation and throw typed errors
+- All 11 API routes refactored to thin wrappers (parse → validate → service → response)
+- `lib/auth.ts` now throws typed `AuthError`/`ForbiddenError` instead of generic `Error`
+- Removed legacy `Error('Unauthorized')` fallback from `lib/api.ts`
+- Server component pages now use `canViewCharacter`/`canManageCampaign`/`canEditCharacter` from `lib/permissions.ts` instead of inline checks
+- Register route now uses `$transaction` for atomic user+wallet+code creation
+- Created system documentation: `docs/system_map.md`, `docs/module_registry.md`, `docs/database_schema.md`, `docs/ai_systems.md`
+- Updated CLAUDE.md with architecture rules, code standards, and session workflow for all future sessions
+- 22 routes, all compiling clean
+- **Next**: Campaign settings page, collaborative character creation after backstory approval
+
 ### Questions for Mike (when he returns)
-1. **Character portrait**: Upload images or paste URLs? What dimensions/format?
-2. **Skills display**: The skill system is freeform (any name, level 1-20). Should skills be grouped by combat/non-combat, or just a flat list?
-3. **Magic display**: Do we show all 10 schools as tabs, or just the ones the character has spells in?
-4. **Body damage visual**: The rulebook has hit locations (head, neck, torso, arms, legs). Should this be a body diagram or a simple grid?
-5. **GM character builder**: Full wizard with steps (Seed -> Root -> Branches -> Attributes), or a single form page?
-6. **Who should be able to create campaigns?** Currently anyone can. Should it be WATCHER+ only? (Creating a campaign auto-promotes to WATCHER currently.)
+1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?
+2. **ComfyUI integration**: Run as subprocess, separate service, or direct API? (~15-30 sec generation time on RTX 4060 acceptable?)
+3. **Portrait fallback**: What to show when ComfyUI isn't running? Generic placeholder avatar?
+4. **Access code distribution**: Do you want to generate some test codes now? The system is ready.
 
 ---
 

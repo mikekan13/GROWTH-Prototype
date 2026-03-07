@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { canViewCharacter } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import CharacterSheet from '@/components/character/CharacterSheet';
 import type { GrowthCharacter } from '@/types/growth';
@@ -20,11 +21,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
     redirect('/trailblazer');
   }
 
-  // Access check
-  const isOwner = character.userId === session.user.id;
-  const isGM = character.campaign.gmUserId === session.user.id;
-  const isAdmin = session.user.role === 'GODHEAD' || session.user.role === 'ADMIN';
-  if (!isOwner && !isGM && !isAdmin) {
+  if (!canViewCharacter(session.user.id, session.user.role, character)) {
     redirect('/trailblazer');
   }
 

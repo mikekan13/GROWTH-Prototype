@@ -19,7 +19,12 @@ export default function AuthForm() {
 
     const body = mode === 'login'
       ? { login: form.get('login'), password: form.get('password') }
-      : { username: form.get('username'), email: form.get('email'), password: form.get('password') };
+      : {
+          username: form.get('username'),
+          email: form.get('email'),
+          password: form.get('password'),
+          accessCode: form.get('accessCode') || undefined,
+        };
 
     try {
       const res = await fetch(endpoint, {
@@ -108,6 +113,15 @@ export default function AuthForm() {
           minLength={8}
           className="w-full px-3 py-2 bg-white/60 border border-[var(--surface-dark)]/20 text-[var(--surface-dark)] placeholder:text-[var(--surface-dark)]/40 focus:outline-none focus:border-[var(--accent-teal)]"
         />
+
+        {mode === 'register' && (
+          <input
+            name="accessCode"
+            type="text"
+            placeholder="Access Code (from rulebook — optional)"
+            className="w-full px-3 py-2 bg-white/60 border border-[var(--surface-dark)]/20 text-[var(--surface-dark)] placeholder:text-[var(--surface-dark)]/40 focus:outline-none focus:border-[var(--accent-gold)]/60 font-mono uppercase"
+          />
+        )}
 
         {error && (
           <p className="text-sm text-[var(--accent-coral)]">{error}</p>

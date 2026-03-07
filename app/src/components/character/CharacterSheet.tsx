@@ -3,6 +3,7 @@
 import type { GrowthCharacter } from '@/types/growth';
 import { PILLARS } from '@/types/growth';
 import AttributeBlock from './AttributeBlock';
+import MagicSection from './MagicSection';
 import SkillsSection from './SkillsSection';
 import VitalsSection from './VitalsSection';
 import InventorySection from './InventorySection';
@@ -226,6 +227,9 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
           </div>
         </div>
       )}
+
+      {/* Magic */}
+      <MagicSection magic={character.magic} />
 
       {/* Skills */}
       <SkillsSection skills={character.skills} />

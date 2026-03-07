@@ -12,7 +12,7 @@ export default async function WatcherDashboard() {
   const campaigns = await prisma.campaign.findMany({
     where: { gmUserId: session.user.id },
     include: {
-      _count: { select: { characters: true } },
+      _count: { select: { characters: true, members: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -44,16 +44,20 @@ export default async function WatcherDashboard() {
           ) : (
             <div className="space-y-2">
               {campaigns.map(c => (
-                <div key={c.id} className="flex items-center justify-between p-3 bg-white/40 border border-[var(--surface-dark)]/10">
+                <Link
+                  key={c.id}
+                  href={`/watcher/campaign/${c.id}`}
+                  className="flex items-center justify-between p-3 bg-white/40 border border-[var(--surface-dark)]/10 hover:bg-white/60 transition-colors no-underline"
+                >
                   <div>
                     <span className="font-bold">{c.name}</span>
                     {c.genre && <span className="text-xs text-[var(--surface-dark)]/40 ml-2">{c.genre}</span>}
                     <div className="text-xs text-[var(--surface-dark)]/40 mt-0.5">
-                      {c._count.characters} characters | Invite: {c.inviteCode}
+                      {c._count.characters} characters | {c._count.members} trailblazers | Invite: {c.inviteCode}
                     </div>
                   </div>
                   <span className="text-xs uppercase tracking-wider text-[var(--accent-teal)]">{c.status}</span>
-                </div>
+                </Link>
               ))}
             </div>
           )}

@@ -13,25 +13,42 @@ model User {
   email        String     @unique
   passwordHash String
   role         String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
-  campaigns    Campaign[] @relation("GMCampaigns")
+  campaigns    Campaign[]       @relation("GMCampaigns")
   characters   Character[]
+  memberships  CampaignMember[]
   wallet       Wallet?
   sessions     Session[]
+  accessCodes  AccessCode[]
   createdAt    DateTime   @default(now())
 }
 
 model Campaign {
-  id          String     @id @default(cuid())
-  name        String
-  genre       String?
-  themes      String?    // JSON array
-  description String?
-  gmUser      User       @relation("GMCampaigns", fields: [gmUserId], references: [id])
-  gmUserId    String
-  inviteCode  String?    @unique
-  status      String     @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
-  characters  Character[]
-  createdAt   DateTime   @default(now())
+  id              String           @id @default(cuid())
+  name            String
+  genre           String?
+  themes          String?          // JSON array
+  description     String?
+  worldContext    String?          // World description for AI context
+  customPrompts   String?          // JSON array of GM-defined backstory prompts
+  gmUser          User             @relation("GMCampaigns", fields: [gmUserId], references: [id])
+  gmUserId        String
+  inviteCode      String?          @unique
+  status          String           @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  maxTrailblazers Int              @default(5)
+  characters      Character[]
+  members         CampaignMember[]
+  createdAt       DateTime         @default(now())
+}
+
+model CampaignMember {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  joinedAt   DateTime @default(now())
+
+  @@unique([campaignId, userId])
 }
 
 model Character {
@@ -53,7 +70,8 @@ model CharacterBackstory {
   id          String    @id @default(cuid())
   character   Character @relation(fields: [characterId], references: [id])
   characterId String    @unique
-  narrative   String
+  responses   String    // JSON: array of { prompt: string, response: string }
+  narrative   String?   // Combined/compiled narrative (generated from responses)
   gmNotes     String?
   status      String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REVISION
   createdAt   DateTime  @default(now())
@@ -85,4 +103,16 @@ model Session {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model AccessCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  role        String    @default("WATCHER") // Role granted on redemption
+  label       String?   // "Kickstarter Backer", "Alpha Tester", etc.
+  redeemedBy  User?     @relation(fields: [redeemedById], references: [id])
+  redeemedById String?
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime? // Optional expiration
 }

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { listCampaigns, createCampaign, createCampaignSchema } from '@/services/campaign';
+import { listAccessCodes, generateAccessCodes, generateCodesSchema } from '@/services/access-code';
 
 export async function GET() {
   try {
     const session = await requireAuth();
-    const result = await listCampaigns(session.user.id);
-    return NextResponse.json(result);
+    const codes = await listAccessCodes(session.user.role);
+    return NextResponse.json({ codes });
   } catch (error) {
     return errorResponse(error);
   }
@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
     const body = await request.json();
-    const input = createCampaignSchema.parse(body);
-    const campaign = await createCampaign(session.user.id, session.user.role, input);
-    return NextResponse.json({ campaign }, { status: 201 });
+    const input = generateCodesSchema.parse(body);
+    const codes = await generateAccessCodes(session.user.role, input);
+    return NextResponse.json({ codes }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }
