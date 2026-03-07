@@ -21,12 +21,12 @@ export default async function Home() {
         {/* Window title bar */}
         <div className="flex items-center justify-between px-3 py-1 bg-[var(--pillar-spirit)]/15 border-b border-[var(--pillar-spirit)]/30">
           <div className="flex items-center gap-2">
-            <div className="w-[8px] h-[8px] bg-[var(--pillar-spirit)]/60" />
-            <div className="w-[8px] h-[8px] bg-[var(--accent-gold)]/40" />
-            <div className="w-[8px] h-[8px] bg-[var(--pillar-body)]/40" />
+            <div className="w-[8px] h-[8px] bg-[var(--pillar-body)]" />
+            <div className="w-[8px] h-[8px] bg-[var(--pillar-soul)]" />
+            <div className="w-[8px] h-[8px] bg-[#002F6C]" />
           </div>
           <span className="text-[var(--pillar-spirit)]/50 text-[9px] tracking-widest">TERMINAL://reality.layer.0</span>
-          <span className="text-[var(--pillar-spirit)]/30 text-[9px]">[-][=][x]</span>
+          <span className="text-[var(--pillar-spirit)]/30 text-[9px]">&#x2298; &#x2295;</span>
         </div>
 
         {/* Terminal header */}
