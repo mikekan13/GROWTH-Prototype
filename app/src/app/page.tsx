@@ -145,8 +145,6 @@ export default async function Home() {
         <div className="relative">
           <div className="h-[2px] bg-[var(--pillar-spirit)]/40" />
           <div className="energy-band bg-[#582a72] py-1.5 px-4 relative overflow-visible">
-            {/* Purple extends full screen width */}
-            <div className="absolute top-0 bottom-0 -left-[50vw] -right-[50vw] bg-[#582a72] -z-10" />
             <div className="absolute top-1/2 -left-[50vw] -right-[50vw] h-[20px] -translate-y-1/2 bg-[var(--krma-gold)]/20 blur-lg" />
             <div className="absolute top-1/2 -left-[50vw] -right-[50vw] h-[3px] -translate-y-1/2 bg-[var(--krma-gold)]" />
             <div className="energy-line absolute top-1/2 -left-[50vw] -right-[50vw] h-[3px] -translate-y-1/2" />
