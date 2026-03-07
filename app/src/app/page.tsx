@@ -141,15 +141,17 @@ export default async function Home() {
           </p>
         </div>
 
-        {/* Purple dialogue band with energy gold line — full width */}
+        {/* Purple dialogue band with energy gold line — breaks out of window */}
         <div className="relative">
           <div className="h-[2px] bg-[var(--pillar-spirit)]/40" />
-          <div className="energy-band bg-[#582a72] py-1.5 px-4 relative overflow-hidden">
-            <div className="absolute top-1/2 left-0 right-0 h-[20px] -translate-y-1/2 bg-[var(--krma-gold)]/20 blur-lg" />
-            <div className="absolute top-1/2 left-0 right-0 h-[3px] -translate-y-1/2 bg-[var(--krma-gold)]" />
-            <div className="energy-line absolute top-1/2 left-0 right-0 h-[3px] -translate-y-1/2" />
-            <div className="energy-pluck absolute top-1/2 left-0 right-0 h-[10px] -translate-y-1/2" />
-            <div className="energy-pluck-delayed absolute top-1/2 left-0 right-0 h-[8px] -translate-y-1/2" />
+          <div className="energy-band bg-[#582a72] py-1.5 px-4 relative overflow-visible">
+            {/* Purple extends full screen width */}
+            <div className="absolute top-0 bottom-0 -left-[50vw] -right-[50vw] bg-[#582a72] -z-10" />
+            <div className="absolute top-1/2 -left-[50vw] -right-[50vw] h-[20px] -translate-y-1/2 bg-[var(--krma-gold)]/20 blur-lg" />
+            <div className="absolute top-1/2 -left-[50vw] -right-[50vw] h-[3px] -translate-y-1/2 bg-[var(--krma-gold)]" />
+            <div className="energy-line absolute top-1/2 -left-[50vw] -right-[50vw] h-[3px] -translate-y-1/2" />
+            <div className="energy-pluck absolute top-1/2 -left-[50vw] -right-[50vw] h-[10px] -translate-y-1/2" />
+            <div className="energy-pluck-delayed absolute top-1/2 -left-[50vw] -right-[50vw] h-[8px] -translate-y-1/2" />
 
             <div className="space-y-0 relative z-10">
               <p className="text-[10px] leading-snug">
