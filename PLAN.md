@@ -332,6 +332,19 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - 22 routes, all compiling clean
 - **Next**: Campaign settings page, collaborative character creation after backstory approval
 
+### 2026-03-07: Login Page — Logo Implementation
+- Created `GrowthLogo` component (`components/GrowthLogo.tsx`) — reusable, scalable via `scale` prop
+- Pixel-matched to `GROWTHlogo.png` using Python/Pillow color extraction from source PNG
+- Letter colors (warm-to-cool): G=#F7525F, R=#E06666, O=#F4CCCC, W=#CFE2F3, T=#6FA8DC, H=#002F6C
+- Panel backgrounds: G=#FFFFFF, R=#393937, O=#222222, W=#222222, T=#393937, H=#F5F4EF
+- Slim cream (#F5F4EF) panel to the left of G
+- Black T-bar above O/W gap with #222222 highlight rectangle on top-left (3D effect)
+- Gold `<n>` (#856A3F) between O and W at letter baseline (looks like a period)
+- Font: Consolas bold at 103px base size
+- Login page (`page.tsx`) updated to use GrowthLogo component
+- **Mike approved**: "This is the logo and how it should be displayed everywhere"
+- **Next**: Continue login page aesthetics (auth form styling, layout, visual polish)
+
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?
 2. **ComfyUI integration**: Run as subprocess, separate service, or direct API? (~15-30 sec generation time on RTX 4060 acceptable?)

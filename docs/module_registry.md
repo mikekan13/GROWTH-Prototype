@@ -32,6 +32,7 @@ Last updated: 2026-03-07
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |
 | Auth | AuthForm, RedeemCode | Login/register with access code, post-registration upgrade |
+| Branding | GrowthLogo | Canonical logo rendering, scalable via `scale` prop. DO NOT modify without Mike's approval |
 | Layout | DashboardShell | Role-aware page wrapper with header |
 
 ## Types
