@@ -45,11 +45,11 @@
   --color-void: var(--surface-void);
   --color-dark: var(--surface-dark);
 
-  /* Fonts */
+  /* Fonts — loaded via next/font/google in layout.tsx */
   --font-terminal: 'Consolas', 'Source Code Pro', monospace;
-  --font-header: 'Bebas Neue', Impact, sans-serif;
+  --font-header: var(--font-bebas-neue), 'Bebas Neue', Impact, sans-serif;
   --font-chapter: 'Inknut Antiqua', Georgia, serif;
-  --font-body: 'Comfortaa', 'Nunito', sans-serif;
+  --font-body: var(--font-comfortaa), 'Comfortaa', 'Nunito', sans-serif;
 }
 
 body {

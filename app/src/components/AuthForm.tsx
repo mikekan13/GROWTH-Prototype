@@ -110,7 +110,7 @@ export default function AuthForm() {
           type="password"
           placeholder="PASSWORD"
           required
-          minLength={8}
+          minLength={mode === 'register' ? 8 : 1}
           className="w-full px-3 py-2 bg-black border border-[var(--accent-teal)]/30 text-[var(--accent-teal)] placeholder:text-[var(--accent-teal)]/25 font-[family-name:var(--font-body)] text-sm tracking-wider focus:outline-none focus:border-[var(--accent-teal)]"
         />
 
