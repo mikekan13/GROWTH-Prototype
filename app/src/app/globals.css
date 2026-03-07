@@ -94,3 +94,221 @@ body {
   padding: 0.125rem 0.5rem;
   font-family: var(--font-terminal);
 }
+
+/* ── Glitch system ── */
+
+/* Clip-path glitch — top slice */
+@keyframes glitch-top {
+  0%, 100% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+  2% { clip-path: inset(0 0 60% 0); transform: translate(-4px, -1px); }
+  4% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+  38% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+  40% { clip-path: inset(0 0 55% 0); transform: translate(3px, 0); }
+  41% { clip-path: inset(0 0 65% 0); transform: translate(-2px, -1px) skewX(-2deg); }
+  42% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+  78% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+  79% { clip-path: inset(0 0 50% 0); transform: translate(5px, 0); }
+  80% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+}
+
+/* Clip-path glitch — bottom slice */
+@keyframes glitch-bottom {
+  0%, 100% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+  2% { clip-path: inset(65% 0 0 0); transform: translate(3px, 1px); }
+  4% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+  38% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+  40% { clip-path: inset(60% 0 0 0); transform: translate(-3px, 0); }
+  41% { clip-path: inset(55% 0 0 0); transform: translate(2px, 1px) skewX(1deg); }
+  42% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+  78% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+  79% { clip-path: inset(55% 0 0 0); transform: translate(-4px, 0); }
+  80% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+}
+
+/* Unstable flicker with skew */
+@keyframes glitch-unstable {
+  0%, 100% { opacity: 1; transform: translate(0) skewX(0); }
+  3% { opacity: 0.8; transform: translate(-2px, 0) skewX(-0.5deg); }
+  5% { opacity: 1; transform: translate(0) skewX(0); }
+  30% { opacity: 1; transform: translate(0) skewX(0); }
+  31% { opacity: 0.6; transform: translate(1px, -1px) skewX(0.3deg); }
+  32% { opacity: 1; transform: translate(0) skewX(0); }
+  65% { opacity: 1; transform: translate(0) skewX(0); }
+  66% { opacity: 0.4; transform: translate(3px, 0) skewX(-1deg); }
+  67% { opacity: 0.9; transform: translate(-1px, 0) skewX(0.5deg); }
+  68% { opacity: 1; transform: translate(0) skewX(0); }
+  91% { opacity: 1; transform: translate(0) skewX(0); }
+  92% { opacity: 0.7; transform: translate(-2px, 1px); }
+  93% { opacity: 1; transform: translate(0) skewX(0); }
+}
+
+/* Stream scan — CRT sweep */
+@keyframes stream-scan {
+  0% { background-position: 0 -100%; }
+  100% { background-position: 0 200%; }
+}
+
+/* Color-split glitch: uses ::before (teal tint) and ::after (body-red tint) as offset clipped copies */
+.glitch-text {
+  position: relative;
+}
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.glitch-text::before {
+  color: var(--pillar-spirit);
+  opacity: 0.7;
+  animation: glitch-top 5s infinite linear;
+}
+.glitch-text::after {
+  color: var(--pillar-body);
+  opacity: 0.7;
+  animation: glitch-bottom 5s infinite linear;
+  animation-delay: -2s;
+}
+
+/* Simple unstable jitter — for lighter-weight elements */
+.glitch-unstable {
+  animation: glitch-unstable 4s infinite;
+}
+
+/* Energy pulse — gold line brightness throb */
+@keyframes energy-pulse {
+  0% { opacity: 0.8; filter: blur(0px); }
+  25% { opacity: 1; filter: blur(0.5px); }
+  50% { opacity: 0.85; filter: blur(0px); }
+  75% { opacity: 1; filter: blur(0.5px); }
+  100% { opacity: 0.8; filter: blur(0px); }
+}
+
+/* Travelling glow along the gold line */
+@keyframes energy-travel {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Guitar string pluck — wave radiates outward from center */
+@keyframes pluck-wave {
+  0% {
+    clip-path: inset(0 50% 0 50%);
+    transform: scaleY(1);
+    opacity: 0;
+  }
+  5% {
+    clip-path: inset(0 30% 0 30%);
+    transform: scaleY(3);
+    opacity: 1;
+  }
+  10% {
+    clip-path: inset(0 15% 0 15%);
+    transform: scaleY(2.5);
+    opacity: 0.9;
+  }
+  18% {
+    clip-path: inset(0 5% 0 5%);
+    transform: scaleY(2);
+    opacity: 0.7;
+  }
+  28% {
+    clip-path: inset(0 0 0 0);
+    transform: scaleY(1.5);
+    opacity: 0.5;
+  }
+  40% {
+    clip-path: inset(0 0 0 0);
+    transform: scaleY(1);
+    opacity: 0;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: scaleY(1);
+    opacity: 0;
+  }
+}
+
+/* Subtle standing vibration on the base line */
+@keyframes string-vibrate {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  10% { transform: translateY(-0.5px) scaleY(1.3); }
+  20% { transform: translateY(0.3px) scaleY(1); }
+  30% { transform: translateY(-0.3px) scaleY(1.2); }
+  40% { transform: translateY(0.2px) scaleY(1); }
+  50% { transform: translateY(0) scaleY(1); }
+  60% { transform: translateY(-0.4px) scaleY(1.2); }
+  70% { transform: translateY(0.3px) scaleY(1); }
+  80% { transform: translateY(-0.2px) scaleY(1.1); }
+  90% { transform: translateY(0.1px) scaleY(1); }
+}
+
+/* Purple band shimmer — subtle brightness shifts */
+@keyframes band-shimmer {
+  0%, 100% { filter: brightness(1); }
+  30% { filter: brightness(1.1); }
+  60% { filter: brightness(0.95); }
+  80% { filter: brightness(1.05); }
+}
+
+.energy-band {
+  animation: band-shimmer 6s ease-in-out infinite;
+}
+
+/* Bright base line with travelling hotspot */
+.energy-line {
+  background: linear-gradient(
+    90deg,
+    var(--krma-gold) 0%,
+    var(--krma-gold) 30%,
+    #ffe8a0 48%,
+    #fff 50%,
+    #ffe8a0 52%,
+    var(--krma-gold) 70%,
+    var(--krma-gold) 100%
+  );
+  background-size: 200% 100%;
+  animation: string-vibrate 2s ease-in-out infinite, energy-pulse 2s ease-in-out infinite, energy-travel 4s linear infinite;
+}
+
+/* Pluck wave overlay — bright burst that radiates from center */
+.energy-pluck {
+  background: radial-gradient(
+    ellipse at center,
+    #fff 0%,
+    var(--krma-gold) 30%,
+    var(--accent-gold) 60%,
+    transparent 100%
+  );
+  animation: pluck-wave 6s ease-out infinite;
+}
+
+/* Second pluck offset for layered rhythm */
+.energy-pluck-delayed {
+  background: radial-gradient(
+    ellipse at center,
+    #ffe8a0 0%,
+    var(--accent-gold) 40%,
+    transparent 100%
+  );
+  animation: pluck-wave 6s ease-out infinite;
+  animation-delay: 3s;
+}
+
+/* Combined stream + scan */
+.stream-scan {
+  background-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(62, 184, 154, 0.06) 45%,
+    rgba(62, 184, 154, 0.12) 50%,
+    rgba(62, 184, 154, 0.06) 55%,
+    transparent 100%
+  );
+  background-size: 100% 200%;
+  animation: stream-scan 3s linear infinite;
+}
