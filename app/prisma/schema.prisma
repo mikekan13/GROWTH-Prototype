@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  email        String     @unique
+  passwordHash String
+  role         String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
+  campaigns    Campaign[] @relation("GMCampaigns")
+  characters   Character[]
+  wallet       Wallet?
+  sessions     Session[]
+  createdAt    DateTime   @default(now())
+}
+
+model Campaign {
+  id          String     @id @default(cuid())
+  name        String
+  genre       String?
+  themes      String?    // JSON array
+  description String?
+  gmUser      User       @relation("GMCampaigns", fields: [gmUserId], references: [id])
+  gmUserId    String
+  inviteCode  String?    @unique
+  status      String     @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  characters  Character[]
+  createdAt   DateTime   @default(now())
+}
+
+model Character {
+  id         String              @id @default(cuid())
+  name       String
+  user       User                @relation(fields: [userId], references: [id])
+  userId     String
+  campaign   Campaign            @relation(fields: [campaignId], references: [id])
+  campaignId String
+  data       String              // JSON<GrowthCharacter>
+  portrait   String?
+  status     String              @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, ACTIVE, DEAD, RETIRED
+  backstory  CharacterBackstory?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+}
+
+model CharacterBackstory {
+  id          String    @id @default(cuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String    @unique
+  narrative   String
+  gmNotes     String?
+  status      String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REVISION
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Wallet {
+  id        String  @id @default(cuid())
+  owner     User?   @relation(fields: [ownerId], references: [id])
+  ownerId   String? @unique
+  ownerType String  // USER, RESERVE
+  label     String? // For reserve wallets: "Terminal", "Mercy", "Balance", "Severity"
+  balance   BigInt  @default(0)
+}
+
+model KrmaTransaction {
+  id           String   @id @default(cuid())
+  fromWalletId String
+  toWalletId   String
+  amount       BigInt
+  reason       String
+  createdAt    DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  /* Surfaces */
+  --surface-calm: #CBD9E8;
+  --surface-white: #FFFFFF;
+  --surface-void: #000000;
+  --surface-dark: #1E2D40;
+
+  /* Pillars */
+  --pillar-body: #E8585A;
+  --pillar-spirit: #3EB89A;
+  --pillar-soul: #7050A8;
+
+  /* Accents */
+  --accent-teal: #2DB8A0;
+  --accent-gold: #D0A030;
+  --accent-amber: #D07818;
+  --accent-coral: #E84040;
+  --terminal-green: #40E070;
+  --krma-gold: #FFCC78;
+
+  /* Derived */
+  --background: var(--surface-calm);
+  --foreground: #1E2D40;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Pillar colors */
+  --color-body: var(--pillar-body);
+  --color-spirit: var(--pillar-spirit);
+  --color-soul: var(--pillar-soul);
+
+  /* Accents */
+  --color-teal: var(--accent-teal);
+  --color-gold: var(--accent-gold);
+  --color-amber: var(--accent-amber);
+  --color-krma: var(--krma-gold);
+
+  /* Surfaces */
+  --color-calm: var(--surface-calm);
+  --color-void: var(--surface-void);
+  --color-dark: var(--surface-dark);
+
+  /* Fonts */
+  --font-terminal: 'Consolas', 'Source Code Pro', monospace;
+  --font-header: 'Bebas Neue', Impact, sans-serif;
+  --font-chapter: 'Inknut Antiqua', Georgia, serif;
+  --font-body: 'Comfortaa', 'Nunito', sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-terminal);
+}
+
+/* Black highlight bar - signature GROWTH UI pattern */
+.highlight-bar {
+  background: var(--surface-void);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  font-family: var(--font-terminal);
+}
+
+/* Section header badge - gold on navy */
+.section-badge {
+  background: var(--surface-dark);
+  color: var(--accent-gold);
+  padding: 0.25rem 1rem;
+  font-family: var(--font-header);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Attribute pill */
+.attr-pill {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  color: white;
+  font-family: var(--font-header);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Terminal badge */
+.terminal-badge {
+  background: #111;
+  color: white;
+  padding: 0.125rem 0.5rem;
+  font-family: var(--font-terminal);
+}
