@@ -1,6 +1,6 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 Current phase: Phase 2 (Campaign Flow)
 
 ---
@@ -203,6 +203,7 @@ Status: IN PROGRESS
 - [x] Structured backstory editor — 8 default prompts + GM custom prompts per campaign
 - [x] GM backstory review UI (/watcher/review/[id] — structured responses, approve/revision with notes)
 - [x] Campaign creator with world context and custom backstory prompts
+- [x] Change Log system — schema, service (diff/coalescence/revert with conflict detection), API routes (GET with filters, POST revert), UI panel (bottom overlay on canvas with auto-poll, timeline, filters, expand/collapse, revert). All character updates via `updateCharacter` automatically create changelog entries. Future features modifying character data should call `createChangeLogEntry` from `services/changelog.ts`.
 - [ ] Campaign settings/edit page (rename, change status, regenerate invite code)
 - [ ] Collaborative character creation (GM creates character after backstory approval)
 

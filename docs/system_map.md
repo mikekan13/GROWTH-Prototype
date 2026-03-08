@@ -1,6 +1,6 @@
 # GRO.WTH System Map
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 ## Architecture Overview
 
@@ -65,6 +65,15 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - All canvas state persisted to localStorage per campaign (debounced 300ms)
 - Persisted state: viewBox, zoom, positions, z-indices, expanded/collapsed, inventory panels, offsets
 - Files: `components/canvas/RelationsCanvas.tsx`, `CharacterCard.tsx`, `InventoryCard.tsx`, `ui/ComplexTooltip.tsx`
+
+### Change Log System
+- Character updates trigger changelog entries via automatic diffing of before/after data
+- Event architecture: `services/character.ts` `updateCharacter` calls `createChangeLogEntry` with before/after snapshots; `lib/changelog-utils.ts` diffs the objects, infers the category, and summarizes changes into human-readable descriptions
+- Coalescence: 5-second server-side window groups rapid changes by the same actor on the same character into a single entry (prevents spam from multi-field edits)
+- Auto-polling UI: `ChangeLogPanel` polls every 5 seconds when the panel is visible (bottom overlay on the Relations Canvas)
+- Revert: any revertible entry can be reverted with conflict detection — the system compares the current field value against the expected "after" value before applying the rollback
+- **Integration rule:** ALL future features that modify character data should wire into the changelog by calling `createChangeLogEntry` from `services/changelog.ts` with before/after data. The `updateCharacter` function already does this automatically for any character data updates routed through it.
+- Files: `services/changelog.ts`, `lib/changelog-utils.ts`, `types/changelog.ts`, `components/changelog/ChangeLogPanel.tsx`, `app/api/changelog/route.ts`, `app/api/changelog/[id]/revert/route.ts`
 
 ### AI Systems (planned)
 - Portrait pipeline: ComfyUI + FLUX.2 Dev + PuLID (see PORTRAIT-PIPELINE.md)

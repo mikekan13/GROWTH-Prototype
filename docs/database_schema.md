@@ -1,6 +1,6 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 Source of truth: `app/prisma/schema.prisma`
 
 ## Models
@@ -54,6 +54,26 @@ KRMA currency holder. One per user + reserve wallets.
 ### KrmaTransaction
 KRMA transfer record. Immutable ledger.
 - Not yet implemented in app logic
+
+### ChangeLog
+Immutable record of every character data change. Supports timeline view, filtering, and revert.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign this change belongs to
+- `characterId`: String — which character was modified
+- `characterName`: String — denormalized for display without joins
+- `groupId`: String — groups coalesced changes (same actor + character within 5s window)
+- `actor`: Enum — `player` | `gm` | `ai_copilot` | `system`
+- `actorUserId`: String (optional) — the user who made the change
+- `category`: String — inferred from changed fields (e.g., attributes, inventory, vitals, skills, magic, identity, grovines, backstory, status, other)
+- `description`: String — human-readable summary of what changed
+- `changes`: JSON — `FieldChange[]` array, each with `{ field, oldValue, newValue }`
+- `source`: String (optional) — origin context (e.g., "character-builder", "canvas-edit", "revert")
+- `revertible`: Boolean (default true) — whether this entry can be reverted
+- `revertedAt`: DateTime (optional) — set when entry is reverted
+- `revertedBy`: String (optional) — userId who performed the revert
+- `snapshotBefore`: JSON (optional) — full character data snapshot before the change (for complex reverts)
+- `createdAt`: DateTime
+- Indexes: `(campaignId, createdAt)`, `(characterId, createdAt)`, `(groupId)`
 
 ### Session
 Auth session token.

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import type { GrowthCharacter } from '@/types/growth';
 
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
+const ChangeLogPanel = dynamic(() => import('@/components/changelog/ChangeLogPanel'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -40,11 +42,45 @@ interface CampaignCanvasProps {
 
 type Tab = 'relations' | 'forge' | 'essence';
 
-export default function CampaignCanvas({ campaign, nodes, connections }: CampaignCanvasProps) {
+export default function CampaignCanvas({ campaign, nodes: initialNodes, connections }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('relations');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [nodes, setNodes] = useState(initialNodes);
+  const [showChangeLog, setShowChangeLog] = useState(false);
   const router = useRouter();
+
+  // Sync local nodes when server re-fetches (e.g. after revert)
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes]);
+
+  // Debounced save: collect rapid changes and persist once after settling
+  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, changes: string[]) => {
+    // Update local state immediately for responsive UI
+    setNodes(prev => prev.map(n =>
+      n.id === nodeId ? { ...n, characterData: character as unknown as Record<string, unknown> } : n
+    ));
+
+    // Debounce the API save (300ms) so rapid slider drags don't spam requests
+    const existing = saveTimersRef.current.get(nodeId);
+    if (existing) clearTimeout(existing);
+
+    saveTimersRef.current.set(nodeId, setTimeout(async () => {
+      saveTimersRef.current.delete(nodeId);
+      try {
+        await fetch(`/api/characters/${nodeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: character }),
+        });
+      } catch {
+        // Silent fail — next interaction will retry
+      }
+    }, 300));
+  }, []);
 
   const handleCreateCharacter = useCallback(async (name: string) => {
     try {
@@ -167,6 +203,7 @@ export default function CampaignCanvas({ campaign, nodes, connections }: Campaig
             campaignId={campaign.id}
             onCreateCharacter={handleCreateCharacter}
             onDeleteCharacter={(nodeId) => setDeleteTarget(nodeId)}
+            onCharacterUpdate={handleCharacterUpdate}
           />
         )}
 
@@ -193,7 +230,7 @@ export default function CampaignCanvas({ campaign, nodes, connections }: Campaig
                 [ESSENCE]
               </div>
               <p className="text-white/30 text-[10px] font-[family-name:var(--font-terminal)] tracking-wider">
-                Campaign themes, world context, and narrative threads. Coming soon.
+                Character essence and narrative threads. Coming soon.
               </p>
               <div className="text-[var(--accent-teal)]/20 text-[9px] font-[family-name:var(--font-terminal)]">
                 {'='.repeat(30)}
@@ -201,6 +238,45 @@ export default function CampaignCanvas({ campaign, nodes, connections }: Campaig
             </div>
           </div>
         )}
+
+        {/* Change Log overlay panel — bottom of canvas */}
+        <div
+          className="absolute bottom-0 left-0 right-0 transition-transform duration-300 ease-in-out"
+          style={{
+            height: showChangeLog ? '45%' : '0',
+            zIndex: 50,
+            pointerEvents: showChangeLog ? 'auto' : 'none',
+          }}
+        >
+          {/* Toggle tab */}
+          <button
+            onClick={() => setShowChangeLog(prev => !prev)}
+            className="absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1 text-[9px] uppercase tracking-[0.2em] transition-colors"
+            style={{
+              fontFamily: 'var(--font-terminal), Consolas, monospace',
+              color: showChangeLog ? '#1a1a2e' : '#ffcc78',
+              backgroundColor: showChangeLog ? '#ffcc78' : 'rgba(26, 26, 46, 0.9)',
+              border: '1px solid rgba(255, 204, 120, 0.4)',
+              borderBottom: showChangeLog ? 'none' : undefined,
+              borderRadius: '3px 3px 0 0',
+              pointerEvents: 'auto',
+              zIndex: 51,
+            }}
+          >
+            {showChangeLog ? '\u25BC CHANGE LOG' : '\u25B2 CHANGE LOG'}
+          </button>
+
+          {/* Panel content */}
+          {showChangeLog && (
+            <div className="h-full border-t" style={{
+              borderColor: 'rgba(255, 204, 120, 0.4)',
+              backgroundColor: 'rgba(10, 10, 26, 0.95)',
+              backdropFilter: 'blur(8px)',
+            }}>
+              <ChangeLogPanel campaignId={campaign.id} visible={showChangeLog} onRevert={() => router.refresh()} />
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Delete confirmation dialog */}

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canViewCharacter, canEditCharacter } from '@/lib/permissions';
 import { createDefaultCharacter } from '@/lib/defaults';
+import { createChangeLogEntry } from '@/services/changelog';
 
 // --- Schemas ---
 
@@ -78,11 +79,30 @@ export async function updateCharacter(
     throw new ForbiddenError('Only the GM can modify character data');
   }
 
+  // Capture before-state for changelog
+  const beforeData = input.data ? JSON.parse(character.data) : null;
+
   const updateData: Record<string, unknown> = {};
   if (input.data) updateData.data = JSON.stringify(input.data);
   if (input.name) updateData.name = input.name;
   if (input.status) updateData.status = input.status;
   if (input.portrait !== undefined) updateData.portrait = input.portrait;
 
-  return prisma.character.update({ where: { id: characterId }, data: updateData });
+  const result = await prisma.character.update({ where: { id: characterId }, data: updateData });
+
+  // Log changes asynchronously (non-blocking)
+  if (beforeData && input.data) {
+    createChangeLogEntry({
+      campaignId: character.campaignId,
+      characterId,
+      characterName: character.name,
+      actor: character.campaign.gmUserId === userId ? 'gm' : 'player',
+      actorUserId: userId,
+      source: 'manual_change',
+      beforeData,
+      afterData: input.data as Record<string, unknown>,
+    }).catch(() => { /* silent — changelog failure should not break character saves */ });
+  }
+
+  return result;
 }

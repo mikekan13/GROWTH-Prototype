@@ -21,6 +21,7 @@ interface ComplexTooltipProps {
   baseValue?: number;
   modifiers: TooltipModifier[];
   totalValue: number;
+  disabled?: boolean;
 }
 
 export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
@@ -28,7 +29,8 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   title,
   baseValue,
   modifiers,
-  totalValue
+  totalValue,
+  disabled = false,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -58,7 +60,15 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
     }
   };
 
+  // Close tooltip when disabled changes to true (e.g. drag started)
+  useEffect(() => {
+    if (disabled && isVisible) {
+      closeAll();
+    }
+  }, [disabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleMouseEnter = (e: React.MouseEvent) => {
+    if (disabled) return;
     setIsVisible(true);
     setIsPositionLocked(false);
     setLockProgress(0);
@@ -70,7 +80,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isVisible) return;
+    if (!isVisible || disabled) return;
 
     if (!isPositionLocked) {
       updatePosition(e);

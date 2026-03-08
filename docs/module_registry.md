@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 ## Services (Business Logic)
 
@@ -11,6 +11,7 @@ Last updated: 2026-03-07
 | CharacterService | `services/character.ts` | Character CRUD, access control | Prisma, permissions, defaults |
 | BackstoryService | `services/backstory.ts` | Structured backstory submit/review | Prisma, permissions |
 | AccessCodeService | `services/access-code.ts` | Code generation, validation, redemption | Prisma, permissions |
+| ChangeLogService | `services/changelog.ts` | Create changelog entries with diff/coalescence (5s window), query with pagination and filters, revert with conflict detection | Prisma, changelog-utils |
 
 ## Infrastructure (lib/)
 
@@ -22,6 +23,7 @@ Last updated: 2026-03-07
 | Errors | `lib/errors.ts` | Typed error classes (AppError, ValidationError, etc.) |
 | API Utils | `lib/api.ts` | Error-to-HTTP-response conversion |
 | Defaults | `lib/defaults.ts` | Default GrowthCharacter factory |
+| ChangeLog Utils | `lib/changelog-utils.ts` | Pure diff/summary utilities: diffObjects (deep object comparison), inferCategory (maps changed fields to changelog categories), summarizeChanges (generates human-readable descriptions from FieldChange arrays) |
 
 ## Components
 
@@ -33,6 +35,7 @@ Last updated: 2026-03-07
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel with filter tabs, quick stats, ComplexTooltip items |
 | Canvas Cards | CampaignCanvas | Campaign page wrapper that loads characters and renders RelationsCanvas |
+| Change Log | ChangeLogPanel | Bottom overlay panel on Relations Canvas — timeline view with filters (actor, category), expand/collapse entries, revert button, auto-poll (5s when visible) |
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |
 | Auth | AuthForm, RedeemCode | Login/register with access code, post-registration upgrade |
@@ -46,6 +49,7 @@ Last updated: 2026-03-07
 | File | Contents |
 |------|----------|
 | `types/growth.ts` | GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthLevels, GrowthCreation, GrowthSkill, GrowthMagic, GrowthTrait, GROvine, GrowthFear, GrowthVitals, GrowthInventory, PILLARS constant |
+| `types/changelog.ts` | ChangeActor (player, gm, ai_copilot, system), ChangeCategory, FieldChange (field/oldValue/newValue), ChangeLogEntry (full DB record type), query/create/revert input types |
 
 ## API Routes (22 total)
 
@@ -62,3 +66,5 @@ Last updated: 2026-03-07
 | /api/characters/[id]/backstory | POST, PATCH | BackstoryService |
 | /api/access-codes | GET, POST | AccessCodeService |
 | /api/access-codes/redeem | POST | AccessCodeService |
+| /api/changelog | GET | ChangeLogService (query with filters: campaignId, characterId, actor, category, pagination) |
+| /api/changelog/[id]/revert | POST | ChangeLogService (revert entry with conflict detection) |

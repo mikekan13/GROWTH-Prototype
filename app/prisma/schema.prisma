@@ -37,6 +37,7 @@ model Campaign {
   maxTrailblazers Int              @default(5)
   characters      Character[]
   members         CampaignMember[]
+  changeLogs      ChangeLog[]
   createdAt       DateTime         @default(now())
 }
 
@@ -62,6 +63,7 @@ model Character {
   portrait   String?
   status     String              @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, ACTIVE, DEAD, RETIRED
   backstory  CharacterBackstory?
+  changeLogs ChangeLog[]
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 }
@@ -103,6 +105,36 @@ model Session {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model ChangeLog {
+  id             String    @id @default(cuid())
+  campaign       Campaign  @relation(fields: [campaignId], references: [id])
+  campaignId     String
+  character      Character @relation(fields: [characterId], references: [id])
+  characterId    String
+  characterName  String    @default("")
+  groupId        String?
+
+  actor          String    // player | gm | ai_copilot | system
+  actorUserId    String
+
+  category       String    // attribute | condition | inventory | etc.
+  description    String
+  changes        String    // JSON: FieldChange[]
+  source         String?
+
+  revertible     Boolean   @default(true)
+  revertedAt     DateTime?
+  revertedBy     String?
+
+  snapshotBefore String?   // Full character JSON snapshot (nullable)
+
+  createdAt      DateTime  @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([characterId, createdAt])
+  @@index([groupId])
 }
 
 model AccessCode {

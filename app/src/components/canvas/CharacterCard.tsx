@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import type { InventoryItem } from './InventoryCard';
+import { updateAttribute, type AttributeName } from '@/lib/character-actions';
+import type { GrowthCharacter } from '@/types/growth';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -53,6 +55,7 @@ interface CharacterCardProps {
   onDelete?: (nodeId: string) => void;
   onInventoryToggle?: (nodeId: string) => void;
   onPanelToggle?: (nodeId: string, panel: string) => void;
+  onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -68,6 +71,144 @@ function getBarPercent(attr: { level: number; current: number; augmentPositive?:
   if (max <= 0) return 0;
   return Math.min(100, (attr.current / max) * 100);
 }
+
+// Condition mappings
+const CONDITION_LABELS: Record<string, string> = {
+  clout: 'WEAK', celerity: 'CLUMSY', constitution: 'EXHAUSTED',
+  flow: 'DEAFENED', frequency: "DEATH'S DOOR", focus: 'MUTED',
+  willpower: 'OVERWHELMED', wisdom: 'CONFUSED', wit: 'INCOHERENT',
+};
+const CONDITION_KEYS: Record<string, string> = {
+  clout: 'weak', celerity: 'clumsy', constitution: 'exhausted',
+  flow: 'deafened', frequency: 'deathsDoor', focus: 'muted',
+  willpower: 'overwhelmed', wisdom: 'confused', wit: 'incoherent',
+};
+
+// ── HBar — Stable component (must live outside CharacterCard to avoid remounts) ──
+
+interface HBarProps {
+  label: string;
+  attrName?: AttributeName;
+  current: number;
+  max: number;
+  isFrequency?: boolean;
+  isLast?: boolean;
+  isConditioned?: boolean;
+  conditionLabel?: string;
+  onAttributeChange?: (attrName: AttributeName, value: number) => void;
+  onDragStateChange?: (dragging: boolean) => void;
+}
+
+const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency, isLast, isConditioned, conditionLabel, onAttributeChange, onDragStateChange }) => {
+  const pct = max > 0 ? Math.min(100, (current / max) * 100) : 0;
+  const isLow = pct < 25;
+  const barRef = useRef<HTMLDivElement>(null);
+  const editable = !!attrName && !!onAttributeChange;
+
+  // Use refs for drag state to avoid re-render mid-drag
+  const draggingRef = useRef(false);
+  const [, forceRender] = useState(0);
+
+  const handleLeverMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!editable || !barRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    draggingRef.current = true;
+    onDragStateChange?.(true);
+    forceRender(n => n + 1);
+
+    // Capture barRef at drag start so it stays stable through re-renders
+    const bar = barRef.current;
+    const attr = attrName!;
+
+    const valueFromX = (clientX: number): number => {
+      const rect = bar.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      return Math.round(ratio * max);
+    };
+
+    const onMove = (me: MouseEvent) => {
+      onAttributeChange!(attr, valueFromX(me.clientX));
+    };
+    const onUp = () => {
+      draggingRef.current = false;
+      onDragStateChange?.(false);
+      forceRender(n => n + 1);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [editable, attrName, max, onAttributeChange, onDragStateChange]);
+
+  const isDragging = draggingRef.current;
+
+  const inner = (
+    <div className={`flex items-center gap-2 ${isFrequency ? 'rounded' : ''}`}
+      style={isFrequency ? { backgroundColor: 'rgba(255, 204, 120, 0.15)', border: '2px solid #ffcc78', padding: '2px', marginLeft: '-4px', marginRight: '-4px' } : undefined}
+    >
+      <span className="text-xl font-bold text-white" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px', paddingLeft: '8px' }}>{current}</span>
+      <div
+        ref={barRef}
+        className={`flex-1 relative h-6 ${isFrequency ? 'bg-black/60' : 'bg-black/40'} rounded cursor-help`}
+        style={{ overflow: 'visible' }}
+      >
+        {/* Current fill */}
+        <div className="absolute top-0 left-0 h-full rounded" style={{
+          width: `${pct}%`,
+          background: 'linear-gradient(90deg, #ffcc78 0%, #ffaa44 100%)',
+          boxShadow: isLow ? '0 0 8px rgba(255, 0, 0, 0.6)' : isFrequency ? '0 0 12px rgba(255, 204, 120, 0.5)' : 'none',
+          transition: isDragging ? 'none' : 'width 0.3s',
+          zIndex: 2,
+          borderRadius: '4px',
+          overflow: 'hidden',
+        }} />
+        {/* Condition text inside the bar */}
+        {isConditioned && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 4 }}>
+            <span className="font-bold uppercase" style={{
+              fontSize: '16px',
+              letterSpacing: '0.15em',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+              color: isFrequency ? '#ff4444' : '#ff6b6b',
+              textShadow: '0 0 8px rgba(255, 68, 68, 0.7), 0 1px 3px rgba(0, 0, 0, 0.9)',
+              animation: 'characterCardConditionPulse 2s ease-in-out infinite',
+            }}>{conditionLabel}</span>
+          </div>
+        )}
+        {/* Draggable lever handle — the only grab target */}
+        {editable && (
+          <div
+            className="absolute top-0 h-full flex items-center cursor-ew-resize"
+            style={{
+              left: `${pct}%`,
+              transform: 'translateX(-50%)',
+              zIndex: 3,
+              padding: '0 8px',
+            }}
+            onMouseDown={handleLeverMouseDown}
+          >
+            <div style={{
+              width: '4px',
+              height: '20px',
+              backgroundColor: '#fff',
+              borderRadius: '2px',
+              boxShadow: isDragging
+                ? '0 0 8px rgba(255, 204, 120, 0.8), 0 0 4px rgba(255, 255, 255, 0.5)'
+                : '0 0 4px rgba(0, 0, 0, 0.5)',
+              opacity: isDragging ? 1 : 0.7,
+              transition: 'opacity 0.15s, box-shadow 0.15s',
+            }} />
+          </div>
+        )}
+      </div>
+      <span className="text-xl font-bold text-white/60" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px', textAlign: 'right' }}>{max}</span>
+      <span className="text-sm font-bold text-white" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px' }}>{label}</span>
+    </div>
+  );
+  return <div className={isLast ? '' : 'mb-2'}>{inner}</div>;
+};
 
 /** Dynamically size the character name to fit the 260px header width. */
 function getNameFontSize(name: string): number {
@@ -92,8 +233,10 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   onDelete,
   onInventoryToggle,
   onPanelToggle,
+  onCharacterUpdate,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isBarDragging, setIsBarDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [isInViewport, setIsInViewport] = useState(true);
@@ -130,6 +273,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const data = node.characterData;
   const levels = data?.levels;
   const attributes = data?.attributes;
+  const conditions = data?.conditions;
   const seed = data?.creation?.seed;
   const root = data?.creation?.root;
   const grovines = data?.grovines || [];
@@ -366,28 +510,29 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const spiritAction = (attributes?.flow?.current || 0) + (attributes?.frequency?.current || 0) + (attributes?.focus?.current || 0);
   const soulAction = (attributes?.willpower?.current || 0) + (attributes?.wisdom?.current || 0) + (attributes?.wit?.current || 0);
 
-  // Horizontal attribute bar helper
-  const HBar = ({ label, current, max, isFrequency, isLast }: { label: string; current: number; max: number; isFrequency?: boolean; isLast?: boolean }) => {
-    const pct = max > 0 ? Math.min(100, (current / max) * 100) : 0;
-    const isLow = pct < 25;
-    const inner = (
-      <div className={`flex items-center gap-2 ${isFrequency ? 'cursor-help rounded' : 'cursor-help'}`}
-        style={isFrequency ? { backgroundColor: 'rgba(255, 204, 120, 0.15)', border: '2px solid #ffcc78', padding: '2px', marginLeft: '-4px', marginRight: '-4px' } : undefined}
-      >
-        <span className="text-xl font-bold text-white" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px', paddingLeft: '8px' }}>{current}</span>
-        <div className={`flex-1 relative h-6 ${isFrequency ? 'bg-black/60' : 'bg-black/40'} rounded overflow-hidden`}>
-          <div className="absolute top-0 left-0 h-full rounded transition-all duration-300" style={{
-            width: `${pct}%`,
-            background: 'linear-gradient(90deg, #ffcc78 0%, #ffaa44 100%)',
-            boxShadow: isLow ? '0 0 8px rgba(255, 0, 0, 0.6)' : isFrequency ? '0 0 12px rgba(255, 204, 120, 0.5)' : 'none'
-          }} />
-        </div>
-        <span className="text-xl font-bold text-white/60" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px', textAlign: 'right' }}>{max}</span>
-        <span className="text-sm font-bold text-white" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px' }}>{label}</span>
-      </div>
-    );
-    return <div className={isLast ? '' : 'mb-2'}>{inner}</div>;
+  // Handler for attribute bar changes
+  const handleAttributeChange = useCallback((attrName: AttributeName, newValue: number) => {
+    if (!onCharacterUpdate || !data) return;
+    // Reconstruct a GrowthCharacter from the node's characterData
+    const charData = data as unknown as GrowthCharacter;
+    const result = updateAttribute(charData, attrName, newValue);
+    if (result.changes.length > 0) {
+      onCharacterUpdate(node.id, result.character, result.changes);
+    }
+  }, [onCharacterUpdate, data, node.id]);
+
+  // Helper to check conditions for a given attribute
+  const getConditionState = (attrName: AttributeName) => {
+    const conditionKey = CONDITION_KEYS[attrName];
+    return {
+      isConditioned: conditionKey ? !!(conditions as Record<string, boolean>)?.[conditionKey] : false,
+      conditionLabel: CONDITION_LABELS[attrName],
+    };
   };
+
+  const handleBarDragState = useCallback((dragging: boolean) => {
+    setIsBarDragging(dragging);
+  }, []);
 
   return (
     <div className="relative" ref={cardRef}>
@@ -792,42 +937,42 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               {/* BODY */}
               <div className="border border-red-500/40 p-3 flex flex-col" style={{ backgroundColor: '#f7525f', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F714; BODY</div>
-                <ComplexTooltip title="Clout" baseValue={attributes?.clout?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.clout?.level || 0 }]} totalValue={attributes?.clout?.current || 0}>
-                  <HBar label="CLT" current={attributes?.clout?.current || 0} max={getAttrMax(attributes?.clout)} />
+                <ComplexTooltip disabled={isBarDragging} title="Clout" baseValue={attributes?.clout?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.clout?.level || 0 }]} totalValue={attributes?.clout?.current || 0}>
+                  <HBar label="CLT" attrName="clout" current={attributes?.clout?.current || 0} max={getAttrMax(attributes?.clout)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('clout')} />
                 </ComplexTooltip>
-                <ComplexTooltip title="Celerity" baseValue={attributes?.celerity?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.celerity?.level || 0 }]} totalValue={attributes?.celerity?.current || 0}>
-                  <HBar label="CEL" current={attributes?.celerity?.current || 0} max={getAttrMax(attributes?.celerity)} />
+                <ComplexTooltip disabled={isBarDragging} title="Celerity" baseValue={attributes?.celerity?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.celerity?.level || 0 }]} totalValue={attributes?.celerity?.current || 0}>
+                  <HBar label="CEL" attrName="celerity" current={attributes?.celerity?.current || 0} max={getAttrMax(attributes?.celerity)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('celerity')} />
                 </ComplexTooltip>
-                <ComplexTooltip title="Constitution" baseValue={attributes?.constitution?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.constitution?.level || 0 }]} totalValue={attributes?.constitution?.current || 0}>
-                  <HBar label="CON" current={attributes?.constitution?.current || 0} max={getAttrMax(attributes?.constitution)} isLast />
+                <ComplexTooltip disabled={isBarDragging} title="Constitution" baseValue={attributes?.constitution?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.constitution?.level || 0 }]} totalValue={attributes?.constitution?.current || 0}>
+                  <HBar label="CON" attrName="constitution" current={attributes?.constitution?.current || 0} max={getAttrMax(attributes?.constitution)} isLast onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('constitution')} />
                 </ComplexTooltip>
               </div>
 
               {/* SPIRIT (Flow/Frequency/Focus) */}
               <div className="border border-purple-500/40 p-3 flex flex-col" style={{ backgroundColor: '#582a72', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70E; SPIRIT</div>
-                <ComplexTooltip title="Flow" baseValue={attributes?.flow?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.flow?.level || 0 }]} totalValue={attributes?.flow?.current || 0}>
-                  <HBar label="FLO" current={attributes?.flow?.current || 0} max={getAttrMax(attributes?.flow)} />
+                <ComplexTooltip disabled={isBarDragging} title="Flow" baseValue={attributes?.flow?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.flow?.level || 0 }]} totalValue={attributes?.flow?.current || 0}>
+                  <HBar label="FLO" attrName="flow" current={attributes?.flow?.current || 0} max={getAttrMax(attributes?.flow)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('flow')} />
                 </ComplexTooltip>
-                <ComplexTooltip title="Frequency" baseValue={attributes?.frequency?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.frequency?.level || 0 }]} totalValue={attributes?.frequency?.current || 0}>
-                  <HBar label="FREQ" current={attributes?.frequency?.current || 0} max={attributes?.frequency?.level || 20} isFrequency />
+                <ComplexTooltip disabled={isBarDragging} title="Frequency" baseValue={attributes?.frequency?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.frequency?.level || 0 }]} totalValue={attributes?.frequency?.current || 0}>
+                  <HBar label="FREQ" attrName="frequency" current={attributes?.frequency?.current || 0} max={attributes?.frequency?.level || 20} isFrequency onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('frequency')} />
                 </ComplexTooltip>
-                <ComplexTooltip title="Focus" baseValue={attributes?.focus?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.focus?.level || 0 }]} totalValue={attributes?.focus?.current || 0}>
-                  <HBar label="FOC" current={attributes?.focus?.current || 0} max={getAttrMax(attributes?.focus)} isLast />
+                <ComplexTooltip disabled={isBarDragging} title="Focus" baseValue={attributes?.focus?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.focus?.level || 0 }]} totalValue={attributes?.focus?.current || 0}>
+                  <HBar label="FOC" attrName="focus" current={attributes?.focus?.current || 0} max={getAttrMax(attributes?.focus)} isLast onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('focus')} />
                 </ComplexTooltip>
               </div>
 
               {/* SOUL (Willpower/Wisdom/Wit) */}
               <div className="border border-blue-500/40 p-3 flex flex-col" style={{ backgroundColor: '#002f6c', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70D; SOUL</div>
-                <ComplexTooltip title="Willpower" baseValue={attributes?.willpower?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.willpower?.level || 0 }]} totalValue={attributes?.willpower?.current || 0}>
-                  <HBar label="WIL" current={attributes?.willpower?.current || 0} max={getAttrMax(attributes?.willpower)} />
+                <ComplexTooltip disabled={isBarDragging} title="Willpower" baseValue={attributes?.willpower?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.willpower?.level || 0 }]} totalValue={attributes?.willpower?.current || 0}>
+                  <HBar label="WIL" attrName="willpower" current={attributes?.willpower?.current || 0} max={getAttrMax(attributes?.willpower)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('willpower')} />
                 </ComplexTooltip>
-                <ComplexTooltip title="Wisdom" baseValue={attributes?.wisdom?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.wisdom?.level || 0 }]} totalValue={attributes?.wisdom?.current || 0}>
-                  <HBar label="WIS" current={attributes?.wisdom?.current || 0} max={getAttrMax(attributes?.wisdom)} />
+                <ComplexTooltip disabled={isBarDragging} title="Wisdom" baseValue={attributes?.wisdom?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.wisdom?.level || 0 }]} totalValue={attributes?.wisdom?.current || 0}>
+                  <HBar label="WIS" attrName="wisdom" current={attributes?.wisdom?.current || 0} max={getAttrMax(attributes?.wisdom)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('wisdom')} />
                 </ComplexTooltip>
-                <ComplexTooltip title="Wit" baseValue={attributes?.wit?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.wit?.level || 0 }]} totalValue={attributes?.wit?.current || 0}>
-                  <HBar label="WIT" current={attributes?.wit?.current || 0} max={getAttrMax(attributes?.wit)} isLast />
+                <ComplexTooltip disabled={isBarDragging} title="Wit" baseValue={attributes?.wit?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.wit?.level || 0 }]} totalValue={attributes?.wit?.current || 0}>
+                  <HBar label="WIT" attrName="wit" current={attributes?.wit?.current || 0} max={getAttrMax(attributes?.wit)} isLast onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('wit')} />
                 </ComplexTooltip>
               </div>
             </div>
@@ -847,6 +992,10 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             75% { transform: translate3d(-49.5%, 70px, 0) scale(1.05) rotate(270deg); opacity: 1; }
             95% { transform: translate3d(-50%, 90px, 0) scale(0.8) rotate(350deg); opacity: 0.5; }
             100% { transform: translate3d(-50%, 96px, 0) scale(0.6) rotate(360deg); opacity: 0; }
+          }
+          @keyframes characterCardConditionPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
           }
           @keyframes characterCardParticleUp {
             0% { transform: translate3d(-50%, 15px, 0) scale(0.8) rotate(0deg); opacity: 1; }
@@ -932,6 +1081,7 @@ export default React.memo(CharacterCard, (prev, next) => (
   prev.node.id === next.node.id &&
   prev.node.x === next.node.x &&
   prev.node.y === next.node.y &&
+  prev.node.characterData === next.node.characterData &&
   prev.isExpanded === next.isExpanded &&
   prev.showInventory === next.showInventory &&
   prev.openPanels === next.openPanels

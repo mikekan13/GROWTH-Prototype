@@ -23,7 +23,7 @@ export function canViewCharacter(
 export function canEditCharacter(
   userId: string,
   userRole: string,
-  character: { campaign: { gmUserId: string } },
+  character: { userId: string; campaign: { gmUserId: string } },
 ): boolean {
-  return character.campaign.gmUserId === userId || isAdminRole(userRole);
+  return character.userId === userId || character.campaign.gmUserId === userId || isAdminRole(userRole);
 }

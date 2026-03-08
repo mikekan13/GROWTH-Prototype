@@ -5,6 +5,7 @@ import CharacterCard from "./CharacterCard";
 import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
 import type { InventoryItem } from "./InventoryCard";
+import type { GrowthCharacter } from "@/types/growth";
 import VitalsCard from "./VitalsCard";
 import TraitsCard from "./TraitsCard";
 import SkillsCard from "./SkillsCard";
@@ -41,6 +42,7 @@ interface RelationsCanvasProps {
   onNodePositionChange?: (nodeId: string, x: number, y: number) => void;
   onCreateCharacter?: (name: string) => void;
   onDeleteCharacter?: (nodeId: string) => void;
+  onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -53,6 +55,7 @@ export default function RelationsCanvas({
   onNodePositionChange,
   onCreateCharacter,
   onDeleteCharacter,
+  onCharacterUpdate,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -700,6 +703,7 @@ export default function RelationsCanvas({
                 return next;
               });
             }}
+            onCharacterUpdate={onCharacterUpdate}
           />
         </foreignObject>
 
