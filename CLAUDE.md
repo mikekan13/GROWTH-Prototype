@@ -104,7 +104,13 @@ C:\Projects\GRO.WTH\
 10. **Update PLAN.md** with what was completed and what's next.
 11. **Update `docs/` files** if you added/changed services, routes, models, or AI systems.
 12. **Commit all code changes** to git.
-13. **Note any unresolved [QUESTION] items** for Mike.
+13. **Push to GitHub** — `git push origin master` from `C:\Projects\GRO.WTH\app`.
+14. **Note any unresolved [QUESTION] items** for Mike.
+
+## Git Remotes (already configured)
+- **App** (`C:\Projects\GRO.WTH\` — git root): `origin` → `https://github.com/mikekan13/GROWTH-Prototype.git`
+- **Repository** (`C:\Projects\GRO.WTH\GRO.WTH Repository\`): `origin` → `https://github.com/mikekan13/GROWTH_Repository.git`
+- Push app changes every session. Push repository changes only when rules files are modified.
 
 ## Visual Identity (from Core Rulebook v0.4.5)
 - **NOT dark-theme-only.** See VISUAL-DESIGN-SPEC.md for full details.
