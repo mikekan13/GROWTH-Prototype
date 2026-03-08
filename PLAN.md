@@ -210,10 +210,15 @@ Status: IN PROGRESS
 **Ship condition**: Full loop from campaign creation to player seeing their completed sheet
 
 ### Phase 3: Session Tools
-Status: NOT STARTED
+Status: IN PROGRESS
 
-- [ ] Dice roller (Fate Die + Skill Die + Effort, full resolution system)
-- [ ] Effort spending (deducts from attribute pools, depletion warnings)
+- [x] **Campaign Terminal** — Unified activity feed replacing ChangeLog overlay. Resizable bottom panel, session grouping (collapsible), filter toggles (All/Chat/Dice/Changes/Events), command input bar with history, auto-poll 5s. Design: `docs/campaign-terminal-design.md`
+- [x] **Game Sessions** — GM starts/ends sessions via `/session start [name]` and `/session end`. Events auto-assigned to active session. Collapsible session groups in terminal.
+- [x] **Dice roller** — Full resolution system: Skill Die (level-based d4→d20) + Fate Die + Effort vs DR. Pure functions in `lib/dice.ts`, integrated via `performSkillCheck()` in `character-actions.ts`. Rolls via `/roll` command or future UI buttons.
+- [x] **Effort spending** — `spendAttribute()` with overflow to Frequency, depletion conditions auto-triggered. Available via `/spend` command and UI attribute bars.
+- [x] **Skills CRUD** — Add/remove/level skills in SkillsCard sub-panel. `addSkill`, `removeSkill`, `updateSkillLevel` in `character-actions.ts`. All changes flow through changelog.
+- [x] **Chat system** — Plain text in terminal = chat message. Persisted to CampaignEvent table. Grouped by session.
+- [x] **Command system** — `/roll`, `/spend`, `/restore`, `/session` commands parsed client-side, execute via character-actions.ts, results posted to terminal.
 - [ ] Damage tracking (hit locations, conditions auto-applied)
 - [ ] Short/long rest recovery
 - [ ] Initiative tracker (basic turn order)

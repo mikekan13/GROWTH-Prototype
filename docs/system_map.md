@@ -1,6 +1,6 @@
 # GRO.WTH System Map
 
-Last updated: 2026-03-08
+Last updated: 2026-03-08 (Campaign Terminal + Dice + Skills)
 
 ## Architecture Overview
 
@@ -74,6 +74,32 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - Revert: any revertible entry can be reverted with conflict detection — the system compares the current field value against the expected "after" value before applying the rollback
 - **Integration rule:** ALL future features that modify character data should wire into the changelog by calling `createChangeLogEntry` from `services/changelog.ts` with before/after data. The `updateCharacter` function already does this automatically for any character data updates routed through it.
 - Files: `services/changelog.ts`, `lib/changelog-utils.ts`, `types/changelog.ts`, `components/changelog/ChangeLogPanel.tsx`, `app/api/changelog/route.ts`, `app/api/changelog/[id]/revert/route.ts`
+
+### Campaign Terminal
+- Unified activity feed replacing the ChangeLog bottom overlay
+- Merges two data sources at display time: ChangeLog entries (character state diffs) + CampaignEvent entries (dice rolls, chat, commands, game events)
+- Resizable bottom panel (drag top edge, height persisted to localStorage per campaign)
+- Events grouped by GameSession (collapsible session headers, "between sessions" for downtime)
+- Filter toggles: All / Chat / Dice / Changes / Events
+- Command input bar (bottom): plain text = chat, / prefix = command
+- Commands: `/roll <skill> dr:<n> effort:<n> attr:<attr>`, `/roll <die>`, `/spend <attr> <n>`, `/restore <attr> <n>`, `/session start [name]`, `/session end`
+- Commands execute via same `character-actions.ts` pure functions as UI buttons
+- Auto-poll 5s when visible, auto-scroll to bottom on new events
+- Design doc: `docs/campaign-terminal-design.md`
+- Files: `components/terminal/CampaignTerminal.tsx`, `TerminalEventRow.tsx`, `CommandInput.tsx`, `lib/terminal-commands.ts`, `types/terminal.ts`, `services/campaign-event.ts`
+
+### Dice / Resolution System
+- Pure rolling functions in `lib/dice.ts`: rollDie, rollSkillDie, rollFateDie, skilledCheck, unskilledCheck
+- Implements GRO.WTH resolution: Skilled (SD + FD + Effort + mods vs DR) and Unskilled (FD + Effort + mods vs DR)
+- Skill Die progression: levels 1-3 = flat bonus, 4-5 = d4, 6-7 = d6, 8-11 = d8, 12-19 = d12, 20 = d20
+- `performSkillCheck()` in `character-actions.ts` combines dice rolling with effort spending (auto-depletion, overflow to Frequency)
+- Effort always spent regardless of success/failure
+
+### Skills System
+- Skills stored inline in character JSON (GrowthSkill[] array)
+- CRUD via pure functions in `character-actions.ts`: addSkill, removeSkill, updateSkillLevel, updateSkill
+- SkillsCard canvas sub-panel supports editing: add form, +/- level buttons, remove button, Roll button (on hover)
+- All changes flow through `onCharacterUpdate` → changelog
 
 ### AI Systems (planned)
 - Portrait pipeline: ComfyUI + FLUX.2 Dev + PuLID (see PORTRAIT-PIPELINE.md)

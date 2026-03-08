@@ -38,6 +38,8 @@ model Campaign {
   characters      Character[]
   members         CampaignMember[]
   changeLogs      ChangeLog[]
+  sessions        GameSession[]
+  events          CampaignEvent[]
   createdAt       DateTime         @default(now())
 }
 
@@ -135,6 +137,40 @@ model ChangeLog {
   @@index([campaignId, createdAt])
   @@index([characterId, createdAt])
   @@index([groupId])
+}
+
+model GameSession {
+  id         String          @id @default(cuid())
+  campaign   Campaign        @relation(fields: [campaignId], references: [id])
+  campaignId String
+  number     Int             // Session 1, 2, 3...
+  name       String?
+  startedAt  DateTime        @default(now())
+  endedAt    DateTime?
+  events     CampaignEvent[]
+
+  @@unique([campaignId, number])
+  @@index([campaignId])
+}
+
+model CampaignEvent {
+  id            String       @id @default(cuid())
+  campaign      Campaign     @relation(fields: [campaignId], references: [id])
+  campaignId    String
+  session       GameSession? @relation(fields: [sessionId], references: [id])
+  sessionId     String?
+  type          String       // dice_roll | chat | command | ai_message | game_event
+  actor         String       // player | gm | ai_copilot | system
+  actorUserId   String
+  actorName     String
+  characterId   String?
+  characterName String?
+  payload       String       // JSON: type-specific payload
+  createdAt     DateTime     @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([campaignId, type])
+  @@index([sessionId])
 }
 
 model AccessCode {

@@ -9,7 +9,9 @@
  * array of what happened (for logging, undo, AI audit trail).
  */
 
-import type { GrowthCharacter, GrowthAttributes, GrowthConditions } from '@/types/growth';
+import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillCategory } from '@/types/growth';
+import { skilledCheck, unskilledCheck, type SkillCheckResult } from '@/lib/dice';
+import type { FateDie } from '@/types/growth';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -199,4 +201,151 @@ export function setAttributeLevel(
   }
 
   return { character: c, changes };
+}
+
+// ── Skill Actions ──────────────────────────────────────────────────────────
+
+/**
+ * Add a new skill to the character.
+ */
+export function addSkill(
+  character: GrowthCharacter,
+  skill: { name: string; level?: number; isCombat?: boolean; category?: SkillCategory; description?: string }
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  const existing = c.skills.find(s => s.name.toLowerCase() === skill.name.toLowerCase());
+  if (existing) {
+    return { character: c, changes: [`Skill "${skill.name}" already exists`] };
+  }
+  const newSkill: GrowthSkill = {
+    name: skill.name,
+    level: Math.max(1, Math.min(20, skill.level || 1)),
+    isCombat: skill.isCombat || false,
+    category: skill.category,
+    description: skill.description,
+  };
+  c.skills.push(newSkill);
+  return { character: c, changes: [`Added skill: ${newSkill.name} (level ${newSkill.level})`] };
+}
+
+/**
+ * Remove a skill by name.
+ */
+export function removeSkill(
+  character: GrowthCharacter,
+  skillName: string
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  const idx = c.skills.findIndex(s => s.name.toLowerCase() === skillName.toLowerCase());
+  if (idx === -1) {
+    return { character: c, changes: [`Skill "${skillName}" not found`] };
+  }
+  c.skills.splice(idx, 1);
+  return { character: c, changes: [`Removed skill: ${skillName}`] };
+}
+
+/**
+ * Update a skill's level (1-20).
+ */
+export function updateSkillLevel(
+  character: GrowthCharacter,
+  skillName: string,
+  newLevel: number
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  const skill = c.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase());
+  if (!skill) {
+    return { character: c, changes: [`Skill "${skillName}" not found`] };
+  }
+  const oldLevel = skill.level;
+  skill.level = Math.max(1, Math.min(20, newLevel));
+  if (skill.level === oldLevel) {
+    return { character: c, changes: [] };
+  }
+  return { character: c, changes: [`${skill.name} level: ${oldLevel} → ${skill.level}`] };
+}
+
+/**
+ * Update a skill's properties (combat flag, category, description).
+ */
+export function updateSkill(
+  character: GrowthCharacter,
+  skillName: string,
+  updates: { isCombat?: boolean; category?: SkillCategory; description?: string }
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  const skill = c.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase());
+  if (!skill) {
+    return { character: c, changes: [`Skill "${skillName}" not found`] };
+  }
+  const changes: string[] = [];
+  if (updates.isCombat !== undefined && updates.isCombat !== skill.isCombat) {
+    skill.isCombat = updates.isCombat;
+    changes.push(`${skill.name}: ${updates.isCombat ? 'marked combat' : 'unmarked combat'}`);
+  }
+  if (updates.category !== undefined && updates.category !== skill.category) {
+    skill.category = updates.category;
+    changes.push(`${skill.name} category: ${updates.category}`);
+  }
+  if (updates.description !== undefined && updates.description !== skill.description) {
+    skill.description = updates.description;
+    changes.push(`${skill.name} description updated`);
+  }
+  return { character: c, changes };
+}
+
+// ── Skill Check Actions ────────────────────────────────────────────────────
+
+export interface SkillCheckActionResult extends ActionResult {
+  roll: SkillCheckResult;
+}
+
+/**
+ * Perform a skill check: roll dice, spend effort from attribute, return result.
+ * Effort is always spent regardless of success/failure.
+ */
+export function performSkillCheck(
+  character: GrowthCharacter,
+  params: {
+    skillName: string;
+    effortAttribute: AttributeName;
+    effortAmount: number;
+    dr: number;
+    flatModifiers?: number;
+  }
+): SkillCheckActionResult {
+  const skill = character.skills.find(s => s.name.toLowerCase() === params.skillName.toLowerCase());
+  const fateDie = character.creation?.seed?.baseFateDie || 'd6';
+
+  // Roll first
+  const roll = skill
+    ? skilledCheck({
+        skillLevel: skill.level,
+        fateDie: fateDie as FateDie,
+        effort: params.effortAmount,
+        dr: params.dr,
+        flatModifiers: params.flatModifiers,
+      })
+    : unskilledCheck({
+        fateDie: fateDie as FateDie,
+        effort: params.effortAmount,
+        dr: params.dr,
+        flatModifiers: params.flatModifiers,
+      });
+
+  // Spend effort (always, regardless of success)
+  const spendResult = spendAttribute(character, params.effortAttribute, params.effortAmount);
+
+  const skillLabel = skill ? skill.name : `${params.skillName} (unskilled)`;
+  const resultLabel = roll.success ? 'SUCCESS' : 'FAILURE';
+  const changes = [
+    `${skillLabel} check vs DR ${params.dr}: ${resultLabel} (${roll.total} = ${roll.skillDie.die}[${roll.skillDie.value}] + ${roll.fateDie.die}[${roll.fateDie.value}] + ${params.effortAmount} effort${roll.flatModifiers ? ` + ${roll.flatModifiers} mod` : ''})`,
+    ...spendResult.changes,
+  ];
+
+  return {
+    character: spendResult.character,
+    changes,
+    roll,
+  };
 }

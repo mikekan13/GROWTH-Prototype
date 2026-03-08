@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
+import type { SkillCategory } from '@/types/growth';
 
 export interface SkillItem {
   name: string;
@@ -14,6 +15,10 @@ export interface SkillItem {
 interface SkillsCardProps {
   skills: SkillItem[];
   onClose?: () => void;
+  onAddSkill?: (skill: { name: string; level: number; isCombat: boolean; category?: SkillCategory }) => void;
+  onRemoveSkill?: (skillName: string) => void;
+  onUpdateSkillLevel?: (skillName: string, newLevel: number) => void;
+  onRollSkill?: (skillName: string) => void;
 }
 
 function getSkillDie(level: number): string {
@@ -46,9 +51,16 @@ function dieColor(level: number): string {
   return '#ffcc78';
 }
 
-export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
+const SKILL_CATEGORIES: SkillCategory[] = ['athletics', 'social', 'martial', 'sciences', 'arts', 'perception', 'magic', 'crafting', 'other'];
+
+export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill }: SkillsCardProps) {
   const [view, setView] = useState<string>('all');
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillLevel, setNewSkillLevel] = useState(1);
+  const [newSkillCombat, setNewSkillCombat] = useState(false);
+  const [newSkillCategory, setNewSkillCategory] = useState<SkillCategory>('other');
 
   const safeSkills = Array.isArray(skills) ? skills : [];
   const combat = safeSkills.filter(s => s.isCombat);
@@ -58,6 +70,22 @@ export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
   const sortedGeneral = [...general].sort((a, b) => b.level - a.level);
 
   const displayed = view === 'combat' ? sortedCombat : view === 'general' ? sortedGeneral : sorted;
+  const isEditable = !!(onAddSkill || onRemoveSkill || onUpdateSkillLevel);
+
+  const handleAddSkill = () => {
+    if (!newSkillName.trim() || !onAddSkill) return;
+    onAddSkill({
+      name: newSkillName.trim(),
+      level: newSkillLevel,
+      isCombat: newSkillCombat,
+      category: newSkillCategory,
+    });
+    setNewSkillName('');
+    setNewSkillLevel(1);
+    setNewSkillCombat(false);
+    setNewSkillCategory('other');
+    setShowAddForm(false);
+  };
 
   return (
     <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '400px' }}>
@@ -74,6 +102,12 @@ export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {isEditable && (
+              <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm); }} onMouseDown={e => e.stopPropagation()}
+                className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: '#ffcc78' }}>
+                +
+              </button>
+            )}
             <button onClick={e => { e.stopPropagation(); setIsExpanded(!isExpanded); }} onMouseDown={e => e.stopPropagation()} className="p-1 hover:bg-white/20 transition-colors" style={{ borderRadius: '2px' }}>
               <svg className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
@@ -88,6 +122,78 @@ export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
 
       {isExpanded && (
         <div className="p-3" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+          {/* Add Skill Form */}
+          {showAddForm && onAddSkill && (
+            <div className="mb-3 p-2 border" style={{ borderColor: '#ffcc78', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={newSkillName}
+                  onChange={e => setNewSkillName(e.target.value)}
+                  onMouseDown={e => e.stopPropagation()}
+                  placeholder="Skill name..."
+                  className="w-full bg-transparent outline-none text-sm text-white px-1 py-0.5 border-b"
+                  style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                  autoFocus
+                />
+                <div className="flex gap-2 items-center">
+                  <label className="text-[9px] text-gray-400">Level:</label>
+                  <input
+                    type="number"
+                    value={newSkillLevel}
+                    onChange={e => setNewSkillLevel(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                    onMouseDown={e => e.stopPropagation()}
+                    min={1} max={20}
+                    className="w-12 bg-transparent outline-none text-xs text-white px-1 py-0.5 border"
+                    style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                  />
+                  <label className="text-[9px] text-gray-400 flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={newSkillCombat}
+                      onChange={e => setNewSkillCombat(e.target.checked)}
+                      onMouseDown={e => e.stopPropagation()}
+                    />
+                    Combat
+                  </label>
+                  <select
+                    value={newSkillCategory}
+                    onChange={e => setNewSkillCategory(e.target.value as SkillCategory)}
+                    onMouseDown={e => e.stopPropagation()}
+                    className="text-[9px] bg-transparent text-white outline-none px-1 py-0.5 border"
+                    style={{ borderColor: '#3a3a4e' }}
+                  >
+                    {SKILL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={e => { e.stopPropagation(); handleAddSkill(); }}
+                    onMouseDown={e => e.stopPropagation()}
+                    disabled={!newSkillName.trim()}
+                    className="text-[9px] px-2 py-0.5 uppercase"
+                    style={{
+                      color: newSkillName.trim() ? '#22ab94' : '#666',
+                      border: '1px solid',
+                      borderColor: newSkillName.trim() ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
+                      borderRadius: '2px',
+                    }}
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); setShowAddForm(false); }}
+                    onMouseDown={e => e.stopPropagation()}
+                    className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
+                    style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* View tabs */}
           <div className="flex flex-wrap gap-1 mb-3">
             {['all', 'combat', 'general'].map(v => (
@@ -113,7 +219,9 @@ export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
           {/* Skills list */}
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {displayed.length === 0 ? (
-              <div className="text-center text-gray-400 text-sm py-4">No skills found</div>
+              <div className="text-center text-gray-400 text-sm py-4">
+                {isEditable ? 'No skills yet. Click + to add one.' : 'No skills found'}
+              </div>
             ) : displayed.map((skill, i) => {
               const die = getSkillDie(skill.level);
               const rank = getSkillRank(skill.level);
@@ -126,7 +234,7 @@ export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
                     ...(skill.isCombat ? [{ name: 'Combat Skill', value: 0 }] : []),
                     ...(skill.description ? [{ name: skill.description, value: 0 }] : []),
                   ]} totalValue={skill.level}>
-                  <div className="p-1.5 border transition-colors cursor-pointer" onMouseDown={e => e.stopPropagation()}
+                  <div className="p-1.5 border transition-colors group" onMouseDown={e => e.stopPropagation()}
                     style={{ borderRadius: '2px', backgroundColor: '#2a2a3e', borderColor: '#3a3a4e' }}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -139,6 +247,45 @@ export default function SkillsCard({ skills, onClose }: SkillsCardProps) {
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Level adjust buttons (only when editable) */}
+                        {onUpdateSkillLevel && (
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={e => { e.stopPropagation(); onUpdateSkillLevel(skill.name, skill.level - 1); }}
+                              className="text-[9px] w-4 h-4 flex items-center justify-center hover:bg-white/10"
+                              style={{ color: '#888', borderRadius: '2px' }}
+                            >-</button>
+                            <button
+                              onClick={e => { e.stopPropagation(); onUpdateSkillLevel(skill.name, skill.level + 1); }}
+                              className="text-[9px] w-4 h-4 flex items-center justify-center hover:bg-white/10"
+                              style={{ color: '#888', borderRadius: '2px' }}
+                            >+</button>
+                          </div>
+                        )}
+                        {/* Roll button */}
+                        {onRollSkill && (
+                          <button
+                            onClick={e => { e.stopPropagation(); onRollSkill(skill.name); }}
+                            className="text-[8px] px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity uppercase"
+                            style={{
+                              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                              color: '#ffcc78',
+                              border: '1px solid rgba(255,204,120,0.3)',
+                              borderRadius: '2px',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
+                            Roll
+                          </button>
+                        )}
+                        {/* Remove button */}
+                        {onRemoveSkill && (
+                          <button
+                            onClick={e => { e.stopPropagation(); onRemoveSkill(skill.name); }}
+                            className="text-[9px] w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-900/30"
+                            style={{ color: '#ff6b6b', borderRadius: '2px' }}
+                          >{'\u00D7'}</button>
+                        )}
                         {/* Mini level bar */}
                         <div className="flex gap-px">
                           {Array.from({ length: 20 }, (_, j) => (

@@ -1,6 +1,6 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-03-08
+Last updated: 2026-03-08 (Campaign Terminal + GameSession + CampaignEvent)
 Source of truth: `app/prisma/schema.prisma`
 
 ## Models
@@ -74,6 +74,32 @@ Immutable record of every character data change. Supports timeline view, filteri
 - `snapshotBefore`: JSON (optional) — full character data snapshot before the change (for complex reverts)
 - `createdAt`: DateTime
 - Indexes: `(campaignId, createdAt)`, `(characterId, createdAt)`, `(groupId)`
+
+### GameSession
+Numbered game session within a campaign. Used by Campaign Terminal for event grouping.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign this session belongs to
+- `number`: Int — sequential session number (unique per campaign via `@@unique([campaignId, number])`)
+- `name`: String (optional) — human-readable session name (e.g., "The Dragon's Lair")
+- `startedAt`: DateTime — when the session was started
+- `endedAt`: DateTime (optional) — null while session is active
+- Relations: campaign, events (CampaignEvent[])
+
+### CampaignEvent
+Activity event in a campaign (dice rolls, chat, commands, AI messages, game events). Merged with ChangeLog entries at display time in the Campaign Terminal.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign this event belongs to
+- `sessionId`: String (optional) — which GameSession this event belongs to (null = "between sessions")
+- `type`: String — event type: `dice_roll` | `chat` | `command` | `ai_message` | `game_event`
+- `actor`: String — who created the event: `player` | `gm` | `ai_copilot` | `system`
+- `actorUserId`: String (optional) — the user who created the event
+- `actorName`: String — display name of the actor
+- `characterId`: String (optional) — character involved (if any)
+- `characterName`: String (optional) — denormalized character name
+- `payload`: JSON — event-specific data (see TerminalPayload types in `types/terminal.ts`)
+- `createdAt`: DateTime
+- Relations: campaign, session (GameSession, optional)
+- Indexes: `(campaignId, createdAt)`, `(sessionId)`
 
 ### Session
 Auth session token.

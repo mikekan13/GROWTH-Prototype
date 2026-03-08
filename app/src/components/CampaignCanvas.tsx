@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GrowthCharacter } from '@/types/growth';
 
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
-const ChangeLogPanel = dynamic(() => import('@/components/changelog/ChangeLogPanel'), { ssr: false });
+const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -38,17 +38,52 @@ interface CampaignCanvasProps {
   };
   nodes: CanvasNode[];
   connections: Connection[];
+  userId?: string;
+  username?: string;
+  userRole?: string;
+  userCharacter?: { id: string; name: string; data: string } | null;
 }
 
 type Tab = 'relations' | 'forge' | 'essence';
 
-export default function CampaignCanvas({ campaign, nodes: initialNodes, connections }: CampaignCanvasProps) {
+const MIN_TERMINAL_HEIGHT = 150;
+const MAX_TERMINAL_FRACTION = 0.8;
+
+export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('relations');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [nodes, setNodes] = useState(initialNodes);
-  const [showChangeLog, setShowChangeLog] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const router = useRouter();
+
+  // Resizable terminal height — persisted per campaign
+  const storageKey = `terminal-height-${campaign.id}`;
+  const [terminalHeight, setTerminalHeight] = useState(() => {
+    if (typeof window === 'undefined') return 350;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? parseInt(stored) : 350;
+    } catch { return 350; }
+  });
+  const isResizing = useRef(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  // Persist terminal height
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, String(terminalHeight)); } catch { /* ignore */ }
+  }, [terminalHeight, storageKey]);
+
+  // Parse user's character data for terminal
+  const parsedCharacter = userCharacter ? (() => {
+    try {
+      return {
+        id: userCharacter.id,
+        name: userCharacter.name,
+        data: JSON.parse(userCharacter.data) as GrowthCharacter,
+      };
+    } catch { return null; }
+  })() : null;
 
   // Sync local nodes when server re-fetches (e.g. after revert)
   useEffect(() => {
@@ -118,6 +153,38 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       setDeleteTarget(null);
     }
   }, [deleteTarget, router]);
+
+  // ── Resize handler ──────────────────────────────────────────────────────
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+
+    const startY = e.clientY;
+    const startHeight = terminalHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizing.current) return;
+      const dy = startY - moveEvent.clientY;
+      const mainEl = mainRef.current;
+      const maxHeight = mainEl ? mainEl.clientHeight * MAX_TERMINAL_FRACTION : 600;
+      const newHeight = Math.max(MIN_TERMINAL_HEIGHT, Math.min(maxHeight, startHeight + dy));
+      setTerminalHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [terminalHeight]);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'relations', label: 'Relations' },
@@ -195,7 +262,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       </header>
 
       {/* Canvas content area — fills remaining space */}
-      <main className="flex-1 relative overflow-hidden">
+      <main ref={mainRef} className="flex-1 relative overflow-hidden">
         {activeTab === 'relations' && (
           <RelationsCanvas
             nodes={nodes}
@@ -239,41 +306,68 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           </div>
         )}
 
-        {/* Change Log overlay panel — bottom of canvas */}
+        {/* Campaign Terminal — resizable bottom overlay */}
         <div
-          className="absolute bottom-0 left-0 right-0 transition-transform duration-300 ease-in-out"
+          className="absolute bottom-0 left-0 right-0"
           style={{
-            height: showChangeLog ? '45%' : '0',
+            height: showTerminal ? `${terminalHeight}px` : '0',
             zIndex: 50,
-            pointerEvents: showChangeLog ? 'auto' : 'none',
+            pointerEvents: showTerminal ? 'auto' : 'none',
+            transition: showTerminal ? 'none' : 'height 0.3s ease-in-out',
           }}
         >
           {/* Toggle tab */}
           <button
-            onClick={() => setShowChangeLog(prev => !prev)}
+            onClick={() => setShowTerminal(prev => !prev)}
             className="absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1 text-[9px] uppercase tracking-[0.2em] transition-colors"
             style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: showChangeLog ? '#1a1a2e' : '#ffcc78',
-              backgroundColor: showChangeLog ? '#ffcc78' : 'rgba(26, 26, 46, 0.9)',
-              border: '1px solid rgba(255, 204, 120, 0.4)',
-              borderBottom: showChangeLog ? 'none' : undefined,
+              color: showTerminal ? '#0a0a1a' : '#22ab94',
+              backgroundColor: showTerminal ? '#22ab94' : 'rgba(10, 10, 26, 0.9)',
+              border: '1px solid rgba(34, 171, 148, 0.4)',
+              borderBottom: showTerminal ? 'none' : undefined,
               borderRadius: '3px 3px 0 0',
               pointerEvents: 'auto',
               zIndex: 51,
             }}
           >
-            {showChangeLog ? '\u25BC CHANGE LOG' : '\u25B2 CHANGE LOG'}
+            {showTerminal ? '\u25BC TERMINAL' : '\u25B2 TERMINAL'}
           </button>
 
+          {/* Resize handle */}
+          {showTerminal && (
+            <div
+              onMouseDown={handleResizeStart}
+              className="absolute top-0 left-0 right-0 h-[6px] cursor-ns-resize"
+              style={{
+                zIndex: 52,
+                backgroundColor: 'transparent',
+              }}
+            >
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[3px] rounded-full" style={{
+                backgroundColor: 'rgba(34, 171, 148, 0.4)',
+                marginTop: '1px',
+              }} />
+            </div>
+          )}
+
           {/* Panel content */}
-          {showChangeLog && (
+          {showTerminal && (
             <div className="h-full border-t" style={{
-              borderColor: 'rgba(255, 204, 120, 0.4)',
+              borderColor: 'rgba(34, 171, 148, 0.4)',
               backgroundColor: 'rgba(10, 10, 26, 0.95)',
               backdropFilter: 'blur(8px)',
             }}>
-              <ChangeLogPanel campaignId={campaign.id} visible={showChangeLog} onRevert={() => router.refresh()} />
+              <CampaignTerminal
+                campaignId={campaign.id}
+                visible={showTerminal}
+                character={parsedCharacter}
+                onCharacterUpdate={(charId, char, changes) => handleCharacterUpdate(charId, char, changes)}
+                onRevert={() => router.refresh()}
+                userId={userId}
+                username={username}
+                userRole={userRole}
+              />
             </div>
           )}
         </div>

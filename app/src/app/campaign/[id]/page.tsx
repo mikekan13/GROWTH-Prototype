@@ -19,6 +19,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
           status: true,
           data: true,
           portrait: true,
+          userId: true,
         },
       },
       members: {
@@ -64,11 +65,23 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     genre: campaign.genre,
   };
 
+  // Find the current user's character for terminal auto-detection
+  const myChar = campaign.characters.find(c => c.userId === session.user.id);
+  const userCharacterInfo = myChar ? {
+    id: myChar.id,
+    name: myChar.name,
+    data: myChar.data,
+  } : null;
+
   return (
     <CampaignCanvas
       campaign={campaignData}
       nodes={nodes}
       connections={[]}
+      userId={session.user.id}
+      username={session.user.username}
+      userRole={session.user.role}
+      userCharacter={userCharacterInfo}
     />
   );
 }

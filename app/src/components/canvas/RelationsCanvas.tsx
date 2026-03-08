@@ -6,6 +6,7 @@ import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
 import type { InventoryItem } from "./InventoryCard";
 import type { GrowthCharacter } from "@/types/growth";
+import { addSkill, removeSkill, updateSkillLevel } from "@/lib/character-actions";
 import VitalsCard from "./VitalsCard";
 import TraitsCard from "./TraitsCard";
 import SkillsCard from "./SkillsCard";
@@ -861,7 +862,26 @@ export default function RelationsCanvas({
               case 'traits':
                 return <TraitsCard traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string }>) || []} fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'skills':
-                return <SkillsCard skills={(charData.skills as Array<{ name: string; level: number; isCombat?: boolean; category?: string; description?: string }>) || []} onClose={() => togglePanel(node.id, panelKey)} />;
+                return <SkillsCard
+                  skills={(charData.skills as Array<{ name: string; level: number; isCombat?: boolean; category?: string; description?: string }>) || []}
+                  onClose={() => togglePanel(node.id, panelKey)}
+                  onAddSkill={onCharacterUpdate ? (skill) => {
+                    const result = addSkill(charData as unknown as GrowthCharacter, skill);
+                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
+                  } : undefined}
+                  onRemoveSkill={onCharacterUpdate ? (skillName) => {
+                    const result = removeSkill(charData as unknown as GrowthCharacter, skillName);
+                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
+                  } : undefined}
+                  onUpdateSkillLevel={onCharacterUpdate ? (skillName, newLevel) => {
+                    const result = updateSkillLevel(charData as unknown as GrowthCharacter, skillName, newLevel);
+                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
+                  } : undefined}
+                  onRollSkill={(skillName) => {
+                    // Dispatch a custom event that CampaignTerminal can listen to for pre-filling /roll command
+                    window.dispatchEvent(new CustomEvent('growth:roll-skill', { detail: { skillName, characterName: node.name, nodeId: node.id } }));
+                  }}
+                />;
               case 'magic':
                 return <MagicCard magic={(charData.magic as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'backstory':
