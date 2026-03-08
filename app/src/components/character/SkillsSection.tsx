@@ -13,8 +13,8 @@ const GOV_ABBREV: Record<string, string> = {
 
 const GOV_COLOR: Record<string, string> = {
   clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
-  flow: '#3EB89A', focus: '#3EB89A',
-  willpower: '#7050A8', wisdom: '#7050A8', wit: '#7050A8',
+  flow: '#7050A8', focus: '#7050A8',
+  willpower: '#3E78C0', wisdom: '#3E78C0', wit: '#3E78C0',
 };
 
 function SkillDieBadge({ level }: { level: number }) {

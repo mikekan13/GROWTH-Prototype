@@ -383,7 +383,7 @@ export default function CampaignTerminal({
               fontSize: '18px',
             }}>CAMPAIGN TERMINAL</h2>
             {activeSession && (
-              <span className="text-[9px] px-2 py-0.5" style={{
+              <span className="text-[13px] px-2 py-0.5" style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 color: '#22ab94',
                 border: '1px solid rgba(34,171,148,0.4)',
@@ -395,7 +395,7 @@ export default function CampaignTerminal({
           </div>
           <button
             onClick={() => { fetchEvents(); fetchSessions(); }}
-            className="px-2 py-1 text-[10px] uppercase tracking-wider transition-colors"
+            className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
             style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: '#22ab94',
@@ -415,7 +415,7 @@ export default function CampaignTerminal({
             <button
               key={f.key}
               onClick={() => setActiveFilter(f.key)}
-              className="px-2 py-1 text-[9px] uppercase tracking-wider transition-colors"
+              className="px-2 py-1 text-[13px] uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 letterSpacing: '0.05em',
@@ -435,7 +435,7 @@ export default function CampaignTerminal({
       {/* Event Feed */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
         {loading && events.length === 0 && (
-          <div className="text-center py-8 text-[11px]" style={{
+          <div className="text-center py-8 text-[13px]" style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
             color: 'rgba(34, 171, 148, 0.5)',
           }}>Loading...</div>
@@ -443,11 +443,11 @@ export default function CampaignTerminal({
 
         {!loading && events.length === 0 && (
           <div className="text-center py-8">
-            <div className="text-[11px] mb-1" style={{
+            <div className="text-[13px] mb-1" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: 'rgba(34, 171, 148, 0.4)',
             }}>Terminal ready</div>
-            <div className="text-[9px]" style={{
+            <div className="text-[13px]" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: 'rgba(255,255,255,0.2)',
             }}>Type a message or use /commands. Activity will appear here.</div>
@@ -471,25 +471,25 @@ export default function CampaignTerminal({
                   }}
                 >
                   {group.sessionId && (
-                    <span className="text-[8px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                    <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
                       {isCollapsed ? '\u25B6' : '\u25BC'}
                     </span>
                   )}
-                  <span className="text-[10px] uppercase tracking-wider flex-1" style={{
+                  <span className="text-[12px] uppercase tracking-wider flex-1" style={{
                     fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                     color: '#22ab94',
                     letterSpacing: '0.1em',
                   }}>
                     {group.label}
                   </span>
-                  <span className="text-[8px]" style={{
+                  <span className="text-[12px]" style={{
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
                     color: 'rgba(255,255,255,0.2)',
                   }}>
                     {group.events.length} events
                   </span>
                   {group.sessionInfo?.endedAt && (
-                    <span className="text-[8px]" style={{
+                    <span className="text-[12px]" style={{
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
                       color: 'rgba(255,255,255,0.15)',
                     }}>ended</span>

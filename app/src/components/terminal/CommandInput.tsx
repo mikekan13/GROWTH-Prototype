@@ -78,7 +78,7 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
       borderColor: 'rgba(34, 171, 148, 0.3)',
       backgroundColor: '#0d0d1a',
     }}>
-      <span className="text-[11px] flex-shrink-0" style={{
+      <span className="text-[13px] flex-shrink-0" style={{
         fontFamily: 'var(--font-terminal), Consolas, monospace',
         color: '#22ab94',
       }}>{'>'}</span>
@@ -90,7 +90,7 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder || 'Type a message or /command...'}
-        className="flex-1 bg-transparent outline-none text-[11px]"
+        className="flex-1 bg-transparent outline-none text-[13px]"
         style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           color: '#ccc',
@@ -102,7 +102,7 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
       <button
         onClick={handleSubmit}
         disabled={disabled || !value.trim()}
-        className="text-[9px] px-2 py-1 uppercase tracking-wider transition-colors"
+        className="text-[13px] px-2 py-1 uppercase tracking-wider transition-colors"
         style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           color: value.trim() ? '#22ab94' : 'rgba(34,171,148,0.3)',

@@ -65,8 +65,8 @@ const GOV_ABBREV: Record<string, string> = {
 
 const GOV_COLOR: Record<string, string> = {
   clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
-  flow: '#3EB89A', focus: '#3EB89A',
-  willpower: '#7050A8', wisdom: '#7050A8', wit: '#7050A8',
+  flow: '#7050A8', focus: '#7050A8',
+  willpower: '#3E78C0', wisdom: '#3E78C0', wit: '#3E78C0',
 };
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -200,7 +200,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
           {isGM && (
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="px-3 py-1 text-[10px] uppercase tracking-wider transition-colors"
+              className="px-3 py-1 text-[12px] uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 color: '#ffcc78',
@@ -220,7 +220,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
             <button
               key={t}
               onClick={() => setActiveType(t)}
-              className="px-2 py-1 text-[9px] uppercase tracking-wider transition-colors"
+              className="px-2 py-1 text-[11px] uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 letterSpacing: '0.05em',
@@ -241,16 +241,16 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
         {/* Create Form (GM only) */}
         {showCreateForm && isGM && (
           <div className="p-4 border" style={{ borderColor: 'rgba(255,204,120,0.3)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-            <div className="text-[10px] uppercase tracking-wider mb-3" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+            <div className="text-[12px] uppercase tracking-wider mb-3" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
               New Design
             </div>
             <div className="space-y-3">
               <div className="flex gap-2 items-center">
-                <label className="text-[9px] text-gray-400 w-10">Type:</label>
+                <label className="text-[11px] text-gray-400 w-10">Type:</label>
                 <select
                   value={newType}
                   onChange={e => setNewType(e.target.value)}
-                  className="text-[10px] bg-transparent text-white outline-none px-2 py-1 border"
+                  className="text-[12px] bg-transparent text-white outline-none px-2 py-1 border"
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
                   {['skill', 'item', 'nectar', 'blossom', 'thorn'].map(t => (
@@ -259,7 +259,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
                 </select>
               </div>
               <div className="flex gap-2 items-center">
-                <label className="text-[9px] text-gray-400 w-10">Name:</label>
+                <label className="text-[11px] text-gray-400 w-10">Name:</label>
                 <input
                   type="text"
                   value={newName}
@@ -271,26 +271,26 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
                 />
               </div>
               <div className="flex gap-2 items-start">
-                <label className="text-[9px] text-gray-400 w-10 pt-1">Desc:</label>
+                <label className="text-[11px] text-gray-400 w-10 pt-1">Desc:</label>
                 <input
                   type="text"
                   value={newDesc}
                   onChange={e => setNewDesc(e.target.value)}
                   placeholder="Description..."
-                  className="flex-1 bg-transparent outline-none text-[10px] text-gray-300 px-2 py-1 border"
+                  className="flex-1 bg-transparent outline-none text-[12px] text-gray-300 px-2 py-1 border"
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 />
               </div>
               {newType === 'skill' && (
                 <div>
-                  <label className="text-[9px] text-gray-400 block mb-1">Governors (at least one):</label>
+                  <label className="text-[11px] text-gray-400 block mb-1">Governors (at least one):</label>
                   <div className="flex flex-wrap gap-1">
                     {SKILL_GOVERNORS.map(gov => (
                       <button
                         key={gov}
                         type="button"
                         onClick={() => toggleGov(gov)}
-                        className="text-[8px] px-1.5 py-0.5 transition-colors uppercase"
+                        className="text-[10px] px-1.5 py-0.5 transition-colors uppercase"
                         style={{
                           borderRadius: '2px',
                           fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -310,7 +310,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
                 <button
                   onClick={handleCreate}
                   disabled={!canSubmit}
-                  className="text-[9px] px-3 py-1 uppercase tracking-wider"
+                  className="text-[11px] px-3 py-1 uppercase tracking-wider"
                   style={{
                     color: canSubmit ? '#ffcc78' : '#666',
                     border: `1px solid ${canSubmit ? 'rgba(255,204,120,0.4)' : '#3a3a4e'}`,
@@ -322,7 +322,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
                 </button>
                 <button
                   onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); }}
-                  className="text-[9px] px-3 py-1 uppercase tracking-wider text-gray-500"
+                  className="text-[11px] px-3 py-1 uppercase tracking-wider text-gray-500"
                   style={{ border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
                   Cancel
@@ -335,7 +335,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
         {/* Player Requests (GM sees pending, players see own) */}
         {pendingRequests.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
+            <div className="text-[12px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
               color: '#D0A030',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
@@ -352,24 +352,24 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
 
         {/* Forge Items */}
         {loading ? (
-          <div className="text-center py-8 text-[11px]" style={{
+          <div className="text-center py-8 text-[13px]" style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
             color: 'rgba(255,204,120,0.3)',
           }}>Loading forge...</div>
         ) : items.length === 0 && pendingRequests.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-[11px] mb-1" style={{
+            <div className="text-[13px] mb-1" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: 'rgba(255,204,120,0.3)',
             }}>Forge is empty</div>
-            <div className="text-[9px]" style={{
+            <div className="text-[11px]" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: 'rgba(255,255,255,0.15)',
             }}>{isGM ? 'Create designs for your campaign — skills, items, nectars, and more.' : 'Your GM hasn\'t published any designs yet.'}</div>
           </div>
         ) : (
           <div>
-            <div className="text-[10px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
+            <div className="text-[12px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
               color: '#ffcc78',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
@@ -394,7 +394,7 @@ export default function ForgePanel({ campaignId, isGM, userId }: ForgePanelProps
         {/* Resolved requests (collapsed) */}
         {resolvedRequests.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider mb-2" style={{
+            <div className="text-[12px] uppercase tracking-wider mb-2" style={{
               color: '#666',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
@@ -434,7 +434,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete }: {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Type badge */}
-          <span className="text-[8px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
+          <span className="text-[10px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             letterSpacing: '0.05em',
             backgroundColor: `${TYPE_COLORS[item.type] || '#888'}20`,
@@ -463,14 +463,14 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete }: {
           )}
           {/* Description preview */}
           {description && (
-            <span className="text-[9px] text-gray-500 truncate" style={{
+            <span className="text-[11px] text-gray-500 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{description}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Status badge */}
-          <span className="text-[8px] px-1.5 py-0.5 uppercase" style={{
+          <span className="text-[10px] px-1.5 py-0.5 uppercase" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             color: STATUS_COLORS[item.status] || '#888',
             border: `1px solid ${STATUS_COLORS[item.status] || '#888'}40`,
@@ -485,12 +485,12 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete }: {
                 <>
                   <button
                     onClick={() => onPublish(item.id)}
-                    className="text-[8px] px-1.5 py-0.5 uppercase"
+                    className="text-[10px] px-1.5 py-0.5 uppercase"
                     style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   >Publish</button>
                   <button
                     onClick={() => onDelete(item.id)}
-                    className="text-[8px] px-1.5 py-0.5 uppercase"
+                    className="text-[10px] px-1.5 py-0.5 uppercase"
                     style={{ color: '#E8585A', border: '1px solid rgba(232,88,90,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   >Delete</button>
                 </>
@@ -498,7 +498,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete }: {
               {item.status === 'published' && (
                 <button
                   onClick={() => onUnpublish(item.id)}
-                  className="text-[8px] px-1.5 py-0.5 uppercase"
+                  className="text-[10px] px-1.5 py-0.5 uppercase"
                   style={{ color: '#888', border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >Unpublish</button>
               )}
@@ -528,7 +528,7 @@ function RequestRow({ request, isGM, onResolve, onRefresh }: {
     }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-[8px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
+          <span className="text-[10px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             letterSpacing: '0.05em',
             backgroundColor: `${TYPE_COLORS[request.type] || '#888'}20`,
@@ -554,13 +554,13 @@ function RequestRow({ request, isGM, onResolve, onRefresh }: {
             </div>
           )}
           {description && (
-            <span className="text-[9px] text-gray-500 truncate" style={{
+            <span className="text-[11px] text-gray-500 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{description}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[8px] px-1.5 py-0.5 uppercase" style={{
+          <span className="text-[10px] px-1.5 py-0.5 uppercase" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             color: STATUS_COLORS[request.status] || '#888',
             border: `1px solid ${STATUS_COLORS[request.status] || '#888'}40`,
@@ -572,18 +572,18 @@ function RequestRow({ request, isGM, onResolve, onRefresh }: {
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => onResolve(request.id, 'approved')}
-                className="text-[8px] px-1.5 py-0.5 uppercase"
+                className="text-[10px] px-1.5 py-0.5 uppercase"
                 style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
               >Approve</button>
               <button
                 onClick={() => onResolve(request.id, 'denied')}
-                className="text-[8px] px-1.5 py-0.5 uppercase"
+                className="text-[10px] px-1.5 py-0.5 uppercase"
                 style={{ color: '#E8585A', border: '1px solid rgba(232,88,90,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
               >Deny</button>
             </div>
           )}
           {request.gmNotes && (
-            <span className="text-[8px] text-gray-500 italic max-w-32 truncate" style={{
+            <span className="text-[10px] text-gray-500 italic max-w-32 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{request.gmNotes}</span>
           )}

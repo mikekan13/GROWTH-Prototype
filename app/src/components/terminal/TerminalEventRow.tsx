@@ -95,17 +95,17 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
         <ActorBadge actor={event.actor} color={actorColor} />
         <span className="text-xs flex-shrink-0" style={{ color: '#ffcc78' }}>{icon}</span>
         {event.characterName && (
-          <span className="text-[9px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#8e7cc3' }}>
+          <span className="text-[13px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#8e7cc3' }}>
             {event.characterName}
           </span>
         )}
-        <span className="text-[10px] flex-1 truncate" style={{
+        <span className="text-[12px] flex-1 truncate" style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           color: payload.reverted ? '#666' : '#ccc',
           textDecoration: payload.reverted ? 'line-through' : 'none',
         }}>{payload.description}</span>
         <Timestamp iso={event.timestamp} />
-        <span className="text-[8px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
           {expanded ? '\u25BC' : '\u25B6'}
         </span>
       </div>
@@ -114,7 +114,7 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
         <div className="px-3 pb-2 pt-1 border-t" style={{ borderColor: 'rgba(255,204,120,0.08)' }}>
           <div className="space-y-1 mb-2">
             {payload.changes.map((change, i) => (
-              <div key={i} className="flex items-center gap-2 text-[9px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              <div key={i} className="flex items-center gap-2 text-[13px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 <span style={{ color: '#666', minWidth: '140px' }}>{change.path}</span>
                 <span style={{ color: '#ff6b6b' }}>{JSON.stringify(change.previousValue)}</span>
                 <span style={{ color: '#666' }}>{'\u2192'}</span>
@@ -123,7 +123,7 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
             ))}
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[8px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255,255,255,0.2)' }}>
+            <span className="text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255,255,255,0.2)' }}>
               {payload.source && `source: ${payload.source}`}
               {payload.reverted && ' \u2022 reverted'}
             </span>
@@ -131,7 +131,7 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
               <button
                 onClick={e => { e.stopPropagation(); onRevert(payload.entryId); }}
                 disabled={reverting === payload.entryId}
-                className="text-[9px] px-2 py-0.5 transition-colors"
+                className="text-[13px] px-2 py-0.5 transition-colors"
                 style={{
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                   color: '#ff6b6b',
@@ -171,15 +171,15 @@ function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRo
         <ActorBadge actor={event.actor} color={actorColor} />
         <span className="text-xs flex-shrink-0" style={{ color: '#ffcc78' }}>{'\uD83C\uDFB2'}</span>
         {event.characterName && (
-          <span className="text-[9px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#8e7cc3' }}>
+          <span className="text-[13px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#8e7cc3' }}>
             {event.characterName}
           </span>
         )}
-        <span className="text-[10px] flex-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ccc' }}>
+        <span className="text-[12px] flex-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ccc' }}>
           {payload.context}
         </span>
         {resultLabel && (
-          <span className="text-[9px] font-bold px-1.5 py-0.5" style={{
+          <span className="text-[13px] font-bold px-1.5 py-0.5" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             color: successColor,
             letterSpacing: '0.1em',
@@ -191,7 +191,7 @@ function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRo
       </div>
 
       {/* Roll breakdown */}
-      <div className="px-3 pb-2 flex flex-wrap gap-3 text-[9px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+      <div className="px-3 pb-2 flex flex-wrap gap-3 text-[13px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
         {payload.skillDie && !payload.skillDie.isFlat && (
           <span style={{ color: '#D0A030' }}>
             SD {payload.skillDie.die}[<b style={{ color: '#ffcc78' }}>{payload.skillDie.value}</b>]
@@ -237,7 +237,7 @@ function ChatRow({ event, payload }: { event: TerminalEvent; payload: ChatPayloa
     <div className="flex items-start gap-2 px-2 py-1.5">
       <ActorBadge actor={event.actor} color={actorColor} />
       <div className="flex-1 min-w-0">
-        <span className="text-[10px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ccc' }}>
+        <span className="text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ccc' }}>
           <span style={{ color: actorColor, fontWeight: 'bold' }}>{event.actorName}</span>
           {': '}
           {payload.message}
@@ -253,12 +253,12 @@ function ChatRow({ event, payload }: { event: TerminalEvent; payload: ChatPayloa
 function CommandRow({ event, payload }: { event: TerminalEvent; payload: CommandPayload }) {
   return (
     <div className="px-2 py-1" style={{ opacity: 0.7 }}>
-      <div className="text-[9px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+      <div className="text-[13px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
         <span style={{ color: '#22ab94' }}>{'>'} </span>
         <span style={{ color: '#888' }}>{payload.input}</span>
       </div>
       {payload.result && (
-        <div className="text-[9px] pl-3" style={{
+        <div className="text-[13px] pl-3" style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           color: payload.success ? '#22ab94' : '#ff6b6b',
         }}>
@@ -285,7 +285,7 @@ function AIMessageRow({ event, payload }: { event: TerminalEvent; payload: AIMes
       <div className="flex items-start gap-2 px-2 py-1.5">
         <ActorBadge actor="ai_copilot" color="#7050A8" />
         <span className="text-xs flex-shrink-0" style={{ color }}>{'\u25C6'}</span>
-        <span className="text-[10px] flex-1 italic" style={{
+        <span className="text-[12px] flex-1 italic" style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           color: '#ccc',
         }}>{payload.message}</span>
@@ -300,7 +300,7 @@ function AIMessageRow({ event, payload }: { event: TerminalEvent; payload: AIMes
 function GameEventRow({ event, payload }: { event: TerminalEvent; payload: GameEventPayload }) {
   return (
     <div className="flex items-center gap-2 px-2 py-1" style={{ opacity: 0.6 }}>
-      <div className="flex-1 text-center text-[9px] uppercase tracking-widest" style={{
+      <div className="flex-1 text-center text-[13px] uppercase tracking-widest" style={{
         fontFamily: 'var(--font-terminal), Consolas, monospace',
         color: '#22ab94',
       }}>
@@ -315,7 +315,7 @@ function GameEventRow({ event, payload }: { event: TerminalEvent; payload: GameE
 
 function ActorBadge({ actor, color }: { actor: string; color: string }) {
   return (
-    <span className="text-[8px] font-bold px-1.5 py-0.5 flex-shrink-0" style={{
+    <span className="text-[12px] font-bold px-1.5 py-0.5 flex-shrink-0" style={{
       backgroundColor: color,
       color: actor === 'gm' ? '#1a1a2e' : '#fff',
       fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -330,7 +330,7 @@ function ActorBadge({ actor, color }: { actor: string; color: string }) {
 
 function Timestamp({ iso }: { iso: string }) {
   return (
-    <span className="text-[8px] flex-shrink-0" style={{
+    <span className="text-[12px] flex-shrink-0" style={{
       fontFamily: 'var(--font-terminal), Consolas, monospace',
       color: 'rgba(255,255,255,0.3)',
     }}>

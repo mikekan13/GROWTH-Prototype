@@ -194,9 +194,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--surface-dark)] flex flex-col">
+    <div className="h-screen bg-[var(--surface-dark)] flex flex-col overflow-hidden">
       {/* Compact header bar */}
-      <header className="bg-[var(--surface-dark)] border-b border-[var(--accent-teal)]/30 flex-shrink-0">
+      <header className="bg-[var(--surface-dark)] border-b border-[var(--accent-teal)]/30 flex-shrink-0 relative z-[60]">
         {/* Micro bar — window controls */}
         <div className="flex items-center justify-between px-3 py-0.5 bg-black/20 border-b border-[var(--accent-teal)]/20">
           <div className="flex items-center gap-1.5">

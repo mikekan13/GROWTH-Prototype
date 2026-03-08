@@ -308,13 +308,13 @@ export const PILLARS = {
   spirit: {
     name: 'Spirit',
     alchemical: 'Sulfur',
-    color: '#3EB89A',
+    color: '#7050A8',
     attributes: ['flow', 'frequency', 'focus'] as const,
   },
   soul: {
     name: 'Soul',
     alchemical: 'Mercury',
-    color: '#7050A8',
+    color: '#3E78C0',
     attributes: ['willpower', 'wisdom', 'wit'] as const,
   },
 } as const;
