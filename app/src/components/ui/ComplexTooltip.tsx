@@ -118,6 +118,9 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      // Ensure tooltip state is cleaned up on unmount
+      setIsVisible(false);
+      setNestedTooltip(null);
     };
   }, []);
 

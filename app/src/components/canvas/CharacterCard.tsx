@@ -45,12 +45,14 @@ interface CharacterCardProps {
   node: CharacterNodeData;
   isExpanded?: boolean;
   showInventory?: boolean;
+  openPanels?: Set<string>;
   onNodeClick?: (node: CharacterNodeData) => void;
   onToggleExpand?: (nodeId: string) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
   onDelete?: (nodeId: string) => void;
   onInventoryToggle?: (nodeId: string) => void;
+  onPanelToggle?: (nodeId: string, panel: string) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -83,11 +85,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   node,
   isExpanded = false,
   showInventory = false,
+  openPanels,
   onToggleExpand,
   onPositionChange,
   onDragOffsetChange,
   onDelete,
   onInventoryToggle,
+  onPanelToggle,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -147,6 +151,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
+    // Signal drag start so tether anchors can scale with the card
+    onDragOffsetChange?.(node.id, 0.001, 0.001);
 
     const foreignObject = (e.target as Element).closest('foreignObject');
     const svg = foreignObject?.closest('svg') as SVGSVGElement | null;
@@ -386,9 +392,9 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   return (
     <div className="relative" ref={cardRef}>
       <div
-        className={`relative character-card text-white transition-all select-none ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
+        className={`relative character-card text-white select-none ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
         style={{
-          width: '1885px', willChange: 'transform', userSelect: 'none',
+          width: '1885px', willChange: 'transform', userSelect: 'none', transformOrigin: '960px 250px', transition: 'filter 0.2s',
           filter: isDragging
             ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
             : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
@@ -765,8 +771,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             ))}
           </div>
 
-          {/* ── TKV Box (positioned absolute on GRO.VINES separator) ── */}
-          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: 'calc(50% - 140px)', top: '418px', border: '3px solid #ffcc78', zIndex: 10 }}>
+          {/* ── TKV Box (centered under portrait) ── */}
+          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '530px', border: '3px solid #ffcc78', zIndex: 10 }}>
             <div className="w-full flex items-center justify-center" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', height: '28px' }}>T&#x049C;V</div>
             <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#582a72', height: '34px' }}>{tkv}</div>
           </div>
@@ -852,29 +858,57 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           }
         `}</style>
 
-        {/* Inventory Button — below the sheet content, right of portrait */}
-        {onInventoryToggle && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onInventoryToggle(node.id); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="absolute flex items-center gap-1 hover:brightness-110 transition-all cursor-pointer shadow-lg"
-            style={{
-              top: '510px', left: '426px', width: '220px', height: '32px',
-              backgroundColor: showInventory ? '#22c55e' : '#582a72',
-              border: `2px solid ${showInventory ? '#4ade80' : '#ffcc78'}`,
-              borderRadius: '0 0 6px 6px',
-              color: 'white',
-              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-              fontSize: '14px',
-              letterSpacing: '0.08em',
-              justifyContent: 'center',
-              zIndex: 10,
-            }}
-          >
-            <span>{'\uD83C\uDF92'}</span>
-            <span>INVENTORY {showInventory ? '\u25BC' : '\u25B6'}</span>
-          </button>
-        )}
+        {/* Sub-panel toggle buttons — single row along bottom edge */}
+        {isExpanded && (() => {
+          const btnStyle = (isOpen: boolean) => ({
+            height: '26px', padding: '0 10px',
+            backgroundColor: isOpen ? '#22c55e' : '#582a72',
+            border: `2px solid ${isOpen ? '#4ade80' : '#ffcc78'}`,
+            borderRadius: '0 0 4px 4px',
+            color: 'white',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+            fontSize: '11px',
+            letterSpacing: '0.08em',
+            justifyContent: 'center' as const,
+          });
+          const Btn = ({ icon, label, isOpen, onClick }: { icon: string; label: string; isOpen: boolean; onClick: () => void }) => (
+            <button
+              onClick={(e) => { e.stopPropagation(); onClick(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 hover:brightness-110 transition-all cursor-pointer shadow-lg"
+              style={btnStyle(isOpen)}
+            >
+              <span>{icon}</span>
+              <span>{label}</span>
+              <span
+                data-panel-circle={label.toLowerCase()}
+                style={{
+                  width: '10px', height: '10px', borderRadius: '50%', marginLeft: '2px', flexShrink: 0,
+                  border: `2px solid ${isOpen ? '#4ade80' : '#ffcc78'}`,
+                  backgroundColor: 'transparent',
+                }}
+              />
+            </button>
+          );
+          const panels = [
+            ...(onInventoryToggle ? [{ key: '_inv', icon: '\uD83C\uDF92', label: 'INVENTORY', isOpen: showInventory, onClick: () => onInventoryToggle(node.id) }] : []),
+            ...(onPanelToggle ? [
+              { key: 'vitals', icon: '\u2695', label: 'VITALS', isOpen: openPanels?.has('vitals') || false, onClick: () => onPanelToggle(node.id, 'vitals') },
+              { key: 'traits', icon: '\u2736', label: 'TRAITS', isOpen: openPanels?.has('traits') || false, onClick: () => onPanelToggle(node.id, 'traits') },
+              { key: 'skills', icon: '\u2605', label: 'SKILLS', isOpen: openPanels?.has('skills') || false, onClick: () => onPanelToggle(node.id, 'skills') },
+              { key: 'magic', icon: '\u2728', label: 'MAGIC', isOpen: openPanels?.has('magic') || false, onClick: () => onPanelToggle(node.id, 'magic') },
+              { key: 'backstory', icon: '\u270E', label: 'BACKSTORY', isOpen: openPanels?.has('backstory') || false, onClick: () => onPanelToggle(node.id, 'backstory') },
+              { key: 'harvests', icon: '\u2618', label: 'HARVESTS', isOpen: openPanels?.has('harvests') || false, onClick: () => onPanelToggle(node.id, 'harvests') },
+            ] : []),
+          ];
+          return (
+            <div className="absolute flex gap-1" style={{ top: '515px', left: '436px', zIndex: 20 }}>
+              {panels.map(p => (
+                <Btn key={p.key} icon={p.icon} label={p.label} isOpen={p.isOpen} onClick={p.onClick} />
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Collapse Button — bottom-right corner of attributes panel */}
         {onToggleExpand && (
@@ -899,5 +933,6 @@ export default React.memo(CharacterCard, (prev, next) => (
   prev.node.x === next.node.x &&
   prev.node.y === next.node.y &&
   prev.isExpanded === next.isExpanded &&
-  prev.showInventory === next.showInventory
+  prev.showInventory === next.showInventory &&
+  prev.openPanels === next.openPanels
 ));

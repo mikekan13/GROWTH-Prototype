@@ -86,10 +86,15 @@ export interface GrowthCreation {
 export type FateDie = 'd4' | 'd6' | 'd8' | 'd12' | 'd20';
 
 // Freeform Skills System
+export type SkillCategory =
+  | 'athletics' | 'social' | 'martial' | 'sciences'
+  | 'arts' | 'perception' | 'magic' | 'crafting' | 'other';
+
 export interface GrowthSkill {
   name: string;
   level: number;          // 1-20, determines skill die
   isCombat: boolean;
+  category?: SkillCategory;
   description?: string;
   // Skill die: 1-3=flat bonus, 4-5=d4, 6-7=d6, 8-11=d8, 12-19=d12, 20=d20
 }
@@ -99,20 +104,39 @@ export type MagicSchool =
   | 'Abjuration' | 'Alteration' | 'Conjuration' | 'Dissolution' | 'Divination'
   | 'Enchantment' | 'Force' | 'Fortune' | 'Illusion' | 'Restoration';
 
+export interface GrowthSpell {
+  name: string;
+  school: MagicSchool;
+  description: string;
+  cost?: number;        // Mana/effort cost
+  strength?: number;    // 1-10 spell strength
+  castingMethod?: 'weaving' | 'wild';
+}
+
+export interface WovenSpell {
+  name: string;
+  schools: MagicSchool[];   // Combined schools
+  description: string;
+  cost?: number;
+  strength?: number;
+  components?: string;      // Special requirements
+}
+
 export interface MagicPillar {
   schools: MagicSchool[];
-  knownSpells: Array<{
-    name: string;
-    school: MagicSchool;
-    description: string;
-    cost?: number;
-  }>;
+  knownSpells: GrowthSpell[];
+  skillLevels?: Partial<Record<MagicSchool, number>>; // Skill level per school
 }
 
 export interface GrowthMagic {
   mercy: MagicPillar;    // Flow-based magic (Spirit pillar)
   severity: MagicPillar;  // Focus-based magic (Spirit pillar)
   balance: MagicPillar;   // Combined Flow+Focus magic
+  wovenSpells?: WovenSpell[];  // Spells combining multiple schools
+  mana?: {
+    current: number;
+    max: number;
+  };
 }
 
 // Nectars (permanent), Blossoms (temporary), Thorns (permanent negative)
@@ -125,6 +149,8 @@ export interface GrowthTrait {
   category: TraitCategory;
   description: string;
   type: 'nectar' | 'blossom' | 'thorn';
+  source?: string;          // Where it came from (GRO.vine name, Godhead, etc.)
+  mechanicalEffect?: string; // E.g. "+1 GRO.vine capacity", "+2 Restoration"
   // nectar = permanent positive (from completing GRO.vines)
   // blossom = temporary buff (bestowed by Godheads during play)
   // thorn = permanent negative (from failed GRO.vines, death)
@@ -147,12 +173,34 @@ export interface GROvine {
 export type BodyPart = 'HEAD' | 'NECK' | 'TORSO' | 'RIGHTARM' | 'LEFTARM'
                      | 'RIGHTUPPERLEG' | 'LEFTUPPERLEG' | 'RIGHTLOWERLEG' | 'LEFTLOWERLEG';
 
+// Equipment Layer System
+export type ArmorLayer = 'body' | 'clothing' | 'lightArmor' | 'heavyArmor';
+
+export interface EquipmentSlot {
+  name: string;
+  layer: ArmorLayer;
+  material?: string;
+  resistance: number;       // Protection value
+  condition: number;        // 1-4 (Destroyed, Broken, Worn, Undamaged)
+  weight?: number;
+  properties?: string[];
+  coveredParts?: BodyPart[];  // Which body parts this covers
+}
+
+export interface GrowthEquipment {
+  body: EquipmentSlot[];       // Skin-level (natural armor, tattoos, etc.)
+  clothing: EquipmentSlot[];   // Up to 3 layers, half base resist, no mobility penalty
+  lightArmor: EquipmentSlot[]; // 1 layer, full base resist, no mobility penalty
+  heavyArmor: EquipmentSlot[]; // 1 layer, 1.5x base resist, -1 Celerity
+}
+
 export interface GrowthVitals {
   bodyParts: Record<BodyPart, number>;
   baseResist: number;
   restRate: number;
   carryLevel: number;     // Equals Clout attribute
   weightStatus: 'Fine' | 'Encumbered';
+  equipment?: GrowthEquipment;
 }
 
 // Inventory
@@ -176,9 +224,25 @@ export interface GrowthFear {
   description: string;
   resistanceLevel: number;  // 1-10
   status: 'active' | 'aligned' | 'removed';
+  hiddenPower?: string;     // Discovered through confrontation
   // Fears assigned by GM, never fully go away
   // Can be "aligned" (integrated, granting paradoxical powers)
   // Can be "removed" (extremely rare, represents reprogramming)
+}
+
+// Harvest System (Seasonal Turns)
+export interface GrowthHarvest {
+  id: string;
+  name: string;
+  description: string;
+  activity: string;         // What the character did
+  duration?: string;        // How long (e.g. "3 months", "1 year")
+  rewards?: Array<{
+    type: 'attribute' | 'skill' | 'equipment' | 'wealth' | 'tech' | 'nectar' | 'other';
+    description: string;
+  }>;
+  cost?: string;            // What it cost (aging, resources, etc.)
+  status: 'planned' | 'active' | 'completed';
 }
 
 // Character Identity
@@ -189,6 +253,16 @@ export interface GrowthIdentity {
   background?: string;
   description?: string;
   image?: string;
+}
+
+// Backstory
+export interface GrowthBackstory {
+  description?: string;     // Physical/visual description
+  backstory?: string;       // Narrative backstory
+  personalityTraits?: string[];
+  values?: string[];        // Positive character drives (discovered, not pre-selected)
+  addictions?: string[];    // Shadow side of values
+  notes?: string;           // GM/player session notes
 }
 
 // Complete Character Interface
@@ -206,6 +280,8 @@ export interface GrowthCharacter {
   fears: GrowthFear[];
   vitals: GrowthVitals;
   inventory: GrowthInventory;
+  backstory: GrowthBackstory;
+  harvests: GrowthHarvest[];
   notes: string;
 }
 
@@ -233,3 +309,49 @@ export const PILLARS = {
     attributes: ['willpower', 'wisdom', 'wit'] as const,
   },
 } as const;
+
+// Magic school metadata for UI
+export const MAGIC_SCHOOLS: Record<MagicSchool, {
+  pillar: 'mercy' | 'severity' | 'balance';
+  governingAttribute: string;
+  primaMateria: string;
+  description: string;
+  resistedBy?: string;
+}> = {
+  // Mercy (Flow-based)
+  Fortune: { pillar: 'mercy', governingAttribute: 'Flow', primaMateria: 'Lead', description: 'Manipulation of luck, buffing, augmenting abilities' },
+  Restoration: { pillar: 'mercy', governingAttribute: 'Flow', primaMateria: 'Tin', description: 'Power to mend, heal, and grow' },
+  Enchantment: { pillar: 'mercy', governingAttribute: 'Flow', primaMateria: 'Copper', description: 'The power over minds', resistedBy: 'Wit' },
+  // Severity (Focus-based)
+  Force: { pillar: 'severity', governingAttribute: 'Focus', primaMateria: 'Iron', description: 'Power to manipulate energy and cause damage', resistedBy: 'Celerity' },
+  Alteration: { pillar: 'severity', governingAttribute: 'Focus', primaMateria: 'Uranium', description: 'Manipulation of matter; changing things physically', resistedBy: 'Constitution' },
+  Conjuration: { pillar: 'severity', governingAttribute: 'Focus', primaMateria: 'Mercury', description: 'Summoning beings, objects, and creating portals', resistedBy: 'Willpower' },
+  // Balance (Flow + Focus)
+  Divination: { pillar: 'balance', governingAttribute: 'Flow + Focus', primaMateria: 'Neptunium', description: 'Read minds, scry, manipulate time', resistedBy: 'Willpower' },
+  Dissolution: { pillar: 'balance', governingAttribute: 'Flow + Focus', primaMateria: 'Plutonium', description: 'Power over life and death', resistedBy: 'Constitution' },
+  Abjuration: { pillar: 'balance', governingAttribute: 'Flow + Focus', primaMateria: 'Gold', description: 'Defensive magic: wards, shields, counterspells' },
+  Illusion: { pillar: 'balance', governingAttribute: 'Flow + Focus', primaMateria: 'Silver', description: 'Deception magic manipulating appearance of reality', resistedBy: 'Wit' },
+};
+
+// Skill die progression helper
+export function getSkillDie(level: number): string {
+  if (level <= 0) return '-';
+  if (level <= 3) return `+${level}`;
+  if (level <= 5) return 'd4';
+  if (level <= 7) return 'd6';
+  if (level <= 11) return 'd8';
+  if (level <= 19) return 'd12';
+  return 'd20';
+}
+
+// Skill level label helper
+export function getSkillRank(level: number): string {
+  if (level <= 0) return 'Untrained';
+  if (level <= 3) return 'Novice';
+  if (level <= 5) return 'Decoder';
+  if (level <= 7) return 'Competent';
+  if (level <= 9) return 'Professional';
+  if (level <= 11) return 'Expert';
+  if (level <= 19) return 'Master';
+  return 'Godlike';
+}

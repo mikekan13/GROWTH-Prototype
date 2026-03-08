@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import CharacterCard from "./CharacterCard";
 import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
 import type { InventoryItem } from "./InventoryCard";
+import VitalsCard from "./VitalsCard";
+import TraitsCard from "./TraitsCard";
+import SkillsCard from "./SkillsCard";
+import MagicCard from "./MagicCard";
+import BackstoryCard from "./BackstoryCard";
+import HarvestCard from "./HarvestCard";
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -107,6 +113,25 @@ export default function RelationsCanvas({
     return new Map(stored);
   });
   const MAX_TETHER_DISTANCE = 2000;
+  const EMPTY_PANEL_SET = useRef(new Set<string>()).current;
+
+  // Cached circle positions: measured once from DOM, stored as card-relative offsets (dx, dy from card center)
+  const circleOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
+  const circleOffsetVersion = useRef(0);
+
+  // Panel z-order: each panel gets an incrementing z-index when dragged; higher = on top
+  const [panelZOrder, setPanelZOrder] = useState<Map<string, number>>(new Map());
+  const panelZCounterRef = useRef(1);
+
+  // ── Sub-panel state (vitals, traits, skills, magic, backstory, harvests) ──
+  const [panelOpenNodes, setPanelOpenNodes] = useState<Map<string, Set<string>>>(() => {
+    const stored = loadJSON<[string, string[]][]>('panelOpen', []);
+    return new Map(stored.map(([id, panels]) => [id, new Set(panels)]));
+  });
+  const [panelOffsets, setPanelOffsets] = useState<Map<string, { x: number; y: number }>>(() => {
+    const stored = loadJSON<[string, { x: number; y: number }][]>('panelOffsets', []);
+    return new Map(stored);
+  });
 
   // ── Persist all canvas state ──
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,19 +147,66 @@ export default function RelationsCanvas({
       saveJSON('expanded', [...expandedNodes]);
       saveJSON('inventoryOpen', [...inventoryOpenNodes]);
       saveJSON('inventoryOffsets', [...inventoryOffsets.entries()]);
+      saveJSON('panelOpen', [...panelOpenNodes.entries()].map(([id, s]) => [id, [...s]]));
+      saveJSON('panelOffsets', [...panelOffsets.entries()]);
     }, 300);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewBox, zoom, nodePositions, nodeZIndices, expandedNodes, inventoryOpenNodes, inventoryOffsets]);
+  }, [viewBox, zoom, nodePositions, nodeZIndices, expandedNodes, inventoryOpenNodes, inventoryOffsets, panelOpenNodes, panelOffsets]);
 
   useEffect(() => {
     persistState();
   }, [persistState]);
 
+  // Measure circle positions from DOM once after expand/panel changes settle.
+  // Stored as offsets from the foreignObject's top-left in SVG units, so they
+  // don't change with zoom/pan/drag — just add current card position at render time.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const circles = svg.querySelectorAll('[data-panel-circle]') as NodeListOf<HTMLElement>;
+      if (circles.length === 0) return;
+      circles.forEach((el) => {
+        const panelName = el.getAttribute('data-panel-circle');
+        if (!panelName) return;
+        const fo = el.closest('foreignObject');
+        if (!fo) return;
+        const foW = parseFloat(fo.getAttribute('width') || '1');
+        const foH = parseFloat(fo.getAttribute('height') || '1');
+        const foRect = fo.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        // Circle center relative to foreignObject top-left, in screen pixels
+        const relScreenX = (elRect.left + elRect.width / 2) - foRect.left;
+        const relScreenY = (elRect.top + elRect.height / 2) - foRect.top;
+        // Convert screen-relative to SVG-unit-relative (foreignObject maps foW SVG units → foRect.width screen px)
+        const dx = (relScreenX / foRect.width) * foW;
+        const dy = (relScreenY / foRect.height) * foH;
+        circleOffsetsRef.current.set(panelName, { dx, dy });
+      });
+      circleOffsetVersion.current += 1;
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [expandedNodes, panelOpenNodes, inventoryOpenNodes]);
+
   const toggleExpand = useCallback((nodeId: string) => {
     setExpandedNodes((prev) => {
       const next = new Set(prev);
-      if (next.has(nodeId)) next.delete(nodeId);
-      else next.add(nodeId);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+        // Close all sub-panels and inventory when collapsing
+        setInventoryOpenNodes((inv) => {
+          const nextInv = new Set(inv);
+          nextInv.delete(nodeId);
+          return nextInv;
+        });
+        setPanelOpenNodes((panels) => {
+          const nextPanels = new Map(panels);
+          nextPanels.delete(nodeId);
+          return nextPanels;
+        });
+      } else {
+        next.add(nodeId);
+      }
       return next;
     });
   }, []);
@@ -155,6 +227,31 @@ export default function RelationsCanvas({
           return nextOffsets;
         });
       }
+      return next;
+    });
+  }, []);
+
+  const togglePanel = useCallback((nodeId: string, panel: string) => {
+    setPanelOpenNodes((prev) => {
+      const next = new Map(prev);
+      const current = next.get(nodeId) || new Set<string>();
+      const updated = new Set(current);
+      if (updated.has(panel)) {
+        updated.delete(panel);
+      } else {
+        updated.add(panel);
+        // Set default offset for this panel if none exists
+        const offsetKey = `${nodeId}__${panel}`;
+        setPanelOffsets((offsets) => {
+          const nextOffsets = new Map(offsets);
+          if (!nextOffsets.has(offsetKey)) {
+            nextOffsets.set(offsetKey, { x: 0, y: 10 });
+          }
+          return nextOffsets;
+        });
+      }
+      if (updated.size === 0) next.delete(nodeId);
+      else next.set(nodeId, updated);
       return next;
     });
   }, []);
@@ -537,8 +634,19 @@ export default function RelationsCanvas({
   const renderCharacterCard = (node: CanvasNode, visualX: number, visualY: number) => {
     const isNodeExpanded = expandedNodes.has(node.id);
     const isInventoryOpen = inventoryOpenNodes.has(node.id) && isNodeExpanded;
+    const nodePanels = panelOpenNodes.get(node.id) || EMPTY_PANEL_SET;
     const cardWidth = isNodeExpanded ? 1920 : 520;
     const cardHeight = isNodeExpanded ? 500 : 240;
+
+    // When dragging, card scales 105% from center — apply same to tether anchors
+    const isDraggingNode = dragOffsets.has(node.id);
+    const scaleAnchor = (ax: number, ay: number) => {
+      if (!isDraggingNode) return { x: ax, y: ay };
+      return {
+        x: visualX + (ax - visualX) * 1.05,
+        y: visualY + (ay - visualY) * 1.05,
+      };
+    };
 
     const charNode: CharacterNodeData = {
       id: node.id,
@@ -567,9 +675,11 @@ export default function RelationsCanvas({
             node={charNode}
             isExpanded={isNodeExpanded}
             showInventory={isInventoryOpen}
+            openPanels={nodePanels}
             onToggleExpand={toggleExpand}
             onDelete={onDeleteCharacter}
             onInventoryToggle={toggleInventory}
+            onPanelToggle={togglePanel}
             onPositionChange={(nodeId, x, y) => {
               setNodePositions((prev) => {
                 const next = new Map(prev);
@@ -594,51 +704,81 @@ export default function RelationsCanvas({
         </foreignObject>
 
         {/* Inventory sub-panel — draggable with tether line */}
+        {/* ── All tether lines/dots (rendered BEFORE panels so they appear behind) ── */}
         {isInventoryOpen && (() => {
-          // Anchor point: the inventory button position on the card
-          const anchorX = visualX - cardWidth / 2 + 426 + 210; // right edge of button (where arrow is)
-          const anchorY = visualY - cardHeight / 2 + 526; // vertical center of button
-
-          const offset = inventoryOffsets.get(node.id) || { x: 0, y: -450 };
-          const panelCenterX = anchorX + offset.x;
-          const panelTopY = anchorY + offset.y;
-          const panelW = 413;
-
-          // Tether line end point (top-center of panel)
-          const tetherEndX = panelCenterX;
-          const tetherEndY = panelTopY + 20; // connect to near top of panel
-
+          const cardLeft = visualX - cardWidth / 2;
+          const cardTop = visualY - cardHeight / 2;
+          const cached = circleOffsetsRef.current.get('inventory');
+          const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 88);
+          const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+          const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
+          const offset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
+          const tetherEndX = anchorX + offset.x;
+          const tetherEndY = anchorY + offset.y + 20;
           return (
             <>
-              {/* Tether line */}
-              <line
-                x1={anchorX}
-                y1={anchorY}
-                x2={tetherEndX}
-                y2={tetherEndY}
-                stroke="#ffcc78"
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                opacity={0.6}
-              />
-              {/* Tether anchor dot */}
-              <circle cx={anchorX} cy={anchorY} r={4} fill="#ffcc78" opacity={0.8} />
+              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
+              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.8} />
               <circle cx={tetherEndX} cy={tetherEndY} r={4} fill="#ffcc78" opacity={0.8} />
+            </>
+          );
+        })()}
+        {isNodeExpanded && [...nodePanels].map((panelKey) => {
+          const offsetKey = `${node.id}__${panelKey}`;
+          const cardLeft = visualX - cardWidth / 2;
+          const cardTop = visualY - cardHeight / 2;
+          const cached = circleOffsetsRef.current.get(panelKey);
+          const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 200);
+          const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+          const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
+          const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
+          const tetherEndX = anchorX + offset.x;
+          const tetherEndY = anchorY + offset.y + 20;
+          return (
+            <React.Fragment key={`tether-${node.id}-${panelKey}`}>
+              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
+              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.8} />
+              <circle cx={tetherEndX} cy={tetherEndY} r={4} fill="#ffcc78" opacity={0.8} />
+            </React.Fragment>
+          );
+        })}
 
+        {/* ── All panels: sorted so last-dragged renders on top ── */}
+        {isNodeExpanded && [
+          ...(isInventoryOpen ? ['_inv'] : []),
+          ...nodePanels,
+        ].sort((a, b) => {
+          return (panelZOrder.get(a) || 0) - (panelZOrder.get(b) || 0);
+        }).map((panelKey) => {
+          // Inventory panel
+          if (panelKey === '_inv') {
+            const cardLeft = visualX - cardWidth / 2;
+            const cardTop = visualY - cardHeight / 2;
+            const cached = circleOffsetsRef.current.get('inventory');
+            const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 88);
+            const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+            const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
+            const invOffset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
+            const panelCenterX = anchorX + invOffset.x;
+            const panelTopY = anchorY + invOffset.y;
+            const panelW = 413;
+
+            return (
               <foreignObject
                 key={`inv-${node.id}`}
                 x={panelCenterX - panelW / 2}
                 y={panelTopY}
                 width={panelW + 20}
                 height={700}
-                style={{ overflow: "visible" }}
+                style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div
-                  style={{ cursor: 'grab', userSelect: 'none' }}
+                  style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
                   onMouseDown={(e) => {
                     if (e.button !== 0) return;
                     e.preventDefault();
                     e.stopPropagation();
+                    setPanelZOrder(prev => { const next = new Map(prev); next.set('_inv', panelZCounterRef.current++); return next; });
 
                     const svg = svgRef.current;
                     if (!svg) return;
@@ -651,14 +791,13 @@ export default function RelationsCanvas({
                     };
 
                     const startSVG = screenToSVG(e.clientX, e.clientY);
-                    const startOffset = { ...offset };
+                    const startOffset = { ...invOffset };
 
                     const onMove = (me: MouseEvent) => {
                       const cur = screenToSVG(me.clientX, me.clientY);
                       let dx = startOffset.x + (cur.x - startSVG.x);
                       let dy = startOffset.y + (cur.y - startSVG.y);
 
-                      // Constrain to max tether distance
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       if (dist > MAX_TETHER_DISTANCE) {
                         const scale = MAX_TETHER_DISTANCE / dist;
@@ -689,9 +828,113 @@ export default function RelationsCanvas({
                   />
                 </div>
               </foreignObject>
-            </>
+            );
+          }
+
+          // Sub-panels
+          const offsetKey = `${node.id}__${panelKey}`;
+
+          // Cached offset from foreignObject top-left + current card position
+          const cardLeft = visualX - cardWidth / 2;
+          const cardTop = visualY - cardHeight / 2;
+          const cached = circleOffsetsRef.current.get(panelKey);
+          const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 200);
+          const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+          const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
+          const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
+          const panelCenterX = anchorX + offset.x;
+          const panelTopY = anchorY + offset.y;
+          const panelW = 440;
+          const tetherEndX = panelCenterX;
+          const tetherEndY = panelTopY + 20;
+
+          const charData = node.characterData as Record<string, unknown> || {};
+
+          const panelContent = (() => {
+            switch (panelKey) {
+              case 'vitals':
+                return <VitalsCard vitals={(charData.vitals as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
+              case 'traits':
+                return <TraitsCard traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string }>) || []} fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined} onClose={() => togglePanel(node.id, panelKey)} />;
+              case 'skills':
+                return <SkillsCard skills={(charData.skills as Array<{ name: string; level: number; isCombat?: boolean; category?: string; description?: string }>) || []} onClose={() => togglePanel(node.id, panelKey)} />;
+              case 'magic':
+                return <MagicCard magic={(charData.magic as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
+              case 'backstory':
+                return <BackstoryCard backstory={(charData.backstory as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
+              case 'harvests':
+                return <HarvestCard harvests={(charData.harvests as Array<{ season: string; turn: number; description?: string; rewards?: string[]; consequences?: string[]; krmaChange?: number }>) || []} onClose={() => togglePanel(node.id, panelKey)} />;
+              default:
+                return null;
+            }
+          })();
+
+          if (!panelContent) return null;
+
+          return (
+            <React.Fragment key={`panel-${node.id}-${panelKey}`}>
+              <foreignObject
+                x={panelCenterX - panelW / 2}
+                y={panelTopY}
+                width={panelW + 20}
+                height={700}
+                style={{ overflow: "visible", pointerEvents: "none" }}
+              >
+                <div
+                  style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
+                  onMouseDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPanelZOrder(prev => { const next = new Map(prev); next.set(panelKey, panelZCounterRef.current++); return next; });
+
+                    const svg = svgRef.current;
+                    if (!svg) return;
+
+                    const svgPoint = svg.createSVGPoint();
+                    const screenToSVG = (cx: number, cy: number) => {
+                      svgPoint.x = cx;
+                      svgPoint.y = cy;
+                      return svgPoint.matrixTransform(svg.getScreenCTM()!.inverse());
+                    };
+
+                    const startSVG = screenToSVG(e.clientX, e.clientY);
+                    const startOffset = { ...offset };
+
+                    const onMove = (me: MouseEvent) => {
+                      const cur = screenToSVG(me.clientX, me.clientY);
+                      let dx = startOffset.x + (cur.x - startSVG.x);
+                      let dy = startOffset.y + (cur.y - startSVG.y);
+
+                      const dist = Math.sqrt(dx * dx + dy * dy);
+                      if (dist > MAX_TETHER_DISTANCE) {
+                        const scale = MAX_TETHER_DISTANCE / dist;
+                        dx *= scale;
+                        dy *= scale;
+                      }
+
+                      setPanelOffsets((prev) => {
+                        const next = new Map(prev);
+                        next.set(offsetKey, { x: dx, y: dy });
+                        return next;
+                      });
+                    };
+
+                    const onUp = () => {
+                      document.removeEventListener('mousemove', onMove);
+                      document.removeEventListener('mouseup', onUp);
+                    };
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                  }}
+                >
+                  {panelContent}
+                </div>
+              </foreignObject>
+            </React.Fragment>
           );
-        })()}
+        })}
       </g>
     );
   };

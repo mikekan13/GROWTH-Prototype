@@ -62,6 +62,8 @@ export function createDefaultCharacter(name: string): GrowthCharacter {
       weight: 0,
       items: [],
     },
+    backstory: {},
+    harvests: [],
     notes: '',
   };
 }
