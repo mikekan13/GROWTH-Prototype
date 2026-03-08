@@ -80,7 +80,7 @@ export default function CampaignTerminal({
 
       // Fetch changelog entries
       const clParams = new URLSearchParams({ campaignId, limit: '100' });
-      const clRes = await fetch(`/api/changelog?${clParams}`);
+      const clRes = await fetch(`/api/changelog?${clParams}`, { cache: 'no-store' });
       const clData = clRes.ok ? await clRes.json() : { entries: [] };
 
       // Fetch campaign events
@@ -88,7 +88,7 @@ export default function CampaignTerminal({
       if (filterTypes && activeFilter !== 'changes') {
         evParams.set('types', filterTypes.filter(t => t !== 'changelog').join(','));
       }
-      const evRes = await fetch(`/api/campaigns/${campaignId}/events?${evParams}`);
+      const evRes = await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' });
       const evData = evRes.ok ? await evRes.json() : { events: [] };
 
       // Wrap changelog entries as TerminalEvents
@@ -232,7 +232,7 @@ export default function CampaignTerminal({
     // Plain text = chat message
     if (!trimmed.startsWith('/')) {
       try {
-        await fetch(`/api/campaigns/${campaignId}/events`, {
+        const res = await fetch(`/api/campaigns/${campaignId}/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -242,8 +242,13 @@ export default function CampaignTerminal({
             payload: { kind: 'chat', message: trimmed },
           }),
         });
-        fetchEvents();
-      } catch { /* silent */ }
+        if (!res.ok) {
+          console.error('[Terminal] Chat POST failed:', res.status);
+        }
+        await fetchEvents();
+      } catch (err) {
+        console.error('[Terminal] Chat POST error:', err);
+      }
       return;
     }
 

@@ -4,6 +4,8 @@ import { errorResponse } from '@/lib/api';
 import { queryChangeLog } from '@/services/changelog';
 import type { ChangeActor, ChangeCategory } from '@/types/changelog';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { user } = await requireAuth();
