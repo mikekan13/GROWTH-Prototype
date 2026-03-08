@@ -10,6 +10,7 @@ import { addSkill, removeSkill, updateSkillLevel } from "@/lib/character-actions
 import VitalsCard from "./VitalsCard";
 import TraitsCard from "./TraitsCard";
 import SkillsCard from "./SkillsCard";
+import type { SkillItem } from "./SkillsCard";
 import MagicCard from "./MagicCard";
 import BackstoryCard from "./BackstoryCard";
 import HarvestCard from "./HarvestCard";
@@ -863,7 +864,7 @@ export default function RelationsCanvas({
                 return <TraitsCard traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string }>) || []} fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'skills':
                 return <SkillsCard
-                  skills={(charData.skills as Array<{ name: string; level: number; isCombat?: boolean; category?: string; description?: string }>) || []}
+                  skills={(charData.skills as SkillItem[]) || []}
                   onClose={() => togglePanel(node.id, panelKey)}
                   onAddSkill={onCharacterUpdate ? (skill) => {
                     const result = addSkill(charData as unknown as GrowthCharacter, skill);
@@ -878,8 +879,26 @@ export default function RelationsCanvas({
                     if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
                   } : undefined}
                   onRollSkill={(skillName) => {
-                    // Dispatch a custom event that CampaignTerminal can listen to for pre-filling /roll command
                     window.dispatchEvent(new CustomEvent('growth:roll-skill', { detail: { skillName, characterName: node.name, nodeId: node.id } }));
+                  }}
+                  onRequestSkill={(request) => {
+                    fetch(`/api/campaigns/${campaignId}/requests`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ type: 'skill', name: request.name, data: { governors: request.governors, description: request.description } }),
+                    }).then(() => {
+                      // Also post a chat event to terminal so GM sees it
+                      fetch(`/api/campaigns/${campaignId}/events`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          type: 'game_event',
+                          characterId: node.id,
+                          characterName: node.name,
+                          payload: { kind: 'game_event', eventType: 'skill_request', description: `Requested skill: "${request.name}" (gov: ${request.governors.join(', ')})${request.description ? ` — ${request.description}` : ''}` },
+                        }),
+                      });
+                    });
                   }}
                 />;
               case 'magic':

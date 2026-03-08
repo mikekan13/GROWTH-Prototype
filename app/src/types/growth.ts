@@ -85,18 +85,27 @@ export interface GrowthCreation {
 
 export type FateDie = 'd4' | 'd6' | 'd8' | 'd12' | 'd20';
 
-// Freeform Skills System
-export type SkillCategory =
-  | 'athletics' | 'social' | 'martial' | 'sciences'
-  | 'arts' | 'perception' | 'magic' | 'crafting' | 'other';
+// Attribute names that can govern skills (all except Frequency)
+export type SkillGovernor =
+  | 'clout' | 'celerity' | 'constitution'
+  | 'flow' | 'focus'
+  | 'willpower' | 'wisdom' | 'wit';
 
+export const SKILL_GOVERNORS: SkillGovernor[] = [
+  'clout', 'celerity', 'constitution',
+  'flow', 'focus',
+  'willpower', 'wisdom', 'wit',
+];
+
+// Freeform Skills System — name defines context, no predefined categories
 export interface GrowthSkill {
   name: string;
-  level: number;          // 1-20, determines skill die
-  isCombat: boolean;
-  category?: SkillCategory;
-  description?: string;
+  level: number;            // 1-20, determines skill die
+  governors: SkillGovernor[]; // At least one required — which attributes govern this skill
+  description?: string;     // Clarifies intent for GM/AI interpretation
+  forgeItemId?: string;     // Reference to campaign ForgeItem (if created via Forge)
   // Skill die: 1-3=flat bonus, 4-5=d4, 6-7=d6, 8-11=d8, 12-19=d12, 20=d20
+  // Modifiers come from external sources (gear, nectars, buffs) — not stored on skill
 }
 
 // Magic System - Three Pillars

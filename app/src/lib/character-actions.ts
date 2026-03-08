@@ -9,7 +9,7 @@
  * array of what happened (for logging, undo, AI audit trail).
  */
 
-import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillCategory } from '@/types/growth';
+import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillGovernor } from '@/types/growth';
 import { skilledCheck, unskilledCheck, type SkillCheckResult } from '@/lib/dice';
 import type { FateDie } from '@/types/growth';
 
@@ -206,26 +206,30 @@ export function setAttributeLevel(
 // ── Skill Actions ──────────────────────────────────────────────────────────
 
 /**
- * Add a new skill to the character.
+ * Add a new skill to the character. Requires at least one governor.
  */
 export function addSkill(
   character: GrowthCharacter,
-  skill: { name: string; level?: number; isCombat?: boolean; category?: SkillCategory; description?: string }
+  skill: { name: string; level?: number; governors: SkillGovernor[]; description?: string; forgeItemId?: string }
 ): ActionResult {
   const c = deepCloneCharacter(character);
   const existing = c.skills.find(s => s.name.toLowerCase() === skill.name.toLowerCase());
   if (existing) {
     return { character: c, changes: [`Skill "${skill.name}" already exists`] };
   }
+  if (!skill.governors || skill.governors.length === 0) {
+    return { character: c, changes: [`Skill "${skill.name}" requires at least one governor attribute`] };
+  }
   const newSkill: GrowthSkill = {
     name: skill.name,
     level: Math.max(1, Math.min(20, skill.level || 1)),
-    isCombat: skill.isCombat || false,
-    category: skill.category,
+    governors: skill.governors,
     description: skill.description,
+    forgeItemId: skill.forgeItemId,
   };
   c.skills.push(newSkill);
-  return { character: c, changes: [`Added skill: ${newSkill.name} (level ${newSkill.level})`] };
+  const govStr = newSkill.governors.join(', ');
+  return { character: c, changes: [`Added skill: ${newSkill.name} (level ${newSkill.level}, gov: ${govStr})`] };
 }
 
 /**
@@ -266,12 +270,12 @@ export function updateSkillLevel(
 }
 
 /**
- * Update a skill's properties (combat flag, category, description).
+ * Update a skill's properties (governors, description).
  */
 export function updateSkill(
   character: GrowthCharacter,
   skillName: string,
-  updates: { isCombat?: boolean; category?: SkillCategory; description?: string }
+  updates: { governors?: SkillGovernor[]; description?: string }
 ): ActionResult {
   const c = deepCloneCharacter(character);
   const skill = c.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase());
@@ -279,13 +283,11 @@ export function updateSkill(
     return { character: c, changes: [`Skill "${skillName}" not found`] };
   }
   const changes: string[] = [];
-  if (updates.isCombat !== undefined && updates.isCombat !== skill.isCombat) {
-    skill.isCombat = updates.isCombat;
-    changes.push(`${skill.name}: ${updates.isCombat ? 'marked combat' : 'unmarked combat'}`);
-  }
-  if (updates.category !== undefined && updates.category !== skill.category) {
-    skill.category = updates.category;
-    changes.push(`${skill.name} category: ${updates.category}`);
+  if (updates.governors !== undefined && updates.governors.length > 0) {
+    const oldGov = skill.governors.join(', ');
+    skill.governors = updates.governors;
+    const newGov = skill.governors.join(', ');
+    if (oldGov !== newGov) changes.push(`${skill.name} governors: ${oldGov} → ${newGov}`);
   }
   if (updates.description !== undefined && updates.description !== skill.description) {
     skill.description = updates.description;

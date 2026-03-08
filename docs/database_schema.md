@@ -101,6 +101,36 @@ Activity event in a campaign (dice rolls, chat, commands, AI messages, game even
 - Relations: campaign, session (GameSession, optional)
 - Indexes: `(campaignId, createdAt)`, `(sessionId)`
 
+### ForgeItem
+Campaign-level design template (skill, item, nectar, blossom, thorn). Created by GM in the Forge.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign this design belongs to
+- `type`: String — `skill` | `item` | `nectar` | `blossom` | `thorn`
+- `name`: String — design name (unique per campaign + type)
+- `status`: String — `draft` | `published`
+- `data`: JSON — type-specific details (e.g., skill: `{ governors, description }`)
+- `createdBy`: String — userId of the GM who created it
+- `createdAt`: DateTime
+- `updatedAt`: DateTime
+- Relations: campaign, requests (PlayerRequest[])
+- Indexes: `(campaignId, type)`, `(campaignId, status)`, `@@unique([campaignId, name, type])`
+
+### PlayerRequest
+Player request for a new campaign component. Submitted from SkillsCard (or future panels), reviewed by GM in the Forge.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign
+- `requesterId`: String — userId of the requesting player
+- `type`: String — same types as ForgeItem
+- `name`: String — requested name
+- `status`: String — `pending` | `approved` | `denied` | `modified`
+- `data`: JSON — what the player wants (e.g., skill: `{ governors, description }`)
+- `gmNotes`: String (optional) — GM feedback
+- `forgeItemId`: String (optional) — linked ForgeItem once approved/modified
+- `createdAt`: DateTime
+- `updatedAt`: DateTime
+- Relations: campaign, forgeItem (optional)
+- Indexes: `(campaignId, status)`, `(requesterId)`
+
 ### Session
 Auth session token.
 - 7-day expiration, cleaned up on logout or expiry

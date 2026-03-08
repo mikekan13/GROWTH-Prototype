@@ -1,20 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import type { GrowthSkill, SkillCategory } from '@/types/growth';
+import type { GrowthSkill } from '@/types/growth';
 import { getSkillDie, getSkillRank } from '@/types/growth';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 
-const CATEGORY_META: Record<SkillCategory, { label: string; color: string }> = {
-  athletics: { label: 'Athletics', color: '#E8585A' },
-  social: { label: 'Social', color: '#D0A030' },
-  martial: { label: 'Martial', color: '#f7525f' },
-  sciences: { label: 'Sciences', color: '#002f6c' },
-  arts: { label: 'Arts', color: '#7050A8' },
-  perception: { label: 'Perception', color: '#3EB89A' },
-  magic: { label: 'Magic', color: '#582a72' },
-  crafting: { label: 'Crafting', color: '#D07818' },
-  other: { label: 'Other', color: '#6fa8dc' },
+// Governor abbreviations and pillar colors
+const GOV_ABBREV: Record<string, string> = {
+  clout: 'CLO', celerity: 'CEL', constitution: 'CON',
+  flow: 'FLO', focus: 'FOC',
+  willpower: 'WIL', wisdom: 'WIS', wit: 'WIT',
+};
+
+const GOV_COLOR: Record<string, string> = {
+  clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
+  flow: '#3EB89A', focus: '#3EB89A',
+  willpower: '#7050A8', wisdom: '#7050A8', wit: '#7050A8',
 };
 
 function SkillDieBadge({ level }: { level: number }) {
@@ -39,7 +39,7 @@ function SkillDieBadge({ level }: { level: number }) {
 function SkillRow({ skill }: { skill: GrowthSkill }) {
   const rank = getSkillRank(skill.level);
   const die = getSkillDie(skill.level);
-  const catMeta = skill.category ? CATEGORY_META[skill.category] : null;
+  const govStr = (skill.governors || []).map(g => GOV_ABBREV[g] || g).join(', ');
 
   return (
     <ComplexTooltip
@@ -48,7 +48,7 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
       modifiers={[
         { name: `Rank: ${rank}`, value: 0 },
         { name: `Skill Die: ${die}`, value: 0 },
-        ...(skill.isCombat ? [{ name: 'Combat Skill', value: 0 }] : []),
+        { name: `Governors: ${govStr}`, value: 0 },
         ...(skill.description ? [{ name: skill.description, value: 0 }] : []),
       ]}
       totalValue={skill.level}
@@ -56,25 +56,19 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
       <div className="flex items-center justify-between py-1 px-2 text-sm cursor-help transition-colors hover:bg-[var(--surface-dark)]/5">
         <div className="flex items-center gap-2">
           <span>{skill.name}</span>
-          {catMeta && (
-            <span className="px-1 text-[9px] uppercase" style={{
-              backgroundColor: catMeta.color,
-              color: 'white',
-              fontFamily: 'var(--font-header)',
-              letterSpacing: '0.03em',
-            }}>
-              {catMeta.label}
-            </span>
-          )}
-          {skill.isCombat && !skill.category && (
-            <span className="px-1 text-[9px] uppercase" style={{
-              backgroundColor: '#E8585A',
-              color: 'white',
-              fontFamily: 'var(--font-header)',
-            }}>
-              Combat
-            </span>
-          )}
+          {/* Governor badges */}
+          <div className="flex gap-px">
+            {(skill.governors || []).map(gov => (
+              <span key={gov} className="px-0.5 text-[8px] uppercase" style={{
+                backgroundColor: `${GOV_COLOR[gov]}20`,
+                color: GOV_COLOR[gov],
+                fontFamily: 'var(--font-header)',
+                letterSpacing: '0.03em',
+              }}>
+                {GOV_ABBREV[gov]}
+              </span>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {/* Level bar */}
@@ -104,58 +98,17 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
 }
 
 export default function SkillsSection({ skills }: { skills: GrowthSkill[] }) {
-  const [view, setView] = useState<'all' | 'combat' | 'general' | 'byCategory'>('all');
-
   if (skills.length === 0) return null;
 
-  const combat = skills.filter(s => s.isCombat);
-  const general = skills.filter(s => !s.isCombat);
-
-  // Group by category
-  const byCategory = skills.reduce<Record<string, GrowthSkill[]>>((acc, s) => {
-    const cat = s.category || (s.isCombat ? 'martial' : 'other');
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(s);
-    return acc;
-  }, {});
-
-  // Sort skills by level descending within each group
   const sortedSkills = [...skills].sort((a, b) => b.level - a.level);
-  const sortedCombat = [...combat].sort((a, b) => b.level - a.level);
-  const sortedGeneral = [...general].sort((a, b) => b.level - a.level);
 
   return (
     <div>
       <div className="flex items-center gap-3 mb-3">
         <div className="section-badge inline-block text-sm">Skills</div>
         <span className="text-[10px]" style={{ color: 'var(--surface-dark)', opacity: 0.4 }}>
-          {skills.length} skills | {combat.length} combat | {general.length} general
+          {skills.length} skill{skills.length !== 1 ? 's' : ''}
         </span>
-      </div>
-
-      {/* View toggles */}
-      <div className="flex gap-1 mb-3">
-        {[
-          { key: 'all' as const, label: 'All' },
-          { key: 'combat' as const, label: 'Combat' },
-          { key: 'general' as const, label: 'General' },
-          { key: 'byCategory' as const, label: 'By Category' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setView(key)}
-            className="px-2 py-0.5 text-[10px] uppercase transition-colors"
-            style={{
-              fontFamily: 'var(--font-header)',
-              letterSpacing: '0.05em',
-              backgroundColor: view === key ? 'var(--surface-dark)' : 'rgba(30, 45, 64, 0.08)',
-              color: view === key ? 'var(--accent-gold)' : 'rgba(30, 45, 64, 0.4)',
-              border: `1px solid ${view === key ? 'var(--accent-gold)' : 'rgba(30, 45, 64, 0.1)'}`,
-            }}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       {/* Skill die legend */}
@@ -173,60 +126,9 @@ export default function SkillsSection({ skills }: { skills: GrowthSkill[] }) {
       </div>
 
       {/* Skills list */}
-      {view === 'all' && (
-        <div className="space-y-0.5">
-          {sortedSkills.map((s, i) => <SkillRow key={i} skill={s} />)}
-        </div>
-      )}
-
-      {view === 'combat' && (
-        <div className="space-y-0.5">
-          {sortedCombat.length > 0 ? (
-            sortedCombat.map((s, i) => <SkillRow key={i} skill={s} />)
-          ) : (
-            <div className="text-xs py-2" style={{ color: 'var(--surface-dark)', opacity: 0.3 }}>No combat skills</div>
-          )}
-        </div>
-      )}
-
-      {view === 'general' && (
-        <div className="space-y-0.5">
-          {sortedGeneral.length > 0 ? (
-            sortedGeneral.map((s, i) => <SkillRow key={i} skill={s} />)
-          ) : (
-            <div className="text-xs py-2" style={{ color: 'var(--surface-dark)', opacity: 0.3 }}>No general skills</div>
-          )}
-        </div>
-      )}
-
-      {view === 'byCategory' && (
-        <div className="space-y-3">
-          {Object.entries(byCategory)
-            .sort(([, a], [, b]) => b.length - a.length)
-            .map(([cat, catSkills]) => {
-              const meta = CATEGORY_META[cat as SkillCategory] || { label: cat, color: '#6fa8dc' };
-              return (
-                <div key={cat}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-2 h-2" style={{ backgroundColor: meta.color }} />
-                    <span className="text-xs uppercase" style={{
-                      fontFamily: 'var(--font-header)',
-                      letterSpacing: '0.05em',
-                      color: meta.color,
-                    }}>
-                      {meta.label} ({catSkills.length})
-                    </span>
-                  </div>
-                  <div className="space-y-0.5">
-                    {[...catSkills].sort((a, b) => b.level - a.level).map((s, i) => (
-                      <SkillRow key={i} skill={s} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      )}
+      <div className="space-y-0.5">
+        {sortedSkills.map((s, i) => <SkillRow key={i} skill={s} />)}
+      </div>
     </div>
   );
 }

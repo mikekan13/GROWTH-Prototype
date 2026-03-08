@@ -40,6 +40,8 @@ model Campaign {
   changeLogs      ChangeLog[]
   sessions        GameSession[]
   events          CampaignEvent[]
+  forgeItems      ForgeItem[]
+  playerRequests  PlayerRequest[]
   createdAt       DateTime         @default(now())
 }
 
@@ -171,6 +173,43 @@ model CampaignEvent {
   @@index([campaignId, createdAt])
   @@index([campaignId, type])
   @@index([sessionId])
+}
+
+model ForgeItem {
+  id         String          @id @default(cuid())
+  campaign   Campaign        @relation(fields: [campaignId], references: [id])
+  campaignId String
+  type       String          // skill | item | nectar | blossom | thorn
+  name       String
+  status     String          @default("draft") // draft | published
+  data       String          // JSON: type-specific details (governors, description, etc.)
+  createdBy  String          // userId of creator (GM)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  requests   PlayerRequest[]
+
+  @@unique([campaignId, name, type])
+  @@index([campaignId, type])
+  @@index([campaignId, status])
+}
+
+model PlayerRequest {
+  id          String     @id @default(cuid())
+  campaign    Campaign   @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  requesterId String     // userId of the requesting player
+  type        String     // skill | item | nectar | blossom | thorn
+  name        String     // Requested name
+  status      String     @default("pending") // pending | approved | denied | modified
+  data        String     // JSON: what the player wants (governors, description, etc.)
+  gmNotes     String?    // GM feedback
+  forgeItem   ForgeItem? @relation(fields: [forgeItemId], references: [id])
+  forgeItemId String?    // Linked ForgeItem once approved/modified
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([campaignId, status])
+  @@index([requesterId])
 }
 
 model AccessCode {

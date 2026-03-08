@@ -1,6 +1,6 @@
 # GRO.WTH System Map
 
-Last updated: 2026-03-08 (Campaign Terminal + Dice + Skills)
+Last updated: 2026-03-08 (Forge System + Skill Redesign)
 
 ## Architecture Overview
 
@@ -96,10 +96,25 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - Effort always spent regardless of success/failure
 
 ### Skills System
+- **Freeform** — name defines context, no predefined categories, no combat flag
+- Skills have: name, level (1-20), governors (1+ attribute names, not Frequency), description
+- Governors: clout, celerity, constitution, flow, focus, willpower, wisdom, wit
+- Modifiers come from external sources (gear, nectars, buffs) — not stored on skill
+- Skill specificity affects DR adjustment (-2 to +2) — evaluated by GM or AI copilot
 - Skills stored inline in character JSON (GrowthSkill[] array)
 - CRUD via pure functions in `character-actions.ts`: addSkill, removeSkill, updateSkillLevel, updateSkill
-- SkillsCard canvas sub-panel supports editing: add form, +/- level buttons, remove button, Roll button (on hover)
-- All changes flow through `onCharacterUpdate` → changelog
+- SkillsCard: governor badges (pillar-colored), +/- level, Roll button, Request button (player)
+- Max output readout in tooltip: max roll, skill cap, effort to cap
+- Files: `types/growth.ts` (SkillGovernor, SKILL_GOVERNORS), `lib/character-actions.ts`, `components/canvas/SkillsCard.tsx`
+
+### Forge System
+- Campaign-level design workshop where GM creates templates and players submit requests
+- ForgeItem: campaign-scoped design (skill/item/nectar/blossom/thorn), draft → published lifecycle
+- PlayerRequest: player-submitted request, GM approves/denies/modifies → creates ForgeItem
+- Players can request skills from SkillsCard (name, governors, description) — appears in Forge + Terminal
+- Published ForgeItems are available in the campaign for assignment to characters
+- KRMA cost: creating a template is free, assigning to a character at a level costs KRMA (future)
+- Files: `services/forge.ts`, `app/api/campaigns/[id]/forge/`, `app/api/campaigns/[id]/requests/`
 
 ### AI Systems (planned)
 - Portrait pipeline: ComfyUI + FLUX.2 Dev + PuLID (see PORTRAIT-PIPELINE.md)

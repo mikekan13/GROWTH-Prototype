@@ -2,23 +2,26 @@
 
 import React, { useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
-import type { SkillCategory } from '@/types/growth';
+import type { SkillGovernor } from '@/types/growth';
+import { SKILL_GOVERNORS } from '@/types/growth';
 
 export interface SkillItem {
   name: string;
   level: number;
-  isCombat?: boolean;
-  category?: string;
+  governors: SkillGovernor[];
   description?: string;
+  forgeItemId?: string;
 }
 
 interface SkillsCardProps {
   skills: SkillItem[];
+  isPlayer?: boolean;
   onClose?: () => void;
-  onAddSkill?: (skill: { name: string; level: number; isCombat: boolean; category?: SkillCategory }) => void;
+  onAddSkill?: (skill: { name: string; level: number; governors: SkillGovernor[]; description?: string }) => void;
   onRemoveSkill?: (skillName: string) => void;
   onUpdateSkillLevel?: (skillName: string, newLevel: number) => void;
   onRollSkill?: (skillName: string) => void;
+  onRequestSkill?: (request: { name: string; governors: SkillGovernor[]; description?: string }) => void;
 }
 
 function getSkillDie(level: number): string {
@@ -29,6 +32,16 @@ function getSkillDie(level: number): string {
   if (level <= 11) return 'd8';
   if (level <= 19) return 'd12';
   return 'd20';
+}
+
+function getMaxDieValue(level: number): number {
+  if (level <= 0) return 0;
+  if (level <= 3) return level;
+  if (level <= 5) return 4;
+  if (level <= 7) return 6;
+  if (level <= 11) return 8;
+  if (level <= 19) return 12;
+  return 20;
 }
 
 function getSkillRank(level: number): string {
@@ -51,41 +64,101 @@ function dieColor(level: number): string {
   return '#ffcc78';
 }
 
-const SKILL_CATEGORIES: SkillCategory[] = ['athletics', 'social', 'martial', 'sciences', 'arts', 'perception', 'magic', 'crafting', 'other'];
+// Governor abbreviations for compact display
+const GOV_ABBREV: Record<string, string> = {
+  clout: 'CLO', celerity: 'CEL', constitution: 'CON',
+  flow: 'FLO', focus: 'FOC',
+  willpower: 'WIL', wisdom: 'WIS', wit: 'WIT',
+};
 
-export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill }: SkillsCardProps) {
-  const [view, setView] = useState<string>('all');
+// Pillar colors for governor badges
+const GOV_COLOR: Record<string, string> = {
+  clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
+  flow: '#3EB89A', focus: '#3EB89A',
+  willpower: '#7050A8', wisdom: '#7050A8', wit: '#7050A8',
+};
+
+export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onRequestSkill }: SkillsCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillLevel, setNewSkillLevel] = useState(1);
-  const [newSkillCombat, setNewSkillCombat] = useState(false);
-  const [newSkillCategory, setNewSkillCategory] = useState<SkillCategory>('other');
+  const [newSkillDesc, setNewSkillDesc] = useState('');
+  const [newSkillGovs, setNewSkillGovs] = useState<Set<SkillGovernor>>(new Set());
 
   const safeSkills = Array.isArray(skills) ? skills : [];
-  const combat = safeSkills.filter(s => s.isCombat);
-  const general = safeSkills.filter(s => !s.isCombat);
   const sorted = [...safeSkills].sort((a, b) => b.level - a.level);
-  const sortedCombat = [...combat].sort((a, b) => b.level - a.level);
-  const sortedGeneral = [...general].sort((a, b) => b.level - a.level);
-
-  const displayed = view === 'combat' ? sortedCombat : view === 'general' ? sortedGeneral : sorted;
   const isEditable = !!(onAddSkill || onRemoveSkill || onUpdateSkillLevel);
 
+  const toggleGov = (gov: SkillGovernor) => {
+    setNewSkillGovs(prev => {
+      const next = new Set(prev);
+      if (next.has(gov)) next.delete(gov);
+      else next.add(gov);
+      return next;
+    });
+  };
+
   const handleAddSkill = () => {
-    if (!newSkillName.trim() || !onAddSkill) return;
+    if (!newSkillName.trim() || !onAddSkill || newSkillGovs.size === 0) return;
     onAddSkill({
       name: newSkillName.trim(),
       level: newSkillLevel,
-      isCombat: newSkillCombat,
-      category: newSkillCategory,
+      governors: Array.from(newSkillGovs),
+      description: newSkillDesc.trim() || undefined,
     });
+    resetForm();
+  };
+
+  const handleRequestSkill = () => {
+    if (!newSkillName.trim() || !onRequestSkill || newSkillGovs.size === 0) return;
+    onRequestSkill({
+      name: newSkillName.trim(),
+      governors: Array.from(newSkillGovs),
+      description: newSkillDesc.trim() || undefined,
+    });
+    resetForm();
+    setShowRequestForm(false);
+  };
+
+  const resetForm = () => {
     setNewSkillName('');
     setNewSkillLevel(1);
-    setNewSkillCombat(false);
-    setNewSkillCategory('other');
+    setNewSkillDesc('');
+    setNewSkillGovs(new Set());
     setShowAddForm(false);
   };
+
+  const canSubmit = newSkillName.trim() && newSkillGovs.size > 0;
+
+  // Governor selector (shared between add and request forms)
+  const GovernorSelector = () => (
+    <div className="space-y-1">
+      <label className="text-[9px] text-gray-400">Governors (at least one):</label>
+      <div className="flex flex-wrap gap-1">
+        {SKILL_GOVERNORS.map(gov => (
+          <button
+            key={gov}
+            type="button"
+            onClick={e => { e.stopPropagation(); toggleGov(gov); }}
+            onMouseDown={e => e.stopPropagation()}
+            className="text-[8px] px-1.5 py-0.5 transition-colors uppercase"
+            style={{
+              borderRadius: '2px',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+              letterSpacing: '0.05em',
+              backgroundColor: newSkillGovs.has(gov) ? GOV_COLOR[gov] : '#2a2a3e',
+              color: newSkillGovs.has(gov) ? 'white' : '#666',
+              border: `1px solid ${newSkillGovs.has(gov) ? GOV_COLOR[gov] : '#3a3a4e'}`,
+            }}
+          >
+            {GOV_ABBREV[gov]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '400px' }}>
@@ -97,15 +170,22 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>SKILLS</h3>
               <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
-                {safeSkills.length} skills {'\u2022'} {combat.length} combat {'\u2022'} {general.length} general
+                {safeSkills.length} skill{safeSkills.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
             {isEditable && (
-              <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm); }} onMouseDown={e => e.stopPropagation()}
+              <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm); setShowRequestForm(false); }} onMouseDown={e => e.stopPropagation()}
                 className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: '#ffcc78' }}>
                 +
+              </button>
+            )}
+            {isPlayer && onRequestSkill && (
+              <button onClick={e => { e.stopPropagation(); setShowRequestForm(!showRequestForm); setShowAddForm(false); }} onMouseDown={e => e.stopPropagation()}
+                className="px-1.5 py-0.5 hover:bg-white/20 transition-colors text-[8px] uppercase"
+                style={{ borderRadius: '2px', color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
+                Request
               </button>
             )}
             <button onClick={e => { e.stopPropagation(); setIsExpanded(!isExpanded); }} onMouseDown={e => e.stopPropagation()} className="p-1 hover:bg-white/20 transition-colors" style={{ borderRadius: '2px' }}>
@@ -122,7 +202,7 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
 
       {isExpanded && (
         <div className="p-3" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-          {/* Add Skill Form */}
+          {/* Add Skill Form (GM) */}
           {showAddForm && onAddSkill && (
             <div className="mb-3 p-2 border" style={{ borderColor: '#ffcc78', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
               <div className="space-y-2">
@@ -136,6 +216,16 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
                   style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   autoFocus
                 />
+                <input
+                  type="text"
+                  value={newSkillDesc}
+                  onChange={e => setNewSkillDesc(e.target.value)}
+                  onMouseDown={e => e.stopPropagation()}
+                  placeholder="Description (optional)..."
+                  className="w-full bg-transparent outline-none text-[10px] text-gray-300 px-1 py-0.5 border-b"
+                  style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                />
+                <GovernorSelector />
                 <div className="flex gap-2 items-center">
                   <label className="text-[9px] text-gray-400">Level:</label>
                   <input
@@ -147,42 +237,24 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
                     className="w-12 bg-transparent outline-none text-xs text-white px-1 py-0.5 border"
                     style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   />
-                  <label className="text-[9px] text-gray-400 flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={newSkillCombat}
-                      onChange={e => setNewSkillCombat(e.target.checked)}
-                      onMouseDown={e => e.stopPropagation()}
-                    />
-                    Combat
-                  </label>
-                  <select
-                    value={newSkillCategory}
-                    onChange={e => setNewSkillCategory(e.target.value as SkillCategory)}
-                    onMouseDown={e => e.stopPropagation()}
-                    className="text-[9px] bg-transparent text-white outline-none px-1 py-0.5 border"
-                    style={{ borderColor: '#3a3a4e' }}
-                  >
-                    {SKILL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={e => { e.stopPropagation(); handleAddSkill(); }}
                     onMouseDown={e => e.stopPropagation()}
-                    disabled={!newSkillName.trim()}
+                    disabled={!canSubmit}
                     className="text-[9px] px-2 py-0.5 uppercase"
                     style={{
-                      color: newSkillName.trim() ? '#22ab94' : '#666',
+                      color: canSubmit ? '#22ab94' : '#666',
                       border: '1px solid',
-                      borderColor: newSkillName.trim() ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
+                      borderColor: canSubmit ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
                       borderRadius: '2px',
                     }}
                   >
                     Add
                   </button>
                   <button
-                    onClick={e => { e.stopPropagation(); setShowAddForm(false); }}
+                    onClick={e => { e.stopPropagation(); resetForm(); }}
                     onMouseDown={e => e.stopPropagation()}
                     className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
                     style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}
@@ -194,20 +266,58 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
             </div>
           )}
 
-          {/* View tabs */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {['all', 'combat', 'general'].map(v => (
-              <button key={v} onClick={e => { e.stopPropagation(); setView(v); }} onMouseDown={e => e.stopPropagation()}
-                className="px-2 py-1 text-xs transition-colors uppercase"
-                style={{
-                  borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em', fontSize: '11px',
-                  backgroundColor: view === v ? '#582a72' : '#2a2a3e', color: view === v ? '#ffcc78' : '#888',
-                  border: `1px solid ${view === v ? '#ffcc78' : '#3a3a4e'}`,
-                }}>
-                {v}
-              </button>
-            ))}
-          </div>
+          {/* Request Skill Form (Player) */}
+          {showRequestForm && onRequestSkill && (
+            <div className="mb-3 p-2 border" style={{ borderColor: '#22ab94', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
+              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Request a Skill</div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={newSkillName}
+                  onChange={e => setNewSkillName(e.target.value)}
+                  onMouseDown={e => e.stopPropagation()}
+                  placeholder="Skill name..."
+                  className="w-full bg-transparent outline-none text-sm text-white px-1 py-0.5 border-b"
+                  style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                  autoFocus
+                />
+                <input
+                  type="text"
+                  value={newSkillDesc}
+                  onChange={e => setNewSkillDesc(e.target.value)}
+                  onMouseDown={e => e.stopPropagation()}
+                  placeholder="Description (what does this skill cover?)..."
+                  className="w-full bg-transparent outline-none text-[10px] text-gray-300 px-1 py-0.5 border-b"
+                  style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                />
+                <GovernorSelector />
+                <div className="flex gap-2">
+                  <button
+                    onClick={e => { e.stopPropagation(); handleRequestSkill(); }}
+                    onMouseDown={e => e.stopPropagation()}
+                    disabled={!canSubmit}
+                    className="text-[9px] px-2 py-0.5 uppercase"
+                    style={{
+                      color: canSubmit ? '#22ab94' : '#666',
+                      border: '1px solid',
+                      borderColor: canSubmit ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
+                      borderRadius: '2px',
+                    }}
+                  >
+                    Submit Request
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); resetForm(); setShowRequestForm(false); }}
+                    onMouseDown={e => e.stopPropagation()}
+                    className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
+                    style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Die legend */}
           <div className="flex gap-2 mb-2 text-[8px] flex-wrap" style={{ color: '#666' }}>
@@ -218,20 +328,24 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
 
           {/* Skills list */}
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {displayed.length === 0 ? (
+            {sorted.length === 0 ? (
               <div className="text-center text-gray-400 text-sm py-4">
-                {isEditable ? 'No skills yet. Click + to add one.' : 'No skills found'}
+                {isEditable ? 'No skills yet. Click + to add one.' : isPlayer ? 'No skills yet. Request one!' : 'No skills found'}
               </div>
-            ) : displayed.map((skill, i) => {
+            ) : sorted.map((skill, i) => {
               const die = getSkillDie(skill.level);
               const rank = getSkillRank(skill.level);
+              const maxRoll = getMaxDieValue(skill.level);
+              const effortToCap = Math.max(0, skill.level - maxRoll);
               return (
                 <ComplexTooltip key={i} title={`\u2605 ${skill.name}`}
                   modifiers={[
                     { name: `Level: ${skill.level}`, value: skill.level },
                     { name: `Rank: ${rank}`, value: 0 },
                     { name: `Skill Die: ${die}`, value: 0 },
-                    ...(skill.isCombat ? [{ name: 'Combat Skill', value: 0 }] : []),
+                    { name: `Max Roll: ${maxRoll}`, value: maxRoll },
+                    ...(effortToCap > 0 ? [{ name: `Effort to Cap: +${effortToCap}`, value: effortToCap }] : []),
+                    { name: `Gov: ${(skill.governors || []).map(g => GOV_ABBREV[g] || g).join(', ')}`, value: 0 },
                     ...(skill.description ? [{ name: skill.description, value: 0 }] : []),
                   ]} totalValue={skill.level}>
                   <div className="p-1.5 border transition-colors group" onMouseDown={e => e.stopPropagation()}
@@ -239,12 +353,18 @@ export default function SkillsCard({ skills, onClose, onAddSkill, onRemoveSkill,
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <span className="text-sm text-white truncate">{skill.name}</span>
-                        {skill.isCombat && (
-                          <span className="text-[8px] px-1" style={{ backgroundColor: '#E8585A', color: 'white', borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', flexShrink: 0 }}>CBT</span>
-                        )}
-                        {skill.category && (
-                          <span className="text-[8px] px-1" style={{ backgroundColor: '#3a3a4e', color: '#888', borderRadius: '2px', flexShrink: 0 }}>{skill.category}</span>
-                        )}
+                        {/* Governor badges */}
+                        <div className="flex gap-px flex-shrink-0">
+                          {(skill.governors || []).map(gov => (
+                            <span key={gov} className="text-[7px] px-0.5" style={{
+                              backgroundColor: `${GOV_COLOR[gov]}30`,
+                              color: GOV_COLOR[gov],
+                              borderRadius: '1px',
+                              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                              letterSpacing: '0.03em',
+                            }}>{GOV_ABBREV[gov]}</span>
+                          ))}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {/* Level adjust buttons (only when editable) */}
