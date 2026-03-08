@@ -9,6 +9,7 @@ import type { GrowthCharacter } from '@/types/growth';
 
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
+const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -275,19 +276,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         )}
 
         {activeTab === 'forge' && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-3">
-              <div className="text-[var(--accent-gold)] text-xs font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase">
-                [FORGE]
-              </div>
-              <p className="text-white/30 text-[10px] font-[family-name:var(--font-terminal)] tracking-wider">
-                Character creation and mechanical shaping. Coming soon.
-              </p>
-              <div className="text-[var(--accent-teal)]/20 text-[9px] font-[family-name:var(--font-terminal)]">
-                {'='.repeat(30)}
-              </div>
-            </div>
-          </div>
+          <ForgePanel
+            campaignId={campaign.id}
+            isGM={userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD'}
+            userId={userId || ''}
+          />
         )}
 
         {activeTab === 'essence' && (
