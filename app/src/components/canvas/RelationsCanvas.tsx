@@ -865,6 +865,7 @@ export default function RelationsCanvas({
               case 'skills':
                 return <SkillsCard
                   skills={(charData.skills as SkillItem[]) || []}
+                  campaignId={campaignId}
                   onClose={() => togglePanel(node.id, panelKey)}
                   onAddSkill={onCharacterUpdate ? (skill) => {
                     const result = addSkill(charData as unknown as GrowthCharacter, skill);

@@ -213,6 +213,7 @@ export function addSkill(
   skill: { name: string; level?: number; governors: SkillGovernor[]; description?: string; forgeItemId?: string }
 ): ActionResult {
   const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.skills)) c.skills = [];
   const existing = c.skills.find(s => s.name.toLowerCase() === skill.name.toLowerCase());
   if (existing) {
     return { character: c, changes: [`Skill "${skill.name}" already exists`] };
@@ -240,6 +241,7 @@ export function removeSkill(
   skillName: string
 ): ActionResult {
   const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.skills)) c.skills = [];
   const idx = c.skills.findIndex(s => s.name.toLowerCase() === skillName.toLowerCase());
   if (idx === -1) {
     return { character: c, changes: [`Skill "${skillName}" not found`] };
@@ -257,6 +259,7 @@ export function updateSkillLevel(
   newLevel: number
 ): ActionResult {
   const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.skills)) c.skills = [];
   const skill = c.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase());
   if (!skill) {
     return { character: c, changes: [`Skill "${skillName}" not found`] };
@@ -278,6 +281,7 @@ export function updateSkill(
   updates: { governors?: SkillGovernor[]; description?: string }
 ): ActionResult {
   const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.skills)) c.skills = [];
   const skill = c.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase());
   if (!skill) {
     return { character: c, changes: [`Skill "${skillName}" not found`] };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import type { SkillGovernor } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
@@ -13,11 +13,18 @@ export interface SkillItem {
   forgeItemId?: string;
 }
 
+export interface ForgeSkillItem {
+  id: string;
+  name: string;
+  data: { governors: SkillGovernor[]; description?: string };
+}
+
 interface SkillsCardProps {
   skills: SkillItem[];
+  campaignId?: string;
   isPlayer?: boolean;
   onClose?: () => void;
-  onAddSkill?: (skill: { name: string; level: number; governors: SkillGovernor[]; description?: string }) => void;
+  onAddSkill?: (skill: { name: string; level: number; governors: SkillGovernor[]; description?: string; forgeItemId?: string }) => void;
   onRemoveSkill?: (skillName: string) => void;
   onUpdateSkillLevel?: (skillName: string, newLevel: number) => void;
   onRollSkill?: (skillName: string) => void;
@@ -78,7 +85,7 @@ const GOV_COLOR: Record<string, string> = {
   willpower: '#3E78C0', wisdom: '#3E78C0', wit: '#3E78C0',
 };
 
-export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onRequestSkill }: SkillsCardProps) {
+export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onRequestSkill }: SkillsCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -86,6 +93,39 @@ export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRe
   const [newSkillLevel, setNewSkillLevel] = useState(1);
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillGovs, setNewSkillGovs] = useState<Set<SkillGovernor>>(new Set());
+
+  // Forge skill picker state (GM)
+  const [forgeSkills, setForgeSkills] = useState<ForgeSkillItem[]>([]);
+  const [forgeLoading, setForgeLoading] = useState(false);
+  const [selectedForgeSkill, setSelectedForgeSkill] = useState<ForgeSkillItem | null>(null);
+  const [forgeSkillLevel, setForgeSkillLevel] = useState(1);
+  const [forgeFilter, setForgeFilter] = useState('');
+
+  // Fetch published forge skills when the add form opens
+  const isGM = !!onAddSkill;
+  useEffect(() => {
+    if (!showAddForm || !campaignId || !isGM) return;
+    let cancelled = false;
+    setForgeLoading(true);
+    fetch(`/api/campaigns/${campaignId}/forge?type=skill`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        const items = (data.items || []).map((item: { id: string; name: string; status: string; data: string | object }) => ({
+          id: item.id,
+          name: item.name,
+          data: typeof item.data === 'string' ? JSON.parse(item.data) : item.data,
+        }));
+        setForgeSkills(items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to fetch forge skills:', err);
+        setForgeSkills([]);
+      })
+      .finally(() => { if (!cancelled) setForgeLoading(false); });
+    return () => { cancelled = true; };
+  }, [showAddForm, campaignId, isGM]);
 
   const safeSkills = Array.isArray(skills) ? skills : [];
   const sorted = [...safeSkills].sort((a, b) => b.level - a.level);
@@ -100,15 +140,19 @@ export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRe
     });
   };
 
-  const handleAddSkill = () => {
-    if (!newSkillName.trim() || !onAddSkill || newSkillGovs.size === 0) return;
+  const handleAddForgeSkill = () => {
+    if (!selectedForgeSkill || !onAddSkill) return;
     onAddSkill({
-      name: newSkillName.trim(),
-      level: newSkillLevel,
-      governors: Array.from(newSkillGovs),
-      description: newSkillDesc.trim() || undefined,
+      name: selectedForgeSkill.name,
+      level: forgeSkillLevel,
+      governors: selectedForgeSkill.data.governors,
+      description: selectedForgeSkill.data.description,
+      forgeItemId: selectedForgeSkill.id,
     });
-    resetForm();
+    setSelectedForgeSkill(null);
+    setForgeSkillLevel(1);
+    setForgeFilter('');
+    setShowAddForm(false);
   };
 
   const handleRequestSkill = () => {
@@ -127,6 +171,9 @@ export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRe
     setNewSkillLevel(1);
     setNewSkillDesc('');
     setNewSkillGovs(new Set());
+    setSelectedForgeSkill(null);
+    setForgeSkillLevel(1);
+    setForgeFilter('');
     setShowAddForm(false);
   };
 
@@ -202,57 +249,114 @@ export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRe
 
       {isExpanded && (
         <div className="p-3" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-          {/* Add Skill Form (GM) */}
+          {/* Add Skill from Forge (GM) */}
           {showAddForm && onAddSkill && (
             <div className="mb-3 p-2 border" style={{ borderColor: '#ffcc78', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={newSkillName}
-                  onChange={e => setNewSkillName(e.target.value)}
-                  onMouseDown={e => e.stopPropagation()}
-                  placeholder="Skill name..."
-                  className="w-full bg-transparent outline-none text-sm text-white px-1 py-0.5 border-b"
-                  style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-                  autoFocus
-                />
-                <input
-                  type="text"
-                  value={newSkillDesc}
-                  onChange={e => setNewSkillDesc(e.target.value)}
-                  onMouseDown={e => e.stopPropagation()}
-                  placeholder="Description (optional)..."
-                  className="w-full bg-transparent outline-none text-[10px] text-gray-300 px-1 py-0.5 border-b"
-                  style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-                />
-                <GovernorSelector />
-                <div className="flex gap-2 items-center">
-                  <label className="text-[9px] text-gray-400">Level:</label>
-                  <input
-                    type="number"
-                    value={newSkillLevel}
-                    onChange={e => setNewSkillLevel(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-                    onMouseDown={e => e.stopPropagation()}
-                    min={1} max={20}
-                    className="w-12 bg-transparent outline-none text-xs text-white px-1 py-0.5 border"
-                    style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-                  />
+              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Assign Forged Skill</div>
+              {forgeLoading ? (
+                <div className="text-[10px] text-gray-400 py-2 text-center">Loading forge skills...</div>
+              ) : forgeSkills.length === 0 ? (
+                <div className="text-[10px] text-gray-400 py-2 text-center">No published skills in the Forge yet.</div>
+              ) : selectedForgeSkill ? (
+                /* Selected skill — confirm with level */
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-white">{selectedForgeSkill.name}</span>
+                    <div className="flex gap-px">
+                      {selectedForgeSkill.data.governors.map(gov => (
+                        <span key={gov} className="text-[7px] px-0.5" style={{
+                          backgroundColor: `${GOV_COLOR[gov]}30`,
+                          color: GOV_COLOR[gov],
+                          borderRadius: '1px',
+                          fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                        }}>{GOV_ABBREV[gov]}</span>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedForgeSkill.data.description && (
+                    <div className="text-[9px] text-gray-400">{selectedForgeSkill.data.description}</div>
+                  )}
+                  <div className="flex gap-2 items-center">
+                    <label className="text-[9px] text-gray-400">Level:</label>
+                    <input
+                      type="number"
+                      value={forgeSkillLevel}
+                      onChange={e => setForgeSkillLevel(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                      onMouseDown={e => e.stopPropagation()}
+                      min={1} max={20}
+                      className="w-12 bg-transparent outline-none text-xs text-white px-1 py-0.5 border"
+                      style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                    />
+                    <span className="text-[9px]" style={{ color: dieColor(forgeSkillLevel) }}>{getSkillDie(forgeSkillLevel)}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={e => { e.stopPropagation(); handleAddForgeSkill(); }}
+                      onMouseDown={e => e.stopPropagation()}
+                      className="text-[9px] px-2 py-0.5 uppercase"
+                      style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}
+                    >
+                      Assign
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setSelectedForgeSkill(null); }}
+                      onMouseDown={e => e.stopPropagation()}
+                      className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
+                      style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}
+                    >
+                      Back
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={e => { e.stopPropagation(); handleAddSkill(); }}
+              ) : (
+                /* Forge skill list */
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={forgeFilter}
+                    onChange={e => setForgeFilter(e.target.value)}
                     onMouseDown={e => e.stopPropagation()}
-                    disabled={!canSubmit}
-                    className="text-[9px] px-2 py-0.5 uppercase"
-                    style={{
-                      color: canSubmit ? '#22ab94' : '#666',
-                      border: '1px solid',
-                      borderColor: canSubmit ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
-                      borderRadius: '2px',
-                    }}
-                  >
-                    Add
-                  </button>
+                    placeholder="Filter skills..."
+                    className="w-full bg-transparent outline-none text-[10px] text-white px-1 py-0.5 border-b"
+                    style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                    autoFocus
+                  />
+                  <div className="max-h-40 overflow-y-auto space-y-0.5">
+                    {forgeSkills
+                      .filter(fs => {
+                        // Hide skills already assigned to this character
+                        const alreadyAssigned = safeSkills.some(s => s.forgeItemId === fs.id);
+                        if (alreadyAssigned) return false;
+                        if (!forgeFilter.trim()) return true;
+                        return fs.name.toLowerCase().includes(forgeFilter.toLowerCase());
+                      })
+                      .map(fs => (
+                        <button
+                          key={fs.id}
+                          onClick={e => { e.stopPropagation(); setSelectedForgeSkill(fs); setForgeSkillLevel(1); }}
+                          onMouseDown={e => e.stopPropagation()}
+                          className="w-full text-left p-1.5 border transition-colors hover:border-[#ffcc78]"
+                          style={{ borderRadius: '2px', backgroundColor: '#1a1a2e', borderColor: '#3a3a4e' }}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-white">{fs.name}</span>
+                            <div className="flex gap-px">
+                              {fs.data.governors.map(gov => (
+                                <span key={gov} className="text-[7px] px-0.5" style={{
+                                  backgroundColor: `${GOV_COLOR[gov]}30`,
+                                  color: GOV_COLOR[gov],
+                                  borderRadius: '1px',
+                                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                                }}>{GOV_ABBREV[gov]}</span>
+                              ))}
+                            </div>
+                          </div>
+                          {fs.data.description && (
+                            <div className="text-[8px] text-gray-500 mt-0.5 truncate">{fs.data.description}</div>
+                          )}
+                        </button>
+                      ))}
+                  </div>
                   <button
                     onClick={e => { e.stopPropagation(); resetForm(); }}
                     onMouseDown={e => e.stopPropagation()}
@@ -262,7 +366,7 @@ export default function SkillsCard({ skills, isPlayer, onClose, onAddSkill, onRe
                     Cancel
                   </button>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
