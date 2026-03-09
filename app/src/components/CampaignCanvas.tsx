@@ -6,6 +6,8 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GrowthCharacter } from '@/types/growth';
+import type { GrowthLocation } from '@/types/location';
+import type { GrowthWorldItem } from '@/types/item';
 
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
@@ -13,7 +15,7 @@ const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr:
 
 interface CanvasNode {
   id: string;
-  type: 'character' | 'npc' | 'location' | 'quest';
+  type: 'character' | 'npc' | 'location' | 'quest' | 'item';
   name: string;
   x: number;
   y: number;
@@ -21,6 +23,12 @@ interface CanvasNode {
   color?: string;
   portrait?: string | null;
   characterData?: Record<string, unknown> | null;
+  locationType?: string;
+  locationData?: GrowthLocation | null;
+  itemType?: string;
+  itemData?: GrowthWorldItem | null;
+  holderName?: string;
+  locationName?: string;
 }
 
 interface Connection {
@@ -45,7 +53,7 @@ interface CampaignCanvasProps {
   userCharacter?: { id: string; name: string; data: string } | null;
 }
 
-type Tab = 'relations' | 'forge' | 'essence';
+type Tab = 'relations' | 'forge' | 'encounters' | 'essence';
 
 const MIN_TERMINAL_HEIGHT = 150;
 const MAX_TERMINAL_FRACTION = 0.8;
@@ -136,6 +144,62 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
   }, [campaign.id, router]);
 
+  const handleCreateLocation = useCallback(async (name: string, type: string) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/locations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to create location');
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
+  const handleCreateItem = useCallback(async (name: string, type: string) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to create item');
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
+  const handleDeleteLocation = useCallback(async (nodeId: string) => {
+    if (!confirm('Delete this location?')) return;
+    try {
+      await fetch(`/api/campaigns/${campaign.id}/locations/${nodeId}`, { method: 'DELETE' });
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
+  const handleDeleteItem = useCallback(async (nodeId: string) => {
+    if (!confirm('Delete this item?')) return;
+    try {
+      await fetch(`/api/campaigns/${campaign.id}/items/${nodeId}`, { method: 'DELETE' });
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
   const handleDeleteCharacter = useCallback(async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -190,6 +254,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const tabs: { key: Tab; label: string }[] = [
     { key: 'relations', label: 'Relations' },
     { key: 'forge', label: 'Forge' },
+    { key: 'encounters', label: 'Encounters' },
     { key: 'essence', label: 'Essence' },
   ];
 
@@ -272,6 +337,10 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onCreateCharacter={handleCreateCharacter}
             onDeleteCharacter={(nodeId) => setDeleteTarget(nodeId)}
             onCharacterUpdate={handleCharacterUpdate}
+            onCreateLocation={handleCreateLocation}
+            onDeleteLocation={handleDeleteLocation}
+            onCreateItem={handleCreateItem}
+            onDeleteItem={handleDeleteItem}
           />
         )}
 
@@ -283,17 +352,185 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           />
         )}
 
-        {activeTab === 'essence' && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-3">
-              <div className="text-[var(--accent-gold)] text-xs font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase">
-                [ESSENCE]
+        {activeTab === 'encounters' && (
+          <div className="h-full overflow-y-auto p-6" style={{ background: 'var(--surface-dark)' }}>
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="text-center mb-6">
+                <div className="text-[var(--pillar-body)] text-xs font-[family-name:var(--font-terminal)] tracking-[0.3em] uppercase mb-1">
+                  Encounter Manager
+                </div>
+                <div className="text-white/20 text-[9px] font-[family-name:var(--font-terminal)]">
+                  Combat &middot; Social &middot; Exploration &middot; Events
+                </div>
               </div>
-              <p className="text-white/30 text-[10px] font-[family-name:var(--font-terminal)] tracking-wider">
-                Character essence and narrative threads. Coming soon.
-              </p>
-              <div className="text-[var(--accent-teal)]/20 text-[9px] font-[family-name:var(--font-terminal)]">
-                {'='.repeat(30)}
+
+              {/* Create encounter button */}
+              {(userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD') && (
+                <button
+                  onClick={async () => {
+                    const name = window.prompt('Encounter name:');
+                    if (!name?.trim()) return;
+                    try {
+                      await fetch(`/api/campaigns/${campaign.id}/encounters`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name.trim(), type: 'combat' }),
+                      });
+                      router.refresh();
+                    } catch { alert('Failed to create encounter'); }
+                  }}
+                  className="w-full py-3 border border-dashed border-[var(--pillar-body)]/30 text-[var(--pillar-body)]/60 text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] hover:border-[var(--pillar-body)]/60 hover:text-[var(--pillar-body)] transition-colors"
+                  style={{ background: 'rgba(232,88,90,0.05)' }}
+                >
+                  + New Encounter
+                </button>
+              )}
+
+              {/* Encounter list placeholder */}
+              <div className="text-center py-12 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
+                <div className="mb-2">Encounters will appear here once created.</div>
+                <div className="text-white/10">
+                  Three-phase combat: Intention &rarr; Resolution &rarr; Impact
+                </div>
+                <div className="text-white/10 mt-1">
+                  Action economy: Body / Spirit / Soul pools per participant
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'essence' && (
+          <div className="h-full overflow-y-auto p-6" style={{ background: 'var(--surface-dark)' }}>
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="text-center mb-8">
+                <div className="text-[var(--accent-teal)] text-xs font-[family-name:var(--font-terminal)] tracking-[0.3em] uppercase mb-1">
+                  Campaign Essence
+                </div>
+                <div className="text-white/20 text-[9px] font-[family-name:var(--font-terminal)]">
+                  GRO.vines &middot; Narrative Threads &middot; Character Arcs
+                </div>
+              </div>
+
+              {/* GRO.vines overview */}
+              <div>
+                <div className="text-[var(--accent-teal)] text-[10px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-3 border-b border-[var(--accent-teal)]/20 pb-1">
+                  Active GRO.vines
+                </div>
+                {nodes.filter(n => n.type === 'character' && n.characterData).map(node => {
+                  const charData = node.characterData as Record<string, unknown>;
+                  const grovines = (charData?.grovines as Array<{ id: string; goal: string; resistance: string; opportunity: string; status: string }>) || [];
+                  const active = grovines.filter(v => v.status === 'active');
+                  if (active.length === 0) return null;
+                  return (
+                    <div key={node.id} className="mb-4">
+                      <div className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider uppercase mb-2">
+                        {node.name}
+                      </div>
+                      {active.map(vine => (
+                        <div key={vine.id} className="ml-4 mb-2 p-3 border-l-2 border-[var(--accent-teal)]/30" style={{ background: 'rgba(34,171,148,0.05)' }}>
+                          <div className="text-white text-[11px] font-bold mb-1">{vine.goal}</div>
+                          <div className="grid grid-cols-3 gap-3 text-[9px]">
+                            <div>
+                              <span className="text-[#4ade80] font-bold">G</span>
+                              <span className="text-white/40 ml-1">{vine.goal.length > 30 ? `${vine.goal.substring(0, 30)}...` : vine.goal}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#E8585A] font-bold">R</span>
+                              <span className="text-white/40 ml-1">{vine.resistance || 'Hidden'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#ffcc78] font-bold">O</span>
+                              <span className="text-white/40 ml-1">{vine.opportunity || 'Awaiting'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                {nodes.filter(n => n.type === 'character' && n.characterData).every(n => {
+                  const charData = n.characterData as Record<string, unknown>;
+                  const grovines = (charData?.grovines as Array<{ status: string }>) || [];
+                  return grovines.filter(v => v.status === 'active').length === 0;
+                }) && (
+                  <div className="text-center py-8 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
+                    No active GRO.vines. Characters can set goals during play or Harvests.
+                  </div>
+                )}
+              </div>
+
+              {/* Traits overview */}
+              <div>
+                <div className="text-[var(--accent-gold)] text-[10px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-3 border-b border-[var(--accent-gold)]/20 pb-1">
+                  Nectars &middot; Blossoms &middot; Thorns
+                </div>
+                {nodes.filter(n => n.type === 'character' && n.characterData).map(node => {
+                  const charData = node.characterData as Record<string, unknown>;
+                  const traits = (charData?.traits as Array<{ name: string; type: string; description: string }>) || [];
+                  if (traits.length === 0) return null;
+                  const nectars = traits.filter(t => t.type === 'nectar');
+                  const blossoms = traits.filter(t => t.type === 'blossom');
+                  const thorns = traits.filter(t => t.type === 'thorn');
+                  return (
+                    <div key={node.id} className="mb-4">
+                      <div className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider uppercase mb-2">
+                        {node.name}
+                      </div>
+                      <div className="ml-4 flex flex-wrap gap-2">
+                        {nectars.map((t, i) => (
+                          <span key={`n-${i}`} className="px-2 py-1 text-[8px] uppercase tracking-wider border rounded-sm" style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.08)' }}>
+                            {t.name}
+                          </span>
+                        ))}
+                        {blossoms.map((t, i) => (
+                          <span key={`b-${i}`} className="px-2 py-1 text-[8px] uppercase tracking-wider border rounded-sm" style={{ color: '#ffcc78', borderColor: 'rgba(255,204,120,0.3)', background: 'rgba(255,204,120,0.08)' }}>
+                            {t.name}
+                          </span>
+                        ))}
+                        {thorns.map((t, i) => (
+                          <span key={`t-${i}`} className="px-2 py-1 text-[8px] uppercase tracking-wider border rounded-sm" style={{ color: '#E8585A', borderColor: 'rgba(232,88,90,0.3)', background: 'rgba(232,88,90,0.08)' }}>
+                            {t.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Harvests overview */}
+              <div>
+                <div className="text-[var(--pillar-body)] text-[10px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-3 border-b border-[var(--pillar-body)]/20 pb-1">
+                  Harvest Log
+                </div>
+                {nodes.filter(n => n.type === 'character' && n.characterData).map(node => {
+                  const charData = node.characterData as Record<string, unknown>;
+                  const harvests = (charData?.harvests as Array<{ id: string; name: string; status: string; activity: string }>) || [];
+                  if (harvests.length === 0) return null;
+                  return (
+                    <div key={node.id} className="mb-3">
+                      <div className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider uppercase mb-1">
+                        {node.name}
+                      </div>
+                      {harvests.map(h => (
+                        <div key={h.id} className="ml-4 mb-1 text-[9px] flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${h.status === 'completed' ? 'bg-[#4ade80]' : h.status === 'active' ? 'bg-[#ffcc78]' : 'bg-white/20'}`} />
+                          <span className="text-white/60">{h.name}</span>
+                          <span className="text-white/30">&mdash; {h.activity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                {nodes.filter(n => n.type === 'character' && n.characterData).every(n => {
+                  const charData = n.characterData as Record<string, unknown>;
+                  return ((charData?.harvests as unknown[]) || []).length === 0;
+                }) && (
+                  <div className="text-center py-4 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
+                    No harvests recorded yet.
+                  </div>
+                )}
               </div>
             </div>
           </div>

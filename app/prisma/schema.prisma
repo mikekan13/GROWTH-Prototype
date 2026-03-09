@@ -42,6 +42,9 @@ model Campaign {
   events          CampaignEvent[]
   forgeItems      ForgeItem[]
   playerRequests  PlayerRequest[]
+  locations       Location[]
+  campaignItems   CampaignItem[]
+  encounters      Encounter[]
   createdAt       DateTime         @default(now())
 }
 
@@ -210,6 +213,62 @@ model PlayerRequest {
 
   @@index([campaignId, status])
   @@index([requesterId])
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  name        String
+  type        String   @default("point_of_interest") // settlement | wilderness | dungeon | building | point_of_interest | region
+  data        String   // JSON<GrowthLocation>
+  status      String   @default("ACTIVE") // ACTIVE, HIDDEN, DESTROYED
+  createdBy   String   // userId of creator (GM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, type])
+}
+
+model CampaignItem {
+  id          String   @id @default(cuid())
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  name        String
+  type        String   @default("misc") // weapon | armor | accessory | consumable | tool | artifact | prima_materia | misc
+  data        String   // JSON<GrowthWorldItem>
+  holderId    String?  // characterId of current holder (null = unowned/world item)
+  locationId  String?  // locationId where item resides (null = carried/unknown)
+  status      String   @default("ACTIVE") // ACTIVE, DESTROYED, CONSUMED, LOST
+  createdBy   String   // userId of creator (GM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, type])
+  @@index([holderId])
+  @@index([locationId])
+}
+
+model Encounter {
+  id          String   @id @default(cuid())
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  name        String
+  type        String   @default("combat") // combat | social | exploration | puzzle | event
+  status      String   @default("PLANNED") // PLANNED, ACTIVE, PAUSED, RESOLVED
+  round       Int      @default(0)
+  phase       String   @default("intention") // intention | resolution | impact
+  data        String   // JSON<GrowthEncounter>
+  locationId  String?  // Where this encounter takes place
+  sessionId   String?  // Which game session
+  createdBy   String   // userId of creator (GM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, status])
 }
 
 model AccessCode {

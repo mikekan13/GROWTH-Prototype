@@ -1,7 +1,7 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-08
-Current phase: Phase 2 (Campaign Flow)
+Last updated: 2026-03-09
+Current phase: Phase 3 (Session Tools) — Skeleton Systems Pass
 
 ---
 
@@ -217,11 +217,24 @@ Status: IN PROGRESS
 - [x] **Dice roller** — Full resolution system: Skill Die (level-based d4→d20) + Fate Die + Effort vs DR. Pure functions in `lib/dice.ts`, integrated via `performSkillCheck()` in `character-actions.ts`. Rolls via `/roll` command or future UI buttons.
 - [x] **Effort spending** — `spendAttribute()` with overflow to Frequency, depletion conditions auto-triggered. Available via `/spend` command and UI attribute bars.
 - [x] **Skills CRUD** — Add/remove/level skills in SkillsCard sub-panel. `addSkill`, `removeSkill`, `updateSkillLevel` in `character-actions.ts`. All changes flow through changelog.
-- [x] **Chat system** — Plain text in terminal = chat message. Persisted to CampaignEvent table. Grouped by session.
+- [x] **Chat system** — Plain text in terminal = chat message. Persisted to CampaignEvent table. Grouped by session. Fixed caching bug (force-dynamic + no-store).
 - [x] **Command system** — `/roll`, `/spend`, `/restore`, `/session` commands parsed client-side, execute via character-actions.ts, results posted to terminal.
+- [x] **Forge system (bones)** — ForgeItem + PlayerRequest models, ForgeService with CRUD + Zod validation, ForgePanel UI in campaign Forge tab. GM creates skill/item/nectar/blossom/thorn templates (draft→published), players submit requests. 6 API routes.
+- [x] **Skill system redesign** — Freeform skills with attribute governors (no categories/combat flag). Governor badges (pillar-colored), max output readout, player request flow from SkillsCard.
+- [ ] **Editable skills in SkillsCard** — Add/remove/level skills directly in the sub-panel, wire to character-actions + changelog
+- [ ] **Dice roller UX** — Skill check rolls from SkillsCard (click skill → roll), effort spending integrated
+- [ ] **Traits** — Blossoms/Thorns/Nectars that modify rolls and drive attribute changes
 - [ ] Damage tracking (hit locations, conditions auto-applied)
 - [ ] Short/long rest recovery
-- [ ] Initiative tracker (basic turn order)
+- [x] **Skeleton Systems Pass (2026-03-09)** — Created structural skeletons for all major remaining systems:
+  - [x] **Location system** — Prisma model, types (`types/location.ts`), service, 2 API routes (CRUD), LocationCard canvas component (compact/expanded)
+  - [x] **World item system** — Prisma model, types (`types/item.ts`), service, 2 API routes (CRUD), WorldItemCard canvas component with damage (P:S:H/D\C:B:E), armor, prima materia support
+  - [x] **Encounter system** — Prisma model, types (`types/encounter.ts`), service, 2 API routes (CRUD), EncounterTracker component with three-phase combat, round tracking, per-pillar action pools
+  - [x] **GROvine panel** — GROvinePanel canvas component with add/complete/fail/abandon, G/R/O detail view, capacity tracking
+  - [x] **Essence tab** — Filled with GROvine overview, Nectars/Blossoms/Thorns summary, Harvest log across all characters
+  - [x] **Encounters tab** — New tab in CampaignCanvas for encounter management
+  - [x] **Canvas create buttons** — Location and Item creation buttons added to canvas toolbar (alongside character create)
+  - [x] **Canvas rendering** — Location and item nodes render as expandable foreignObject cards (like CharacterCard), not just circles
 
 **Ship condition**: Can run a combat encounter using the app
 
@@ -237,13 +250,15 @@ Status: NOT STARTED
 **Ship condition**: KRMA flows correctly through the system during gameplay
 
 ### Phase 5: Relations Canvas (GM Vision)
-Status: NOT STARTED
+Status: LARGELY COMPLETE (merged into Phase 2-3)
 
 The spatial GM interface with floating/dockable panels:
-- [ ] Canvas with draggable/resizable panels
-- [ ] Character cards as spatial nodes
-- [ ] NPC cards
-- [ ] Relationship lines between entities
+- [x] Canvas with draggable/resizable panels
+- [x] Character cards as spatial nodes
+- [x] Location cards as spatial nodes (2026-03-09)
+- [x] World item cards as spatial nodes (2026-03-09)
+- [ ] NPC cards (currently render as circles — need CharacterCard-like expansion for NPCs)
+- [x] Relationship lines between entities (connection system exists)
 - [ ] Campaign overview panel
 - [ ] Session notes panel
 
@@ -350,6 +365,22 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - Login page (`page.tsx`) updated to use GrowthLogo component
 - **Mike approved**: "This is the logo and how it should be displayed everywhere"
 - **Next**: Continue login page aesthetics (auth form styling, layout, visual polish)
+
+### 2026-03-08: Skill System Redesign + Forge + Terminal Fix
+- **Skill system redesign**: Freeform skills — no predefined categories, no combat flag. Skills have `governors: SkillGovernor[]` (any attribute except Frequency), optional description, optional forgeItemId. Max output readout in tooltip. Governor badges (pillar-colored) on skill rows.
+- **Forge system (bones)**: ForgeItem + PlayerRequest Prisma models + migration. ForgeService with full CRUD, Zod validation per type (skill/item/nectar/blossom/thorn), draft→published lifecycle. GM creates templates, players submit requests. 6 new API routes.
+- **ForgePanel component**: Type filter, create form (GM), publish/unpublish/delete, pending requests queue with approve/deny, governor toggle selector for skills. Wired into existing Forge tab on campaign page.
+- **Player skill requests**: Players can request skills from SkillsCard with name, governors, and description. Requests POST to both Forge DB and Terminal feed. Editable while pending.
+- **Pillar color correction**: Spirit=#7050A8 (purple), Soul=#3E78C0 (blue). Teal is Terminal only, NOT an attribute color. Fixed in SkillsSection, SkillsCard, ForgePanel, and PILLARS constant.
+- **Layout fix**: Root container `h-screen overflow-hidden` (was `min-h-screen`) — canvas zoom/pan no longer affects header/terminal overlays. Header gets `z-[60]`.
+- **Text size bump**: +2px across ForgePanel, CampaignTerminal, CommandInput, TerminalEventRow.
+- **Terminal chat fix**: Messages weren't appearing due to Next.js/browser fetch caching. Added `cache: 'no-store'` on GET fetches, `export const dynamic = 'force-dynamic'` on events + changelog API routes.
+- **Demo page deleted**: All work happens in the live campaign page as intended.
+- CommandInput converted to forwardRef with imperative handle (prefill + focus) for cross-component control.
+- Custom event pattern (`growth:roll-skill`) for SkillsCard → Terminal communication.
+- Docs updated: database_schema.md, module_registry.md, system_map.md
+- 28 routes total, all compiling clean
+- **Next**: Editable skills in SkillsCard (add/remove/level), dice roller tied to skill checks, traits (Blossoms/Thorns/Nectars)
 
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?

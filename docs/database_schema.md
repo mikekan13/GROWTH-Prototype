@@ -1,6 +1,6 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-03-08 (Campaign Terminal + GameSession + CampaignEvent)
+Last updated: 2026-03-09 (Skeleton Systems — Location, CampaignItem, Encounter)
 Source of truth: `app/prisma/schema.prisma`
 
 ## Models
@@ -130,6 +130,45 @@ Player request for a new campaign component. Submitted from SkillsCard (or futur
 - `updatedAt`: DateTime
 - Relations: campaign, forgeItem (optional)
 - Indexes: `(campaignId, status)`, `(requesterId)`
+
+### Location
+Campaign-level location entity. Appears as an expandable card on the Relations Canvas.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign
+- `name`: String — location name
+- `type`: String — `settlement` | `wilderness` | `dungeon` | `building` | `point_of_interest` | `region`
+- `data`: JSON — `GrowthLocation` (see `types/location.ts`)
+- `status`: String — `ACTIVE` | `HIDDEN` | `DESTROYED`
+- `createdBy`: String — userId of creator (GM)
+- Indexes: `(campaignId)`, `(campaignId, type)`
+
+### CampaignItem
+Campaign-level item entity. Represents weapons, armor, artifacts, prima materia, etc. as standalone world objects.
+- `id`: String (cuid)
+- `campaignId`: String — which campaign
+- `name`: String — item name
+- `type`: String — `weapon` | `armor` | `accessory` | `consumable` | `tool` | `artifact` | `prima_materia` | `misc`
+- `data`: JSON — `GrowthWorldItem` (see `types/item.ts`)
+- `holderId`: String (optional) — characterId of current holder
+- `locationId`: String (optional) — locationId where item resides
+- `status`: String — `ACTIVE` | `DESTROYED` | `CONSUMED` | `LOST`
+- `createdBy`: String — userId of creator (GM)
+- Indexes: `(campaignId)`, `(campaignId, type)`, `(holderId)`, `(locationId)`
+
+### Encounter
+Combat, social, or exploration encounter. Tracks three-phase resolution (Intention → Resolution → Impact).
+- `id`: String (cuid)
+- `campaignId`: String — which campaign
+- `name`: String — encounter name
+- `type`: String — `combat` | `social` | `exploration` | `puzzle` | `event`
+- `status`: String — `PLANNED` | `ACTIVE` | `PAUSED` | `RESOLVED`
+- `round`: Int — current combat round (0 = not started)
+- `phase`: String — `intention` | `resolution` | `impact`
+- `data`: JSON — `GrowthEncounter` (see `types/encounter.ts`)
+- `locationId`: String (optional) — where this encounter takes place
+- `sessionId`: String (optional) — which game session
+- `createdBy`: String — userId of creator (GM)
+- Indexes: `(campaignId)`, `(campaignId, status)`
 
 ### Session
 Auth session token.

@@ -14,12 +14,18 @@ import type { SkillItem } from "./SkillsCard";
 import MagicCard from "./MagicCard";
 import BackstoryCard from "./BackstoryCard";
 import HarvestCard from "./HarvestCard";
+import LocationCard from "./LocationCard";
+import type { LocationNodeData } from "./LocationCard";
+import WorldItemCard from "./WorldItemCard";
+import type { WorldItemNodeData } from "./WorldItemCard";
+import type { GrowthLocation } from "@/types/location";
+import type { GrowthWorldItem } from "@/types/item";
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
 interface CanvasNode {
   id: string;
-  type: "character" | "npc" | "location" | "quest";
+  type: "character" | "npc" | "location" | "quest" | "item";
   name: string;
   x: number;
   y: number;
@@ -27,6 +33,13 @@ interface CanvasNode {
   color?: string;
   portrait?: string | null;
   characterData?: Record<string, unknown> | null;
+  // Location/item-specific data
+  locationType?: string;
+  locationData?: GrowthLocation | null;
+  itemType?: string;
+  itemData?: GrowthWorldItem | null;
+  holderName?: string;
+  locationName?: string;
 }
 
 interface CanvasConnection {
@@ -45,6 +58,12 @@ interface RelationsCanvasProps {
   onCreateCharacter?: (name: string) => void;
   onDeleteCharacter?: (nodeId: string) => void;
   onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
+  onCreateLocation?: (name: string, type: string) => void;
+  onDeleteLocation?: (nodeId: string) => void;
+  onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
+  onCreateItem?: (name: string, type: string) => void;
+  onDeleteItem?: (nodeId: string) => void;
+  onItemUpdate?: (nodeId: string, data: GrowthWorldItem) => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -58,6 +77,12 @@ export default function RelationsCanvas({
   onCreateCharacter,
   onDeleteCharacter,
   onCharacterUpdate,
+  onCreateLocation,
+  onDeleteLocation,
+  onLocationUpdate,
+  onCreateItem,
+  onDeleteItem,
+  onItemUpdate,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -390,6 +415,7 @@ export default function RelationsCanvas({
       case "npc":       return "\u{1F5E3}";
       case "quest":     return "\u{1F4DC}";
       case "location":  return "\u{1F4CD}";
+      case "item":      return "\u{2694}";
       default:          return "?";
     }
   }, []);
@@ -401,6 +427,7 @@ export default function RelationsCanvas({
       case "npc":       return "var(--accent-gold)";
       case "quest":     return "var(--pillar-spirit)";
       case "location":  return "var(--pillar-soul)";
+      case "item":      return "var(--krma-gold)";
       default:          return "#808080";
     }
   }, []);
@@ -1296,20 +1323,44 @@ export default function RelationsCanvas({
               CREATE
             </button>
 
-            {/* Future action icons (dimmed) */}
-            <div style={{ display: "flex", gap: 10, opacity: 0.4 }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </div>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-            </div>
+            {/* Location create button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const name = window.prompt("Location name:");
+                if (name?.trim()) {
+                  onCreateLocation?.(name.trim(), "point_of_interest");
+                }
+              }}
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                background: "rgba(112,80,168,0.3)", border: "1px solid rgba(112,80,168,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", color: "#7050A8", fontSize: 14,
+              }}
+              title="Create Location"
+            >
+              {"\u{1F4CD}"}
+            </button>
+            {/* Item create button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const name = window.prompt("Item name:");
+                if (name?.trim()) {
+                  onCreateItem?.(name.trim(), "misc");
+                }
+              }}
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                background: "rgba(255,204,120,0.2)", border: "1px solid rgba(255,204,120,0.4)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", color: "#ffcc78", fontSize: 14,
+              }}
+              title="Create Item"
+            >
+              {"\u2694"}
+            </button>
           </div>
         </foreignObject>
 
@@ -1344,9 +1395,157 @@ export default function RelationsCanvas({
             return renderCharacterCard(node, visualX, visualY);
           })}
 
-        {/* ── Non-character nodes (circle icons) — sorted by z-index ── */}
+        {/* ── Location nodes (foreignObject cards) — sorted by z-index ── */}
         {nodes
-          .filter((n) => n.type !== "character")
+          .filter((n) => n.type === "location" && n.locationData)
+          .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
+          .map((node) => {
+            const position = getNodePosition(node.id, node.x, node.y);
+            const isNodeExpanded = expandedNodes.has(node.id);
+            const isDraggingNode = dragOffsets.has(node.id);
+            const cardWidth = isNodeExpanded ? 500 : 340;
+            const cardHeight = isNodeExpanded ? 700 : 180;
+
+            const margin = Math.max(cardWidth, cardHeight);
+            const isInViewport =
+              position.x + cardWidth / 2 + margin > viewBox.x &&
+              position.x - cardWidth / 2 - margin < viewBox.x + viewBox.width &&
+              position.y + cardHeight / 2 + margin > viewBox.y &&
+              position.y - cardHeight / 2 - margin < viewBox.y + viewBox.height;
+
+            if (!isInViewport) return null;
+
+            const offset = dragOffsets.get(node.id) || { x: 0, y: 0 };
+            const visualX = position.x + offset.x;
+            const visualY = position.y + offset.y;
+
+            return (
+              <foreignObject
+                key={`loc-${node.id}`}
+                x={visualX - cardWidth / 2}
+                y={visualY - cardHeight / 2}
+                width={cardWidth}
+                height={cardHeight}
+                style={{ overflow: "visible" }}
+              >
+                <div style={{ transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                  <LocationCard
+                    node={{
+                      id: node.id,
+                      name: node.name,
+                      type: (node.locationType || 'point_of_interest') as LocationNodeData['type'],
+                      status: node.status || 'ACTIVE',
+                      data: node.locationData!,
+                      x: visualX,
+                      y: visualY,
+                    }}
+                    isExpanded={isNodeExpanded}
+                    onToggleExpand={toggleExpand}
+                    onDelete={onDeleteLocation}
+                    onPositionChange={(nodeId, x, y) => {
+                      setNodePositions((prev) => {
+                        const next = new Map(prev);
+                        next.set(nodeId, { x, y });
+                        return next;
+                      });
+                      onNodePositionChange?.(nodeId, x, y);
+                      bringNodeToFront(nodeId);
+                    }}
+                    onDragOffsetChange={(nodeId, offsetX, offsetY) => {
+                      setDragOffsets((prev) => {
+                        const next = new Map(prev);
+                        if (offsetX === 0 && offsetY === 0) {
+                          next.delete(nodeId);
+                        } else {
+                          next.set(nodeId, { x: offsetX, y: offsetY });
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+              </foreignObject>
+            );
+          })}
+
+        {/* ── Item nodes (foreignObject cards) — sorted by z-index ── */}
+        {nodes
+          .filter((n) => n.type === "item" && n.itemData)
+          .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
+          .map((node) => {
+            const position = getNodePosition(node.id, node.x, node.y);
+            const isNodeExpanded = expandedNodes.has(node.id);
+            const isDraggingNode = dragOffsets.has(node.id);
+            const cardWidth = isNodeExpanded ? 440 : 300;
+            const cardHeight = isNodeExpanded ? 600 : 160;
+
+            const margin = Math.max(cardWidth, cardHeight);
+            const isInViewport =
+              position.x + cardWidth / 2 + margin > viewBox.x &&
+              position.x - cardWidth / 2 - margin < viewBox.x + viewBox.width &&
+              position.y + cardHeight / 2 + margin > viewBox.y &&
+              position.y - cardHeight / 2 - margin < viewBox.y + viewBox.height;
+
+            if (!isInViewport) return null;
+
+            const offset = dragOffsets.get(node.id) || { x: 0, y: 0 };
+            const visualX = position.x + offset.x;
+            const visualY = position.y + offset.y;
+
+            return (
+              <foreignObject
+                key={`item-${node.id}`}
+                x={visualX - cardWidth / 2}
+                y={visualY - cardHeight / 2}
+                width={cardWidth}
+                height={cardHeight}
+                style={{ overflow: "visible" }}
+              >
+                <div style={{ transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                  <WorldItemCard
+                    node={{
+                      id: node.id,
+                      name: node.name,
+                      type: (node.itemType || 'misc') as WorldItemNodeData['type'],
+                      status: node.status || 'ACTIVE',
+                      data: node.itemData!,
+                      holderName: node.holderName,
+                      locationName: node.locationName,
+                      x: visualX,
+                      y: visualY,
+                    }}
+                    isExpanded={isNodeExpanded}
+                    onToggleExpand={toggleExpand}
+                    onDelete={onDeleteItem}
+                    onPositionChange={(nodeId, x, y) => {
+                      setNodePositions((prev) => {
+                        const next = new Map(prev);
+                        next.set(nodeId, { x, y });
+                        return next;
+                      });
+                      onNodePositionChange?.(nodeId, x, y);
+                      bringNodeToFront(nodeId);
+                    }}
+                    onDragOffsetChange={(nodeId, offsetX, offsetY) => {
+                      setDragOffsets((prev) => {
+                        const next = new Map(prev);
+                        if (offsetX === 0 && offsetY === 0) {
+                          next.delete(nodeId);
+                        } else {
+                          next.set(nodeId, { x: offsetX, y: offsetY });
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+              </foreignObject>
+            );
+          })}
+
+        {/* ── Non-card nodes (circle icons for npc/quest) — sorted by z-index ── */}
+        {nodes
+          .filter((n) => n.type !== "character" && !(n.type === "location" && n.locationData) && !(n.type === "item" && n.itemData))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
             const isSelected = selectedNode === node.id;

@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-08 (Forge System + Skill Redesign)
+Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GROvines)
 
 ## Services (Business Logic)
 
@@ -14,6 +14,9 @@ Last updated: 2026-03-08 (Forge System + Skill Redesign)
 | ChangeLogService | `services/changelog.ts` | Create changelog entries with diff/coalescence (5s window), query with pagination and filters, revert with conflict detection | Prisma, changelog-utils |
 | CampaignEventService | `services/campaign-event.ts` | Campaign event CRUD (dice rolls, chat, commands, game events), session management (start/end/list), auto-assigns events to active session | Prisma |
 | ForgeService | `services/forge.ts` | ForgeItem CRUD (skill/item/nectar/blossom/thorn templates), publish/unpublish, PlayerRequest CRUD (create/edit/resolve), Zod validation per type | Prisma, permissions |
+| LocationService | `services/location.ts` | Location CRUD (settlement/wilderness/dungeon/building/POI/region), GM-only create/update/delete, Zod validation | Prisma, permissions |
+| CampaignItemService | `services/campaign-item.ts` | World item CRUD (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), holder/location assignment, GM-only | Prisma, permissions |
+| EncounterService | `services/encounter.ts` | Encounter CRUD (combat/social/exploration/puzzle/event), round/phase tracking, GM-only | Prisma, permissions |
 
 ## Infrastructure (lib/)
 
@@ -40,6 +43,10 @@ Last updated: 2026-03-08 (Forge System + Skill Redesign)
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel with filter tabs, quick stats, ComplexTooltip items |
 | Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, Roll button, Request button (player), add form (GM). No categories or combat flags |
+| Canvas Cards | LocationCard | Expandable location card on canvas. Compact (280px) and expanded (480px) views. Shows description, tech/wealth/danger levels, features, ley lines, tags |
+| Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (240px) and expanded (400px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance, prima materia, material modifiers, condition |
+| Canvas Cards | GROvinePanel | GROvine management sub-panel for characters. Add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking |
+| Canvas Cards | EncounterTracker | Combat encounter management card. Three-phase (Intention/Resolution/Impact), round counter, per-pillar action pools, participant tracking by side |
 | Canvas Cards | CampaignCanvas | Campaign page wrapper that loads characters and renders RelationsCanvas |
 | Change Log | ChangeLogPanel | (Legacy — absorbed into Campaign Terminal) Bottom overlay panel, retained as reference |
 | Terminal | CampaignTerminal | Unified campaign activity feed — merges changelog + campaign events. Resizable bottom overlay, session grouping, filter toggles, auto-poll (5s). Replaces ChangeLogPanel |
