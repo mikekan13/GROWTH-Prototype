@@ -8,6 +8,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthLocation } from '@/types/location';
 import type { GrowthWorldItem } from '@/types/item';
+import { calculateCharacterTKV, calculateItemKV, calculateLocationKV } from '@/lib/kv-calculator';
+import { recomputeAugments } from '@/lib/character-actions';
 
 function formatKrma(value: string): string {
   return Number(value).toLocaleString();
@@ -100,6 +102,121 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => { cancelled = true; clearInterval(interval); };
   }, [isGM, campaign.id]);
 
+  // ── Crystallization state ──
+  const [crystallizedEntityIds, setCrystallizedEntityIds] = useState<Set<string>>(new Set());
+  const [crystallizeTarget, setCrystallizeTarget] = useState<{
+    nodeId: string;
+    nodeType: string;
+    nodeName: string;
+    direction: 'crystallize' | 'dissolve';
+    kv: number;
+    previousY: number;
+  } | null>(null);
+  const [isCrystallizing, setIsCrystallizing] = useState(false);
+  const moveNodeRef = useRef<((nodeId: string, y: number) => void) | null>(null);
+
+  // Fetch crystallized entities on mount
+  useEffect(() => {
+    if (!isGM) return;
+    let cancelled = false;
+    async function fetchCrystallized() {
+      try {
+        const res = await fetch(`/api/krma/campaigns/${campaign.id}/crystallize`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) {
+          setCrystallizedEntityIds(new Set(data.crystallizedEntityIds || []));
+        }
+      } catch { /* silent */ }
+    }
+    fetchCrystallized();
+    return () => { cancelled = true; };
+  }, [isGM, campaign.id]);
+
+  // Calculate KV for an entity by looking it up in nodes
+  const getEntityKV = useCallback((nodeId: string, nodeType: string): number => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (nodeType === 'character' && node.characterData) {
+      try {
+        const charData = node.characterData as unknown as GrowthCharacter;
+        if (charData?.attributes) {
+          const tkv = calculateCharacterTKV(charData);
+          return tkv.total;
+        }
+      } catch { /* fallback */ }
+      return 0;
+    }
+    if (nodeType === 'item' && node.itemData) {
+      return calculateItemKV(node.itemData);
+    }
+    if (nodeType === 'location' && node.locationData) {
+      return calculateLocationKV(node.locationData);
+    }
+    return 0;
+  }, [nodes]);
+
+  // Handle entity crossing the KRMA line
+  const handleEntityCrossLine = useCallback((
+    event: { nodeId: string; nodeType: string; nodeName: string; direction: 'crystallize' | 'dissolve'; previousY: number },
+    moveNode: (nodeId: string, y: number) => void,
+  ) => {
+    if (!isGM) return;
+    const kv = getEntityKV(event.nodeId, event.nodeType);
+    moveNodeRef.current = moveNode;
+    setCrystallizeTarget({ nodeId: event.nodeId, nodeType: event.nodeType, nodeName: event.nodeName, direction: event.direction, kv, previousY: event.previousY });
+  }, [isGM, getEntityKV]);
+
+  // Confirm crystallization/dissolution — entity stays where user dropped it
+  const handleConfirmCrystallize = useCallback(async () => {
+    if (!crystallizeTarget) return;
+    setIsCrystallizing(true);
+    try {
+      const res = await fetch(`/api/krma/campaigns/${campaign.id}/crystallize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityId: crystallizeTarget.nodeId,
+          entityType: crystallizeTarget.nodeType,
+          entityName: crystallizeTarget.nodeName,
+          karmicValue: crystallizeTarget.kv,
+          action: crystallizeTarget.direction,
+        }),
+      });
+      if (res.ok) {
+        setCrystallizedEntityIds(prev => {
+          const next = new Set(prev);
+          if (crystallizeTarget.direction === 'crystallize') {
+            next.add(crystallizeTarget.nodeId);
+          } else {
+            next.delete(crystallizeTarget.nodeId);
+          }
+          return next;
+        });
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Crystallization failed');
+        moveNodeRef.current?.(crystallizeTarget.nodeId, crystallizeTarget.previousY);
+      }
+    } catch {
+      alert('Connection failed');
+      moveNodeRef.current?.(crystallizeTarget.nodeId, crystallizeTarget.previousY);
+    } finally {
+      setIsCrystallizing(false);
+      setCrystallizeTarget(null);
+      moveNodeRef.current = null;
+    }
+  }, [crystallizeTarget, campaign.id]);
+
+  // Cancel crystallization — snap entity back to where it was
+  const handleCancelCrystallize = useCallback(() => {
+    if (crystallizeTarget) {
+      moveNodeRef.current?.(crystallizeTarget.nodeId, crystallizeTarget.previousY);
+    }
+    moveNodeRef.current = null;
+    setCrystallizeTarget(null);
+  }, [crystallizeTarget]);
+
   // Resizable terminal height — persisted per campaign
   const storageKey = `terminal-height-${campaign.id}`;
   const [terminalHeight, setTerminalHeight] = useState(() => {
@@ -128,18 +245,43 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch { return null; }
   })() : null;
 
+  // Compute TKV for character nodes
+  const stampTKV = useCallback((nodeList: CanvasNode[]): CanvasNode[] => {
+    return nodeList.map(n => {
+      if (n.type !== 'character' || !n.characterData) return n;
+      try {
+        const charData = n.characterData as unknown as GrowthCharacter;
+        if (charData?.attributes) {
+          const tkv = calculateCharacterTKV(charData);
+          return { ...n, characterData: { ...n.characterData, tkv: tkv.total } as Record<string, unknown> };
+        }
+      } catch { /* keep original */ }
+      return n;
+    });
+  }, []);
+
   // Sync local nodes when server re-fetches (e.g. after revert)
   useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes]);
+    setNodes(stampTKV(initialNodes));
+  }, [initialNodes, stampTKV]);
 
   // Debounced save: collect rapid changes and persist once after settling
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, changes: string[]) => {
-    // Update local state immediately for responsive UI
+    // Recompute augments from equipped items + traits before saving
+    const { character: augmented } = recomputeAugments(character);
+
+    // Compute TKV and update local state immediately for responsive UI
+    let tkvValue = 0;
+    try {
+      if (augmented?.attributes) {
+        tkvValue = calculateCharacterTKV(augmented).total;
+      }
+    } catch { /* fallback to 0 */ }
+    const charWithTKV = { ...augmented, tkv: tkvValue } as unknown as Record<string, unknown>;
     setNodes(prev => prev.map(n =>
-      n.id === nodeId ? { ...n, characterData: character as unknown as Record<string, unknown> } : n
+      n.id === nodeId ? { ...n, characterData: charWithTKV } : n
     ));
 
     // Debounce the API save (300ms) so rapid slider drags don't spam requests
@@ -152,7 +294,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         await fetch(`/api/characters/${nodeId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: character }),
+          body: JSON.stringify({ data: augmented }),
         });
       } catch {
         // Silent fail — next interaction will retry
@@ -407,6 +549,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             nodes={nodes}
             connections={connections}
             campaignId={campaign.id}
+            crystallizedEntityIds={crystallizedEntityIds}
             onCreateCharacter={handleCreateCharacter}
             onDeleteCharacter={(nodeId) => setDeleteTarget(nodeId)}
             onCharacterUpdate={handleCharacterUpdate}
@@ -414,6 +557,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onDeleteLocation={handleDeleteLocation}
             onCreateItem={handleCreateItem}
             onDeleteItem={handleDeleteItem}
+            onEntityCrossLine={handleEntityCrossLine}
           />
         )}
 
@@ -687,6 +831,23 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         cancelText="Cancel"
         isLoading={isDeleting}
         variant="danger"
+      />
+
+      {/* Crystallization confirmation dialog */}
+      <ConfirmDialog
+        isOpen={crystallizeTarget !== null}
+        onClose={handleCancelCrystallize}
+        onConfirm={handleConfirmCrystallize}
+        title={crystallizeTarget?.direction === 'crystallize' ? 'Crystallize Entity' : 'Dissolve Entity'}
+        message={
+          crystallizeTarget?.direction === 'crystallize'
+            ? `Do you want to crystallize "${crystallizeTarget?.nodeName}" into the campaign?\n\nThis will commit ${crystallizeTarget?.kv} KV to the campaign ledger.`
+            : `Do you want to dissolve "${crystallizeTarget?.nodeName}" back to fluid state?\n\nThis will remove ${crystallizeTarget?.kv} KV from the campaign ledger.`
+        }
+        confirmText={crystallizeTarget?.direction === 'crystallize' ? 'Crystallize' : 'Dissolve'}
+        cancelText="Cancel"
+        isLoading={isCrystallizing}
+        variant={crystallizeTarget?.direction === 'crystallize' ? 'info' : 'danger'}
       />
     </div>
   );

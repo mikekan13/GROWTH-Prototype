@@ -22,6 +22,7 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | KRMA Evaluator | `services/krma/evaluator.ts` | Deterministic KV calculator (TKV breakdown by pillar, skills, WTH, traits). Death split calculator (component-level routing by pillar/governor). Versioned + hashable. | krma types, growth types |
 | KRMA Death Split | `services/krma/death-split.ts` | Orchestrates multi-transaction death process: Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch. | ledger, wallet, evaluator |
 | KRMA Reconciliation | `services/krma/reconciliation.ts` | Balance reconciliation, global supply invariant check, checksum chain verification, full audit | Prisma, ledger |
+| KRMA Crystallization | `services/krma/crystallization.ts` | Crystallize/dissolve entities across KRMA line. Ledger stored as campaign events. Prevents double-crystallization. Pool tracking | Prisma, permissions |
 | DiceService | `services/dice.ts` | Single entry point for all dice rolling. Skilled/unskilled checks, death saves, fear checks, contested rolls, quick rolls, custom rolls. Integrates crypto RNG, Godhead injection, event bus | dice lib, dice-events, dice-injection |
 | DiceInjectionRegistry | `services/dice-injection.ts` | Godhead override system. Register/remove/apply injections that silently modify die results. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp, hidden modifier. Audit-logged | dice types |
 
@@ -117,6 +118,7 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | /api/krma/campaigns/[id]/defund | POST | KRMA Wallet (GM withdraws from campaign to personal wallet) |
 | /api/krma/campaigns/[id]/transactions | GET | KRMA Wallet (campaign transaction history, GM-only) |
 | /api/krma/campaigns/[id]/economy | GET | KRMA Wallet (campaign fluid/crystallized/total breakdown, GM-only) |
+| /api/krma/campaigns/[id]/crystallize | POST, GET | Crystallization (crystallize/dissolve entities, get ledger + crystallized IDs) |
 | /api/krma/metrics | GET | KRMA Wallet (global KRMA metrics, Admin-only) |
 | /api/krma/audit/verify | POST | KRMA Reconciliation (full ledger audit, Admin-only) |
 | /api/dice/roll | POST | DiceService (quick roll — one or more dice, no DR/effort) |

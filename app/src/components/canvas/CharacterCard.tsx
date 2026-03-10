@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import type { InventoryItem } from './InventoryCard';
 import { updateAttribute, type AttributeName } from '@/lib/character-actions';
-import type { GrowthCharacter } from '@/types/growth';
+import type { GrowthCharacter, AugmentSource } from '@/types/growth';
+import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -70,6 +71,46 @@ function getBarPercent(attr: { level: number; current: number; augmentPositive?:
   const max = getAttrMax(attr);
   if (max <= 0) return 0;
   return Math.min(100, (attr.current / max) * 100);
+}
+
+// Source type display labels and colors for nested tooltips
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  nectar: 'Nectar (Permanent Buff)',
+  blossom: 'Blossom (Temporary Buff)',
+  thorn: 'Thorn (Permanent Penalty)',
+  item: 'Equipment',
+  condition: 'Condition Effect',
+  effect: 'Active Effect',
+  other: 'Other',
+};
+
+// Build tooltip modifiers from an attribute's augment sources
+function buildAttrModifiers(attr: { level: number; current: number; augmentPositive?: number; augmentNegative?: number; augmentSources?: AugmentSource[] } | undefined): TooltipModifier[] {
+  if (!attr) return [];
+  const sources = attr.augmentSources;
+  if (!sources || sources.length === 0) {
+    // No itemized sources — show aggregate augments if any exist
+    const mods: TooltipModifier[] = [];
+    if (attr.augmentPositive && attr.augmentPositive > 0) {
+      mods.push({ name: 'Positive Augments', value: attr.augmentPositive });
+    }
+    if (attr.augmentNegative && attr.augmentNegative > 0) {
+      mods.push({ name: 'Negative Augments', value: -(attr.augmentNegative) });
+    }
+    return mods;
+  }
+  // Itemized sources with nested tooltip data
+  return sources.map(s => ({
+    name: s.name,
+    value: s.value,
+    description: s.description,
+    source: {
+      name: s.name,
+      type: SOURCE_TYPE_LABELS[s.sourceType] || s.sourceType,
+      description: s.description,
+      stats: s.stats,
+    },
+  }));
 }
 
 // Condition mappings
@@ -937,13 +978,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               {/* BODY */}
               <div className="border border-red-500/40 p-3 flex flex-col" style={{ backgroundColor: '#f7525f', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F714; BODY</div>
-                <ComplexTooltip disabled={isBarDragging} title="Clout" baseValue={attributes?.clout?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.clout?.level || 0 }]} totalValue={attributes?.clout?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Clout" baseValue={attributes?.clout?.level || 0} currentValue={attributes?.clout?.current || 0} modifiers={buildAttrModifiers(attributes?.clout)} totalValue={getAttrMax(attributes?.clout)}>
                   <HBar label="CLT" attrName="clout" current={attributes?.clout?.current || 0} max={getAttrMax(attributes?.clout)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('clout')} />
                 </ComplexTooltip>
-                <ComplexTooltip disabled={isBarDragging} title="Celerity" baseValue={attributes?.celerity?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.celerity?.level || 0 }]} totalValue={attributes?.celerity?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Celerity" baseValue={attributes?.celerity?.level || 0} currentValue={attributes?.celerity?.current || 0} modifiers={buildAttrModifiers(attributes?.celerity)} totalValue={getAttrMax(attributes?.celerity)}>
                   <HBar label="CEL" attrName="celerity" current={attributes?.celerity?.current || 0} max={getAttrMax(attributes?.celerity)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('celerity')} />
                 </ComplexTooltip>
-                <ComplexTooltip disabled={isBarDragging} title="Constitution" baseValue={attributes?.constitution?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.constitution?.level || 0 }]} totalValue={attributes?.constitution?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Constitution" baseValue={attributes?.constitution?.level || 0} currentValue={attributes?.constitution?.current || 0} modifiers={buildAttrModifiers(attributes?.constitution)} totalValue={getAttrMax(attributes?.constitution)}>
                   <HBar label="CON" attrName="constitution" current={attributes?.constitution?.current || 0} max={getAttrMax(attributes?.constitution)} isLast onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('constitution')} />
                 </ComplexTooltip>
               </div>
@@ -951,13 +992,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               {/* SPIRIT (Flow/Frequency/Focus) */}
               <div className="border border-purple-500/40 p-3 flex flex-col" style={{ backgroundColor: '#582a72', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70E; SPIRIT</div>
-                <ComplexTooltip disabled={isBarDragging} title="Flow" baseValue={attributes?.flow?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.flow?.level || 0 }]} totalValue={attributes?.flow?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Flow" baseValue={attributes?.flow?.level || 0} currentValue={attributes?.flow?.current || 0} modifiers={buildAttrModifiers(attributes?.flow)} totalValue={getAttrMax(attributes?.flow)}>
                   <HBar label="FLO" attrName="flow" current={attributes?.flow?.current || 0} max={getAttrMax(attributes?.flow)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('flow')} />
                 </ComplexTooltip>
-                <ComplexTooltip disabled={isBarDragging} title="Frequency" baseValue={attributes?.frequency?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.frequency?.level || 0 }]} totalValue={attributes?.frequency?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Frequency" baseValue={attributes?.frequency?.level || 0} currentValue={attributes?.frequency?.current || 0} modifiers={[]} totalValue={attributes?.frequency?.level || 20}>
                   <HBar label="FREQ" attrName="frequency" current={attributes?.frequency?.current || 0} max={attributes?.frequency?.level || 20} isFrequency onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('frequency')} />
                 </ComplexTooltip>
-                <ComplexTooltip disabled={isBarDragging} title="Focus" baseValue={attributes?.focus?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.focus?.level || 0 }]} totalValue={attributes?.focus?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Focus" baseValue={attributes?.focus?.level || 0} currentValue={attributes?.focus?.current || 0} modifiers={buildAttrModifiers(attributes?.focus)} totalValue={getAttrMax(attributes?.focus)}>
                   <HBar label="FOC" attrName="focus" current={attributes?.focus?.current || 0} max={getAttrMax(attributes?.focus)} isLast onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('focus')} />
                 </ComplexTooltip>
               </div>
@@ -965,13 +1006,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               {/* SOUL (Willpower/Wisdom/Wit) */}
               <div className="border border-blue-500/40 p-3 flex flex-col" style={{ backgroundColor: '#002f6c', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70D; SOUL</div>
-                <ComplexTooltip disabled={isBarDragging} title="Willpower" baseValue={attributes?.willpower?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.willpower?.level || 0 }]} totalValue={attributes?.willpower?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Willpower" baseValue={attributes?.willpower?.level || 0} currentValue={attributes?.willpower?.current || 0} modifiers={buildAttrModifiers(attributes?.willpower)} totalValue={getAttrMax(attributes?.willpower)}>
                   <HBar label="WIL" attrName="willpower" current={attributes?.willpower?.current || 0} max={getAttrMax(attributes?.willpower)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('willpower')} />
                 </ComplexTooltip>
-                <ComplexTooltip disabled={isBarDragging} title="Wisdom" baseValue={attributes?.wisdom?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.wisdom?.level || 0 }]} totalValue={attributes?.wisdom?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Wisdom" baseValue={attributes?.wisdom?.level || 0} currentValue={attributes?.wisdom?.current || 0} modifiers={buildAttrModifiers(attributes?.wisdom)} totalValue={getAttrMax(attributes?.wisdom)}>
                   <HBar label="WIS" attrName="wisdom" current={attributes?.wisdom?.current || 0} max={getAttrMax(attributes?.wisdom)} onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('wisdom')} />
                 </ComplexTooltip>
-                <ComplexTooltip disabled={isBarDragging} title="Wit" baseValue={attributes?.wit?.current || 0} modifiers={[{ name: 'Base Level', value: attributes?.wit?.level || 0 }]} totalValue={attributes?.wit?.current || 0}>
+                <ComplexTooltip disabled={isBarDragging} title="Wit" baseValue={attributes?.wit?.level || 0} currentValue={attributes?.wit?.current || 0} modifiers={buildAttrModifiers(attributes?.wit)} totalValue={getAttrMax(attributes?.wit)}>
                   <HBar label="WIT" attrName="wit" current={attributes?.wit?.current || 0} max={getAttrMax(attributes?.wit)} isLast onAttributeChange={handleAttributeChange} onDragStateChange={handleBarDragState} {...getConditionState('wit')} />
                 </ComplexTooltip>
               </div>

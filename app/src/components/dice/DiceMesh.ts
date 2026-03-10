@@ -2,10 +2,13 @@
  * Dice Mesh Factory — Creates Three.js meshes with numbers ON each face.
  *
  * Each die is a colored polyhedron with small number planes positioned
- * flush on every face (like Roll20 dice). Numbers are canvas-rendered
- * textures on tiny planes aligned to each face normal.
+ * flush on every face. Numbers are canvas-rendered textures on tiny planes
+ * aligned to each face normal.
  *
- * Face normals are precomputed for snap-to-result after physics settle.
+ * D4 is special: numbers appear near each vertex on the 3 adjacent faces.
+ * The result is the number at the top point (vertex), not a face.
+ *
+ * Face normals / vertex directions are precomputed for snap-to-flat after settle.
  */
 
 import * as THREE from 'three';
@@ -15,7 +18,7 @@ import type { DieType, DieColor } from '@/types/dice';
 
 const DIE_BODY_COLORS: Record<DieColor, { base: number; emissive: number; edgeHex: number; textColor: string }> = {
   red:    { base: 0x7A1A1A, emissive: 0x300808, edgeHex: 0xE8585A, textColor: '#FFFFFF' },
-  blue:   { base: 0x14504A, emissive: 0x082820, edgeHex: 0x3EB89A, textColor: '#FFFFFF' },
+  blue:   { base: 0x1A2E6A, emissive: 0x0C1430, edgeHex: 0x4080D0, textColor: '#FFFFFF' },
   purple: { base: 0x3A1868, emissive: 0x1A0C30, edgeHex: 0x9070D0, textColor: '#FFFFFF' },
   teal:   { base: 0x126858, emissive: 0x083028, edgeHex: 0x2DB8A0, textColor: '#FFFFFF' },
   gold:   { base: 0x6A5818, emissive: 0x352C0C, edgeHex: 0xD0A030, textColor: '#1A1408' },
@@ -32,7 +35,7 @@ function renderNumberTexture(value: number, textColor: string): THREE.CanvasText
   const cached = numberTextureCache.get(key);
   if (cached) return cached;
 
-  const size = 128;
+  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -41,26 +44,26 @@ function renderNumberTexture(value: number, textColor: string): THREE.CanvasText
   ctx.clearRect(0, 0, size, size);
 
   const text = value.toString();
-  const fontSize = value >= 10 ? 56 : 68;
-  ctx.font = `bold ${fontSize}px Consolas, monospace`;
+  const fontSize = value >= 10 ? 120 : 150;
+  ctx.font = `${fontSize}px 'Bebas Neue', 'Impact', sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   // Shadow for readability
   ctx.shadowColor = 'rgba(0,0,0,0.8)';
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = 8;
   ctx.fillStyle = textColor;
   ctx.fillText(text, size / 2, size / 2);
 
   // Second pass, sharper
-  ctx.shadowBlur = 2;
+  ctx.shadowBlur = 3;
   ctx.fillText(text, size / 2, size / 2);
   ctx.shadowBlur = 0;
 
   // Underline for 6 and 9
   if (value === 6 || value === 9) {
-    const y = size / 2 + fontSize * 0.38;
-    ctx.fillRect(size / 2 - 16, y, 32, 3);
+    const y = size / 2 + fontSize * 0.35;
+    ctx.fillRect(size / 2 - 28, y, 56, 5);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -159,9 +162,15 @@ function computeFaces(geometry: THREE.BufferGeometry, faceCount: number): FaceIn
 export interface DiceMeshResult {
   group: THREE.Group;
   dieType: DieType;
+  geometry: THREE.BufferGeometry; // Base geometry for physics shape
   faceNormals: THREE.Vector3[];
-  /** Get quaternion that puts face `faceIndex` pointing up (+Y) */
-  getSnapRotation: (faceIndex: number) => THREE.Quaternion;
+  /**
+   * For D4: vertex directions (outward from center). Index = vertex/value index.
+   * For other dice: undefined (use faceNormals instead).
+   */
+  vertexDirections?: THREE.Vector3[];
+  /** Get quaternion that puts face/vertex `index` pointing up (+Y) */
+  getSnapRotation: (index: number) => THREE.Quaternion;
 }
 
 // ── Create Number Planes on Faces ─────────────────────────────────────────
@@ -196,6 +205,163 @@ function addFaceNumbers(
 
     group.add(plane);
   }
+}
+
+// ── D4 Vertex Numbers ────────────────────────────────────────────────────
+
+/**
+ * Extract the 4 unique vertices of a TetrahedronGeometry.
+ */
+function getTetrahedronVertices(geometry: THREE.BufferGeometry): THREE.Vector3[] {
+  const pos = geometry.getAttribute('position');
+  const tolerance = 0.001;
+  const verts: THREE.Vector3[] = [];
+
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    let found = false;
+    for (const existing of verts) {
+      if (existing.distanceTo(v) < tolerance) { found = true; break; }
+    }
+    if (!found) verts.push(v);
+  }
+  return verts;
+}
+
+/**
+ * For each face, find which vertex of the tetrahedron is NOT on that face.
+ * That opposite vertex's number goes on the face, positioned near the vertex
+ * that IS on the face and closest to the opposite vertex's projection.
+ *
+ * Actually, the standard D4 convention: each face shows 3 numbers (one near
+ * each corner). The number at the TOP point (the vertex pointing up) is the
+ * result. Each vertex has a number, and that number appears on all 3 adjacent
+ * faces near that vertex.
+ */
+function addD4VertexNumbers(
+  group: THREE.Group,
+  geometry: THREE.BufferGeometry,
+  faces: FaceInfo[],
+  values: number[], // [1, 2, 3, 4] — one per vertex
+  textColor: string,
+  planeSize: number,
+): void {
+  const verts = getTetrahedronVertices(geometry);
+  const tolerance = 0.1;
+
+  // For each face, find which 3 vertices are on it
+  // Then place each vertex's number near that vertex on the face
+  const pos = geometry.getAttribute('position');
+
+  for (let faceIdx = 0; faceIdx < faces.length; faceIdx++) {
+    const { center: faceCenter, normal: faceNormal } = faces[faceIdx];
+
+    // Get the 3 raw vertices of this triangle face
+    const base = faceIdx * 3; // non-indexed: 3 verts per face
+    const faceVerts: THREE.Vector3[] = [];
+    for (let vi = 0; vi < 3; vi++) {
+      faceVerts.push(new THREE.Vector3(
+        pos.getX(base + vi),
+        pos.getY(base + vi),
+        pos.getZ(base + vi),
+      ));
+    }
+
+    // For each face vertex, find which unique vertex it matches → get its value
+    for (const fv of faceVerts) {
+      let vertIdx = 0;
+      for (let vi = 0; vi < verts.length; vi++) {
+        if (verts[vi].distanceTo(fv) < tolerance) { vertIdx = vi; break; }
+      }
+      const value = values[vertIdx];
+
+      // Position the number: 60% from face center toward the vertex
+      const numPos = new THREE.Vector3().lerpVectors(faceCenter, fv, 0.6);
+      // Lift slightly above face to avoid z-fighting
+      numPos.addScaledVector(faceNormal, 0.03);
+
+      const texture = renderNumberTexture(value, textColor);
+      const planeMat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.FrontSide,
+      });
+      const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+      const plane = new THREE.Mesh(planeGeo, planeMat);
+
+      plane.position.copy(numPos);
+      const target = numPos.clone().add(faceNormal);
+      plane.lookAt(target);
+
+      group.add(plane);
+    }
+  }
+}
+
+/**
+ * Build a D4 with vertex-based numbering.
+ * The result is read from the top vertex, not a face.
+ */
+function buildD4(
+  geometry: THREE.BufferGeometry,
+  values: number[],
+  color: DieColor,
+  numberPlaneSize: number,
+): DiceMeshResult {
+  const colors = DIE_BODY_COLORS[color];
+
+  // Die body
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: colors.base,
+    emissive: colors.emissive,
+    roughness: 0.3,
+    metalness: 0.15,
+    flatShading: true,
+  });
+  const bodyMesh = new THREE.Mesh(geometry, bodyMat);
+  bodyMesh.castShadow = true;
+
+  // Edges
+  const edgesGeo = new THREE.EdgesGeometry(geometry, 12);
+  const edgesMat = new THREE.LineBasicMaterial({
+    color: colors.edgeHex,
+    transparent: true,
+    opacity: 0.5,
+  });
+  const edgesMesh = new THREE.LineSegments(edgesGeo, edgesMat);
+
+  // Compute face info (still needed for number plane orientation)
+  const faces = computeFaces(geometry, 4);
+  const faceNormals = faces.map(f => f.normal.clone());
+
+  // Vertices and their outward directions (from center)
+  const verts = getTetrahedronVertices(geometry);
+  const vertexDirections = verts.map(v => v.clone().normalize());
+
+  // Group
+  const group = new THREE.Group();
+  group.add(bodyMesh);
+  group.add(edgesMesh);
+
+  // Add numbers near vertices on each adjacent face
+  addD4VertexNumbers(group, geometry, faces, values, colors.textColor, numberPlaneSize);
+
+  const UP = new THREE.Vector3(0, 1, 0);
+
+  return {
+    group,
+    dieType: 'd4',
+    geometry,
+    faceNormals,
+    vertexDirections,
+    getSnapRotation: (index: number): THREE.Quaternion => {
+      // For D4, snap so vertex `index` points up
+      const dir = vertexDirections[index];
+      if (!dir) return new THREE.Quaternion();
+      return new THREE.Quaternion().setFromUnitVectors(dir, UP);
+    },
+  };
 }
 
 // ── Die Value Layouts ─────────────────────────────────────────────────────
@@ -263,6 +429,7 @@ function buildDie(
   return {
     group,
     dieType,
+    geometry,
     faceNormals,
     getSnapRotation: (faceIndex: number): THREE.Quaternion => {
       const normal = faceNormals[faceIndex];
@@ -281,6 +448,59 @@ export function getFaceIndexForValue(dieType: DieType, targetValue: number): num
   return idx >= 0 ? idx : 0;
 }
 
+/**
+ * Get the value for a given face index.
+ */
+export function getValueForFaceIndex(dieType: DieType, faceIndex: number): number {
+  const values = getValuesForDie(dieType);
+  return values[faceIndex] ?? 1;
+}
+
+/**
+ * Find which face/vertex index is most aligned with +Y given the die's current quaternion.
+ * For D4: checks vertex directions (top point = result).
+ * For other dice: checks face normals (top face = result).
+ */
+export function readUpFaceIndex(meshResult: DiceMeshResult, worldQuat: THREE.Quaternion): number {
+  const up = new THREE.Vector3(0, 1, 0);
+  let bestDot = -Infinity;
+  let bestIndex = 0;
+
+  // D4: read from vertex directions
+  if (meshResult.vertexDirections) {
+    for (let i = 0; i < meshResult.vertexDirections.length; i++) {
+      const worldDir = meshResult.vertexDirections[i].clone().applyQuaternion(worldQuat);
+      const dot = worldDir.dot(up);
+      if (dot > bestDot) {
+        bestDot = dot;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
+
+  // Other dice: read from face normals
+  for (let i = 0; i < meshResult.faceNormals.length; i++) {
+    const worldNormal = meshResult.faceNormals[i].clone().applyQuaternion(worldQuat);
+    const dot = worldNormal.dot(up);
+    if (dot > bestDot) {
+      bestDot = dot;
+      bestIndex = i;
+    }
+  }
+
+  return bestIndex;
+}
+
+/**
+ * Read which face/vertex is pointing up (+Y) given the die's current world quaternion.
+ * Returns the face value (not the face index).
+ */
+export function readUpFaceValue(meshResult: DiceMeshResult, worldQuat: THREE.Quaternion): number {
+  const bestIndex = readUpFaceIndex(meshResult, worldQuat);
+  return getValueForFaceIndex(meshResult.dieType, bestIndex);
+}
+
 function getValuesForDie(dieType: DieType): number[] {
   switch (dieType) {
     case 'd4':  return getD4Values();
@@ -292,37 +512,40 @@ function getValuesForDie(dieType: DieType): number[] {
   }
 }
 
+// Scale factor — controls overall die size
+const S = 1.4;
+
 export function createDieMesh(dieType: DieType, color: DieColor = 'white'): DiceMeshResult {
   switch (dieType) {
     case 'd4':
-      return buildDie(
-        new THREE.TetrahedronGeometry(0.75), 'd4', 4,
-        getD4Values(), color, 0.45,
+      return buildD4(
+        new THREE.TetrahedronGeometry(0.75 * S),
+        getD4Values(), color, 0.35 * S,
       );
     case 'd6':
       return buildDie(
-        new THREE.BoxGeometry(0.9, 0.9, 0.9), 'd6', 6,
-        getD6Values(), color, 0.55,
+        new THREE.BoxGeometry(0.9 * S, 0.9 * S, 0.9 * S), 'd6', 6,
+        getD6Values(), color, 0.55 * S,
       );
     case 'd8':
       return buildDie(
-        new THREE.OctahedronGeometry(0.7), 'd8', 8,
-        getD8Values(), color, 0.38,
+        new THREE.OctahedronGeometry(0.7 * S), 'd8', 8,
+        getD8Values(), color, 0.38 * S,
       );
     case 'd12':
       return buildDie(
-        new THREE.DodecahedronGeometry(0.7), 'd12', 12,
-        getD12Values(), color, 0.3,
+        new THREE.DodecahedronGeometry(0.7 * S), 'd12', 12,
+        getD12Values(), color, 0.3 * S,
       );
     case 'd20':
       return buildDie(
-        new THREE.IcosahedronGeometry(0.7), 'd20', 20,
-        getD20Values(), color, 0.28,
+        new THREE.IcosahedronGeometry(0.7 * S), 'd20', 20,
+        getD20Values(), color, 0.28 * S,
       );
     default:
       return buildDie(
-        new THREE.BoxGeometry(0.9, 0.9, 0.9), 'd6', 6,
-        getD6Values(), color, 0.55,
+        new THREE.BoxGeometry(0.9 * S, 0.9 * S, 0.9 * S), 'd6', 6,
+        getD6Values(), color, 0.55 * S,
       );
   }
 }

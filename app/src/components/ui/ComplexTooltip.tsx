@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-interface TooltipModifier {
+export interface TooltipModifier {
   name: string;
   value: number;
   description?: string;
@@ -19,6 +19,7 @@ interface ComplexTooltipProps {
   children: React.ReactNode;
   title: string;
   baseValue?: number;
+  currentValue?: number;    // Current pool (e.g. 8 of 14)
   modifiers: TooltipModifier[];
   totalValue: number;
   disabled?: boolean;
@@ -28,6 +29,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   children,
   title,
   baseValue,
+  currentValue,
   modifiers,
   totalValue,
   disabled = false,
@@ -148,6 +150,29 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
     setTimeout(() => setNestedTooltip(null), 100);
   };
 
+  // Split modifiers into positive and negative for sectioned display
+  const positiveModifiers = modifiers.filter(m => m.value > 0);
+  const negativeModifiers = modifiers.filter(m => m.value < 0);
+  const neutralModifiers = modifiers.filter(m => m.value === 0);
+  const hasAugments = positiveModifiers.length > 0 || negativeModifiers.length > 0;
+
+  const renderModifier = (mod: TooltipModifier, index: number) => (
+    <div
+      key={index}
+      className={`flex justify-between text-xs px-1 py-0.5 rounded transition-colors ${mod.source ? 'cursor-pointer hover:bg-yellow-600/15' : ''}`}
+      onMouseEnter={(e) => handleModifierHover(e, mod.source)}
+      onMouseLeave={handleModifierLeave}
+    >
+      <span className="text-gray-300 flex items-center gap-1">
+        {mod.source && <span className="text-yellow-500" style={{ fontSize: '8px' }}>&#x25B6;</span>}
+        {mod.name}
+      </span>
+      <span className={`font-bold ${mod.value > 0 ? 'text-green-400' : mod.value < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+        {mod.value > 0 ? '+' : ''}{mod.value}
+      </span>
+    </div>
+  );
+
   return (
     <>
       <div
@@ -177,41 +202,84 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
             }}
           >
             {/* Title */}
-            <div className="text-yellow-400 font-bold text-sm mb-2 border-b border-yellow-600/40 pb-2">
+            <div className="text-yellow-400 font-bold text-sm mb-2 border-b border-yellow-600/40 pb-2"
+              style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em', fontSize: '16px' }}
+            >
               {title}
             </div>
 
+            {/* Pool Display (current / max) */}
+            {currentValue !== undefined && (
+              <div className="flex justify-between text-xs mb-2 px-1">
+                <span className="text-gray-400">Pool:</span>
+                <span>
+                  <span className={`font-bold ${currentValue <= 0 ? 'text-red-400' : 'text-white'}`}>{currentValue}</span>
+                  <span className="text-gray-500"> / </span>
+                  <span className="text-yellow-400 font-bold">{totalValue}</span>
+                </span>
+              </div>
+            )}
+
             {/* Base Value */}
             {baseValue !== undefined && (
-              <div className="flex justify-between text-xs mb-1 text-gray-300">
-                <span>Base:</span>
+              <div className="flex justify-between text-xs mb-1 px-1">
+                <span className="text-gray-400">Base Level:</span>
                 <span className="text-white font-bold">{baseValue}</span>
               </div>
             )}
 
-            {/* Modifiers List */}
-            <div className="space-y-1 mb-2">
-              {modifiers.map((mod, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between text-xs cursor-help hover:bg-yellow-600/10 px-1 py-0.5 rounded transition-colors"
-                  onMouseEnter={(e) => handleModifierHover(e, mod.source)}
-                  onMouseLeave={handleModifierLeave}
-                >
-                  <span className="text-gray-300 flex items-center gap-1">
-                    {mod.source && <span className="text-yellow-500">&#x25B6;</span>}
-                    {mod.name}
-                  </span>
-                  <span className={`font-bold ${mod.value >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {mod.value >= 0 ? '+' : ''}{mod.value}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {/* Augments Section */}
+            {hasAugments && (
+              <div className="mt-1 mb-1">
+                {/* Positive augments */}
+                {positiveModifiers.length > 0 && (
+                  <div className="mb-1">
+                    <div className="text-[10px] text-green-500/70 uppercase tracking-wider px-1 mb-0.5"
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                    >
+                      Augments +
+                    </div>
+                    <div className="space-y-0.5 border-l-2 border-green-500/30 ml-1 pl-1">
+                      {positiveModifiers.map((mod, i) => renderModifier(mod, i))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Total */}
+                {/* Negative augments */}
+                {negativeModifiers.length > 0 && (
+                  <div className="mb-1">
+                    <div className="text-[10px] text-red-500/70 uppercase tracking-wider px-1 mb-0.5"
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                    >
+                      Augments -
+                    </div>
+                    <div className="space-y-0.5 border-l-2 border-red-500/30 ml-1 pl-1">
+                      {negativeModifiers.map((mod, i) => renderModifier(mod, i))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Neutral modifiers (if any) */}
+            {neutralModifiers.length > 0 && (
+              <div className="space-y-0.5 mb-2">
+                {neutralModifiers.map((mod, i) => renderModifier(mod, i))}
+              </div>
+            )}
+
+            {/* No augments - flat display for non-attribute tooltips */}
+            {!hasAugments && baseValue === undefined && modifiers.length > 0 && (
+              <div className="space-y-0.5 mb-2">
+                {modifiers.map((mod, i) => renderModifier(mod, i))}
+              </div>
+            )}
+
+            {/* Total / Max */}
             <div className="flex justify-between text-sm font-bold border-t border-yellow-600/40 pt-2">
-              <span className="text-yellow-400">Total:</span>
+              <span className="text-yellow-400" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.03em' }}>
+                {currentValue !== undefined ? 'Max Pool:' : 'Total:'}
+              </span>
               <span className="text-white">{totalValue}</span>
             </div>
           </div>
@@ -228,10 +296,14 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
           onMouseLeave={() => setNestedTooltip(null)}
         >
           <div className="bg-gray-800 border-2 border-purple-500/80 rounded-lg shadow-2xl p-3 min-w-[250px] max-w-[350px]">
-            <div className="text-purple-400 font-bold text-sm mb-1">
+            <div className="text-purple-400 font-bold text-sm mb-1"
+              style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.04em' }}
+            >
               {nestedTooltip.name}
             </div>
-            <div className="text-gray-400 text-xs mb-2 italic">
+            <div className="text-gray-400 text-xs mb-2 italic"
+              style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+            >
               {nestedTooltip.type}
             </div>
 

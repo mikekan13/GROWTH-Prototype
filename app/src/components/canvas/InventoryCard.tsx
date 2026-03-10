@@ -3,6 +3,11 @@
 import React, { useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 
+export interface ItemAugment {
+  attribute: string;  // e.g. 'clout', 'constitution', 'willpower'
+  value: number;      // positive = buff, negative = penalty
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -11,6 +16,7 @@ export interface InventoryItem {
   equipped?: boolean;
   description?: string;
   properties?: string[];
+  augments?: ItemAugment[];  // Attribute modifiers when equipped
   value?: number;
   weight?: number;
   rarity?: 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary' | 'artifact';
@@ -42,6 +48,12 @@ const RARITY_TEXT_COLORS: Record<string, string> = {
   artifact: '#f7525f',
 };
 
+const ATTR_LABELS: Record<string, string> = {
+  clout: 'Clout', celerity: 'Celerity', constitution: 'Constitution',
+  flow: 'Flow', focus: 'Focus',
+  willpower: 'Willpower', wisdom: 'Wisdom', wit: 'Wit',
+};
+
 function buildItemModifiers(item: InventoryItem) {
   const modifiers: Array<{
     name: string;
@@ -49,42 +61,38 @@ function buildItemModifiers(item: InventoryItem) {
     source?: { name: string; type: string; description?: string; stats?: Record<string, string | number> };
   }> = [];
 
-  if (item.properties) {
-    item.properties.forEach((prop) => {
+  const sourceInfo = {
+    name: item.name,
+    type: `${item.type} — ${item.rarity || 'common'}`,
+    description: item.description,
+    stats: {
+      ...(item.value != null ? { 'Value': `${item.value} \u049CV` } : {}),
+      ...(item.weight != null ? { 'Weight': `${item.weight} lb` } : {}),
+      ...(item.quantity > 1 ? { 'Quantity': item.quantity } : {}),
+      ...(item.equipped ? { 'Status': 'Equipped' } : {}),
+    },
+  };
+
+  // Show attribute augments
+  if (item.augments && item.augments.length > 0) {
+    item.augments.forEach((aug) => {
       modifiers.push({
-        name: prop,
-        value: 0,
-        source: {
-          name: item.name,
-          type: `${item.type} — ${item.rarity || 'common'}`,
-          description: item.description,
-          stats: {
-            ...(item.value != null ? { 'Value': `${item.value} \u049CV` } : {}),
-            ...(item.weight != null ? { 'Weight': `${item.weight} lb` } : {}),
-            ...(item.quantity > 1 ? { 'Quantity': item.quantity } : {}),
-            ...(item.equipped ? { 'Status': 'Equipped' } : {}),
-          },
-        },
+        name: `${ATTR_LABELS[aug.attribute] || aug.attribute} ${aug.value >= 0 ? '+' : ''}${aug.value}`,
+        value: aug.value,
+        source: sourceInfo,
       });
     });
   }
 
-  if (modifiers.length === 0) {
-    modifiers.push({
-      name: item.type,
-      value: 0,
-      source: {
-        name: item.name,
-        type: `${item.type} — ${item.rarity || 'common'}`,
-        description: item.description,
-        stats: {
-          ...(item.value != null ? { 'Value': `${item.value} \u049CV` } : {}),
-          ...(item.weight != null ? { 'Weight': `${item.weight} lb` } : {}),
-          ...(item.quantity > 1 ? { 'Quantity': item.quantity } : {}),
-          ...(item.equipped ? { 'Status': 'Equipped' } : {}),
-        },
-      },
+  // Show properties
+  if (item.properties) {
+    item.properties.forEach((prop) => {
+      modifiers.push({ name: prop, value: 0, source: sourceInfo });
     });
+  }
+
+  if (modifiers.length === 0) {
+    modifiers.push({ name: item.type, value: 0, source: sourceInfo });
   }
 
   return modifiers;
@@ -237,15 +245,24 @@ export default function InventoryCard({ characterName: _characterName, items, on
                           {item.description && (
                             <p className="text-xs mt-1 line-clamp-2" style={{ color: '#888' }}>{item.description}</p>
                           )}
-                          {item.properties && item.properties.length > 0 && (
+                          {((item.properties && item.properties.length > 0) || (item.augments && item.augments.length > 0)) && (
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {item.properties.slice(0, 3).map((prop, index) => (
+                              {item.augments?.map((aug, index) => (
+                                <span key={`aug-${index}`} className="text-xs px-1" style={{
+                                  backgroundColor: aug.value >= 0 ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
+                                  color: aug.value >= 0 ? '#4ade80' : '#f87171',
+                                  borderRadius: '2px',
+                                }}>
+                                  {ATTR_LABELS[aug.attribute] || aug.attribute} {aug.value >= 0 ? '+' : ''}{aug.value}
+                                </span>
+                              ))}
+                              {item.properties?.slice(0, 3).map((prop, index) => (
                                 <span key={index} className="text-xs px-1" style={{ backgroundColor: 'rgba(88, 42, 114, 0.3)', color: '#c4a0e8', borderRadius: '2px' }}>
                                   {prop}
                                 </span>
                               ))}
-                              {item.properties.length > 3 && (
-                                <span className="text-xs" style={{ color: '#888' }}>+{item.properties.length - 3}</span>
+                              {(item.properties?.length || 0) > 3 && (
+                                <span className="text-xs" style={{ color: '#888' }}>+{(item.properties?.length || 0) - 3}</span>
                               )}
                             </div>
                           )}

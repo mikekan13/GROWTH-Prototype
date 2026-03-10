@@ -9,7 +9,7 @@
  * array of what happened (for logging, undo, AI audit trail).
  */
 
-import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillGovernor } from '@/types/growth';
+import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillGovernor, AugmentSource } from '@/types/growth';
 import { skilledCheck, unskilledCheck, type SkillCheckResult } from '@/lib/dice';
 import type { FateDie } from '@/types/growth';
 
@@ -354,4 +354,107 @@ export function performSkillCheck(
     changes,
     roll,
   };
+}
+
+// ── Augment Recomputation ──────────────────────────────────────────────────
+
+interface InventoryItemLike {
+  id: string;
+  name: string;
+  type: string;
+  equipped?: boolean;
+  description?: string;
+  rarity?: string;
+  weight?: number;
+  value?: number;
+  augments?: Array<{ attribute: string; value: number }>;
+}
+
+interface TraitLike {
+  name: string;
+  type: 'nectar' | 'blossom' | 'thorn';
+  description?: string;
+  augments?: Array<{ attribute: string; value: number }>;
+}
+
+const STANDARD_ATTRS = ['clout', 'celerity', 'constitution', 'flow', 'focus', 'willpower', 'wisdom', 'wit'] as const;
+
+/**
+ * Recompute augmentPositive, augmentNegative, and augmentSources for all attributes
+ * from equipped inventory items and traits. Pure function — returns updated character.
+ */
+export function recomputeAugments(character: GrowthCharacter): ActionResult {
+  const c = deepCloneCharacter(character);
+  const changes: string[] = [];
+
+  // Build per-attribute source lists
+  const sourcesMap: Record<string, AugmentSource[]> = {};
+  for (const attr of STANDARD_ATTRS) {
+    sourcesMap[attr] = [];
+  }
+
+  // Collect from equipped inventory items
+  const inventory = (c as unknown as Record<string, unknown>).inventory;
+  if (Array.isArray(inventory)) {
+    for (const item of inventory as InventoryItemLike[]) {
+      if (!item.equipped || !item.augments) continue;
+      for (const aug of item.augments) {
+        if (sourcesMap[aug.attribute]) {
+          sourcesMap[aug.attribute].push({
+            name: item.name,
+            value: aug.value,
+            sourceType: 'item',
+            sourceId: item.id,
+            description: item.description,
+            stats: {
+              'Type': `${item.type}${item.rarity ? ` — ${item.rarity}` : ''}`,
+              ...(item.weight != null ? { 'Weight': `${item.weight} lb` } : {}),
+              ...(item.value != null ? { 'Value': `${item.value} \u049CV` } : {}),
+              'Status': 'Equipped',
+            },
+          });
+        }
+      }
+    }
+  }
+
+  // Collect from traits
+  const traits = c.traits;
+  if (Array.isArray(traits)) {
+    for (const trait of traits as TraitLike[]) {
+      if (!trait.augments) continue;
+      for (const aug of trait.augments) {
+        if (sourcesMap[aug.attribute]) {
+          sourcesMap[aug.attribute].push({
+            name: trait.name,
+            value: aug.value,
+            sourceType: trait.type,
+            description: trait.description,
+          });
+        }
+      }
+    }
+  }
+
+  // Apply to each attribute
+  for (const attrName of STANDARD_ATTRS) {
+    const attr = c.attributes[attrName];
+    if (!attr || !('augmentPositive' in attr)) continue;
+
+    const sources = sourcesMap[attrName];
+    const oldPos = attr.augmentPositive || 0;
+    const oldNeg = attr.augmentNegative || 0;
+    const newPos = sources.filter(s => s.value > 0).reduce((sum, s) => sum + s.value, 0);
+    const newNeg = sources.filter(s => s.value < 0).reduce((sum, s) => sum + Math.abs(s.value), 0);
+
+    attr.augmentPositive = newPos;
+    attr.augmentNegative = newNeg;
+    attr.augmentSources = sources.length > 0 ? sources : undefined;
+
+    if (oldPos !== newPos || oldNeg !== newNeg) {
+      changes.push(`${attrName}: augments changed from +${oldPos}/-${oldNeg} to +${newPos}/-${newNeg}`);
+    }
+  }
+
+  return { character: c, changes };
 }

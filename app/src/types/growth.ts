@@ -4,12 +4,23 @@
  * Google Sheets references removed
  */
 
+// Individual source of an attribute augment (trait, item, condition, etc.)
+export interface AugmentSource {
+  name: string;           // Display name (e.g. "Iron Gauntlets", "Warrior's Nectar")
+  value: number;          // +/- modifier value
+  sourceType: 'nectar' | 'blossom' | 'thorn' | 'item' | 'condition' | 'effect' | 'other';
+  sourceId?: string;      // Reference to the trait/item entity
+  description?: string;   // Flavor text or mechanical explanation
+  stats?: Record<string, string | number>; // Extra info for nested tooltip (weight, condition, etc.)
+}
+
 // Core Attribute (8 standard attributes use this)
 export interface GrowthAttribute {
   level: number;          // Base attribute level
   current: number;        // Current pool available (depletes with use)
   augmentPositive: number; // Positive augments (from nectars, equipment, etc.)
   augmentNegative: number; // Negative augments (from thorns, damage, etc.)
+  augmentSources?: AugmentSource[]; // Itemized breakdown of augment sources
   // Pool Max = level + augmentPositive - augmentNegative
   // When current reaches 0, character gets condition + overflow to frequency
 }

@@ -1,6 +1,6 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 Current phase: Phase 3 (Session Tools) — Skeleton Systems Pass
 
 ---
@@ -438,6 +438,17 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - **Terminal gate fix**: Changed from `GODHEAD || ADMIN` to ADMIN-only.
 - **Bug fix**: Prisma client cache invalidation — `.next` cache had stale client missing new Wallet fields. Required `rm -rf .next` + `npx prisma generate`.
 - 36 routes total, all compiling clean
+
+### 2026-03-10: KRMA Crystallization + Canvas Visual Effects
+- **Crystallization system**: Entity crystallize/dissolve via KRMA line crossing. Backend service (`services/krma/crystallization.ts`), crystallization ledger stored as campaign events, POST/GET API routes. GM drags entity across Y=0 purple line → confirm dialog → API call → ledger entry.
+- **Guitar string effect**: KRMA line deforms like a guitar string when cards are dragged through it. Cosine bump shape matching card width (character=520, location=340, item=300). Natural bounce-back vibration on release using damped oscillation (cos × e^-dt).
+- **Direction-aware card glow**: Red (#E84040) backlight when dragging UP to crystallize, Blue (#4080E8) when dragging DOWN to dissolve. Pulsing fade effect. Only appears when card crosses Y=0 to opposite side.
+- **Sub-panel KRMA line constraint**: Sub-panels (inventory, vitals, traits, skills, magic, backstory, harvests) cannot cross the KRMA line to the opposite side from their parent card. Offset-based clamping with asymmetric buffers (150px crystallized side, 10px fluid side).
+- **Line crossing detection**: useEffect-based system watching `dragOffsets` map for entries being removed. Tracks pre-drag Y via `dragStartYRef`. Only fires valid state transitions (crystallize if not already crystallized, dissolve if already crystallized).
+- **Bug fix**: Entity snap-back after crystallization confirm — was API 400 because entity wasn't formally crystallized. Fixed by checking `crystallizedEntityIds` before firing crossing events.
+- **Cleanup**: Removed all `[KRMA-CROSS]` console.log debug statements from CampaignCanvas.tsx and RelationsCanvas.tsx.
+- Files changed: `RelationsCanvas.tsx`, `CampaignCanvas.tsx`, `services/krma/crystallization.ts`, `types/crystallization.ts`, `api/krma/campaigns/[id]/crystallize/route.ts`, `lib/kv-calculator.ts`
+- **Next**: Track actual KRMA usage in campaigns (spending, earning, character investment). Item/location KV needs official rules from Mike.
 
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?

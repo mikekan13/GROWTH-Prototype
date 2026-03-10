@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
+import { recomputeAugments } from '@/lib/character-actions';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -67,7 +68,10 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   const characterNodes = campaign.characters.map((char, index) => {
     let charData = null;
     try {
-      charData = JSON.parse(char.data);
+      const parsed = JSON.parse(char.data);
+      // Recompute augments from equipped items + traits on load
+      const { character: augmented } = recomputeAugments(parsed);
+      charData = augmented as unknown as Record<string, unknown>;
     } catch { /* use null */ }
 
     return {

@@ -49,10 +49,19 @@ interface CanvasConnection {
   strength: number;
 }
 
+export interface LineCrossingEvent {
+  nodeId: string;
+  nodeType: string;
+  nodeName: string;
+  direction: 'crystallize' | 'dissolve';
+  previousY: number;
+}
+
 interface RelationsCanvasProps {
   nodes: CanvasNode[];
   connections: CanvasConnection[];
   campaignId: string;
+  crystallizedEntityIds?: Set<string>;
   onNodeClick?: (node: CanvasNode) => void;
   onNodePositionChange?: (nodeId: string, x: number, y: number) => void;
   onCreateCharacter?: (name: string) => void;
@@ -64,6 +73,7 @@ interface RelationsCanvasProps {
   onCreateItem?: (name: string, type: string) => void;
   onDeleteItem?: (nodeId: string) => void;
   onItemUpdate?: (nodeId: string, data: GrowthWorldItem) => void;
+  onEntityCrossLine?: (event: LineCrossingEvent, moveNode: (nodeId: string, y: number) => void) => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -72,6 +82,7 @@ export default function RelationsCanvas({
   nodes = [],
   connections = [],
   campaignId,
+  crystallizedEntityIds,
   onNodeClick,
   onNodePositionChange,
   onCreateCharacter,
@@ -83,6 +94,7 @@ export default function RelationsCanvas({
   onCreateItem,
   onDeleteItem,
   onItemUpdate,
+  onEntityCrossLine,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,7 +120,7 @@ export default function RelationsCanvas({
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
   const [viewBox, setViewBox] = useState(() => loadJSON('viewBox', { x: -693, y: -462, width: 1386, height: 924 }));
-  const [zoom, setZoom] = useState(() => loadJSON('zoom', 1));
+  const [zoom, setZoom] = useState(() => Math.max(0.08, Math.min(1.5, loadJSON('zoom', 1))));
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0, viewBoxX: 0, viewBoxY: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -381,6 +393,206 @@ export default function RelationsCanvas({
     });
   }, []);
 
+  // ── Guitar string pluck effect on KRMA line ──
+  // The card physically pushes through the line like a finger on a guitar string.
+  // When the card passes through or releases, the string bounces back naturally.
+  const pluckRef = useRef<{ x: number; amplitude: number; radius: number; startTime: number } | null>(null);
+  // Track each dragged node's last deflection so we can hand off smoothly to pluck
+  const lastDeflectionRef = useRef<Map<string, { x: number; peakDeflection: number; radius: number }>>(new Map());
+
+  // Get the card width for a given node (half-width used as contact radius)
+  const getCardHalfWidth = useCallback((nodeId: string): number => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return 260;
+    const isExp = expandedNodes.has(nodeId);
+    switch (node.type) {
+      case 'character': return isExp ? 960 : 260;
+      case 'location':  return isExp ? 260 : 170;
+      case 'item':      return isExp ? 220 : 150;
+      default:          return 200;
+    }
+  }, [nodes, expandedNodes]);
+
+  // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card
+  // Asymmetric: crystallized panels extend downward toward line so need bigger buffer;
+  // fluid panels extend downward away from line so need smaller buffer
+  const LINE_BUFFER_CRYSTAL = 150;
+  const LINE_BUFFER_FLUID = 10;
+  const clampPanelY = (panelY: number, cardCenterY: number): number => {
+    if (cardCenterY < 0 && panelY > -LINE_BUFFER_CRYSTAL) return -LINE_BUFFER_CRYSTAL;
+    if (cardCenterY > 0 && panelY < LINE_BUFFER_FLUID) return LINE_BUFFER_FLUID;
+    return panelY;
+  };
+
+  // Clamp an offset so the resulting panel position respects the KRMA line
+  const clampOffsetY = (offsetY: number, anchorY: number, cardCenterY: number): number => {
+    const panelY = anchorY + offsetY;
+    if (cardCenterY < 0 && panelY > -LINE_BUFFER_CRYSTAL) return -LINE_BUFFER_CRYSTAL - anchorY;
+    if (cardCenterY > 0 && panelY < LINE_BUFFER_FLUID) return LINE_BUFFER_FLUID - anchorY;
+    return offsetY;
+  };
+
+  // Compute line deflection — card pushes through like a finger on a string
+  const getLineDeflection = useCallback((segmentX: number, time: number): number => {
+    // Helper: compute the shape factor for a given X distance from card center
+    const shapeAt = (dx: number, radius: number) => {
+      if (Math.abs(dx) < radius) {
+        const t = Math.abs(dx) / radius;
+        return 0.5 * (1 + Math.cos(Math.PI * t));
+      } else {
+        const overshoot = Math.abs(dx) - radius;
+        return Math.exp(-overshoot / 200) * 0.3;
+      }
+    };
+
+    // 1) Active drag: line wraps around the card
+    let dragDeflection = 0;
+    for (const [nodeId, offset] of dragOffsets) {
+      const basePos = nodePositions.get(nodeId);
+      if (!basePos) continue;
+      const cardX = basePos.x + offset.x;
+      const cardY = basePos.y + offset.y;
+      const distFromLine = Math.abs(cardY);
+      if (distFromLine > 400) continue;
+
+      const radius = getCardHalfWidth(nodeId);
+      const dx = segmentX - cardX;
+      dragDeflection += cardY * shapeAt(dx, radius);
+
+      // Track peak deflection for smooth handoff to pluck
+      const prev = lastDeflectionRef.current.get(nodeId);
+      const absDef = Math.abs(cardY);
+      if (!prev || absDef > Math.abs(prev.peakDeflection)) {
+        lastDeflectionRef.current.set(nodeId, { x: cardX, peakDeflection: cardY, radius });
+      } else {
+        lastDeflectionRef.current.set(nodeId, { ...prev, x: cardX, radius });
+      }
+    }
+
+    // 2) Pluck vibration (smooth bounce-back after release or pass-through)
+    let pluckDeflection = 0;
+    if (pluckRef.current) {
+      const elapsed = time - pluckRef.current.startTime;
+      const decay = Math.exp(-elapsed * 1.8);
+      if (decay < 0.005) {
+        pluckRef.current = null;
+      } else {
+        const dx = segmentX - pluckRef.current.x;
+        const shape = shapeAt(dx, pluckRef.current.radius);
+        pluckDeflection = pluckRef.current.amplitude * decay
+          * Math.cos(elapsed * 18) * shape;
+      }
+    }
+
+    return dragDeflection + pluckDeflection;
+  }, [dragOffsets, nodePositions, getCardHalfWidth]);
+
+  // Detect when a card leaves the line's zone (passes through or releases) → trigger pluck
+  const prevNearLineRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Which nodes are currently deflecting the line?
+    const currentNear = new Set<string>();
+    for (const [nodeId, offset] of dragOffsets) {
+      const basePos = nodePositions.get(nodeId);
+      if (!basePos) continue;
+      const cardY = basePos.y + offset.y;
+      if (Math.abs(cardY) <= 400) {
+        currentNear.add(nodeId);
+      }
+    }
+
+    // Check for nodes that just left the deflection zone (passed through or released)
+    for (const nodeId of prevNearLineRef.current) {
+      if (!currentNear.has(nodeId)) {
+        // Node left the zone — hand off its deflection to pluck vibration
+        const info = lastDeflectionRef.current.get(nodeId);
+        if (info && Math.abs(info.peakDeflection) > 5) {
+          pluckRef.current = {
+            x: info.x,
+            amplitude: info.peakDeflection,
+            radius: info.radius,
+            startTime: animationTime,
+          };
+        }
+        lastDeflectionRef.current.delete(nodeId);
+      }
+    }
+
+    prevNearLineRef.current = currentNear;
+  }, [dragOffsets, nodePositions, animationTime]);
+
+  // ── Line crossing + shimmer state ──
+  const [shimmeringNodes, setShimmeringNodes] = useState<Set<string>>(new Set());
+
+  /** Imperatively move a node to a new Y position */
+  const moveNodeY = useCallback((nodeId: string, y: number) => {
+    setNodePositions(prev => {
+      const next = new Map(prev);
+      const pos = next.get(nodeId);
+      next.set(nodeId, { x: pos?.x ?? 0, y });
+      return next;
+    });
+  }, []);
+
+  // ── Drag-end line-crossing detection (runs AFTER React paints) ──
+  // Track which nodes are currently being dragged and their Y when drag started
+  const prevDraggingRef = useRef<Set<string>>(new Set());
+  const dragStartYRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const currentDragging = new Set(dragOffsets.keys());
+
+    // Detect drag starts — record starting Y position
+    for (const nodeId of currentDragging) {
+      if (!prevDraggingRef.current.has(nodeId) && !dragStartYRef.current.has(nodeId)) {
+        const pos = nodePositions.get(nodeId);
+        if (pos) {
+          dragStartYRef.current.set(nodeId, pos.y);
+        }
+      }
+    }
+
+    // Detect drag ends — check for line crossing
+    for (const nodeId of prevDraggingRef.current) {
+      if (!currentDragging.has(nodeId)) {
+        const startY = dragStartYRef.current.get(nodeId);
+        const pos = nodePositions.get(nodeId);
+        dragStartYRef.current.delete(nodeId);
+
+        if (startY === undefined || !pos || !onEntityCrossLine) continue;
+
+        const crossed =
+          (startY > 0 && pos.y <= 0) ? 'crystallize' as const :
+          (startY <= 0 && pos.y > 0) ? 'dissolve' as const : null;
+
+        if (!crossed) continue;
+
+        // Only trigger valid state transitions:
+        // - "crystallize" only if entity is NOT already crystallized
+        // - "dissolve" only if entity IS currently crystallized
+        const isCrystallized = crystallizedEntityIds?.has(nodeId) ?? false;
+        if (crossed === 'crystallize' && isCrystallized) continue;
+        if (crossed === 'dissolve' && !isCrystallized) continue;
+
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) continue;
+
+        // Fire shimmer
+        setShimmeringNodes(prev => { const n = new Set(prev); n.add(nodeId); return n; });
+        setTimeout(() => {
+          setShimmeringNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; });
+        }, 1200);
+
+        onEntityCrossLine(
+          { nodeId, nodeType: node.type, nodeName: node.name, direction: crossed, previousY: startY },
+          moveNodeY,
+        );
+      }
+    }
+
+    prevDraggingRef.current = currentDragging;
+  }, [dragOffsets, nodePositions, nodes, onEntityCrossLine, moveNodeY, crystallizedEntityIds]);
+
   /** Convert client-space coords to SVG world coords */
   const clientToSvg = useCallback(
     (clientX: number, clientY: number) => {
@@ -549,7 +761,7 @@ export default function RelationsCanvas({
       const svgY = viewBox.y + (mouseY / rect.height) * viewBox.height;
 
       const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
-      const newZoom = Math.max(0.666, Math.min(5, zoom * zoomFactor));
+      const newZoom = Math.max(0.08, Math.min(1.5, zoom * zoomFactor));
 
       if (newZoom !== zoom) {
         const scaleFactor = newZoom / zoom;
@@ -692,9 +904,30 @@ export default function RelationsCanvas({
     };
 
     const inventoryItems: InventoryItem[] = (node.characterData as Record<string, unknown>)?.inventory as InventoryItem[] || [];
+    const isShimmering = shimmeringNodes.has(node.id);
+    // Direction-aware backlight: Red = going up (crystallizing), Blue = going down (dissolving)
+    const preDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
+    const hasCrossed = preDragY !== undefined && ((preDragY > 0 && visualY <= 0) || (preDragY <= 0 && visualY > 0));
+    const glowColor = hasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#7050A8';
+    const showGlow = hasCrossed || isShimmering;
+    const glowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
     return (
       <g key={`card-group-${node.id}`}>
+        {/* Soft pulsing backlight glow when card has crossed the KRMA line */}
+        {showGlow && (
+          <rect
+            x={visualX - cardWidth / 2 - 30}
+            y={visualY - cardHeight / 2 - 30}
+            width={cardWidth + 60}
+            height={cardHeight + 60}
+            rx={20}
+            fill={glowColor}
+            stroke="none"
+            filter="url(#cardBacklight)"
+            opacity={glowPulse}
+          />
+        )}
         <foreignObject
           key={`card-${node.id}`}
           x={visualX - cardWidth / 2}
@@ -747,7 +980,7 @@ export default function RelationsCanvas({
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           const offset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
           const tetherEndX = anchorX + offset.x;
-          const tetherEndY = anchorY + offset.y + 20;
+          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY);
           return (
             <>
               <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
@@ -766,7 +999,7 @@ export default function RelationsCanvas({
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
           const tetherEndX = anchorX + offset.x;
-          const tetherEndY = anchorY + offset.y + 20;
+          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY);
           return (
             <React.Fragment key={`tether-${node.id}-${panelKey}`}>
               <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
@@ -793,7 +1026,7 @@ export default function RelationsCanvas({
             const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
             const invOffset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
             const panelCenterX = anchorX + invOffset.x;
-            const panelTopY = anchorY + invOffset.y;
+            const panelTopY = clampPanelY(anchorY + invOffset.y, visualY);
             const panelW = 413;
 
             return (
@@ -824,12 +1057,17 @@ export default function RelationsCanvas({
                     };
 
                     const startSVG = screenToSVG(e.clientX, e.clientY);
-                    const startOffset = { ...invOffset };
+                    // Use clamped offset as start so drag begins from visual position
+                    const startOffset = { x: invOffset.x, y: clampOffsetY(invOffset.y, anchorY, visualY) };
 
                     const onMove = (me: MouseEvent) => {
                       const cur = screenToSVG(me.clientX, me.clientY);
+
                       let dx = startOffset.x + (cur.x - startSVG.x);
                       let dy = startOffset.y + (cur.y - startSVG.y);
+
+                      // Clamp offset so panel position stays on the right side of the line
+                      dy = clampOffsetY(dy, anchorY, visualY);
 
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       if (dist > MAX_TETHER_DISTANCE) {
@@ -876,7 +1114,7 @@ export default function RelationsCanvas({
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
           const panelCenterX = anchorX + offset.x;
-          const panelTopY = anchorY + offset.y;
+          const panelTopY = clampPanelY(anchorY + offset.y, visualY);
           const panelW = 440;
           const tetherEndX = panelCenterX;
           const tetherEndY = panelTopY + 20;
@@ -970,12 +1208,17 @@ export default function RelationsCanvas({
                     };
 
                     const startSVG = screenToSVG(e.clientX, e.clientY);
-                    const startOffset = { ...offset };
+                    // Use clamped offset as start so drag begins from visual position
+                    const startOffset = { x: offset.x, y: clampOffsetY(offset.y, anchorY, visualY) };
 
                     const onMove = (me: MouseEvent) => {
                       const cur = screenToSVG(me.clientX, me.clientY);
+
                       let dx = startOffset.x + (cur.x - startSVG.x);
                       let dy = startOffset.y + (cur.y - startSVG.y);
+
+                      // Clamp offset so panel position stays on the right side of the line
+                      dy = clampOffsetY(dy, anchorY, visualY);
 
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       if (dist > MAX_TETHER_DISTANCE) {
@@ -1061,6 +1304,23 @@ export default function RelationsCanvas({
             </feMerge>
           </filter>
 
+          {/* Crystallization shimmer */}
+          <filter id="crystallizeShimmer" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+            <feColorMatrix in="blur" type="matrix" values="0.5 0 0.5 0 0.2  0 0.2 0.5 0 0  0.5 0 1 0 0.3  0 0 0 0.8 0" result="purple" />
+            <feGaussianBlur in="purple" stdDeviation="12" result="outerGlow" />
+            <feMerge>
+              <feMergeNode in="outerGlow" />
+              <feMergeNode in="purple" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          {/* Soft backlight glow for drag direction */}
+          <filter id="cardBacklight" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="18" />
+          </filter>
+
           {/* KRMA Line glow (intense) */}
           <filter id="krmaLineGlow" x="-100%" y="-100%" width="300%" height="300%">
             <feGaussianBlur stdDeviation="8" result="coloredBlur" />
@@ -1120,7 +1380,8 @@ export default function RelationsCanvas({
               const waveOffset =
                 Math.sin(animationTime * 0.8 + x * 0.001) * 3 +
                 Math.sin(animationTime * 1.2 + x * 0.0015) * 2;
-              segments.push(`${x},${waveOffset}`);
+              const deflection = getLineDeflection(x, animationTime);
+              segments.push(`${x},${waveOffset + deflection}`);
             }
 
             const pathData = `M ${segments.join(" L ")}`;
@@ -1418,8 +1679,28 @@ export default function RelationsCanvas({
             const offset = dragOffsets.get(node.id) || { x: 0, y: 0 };
             const visualX = position.x + offset.x;
             const visualY = position.y + offset.y;
+            const isShimmering = shimmeringNodes.has(node.id);
+            const locPreDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
+            const locHasCrossed = locPreDragY !== undefined && ((locPreDragY > 0 && visualY <= 0) || (locPreDragY <= 0 && visualY > 0));
+            const locGlowColor = locHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#7050A8';
+            const locShowGlow = locHasCrossed || isShimmering;
+            const locGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
             return (
+              <g key={`loc-group-${node.id}`}>
+              {locShowGlow && (
+                <rect
+                  x={visualX - cardWidth / 2 - 25}
+                  y={visualY - cardHeight / 2 - 25}
+                  width={cardWidth + 50}
+                  height={cardHeight + 50}
+                  rx={16}
+                  fill={locGlowColor}
+                  stroke="none"
+                  filter="url(#cardBacklight)"
+                  opacity={locGlowPulse}
+                />
+              )}
               <foreignObject
                 key={`loc-${node.id}`}
                 x={visualX - cardWidth / 2}
@@ -1465,6 +1746,7 @@ export default function RelationsCanvas({
                   />
                 </div>
               </foreignObject>
+              </g>
             );
           })}
 
@@ -1491,8 +1773,28 @@ export default function RelationsCanvas({
             const offset = dragOffsets.get(node.id) || { x: 0, y: 0 };
             const visualX = position.x + offset.x;
             const visualY = position.y + offset.y;
+            const isShimmering = shimmeringNodes.has(node.id);
+            const itemPreDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
+            const itemHasCrossed = itemPreDragY !== undefined && ((itemPreDragY > 0 && visualY <= 0) || (itemPreDragY <= 0 && visualY > 0));
+            const itemGlowColor = itemHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#7050A8';
+            const itemShowGlow = itemHasCrossed || isShimmering;
+            const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
             return (
+              <g key={`item-group-${node.id}`}>
+              {itemShowGlow && (
+                <rect
+                  x={visualX - cardWidth / 2 - 25}
+                  y={visualY - cardHeight / 2 - 25}
+                  width={cardWidth + 50}
+                  height={cardHeight + 50}
+                  rx={16}
+                  fill={itemGlowColor}
+                  stroke="none"
+                  filter="url(#cardBacklight)"
+                  opacity={itemGlowPulse}
+                />
+              )}
               <foreignObject
                 key={`item-${node.id}`}
                 x={visualX - cardWidth / 2}
@@ -1540,6 +1842,7 @@ export default function RelationsCanvas({
                   />
                 </div>
               </foreignObject>
+              </g>
             );
           })}
 
