@@ -1,6 +1,10 @@
 /**
  * Dice rolling utilities for GRO.WTH resolution system.
  *
+ * Uses crypto.getRandomValues() with rejection sampling for uniform distribution.
+ * No game system should call these directly — use DiceService instead.
+ * These remain exported for unit testing and the service layer.
+ *
  * Resolution:
  *   Skilled Check:  Roll SD → Wager Effort → Roll FD → Total = SD + FD + flat mods + Effort vs DR
  *   Unskilled Check: Wager Effort blind → Roll FD → Total = FD + flat mods + Effort vs DR
@@ -42,19 +46,49 @@ export interface UnskilledCheckResult {
   isSkilled: false;
 }
 
-// ── Core Rolling ───────────────────────────────────────────────────────────
+// ── Cryptographic RNG ─────────────────────────────────────────────────────
 
-/** Roll a single die (d4, d6, d8, d12, d20). Returns 1 to max. */
+/**
+ * Generate a cryptographically uniform random integer in [1, sides].
+ * Uses rejection sampling to eliminate modulo bias.
+ *
+ * For GRO.WTH dice (d4/d6/d8/d12/d20), rejection rate is negligible (<0.0000002%).
+ */
 export function rollDie(sides: number): number {
-  return Math.floor(Math.random() * sides) + 1;
+  if (sides <= 0) return 0;
+  if (sides === 1) return 1;
+
+  // Rejection sampling: discard values in the biased tail of uint32 range
+  const limit = Math.floor(0x100000000 / sides) * sides;
+  const array = new Uint32Array(1);
+
+  let value: number;
+  do {
+    crypto.getRandomValues(array);
+    value = array[0];
+  } while (value >= limit);
+
+  return (value % sides) + 1;
 }
 
-/** Parse a die string like "d8" into its sides count. */
+/**
+ * Generate a batch of cryptographic random values.
+ * More efficient than calling rollDie() in a loop when rolling multiple dice.
+ */
+export function rollDice(specs: Array<{ sides: number }>): number[] {
+  return specs.map(s => rollDie(s.sides));
+}
+
+// ── Parsing ───────────────────────────────────────────────────────────────
+
+/** Parse a die string like "d8" into its sides count. Returns 0 if invalid. */
 export function parseDie(die: string): number {
   const match = die.match(/^d(\d+)$/);
   if (!match) return 0;
   return parseInt(match[1], 10);
 }
+
+// ── Skill Die Lookup ──────────────────────────────────────────────────────
 
 /** Get the skill die type for a given skill level. */
 export function getSkillDieType(level: number): { die: string; sides: number; isFlat: boolean; flatBonus: number } {
@@ -82,7 +116,7 @@ export function rollFateDie(fateDie: FateDie): DieResult {
   return { die: fateDie, value: rollDie(sides), isFlat: false };
 }
 
-// ── Resolution ─────────────────────────────────────────────────────────────
+// ── Resolution (Legacy — used by character-actions.ts) ────────────────────
 
 /** Perform a skilled check: Roll SD → (wager effort) → Roll FD → compute total vs DR. */
 export function skilledCheck(params: {

@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GROvines)
+Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 
 ## Services (Business Logic)
 
@@ -17,6 +17,13 @@ Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GRO
 | LocationService | `services/location.ts` | Location CRUD (settlement/wilderness/dungeon/building/POI/region), GM-only create/update/delete, Zod validation | Prisma, permissions |
 | CampaignItemService | `services/campaign-item.ts` | World item CRUD (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), holder/location assignment, GM-only | Prisma, permissions |
 | EncounterService | `services/encounter.ts` | Encounter CRUD (combat/social/exploration/puzzle/event), round/phase tracking, GM-only | Prisma, permissions |
+| KRMA Ledger | `services/krma/ledger.ts` | Core transaction engine — ALL KRMA mutations. Append-only, checksummed, idempotent, atomic. Single/batch execution. | Prisma, krma types |
+| KRMA Wallet | `services/krma/wallet.ts` | Wallet CRUD (user/campaign/character/system), fund/defund campaigns, transaction history, global metrics | Prisma, ledger, permissions |
+| KRMA Evaluator | `services/krma/evaluator.ts` | Deterministic KV calculator (TKV breakdown by pillar, skills, WTH, traits). Death split calculator (component-level routing by pillar/governor). Versioned + hashable. | krma types, growth types |
+| KRMA Death Split | `services/krma/death-split.ts` | Orchestrates multi-transaction death process: Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch. | ledger, wallet, evaluator |
+| KRMA Reconciliation | `services/krma/reconciliation.ts` | Balance reconciliation, global supply invariant check, checksum chain verification, full audit | Prisma, ledger |
+| DiceService | `services/dice.ts` | Single entry point for all dice rolling. Skilled/unskilled checks, death saves, fear checks, contested rolls, quick rolls, custom rolls. Integrates crypto RNG, Godhead injection, event bus | dice lib, dice-events, dice-injection |
+| DiceInjectionRegistry | `services/dice-injection.ts` | Godhead override system. Register/remove/apply injections that silently modify die results. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp, hidden modifier. Audit-logged | dice types |
 
 ## Infrastructure (lib/)
 
@@ -29,9 +36,10 @@ Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GRO
 | API Utils | `lib/api.ts` | Error-to-HTTP-response conversion |
 | Defaults | `lib/defaults.ts` | Default GrowthCharacter factory |
 | ChangeLog Utils | `lib/changelog-utils.ts` | Pure diff/summary utilities: diffObjects (deep object comparison), inferCategory (maps changed fields to changelog categories), summarizeChanges (generates human-readable descriptions from FieldChange arrays) |
-| Dice | `lib/dice.ts` | Pure dice rolling utilities: rollDie, rollSkillDie, rollFateDie, skilledCheck, unskilledCheck. Implements GRO.WTH resolution system (SD + FD + Effort vs DR) |
+| Dice | `lib/dice.ts` | Crypto-RNG dice primitives: rollDie (rejection sampling), rollDice (batch), rollSkillDie, rollFateDie, skilledCheck, unskilledCheck. Uses crypto.getRandomValues() for uniform distribution |
+| Dice Events | `lib/dice-events.ts` | Pub/sub event bus for roll results. Subscribers: terminal log, 3D overlay, roll history. DiceService emits after every roll |
 | Character Actions | `lib/character-actions.ts` | Pure functions for character state mutations: attribute CRUD (update/spend/restore/setLevel), skill CRUD (add/remove/updateLevel/update with governors), performSkillCheck (rolls dice + spends effort). Returns { character, changes[] } for audit trail |
-| Terminal Commands | `lib/terminal-commands.ts` | Command parser + executor for Campaign Terminal: /roll, /spend, /restore, /session. Calls character-actions.ts functions |
+| Terminal Commands | `lib/terminal-commands.ts` | Command parser + executor for Campaign Terminal: /roll, /check, /deathsave, /spend, /restore, /session, /inject. /check and /deathsave use DiceService, /inject manages Godhead overrides |
 
 ## Components
 
@@ -55,6 +63,7 @@ Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GRO
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |
 | Auth | AuthForm, RedeemCode | Login/register with access code, post-registration upgrade |
+| 3D Dice | DiceOverlay, DiceOverlayLoader, DiceAnimator, DiceScene, DicePhysics, DiceMesh, DiceTextureAtlas, DiceResultBar, DiceToggle | Full 3D dice rolling visualization. Three.js + Cannon-es physics. Lazy-loaded via next/dynamic. Mounted in root layout. Auto-subscribes to DiceService events. Snap-to-result after physics settle. Death save dramatic effects. Skip/Escape to dismiss. Toggle ON/OFF via localStorage |
 | UI | ComplexTooltip | 500ms lock-on-hover tooltip with nested tooltip support via createPortal |
 | UI | ConfirmDialog, Modal | Reusable dialog/modal primitives |
 | Branding | GrowthLogo | Canonical logo rendering, scalable via `scale` prop. DO NOT modify without Mike's approval |
@@ -65,10 +74,19 @@ Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GRO
 | File | Contents |
 |------|----------|
 | `types/growth.ts` | GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthLevels, GrowthCreation, GrowthSkill (with SkillGovernor[], no categories/combat flag), GrowthMagic, GrowthTrait, GROvine, GrowthFear, GrowthVitals, GrowthInventory, SKILL_GOVERNORS, PILLARS constant |
+| `types/krma.ts` | WalletType, KrmaState, ActorType, TransactionReason (30+ codes), genesis constants (supply, distribution, burn cap), KV evaluator constants, pillar classification helpers, TKVBreakdown, DeathSplitManifest, WalletSummary, TransactionRecord, ReconciliationReport |
 | `types/changelog.ts` | ChangeActor (player, gm, ai_copilot, system), ChangeCategory, FieldChange (field/oldValue/newValue), ChangeLogEntry (full DB record type), query/create/revert input types |
 | `types/terminal.ts` | TerminalEvent (unified event type), TerminalEventType, TerminalPayload (discriminated union), payload types (ChangeLogPayload, DiceRollPayload, ChatPayload, CommandPayload, AIMessagePayload, GameEventPayload), GameSessionInfo, TerminalFilter |
+| `types/dice.ts` | DieType, DieColor, RollSource (discriminated union — 10 source types), DieSpec, RollRequest, DieOutcome, RollResult, ContestedRollResult, InjectionFilter, InjectionOverride, DiceInjection, legacy compat types |
 
-## API Routes (32 total)
+## Hooks
+
+| Hook | File | Purpose |
+|------|------|---------|
+| useDiceEvents | `hooks/useDiceEvents.ts` | Subscribe to dice roll events from DiceService event bus |
+| useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
+
+## API Routes (36 total)
 
 | Route | Methods | Service |
 |-------|---------|---------|
@@ -92,3 +110,15 @@ Last updated: 2026-03-09 (Skeleton Systems — Locations, Items, Encounters, GRO
 | /api/campaigns/[id]/forge/[itemId]/publish | POST, DELETE | ForgeService (publish/unpublish forge item, GM-only) |
 | /api/campaigns/[id]/requests | GET, POST | ForgeService (list + create player requests, players see own only) |
 | /api/campaigns/[id]/requests/[requestId] | PATCH | ForgeService (player edit or GM resolve with approve/deny/modify) |
+| /api/krma/wallets/me | GET | KRMA Wallet (authenticated user's wallet balance) |
+| /api/krma/wallets/me/transactions | GET | KRMA Wallet (paginated transaction history, filterable by reason) |
+| /api/krma/campaigns/[id]/balance | GET | KRMA Wallet (campaign wallet balance, GM-only) |
+| /api/krma/campaigns/[id]/fund | POST | KRMA Wallet (GM funds campaign from personal wallet) |
+| /api/krma/campaigns/[id]/defund | POST | KRMA Wallet (GM withdraws from campaign to personal wallet) |
+| /api/krma/campaigns/[id]/transactions | GET | KRMA Wallet (campaign transaction history, GM-only) |
+| /api/krma/campaigns/[id]/economy | GET | KRMA Wallet (campaign fluid/crystallized/total breakdown, GM-only) |
+| /api/krma/metrics | GET | KRMA Wallet (global KRMA metrics, Admin-only) |
+| /api/krma/audit/verify | POST | KRMA Reconciliation (full ledger audit, Admin-only) |
+| /api/dice/roll | POST | DiceService (quick roll — one or more dice, no DR/effort) |
+| /api/dice/check | POST | DiceService (full skill/unskilled check with DR, effort, modifiers) |
+| /api/dice/inject | GET, POST, DELETE | DiceInjection (Godhead-only — list/register/remove injections) |

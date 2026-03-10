@@ -46,14 +46,47 @@ QR code credentials from physical rulebook.
 - Optional `expiresAt` for time-limited codes
 
 ### Wallet
-KRMA currency holder. One per user + reserve wallets.
-- `ownerType`: USER | RESERVE
-- `label`: For reserve wallets ("Terminal", "Mercy", "Balance", "Severity")
-- Not yet implemented in app logic
+KRMA currency holder. Every unit of KRMA lives in exactly one wallet.
+- `walletType`: USER | RESERVE | CAMPAIGN | CHARACTER | BURN | LADY_DEATH
+- `ownerType`: Kept for backwards compat; `walletType` is canonical
+- `label`: Reserve: "Terminal","Mercy","Balance","Severity"; System: "Burn Sink","Lady Death"
+- `ownerId`: Unique per user (USER wallets)
+- `campaignId`: For CAMPAIGN wallets
+- `characterId`: For CHARACTER wallets
+- `frozen`: Admin hold flag
+- **Cardinality**: 4 RESERVE, 1 BURN, 1 LADY_DEATH, 1 per user, 1 per campaign, 1 per character
+- **Genesis**: 100B KRMA distributed to reserves (Terminal 75%, Balance 12.5%, Mercy 6.25%, Severity 6.25%)
 
 ### KrmaTransaction
-KRMA transfer record. Immutable ledger.
-- Not yet implemented in app logic
+Append-only KRMA transaction ledger. Immutable, checksummed, sequenced.
+- `sequenceNumber`: Global monotonic counter (unique, gap-free)
+- `fromWalletId` / `toWalletId`: Source and destination wallets
+- `amount`: BigInt, always positive
+- `state`: FLUID | LOCK | UNLOCK | BURN
+- `reason`: Transaction type code (30+ types, see `types/krma.ts`)
+- `description`: Human-readable explanation
+- `metadata`: JSON string containing context (characterId, campaignId, deathContext, kvBreakdown, etc.)
+- `actorId` / `actorType`: Who initiated (USER, SYSTEM, GM, EVALUATOR, GODHEAD)
+- `checksum`: SHA-256 hash chain link (tamper detection)
+- `idempotencyKey`: Unique, prevents duplicate transactions
+
+### LedgerSequence
+Singleton for atomic sequence number generation.
+- `id`: Always "singleton"
+- `current`: Current sequence number (BigInt)
+
+### BurnLedger
+Singleton tracking global KRMA burn total and hard cap.
+- `id`: Always "singleton"
+- `totalBurned`: BigInt
+- `cap`: 5,000,000,000 (5B hard cap)
+
+### AuditEntry
+Audit log for all attempted KRMA operations (including failures).
+- `actorId` / `actorType`: Who attempted
+- `action` / `targetType` / `targetId`: What was attempted
+- `outcome`: SUCCESS | DENIED | FAILED | ERROR
+- `reason` / `metadata`: Context
 
 ### ChangeLog
 Immutable record of every character data change. Supports timeline view, filtering, and revert.

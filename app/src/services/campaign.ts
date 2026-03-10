@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ConflictError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove, isAdminRole } from '@/lib/permissions';
+import { createCampaignWallet } from '@/services/krma/wallet';
 
 // --- Schemas ---
 
@@ -44,7 +45,7 @@ export async function createCampaign(userId: string, userRole: string, input: z.
   }
 
   const inviteCode = crypto.randomBytes(4).toString('hex');
-  return prisma.campaign.create({
+  const campaign = await prisma.campaign.create({
     data: {
       name: input.name,
       genre: input.genre,
@@ -55,6 +56,11 @@ export async function createCampaign(userId: string, userRole: string, input: z.
       inviteCode,
     },
   });
+
+  // Create KRMA wallet for the campaign
+  await createCampaignWallet(campaign.id);
+
+  return campaign;
 }
 
 export async function getCampaignDetail(campaignId: string, userId: string, userRole: string) {

@@ -215,10 +215,12 @@ Status: IN PROGRESS
 - [x] **Campaign Terminal** — Unified activity feed replacing ChangeLog overlay. Resizable bottom panel, session grouping (collapsible), filter toggles (All/Chat/Dice/Changes/Events), command input bar with history, auto-poll 5s. Design: `docs/campaign-terminal-design.md`
 - [x] **Game Sessions** — GM starts/ends sessions via `/session start [name]` and `/session end`. Events auto-assigned to active session. Collapsible session groups in terminal.
 - [x] **Dice roller** — Full resolution system: Skill Die (level-based d4→d20) + Fate Die + Effort vs DR. Pure functions in `lib/dice.ts`, integrated via `performSkillCheck()` in `character-actions.ts`. Rolls via `/roll` command or future UI buttons.
+- [x] **Dice engine upgrade (2026-03-09)** — Crypto RNG (rejection sampling), DiceService orchestrator, event bus, Godhead injection system, 3 new API routes, `/check` + `/deathsave` + `/inject` terminal commands.
+- [x] **3D dice visualization (2026-03-09)** — Three.js + Cannon-es physics simulation. Lazy-loaded overlay (portal to body). Pillar-colored dice, death save dramatic effects, snap-to-result after physics settle. DiceOverlayLoader in root layout, DiceToggle for user preference. 9 component files in `components/dice/`.
 - [x] **Effort spending** — `spendAttribute()` with overflow to Frequency, depletion conditions auto-triggered. Available via `/spend` command and UI attribute bars.
 - [x] **Skills CRUD** — Add/remove/level skills in SkillsCard sub-panel. `addSkill`, `removeSkill`, `updateSkillLevel` in `character-actions.ts`. All changes flow through changelog.
 - [x] **Chat system** — Plain text in terminal = chat message. Persisted to CampaignEvent table. Grouped by session. Fixed caching bug (force-dynamic + no-store).
-- [x] **Command system** — `/roll`, `/spend`, `/restore`, `/session` commands parsed client-side, execute via character-actions.ts, results posted to terminal.
+- [x] **Command system** — `/roll`, `/check`, `/deathsave`, `/spend`, `/restore`, `/session`, `/inject` commands parsed client-side, execute via character-actions.ts + DiceService, results posted to terminal.
 - [x] **Forge system (bones)** — ForgeItem + PlayerRequest models, ForgeService with CRUD + Zod validation, ForgePanel UI in campaign Forge tab. GM creates skill/item/nectar/blossom/thorn templates (draft→published), players submit requests. 6 API routes.
 - [x] **Skill system redesign** — Freeform skills with attribute governors (no categories/combat flag). Governor badges (pillar-colored), max output readout, player request flow from SkillsCard.
 - [ ] **Editable skills in SkillsCard** — Add/remove/level skills directly in the sub-panel, wire to character-actions + changelog
@@ -239,13 +241,31 @@ Status: IN PROGRESS
 **Ship condition**: Can run a combat encounter using the app
 
 ### Phase 4: KRMA Economy
-Status: NOT STARTED
+Status: CORE LEDGER COMPLETE
 
-- [ ] Reserve wallets (Terminal: 50M, Mercy: 20M, Balance: 20M, Severity: 10M)
-- [ ] GM KRMA allocation on account creation
-- [ ] KRMA earning/spending during sessions
-- [ ] TKV calculation from character data
-- [ ] Transaction history view
+- [x] Reserve wallets (Terminal: 75B, Balance: 12.5B, Mercy: 6.25B, Severity: 6.25B) — genesis seeded
+- [x] Wallet system (USER, CAMPAIGN, CHARACTER, BURN, LADY_DEATH types)
+- [x] Append-only transaction ledger with SHA-256 checksum chain
+- [x] Idempotent transactions, atomic single + batch execution
+- [x] TKV calculation from character data (deterministic evaluator, versioned)
+- [x] Death split engine (component-level: Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death)
+- [x] Campaign fund/defund from GM personal wallet
+- [x] Transaction history API (paginated, filterable)
+- [x] Global metrics API (Godhead-only)
+- [x] Full audit/reconciliation system (balance check + global invariant + chain verification)
+- [x] Design document: docs/KRMA-SYSTEM-DESIGN.md
+- [ ] GM KRMA allocation via subscription (bell-curve, values TBD)
+- [ ] KRMA earning/spending during sessions (session reward API)
+- [ ] Character investment on approval (CHARACTER_INVEST transaction)
+- [ ] Burn system (exponential cost formula TBD)
+- [x] UI: KRMA readouts on all 3 interfaces (canvas header, watcher console, terminal admin)
+  - Canonical display: gold gradient bar + Bebas Neue + Inknut Antiqua Ҝ + purple/red squares with `]`
+  - Canvas header: total/fluid/crystallized (GM-only, 30s polling)
+  - Watcher console: total/self/camp with per-campaign breakdown
+  - Terminal admin: total/circ/burn with reserve breakdown
+  - Campaign economy API: `GET /api/krma/campaigns/[id]/economy`
+- [ ] UI: transaction history view
+- [ ] Integration: character approval → wallet creation + KRMA investment
 
 **Ship condition**: KRMA flows correctly through the system during gameplay
 
@@ -381,6 +401,43 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - Docs updated: database_schema.md, module_registry.md, system_map.md
 - 28 routes total, all compiling clean
 - **Next**: Editable skills in SkillsCard (add/remove/level), dice roller tied to skill checks, traits (Blossoms/Thorns/Nectars)
+
+### 2026-03-09: Dice System Engine (Phase 1)
+- **Crypto RNG**: `lib/dice.ts` upgraded from `Math.random()` to `crypto.getRandomValues()` with rejection sampling for zero modulo bias. Same API, cryptographically uniform.
+- **DiceService** (`services/dice.ts`): Single entry point for all dice rolling. Methods: `skilledCheck`, `unskilledCheck`, `deathSave`, `quickRoll`, `quickRollMultiple`, `fearCheck`, `contestedRoll`, `customRoll`. Every game system calls this — never `rollDie()` directly.
+- **Godhead injection** (`services/dice-injection.ts`): Silent result override system. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp min/max, hidden modifier, set total. One-shot + expiring injections. Audit-logged.
+- **Event bus** (`lib/dice-events.ts`): Pub/sub for roll results. Terminal log + future 3D overlay subscribe independently.
+- **React hooks** (`hooks/useDiceEvents.ts`): `useDiceEvents` (subscribe to rolls), `useDiceQueue` (queue for sequential animation).
+- **Types** (`types/dice.ts`): RollRequest, RollResult, DieOutcome, RollSource (10 source types), injection types, backward compat types.
+- **Terminal commands**: Added `/check` (full skill check via DiceService), `/deathsave` (FD + Health Level), `/inject` (list/clear/remove/ensure-success/ensure-failure/set). `/roll` updated to support multi-die quick rolls.
+- **API routes** (3 new): `POST /api/dice/roll`, `POST /api/dice/check`, `GET/POST/DELETE /api/dice/inject`
+- **Design doc**: `docs/DICE-SYSTEM-PLAN.md` — full plan including Phase 2 (3D Three.js + Cannon-es visualization), Phase 3 (polish), Phase 4 (AI Oracle).
+- 36 routes total, all compiling clean
+
+**3D Dice Visualization (same session):**
+- **Three.js + Cannon-es**: Installed as dependencies (~195KB gzipped combined)
+- **DiceScene** (`components/dice/DiceScene.ts`): Camera, lights (warm directional + teal fill), dark floor with grid, shadow mapping, ACESFilmic tone mapping
+- **DiceMesh** (`components/dice/DiceMesh.ts`): Factory for d4/d6/d8/d12/d20 geometries with face-to-value rotation mappings
+- **DiceTextureAtlas** (`components/dice/DiceTextureAtlas.ts`): Canvas-rendered number textures with pillar-colored backgrounds, glow effects, 6/9 underlines. Cached per value+color combo
+- **DicePhysics** (`components/dice/DicePhysics.ts`): Cannon-es world with floor + 4 walls, sphere-approximated dice bodies, throw forces, settle detection (velocity threshold × 30 frames)
+- **DiceAnimator** (`components/dice/DiceAnimator.ts`): Orchestrates spawn → throw → physics → settle → snap-to-result (300ms ease-out slerp). Skip support
+- **DiceOverlay** (`components/dice/DiceOverlay.tsx`): Full-screen portal, subscribes to dice event queue, processes one roll at a time. Backdrop with death save red pulse. Auto-dismiss 3s. Escape/Space/click to skip
+- **DiceResultBar** (`components/dice/DiceResultBar.tsx`): Bottom bar showing SD + FD + effort breakdown, total vs DR, success/failure badge with margin
+- **DiceOverlayLoader** (`components/dice/DiceOverlayLoader.tsx`): `next/dynamic` lazy loader (SSR: false). Mounted once in root layout
+- **DiceToggle** (`components/dice/DiceToggle.tsx`): ON/OFF button for 3D dice (localStorage preference)
+- Full `next build` passes clean
+- **Next**: Continue with other Phase 3 items (traits, damage tracking, rest recovery)
+
+### 2026-03-09: KRMA UI Wiring
+- **Campaign economy API**: `GET /api/krma/campaigns/[id]/economy` — returns fluid/crystallized/total + character breakdown. GM-only (canManageCampaign). Auto-creates campaign wallet for pre-KRMA campaigns.
+- **Canvas header KRMA readout**: Gold gradient bar + Bebas Neue total + Inknut Antiqua Ҝ + purple (fluid) + red (crystallized) squares with `]`. 30s polling. GM-only.
+- **Watcher console KRMA**: Same gold bar pattern showing total controlled KRMA (personal + campaigns), SELF/CAMP breakdown, per-campaign rows.
+- **Terminal admin KRMA**: Global metrics with CIRC/BURN squares, reserve wallet breakdown.
+- **Canonical KRMA display pattern**: Gold gradient bg (#D4A830→#E8C848→#D4A830), Bebas Neue numbers (#582a72 text), Inknut Antiqua Ҝ (weight 900), Consolas for sub-values. Applied consistently across all interfaces.
+- **Inknut Antiqua font**: Added to root layout (Google Fonts, latin + latin-ext, weights 400-900) with CSS variable `--font-inknut-antiqua`.
+- **Terminal gate fix**: Changed from `GODHEAD || ADMIN` to ADMIN-only.
+- **Bug fix**: Prisma client cache invalidation — `.next` cache had stale client missing new Wallet fields. Required `rm -rf .next` + `npx prisma generate`.
+- 36 routes total, all compiling clean
 
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?

@@ -9,6 +9,10 @@ import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthLocation } from '@/types/location';
 import type { GrowthWorldItem } from '@/types/item';
 
+function formatKrma(value: string): string {
+  return Number(value).toLocaleString();
+}
+
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
 const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr: false });
@@ -58,6 +62,12 @@ type Tab = 'relations' | 'forge' | 'encounters' | 'essence';
 const MIN_TERMINAL_HEIGHT = 150;
 const MAX_TERMINAL_FRACTION = 0.8;
 
+interface CampaignEconomyData {
+  fluid: string;
+  crystallized: string;
+  total: string;
+}
+
 export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('relations');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -65,6 +75,30 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
   const router = useRouter();
+
+  // KRMA economy data (GM / Admin)
+  const isGM = userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD';
+  const [economy, setEconomy] = useState<CampaignEconomyData | null>(null);
+
+  useEffect(() => {
+    if (!isGM) return;
+    let cancelled = false;
+
+    async function fetchEconomy() {
+      try {
+        const res = await fetch(`/api/krma/campaigns/${campaign.id}/economy`);
+        if (!res.ok) return;
+        if (!cancelled) {
+          const data = await res.json();
+          setEconomy({ fluid: data.fluid, crystallized: data.crystallized, total: data.total });
+        }
+      } catch { /* silent */ }
+    }
+
+    fetchEconomy();
+    const interval = setInterval(fetchEconomy, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isGM, campaign.id]);
 
   // Resizable terminal height — persisted per campaign
   const storageKey = `terminal-height-${campaign.id}`;
@@ -316,8 +350,47 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             ))}
           </div>
 
-          {/* Right: invite code */}
-          <div className="text-right">
+          {/* Right: KRMA readout + invite code */}
+          <div className="text-right flex items-center gap-4">
+            {isGM && economy && (
+              <div className="flex items-center gap-0">
+                {/* Gold KRMA bar — purple text */}
+                <div
+                  className="px-5 py-2 flex items-center gap-3"
+                  style={{ background: 'linear-gradient(90deg, #D4A830, #E8C848, #D4A830)' }}
+                >
+                  <span
+                    className="uppercase leading-none"
+                    style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: '#582a72', fontWeight: 'bold', letterSpacing: '-0.01em' }}
+                  >
+                    {formatKrma(economy.total)}
+                  </span>
+                  <span className="leading-none" style={{ fontSize: '28px', color: '#582a72', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                    <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '22px', fontWeight: 900 }}>Ҝ</span>
+                    <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
+                  </span>
+                </div>
+                {/* Purple box — fluid */}
+                <div
+                  className="h-16 min-w-16 px-3 flex flex-col items-center justify-center"
+                  style={{ background: '#582a72' }}
+                >
+                  <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.fluid)}</span>
+                  <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">FLD</span>
+                </div>
+                {/* Red box with ] */}
+                <div
+                  className="h-16 flex items-center"
+                  style={{ background: '#E8585A' }}
+                >
+                  <div className="flex flex-col items-center justify-center px-3">
+                    <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.crystallized)}</span>
+                    <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">CRY</span>
+                  </div>
+                  <span className="text-white font-bold font-[family-name:var(--font-terminal)] text-[32px] leading-none pr-1.5">]</span>
+                </div>
+              </div>
+            )}
             {campaign.inviteCode && (
               <div className="text-[10px] text-white/40 font-[family-name:var(--font-terminal)]">
                 Invite: <span className="text-[var(--accent-gold)]">{campaign.inviteCode}</span>

@@ -4,21 +4,29 @@ import { prisma } from '@/lib/db';
 import DashboardShell from '@/components/DashboardShell';
 import GlitchText from '@/components/GlitchText';
 import Link from 'next/link';
+import { getGlobalMetrics } from '@/services/krma/wallet';
+
+function formatKrma(n: bigint): string {
+  return Number(n).toLocaleString();
+}
 
 export default async function TerminalDashboard() {
   const session = await getSession();
   if (!session) redirect('/');
-  if (session.user.role !== 'GODHEAD' && session.user.role !== 'ADMIN') {
+  if (session.user.role !== 'ADMIN') {
     redirect('/trailblazer');
   }
 
-  const campaigns = await prisma.campaign.findMany({
-    include: {
-      gmUser: { select: { username: true } },
-      _count: { select: { characters: true, members: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [campaigns, krmaMetrics] = await Promise.all([
+    prisma.campaign.findMany({
+      include: {
+        gmUser: { select: { username: true } },
+        _count: { select: { characters: true, members: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getGlobalMetrics().catch(() => null),
+  ]);
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
@@ -48,7 +56,7 @@ export default async function TerminalDashboard() {
         {/* Main grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* System Health panel */}
+          {/* System Health + KRMA panel */}
           <div className="bg-white/60 border border-[var(--surface-dark)]/15 relative overflow-hidden">
             <div className="bg-[var(--surface-dark)] px-4 py-1.5 flex items-center justify-between">
               <span className="text-[var(--accent-gold)] text-xs font-[family-name:var(--font-header)] uppercase tracking-[0.15em]">
@@ -57,22 +65,69 @@ export default async function TerminalDashboard() {
               <span className="text-[var(--accent-teal)]/50 text-[8px] font-[family-name:var(--font-terminal)]">LIVE</span>
             </div>
             <div className="p-4 space-y-3 stream-scan">
+              {/* KRMA hero readout */}
+              {krmaMetrics && (
+                <div className="flex items-center gap-0 mb-3">
+                  <div
+                    className="px-4 py-1.5 flex items-center gap-2"
+                    style={{ background: 'linear-gradient(90deg, #D4A830, #E8C848, #D4A830)' }}
+                  >
+                    <span
+                      className="uppercase leading-none"
+                      style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '24px', color: '#582a72', fontWeight: 'bold', letterSpacing: '-0.01em' }}
+                    >
+                      {formatKrma(krmaMetrics.totalInReserves + krmaMetrics.totalCirculation)}
+                    </span>
+                    <span className="leading-none" style={{ fontSize: '20px', color: '#582a72', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                      <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '16px', fontWeight: 900 }}>Ҝ</span>
+                      <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
+                    </span>
+                  </div>
+                  <div
+                    className="h-[40px] min-w-[40px] px-2 flex flex-col items-center justify-center"
+                    style={{ background: '#582a72' }}
+                  >
+                    <span className="text-white text-[11px] font-bold whitespace-nowrap" style={{ fontFamily: 'Consolas, monospace' }}>{formatKrma(krmaMetrics.totalCirculation)}</span>
+                    <span className="text-white/50 text-[6px] tracking-[0.1em]" style={{ fontFamily: 'Consolas, monospace' }}>CIRC</span>
+                  </div>
+                  <div
+                    className="h-[40px] flex items-center"
+                    style={{ background: '#E8585A' }}
+                  >
+                    <div className="flex flex-col items-center justify-center px-2">
+                      <span className="text-white text-[11px] font-bold whitespace-nowrap" style={{ fontFamily: 'Consolas, monospace' }}>{formatKrma(krmaMetrics.totalBurned)}</span>
+                      <span className="text-white/50 text-[6px] tracking-[0.1em]" style={{ fontFamily: 'Consolas, monospace' }}>BURN</span>
+                    </div>
+                    <span className="text-white font-bold text-[22px] leading-none pr-1" style={{ fontFamily: 'Consolas, monospace' }}>]</span>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-[var(--surface-dark)] text-xs font-[family-name:var(--font-terminal)]">Pattern Stability</span>
                 <span className="highlight-bar text-[var(--accent-teal)] text-xs px-2 py-0.5">50.1%</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[var(--surface-dark)] text-xs font-[family-name:var(--font-terminal)]">Active Sessions</span>
-                <span className="highlight-bar text-white text-xs px-2 py-0.5">1</span>
+                <span className="text-[var(--surface-dark)] text-xs font-[family-name:var(--font-terminal)]">Transactions</span>
+                <span className="highlight-bar text-white text-xs px-2 py-0.5">{krmaMetrics?.totalTransactions ?? 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[var(--surface-dark)] text-xs font-[family-name:var(--font-terminal)]">Reality Anchor</span>
-                <span className="text-[var(--pillar-spirit)] text-xs font-[family-name:var(--font-terminal)] bg-[var(--pillar-spirit)]/10 px-2 py-0.5">ESTABLISHED</span>
+                <span className="text-[var(--surface-dark)] text-xs font-[family-name:var(--font-terminal)]">Wallets</span>
+                <span className="text-[var(--pillar-spirit)] text-xs font-[family-name:var(--font-terminal)] bg-[var(--pillar-spirit)]/10 px-2 py-0.5">{krmaMetrics?.totalWallets ?? 0}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[var(--surface-dark)] text-xs font-[family-name:var(--font-terminal)]">KRMA Reserve</span>
-                <span className="text-[var(--accent-gold)] text-xs font-[family-name:var(--font-terminal)] bg-[var(--accent-gold)]/10 px-2 py-0.5">&#8734;</span>
-              </div>
+              {krmaMetrics && (
+                <div className="border-t border-dashed border-[var(--surface-dark)]/15 pt-2 space-y-1.5">
+                  {krmaMetrics.reserves.map(r => (
+                    <div key={r.label} className="flex items-center gap-0" style={{ marginBottom: '2px' }}>
+                      <div className="px-1.5 py-0.5" style={{ background: 'rgba(208, 160, 48, 0.2)' }}>
+                        <span className="text-[var(--surface-dark)] text-[10px] font-bold" style={{ fontFamily: 'Consolas, monospace' }}>{formatKrma(r.balance)}</span>
+                      </div>
+                      <div className="px-1.5 py-0.5" style={{ background: 'rgba(88, 42, 114, 0.1)' }}>
+                        <span className="text-[var(--surface-dark)]/60 text-[10px]" style={{ fontFamily: 'Consolas, monospace' }}>{r.label}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

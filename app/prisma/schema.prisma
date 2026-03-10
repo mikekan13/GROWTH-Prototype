@@ -88,21 +88,72 @@ model CharacterBackstory {
 }
 
 model Wallet {
-  id        String  @id @default(cuid())
-  owner     User?   @relation(fields: [ownerId], references: [id])
-  ownerId   String? @unique
-  ownerType String  // USER, RESERVE
-  label     String? // For reserve wallets: "Terminal", "Mercy", "Balance", "Severity"
-  balance   BigInt  @default(0)
+  id           String  @id @default(cuid())
+  owner        User?   @relation(fields: [ownerId], references: [id])
+  ownerId      String? @unique
+  walletType   String  @default("USER")   // USER, RESERVE, CAMPAIGN, CHARACTER, BURN, LADY_DEATH
+  ownerType    String  @default("USER")   // Kept for backwards compat; walletType is canonical
+  label        String?                    // Reserve: "Terminal","Mercy","Balance","Severity"; System: "Burn Sink","Lady Death"
+  balance      BigInt  @default(0)
+  campaignId   String?                    // For CAMPAIGN wallets
+  characterId  String?                    // For CHARACTER wallets
+  frozen       Boolean @default(false)
+
+  @@index([walletType])
+  @@index([campaignId])
+  @@index([characterId])
 }
 
 model KrmaTransaction {
-  id           String   @id @default(cuid())
-  fromWalletId String
-  toWalletId   String
-  amount       BigInt
-  reason       String
-  createdAt    DateTime @default(now())
+  id              String   @id @default(cuid())
+  sequenceNumber  BigInt   @unique
+  fromWalletId    String
+  toWalletId      String
+  amount          BigInt
+  state           String                  // FLUID, LOCK, UNLOCK, BURN
+  reason          String                  // Transaction type code (e.g. CAMPAIGN_FUND)
+  description     String   @default("")   // Human-readable explanation
+  metadata        String   @default("{}") // JSON: TransactionMetadata
+  campaignId      String?                 // Campaign context if applicable
+  actorId         String                  // Who initiated
+  actorType       String   @default("SYSTEM") // USER, SYSTEM, GM, EVALUATOR, GODHEAD
+  checksum        String                  // SHA-256 chain link
+  idempotencyKey  String?  @unique        // Prevents duplicate transactions
+  createdAt       DateTime @default(now())
+
+  @@index([fromWalletId])
+  @@index([toWalletId])
+  @@index([campaignId, createdAt])
+  @@index([createdAt])
+  @@index([reason])
+}
+
+model LedgerSequence {
+  id      String @id @default("singleton")
+  current BigInt @default(0)
+}
+
+model BurnLedger {
+  id          String @id @default("singleton")
+  totalBurned BigInt @default(0)
+  cap         BigInt @default(5000000000)
+}
+
+model AuditEntry {
+  id         String   @id @default(cuid())
+  timestamp  DateTime @default(now())
+  actorId    String
+  actorType  String
+  action     String
+  targetType String
+  targetId   String
+  outcome    String   // SUCCESS, DENIED, FAILED, ERROR
+  reason     String   @default("")
+  metadata   String   @default("{}")
+
+  @@index([actorId])
+  @@index([targetId])
+  @@index([timestamp])
 }
 
 model Session {

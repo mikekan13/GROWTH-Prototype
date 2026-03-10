@@ -65,7 +65,7 @@ export async function registerUser(input: z.infer<typeof registerSchema>) {
     });
 
     await tx.wallet.create({
-      data: { ownerId: newUser.id, ownerType: 'USER', balance: 0 },
+      data: { ownerId: newUser.id, walletType: 'USER', ownerType: 'USER', balance: 0 },
     });
 
     if (accessCodeId) {

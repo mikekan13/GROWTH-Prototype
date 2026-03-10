@@ -44,3 +44,17 @@ export class ConflictError extends AppError {
     this.name = 'ConflictError';
   }
 }
+
+export class InsufficientBalanceError extends AppError {
+  constructor(message: string = 'Insufficient KRMA balance') {
+    super(message, 422);
+    this.name = 'InsufficientBalanceError';
+  }
+}
+
+export class LedgerIntegrityError extends AppError {
+  constructor(message: string = 'Ledger integrity violation') {
+    super(message, 500);
+    this.name = 'LedgerIntegrityError';
+  }
+}
