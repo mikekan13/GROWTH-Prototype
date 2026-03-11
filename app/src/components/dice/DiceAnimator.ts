@@ -38,8 +38,8 @@ export interface SettledDie {
 export type SettleSource = 'physical' | 'service';
 
 export interface AnimatorCallbacks {
-  /** Called when dice are thrown (flung or spawned) — trigger server roll here */
-  onThrow: (dice: Array<{ dieType: DieType; color: DieColor }>) => void;
+  /** Called when dice are thrown (flung or spawned) — trigger server roll here. throwId ties the response back to the correct dice. */
+  onThrow: (dice: Array<{ dieType: DieType; color: DieColor }>, throwId: number) => void;
   /** Called when all dice have settled and revealed their server-authoritative values */
   onSettle: (dice: SettledDie[], source: SettleSource) => void;
 }
@@ -54,6 +54,8 @@ interface AnimatedDie {
   targetValue: number;
   /** Server-authoritative value — set after /api/dice/roll returns */
   serverValue: number | null;
+  /** Which throw this die belongs to — used to match server responses */
+  throwId: number;
   /** Glow mesh on the top face when settled */
   glowMesh: THREE.Mesh | null;
   /** Whether this die's numbers have been revealed */
@@ -208,6 +210,8 @@ export class DiceAnimator {
 
   /** Active throw batches — each spawn/fling is its own independent batch. */
   private throwBatches: Array<{ dice: Set<AnimatedDie>; source: SettleSource; reported: boolean }> = [];
+  /** Monotonically increasing throw ID — ties server responses to the correct dice. */
+  private nextThrowId = 1;
 
   /** Pre-glitch: symbols flicker while dice are still winding down */
   private preGlitchActive = false;
@@ -369,6 +373,7 @@ export class DiceAnimator {
         label: outcome.label,
         targetValue: outcome.value,
         serverValue: outcome.value, // From RollResult — already server-authoritative
+        throwId: 0, // Service rolls have values already — throwId not used for matching
         glowMesh: null,
         revealed: false,
         revealTime: 0,
@@ -676,10 +681,14 @@ export class DiceAnimator {
       reported: false,
     });
 
+    // Assign throw ID to this batch
+    const throwId = this.nextThrowId++;
+
     // Mark thrown dice as unrevealed — server will provide authoritative values
     for (const g of this.grabbedDice) {
       g.ad.revealed = false;
       g.ad.serverValue = null;
+      g.ad.throwId = throwId;
       this.hideNumbers(g.ad);
       // Remove any existing glow
       if (g.ad.glowMesh) {
@@ -697,7 +706,7 @@ export class DiceAnimator {
 
     // Fire throw callback — DiceOverlay calls the server for authoritative values
     if (thrownDice.length > 0) {
-      this.callbacks.onThrow(thrownDice);
+      this.callbacks.onThrow(thrownDice, throwId);
     }
   }
 
@@ -1044,6 +1053,7 @@ export class DiceAnimator {
     );
 
     const targetValue = this.randomValue(dieType);
+    const throwId = this.nextThrowId++;
 
     const ad: AnimatedDie = {
       body,
@@ -1053,6 +1063,7 @@ export class DiceAnimator {
       label: dieType.toUpperCase(),
       targetValue,
       serverValue: null, // Will be set by server response
+      throwId,
       glowMesh: null,
       revealed: false, // Hidden until server value arrives and die settles
       revealTime: 0,
@@ -1066,18 +1077,18 @@ export class DiceAnimator {
     this.ensureLoopRunning();
 
     // Fire throw callback — DiceOverlay calls the server for authoritative values
-    this.callbacks.onThrow([{ dieType, color }]);
+    this.callbacks.onThrow([{ dieType, color }], throwId);
   }
 
   /**
-   * Set server-authoritative values for dice that are currently in-flight.
+   * Set server-authoritative values for a specific throw batch.
    * Called by DiceOverlay after /api/dice/roll returns.
-   * Values are assigned to unrevealed dice in order.
+   * throwId ties the response to the exact dice that triggered the call.
    */
-  setServerValues(values: Array<{ dieType: DieType; value: number }>): void {
-    const unrevealed = this.animatedDice.filter(ad => ad.serverValue === null);
-    for (let i = 0; i < Math.min(values.length, unrevealed.length); i++) {
-      unrevealed[i].serverValue = values[i].value;
+  setServerValues(throwId: number, values: Array<{ dieType: DieType; value: number }>): void {
+    const batch = this.animatedDice.filter(ad => ad.throwId === throwId && ad.serverValue === null);
+    for (let i = 0; i < Math.min(values.length, batch.length); i++) {
+      batch[i].serverValue = values[i].value;
     }
   }
 

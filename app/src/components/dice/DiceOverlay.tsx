@@ -118,7 +118,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
     canvas.height = rect.height * window.devicePixelRatio;
 
     const animator = new DiceAnimator(canvas, {
-      onThrow: async (dice) => {
+      onThrow: async (dice, throwId) => {
         // Call server for authoritative crypto-random values
         try {
           const dieTypes = dice.map(d => d.dieType);
@@ -133,14 +133,14 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
               dieType: dice[i].dieType,
               value: r.value,
             }));
-            animatorRef.current?.setServerValues(values);
+            animatorRef.current?.setServerValues(throwId, values);
           } else {
             // Auth failed or server error — use client-side fallback
             const fallback = dice.map(d => ({
               dieType: d.dieType,
               value: Math.floor(Math.random() * parseInt(d.dieType.slice(1))) + 1,
             }));
-            animatorRef.current?.setServerValues(fallback);
+            animatorRef.current?.setServerValues(throwId, fallback);
           }
         } catch {
           // If server call fails, set fallback values so dice don't stay stuck
@@ -148,7 +148,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
             dieType: d.dieType,
             value: Math.floor(Math.random() * parseInt(d.dieType.slice(1))) + 1,
           }));
-          animatorRef.current?.setServerValues(fallback);
+          animatorRef.current?.setServerValues(throwId, fallback);
         }
       },
       onSettle: (dice, source) => {
