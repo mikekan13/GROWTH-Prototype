@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { GrowthWorldItem, WorldItemType, ItemRarity } from '@/types/item';
 import { ITEM_TYPE_ICONS, RARITY_COLORS, formatDamage, getConditionLabel, getConditionColor } from '@/types/item';
+import { getWeightLabel } from '@/types/material';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -182,8 +183,13 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
               <span style={{ color: 'rgba(255,255,255,0.4)', textTransform: 'capitalize', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{node.type.replace('_', ' ')}</span>
               <span style={{ color: conditionColor, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{conditionLabel}</span>
             </div>
+            {data.material && (
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                {data.material}{data.resistance != null ? ` · R${data.resistance}` : ''}{data.damage && Object.values(data.damage).some(v => v > 0) ? ` · ${formatDamage(data.damage)}` : ''}
+              </div>
+            )}
             {data.description && (
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 4, lineHeight: 1.3, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 3, lineHeight: 1.3, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 {data.description.length > 70 ? `${data.description.substring(0, 70)}...` : data.description}
               </div>
             )}
@@ -295,7 +301,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}>
             <MiniStat label="Condition" value={conditionLabel} color={conditionColor} />
-            <MiniStat label="Weight" value={data.weightLevel ?? '-'} color="#c0c0c0" />
+            <MiniStat label="Weight" value={data.weightLevel != null ? `${data.weightLevel} (${getWeightLabel(data.weightLevel)})` : '-'} color="#c0c0c0" />
             <MiniStat label="Tech" value={data.techLevel ?? '-'} color="#22ab94" />
             <MiniStat label="Value" value={data.value != null ? `${data.value} KV` : '-'} color="#ffcc78" />
           </div>

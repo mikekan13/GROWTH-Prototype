@@ -54,7 +54,7 @@ Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel showing real CampaignItems (HeldItemData). Weight level display, carry capacity tracking, condition/material/damage info, equip toggle, remove-from-inventory button, drop-target highlighting |
 | Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, Roll button, Request button (player), add form (GM). No categories or combat flags |
 | Canvas Cards | LocationCard | Expandable location card on canvas. Compact (280px) and expanded (480px) views. Shows description, tech/wealth/danger levels, features, ley lines, tags |
-| Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (240px) and expanded (400px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance, prima materia, material modifiers, condition |
+| Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (280px) and expanded (420px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance/layer/coverage, prima materia, material modifiers, weapon properties, weight labels, condition, GM notes. Compact view shows material + damage/resist summary |
 | Canvas Cards | GROvinePanel | GROvine management sub-panel for characters. Add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking |
 | Canvas Cards | EncounterTracker | Combat encounter management card. Three-phase (Intention/Resolution/Impact), round counter, per-pillar action pools, participant tracking by side |
 | Canvas Cards | VitalsCard | Character vitals sub-panel on canvas — body part grid, damage tracking, conditions |
@@ -67,7 +67,7 @@ Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 | Terminal | CampaignTerminal | Unified campaign activity feed — merges changelog + campaign events. Resizable bottom overlay, session grouping, filter toggles, auto-poll (5s). Replaces ChangeLogPanel |
 | Terminal | TerminalEventRow | Renders one terminal event — dispatches by type (changelog, dice_roll, chat, command, ai_message, game_event) with distinct styling |
 | Terminal | CommandInput | Command input bar with history (up/down arrows), auto-submit on Enter, imperative prefill via ref |
-| Forge | ForgePanel | GM design workshop — type filter, create form (full item builder with material catalog, weapon/armor fields), publish/unpublish/delete, "Place on Canvas" flow, pending request queue with approve/deny, governor toggle selector for skills |
+| Forge | ForgePanel | GM design workshop — type filter, full item builder: primary+secondary material combination (auto-calculates resist/weight/tech via combineMaterials), weapon damage grid + properties (Unblockable/Brittle/Strong/etc) + range + target attr, armor layer with auto-resist calc + body part coverage, prima materia (school/level/stable/charges), GM notes field. Publish/unpublish/delete, "Place on Canvas" flow, pending request queue with approve/deny, governor toggle for skills. Forge rows show sub-type/material/rarity badges |
 | Canvas | CanvasToolbox | HTML overlay toolbar on KRMA line — follows camera horizontally via SVG→screen coord conversion. Buttons: Add Character, Add Item from Forge (dropdown), Add Note |
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |

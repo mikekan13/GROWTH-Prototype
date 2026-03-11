@@ -55,6 +55,25 @@ export interface GrowthWorldItem {
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';
 
+// Canonical weapon properties from repository
+export const WEAPON_PROPERTIES = [
+  'Unblockable',
+  'Brittle',
+  'Strong',
+  'Regenerating',
+  'Sharp',
+  'Blunt',
+  'Flexible',
+] as const;
+
+// Canonical hit locations / body parts for armor coverage
+export const BODY_PARTS = [
+  'Head & Neck',
+  'Torso',
+  'Arms',
+  'Legs',
+] as const;
+
 /**
  * A CampaignItem held by a character, used by InventoryCard.
  * This is the bridge between the DB CampaignItem and the UI.

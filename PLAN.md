@@ -1,6 +1,6 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
 Current phase: Phase 3 (Session Tools) — Skeleton Systems Pass
 
 ---
@@ -467,6 +467,19 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - **Canvas toolbox**: Removed SVG foreignObject approach. New HTML overlay component converts SVG coords to screen pixels via `getScreenCTM()`, follows camera horizontally along KRMA line (Y=0). Contains "Add Character", "Add Item from Forge" (with dropdown of published items), and "Add Note" buttons.
 - **Relations → Canvas rename**: Tab type changed from `'relations'` to `'canvas'`, tab label "Relations" → "Canvas", breadcrumb updated to `CANVAS://session.layer.0`, watcher page link text updated.
 - **Files changed**: `CampaignCanvas.tsx`, `RelationsCanvas.tsx`, `ForgePanel.tsx`, `services/forge.ts`, `watcher/campaign/[id]/page.tsx`
+- Full `next build` passes clean
+
+### 2026-03-11 (Session 3): Forge Full Item Builder + Canvas Item Display
+- **Forge full item builder**: Primary + secondary material selection with `combineMaterials()` auto-calculating resist (average), tech (max), weight (average), and merged modifiers. Material summary shows resist type, R-value, tech, weight, and all mods.
+- **Weapon properties**: Toggle buttons for canonical properties (Unblockable, Brittle, Strong, Regenerating, Sharp, Blunt, Flexible). Saved to `weaponProperties[]`.
+- **Armor coverage**: Body part toggle buttons (Head & Neck, Torso, Arms, Legs) from canonical hit location system. Armor resistance auto-calculates from material baseResist × layer multiplier (Clothing 0.5×, Light 1×, Heavy 1.5×) — updates when either material or layer changes.
+- **Prima Materia section**: School (text), Level (1-10), Stable/Unstable toggle, Charges (stable only). Full section appears when sub-type is prima_materia.
+- **GM Notes field**: Added to all item types. Stored in `data.notes`, displayed on WorldItemCard expanded view.
+- **Forge row improvements**: Shows item sub-type badge instead of generic "item", plus material and rarity badges for quick scanning.
+- **WorldItemCard compact view**: Now shows material + damage/resist summary line below type/condition.
+- **WorldItemCard expanded view**: Weight stat now shows label (e.g. "4 (Heavy)") via `getWeightLabel()`.
+- **Constants added**: `WEAPON_PROPERTIES` and `BODY_PARTS` arrays in `types/item.ts` for canonical reference.
+- **Files changed**: `ForgePanel.tsx`, `WorldItemCard.tsx`, `types/item.ts`, `docs/module_registry.md`, `PLAN.md`
 - Full `next build` passes clean
 - **Next**: Encumbrance enforcement, armor integration with damage system, item equip slots
 

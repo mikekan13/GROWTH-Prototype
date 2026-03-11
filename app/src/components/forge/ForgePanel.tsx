@@ -4,8 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { SkillGovernor } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
 import type { WorldItemType, ItemRarity } from '@/types/item';
-import { ITEM_TYPE_ICONS } from '@/types/item';
-import { getMaterialNames, getMaterial } from '@/lib/materials';
+import { ITEM_TYPE_ICONS, WEAPON_PROPERTIES, BODY_PARTS } from '@/types/item';
+import { ARMOR_LAYER_RULES } from '@/types/material';
+import { getMaterialNames, getMaterial, combineMaterials } from '@/lib/materials';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -94,13 +95,22 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
   const [itemWeightLevel, setItemWeightLevel] = useState(1);
   const [itemTechLevel, setItemTechLevel] = useState(4);
   const [itemValue, setItemValue] = useState(0);
+  const [itemSecondaryMaterial, setItemSecondaryMaterial] = useState('');
+  const [itemNotes, setItemNotes] = useState('');
   // Weapon fields
   const [weaponDamage, setWeaponDamage] = useState({ piercing: 0, slashing: 0, heat: 0, decay: 0, cold: 0, bashing: 0, energy: 0 });
   const [weaponRange, setWeaponRange] = useState('melee');
   const [weaponTarget, setWeaponTarget] = useState('');
+  const [weaponProps, setWeaponProps] = useState<Set<string>>(new Set());
   // Armor fields
   const [armorLayer, setArmorLayer] = useState<'clothing' | 'lightArmor' | 'heavyArmor'>('lightArmor');
   const [armorResistance, setArmorResistance] = useState(0);
+  const [armorCoveredParts, setArmorCoveredParts] = useState<Set<string>>(new Set());
+  // Prima Materia fields
+  const [pmSchool, setPmSchool] = useState('');
+  const [pmLevel, setPmLevel] = useState(1);
+  const [pmStable, setPmStable] = useState(true);
+  const [pmCharges, setPmCharges] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -138,11 +148,19 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
       data.techLevel = itemTechLevel;
       data.condition = 4; // Undamaged by default
       if (itemMaterial) data.material = itemMaterial;
+      if (itemSecondaryMaterial) data.material = `${itemMaterial}/${itemSecondaryMaterial}`;
       if (itemValue > 0) data.value = itemValue;
-      // Auto-apply material modifiers
+      if (itemNotes.trim()) data.notes = itemNotes.trim();
+      // Auto-apply material modifiers (combined if secondary)
       if (itemMaterial) {
-        const mat = getMaterial(itemMaterial);
-        if (mat) data.materialModifiers = mat.mods;
+        const primaryMat = getMaterial(itemMaterial);
+        const secondaryMat = itemSecondaryMaterial ? getMaterial(itemSecondaryMaterial) : null;
+        if (primaryMat && secondaryMat) {
+          const combined = combineMaterials(primaryMat, secondaryMat);
+          data.materialModifiers = combined.mods;
+        } else if (primaryMat) {
+          data.materialModifiers = primaryMat.mods;
+        }
       }
       // Weapon-specific
       if (itemSubType === 'weapon') {
@@ -150,11 +168,22 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
         if (hasAnyDamage) data.damage = weaponDamage;
         if (weaponRange) data.range = weaponRange;
         if (weaponTarget) data.targetAttribute = weaponTarget;
+        if (weaponProps.size > 0) data.weaponProperties = Array.from(weaponProps);
       }
       // Armor-specific
       if (itemSubType === 'armor') {
         data.armorLayer = armorLayer;
         if (armorResistance > 0) data.resistance = armorResistance;
+        if (armorCoveredParts.size > 0) data.coveredParts = Array.from(armorCoveredParts);
+      }
+      // Prima Materia-specific
+      if (itemSubType === 'prima_materia' && pmSchool.trim()) {
+        data.primaMateria = {
+          school: pmSchool.trim(),
+          level: pmLevel,
+          stable: pmStable,
+          ...(pmStable && pmCharges > 0 ? { charges: pmCharges } : {}),
+        };
       }
     } else {
       data.description = newDesc.trim() || 'No description';
@@ -352,15 +381,23 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
                 <ItemCreateFields
                   itemSubType={itemSubType} setItemSubType={setItemSubType}
                   itemMaterial={itemMaterial} setItemMaterial={setItemMaterial}
+                  itemSecondaryMaterial={itemSecondaryMaterial} setItemSecondaryMaterial={setItemSecondaryMaterial}
                   itemRarity={itemRarity} setItemRarity={setItemRarity}
                   itemWeightLevel={itemWeightLevel} setItemWeightLevel={setItemWeightLevel}
                   itemTechLevel={itemTechLevel} setItemTechLevel={setItemTechLevel}
                   itemValue={itemValue} setItemValue={setItemValue}
+                  itemNotes={itemNotes} setItemNotes={setItemNotes}
                   weaponDamage={weaponDamage} setWeaponDamage={(v) => setWeaponDamage(v as typeof weaponDamage)}
                   weaponRange={weaponRange} setWeaponRange={setWeaponRange}
                   weaponTarget={weaponTarget} setWeaponTarget={setWeaponTarget}
+                  weaponProps={weaponProps} setWeaponProps={setWeaponProps}
                   armorLayer={armorLayer} setArmorLayer={setArmorLayer}
                   armorResistance={armorResistance} setArmorResistance={setArmorResistance}
+                  armorCoveredParts={armorCoveredParts} setArmorCoveredParts={setArmorCoveredParts}
+                  pmSchool={pmSchool} setPmSchool={setPmSchool}
+                  pmLevel={pmLevel} setPmLevel={setPmLevel}
+                  pmStable={pmStable} setPmStable={setPmStable}
+                  pmCharges={pmCharges} setPmCharges={setPmCharges}
                 />
               )}
               <div className="flex gap-2 pt-1">
@@ -378,7 +415,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
                   Create
                 </button>
                 <button
-                  onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); }}
+                  onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); setItemNotes(''); setItemSecondaryMaterial(''); setWeaponProps(new Set()); setArmorCoveredParts(new Set()); setPmSchool(''); }}
                   className="text-[11px] px-3 py-1 uppercase tracking-wider text-gray-500"
                   style={{ border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
@@ -485,6 +522,10 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
   const data = item.data || {};
   const governors = (data.governors as string[]) || [];
   const description = data.description as string | undefined;
+  const isItemType = item.type === 'item';
+  const itemSubType = data.itemType as string | undefined;
+  const material = data.material as string | undefined;
+  const rarity = data.rarity as string | undefined;
 
   return (
     <div className="p-2.5 border transition-colors group" style={{
@@ -503,7 +544,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
             borderRadius: '2px',
             border: `1px solid ${TYPE_COLORS[item.type] || '#888'}40`,
           }}>
-            {item.type}
+            {isItemType && itemSubType ? itemSubType.replace('_', ' ') : item.type}
           </span>
           {/* Name */}
           <span className="text-sm text-white truncate" style={{
@@ -522,8 +563,23 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
               ))}
             </div>
           )}
+          {/* Item detail badges */}
+          {isItemType && (
+            <div className="flex gap-1 flex-shrink-0">
+              {material && (
+                <span className="text-[8px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                  {material}
+                </span>
+              )}
+              {rarity && rarity !== 'common' && (
+                <span className="text-[8px] px-1 py-0.5 uppercase" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '2px', color: 'rgba(255,204,120,0.6)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+                  {rarity.replace('_', ' ')}
+                </span>
+              )}
+            </div>
+          )}
           {/* Description preview */}
-          {description && (
+          {description && !isItemType && (
             <span className="text-[11px] text-gray-500 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{description}</span>
@@ -673,40 +729,102 @@ const DAMAGE_ABBREV: Record<string, string> = { piercing: 'P', slashing: 'S', he
 function ItemCreateFields({
   itemSubType, setItemSubType,
   itemMaterial, setItemMaterial,
+  itemSecondaryMaterial, setItemSecondaryMaterial,
   itemRarity, setItemRarity,
   itemWeightLevel, setItemWeightLevel,
   itemTechLevel, setItemTechLevel,
   itemValue, setItemValue,
+  itemNotes, setItemNotes,
   weaponDamage, setWeaponDamage,
   weaponRange, setWeaponRange,
   weaponTarget, setWeaponTarget,
+  weaponProps, setWeaponProps,
   armorLayer, setArmorLayer,
   armorResistance, setArmorResistance,
+  armorCoveredParts, setArmorCoveredParts,
+  pmSchool, setPmSchool,
+  pmLevel, setPmLevel,
+  pmStable, setPmStable,
+  pmCharges, setPmCharges,
 }: {
   itemSubType: WorldItemType; setItemSubType: (v: WorldItemType) => void;
   itemMaterial: string; setItemMaterial: (v: string) => void;
+  itemSecondaryMaterial: string; setItemSecondaryMaterial: (v: string) => void;
   itemRarity: ItemRarity; setItemRarity: (v: ItemRarity) => void;
   itemWeightLevel: number; setItemWeightLevel: (v: number) => void;
   itemTechLevel: number; setItemTechLevel: (v: number) => void;
   itemValue: number; setItemValue: (v: number) => void;
+  itemNotes: string; setItemNotes: (v: string) => void;
   weaponDamage: Record<string, number>; setWeaponDamage: (v: Record<string, number>) => void;
   weaponRange: string; setWeaponRange: (v: string) => void;
   weaponTarget: string; setWeaponTarget: (v: string) => void;
+  weaponProps: Set<string>; setWeaponProps: (v: Set<string>) => void;
   armorLayer: 'clothing' | 'lightArmor' | 'heavyArmor'; setArmorLayer: (v: 'clothing' | 'lightArmor' | 'heavyArmor') => void;
   armorResistance: number; setArmorResistance: (v: number) => void;
+  armorCoveredParts: Set<string>; setArmorCoveredParts: (v: Set<string>) => void;
+  pmSchool: string; setPmSchool: (v: string) => void;
+  pmLevel: number; setPmLevel: (v: number) => void;
+  pmStable: boolean; setPmStable: (v: boolean) => void;
+  pmCharges: number; setPmCharges: (v: number) => void;
 }) {
   const materialNames = getMaterialNames();
-  const selectedMat = itemMaterial ? getMaterial(itemMaterial) : null;
+  const primaryMat = itemMaterial ? getMaterial(itemMaterial) : null;
+  const secondaryMat = itemSecondaryMaterial ? getMaterial(itemSecondaryMaterial) : null;
+
+  // Compute combined material stats when both materials are selected
+  const effectiveMat = primaryMat && secondaryMat
+    ? combineMaterials(primaryMat, secondaryMat)
+    : primaryMat || null;
 
   // Auto-fill from material selection
-  const handleMaterialChange = (name: string) => {
-    setItemMaterial(name);
-    const mat = getMaterial(name);
-    if (mat) {
-      setItemWeightLevel(mat.baseWeight);
-      setItemTechLevel(mat.techLevel);
-      if (itemSubType === 'armor') setArmorResistance(mat.baseResist);
+  const handleMaterialChange = (name: string, isSecondary = false) => {
+    if (isSecondary) {
+      setItemSecondaryMaterial(name);
+    } else {
+      setItemMaterial(name);
     }
+
+    // Recalculate stats from materials
+    const pMat = isSecondary ? primaryMat : getMaterial(name);
+    const sMat = isSecondary ? getMaterial(name) : secondaryMat;
+
+    if (pMat && sMat) {
+      const combined = combineMaterials(pMat, sMat);
+      setItemWeightLevel(combined.baseWeight);
+      setItemTechLevel(combined.techLevel);
+      if (itemSubType === 'armor') {
+        const mult = ARMOR_LAYER_RULES[armorLayer].resistMultiplier;
+        setArmorResistance(Math.round(combined.baseResist * mult));
+      }
+    } else if (pMat) {
+      setItemWeightLevel(pMat.baseWeight);
+      setItemTechLevel(pMat.techLevel);
+      if (itemSubType === 'armor') {
+        const mult = ARMOR_LAYER_RULES[armorLayer].resistMultiplier;
+        setArmorResistance(Math.round(pMat.baseResist * mult));
+      }
+    }
+  };
+
+  // Recalc armor resistance when layer changes
+  const handleArmorLayerChange = (layer: 'clothing' | 'lightArmor' | 'heavyArmor') => {
+    setArmorLayer(layer);
+    if (effectiveMat) {
+      const mult = ARMOR_LAYER_RULES[layer].resistMultiplier;
+      setArmorResistance(Math.round(effectiveMat.baseResist * mult));
+    }
+  };
+
+  const toggleWeaponProp = (prop: string) => {
+    const next = new Set(weaponProps);
+    if (next.has(prop)) next.delete(prop); else next.add(prop);
+    setWeaponProps(next);
+  };
+
+  const toggleCoveredPart = (part: string) => {
+    const next = new Set(armorCoveredParts);
+    if (next.has(part)) next.delete(part); else next.add(part);
+    setArmorCoveredParts(next);
   };
 
   const inputStyle = {
@@ -737,9 +855,9 @@ function ItemCreateFields({
         </div>
       </div>
 
-      {/* Material Selection */}
+      {/* Primary Material Selection */}
       <div className="flex gap-2 items-center">
-        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0">Material:</label>
+        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0">Primary:</label>
         <select value={itemMaterial} onChange={e => handleMaterialChange(e.target.value)}
           className="flex-1 text-[12px] px-2 py-1 border" style={inputStyle}
         >
@@ -749,12 +867,33 @@ function ItemCreateFields({
           ))}
         </select>
       </div>
-      {selectedMat && (
+
+      {/* Secondary Material Selection */}
+      <div className="flex gap-2 items-center">
+        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0">Second:</label>
+        <select value={itemSecondaryMaterial} onChange={e => handleMaterialChange(e.target.value, true)}
+          className="flex-1 text-[12px] px-2 py-1 border" style={inputStyle}
+        >
+          <option value="" style={{ backgroundColor: '#1a1a2e' }}>None</option>
+          {materialNames.filter(n => n !== itemMaterial).map(name => (
+            <option key={name} value={name} style={{ backgroundColor: '#1a1a2e' }}>{name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Material Summary */}
+      {effectiveMat && (
         <div className="flex flex-wrap gap-1 ml-16">
           <span className="text-[9px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#22ab94' }}>
-            {selectedMat.resistType} R{selectedMat.baseResist}
+            {effectiveMat.resistType} R{effectiveMat.baseResist}
           </span>
-          {selectedMat.mods.map(mod => (
+          <span className="text-[9px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#ffcc78' }}>
+            T{effectiveMat.techLevel}
+          </span>
+          <span className="text-[9px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#c0c0c0' }}>
+            W{effectiveMat.baseWeight}
+          </span>
+          {effectiveMat.mods.map(mod => (
             <span key={mod} className="text-[8px] px-1 py-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '2px', color: 'rgba(255,255,255,0.5)' }}>
               {mod}
             </span>
@@ -827,6 +966,24 @@ function ItemCreateFields({
               </select>
             </div>
           </div>
+          {/* Weapon Properties */}
+          <div>
+            <label className="text-[9px] text-gray-500 block mb-1">Properties</label>
+            <div className="flex flex-wrap gap-1">
+              {WEAPON_PROPERTIES.map(prop => (
+                <button key={prop} type="button" onClick={() => toggleWeaponProp(prop)}
+                  className="text-[8px] px-1.5 py-0.5 uppercase"
+                  style={{
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    backgroundColor: weaponProps.has(prop) ? 'rgba(232,88,90,0.25)' : '#2a2a3e',
+                    color: weaponProps.has(prop) ? '#E8585A' : '#666',
+                    border: `1px solid ${weaponProps.has(prop) ? 'rgba(232,88,90,0.4)' : '#3a3a4e'}`,
+                  }}
+                >{prop}</button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -839,7 +996,7 @@ function ItemCreateFields({
           <div className="flex gap-2">
             <div className="flex-1">
               <label className="text-[9px] text-gray-500 block">Layer</label>
-              <select value={armorLayer} onChange={e => setArmorLayer(e.target.value as typeof armorLayer)}
+              <select value={armorLayer} onChange={e => handleArmorLayerChange(e.target.value as typeof armorLayer)}
                 className="w-full text-[11px] px-1 py-0.5 border" style={inputStyle}>
                 <option value="clothing" style={{ backgroundColor: '#1a1a2e' }}>Clothing (0.5x, 3 layers)</option>
                 <option value="lightArmor" style={{ backgroundColor: '#1a1a2e' }}>Light Armor (1x, 1 layer)</option>
@@ -853,8 +1010,82 @@ function ItemCreateFields({
                 className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
             </div>
           </div>
+          {/* Covered Parts */}
+          <div>
+            <label className="text-[9px] text-gray-500 block mb-1">Coverage</label>
+            <div className="flex flex-wrap gap-1">
+              {BODY_PARTS.map(part => (
+                <button key={part} type="button" onClick={() => toggleCoveredPart(part)}
+                  className="text-[8px] px-1.5 py-0.5"
+                  style={{
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    backgroundColor: armorCoveredParts.has(part) ? 'rgba(62,120,192,0.25)' : '#2a2a3e',
+                    color: armorCoveredParts.has(part) ? '#3E78C0' : '#666',
+                    border: `1px solid ${armorCoveredParts.has(part) ? 'rgba(62,120,192,0.4)' : '#3a3a4e'}`,
+                  }}
+                >{part}</button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Prima Materia Fields */}
+      {itemSubType === 'prima_materia' && (
+        <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(112,80,168,0.2)' }}>
+          <div className="text-[10px] uppercase tracking-wider" style={{ color: '#7050A8', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+            Prima Materia
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[9px] text-gray-500 block">School</label>
+              <input type="text" value={pmSchool} onChange={e => setPmSchool(e.target.value)}
+                placeholder="Alteration, Restoration..."
+                className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+            </div>
+            <div style={{ width: 60 }}>
+              <label className="text-[9px] text-gray-500 block">Level</label>
+              <input type="number" min={1} max={10} value={pmLevel} onChange={e => setPmLevel(Number(e.target.value))}
+                className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+            </div>
+          </div>
+          <div className="flex gap-3 items-center">
+            <button type="button" onClick={() => setPmStable(!pmStable)}
+              className="text-[9px] px-2 py-0.5"
+              style={{
+                borderRadius: '2px',
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                backgroundColor: pmStable ? 'rgba(74,222,128,0.15)' : 'rgba(245,158,11,0.15)',
+                color: pmStable ? '#4ade80' : '#f59e0b',
+                border: `1px solid ${pmStable ? 'rgba(74,222,128,0.3)' : 'rgba(245,158,11,0.3)'}`,
+              }}
+            >
+              {pmStable ? 'Stable' : 'Unstable'}
+            </button>
+            {pmStable && (
+              <div className="flex items-center gap-1">
+                <label className="text-[9px] text-gray-500">Charges:</label>
+                <input type="number" min={0} value={pmCharges} onChange={e => setPmCharges(Number(e.target.value))}
+                  className="text-[12px] px-1 py-0.5 border" style={{ ...inputStyle, width: 50 }} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* GM Notes */}
+      <div className="flex gap-2 items-start">
+        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0 pt-1">Notes:</label>
+        <input
+          type="text"
+          value={itemNotes}
+          onChange={e => setItemNotes(e.target.value)}
+          placeholder="GM notes (hidden from players)..."
+          className="flex-1 bg-transparent outline-none text-[11px] text-gray-400 px-2 py-1 border"
+          style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+        />
+      </div>
     </div>
   );
 }
