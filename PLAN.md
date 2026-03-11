@@ -450,6 +450,16 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - Files changed: `RelationsCanvas.tsx`, `CampaignCanvas.tsx`, `services/krma/crystallization.ts`, `types/crystallization.ts`, `api/krma/campaigns/[id]/crystallize/route.ts`, `lib/kv-calculator.ts`
 - **Next**: Track actual KRMA usage in campaigns (spending, earning, character investment). Item/location KV needs official rules from Mike.
 
+### 2026-03-11: Item System + Material Catalog + Drag-and-Drop Inventory
+- **Material system scaffolded**: `types/material.ts` (ResistType, MaterialMod union type, Material interface, weight level labels 0-10, condition labels, armor layer rules) + `lib/materials.ts` (25+ material catalog from Linen→Dragonscale, combineMaterials(), getMaterial(), getAvailableMaterials()). Based on repository 03_ITEMS_CRAFTING rules.
+- **Item types updated**: `types/item.ts` now includes `equipped` field on GrowthWorldItem, `HeldItemData` bridge type for inventory display.
+- **InventoryCard fully rewritten**: No longer uses fake `InventoryItem` interface. Now shows real CampaignItems (HeldItemData) with proper weight levels (0-10 with labels), conditions (1-4 with colors), materials, weapon damage (P:S:H/D\C:B:E), armor resistance/layer, material modifiers, weapon properties, GM notes. Carry level tracking (totalWeight vs carryLevel from Clout). Filter tabs, equip toggle, remove-from-inventory button. Drop-target highlighting when item is dragged over.
+- **Drag-and-drop inventory**: WorldItemCards on canvas can be dragged onto CharacterCards to assign to inventory (sets holderId via PATCH API). Items with holderId disappear from canvas and appear in that character's InventoryCard. Remove button clears holderId, returning item to canvas. Character cards glow green (#4ade80) when an item is being dragged near them. Both compact and expanded card views support drop-target visual feedback.
+- **Data flow**: page.tsx passes holderId through item nodes → RelationsCanvas filters held items from WorldItemCard rendering and builds HeldItemData[] per character → InventoryCard shows held items → CampaignCanvas handles transfer API calls (PATCH holderId) + item update API calls (PATCH data for equip toggle) with immediate local state update.
+- **Files changed**: `types/material.ts` (new), `lib/materials.ts` (new), `types/item.ts`, `components/canvas/InventoryCard.tsx` (rewrite), `components/canvas/RelationsCanvas.tsx`, `components/canvas/CharacterCard.tsx`, `components/CampaignCanvas.tsx`, `app/campaign/[id]/page.tsx`
+- Full `next build` passes clean
+- **Next**: Item creation UI with material selection from catalog, encumbrance enforcement, armor integration with damage system
+
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?
 2. **ComfyUI integration**: Run as subprocess, separate service, or direct API? (~15-30 sec generation time on RTX 4060 acceptable?)

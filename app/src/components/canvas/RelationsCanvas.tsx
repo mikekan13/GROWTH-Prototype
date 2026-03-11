@@ -4,8 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import CharacterCard from "./CharacterCard";
 import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
-import type { InventoryItem } from "./InventoryCard";
 import type { GrowthCharacter } from "@/types/growth";
+import type { HeldItemData } from "@/types/item";
 import { addSkill, removeSkill, updateSkillLevel } from "@/lib/character-actions";
 import VitalsCard from "./VitalsCard";
 import TraitsCard from "./TraitsCard";
@@ -38,6 +38,7 @@ interface CanvasNode {
   locationData?: GrowthLocation | null;
   itemType?: string;
   itemData?: GrowthWorldItem | null;
+  holderId?: string | null;
   holderName?: string;
   locationName?: string;
 }
@@ -73,6 +74,7 @@ interface RelationsCanvasProps {
   onCreateItem?: (name: string, type: string) => void;
   onDeleteItem?: (nodeId: string) => void;
   onItemUpdate?: (nodeId: string, data: GrowthWorldItem) => void;
+  onItemTransfer?: (itemId: string, holderId: string | null) => void;
   onEntityCrossLine?: (event: LineCrossingEvent, moveNode: (nodeId: string, y: number) => void) => void;
 }
 
@@ -94,6 +96,7 @@ export default function RelationsCanvas({
   onCreateItem,
   onDeleteItem,
   onItemUpdate,
+  onItemTransfer,
   onEntityCrossLine,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -172,6 +175,10 @@ export default function RelationsCanvas({
     const observers = panelObserversRef.current;
     return () => { observers.forEach(o => o.disconnect()); observers.clear(); };
   }, []);
+
+  // ── Item drag-and-drop state ──
+  // Tracks which item node is actively being dragged (for character card drop-target highlighting)
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
   // ── Sub-panel state (vitals, traits, skills, magic, backstory, harvests) ──
   const [panelOpenNodes, setPanelOpenNodes] = useState<Map<string, Set<string>>>(() => {
@@ -938,7 +945,34 @@ export default function RelationsCanvas({
       characterData: node.characterData as CharacterNodeData['characterData'],
     };
 
-    const inventoryItems: InventoryItem[] = (node.characterData as Record<string, unknown>)?.inventory as InventoryItem[] || [];
+    // Build held items for this character from item nodes with holderId matching this character
+    const heldItems: HeldItemData[] = nodes
+      .filter(n => n.type === 'item' && n.holderId === node.id && n.itemData)
+      .map(n => ({
+        id: n.id,
+        name: n.name,
+        type: (n.itemType || 'misc') as HeldItemData['type'],
+        status: n.status || 'ACTIVE',
+        data: n.itemData!,
+      }));
+    // Get carry level from character data (vitals.carryLevel = Clout attribute)
+    const charData = node.characterData as Record<string, unknown> | null;
+    const vitals = charData?.vitals as Record<string, unknown> | null;
+    const carryLevel = (vitals?.carryLevel as number) ?? 1;
+    // Check if an item is being dragged near this character (for drop-target highlighting)
+    const isDropTarget = draggingItemId != null && (() => {
+      const dragOffset = dragOffsets.get(draggingItemId);
+      if (!dragOffset) return false;
+      const itemNode = nodes.find(n => n.id === draggingItemId);
+      if (!itemNode) return false;
+      const itemPos = getNodePosition(itemNode.id, itemNode.x, itemNode.y);
+      const itemVisX = itemPos.x + dragOffset.x;
+      const itemVisY = itemPos.y + dragOffset.y;
+      // Check if item is within character card bounds (generous hitbox)
+      const dx = Math.abs(itemVisX - visualX);
+      const dy = Math.abs(itemVisY - visualY);
+      return dx < cardWidth / 2 + 100 && dy < cardHeight / 2 + 100;
+    })();
     const isShimmering = shimmeringNodes.has(node.id);
     // Direction-aware backlight: Red = going up (crystallizing), Blue = going down (dissolving)
     const preDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
@@ -975,6 +1009,7 @@ export default function RelationsCanvas({
             node={charNode}
             isExpanded={isNodeExpanded}
             showInventory={isInventoryOpen}
+            isDropTarget={isDropTarget}
             openPanels={nodePanels}
             onToggleExpand={toggleExpand}
             onDelete={onDeleteCharacter}
@@ -1134,8 +1169,19 @@ export default function RelationsCanvas({
                   }}
                 >
                   <InventoryCard
+                    characterId={node.id}
                     characterName={node.name}
-                    items={inventoryItems}
+                    carryLevel={carryLevel}
+                    items={heldItems}
+                    isDropTarget={isDropTarget}
+                    isGM={true}
+                    onRemoveItem={(itemId) => onItemTransfer?.(itemId, null)}
+                    onToggleEquip={(itemId, equipped) => {
+                      const itemNode = nodes.find(n => n.id === itemId);
+                      if (itemNode?.itemData) {
+                        onItemUpdate?.(itemId, { ...itemNode.itemData, equipped });
+                      }
+                    }}
                     onClose={() => toggleInventory(node.id)}
                   />
                 </div>
@@ -1802,9 +1848,9 @@ export default function RelationsCanvas({
             );
           })}
 
-        {/* ── Item nodes (foreignObject cards) — sorted by z-index ── */}
+        {/* ── Item nodes (foreignObject cards) — only unassigned items, sorted by z-index ── */}
         {nodes
-          .filter((n) => n.type === "item" && n.itemData)
+          .filter((n) => n.type === "item" && n.itemData && !n.holderId)
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
             const position = getNodePosition(node.id, node.x, node.y);
@@ -1872,13 +1918,30 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteItem}
                     onPositionChange={(nodeId, x, y) => {
-                      setNodePositions((prev) => {
-                        const next = new Map(prev);
-                        next.set(nodeId, { x, y });
-                        return next;
+                      // Check if item was dropped on a character card
+                      const dropTarget = nodes.find(n => {
+                        if (n.type !== 'character') return false;
+                        const charPos = getNodePosition(n.id, n.x, n.y);
+                        const charExpanded = expandedNodes.has(n.id);
+                        const cw = charExpanded ? 1920 : 520;
+                        const ch = charExpanded ? 500 : 240;
+                        return Math.abs(x - charPos.x) < cw / 2 + 80 && Math.abs(y - charPos.y) < ch / 2 + 80;
                       });
-                      onNodePositionChange?.(nodeId, x, y);
-                      bringNodeToFront(nodeId);
+
+                      if (dropTarget && onItemTransfer) {
+                        // Item dropped on character — transfer to their inventory
+                        onItemTransfer(nodeId, dropTarget.id);
+                      } else {
+                        // Normal position update
+                        setNodePositions((prev) => {
+                          const next = new Map(prev);
+                          next.set(nodeId, { x, y });
+                          return next;
+                        });
+                        onNodePositionChange?.(nodeId, x, y);
+                        bringNodeToFront(nodeId);
+                      }
+                      setDraggingItemId(null);
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
                       setDragOffsets((prev) => {
@@ -1890,6 +1953,10 @@ export default function RelationsCanvas({
                         }
                         return next;
                       });
+                      // Track which item is being dragged for drop-target highlighting
+                      if (offsetX !== 0 || offsetY !== 0) {
+                        setDraggingItemId(nodeId);
+                      }
                     }}
                   />
                 </div>

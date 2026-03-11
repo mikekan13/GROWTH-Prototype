@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
-import type { InventoryItem } from './InventoryCard';
+import type { HeldItemData } from '@/types/item';
 import { updateAttribute, type AttributeName } from '@/lib/character-actions';
 import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
@@ -39,7 +39,7 @@ export interface CharacterNodeData {
     grovines?: Array<{ goal?: string; opportunity?: string; kv?: number }>;
     age?: string;
     birthday?: string;
-    inventory?: InventoryItem[];
+    inventory?: HeldItemData[];
     [key: string]: unknown;
   } | null;
 }
@@ -48,6 +48,7 @@ interface CharacterCardProps {
   node: CharacterNodeData;
   isExpanded?: boolean;
   showInventory?: boolean;
+  isDropTarget?: boolean;
   openPanels?: Set<string>;
   onNodeClick?: (node: CharacterNodeData) => void;
   onToggleExpand?: (nodeId: string) => void;
@@ -267,6 +268,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   node,
   isExpanded = false,
   showInventory = false,
+  isDropTarget = false,
   openPanels,
   onToggleExpand,
   onPositionChange,
@@ -401,9 +403,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     return (
       <div className="relative">
         <div
-          className={`flex bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/50 rounded-lg p-3 text-white hover:border-gray-600 transition-all select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-lg p-3 text-white hover:border-gray-600 transition-all select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           style={{
             width: '500px', height: '220px', userSelect: 'none',
+            borderColor: isDropTarget ? '#4ade80' : 'rgba(55, 65, 81, 0.5)',
+            boxShadow: isDropTarget ? '0 0 30px rgba(74, 222, 128, 0.4), inset 0 0 15px rgba(74, 222, 128, 0.1)' : 'none',
             filter: isDragging
               ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
               : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
@@ -581,6 +585,9 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         className={`relative character-card text-white select-none ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
         style={{
           width: '1885px', willChange: 'transform', userSelect: 'none', transformOrigin: '960px 250px', transition: 'filter 0.2s',
+          outline: isDropTarget ? '3px solid #4ade80' : 'none',
+          borderRadius: isDropTarget ? '8px' : undefined,
+          boxShadow: isDropTarget ? '0 0 40px rgba(74, 222, 128, 0.3)' : 'none',
           filter: isDragging
             ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
             : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
@@ -1125,5 +1132,6 @@ export default React.memo(CharacterCard, (prev, next) => (
   prev.node.characterData === next.node.characterData &&
   prev.isExpanded === next.isExpanded &&
   prev.showInventory === next.showInventory &&
+  prev.isDropTarget === next.isDropTarget &&
   prev.openPanels === next.openPanels
 ));

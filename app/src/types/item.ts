@@ -46,11 +46,26 @@ export interface GrowthWorldItem {
     charges?: number;           // Remaining uses (stable only)
   };
 
+  // Equipped state (tracked per-character when item is held)
+  equipped?: boolean;
+
   // Tags for filtering/searching
   tags?: string[];
 }
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';
+
+/**
+ * A CampaignItem held by a character, used by InventoryCard.
+ * This is the bridge between the DB CampaignItem and the UI.
+ */
+export interface HeldItemData {
+  id: string;
+  name: string;
+  type: WorldItemType;
+  status: string;
+  data: GrowthWorldItem;
+}
 
 export const ITEM_TYPE_ICONS: Record<WorldItemType, string> = {
   weapon: '\u2694\uFE0F',       // crossed swords

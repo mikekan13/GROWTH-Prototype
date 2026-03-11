@@ -15,7 +15,7 @@ Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 | CampaignEventService | `services/campaign-event.ts` | Campaign event CRUD (dice rolls, chat, commands, game events), session management (start/end/list), auto-assigns events to active session | Prisma |
 | ForgeService | `services/forge.ts` | ForgeItem CRUD (skill/item/nectar/blossom/thorn templates), publish/unpublish, PlayerRequest CRUD (create/edit/resolve), Zod validation per type | Prisma, permissions |
 | LocationService | `services/location.ts` | Location CRUD (settlement/wilderness/dungeon/building/POI/region), GM-only create/update/delete, Zod validation | Prisma, permissions |
-| CampaignItemService | `services/campaign-item.ts` | World item CRUD (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), holder/location assignment, GM-only | Prisma, permissions |
+| CampaignItemService | `services/campaign-item.ts` | World item CRUD (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), holder/location assignment, drag-and-drop inventory transfer via holderId, GM-only | Prisma, permissions |
 | EncounterService | `services/encounter.ts` | Encounter CRUD (combat/social/exploration/puzzle/event), round/phase tracking, GM-only | Prisma, permissions |
 | KRMA Ledger | `services/krma/ledger.ts` | Core transaction engine — ALL KRMA mutations. Append-only, checksummed, idempotent, atomic. Single/batch execution. | Prisma, krma types |
 | KRMA Wallet | `services/krma/wallet.ts` | Wallet CRUD (user/campaign/character/system), fund/defund campaigns, transaction history, global metrics | Prisma, ledger, permissions |
@@ -51,7 +51,7 @@ Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 | Character Builder | CharacterBuilder | 4-step wizard (Identity → Origin → Attributes → WTH) |
 | Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, localStorage persistence |
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
-| Canvas Cards | InventoryCard | Draggable inventory sub-panel with filter tabs, quick stats, ComplexTooltip items |
+| Canvas Cards | InventoryCard | Draggable inventory sub-panel showing real CampaignItems (HeldItemData). Weight level display, carry capacity tracking, condition/material/damage info, equip toggle, remove-from-inventory button, drop-target highlighting |
 | Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, Roll button, Request button (player), add form (GM). No categories or combat flags |
 | Canvas Cards | LocationCard | Expandable location card on canvas. Compact (280px) and expanded (480px) views. Shows description, tech/wealth/danger levels, features, ley lines, tags |
 | Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (240px) and expanded (400px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance, prima materia, material modifiers, condition |
@@ -88,7 +88,9 @@ Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 | `types/terminal.ts` | TerminalEvent (unified event type), TerminalEventType, TerminalPayload (discriminated union), payload types (ChangeLogPayload, DiceRollPayload, ChatPayload, CommandPayload, AIMessagePayload, GameEventPayload), GameSessionInfo, TerminalFilter |
 | `types/dice.ts` | DieType, DieColor, RollSource (discriminated union — 10 source types), DieSpec, RollRequest, DieOutcome, RollResult, ContestedRollResult, InjectionFilter, InjectionOverride, DiceInjection, legacy compat types |
 | `types/location.ts` | LocationType (settlement/wilderness/dungeon/building/POI/region), Location fields, create/update input types |
-| `types/item.ts` | ItemType (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), WorldItem fields, damage/armor/material types |
+| `types/item.ts` | ItemType, WorldItem fields, damage/armor/material types, HeldItemData (bridge type for inventory display) |
+| `types/material.ts` | Material system: ResistType (soft/hard), MaterialMod union type, Material interface, weight level labels, condition labels, armor layer rules |
+| `lib/materials.ts` | Material catalog (25+ materials: Linen→Dragonscale), getMaterial(), combineMaterials(), getAvailableMaterials() |
 | `types/encounter.ts` | EncounterType (combat/social/exploration/puzzle/event), EncounterPhase (intention/resolution/impact), Encounter fields, participant/round tracking types |
 | `types/crystallization.ts` | CrystallizationEntry, CrystallizationLedger, crystallize/dissolve request/response types |
 

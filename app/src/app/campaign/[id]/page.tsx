@@ -121,6 +121,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       status: item.status,
       itemType: item.type,
       itemData: itemData,
+      holderId: item.holderId || null,
       holderName: item.holderId ? charNameMap.get(item.holderId) : undefined,
       locationName: item.locationId ? locNameMap.get(item.locationId) : undefined,
     };

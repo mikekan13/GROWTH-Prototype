@@ -376,6 +376,48 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
   }, [campaign.id, router]);
 
+  const handleItemUpdate = useCallback(async (itemId: string, data: GrowthWorldItem) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+      });
+      if (!res.ok) return;
+      // Update local state
+      setNodes(prev => prev.map(n =>
+        n.id === itemId ? { ...n, itemData: data as unknown as typeof n.itemData } : n
+      ));
+    } catch { /* silent */ }
+  }, [campaign.id]);
+
+  const handleItemTransfer = useCallback(async (itemId: string, holderId: string | null) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ holderId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Failed to transfer item');
+        return;
+      }
+      // Update local node state immediately for responsive UI
+      setNodes(prev => prev.map(n =>
+        n.id === itemId ? {
+          ...n,
+          holderId,
+          holderName: holderId
+            ? prev.find(c => c.id === holderId)?.name
+            : undefined,
+        } : n
+      ));
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id]);
+
   const handleDeleteCharacter = useCallback(async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -557,6 +599,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onDeleteLocation={handleDeleteLocation}
             onCreateItem={handleCreateItem}
             onDeleteItem={handleDeleteItem}
+            onItemUpdate={handleItemUpdate}
+            onItemTransfer={handleItemTransfer}
             onEntityCrossLine={handleEntityCrossLine}
           />
         )}
