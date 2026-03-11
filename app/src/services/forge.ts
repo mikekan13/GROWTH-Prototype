@@ -19,10 +19,51 @@ const forgeSkillDataSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
+const forgeDamageSchema = z.object({
+  piercing: z.number().min(0).default(0),
+  slashing: z.number().min(0).default(0),
+  heat: z.number().min(0).default(0),
+  decay: z.number().min(0).default(0),
+  cold: z.number().min(0).default(0),
+  bashing: z.number().min(0).default(0),
+  energy: z.number().min(0).default(0),
+}).optional();
+
+const forgePrimaMateriaSchema = z.object({
+  school: z.string().max(100),
+  level: z.number().int().min(1).max(10),
+  stable: z.boolean(),
+  charges: z.number().int().min(0).optional(),
+}).optional();
+
 const forgeItemDataSchema = z.object({
-  weightLevel: z.number().int().min(0).max(10).optional(),
-  techLevel: z.number().int().min(1).max(10).optional(),
+  // Core properties
   description: z.string().max(500).optional(),
+  material: z.string().max(100).optional(),
+  techLevel: z.number().int().min(1).max(10).optional(),
+  weightLevel: z.number().int().min(0).max(10).optional(),
+  condition: z.number().int().min(1).max(4).optional(),
+  rarity: z.enum(['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact']).optional(),
+  value: z.number().min(0).optional(),
+  notes: z.string().max(1000).optional(),
+  // Item sub-type (weapon, armor, etc.)
+  itemType: z.enum(['weapon', 'armor', 'accessory', 'consumable', 'tool', 'artifact', 'prima_materia', 'misc']).optional(),
+  // Weapon fields
+  damage: forgeDamageSchema,
+  range: z.enum(['melee', 'short', 'medium', 'long']).optional(),
+  weaponProperties: z.array(z.string().max(100)).max(20).optional(),
+  targetAttribute: z.string().max(50).optional(),
+  // Armor fields
+  armorLayer: z.enum(['clothing', 'lightArmor', 'heavyArmor']).optional(),
+  resistance: z.number().min(0).optional(),
+  coveredParts: z.array(z.string().max(50)).max(20).optional(),
+  // Material modifiers
+  materialModifiers: z.array(z.string().max(100)).max(20).optional(),
+  // Prima Materia
+  primaMateria: forgePrimaMateriaSchema,
+  // Tags
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  // Legacy field
   properties: z.array(z.string().max(100)).max(20).optional(),
 });
 

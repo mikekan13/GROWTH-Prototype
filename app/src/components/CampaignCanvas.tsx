@@ -33,6 +33,7 @@ interface CanvasNode {
   locationData?: GrowthLocation | null;
   itemType?: string;
   itemData?: GrowthWorldItem | null;
+  holderId?: string | null;
   holderName?: string;
   locationName?: string;
 }
@@ -59,7 +60,8 @@ interface CampaignCanvasProps {
   userCharacter?: { id: string; name: string; data: string } | null;
 }
 
-type Tab = 'relations' | 'forge' | 'encounters' | 'essence';
+type Tab = 'canvas' | 'forge' | 'encounters' | 'essence';
+// Tab was renamed from 'relations' to 'canvas' (2026-03-11)
 
 const MIN_TERMINAL_HEIGHT = 150;
 const MAX_TERMINAL_FRACTION = 0.8;
@@ -71,12 +73,15 @@ interface CampaignEconomyData {
 }
 
 export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter }: CampaignCanvasProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('relations');
+  const [activeTab, setActiveTab] = useState<Tab>('canvas');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
   const router = useRouter();
+
+  // Forge items (published, for Canvas toolbox "Place from Forge")
+  const [forgeItems, setForgeItems] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown> }>>([]);
 
   // KRMA economy data (GM / Admin)
   const isGM = userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD';
@@ -100,6 +105,27 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     fetchEconomy();
     const interval = setInterval(fetchEconomy, 30000);
     return () => { cancelled = true; clearInterval(interval); };
+  }, [isGM, campaign.id]);
+
+  // Fetch published forge items for Canvas toolbox
+  useEffect(() => {
+    if (!isGM) return;
+    let cancelled = false;
+    async function fetchForgeItems() {
+      try {
+        const res = await fetch(`/api/campaigns/${campaign.id}/forge?status=published&type=item`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setForgeItems((data.items || []).map((fi: Record<string, unknown>) => ({
+          id: fi.id as string,
+          name: fi.name as string,
+          type: fi.type as string,
+          data: (fi.data || {}) as Record<string, unknown>,
+        })));
+      } catch { /* silent */ }
+    }
+    fetchForgeItems();
+    return () => { cancelled = true; };
   }, [isGM, campaign.id]);
 
   // ── Crystallization state ──
@@ -391,6 +417,24 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     } catch { /* silent */ }
   }, [campaign.id]);
 
+  const handleCreateItemFromForge = useCallback(async (name: string, type: string, data: Record<string, unknown>) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type, data }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to place item');
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
   const handleItemTransfer = useCallback(async (itemId: string, holderId: string | null) => {
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}/items/${itemId}`, {
@@ -470,7 +514,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [terminalHeight]);
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'relations', label: 'Relations' },
+    { key: 'canvas', label: 'Canvas' },
     { key: 'forge', label: 'Forge' },
     { key: 'encounters', label: 'Encounters' },
     { key: 'essence', label: 'Essence' },
@@ -488,7 +532,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             <div className="w-[6px] h-[6px] bg-[#002F6C]" />
           </div>
           <span className="text-[var(--accent-teal)]/40 text-[8px] tracking-[0.3em] font-[family-name:var(--font-terminal)]">
-            CANVAS://relations.layer.0
+            CANVAS://session.layer.0
           </span>
           <span className="text-[var(--accent-teal)]/30 text-[8px]">&#x2298; &#x2295;</span>
         </div>
@@ -586,7 +630,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
       {/* Canvas content area — fills remaining space */}
       <main ref={mainRef} className="flex-1 relative overflow-hidden">
-        {activeTab === 'relations' && (
+        {activeTab === 'canvas' && (
           <RelationsCanvas
             nodes={nodes}
             connections={connections}
@@ -601,6 +645,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onDeleteItem={handleDeleteItem}
             onItemUpdate={handleItemUpdate}
             onItemTransfer={handleItemTransfer}
+            onCreateItemFromForge={handleCreateItemFromForge}
+            forgeItems={forgeItems}
             onEntityCrossLine={handleEntityCrossLine}
           />
         )}
@@ -610,6 +656,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             campaignId={campaign.id}
             isGM={userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD'}
             userId={userId || ''}
+            onPlaceItem={handleCreateItemFromForge}
           />
         )}
 

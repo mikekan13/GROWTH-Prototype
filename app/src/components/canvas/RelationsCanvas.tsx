@@ -58,11 +58,19 @@ export interface LineCrossingEvent {
   previousY: number;
 }
 
+export interface ForgeItemSummary {
+  id: string;
+  name: string;
+  type: string;
+  data: Record<string, unknown>;
+}
+
 interface RelationsCanvasProps {
   nodes: CanvasNode[];
   connections: CanvasConnection[];
   campaignId: string;
   crystallizedEntityIds?: Set<string>;
+  forgeItems?: ForgeItemSummary[];
   onNodeClick?: (node: CanvasNode) => void;
   onNodePositionChange?: (nodeId: string, x: number, y: number) => void;
   onCreateCharacter?: (name: string) => void;
@@ -75,6 +83,7 @@ interface RelationsCanvasProps {
   onDeleteItem?: (nodeId: string) => void;
   onItemUpdate?: (nodeId: string, data: GrowthWorldItem) => void;
   onItemTransfer?: (itemId: string, holderId: string | null) => void;
+  onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
   onEntityCrossLine?: (event: LineCrossingEvent, moveNode: (nodeId: string, y: number) => void) => void;
 }
 
@@ -85,6 +94,7 @@ export default function RelationsCanvas({
   connections = [],
   campaignId,
   crystallizedEntityIds,
+  forgeItems,
   onNodeClick,
   onNodePositionChange,
   onCreateCharacter,
@@ -97,6 +107,7 @@ export default function RelationsCanvas({
   onDeleteItem,
   onItemUpdate,
   onItemTransfer,
+  onCreateItemFromForge,
   onEntityCrossLine,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1604,124 +1615,7 @@ export default function RelationsCanvas({
           </g>
         </g>
 
-        {/* ── Creation Toolbox (anchored to KRMA Line center) ── */}
-        <foreignObject x={-130} y={-100} width={260} height={200} style={{ overflow: "visible" }}>
-          <div
-            style={{
-              width: 260,
-              height: 200,
-              background: "linear-gradient(135deg, #22ab94 0%, #1e9b82 50%, #22ab94 100%)",
-              border: "2px dashed #1e9b82",
-              borderRadius: 12,
-              padding: 16,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 12,
-              fontFamily: "var(--font-terminal), Consolas, monospace",
-              boxShadow: "0 8px 32px rgba(34, 171, 148, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-              userSelect: "none",
-            }}
-          >
-            {/* Shield icon */}
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 70%)",
-                border: "1px solid rgba(255,255,255,0.4)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M12 2L3 7v6c0 5.55 3.84 9.74 9 9.74s9-4.19 9-9.74V7l-7-5z" />
-              </svg>
-            </div>
-
-            {/* KRMA display */}
-            <div style={{ color: "white", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
-              {"\u049C"} KRMA TOOLS
-            </div>
-
-            {/* Create button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const name = window.prompt("Character name:");
-                if (name?.trim()) {
-                  onCreateCharacter?.(name.trim());
-                }
-              }}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                background: "linear-gradient(145deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%)",
-                border: "1px solid rgba(255,255,255,0.4)",
-                borderRadius: 10,
-                color: "white",
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                textShadow: "0 2px 4px rgba(0,0,0,0.4)",
-                boxShadow: "0 4px 15px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              CREATE
-            </button>
-
-            {/* Location create button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const name = window.prompt("Location name:");
-                if (name?.trim()) {
-                  onCreateLocation?.(name.trim(), "point_of_interest");
-                }
-              }}
-              style={{
-                width: 28, height: 28, borderRadius: "50%",
-                background: "rgba(112,80,168,0.3)", border: "1px solid rgba(112,80,168,0.5)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", color: "#7050A8", fontSize: 14,
-              }}
-              title="Create Location"
-            >
-              {"\u{1F4CD}"}
-            </button>
-            {/* Item create button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const name = window.prompt("Item name:");
-                if (name?.trim()) {
-                  onCreateItem?.(name.trim(), "misc");
-                }
-              }}
-              style={{
-                width: 28, height: 28, borderRadius: "50%",
-                background: "rgba(255,204,120,0.2)", border: "1px solid rgba(255,204,120,0.4)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", color: "#ffcc78", fontSize: 14,
-              }}
-              title="Create Item"
-            >
-              {"\u2694"}
-            </button>
-          </div>
-        </foreignObject>
+        {/* Creation Toolbox moved to HTML overlay (always visible in viewport) */}
 
         {/* ── Connections (behind nodes) ── */}
         {connections.map((c) => renderConnection(c))}
@@ -2039,6 +1933,17 @@ export default function RelationsCanvas({
           })}
       </svg>
 
+      {/* ── Canvas Toolbox (follows camera on the KRMA line) ── */}
+      <CanvasToolbox
+        viewBox={viewBox}
+        svgRef={svgRef}
+        forgeItems={forgeItems}
+        onCreateCharacter={onCreateCharacter}
+        onCreateLocation={onCreateLocation}
+        onCreateItem={onCreateItem}
+        onCreateItemFromForge={onCreateItemFromForge}
+      />
+
       {/* ── Debug overlay (Ctrl+D) ── */}
       {showDebug && (
         <div
@@ -2159,5 +2064,238 @@ export default function RelationsCanvas({
         </div>
       )}
     </div>
+  );
+}
+
+// ── Canvas Toolbox (viewport-fixed overlay) ──────────────────────────────────
+
+import { ITEM_TYPE_ICONS } from '@/types/item';
+
+function CanvasToolbox({
+  viewBox,
+  svgRef,
+  forgeItems,
+  onCreateCharacter,
+  onCreateLocation,
+  onCreateItem,
+  onCreateItemFromForge,
+}: {
+  viewBox: { x: number; y: number; width: number; height: number };
+  svgRef: React.RefObject<SVGSVGElement | null>;
+  forgeItems?: ForgeItemSummary[];
+  onCreateCharacter?: (name: string) => void;
+  onCreateLocation?: (name: string, type: string) => void;
+  onCreateItem?: (name: string, type: string) => void;
+  onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showForgeItems, setShowForgeItems] = useState(false);
+
+  const publishedItems = (forgeItems || []).filter(f => f.type === 'item');
+
+  // Convert SVG coords (center of viewBox X, Y=0 on KRMA line) to screen pixels
+  const svgCenterX = viewBox.x + viewBox.width / 2;
+  const svgY = 0; // KRMA line is at Y=0
+  let screenX = '50%';
+  let screenY = '50%';
+  if (svgRef.current) {
+    const svg = svgRef.current;
+    const ctm = svg.getScreenCTM();
+    if (ctm) {
+      const pt = svg.createSVGPoint();
+      pt.x = svgCenterX;
+      pt.y = svgY;
+      const screenPt = pt.matrixTransform(ctm);
+      const rect = svg.getBoundingClientRect();
+      screenX = `${screenPt.x - rect.left}px`;
+      screenY = `${screenPt.y - rect.top}px`;
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: screenX,
+        top: screenY,
+        transform: 'translate(-50%, -50%)',
+        zIndex: 50,
+        pointerEvents: 'auto',
+        userSelect: 'none',
+      }}
+    >
+      {/* Collapsed: compact pill */}
+      {!isExpanded ? (
+        <button
+          onClick={() => setIsExpanded(true)}
+          style={{
+            background: 'linear-gradient(135deg, #22ab94 0%, #1e9b82 100%)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: 20,
+            padding: '6px 16px',
+            color: 'white',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-terminal), Consolas, monospace',
+            boxShadow: '0 4px 20px rgba(34, 171, 148, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2L3 7v6c0 5.55 3.84 9.74 9 9.74s9-4.19 9-9.74V7l-7-5z" />
+          </svg>
+          {'\u049C'} TOOLS
+        </button>
+      ) : (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(34,171,148,0.95) 0%, rgba(30,155,130,0.95) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: 12,
+            padding: 12,
+            minWidth: 220,
+            boxShadow: '0 8px 32px rgba(34, 171, 148, 0.4), 0 2px 8px rgba(0,0,0,0.3)',
+            fontFamily: 'var(--font-terminal), Consolas, monospace',
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                <path d="M12 2L3 7v6c0 5.55 3.84 9.74 9 9.74s9-4.19 9-9.74V7l-7-5z" />
+              </svg>
+              <span style={{ color: 'white', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>{'\u049C'} TOOLS</span>
+            </div>
+            <button
+              onClick={() => { setIsExpanded(false); setShowForgeItems(false); }}
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 4, width: 20, height: 20, cursor: 'pointer', color: 'white', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              &times;
+            </button>
+          </div>
+
+          {/* Create buttons */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <ToolboxButton
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
+              label="Character"
+              onClick={() => {
+                const name = window.prompt('Character name:');
+                if (name?.trim()) onCreateCharacter?.(name.trim());
+              }}
+            />
+            <ToolboxButton
+              icon={<span style={{ fontSize: 13 }}>{'\uD83D\uDCCD'}</span>}
+              label="Location"
+              color="#7050A8"
+              onClick={() => {
+                const name = window.prompt('Location name:');
+                if (name?.trim()) onCreateLocation?.(name.trim(), 'point_of_interest');
+              }}
+            />
+            <ToolboxButton
+              icon={<span style={{ fontSize: 13 }}>{'\u2694'}</span>}
+              label="Item"
+              color="#ffcc78"
+              onClick={() => {
+                const name = window.prompt('Item name:');
+                if (name?.trim()) onCreateItem?.(name.trim(), 'misc');
+              }}
+            />
+          </div>
+
+          {/* Place from Forge */}
+          {publishedItems.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowForgeItems(!showForgeItems)}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  background: showForgeItems ? 'rgba(255,204,120,0.2)' : 'rgba(255,255,255,0.1)',
+                  border: `1px solid ${showForgeItems ? 'rgba(255,204,120,0.4)' : 'rgba(255,255,255,0.2)'}`,
+                  borderRadius: 6,
+                  color: showForgeItems ? '#ffcc78' : 'rgba(255,255,255,0.8)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                <span>{'\u2692'} PLACE FROM FORGE ({publishedItems.length})</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ transform: showForgeItems ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showForgeItems && (
+                <div style={{ marginTop: 4, maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {publishedItems.map(fi => (
+                    <button
+                      key={fi.id}
+                      onClick={() => {
+                        onCreateItemFromForge?.(fi.name, fi.type === 'item' ? ((fi.data.itemType as string) || 'misc') : 'misc', fi.data);
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: 4,
+                        color: 'white',
+                        fontSize: 10,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <span>{ITEM_TYPE_ICONS[(fi.data.itemType || 'misc') as keyof typeof ITEM_TYPE_ICONS] || '\uD83D\uDCE6'}</span>
+                      <span style={{ flex: 1 }}>{fi.name}</span>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>PLACE</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolboxButton({ icon, label, color, onClick }: { icon: React.ReactNode; label: string; color?: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: '6px 4px',
+        background: 'rgba(255,255,255,0.12)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        borderRadius: 8,
+        color: color || 'white',
+        fontSize: 9,
+        fontWeight: 600,
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 3,
+        letterSpacing: '0.05em',
+        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+      }}
+    >
+      {icon}
+      {label.toUpperCase()}
+    </button>
   );
 }

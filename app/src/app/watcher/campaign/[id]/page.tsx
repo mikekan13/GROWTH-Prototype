@@ -59,7 +59,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                 href={`/campaign/${campaign.id}`}
                 className="inline-block px-3 py-1.5 bg-[var(--surface-dark)] text-[var(--accent-teal)] text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] border border-[var(--accent-teal)]/40 hover:bg-[var(--accent-teal)] hover:text-black transition-colors"
               >
-                Open Relations Canvas
+                Open Campaign Canvas
               </Link>
               <Link
                 href={`/watcher/campaign/${campaign.id}/settings`}
