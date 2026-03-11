@@ -67,7 +67,8 @@ Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 | Terminal | CampaignTerminal | Unified campaign activity feed — merges changelog + campaign events. Resizable bottom overlay, session grouping, filter toggles, auto-poll (5s). Replaces ChangeLogPanel |
 | Terminal | TerminalEventRow | Renders one terminal event — dispatches by type (changelog, dice_roll, chat, command, ai_message, game_event) with distinct styling |
 | Terminal | CommandInput | Command input bar with history (up/down arrows), auto-submit on Enter, imperative prefill via ref |
-| Forge | ForgePanel | GM design workshop — type filter, create form, publish/unpublish/delete, pending request queue with approve/deny, governor toggle selector for skills |
+| Forge | ForgePanel | GM design workshop — type filter, create form (full item builder with material catalog, weapon/armor fields), publish/unpublish/delete, "Place on Canvas" flow, pending request queue with approve/deny, governor toggle selector for skills |
+| Canvas | CanvasToolbox | HTML overlay toolbar on KRMA line — follows camera horizontally via SVG→screen coord conversion. Buttons: Add Character, Add Item from Forge (dropdown), Add Note |
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |
 | Auth | AuthForm, RedeemCode | Login/register with access code, post-registration upgrade |

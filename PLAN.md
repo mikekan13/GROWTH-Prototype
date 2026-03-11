@@ -460,6 +460,16 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - Full `next build` passes clean
 - **Next**: Item creation UI with material selection from catalog, encumbrance enforcement, armor integration with damage system
 
+### 2026-03-11 (Session 2): Forge Item Creation + Canvas Toolbox
+- **Forge item creation**: Full item builder in ForgePanel with material dropdown (auto-fills weight/tech/resistance from catalog), item sub-type selector (8 types with icons), stats grid (weight, tech, KV, rarity), weapon section (7 damage types, range, target), armor section (layer select with rule descriptions, resistance).
+- **Forge schema expanded**: `services/forge.ts` forgeItemDataSchema now includes all GrowthWorldItem fields — damage types, armor layers, prima materia, material modifiers, tags, rarity, notes.
+- **Place on Canvas flow**: Published forge items get a "Place on Canvas" button → creates CampaignItem from forge data via POST API → appears as WorldItemCard on canvas.
+- **Canvas toolbox**: Removed SVG foreignObject approach. New HTML overlay component converts SVG coords to screen pixels via `getScreenCTM()`, follows camera horizontally along KRMA line (Y=0). Contains "Add Character", "Add Item from Forge" (with dropdown of published items), and "Add Note" buttons.
+- **Relations → Canvas rename**: Tab type changed from `'relations'` to `'canvas'`, tab label "Relations" → "Canvas", breadcrumb updated to `CANVAS://session.layer.0`, watcher page link text updated.
+- **Files changed**: `CampaignCanvas.tsx`, `RelationsCanvas.tsx`, `ForgePanel.tsx`, `services/forge.ts`, `watcher/campaign/[id]/page.tsx`
+- Full `next build` passes clean
+- **Next**: Encumbrance enforcement, armor integration with damage system, item equip slots
+
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?
 2. **ComfyUI integration**: Run as subprocess, separate service, or direct API? (~15-30 sec generation time on RTX 4060 acceptable?)
