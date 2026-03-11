@@ -1,26 +1,28 @@
 /**
  * Dice Service — The single entry point for all dice rolling in GRO.WTH.
+ * SERVER-ONLY — all dice rolling happens on the server. Clients call API routes.
  *
  * Every game system (skills, items, encounters, combat, death saves, terminal)
- * calls DiceService methods. Never call lib/dice.ts rollDie() directly from
- * game logic — it bypasses injection, events, and logging.
+ * calls DiceService methods via API routes. Never import this from client code.
  *
  * Flow:
- *   1. Build RollRequest from params
- *   2. Generate crypto-random results (lib/dice.ts)
- *   3. Check injection registry (Godhead overrides)
- *   4. Compute totals, success/failure, margin
- *   5. Emit RollResult via event bus
- *   6. Return result
+ *   1. Client calls API route (e.g. POST /api/dice/check)
+ *   2. API route calls DiceService method
+ *   3. DiceService generates crypto-random results (lib/dice.ts)
+ *   4. Checks injection registry (Godhead overrides)
+ *   5. Computes totals, success/failure, margin
+ *   6. Returns RollResult to API route → client
+ *   7. Client emits to event bus for 3D visualization
  */
+import 'server-only';
 
 import type { FateDie } from '@/types/growth';
 import type {
   RollRequest, RollResult, RollSource, DieSpec, DieOutcome,
   DieType, DieColor, ContestedRollResult,
 } from '@/types/dice';
-import { rollDie, getSkillDieType, parseDie } from '@/lib/dice';
-import { diceEvents } from '@/lib/dice-events';
+import { rollDie } from '@/lib/dice';
+import { getSkillDieType, parseDie } from '@/lib/dice-utils';
 import { injectionRegistry } from './dice-injection';
 
 // ── ID Generation ─────────────────────────────────────────────────────────
@@ -145,9 +147,7 @@ function executeRoll(request: RollRequest): RollResult {
     injectionVisible: false, // Only Godhead/Terminal Admin can see this
   };
 
-  // 7. Emit event
-  diceEvents.emit(result);
-
+  // Result returned to API route → client. Client emits to event bus.
   return result;
 }
 

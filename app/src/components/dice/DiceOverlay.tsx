@@ -21,13 +21,13 @@ import { DiceAnimator } from './DiceAnimator';
 
 const STORAGE_KEY = 'growth_dice_3d_enabled';
 
-// Each die type has a canonical GROWTH pillar color
-const DIE_OPTIONS: { type: DieType; label: string; color: DieColor; hex: string }[] = [
-  { type: 'd4', label: 'D4', color: 'red', hex: '#E8585A' },
-  { type: 'd6', label: 'D6', color: 'teal', hex: '#2DB8A0' },
-  { type: 'd8', label: 'D8', color: 'blue', hex: '#4080D0' },
-  { type: 'd12', label: 'D12', color: 'purple', hex: '#7050A8' },
-  { type: 'd20', label: 'D20', color: 'gold', hex: '#D0A030' },
+// Each die type has a canonical GROWTH pillar color and shape glyph
+const DIE_OPTIONS: { type: DieType; label: string; color: DieColor; hex: string; glyph: string }[] = [
+  { type: 'd4', label: 'D4', color: 'red', hex: '#E8585A', glyph: '▲' },
+  { type: 'd6', label: 'D6', color: 'teal', hex: '#2DB8A0', glyph: '■' },
+  { type: 'd8', label: 'D8', color: 'blue', hex: '#4080D0', glyph: '◆' },
+  { type: 'd12', label: 'D12', color: 'purple', hex: '#7050A8', glyph: '⬟' },
+  { type: 'd20', label: 'D20', color: 'gold', hex: '#D0A030', glyph: '⬢' },
 ];
 
 interface ContextMenuState {
@@ -42,7 +42,7 @@ function is3DEnabled(): boolean {
   return stored !== 'false';
 }
 
-export function DiceOverlay() {
+export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hitDivRef = useRef<HTMLDivElement>(null);
@@ -118,15 +118,78 @@ export function DiceOverlay() {
     canvas.height = rect.height * window.devicePixelRatio;
 
     const animator = new DiceAnimator(canvas, {
-      onSettle: (_dice) => {
-        // TODO: Wire settled values back to terminal/game systems
+      onThrow: async (dice) => {
+        // Call server for authoritative crypto-random values
+        try {
+          const dieTypes = dice.map(d => d.dieType);
+          const res = await fetch('/api/dice/roll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dice: dieTypes, context: 'Physical dice throw' }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const values = (data.rolls as Array<{ die: string; value: number }>).map((r, i) => ({
+              dieType: dice[i].dieType,
+              value: r.value,
+            }));
+            animatorRef.current?.setServerValues(values);
+          } else {
+            // Auth failed or server error — use client-side fallback
+            const fallback = dice.map(d => ({
+              dieType: d.dieType,
+              value: Math.floor(Math.random() * parseInt(d.dieType.slice(1))) + 1,
+            }));
+            animatorRef.current?.setServerValues(fallback);
+          }
+        } catch {
+          // If server call fails, set fallback values so dice don't stay stuck
+          const fallback = dice.map(d => ({
+            dieType: d.dieType,
+            value: Math.floor(Math.random() * parseInt(d.dieType.slice(1))) + 1,
+          }));
+          animatorRef.current?.setServerValues(fallback);
+        }
+      },
+      onSettle: (dice, source) => {
+        // Emit settled dice as a window event for CampaignTerminal to pick up
+        window.dispatchEvent(new CustomEvent('growth:dice-settled', {
+          detail: { dice, source },
+        }));
       },
     });
 
     animatorRef.current = animator;
     initialized.current = true;
+    onReady?.();
     return true;
-  }, [findCanvasContainer, mountIntoContainer]);
+  }, [findCanvasContainer, mountIntoContainer, onReady]);
+
+  // ── Eager preload: init the animator on idle so first right-click is instant ──
+
+  useEffect(() => {
+    if (initialized.current) return;
+
+    // Poll for the canvas container (it mounts after navigation to a campaign page)
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout>;
+
+    const tryInit = () => {
+      if (cancelled || initialized.current) return;
+      if (ensureInitialized()) return; // success
+      // Container not in DOM yet — retry
+      pollTimer = setTimeout(tryInit, 1000);
+    };
+
+    // Start on idle
+    if ('requestIdleCallback' in window) {
+      const id = (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(() => tryInit());
+      return () => { cancelled = true; clearTimeout(pollTimer); (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(id); };
+    } else {
+      pollTimer = setTimeout(tryInit, 500);
+      return () => { cancelled = true; clearTimeout(pollTimer); };
+    }
+  }, [ensureInitialized]);
 
   // ── Process queue (from dice service rolls) ─────────────────────────
 
@@ -171,6 +234,12 @@ export function DiceOverlay() {
     animatorRef.current.removeDieAt(contextMenu.x, contextMenu.y);
     closeContextMenu();
   }, [contextMenu, closeContextMenu]);
+
+  const handleRemoveAll = useCallback(() => {
+    if (!animatorRef.current) return;
+    animatorRef.current.removeAllDice();
+    closeContextMenu();
+  }, [closeContextMenu]);
 
   // ── Document-level contextmenu listener ─────────────────────────────
   // Attached to document in capture phase so it fires before anything else.
@@ -342,82 +411,102 @@ export function DiceOverlay() {
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
-    <div
-      ref={wrapperRef}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 50,
-        pointerEvents: 'none',
-        display: active ? 'block' : 'none',
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-        }}
-      />
-
+    <>
       <div
-        ref={hitDivRef}
+        ref={wrapperRef}
         style={{
           position: 'absolute',
           inset: 0,
-          pointerEvents: active ? 'auto' : 'none',
+          zIndex: 50,
+          pointerEvents: 'none',
+          display: active ? 'block' : 'none',
         }}
-      />
-
-      {contextMenu && (
-        <div
-          data-dice-menu
+      >
+        <canvas
+          ref={canvasRef}
           style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            zIndex: 9999,
-            pointerEvents: 'auto',
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
           }}
-          onMouseDown={e => e.stopPropagation()}
-        >
-          {contextMenu.mode === 'remove' ? (
-            <div className="bg-zinc-900 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[140px]">
-              <button
-                className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 font-[Consolas,monospace]"
-                onClick={handleRemoveDie}
-              >
-                Put away
-              </button>
-            </div>
-          ) : (
-            <div className="bg-zinc-900 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[140px]">
-              <div className="px-3 py-1 text-xs text-zinc-500 font-[Consolas,monospace] border-b border-zinc-800">
-                Pull out a die
-              </div>
-              {DIE_OPTIONS.map(({ type, label, hex }) => (
+        />
+
+        <div
+          ref={hitDivRef}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: active ? 'auto' : 'none',
+          }}
+        />
+
+        {contextMenu && (
+          <div
+            data-dice-menu
+            style={{
+              position: 'fixed',
+              left: contextMenu.x,
+              top: contextMenu.y,
+              zIndex: 9999,
+              pointerEvents: 'auto',
+            }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            {contextMenu.mode === 'remove' ? (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[140px]">
                 <button
-                  key={type}
-                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 font-[Consolas,monospace] flex items-center gap-2"
-                  onClick={() => handleSpawnDie(type)}
+                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 font-[Consolas,monospace]"
+                  onClick={handleRemoveDie}
                 >
-                  <span
-                    className="w-3 h-3 rounded-full inline-block border border-zinc-600 flex-shrink-0"
-                    style={{ backgroundColor: hex }}
-                  />
-                  {label}
+                  Put away
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+                <button
+                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-400 hover:bg-zinc-700 font-[Consolas,monospace]"
+                  onClick={handleRemoveAll}
+                >
+                  Put away all
+                </button>
+              </div>
+            ) : (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[140px]">
+                <div className="px-3 py-1 text-xs text-zinc-500 font-[Consolas,monospace] border-b border-zinc-800">
+                  Pull out a die
+                </div>
+                {DIE_OPTIONS.map(({ type, label, hex, glyph }) => (
+                  <button
+                    key={type}
+                    className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 font-[Consolas,monospace] flex items-center gap-2"
+                    onClick={() => handleSpawnDie(type)}
+                  >
+                    <span className="text-base leading-none flex-shrink-0" style={{ color: hex }}>
+                      {glyph}
+                    </span>
+                    {label}
+                  </button>
+                ))}
+                {animatorRef.current?.hasDice() && (
+                  <>
+                    <div className="border-t border-zinc-800 my-1" />
+                    <button
+                      className="w-full px-3 py-1.5 text-left text-sm text-zinc-400 hover:bg-zinc-700 font-[Consolas,monospace]"
+                      onClick={handleRemoveAll}
+                    >
+                      Put away all
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+    </>
   );
 }
+
 
 function passThrough(hitDiv: HTMLElement, originalEvent: MouseEvent): void {
   hitDiv.style.pointerEvents = 'none';

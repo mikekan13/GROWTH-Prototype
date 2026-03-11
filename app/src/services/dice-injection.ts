@@ -1,12 +1,15 @@
 /**
  * Godhead Dice Injection Registry
+ * SERVER-ONLY — never import from client code.
  *
- * Server-side only. Allows the Godhead (admin) or future AI Oracle to silently
- * override die results before they reach players. All injections are audit-logged.
+ * Allows the Godhead (admin) or future AI Oracle to silently override die results
+ * before they reach players. All injections are audit-logged.
  *
  * Security: injection data never reaches clients. The `injected` flag on RollResult
- * is only visible in Terminal Admin view.
+ * is only visible in Terminal Admin view. Registry is only accessible via
+ * authenticated API routes (/api/dice/inject).
  */
+import 'server-only';
 
 import type { RollRequest, DiceInjection, InjectionFilter } from '@/types/dice';
 

@@ -1,6 +1,6 @@
 # GRO.WTH System Map
 
-Last updated: 2026-03-08 (Forge System + Skill Redesign)
+Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems + Dice Engine)
 
 ## Architecture Overview
 
@@ -60,11 +60,16 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 ### Relations Canvas (Watcher Console)
 - SVG infinite canvas with pan, zoom, node dragging, viewport culling
 - CharacterCard: expanded (full sheet) / compact views, drag-to-move, dynamic name sizing
-- InventoryCard: draggable sub-panel with gold tether line, 2000px max distance
+- Sub-panels: InventoryCard, SkillsCard, VitalsCard, TraitsCard, MagicCard, BackstoryCard, GROvinePanel, HarvestCard — draggable with gold tether lines, 2000px max distance
+- LocationCard: expandable location nodes on canvas (compact 280px / expanded 480px)
+- WorldItemCard: expandable world item nodes on canvas (compact 240px / expanded 400px)
+- EncounterTracker: combat encounter management card with three-phase tracking
+- KRMA Line: horizontal line at Y=0 separating fluid/crystallized zones. Guitar string deformation effect, direction-aware glow, sub-panel clamping
+- Canvas create buttons: character, location, and item creation in toolbar
 - ComplexTooltip: 500ms lock-on-hover, nested tooltips via createPortal
 - All canvas state persisted to localStorage per campaign (debounced 300ms)
-- Persisted state: viewBox, zoom, positions, z-indices, expanded/collapsed, inventory panels, offsets
-- Files: `components/canvas/RelationsCanvas.tsx`, `CharacterCard.tsx`, `InventoryCard.tsx`, `ui/ComplexTooltip.tsx`
+- Persisted state: viewBox, zoom, positions, z-indices, expanded/collapsed, sub-panels, offsets
+- Files: `components/canvas/RelationsCanvas.tsx`, `CampaignCanvas.tsx`, all `*Card.tsx` / `*Panel.tsx` / `*Tracker.tsx` in `components/canvas/`, `ui/ComplexTooltip.tsx`
 
 ### Change Log System
 - Character updates trigger changelog entries via automatic diffing of before/after data
@@ -89,11 +94,18 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - Files: `components/terminal/CampaignTerminal.tsx`, `TerminalEventRow.tsx`, `CommandInput.tsx`, `lib/terminal-commands.ts`, `types/terminal.ts`, `services/campaign-event.ts`
 
 ### Dice / Resolution System
-- Pure rolling functions in `lib/dice.ts`: rollDie, rollSkillDie, rollFateDie, skilledCheck, unskilledCheck
+- **Core rolling**: Crypto RNG (rejection sampling via `crypto.getRandomValues()`) in `lib/dice.ts`: rollDie, rollSkillDie, rollFateDie, skilledCheck, unskilledCheck
 - Implements GRO.WTH resolution: Skilled (SD + FD + Effort + mods vs DR) and Unskilled (FD + Effort + mods vs DR)
 - Skill Die progression: levels 1-3 = flat bonus, 4-5 = d4, 6-7 = d6, 8-11 = d8, 12-19 = d12, 20 = d20
+- **DiceService** (`services/dice.ts`): Single entry point for all rolling — skilledCheck, unskilledCheck, deathSave, fearCheck, contestedRoll, quickRoll, customRoll. All game systems call DiceService, never `rollDie()` directly
+- **Event bus** (`lib/dice-events.ts`): Pub/sub for roll results. Terminal log and 3D overlay subscribe independently
+- **Godhead injection** (`services/dice-injection.ts`): Silent result override system. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp, hidden modifier. Audit-logged
 - `performSkillCheck()` in `character-actions.ts` combines dice rolling with effort spending (auto-depletion, overflow to Frequency)
 - Effort always spent regardless of success/failure
+- **3D visualization**: Three.js + Cannon-es physics simulation. Lazy-loaded overlay (portal to body). Pillar-colored dice, death save dramatic effects, snap-to-result after physics settle. 9 component files in `components/dice/`. DiceOverlayLoader in root layout, DiceToggle for user preference (localStorage)
+- **API routes**: `POST /api/dice/roll` (quick roll), `POST /api/dice/check` (full skill check), `GET/POST/DELETE /api/dice/inject` (Godhead injections)
+- **Terminal commands**: `/roll`, `/check`, `/deathsave`, `/inject`
+- Files: `lib/dice.ts`, `lib/dice-events.ts`, `services/dice.ts`, `services/dice-injection.ts`, `types/dice.ts`, `hooks/useDiceEvents.ts`, `components/dice/*`
 
 ### Skills System
 - **Freeform** — name defines context, no predefined categories, no combat flag
@@ -116,14 +128,47 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - KRMA cost: creating a template is free, assigning to a character at a level costs KRMA (future)
 - Files: `services/forge.ts`, `app/api/campaigns/[id]/forge/`, `app/api/campaigns/[id]/requests/`
 
+### Location System (skeleton)
+- Campaign-scoped locations: settlement, wilderness, dungeon, building, POI, region
+- GM-only CRUD with Zod validation
+- LocationCard canvas component (compact 280px / expanded 480px) with description, tech/wealth/danger levels, features, ley lines, tags
+- Files: `services/location.ts`, `types/location.ts`, `components/canvas/LocationCard.tsx`, `app/api/campaigns/[id]/locations/`
+
+### World Item System (skeleton)
+- Campaign-scoped items: weapon, armor, accessory, consumable, tool, artifact, prima_materia, misc
+- Holder/location assignment, GM-only CRUD
+- WorldItemCard canvas component (compact 240px / expanded 400px) with damage (P:S:H/D\C:B:E), armor resistance, prima materia, material modifiers, condition
+- Files: `services/campaign-item.ts`, `types/item.ts`, `components/canvas/WorldItemCard.tsx`, `app/api/campaigns/[id]/items/`
+
+### Encounter System (skeleton)
+- Campaign-scoped encounters: combat, social, exploration, puzzle, event
+- Three-phase tracking (Intention/Resolution/Impact), round counter, per-pillar action pools, participant tracking by side
+- GM-only CRUD
+- Files: `services/encounter.ts`, `types/encounter.ts`, `components/canvas/EncounterTracker.tsx`, `app/api/campaigns/[id]/encounters/`
+
+### GROvine System
+- GROvinePanel canvas component: add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking
+- Essence tab in CampaignCanvas: GROvine overview, Nectars/Blossoms/Thorns summary, Harvest log across all characters
+- Files: `components/canvas/GROvinePanel.tsx`, `components/canvas/HarvestCard.tsx`
+
 ### AI Systems (planned)
 - Portrait pipeline: ComfyUI + FLUX.2 Dev + PuLID (see PORTRAIT-PIPELINE.md)
 - Oracle (future): AI co-GM, separate service
 - Rule Arbiter (future): AI copilot for session mechanics
 
-### KRMA Economy (planned)
-- Reserve wallets, GM KRMA pools, TKV calculation
-- Wallet + KrmaTransaction models in schema (not yet implemented)
+### KRMA Economy
+- **Core ledger** (`services/krma/ledger.ts`): Append-only transaction engine with SHA-256 checksum chain, idempotent, atomic single + batch execution
+- **Wallets** (`services/krma/wallet.ts`): USER, CAMPAIGN, CHARACTER, BURN, LADY_DEATH types. Fund/defund campaigns, transaction history, global metrics
+- **Genesis**: 100B KRMA seeded across 4 reserves (Terminal 75%, Balance 12.5%, Mercy 6.25%, Severity 6.25%)
+- **TKV evaluator** (`services/krma/evaluator.ts`): Deterministic character value calculator (pillar breakdown, skills, WTH, traits). Versioned + hashable
+- **Death split** (`services/krma/death-split.ts`): Multi-transaction death process — Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch
+- **Reconciliation** (`services/krma/reconciliation.ts`): Balance reconciliation, global supply invariant check, checksum chain verification, full audit
+- **Crystallization** (`services/krma/crystallization.ts`): Crystallize/dissolve entities across KRMA line. Ledger stored as campaign events. Prevents double-crystallization. Pool tracking
+- **KV Calculator** (`lib/kv-calculator.ts`): Client-side KV calculation utilities
+- **UI**: KRMA readouts on all 3 interfaces — canvas header (GM-only, 30s poll, fluid/crystallized/total), watcher console (total/self/camp with per-campaign breakdown), terminal admin (total/circ/burn with reserve breakdown). Canonical display: gold gradient bar + Bebas Neue + Inknut Antiqua Ҝ
+- **Canvas effects**: Guitar string deformation on KRMA line when cards dragged through, direction-aware card glow (red=crystallize, blue=dissolve), sub-panel constraint clamping
+- **API routes**: 9 routes under `/api/krma/` (wallets, campaigns, balance, fund/defund, transactions, economy, crystallize, metrics, audit)
+- Files: `services/krma/*`, `lib/kv-calculator.ts`, `types/krma.ts`, `types/crystallization.ts`
 
 ## Three Interfaces
 

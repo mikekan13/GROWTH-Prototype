@@ -165,6 +165,14 @@ export default function RelationsCanvas({
   const [panelZOrder, setPanelZOrder] = useState<Map<string, number>>(new Map());
   const panelZCounterRef = useRef(1);
 
+  // Measured panel heights: tracks actual rendered height of each sub-panel via ResizeObserver
+  const panelHeightsRef = useRef<Map<string, number>>(new Map());
+  const panelObserversRef = useRef<Map<string, ResizeObserver>>(new Map());
+  useEffect(() => {
+    const observers = panelObserversRef.current;
+    return () => { observers.forEach(o => o.disconnect()); observers.clear(); };
+  }, []);
+
   // ── Sub-panel state (vitals, traits, skills, magic, backstory, harvests) ──
   const [panelOpenNodes, setPanelOpenNodes] = useState<Map<string, Set<string>>>(() => {
     const stored = loadJSON<[string, string[]][]>('panelOpen', []);
@@ -413,24 +421,51 @@ export default function RelationsCanvas({
     }
   }, [nodes, expandedNodes]);
 
-  // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card
-  // Asymmetric: crystallized panels extend downward toward line so need bigger buffer;
-  // fluid panels extend downward away from line so need smaller buffer
-  const LINE_BUFFER_CRYSTAL = 150;
-  const LINE_BUFFER_FLUID = 10;
-  const clampPanelY = (panelY: number, cardCenterY: number): number => {
-    if (cardCenterY < 0 && panelY > -LINE_BUFFER_CRYSTAL) return -LINE_BUFFER_CRYSTAL;
-    if (cardCenterY > 0 && panelY < LINE_BUFFER_FLUID) return LINE_BUFFER_FLUID;
+  // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card.
+  // For crystallized panels (above line), the BOTTOM edge (panelY + panelHeight) must not cross below the line.
+  // For fluid panels (below line), the TOP edge (panelY) must not cross above the line.
+  const LINE_BUFFER = 10;
+  const clampPanelY = (panelY: number, cardCenterY: number, panelHeight = 0): number => {
+    if (cardCenterY < 0) {
+      // Crystallized: bottom edge must stay above line (Y=0)
+      const maxTopY = -LINE_BUFFER - panelHeight;
+      if (panelY > maxTopY) return maxTopY;
+    }
+    if (cardCenterY > 0 && panelY < LINE_BUFFER) return LINE_BUFFER;
     return panelY;
   };
 
   // Clamp an offset so the resulting panel position respects the KRMA line
-  const clampOffsetY = (offsetY: number, anchorY: number, cardCenterY: number): number => {
+  const clampOffsetY = (offsetY: number, anchorY: number, cardCenterY: number, panelHeight = 0): number => {
     const panelY = anchorY + offsetY;
-    if (cardCenterY < 0 && panelY > -LINE_BUFFER_CRYSTAL) return -LINE_BUFFER_CRYSTAL - anchorY;
-    if (cardCenterY > 0 && panelY < LINE_BUFFER_FLUID) return LINE_BUFFER_FLUID - anchorY;
+    if (cardCenterY < 0) {
+      const maxTopY = -LINE_BUFFER - panelHeight;
+      if (panelY > maxTopY) return maxTopY - anchorY;
+    }
+    if (cardCenterY > 0 && panelY < LINE_BUFFER) return LINE_BUFFER - anchorY;
     return offsetY;
   };
+
+  // Measure panel height via ResizeObserver — returns a ref callback for the panel wrapper div
+  const measurePanelRef = useCallback((panelKey: string) => {
+    return (el: HTMLDivElement | null) => {
+      const observers = panelObserversRef.current;
+      // Clean up old observer for this key
+      const existing = observers.get(panelKey);
+      if (existing) { existing.disconnect(); observers.delete(panelKey); }
+      if (!el) { panelHeightsRef.current.delete(panelKey); return; }
+      // Measure immediately
+      panelHeightsRef.current.set(panelKey, el.offsetHeight);
+      // Watch for resize
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          panelHeightsRef.current.set(panelKey, (entry.target as HTMLElement).offsetHeight);
+        }
+      });
+      ro.observe(el);
+      observers.set(panelKey, ro);
+    };
+  }, []);
 
   // Compute line deflection — card pushes through like a finger on a string
   const getLineDeflection = useCallback((segmentX: number, time: number): number => {
@@ -979,8 +1014,9 @@ export default function RelationsCanvas({
           const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           const offset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
+          const invPanelH = panelHeightsRef.current.get(`_inv_${node.id}`) || 0;
           const tetherEndX = anchorX + offset.x;
-          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY);
+          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, invPanelH);
           return (
             <>
               <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
@@ -998,8 +1034,9 @@ export default function RelationsCanvas({
           const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
+          const subPanelH = panelHeightsRef.current.get(offsetKey) || 0;
           const tetherEndX = anchorX + offset.x;
-          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY);
+          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, subPanelH);
           return (
             <React.Fragment key={`tether-${node.id}-${panelKey}`}>
               <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
@@ -1025,8 +1062,10 @@ export default function RelationsCanvas({
             const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
             const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
             const invOffset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
+            const invHeightKey = `_inv_${node.id}`;
+            const invPanelH = panelHeightsRef.current.get(invHeightKey) || 0;
             const panelCenterX = anchorX + invOffset.x;
-            const panelTopY = clampPanelY(anchorY + invOffset.y, visualY);
+            const panelTopY = clampPanelY(anchorY + invOffset.y, visualY, invPanelH);
             const panelW = 413;
 
             return (
@@ -1039,6 +1078,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div
+                  ref={measurePanelRef(invHeightKey)}
                   style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
                   onMouseDown={(e) => {
                     if (e.button !== 0) return;
@@ -1057,8 +1097,9 @@ export default function RelationsCanvas({
                     };
 
                     const startSVG = screenToSVG(e.clientX, e.clientY);
+                    const h = panelHeightsRef.current.get(invHeightKey) || 0;
                     // Use clamped offset as start so drag begins from visual position
-                    const startOffset = { x: invOffset.x, y: clampOffsetY(invOffset.y, anchorY, visualY) };
+                    const startOffset = { x: invOffset.x, y: clampOffsetY(invOffset.y, anchorY, visualY, h) };
 
                     const onMove = (me: MouseEvent) => {
                       const cur = screenToSVG(me.clientX, me.clientY);
@@ -1067,7 +1108,7 @@ export default function RelationsCanvas({
                       let dy = startOffset.y + (cur.y - startSVG.y);
 
                       // Clamp offset so panel position stays on the right side of the line
-                      dy = clampOffsetY(dy, anchorY, visualY);
+                      dy = clampOffsetY(dy, anchorY, visualY, h);
 
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       if (dist > MAX_TETHER_DISTANCE) {
@@ -1113,8 +1154,9 @@ export default function RelationsCanvas({
           const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
+          const subPanelH = panelHeightsRef.current.get(offsetKey) || 0;
           const panelCenterX = anchorX + offset.x;
-          const panelTopY = clampPanelY(anchorY + offset.y, visualY);
+          const panelTopY = clampPanelY(anchorY + offset.y, visualY, subPanelH);
           const panelW = 440;
           const tetherEndX = panelCenterX;
           const tetherEndY = panelTopY + 20;
@@ -1145,7 +1187,15 @@ export default function RelationsCanvas({
                     if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
                   } : undefined}
                   onRollSkill={(skillName) => {
-                    window.dispatchEvent(new CustomEvent('growth:roll-skill', { detail: { skillName, characterName: node.name, nodeId: node.id } }));
+                    const skillData = ((charData.skills as SkillItem[]) || []).find(s => s.name === skillName);
+                    window.dispatchEvent(new CustomEvent('growth:roll-skill', {
+                      detail: {
+                        skillName,
+                        characterName: node.name,
+                        nodeId: node.id,
+                        governors: skillData?.governors || [],
+                      },
+                    }));
                   }}
                   onRequestSkill={(request) => {
                     fetch(`/api/campaigns/${campaignId}/requests`, {
@@ -1190,6 +1240,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div
+                  ref={measurePanelRef(offsetKey)}
                   style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
                   onMouseDown={(e) => {
                     if (e.button !== 0) return;
@@ -1208,8 +1259,9 @@ export default function RelationsCanvas({
                     };
 
                     const startSVG = screenToSVG(e.clientX, e.clientY);
+                    const h = panelHeightsRef.current.get(offsetKey) || 0;
                     // Use clamped offset as start so drag begins from visual position
-                    const startOffset = { x: offset.x, y: clampOffsetY(offset.y, anchorY, visualY) };
+                    const startOffset = { x: offset.x, y: clampOffsetY(offset.y, anchorY, visualY, h) };
 
                     const onMove = (me: MouseEvent) => {
                       const cur = screenToSVG(me.clientX, me.clientY);
@@ -1218,7 +1270,7 @@ export default function RelationsCanvas({
                       let dy = startOffset.y + (cur.y - startSVG.y);
 
                       // Clamp offset so panel position stays on the right side of the line
-                      dy = clampOffsetY(dy, anchorY, visualY);
+                      dy = clampOffsetY(dy, anchorY, visualY, h);
 
                       const dist = Math.sqrt(dx * dx + dy * dy);
                       if (dist > MAX_TETHER_DISTANCE) {

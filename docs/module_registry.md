@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
+Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
 
 ## Services (Business Logic)
 
@@ -41,6 +41,7 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | Dice Events | `lib/dice-events.ts` | Pub/sub event bus for roll results. Subscribers: terminal log, 3D overlay, roll history. DiceService emits after every roll |
 | Character Actions | `lib/character-actions.ts` | Pure functions for character state mutations: attribute CRUD (update/spend/restore/setLevel), skill CRUD (add/remove/updateLevel/update with governors), performSkillCheck (rolls dice + spends effort). Returns { character, changes[] } for audit trail |
 | Terminal Commands | `lib/terminal-commands.ts` | Command parser + executor for Campaign Terminal: /roll, /check, /deathsave, /spend, /restore, /session, /inject. /check and /deathsave use DiceService, /inject manages Godhead overrides |
+| KV Calculator | `lib/kv-calculator.ts` | Client-side KRMA Value calculation utilities for character/entity valuation |
 
 ## Components
 
@@ -56,11 +57,17 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (240px) and expanded (400px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance, prima materia, material modifiers, condition |
 | Canvas Cards | GROvinePanel | GROvine management sub-panel for characters. Add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking |
 | Canvas Cards | EncounterTracker | Combat encounter management card. Three-phase (Intention/Resolution/Impact), round counter, per-pillar action pools, participant tracking by side |
-| Canvas Cards | CampaignCanvas | Campaign page wrapper that loads characters and renders RelationsCanvas |
+| Canvas Cards | VitalsCard | Character vitals sub-panel on canvas — body part grid, damage tracking, conditions |
+| Canvas Cards | TraitsCard | Character traits sub-panel — Nectars (permanent), Blossoms (temporary), Thorns (permanent negative) |
+| Canvas Cards | MagicCard | Character magic sub-panel — mercy/severity/balance spell display |
+| Canvas Cards | BackstoryCard | Character backstory sub-panel — structured prompt responses, narrative view |
+| Canvas Cards | HarvestCard | Harvest log sub-panel — GROvine completion history across characters |
+| Canvas Cards | CampaignCanvas | Campaign page wrapper that loads characters, locations, items and renders RelationsCanvas with tabs (Relations/Forge/Essence/Encounters) |
 | Change Log | ChangeLogPanel | (Legacy — absorbed into Campaign Terminal) Bottom overlay panel, retained as reference |
 | Terminal | CampaignTerminal | Unified campaign activity feed — merges changelog + campaign events. Resizable bottom overlay, session grouping, filter toggles, auto-poll (5s). Replaces ChangeLogPanel |
 | Terminal | TerminalEventRow | Renders one terminal event — dispatches by type (changelog, dice_roll, chat, command, ai_message, game_event) with distinct styling |
 | Terminal | CommandInput | Command input bar with history (up/down arrows), auto-submit on Enter, imperative prefill via ref |
+| Forge | ForgePanel | GM design workshop — type filter, create form, publish/unpublish/delete, pending request queue with approve/deny, governor toggle selector for skills |
 | Campaign | CampaignCreator, JoinCampaign | Campaign creation with world context, invite code join |
 | Backstory | BackstoryEditor, BackstoryReview | Structured prompt editor, GM review interface |
 | Auth | AuthForm, RedeemCode | Login/register with access code, post-registration upgrade |
@@ -68,6 +75,7 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | UI | ComplexTooltip | 500ms lock-on-hover tooltip with nested tooltip support via createPortal |
 | UI | ConfirmDialog, Modal | Reusable dialog/modal primitives |
 | Branding | GrowthLogo | Canonical logo rendering, scalable via `scale` prop. DO NOT modify without Mike's approval |
+| Branding | GlitchText | Glitch text effect component for reality layer transitions |
 | Layout | DashboardShell | Role-aware page wrapper with header |
 
 ## Types
@@ -79,6 +87,10 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | `types/changelog.ts` | ChangeActor (player, gm, ai_copilot, system), ChangeCategory, FieldChange (field/oldValue/newValue), ChangeLogEntry (full DB record type), query/create/revert input types |
 | `types/terminal.ts` | TerminalEvent (unified event type), TerminalEventType, TerminalPayload (discriminated union), payload types (ChangeLogPayload, DiceRollPayload, ChatPayload, CommandPayload, AIMessagePayload, GameEventPayload), GameSessionInfo, TerminalFilter |
 | `types/dice.ts` | DieType, DieColor, RollSource (discriminated union — 10 source types), DieSpec, RollRequest, DieOutcome, RollResult, ContestedRollResult, InjectionFilter, InjectionOverride, DiceInjection, legacy compat types |
+| `types/location.ts` | LocationType (settlement/wilderness/dungeon/building/POI/region), Location fields, create/update input types |
+| `types/item.ts` | ItemType (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), WorldItem fields, damage/armor/material types |
+| `types/encounter.ts` | EncounterType (combat/social/exploration/puzzle/event), EncounterPhase (intention/resolution/impact), Encounter fields, participant/round tracking types |
+| `types/crystallization.ts` | CrystallizationEntry, CrystallizationLedger, crystallize/dissolve request/response types |
 
 ## Hooks
 
@@ -87,7 +99,7 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | useDiceEvents | `hooks/useDiceEvents.ts` | Subscribe to dice roll events from DiceService event bus |
 | useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
 
-## API Routes (36 total)
+## API Routes (39 total)
 
 | Route | Methods | Service |
 |-------|---------|---------|
@@ -124,3 +136,9 @@ Last updated: 2026-03-09 (Dice System Engine + 3D Visualization)
 | /api/dice/roll | POST | DiceService (quick roll — one or more dice, no DR/effort) |
 | /api/dice/check | POST | DiceService (full skill/unskilled check with DR, effort, modifiers) |
 | /api/dice/inject | GET, POST, DELETE | DiceInjection (Godhead-only — list/register/remove injections) |
+| /api/campaigns/[id]/locations | GET, POST | LocationService (list + create locations, GM-only create) |
+| /api/campaigns/[id]/locations/[locationId] | GET, PATCH, DELETE | LocationService (get/update/delete location, GM-only) |
+| /api/campaigns/[id]/items | GET, POST | CampaignItemService (list + create world items, GM-only create) |
+| /api/campaigns/[id]/items/[itemId] | GET, PATCH, DELETE | CampaignItemService (get/update/delete item, GM-only) |
+| /api/campaigns/[id]/encounters | GET, POST | EncounterService (list + create encounters, GM-only create) |
+| /api/campaigns/[id]/encounters/[encounterId] | GET, PATCH, DELETE | EncounterService (get/update/delete encounter, GM-only) |

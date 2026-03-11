@@ -48,6 +48,8 @@ export interface DiceRollPayload {
   success?: boolean;
   margin?: number;
   isSkilled: boolean;
+  /** Raw dice for physical rolls — used to color min/max values in the log */
+  physicalDice?: Array<{ dieType: string; value: number }>;
 }
 
 export interface ChatPayload {

@@ -27,7 +27,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       id: result.id,
-      rolls: result.rolls.map(r => ({ die: r.die, value: r.value })),
+      rolls: result.rolls.map(r => ({
+        die: r.die,
+        label: r.label,
+        value: r.value,
+        maxValue: r.maxValue,
+      })),
       total: result.total,
       timestamp: result.timestamp,
     });

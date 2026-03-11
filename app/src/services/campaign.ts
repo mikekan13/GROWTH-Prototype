@@ -2,7 +2,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ConflictError, ValidationError } from '@/lib/errors';
-import { isWatcherOrAbove, isAdminRole } from '@/lib/permissions';
+import { isWatcherOrAbove, isAdminRole, canManageCampaign } from '@/lib/permissions';
 import { createCampaignWallet } from '@/services/krma/wallet';
 
 // --- Schemas ---
@@ -17,6 +17,15 @@ export const createCampaignSchema = z.object({
 
 export const joinCampaignSchema = z.object({
   inviteCode: z.string().min(1, 'Invite code required').max(20),
+});
+
+export const updateCampaignSchema = z.object({
+  name: z.string().min(1, 'Campaign name required').max(100).optional(),
+  description: z.string().max(2000).optional(),
+  worldContext: z.string().max(5000).optional(),
+  status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'ARCHIVED']).optional(),
+  maxTrailblazers: z.number().int().min(1).max(50).optional(),
+  customPrompts: z.array(z.string().max(500)).max(20).optional(),
 });
 
 // --- Service Functions ---
@@ -110,4 +119,57 @@ export async function joinCampaign(userId: string, inviteCode: string) {
   });
 
   return { campaign: { id: campaign.id, name: campaign.name }, member };
+}
+
+export async function updateCampaign(
+  campaignId: string,
+  userId: string,
+  userRole: string,
+  input: z.infer<typeof updateCampaignSchema>,
+) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+
+  if (!canManageCampaign(userId, userRole, campaign)) {
+    throw new ForbiddenError('Only the GM or admin can edit this campaign');
+  }
+
+  // If reducing seats, check current member count
+  if (input.maxTrailblazers !== undefined) {
+    const memberCount = await prisma.campaignMember.count({ where: { campaignId } });
+    if (input.maxTrailblazers < memberCount) {
+      throw new ValidationError(`Cannot reduce seats below current member count (${memberCount})`);
+    }
+  }
+
+  const updated = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.description !== undefined && { description: input.description }),
+      ...(input.worldContext !== undefined && { worldContext: input.worldContext }),
+      ...(input.status !== undefined && { status: input.status }),
+      ...(input.maxTrailblazers !== undefined && { maxTrailblazers: input.maxTrailblazers }),
+      ...(input.customPrompts !== undefined && { customPrompts: JSON.stringify(input.customPrompts) }),
+    },
+  });
+
+  return updated;
+}
+
+export async function regenerateInviteCode(campaignId: string, userId: string, userRole: string) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+
+  if (!canManageCampaign(userId, userRole, campaign)) {
+    throw new ForbiddenError('Only the GM or admin can regenerate the invite code');
+  }
+
+  const newCode = crypto.randomBytes(4).toString('hex');
+  const updated = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { inviteCode: newCode },
+  });
+
+  return { inviteCode: updated.inviteCode };
 }

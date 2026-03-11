@@ -1,17 +1,14 @@
 /**
  * Dice rolling utilities for GRO.WTH resolution system.
+ * SERVER-ONLY — all RNG happens on the server. Never import this from client code.
  *
  * Uses crypto.getRandomValues() with rejection sampling for uniform distribution.
  * No game system should call these directly — use DiceService instead.
  * These remain exported for unit testing and the service layer.
  *
- * Resolution:
- *   Skilled Check:  Roll SD → Wager Effort → Roll FD → Total = SD + FD + flat mods + Effort vs DR
- *   Unskilled Check: Wager Effort blind → Roll FD → Total = FD + flat mods + Effort vs DR
- *
- * Skill Die progression: 1-3 = flat bonus (+1/+2/+3), 4-5 = d4, 6-7 = d6, 8-11 = d8, 12-19 = d12, 20 = d20
- * Effort is always spent regardless of success/failure.
+ * For client-safe utilities (parseDie, getSkillDieType), import from '@/lib/dice-utils'.
  */
+import 'server-only';
 
 import type { FateDie } from '@/types/growth';
 
@@ -81,25 +78,9 @@ export function rollDice(specs: Array<{ sides: number }>): number[] {
 
 // ── Parsing ───────────────────────────────────────────────────────────────
 
-/** Parse a die string like "d8" into its sides count. Returns 0 if invalid. */
-export function parseDie(die: string): number {
-  const match = die.match(/^d(\d+)$/);
-  if (!match) return 0;
-  return parseInt(match[1], 10);
-}
-
-// ── Skill Die Lookup ──────────────────────────────────────────────────────
-
-/** Get the skill die type for a given skill level. */
-export function getSkillDieType(level: number): { die: string; sides: number; isFlat: boolean; flatBonus: number } {
-  if (level <= 0) return { die: '-', sides: 0, isFlat: true, flatBonus: 0 };
-  if (level <= 3) return { die: `+${level}`, sides: 0, isFlat: true, flatBonus: level };
-  if (level <= 5) return { die: 'd4', sides: 4, isFlat: false, flatBonus: 0 };
-  if (level <= 7) return { die: 'd6', sides: 6, isFlat: false, flatBonus: 0 };
-  if (level <= 11) return { die: 'd8', sides: 8, isFlat: false, flatBonus: 0 };
-  if (level <= 19) return { die: 'd12', sides: 12, isFlat: false, flatBonus: 0 };
-  return { die: 'd20', sides: 20, isFlat: false, flatBonus: 0 };
-}
+// Import shared utilities for local use + re-export for backward compatibility
+import { parseDie, getSkillDieType } from './dice-utils';
+export { parseDie, getSkillDieType };
 
 /** Roll a skill die for a given skill level. */
 export function rollSkillDie(skillLevel: number): DieResult {

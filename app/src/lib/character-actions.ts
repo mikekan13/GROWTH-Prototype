@@ -10,8 +10,6 @@
  */
 
 import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillGovernor, AugmentSource } from '@/types/growth';
-import { skilledCheck, unskilledCheck, type SkillCheckResult } from '@/lib/dice';
-import type { FateDie } from '@/types/growth';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -298,62 +296,6 @@ export function updateSkill(
     changes.push(`${skill.name} description updated`);
   }
   return { character: c, changes };
-}
-
-// ── Skill Check Actions ────────────────────────────────────────────────────
-
-export interface SkillCheckActionResult extends ActionResult {
-  roll: SkillCheckResult;
-}
-
-/**
- * Perform a skill check: roll dice, spend effort from attribute, return result.
- * Effort is always spent regardless of success/failure.
- */
-export function performSkillCheck(
-  character: GrowthCharacter,
-  params: {
-    skillName: string;
-    effortAttribute: AttributeName;
-    effortAmount: number;
-    dr: number;
-    flatModifiers?: number;
-  }
-): SkillCheckActionResult {
-  const skill = character.skills.find(s => s.name.toLowerCase() === params.skillName.toLowerCase());
-  const fateDie = character.creation?.seed?.baseFateDie || 'd6';
-
-  // Roll first
-  const roll = skill
-    ? skilledCheck({
-        skillLevel: skill.level,
-        fateDie: fateDie as FateDie,
-        effort: params.effortAmount,
-        dr: params.dr,
-        flatModifiers: params.flatModifiers,
-      })
-    : unskilledCheck({
-        fateDie: fateDie as FateDie,
-        effort: params.effortAmount,
-        dr: params.dr,
-        flatModifiers: params.flatModifiers,
-      });
-
-  // Spend effort (always, regardless of success)
-  const spendResult = spendAttribute(character, params.effortAttribute, params.effortAmount);
-
-  const skillLabel = skill ? skill.name : `${params.skillName} (unskilled)`;
-  const resultLabel = roll.success ? 'SUCCESS' : 'FAILURE';
-  const changes = [
-    `${skillLabel} check vs DR ${params.dr}: ${resultLabel} (${roll.total} = ${roll.skillDie.die}[${roll.skillDie.value}] + ${roll.fateDie.die}[${roll.fateDie.value}] + ${params.effortAmount} effort${roll.flatModifiers ? ` + ${roll.flatModifiers} mod` : ''})`,
-    ...spendResult.changes,
-  ];
-
-  return {
-    character: spendResult.character,
-    changes,
-    roll,
-  };
 }
 
 // ── Augment Recomputation ──────────────────────────────────────────────────

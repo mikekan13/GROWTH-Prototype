@@ -54,12 +54,20 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             )}
           </div>
           <div className="text-right space-y-1">
-            <Link
-              href={`/campaign/${campaign.id}`}
-              className="inline-block px-3 py-1.5 bg-[var(--surface-dark)] text-[var(--accent-teal)] text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] border border-[var(--accent-teal)]/40 hover:bg-[var(--accent-teal)] hover:text-black transition-colors"
-            >
-              Open Relations Canvas
-            </Link>
+            <div className="flex gap-2 justify-end">
+              <Link
+                href={`/campaign/${campaign.id}`}
+                className="inline-block px-3 py-1.5 bg-[var(--surface-dark)] text-[var(--accent-teal)] text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] border border-[var(--accent-teal)]/40 hover:bg-[var(--accent-teal)] hover:text-black transition-colors"
+              >
+                Open Relations Canvas
+              </Link>
+              <Link
+                href={`/watcher/campaign/${campaign.id}/settings`}
+                className="inline-block px-3 py-1.5 bg-transparent text-[var(--surface-dark)]/60 text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] border border-[var(--surface-dark)]/20 hover:border-[var(--accent-teal)]/40 hover:text-[var(--accent-teal)] transition-colors"
+              >
+                Settings
+              </Link>
+            </div>
             <div className="text-xs uppercase tracking-wider text-[var(--accent-teal)]">{campaign.status}</div>
             <div className="text-xs text-[var(--surface-dark)]/40">
               Invite: <span className="font-mono text-[var(--accent-gold)]">{campaign.inviteCode}</span>

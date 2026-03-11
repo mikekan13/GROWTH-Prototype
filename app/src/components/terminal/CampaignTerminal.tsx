@@ -7,7 +7,11 @@ import type { CommandInputHandle } from './CommandInput';
 import type { TerminalEvent, TerminalFilter, ChangeLogPayload, GameSessionInfo } from '@/types/terminal';
 import type { ChangeLogEntry } from '@/types/changelog';
 import type { GrowthCharacter } from '@/types/growth';
-import { executeCommand } from '@/lib/terminal-commands';
+import { executeCommand, type DiceApiIntent } from '@/lib/terminal-commands';
+import { spendAttribute, type AttributeName } from '@/lib/character-actions';
+import { diceEvents } from '@/lib/dice-events';
+import type { RollResult } from '@/types/dice';
+import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -198,12 +202,66 @@ export default function CampaignTerminal({
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.skillName && commandInputRef.current) {
-        commandInputRef.current.prefill(`/roll ${detail.skillName}`);
+        const governors: string[] = detail.governors || [];
+        const defaultAttr = governors[0] || 'willpower';
+        commandInputRef.current.prefill(`/check ${detail.skillName} dr: effort:0 attr:${defaultAttr}`);
       }
     };
     window.addEventListener('growth:roll-skill', handler);
     return () => window.removeEventListener('growth:roll-skill', handler);
   }, []);
+
+  // Listen for 3D dice settling on the canvas — post results to campaign terminal
+  // Only posts events for physical dice throws (spawned/flung on canvas).
+  // Service-initiated rolls (skill checks, etc.) already post their own events.
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        dice: Array<{ dieType: string; color: string; value: number; label: string }>;
+        source: 'physical' | 'service';
+      };
+      if (!detail?.dice || detail.dice.length === 0) return;
+
+      // Service rolls already post their own terminal event — skip to avoid duplicates
+      if (detail.source === 'service') return;
+
+      const { dice } = detail;
+      const total = dice.reduce((sum, d) => sum + d.value, 0);
+      const diceStr = dice.map(d => `${d.dieType.toUpperCase()}→${d.value}`).join(' + ');
+      const context = dice.length === 1
+        ? `${dice[0].dieType.toUpperCase()} roll`
+        : `${dice.length} dice roll`;
+
+      // Build a minimal DiceRollPayload for the terminal
+      const payload: DiceRollPayload = {
+        kind: 'dice_roll',
+        context,
+        fateDie: { die: dice[0].dieType, value: dice[0].value },
+        total,
+        isSkilled: false,
+        physicalDice: dice.map(d => ({ dieType: d.dieType, value: d.value })),
+      };
+
+      // Post to campaign events
+      await fetch(`/api/campaigns/${campaignId}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'dice_roll',
+          characterId: character?.id,
+          characterName: character?.name,
+          payload: {
+            ...payload,
+            context: `${context}: ${diceStr} = ${total}`,
+          },
+        }),
+      });
+
+      fetchEvents();
+    };
+    window.addEventListener('growth:dice-settled', handler);
+    return () => window.removeEventListener('growth:dice-settled', handler);
+  }, [campaignId, character, fetchEvents]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -225,6 +283,165 @@ export default function CampaignTerminal({
       setReverting(null);
     }
   };
+
+  // ── Dice API Intent Handler ──────────────────────────────────────────────
+
+  const executeDiceApiCall = useCallback(async (intent: DiceApiIntent) => {
+    try {
+      const res = await fetch(intent.endpoint, {
+        method: intent.method,
+        headers: intent.body ? { 'Content-Type': 'application/json' } : undefined,
+        body: intent.body ? JSON.stringify(intent.body) : undefined,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Server error' }));
+        // Post error as command event
+        await fetch(`/api/campaigns/${campaignId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'command',
+            characterId: character?.id,
+            characterName: character?.name,
+            payload: { kind: 'command', input: intent.context.input, result: err.error || 'Roll failed', success: false },
+          }),
+        });
+        return;
+      }
+
+      const data = await res.json();
+
+      // Handle injection commands (GET list, POST register, DELETE)
+      if (intent.endpoint.includes('/inject')) {
+        let resultText = '';
+        if (intent.method === 'GET') {
+          const injections = data.injections || [];
+          resultText = injections.length === 0
+            ? 'No active injections'
+            : injections.map((inj: { id: string; filterType: string; overrideType: string; reason: string }) =>
+                `[${inj.id}] filter:${inj.filterType} override:${inj.overrideType} — ${inj.reason}`
+              ).join('\n');
+        } else if (intent.method === 'DELETE') {
+          resultText = data.cleared ? 'All injections cleared' : (data.removed ? `Removed ${data.id}` : `Not found: ${data.id}`);
+        } else {
+          resultText = data.id ? `Injection ${data.id} registered` : 'Injection registered';
+        }
+
+        await fetch(`/api/campaigns/${campaignId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'command',
+            payload: { kind: 'command', input: intent.context.input, result: resultText, success: true } as CommandPayload,
+          }),
+        });
+        fetchEvents();
+        return;
+      }
+
+      // Handle dice roll results — build terminal event and emit to 3D viz
+      const rolls = data.rolls || [];
+      const sdRoll = rolls.find((r: { label: string }) => r.label === 'Skill Die');
+      const fdRoll = rolls.find((r: { label: string }) => r.label === 'Fate Die') || rolls[0];
+
+      const isDeathSave = intent.endpoint.includes('/deathsave');
+      const isCheck = intent.endpoint.includes('/check') || (intent.context.skillName && !isDeathSave);
+      const skillName = intent.context.skillName;
+
+      const payload: DiceRollPayload = {
+        kind: 'dice_roll',
+        context: isDeathSave
+          ? `Death Save vs Lady Death (DR ${data.dr})`
+          : skillName
+            ? `${skillName} check vs DR ${data.dr}`
+            : `Quick roll`,
+        skillName: isCheck ? skillName : undefined,
+        skillLevel: isCheck ? (intent.body as Record<string, unknown>)?.skillLevel as number : undefined,
+        skillDie: sdRoll ? { die: sdRoll.die, value: sdRoll.value, isFlat: sdRoll.die === 'flat' } : undefined,
+        fateDie: fdRoll ? { die: fdRoll.die, value: fdRoll.value } : { die: 'unknown', value: 0 },
+        effort: (intent.body as Record<string, unknown>)?.effort as number,
+        effortAttribute: (intent.body as Record<string, unknown>)?.effortAttribute as string,
+        total: data.total,
+        dr: data.dr,
+        success: data.success,
+        margin: data.margin,
+        isSkilled: !!(intent.body as Record<string, unknown>)?.isSkilled,
+      };
+
+      // Emit to event bus for 3D dice visualization
+      const rollResult: RollResult = {
+        id: data.id,
+        request: {
+          id: data.id,
+          source: isDeathSave
+            ? { type: 'death_save', characterId: String((intent.body as Record<string, unknown>)?.characterId || '') }
+            : skillName
+              ? { type: 'skill_check', skillName, skillLevel: Number((intent.body as Record<string, unknown>)?.skillLevel) || 0, characterId: String((intent.body as Record<string, unknown>)?.characterId || '') }
+              : { type: 'quick_roll', context: `Quick roll` },
+          dice: rolls.map((r: { die: string; label: string; maxValue: number }) => ({
+            die: r.die,
+            label: r.label,
+            sides: r.maxValue || 0,
+          })),
+        },
+        rolls: rolls.map((r: { die: string; label: string; value: number; maxValue: number }) => ({
+          die: r.die,
+          label: r.label,
+          value: r.value,
+          maxValue: r.maxValue || 0,
+          natural: r.value,
+          wasInjected: false,
+        })),
+        total: data.total,
+        dr: data.dr,
+        success: data.success,
+        margin: data.margin,
+        timestamp: data.timestamp || Date.now(),
+        injected: false,
+        injectionVisible: false,
+      };
+      diceEvents.emit(rollResult);
+
+      // Spend effort from character (deterministic, client-side)
+      if (intent.effortSpend && character && onCharacterUpdate) {
+        const spendResult = spendAttribute(
+          character.data,
+          intent.effortSpend.attribute as AttributeName,
+          intent.effortSpend.amount,
+        );
+        if (spendResult.character) {
+          onCharacterUpdate(character.id, spendResult.character, spendResult.changes);
+        }
+      }
+
+      // Post dice event to campaign events
+      await fetch(`/api/campaigns/${campaignId}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'dice_roll',
+          characterId: character?.id,
+          characterName: character?.name,
+          payload,
+        }),
+      });
+
+      fetchEvents();
+    } catch {
+      // Post connection error
+      await fetch(`/api/campaigns/${campaignId}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'command',
+          payload: { kind: 'command', input: intent.context.input, result: 'Connection failed', success: false },
+        }),
+      }).catch(() => {});
+    }
+  }, [campaignId, character, onCharacterUpdate, fetchEvents]);
+
+  // ── Command Submit Handler ──────────────────────────────────────────────
 
   const handleCommandSubmit = useCallback(async (input: string) => {
     const trimmed = input.trim();
@@ -267,7 +484,6 @@ export default function CampaignTerminal({
             }),
           });
           if (res.ok) {
-            // Create a game_event for the session change
             const sessionData = await res.json();
             await fetch(`/api/campaigns/${campaignId}/events`, {
               method: 'POST',
@@ -291,10 +507,16 @@ export default function CampaignTerminal({
       }
     }
 
-    // Execute command locally
+    // Parse and execute command
     const result = executeCommand(trimmed, character?.data || null);
 
-    // If command modified character, push update
+    // If command returned a dice API intent, execute it server-side
+    if (result.diceApiCall) {
+      await executeDiceApiCall(result.diceApiCall);
+      return;
+    }
+
+    // If command modified character (spend/restore), push update
     if (result.character && character && onCharacterUpdate) {
       onCharacterUpdate(character.id, result.character, result.changes);
     }
@@ -316,7 +538,7 @@ export default function CampaignTerminal({
     }
 
     fetchEvents();
-  }, [campaignId, character, onCharacterUpdate, fetchEvents, fetchSessions]);
+  }, [campaignId, character, onCharacterUpdate, fetchEvents, fetchSessions, executeDiceApiCall]);
 
   const toggleSessionCollapse = (sessionId: string) => {
     setCollapsedSessions(prev => {

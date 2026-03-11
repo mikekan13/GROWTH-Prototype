@@ -107,3 +107,6 @@ nul
 
 # Claude Code settings (user-specific)
 .claude/settings.local.json
+
+# Large PDFs (stored elsewhere)
+X_ARCHIVE_ORIGINS/*.pdf

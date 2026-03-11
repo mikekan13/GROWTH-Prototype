@@ -156,10 +156,33 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
 
 // ── Dice Roll Row ──────────────────────────────────────────────────────────
 
+const DIE_MAX: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
+
+function dieValueColor(dieType: string, value: number): string {
+  if (value === 1) return '#FF4444';
+  if (value === (DIE_MAX[dieType] ?? 0)) return '#44FF66';
+  return '#ffcc78';
+}
+
+function getTotalExtreme(payload: DiceRollPayload): 'min' | 'max' | null {
+  if (payload.physicalDice && payload.physicalDice.length > 0) {
+    const allMin = payload.physicalDice.every(d => d.value === 1);
+    const allMax = payload.physicalDice.every(d => d.value === (DIE_MAX[d.dieType] ?? 0));
+    if (allMin) return 'min';
+    if (allMax) return 'max';
+  } else if (payload.fateDie) {
+    if (payload.fateDie.value === 1) return 'min';
+    if (payload.fateDie.value === (DIE_MAX[payload.fateDie.die] ?? 0)) return 'max';
+  }
+  return null;
+}
+
 function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRollPayload }) {
   const actorColor = ACTOR_COLORS[event.actor] || '#666';
   const successColor = payload.success === true ? '#22ab94' : payload.success === false ? '#ff6b6b' : '#ffcc78';
   const resultLabel = payload.success === true ? 'SUCCESS' : payload.success === false ? 'FAILURE' : '';
+  const totalExtreme = getTotalExtreme(payload);
+  const totalColor = totalExtreme === 'min' ? '#FF4444' : totalExtreme === 'max' ? '#44FF66' : '#ffcc78';
 
   return (
     <div style={{
@@ -176,7 +199,23 @@ function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRo
           </span>
         )}
         <span className="text-[12px] flex-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ccc' }}>
-          {payload.context}
+          {payload.physicalDice && payload.physicalDice.length > 0 ? (
+            <>
+              {payload.physicalDice.length === 1
+                ? `${payload.physicalDice[0].dieType.toUpperCase()} roll: `
+                : `${payload.physicalDice.length} dice roll: `}
+              {payload.physicalDice.map((d, i) => (
+                <span key={i}>
+                  {i > 0 && ' + '}
+                  {d.dieType.toUpperCase()}→
+                  <b style={{ color: dieValueColor(d.dieType, d.value) }}>{d.value}</b>
+                </span>
+              ))}
+              {' = '}<b style={{ color: '#ffcc78' }}>{payload.total}</b>
+            </>
+          ) : (
+            payload.context
+          )}
         </span>
         {resultLabel && (
           <span className="text-[13px] font-bold px-1.5 py-0.5" style={{
@@ -192,35 +231,53 @@ function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRo
 
       {/* Roll breakdown */}
       <div className="px-3 pb-2 flex flex-wrap gap-3 text-[13px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-        {payload.skillDie && !payload.skillDie.isFlat && (
-          <span style={{ color: '#D0A030' }}>
-            SD {payload.skillDie.die}[<b style={{ color: '#ffcc78' }}>{payload.skillDie.value}</b>]
-          </span>
-        )}
-        {payload.skillDie?.isFlat && payload.skillDie.value > 0 && (
-          <span style={{ color: '#D0A030' }}>
-            SD {payload.skillDie.die}
-          </span>
-        )}
-        <span style={{ color: '#3EB89A' }}>
-          FD {payload.fateDie.die}[<b style={{ color: '#22ab94' }}>{payload.fateDie.value}</b>]
-        </span>
-        {payload.effort !== undefined && payload.effort > 0 && (
-          <span style={{ color: '#E8585A' }}>
-            +{payload.effort} effort{payload.effortAttribute ? ` (${payload.effortAttribute})` : ''}
-          </span>
-        )}
-        {payload.flatModifiers !== undefined && payload.flatModifiers !== 0 && (
-          <span style={{ color: '#888' }}>
-            {payload.flatModifiers > 0 ? '+' : ''}{payload.flatModifiers} mod
-          </span>
-        )}
-        <span style={{ color: '#ffcc78' }}>
-          = <b>{payload.total}</b>
-        </span>
-        {payload.dr !== undefined && (
-          <span style={{ color: '#888' }}>
-            vs DR {payload.dr} ({payload.margin !== undefined && payload.margin >= 0 ? '+' : ''}{payload.margin})
+        {payload.isSkilled ? (
+          <>
+            {payload.skillDie && !payload.skillDie.isFlat && (
+              <span style={{ color: '#D0A030' }}>
+                SD {payload.skillDie.die}[<b style={{ color: dieValueColor(payload.skillDie.die, payload.skillDie.value) }}>{payload.skillDie.value}</b>]
+              </span>
+            )}
+            {payload.skillDie?.isFlat && payload.skillDie.value > 0 && (
+              <span style={{ color: '#D0A030' }}>
+                SD {payload.skillDie.die}
+              </span>
+            )}
+            <span style={{ color: '#3EB89A' }}>
+              FD {payload.fateDie.die}[<b style={{ color: dieValueColor(payload.fateDie.die, payload.fateDie.value) }}>{payload.fateDie.value}</b>]
+            </span>
+            {payload.effort !== undefined && payload.effort > 0 && (
+              <span style={{ color: '#E8585A' }}>
+                +{payload.effort} effort{payload.effortAttribute ? ` (${payload.effortAttribute})` : ''}
+              </span>
+            )}
+            {payload.flatModifiers !== undefined && payload.flatModifiers !== 0 && (
+              <span style={{ color: '#888' }}>
+                {payload.flatModifiers > 0 ? '+' : ''}{payload.flatModifiers} mod
+              </span>
+            )}
+            <span style={{ color: totalColor }}>
+              = <b>{payload.total}</b>
+              {totalExtreme && (
+                <b style={{ marginLeft: '4px', fontSize: '10px' }}>
+                  ({totalExtreme === 'max' ? 'MAX' : 'MIN'})
+                </b>
+              )}
+            </span>
+            {payload.dr !== undefined && (
+              <span style={{ color: '#888' }}>
+                vs DR {payload.dr} ({payload.margin !== undefined && payload.margin >= 0 ? '+' : ''}{payload.margin})
+              </span>
+            )}
+          </>
+        ) : (
+          <span style={{ color: totalColor }}>
+            Result = <b>{payload.total}</b>
+            {totalExtreme && (
+              <b style={{ marginLeft: '4px', fontSize: '10px' }}>
+                ({totalExtreme === 'max' ? 'MAX' : 'MIN'})
+              </b>
+            )}
           </span>
         )}
       </div>
