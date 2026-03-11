@@ -1010,12 +1010,14 @@ export default function RelationsCanvas({
         )}
         <foreignObject
           key={`card-${node.id}`}
-          x={visualX - cardWidth / 2}
-          y={visualY - cardHeight / 2}
-          width={cardWidth}
-          height={cardHeight}
-          style={{ overflow: "visible" }}
+          x={visualX - cardWidth / 2 - viewBox.width}
+          y={visualY - cardHeight / 2 - viewBox.height}
+          width={cardWidth + viewBox.width * 2}
+          height={cardHeight + viewBox.height * 2}
+          style={{ overflow: "visible", pointerEvents: "none" }}
         >
+          <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
+          <div style={{ pointerEvents: "auto" }}>
           <CharacterCard
             node={charNode}
             isExpanded={isNodeExpanded}
@@ -1048,6 +1050,8 @@ export default function RelationsCanvas({
             }}
             onCharacterUpdate={onCharacterUpdate}
           />
+          </div>
+          </div>
         </foreignObject>
 
         {/* Inventory sub-panel — draggable with tether line */}
@@ -1369,7 +1373,7 @@ export default function RelationsCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full rounded-lg overflow-hidden select-none"
+      className="relative w-full h-full overflow-hidden select-none"
       style={{ background: "var(--surface-void)", cursor: isPanning ? "grabbing" : "grab" }}
     >
       {/* Main SVG */}
@@ -1632,12 +1636,14 @@ export default function RelationsCanvas({
             const cardHeight = isNodeExpanded ? 500 : 240;
 
             // Viewport culling
-            const margin = Math.max(cardWidth, cardHeight);
+            // Margin scales with viewport so culling works at all zoom levels
+            const cullMarginX = viewBox.width * 0.5 + cardWidth;
+            const cullMarginY = viewBox.height * 0.5 + cardHeight;
             const isInViewport =
-              position.x + cardWidth / 2 + margin > viewBox.x &&
-              position.x - cardWidth / 2 - margin < viewBox.x + viewBox.width &&
-              position.y + cardHeight / 2 + margin > viewBox.y &&
-              position.y - cardHeight / 2 - margin < viewBox.y + viewBox.height;
+              position.x + cullMarginX > viewBox.x &&
+              position.x - cullMarginX < viewBox.x + viewBox.width &&
+              position.y + cullMarginY > viewBox.y &&
+              position.y - cullMarginY < viewBox.y + viewBox.height;
 
             if (!isSelected && !isInViewport) return null;
 
@@ -1659,12 +1665,14 @@ export default function RelationsCanvas({
             const cardWidth = isNodeExpanded ? 500 : 340;
             const cardHeight = isNodeExpanded ? 700 : 180;
 
-            const margin = Math.max(cardWidth, cardHeight);
+            // Margin scales with viewport so culling works at all zoom levels
+            const cullMarginX = viewBox.width * 0.5 + cardWidth;
+            const cullMarginY = viewBox.height * 0.5 + cardHeight;
             const isInViewport =
-              position.x + cardWidth / 2 + margin > viewBox.x &&
-              position.x - cardWidth / 2 - margin < viewBox.x + viewBox.width &&
-              position.y + cardHeight / 2 + margin > viewBox.y &&
-              position.y - cardHeight / 2 - margin < viewBox.y + viewBox.height;
+              position.x + cullMarginX > viewBox.x &&
+              position.x - cullMarginX < viewBox.x + viewBox.width &&
+              position.y + cullMarginY > viewBox.y &&
+              position.y - cullMarginY < viewBox.y + viewBox.height;
 
             if (!isInViewport) return null;
 
@@ -1695,13 +1703,14 @@ export default function RelationsCanvas({
               )}
               <foreignObject
                 key={`loc-${node.id}`}
-                x={visualX - cardWidth / 2}
-                y={visualY - cardHeight / 2}
-                width={cardWidth}
-                height={cardHeight}
-                style={{ overflow: "visible" }}
+                x={visualX - cardWidth / 2 - viewBox.width}
+                y={visualY - cardHeight / 2 - viewBox.height}
+                width={cardWidth + viewBox.width * 2}
+                height={cardHeight + viewBox.height * 2}
+                style={{ overflow: "visible", pointerEvents: "none" }}
               >
-                <div style={{ transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
+                <div style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <LocationCard
                     node={{
                       id: node.id,
@@ -1737,6 +1746,7 @@ export default function RelationsCanvas({
                     }}
                   />
                 </div>
+                </div>
               </foreignObject>
               </g>
             );
@@ -1753,12 +1763,14 @@ export default function RelationsCanvas({
             const cardWidth = isNodeExpanded ? 440 : 300;
             const cardHeight = isNodeExpanded ? 600 : 160;
 
-            const margin = Math.max(cardWidth, cardHeight);
+            // Margin scales with viewport so culling works at all zoom levels
+            const cullMarginX = viewBox.width * 0.5 + cardWidth;
+            const cullMarginY = viewBox.height * 0.5 + cardHeight;
             const isInViewport =
-              position.x + cardWidth / 2 + margin > viewBox.x &&
-              position.x - cardWidth / 2 - margin < viewBox.x + viewBox.width &&
-              position.y + cardHeight / 2 + margin > viewBox.y &&
-              position.y - cardHeight / 2 - margin < viewBox.y + viewBox.height;
+              position.x + cullMarginX > viewBox.x &&
+              position.x - cullMarginX < viewBox.x + viewBox.width &&
+              position.y + cullMarginY > viewBox.y &&
+              position.y - cullMarginY < viewBox.y + viewBox.height;
 
             if (!isInViewport) return null;
 
@@ -1789,13 +1801,14 @@ export default function RelationsCanvas({
               )}
               <foreignObject
                 key={`item-${node.id}`}
-                x={visualX - cardWidth / 2}
-                y={visualY - cardHeight / 2}
-                width={cardWidth}
-                height={cardHeight}
-                style={{ overflow: "visible" }}
+                x={visualX - cardWidth / 2 - viewBox.width}
+                y={visualY - cardHeight / 2 - viewBox.height}
+                width={cardWidth + viewBox.width * 2}
+                height={cardHeight + viewBox.height * 2}
+                style={{ overflow: "visible", pointerEvents: "none" }}
               >
-                <div style={{ transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
+                <div style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <WorldItemCard
                     node={{
                       id: node.id,
@@ -1854,6 +1867,7 @@ export default function RelationsCanvas({
                     }}
                   />
                 </div>
+                </div>
               </foreignObject>
               </g>
             );
@@ -1869,14 +1883,12 @@ export default function RelationsCanvas({
             const position = getNodePosition(node.id, node.x, node.y);
             const fillColor = getNodeFill(node.type, node.color);
 
-            // Viewport culling
-            const nodeRadius = 30;
-            const margin = 100;
+            const cullMargin = Math.max(viewBox.width, viewBox.height) * 0.5;
             const isInViewport =
-              position.x + nodeRadius + margin > viewBox.x &&
-              position.x - nodeRadius - margin < viewBox.x + viewBox.width &&
-              position.y + nodeRadius + margin > viewBox.y &&
-              position.y - nodeRadius - margin < viewBox.y + viewBox.height;
+              position.x + cullMargin > viewBox.x &&
+              position.x - cullMargin < viewBox.x + viewBox.width &&
+              position.y + cullMargin > viewBox.y &&
+              position.y - cullMargin < viewBox.y + viewBox.height;
 
             if (!isSelected && !isHovered && !isInViewport) return null;
 
@@ -1936,7 +1948,7 @@ export default function RelationsCanvas({
       {/* ── Canvas Toolbox (follows camera on the KRMA line) ── */}
       <CanvasToolbox
         viewBox={viewBox}
-        svgRef={svgRef}
+        zoom={zoom}
         forgeItems={forgeItems}
         onCreateCharacter={onCreateCharacter}
         onCreateLocation={onCreateLocation}
@@ -2073,7 +2085,7 @@ import { ITEM_TYPE_ICONS } from '@/types/item';
 
 function CanvasToolbox({
   viewBox,
-  svgRef,
+  zoom,
   forgeItems,
   onCreateCharacter,
   onCreateLocation,
@@ -2081,7 +2093,7 @@ function CanvasToolbox({
   onCreateItemFromForge,
 }: {
   viewBox: { x: number; y: number; width: number; height: number };
-  svgRef: React.RefObject<SVGSVGElement | null>;
+  zoom: number;
   forgeItems?: ForgeItemSummary[];
   onCreateCharacter?: (name: string) => void;
   onCreateLocation?: (name: string, type: string) => void;
@@ -2093,24 +2105,16 @@ function CanvasToolbox({
 
   const publishedItems = (forgeItems || []).filter(f => f.type === 'item');
 
-  // Convert SVG coords (center of viewBox X, Y=0 on KRMA line) to screen pixels
-  const svgCenterX = viewBox.x + viewBox.width / 2;
-  const svgY = 0; // KRMA line is at Y=0
-  let screenX = '50%';
-  let screenY = '50%';
-  if (svgRef.current) {
-    const svg = svgRef.current;
-    const ctm = svg.getScreenCTM();
-    if (ctm) {
-      const pt = svg.createSVGPoint();
-      pt.x = svgCenterX;
-      pt.y = svgY;
-      const screenPt = pt.matrixTransform(ctm);
-      const rect = svg.getBoundingClientRect();
-      screenX = `${screenPt.x - rect.left}px`;
-      screenY = `${screenPt.y - rect.top}px`;
-    }
-  }
+  // Position derived directly from viewBox state — no CTM, no frame-lag wobble.
+  // X: always centered horizontally in the visible area.
+  // Y: locked to KRMA line (SVG Y=0) mapped to container fraction.
+  const screenX = '50%';
+  const yFraction = (0 - viewBox.y) / viewBox.height;
+  const screenY = `${(yFraction * 100).toFixed(2)}%`;
+
+  // Scale with zoom like SVG foreignObject cards do.
+  // zoom=1 is the default; zoom<1 = zoomed out (smaller), zoom>1 = zoomed in (larger).
+  const toolScale = 0.4 / zoom;
 
   return (
     <div
@@ -2118,7 +2122,7 @@ function CanvasToolbox({
         position: 'absolute',
         left: screenX,
         top: screenY,
-        transform: 'translate(-50%, -50%)',
+        transform: `translate(-50%, -50%) scale(${toolScale})`,
         zIndex: 50,
         pointerEvents: 'auto',
         userSelect: 'none',
@@ -2131,7 +2135,7 @@ function CanvasToolbox({
           style={{
             background: 'linear-gradient(135deg, #22ab94 0%, #1e9b82 100%)',
             border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: 20,
+            borderRadius: 4,
             padding: '6px 16px',
             color: 'white',
             fontSize: 11,
@@ -2156,7 +2160,7 @@ function CanvasToolbox({
             background: 'linear-gradient(135deg, rgba(34,171,148,0.95) 0%, rgba(30,155,130,0.95) 100%)',
             backdropFilter: 'blur(12px)',
             border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: 12,
+            borderRadius: 4,
             padding: 12,
             minWidth: 220,
             boxShadow: '0 8px 32px rgba(34, 171, 148, 0.4), 0 2px 8px rgba(0,0,0,0.3)',
