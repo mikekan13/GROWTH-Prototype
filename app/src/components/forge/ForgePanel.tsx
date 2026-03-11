@@ -5,8 +5,9 @@ import type { SkillGovernor } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
 import type { WorldItemType, ItemRarity } from '@/types/item';
 import { ITEM_TYPE_ICONS, WEAPON_PROPERTIES, BODY_PARTS } from '@/types/item';
+import type { Material, MaterialMod, ResistType } from '@/types/material';
 import { ARMOR_LAYER_RULES } from '@/types/material';
-import { getMaterialNames, getMaterial, combineMaterials } from '@/lib/materials';
+import { getMaterialNames, getMaterial, combineMaterials, MATERIAL_CATALOG } from '@/lib/materials';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -261,17 +262,17 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
       <div className="flex-shrink-0 px-6 py-4 border-b" style={{ borderColor: 'rgba(255,204,120,0.2)' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <span style={{ color: '#ffcc78', fontSize: '16px' }}>{'\u2692'}</span>
+            <span style={{ color: '#ffcc78', fontSize: '20px' }}>{'\u2692'}</span>
             <h2 className="text-sm uppercase tracking-[0.2em]" style={{
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
               color: '#ffcc78',
-              fontSize: '20px',
+              fontSize: '24px',
             }}>THE FORGE</h2>
           </div>
           {isGM && (
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="px-3 py-1 text-[12px] uppercase tracking-wider transition-colors"
+              className="px-3 py-1 text-[14px] uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 color: '#ffcc78',
@@ -291,7 +292,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
             <button
               key={t}
               onClick={() => setActiveType(t)}
-              className="px-2 py-1 text-[11px] uppercase tracking-wider transition-colors"
+              className="px-3 py-1.5 text-[13px] uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 letterSpacing: '0.05em',
@@ -312,16 +313,16 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
         {/* Create Form (GM only) */}
         {showCreateForm && isGM && (
           <div className="p-4 border" style={{ borderColor: 'rgba(255,204,120,0.3)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-            <div className="text-[12px] uppercase tracking-wider mb-3" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+            <div className="text-[16px] uppercase tracking-wider mb-3" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
               New Design
             </div>
             <div className="space-y-3">
               <div className="flex gap-2 items-center">
-                <label className="text-[11px] text-gray-400 w-10">Type:</label>
+                <label className="text-[14px] text-gray-400 w-10">Type:</label>
                 <select
                   value={newType}
                   onChange={e => setNewType(e.target.value)}
-                  className="text-[12px] bg-transparent text-white outline-none px-2 py-1 border"
+                  className="text-[14px] bg-transparent text-white outline-none px-2 py-1 border"
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
                   {['skill', 'item', 'nectar', 'blossom', 'thorn'].map(t => (
@@ -330,7 +331,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
                 </select>
               </div>
               <div className="flex gap-2 items-center">
-                <label className="text-[11px] text-gray-400 w-10">Name:</label>
+                <label className="text-[14px] text-gray-400 w-10">Name:</label>
                 <input
                   type="text"
                   value={newName}
@@ -342,26 +343,26 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
                 />
               </div>
               <div className="flex gap-2 items-start">
-                <label className="text-[11px] text-gray-400 w-10 pt-1">Desc:</label>
+                <label className="text-[14px] text-gray-400 w-10 pt-1">Desc:</label>
                 <input
                   type="text"
                   value={newDesc}
                   onChange={e => setNewDesc(e.target.value)}
                   placeholder="Description..."
-                  className="flex-1 bg-transparent outline-none text-[12px] text-gray-300 px-2 py-1 border"
+                  className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border"
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 />
               </div>
               {newType === 'skill' && (
                 <div>
-                  <label className="text-[11px] text-gray-400 block mb-1">Governors (at least one):</label>
+                  <label className="text-[14px] text-gray-400 block mb-1">Governors (at least one):</label>
                   <div className="flex flex-wrap gap-1">
                     {SKILL_GOVERNORS.map(gov => (
                       <button
                         key={gov}
                         type="button"
                         onClick={() => toggleGov(gov)}
-                        className="text-[10px] px-1.5 py-0.5 transition-colors uppercase"
+                        className="text-[14px] px-1.5 py-0.5 transition-colors uppercase"
                         style={{
                           borderRadius: '2px',
                           fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -404,7 +405,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
                 <button
                   onClick={handleCreate}
                   disabled={!canSubmit}
-                  className="text-[11px] px-3 py-1 uppercase tracking-wider"
+                  className="text-[14px] px-3 py-1 uppercase tracking-wider"
                   style={{
                     color: canSubmit ? '#ffcc78' : '#666',
                     border: `1px solid ${canSubmit ? 'rgba(255,204,120,0.4)' : '#3a3a4e'}`,
@@ -416,7 +417,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
                 </button>
                 <button
                   onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); setItemNotes(''); setItemSecondaryMaterial(''); setWeaponProps(new Set()); setArmorCoveredParts(new Set()); setPmSchool(''); }}
-                  className="text-[11px] px-3 py-1 uppercase tracking-wider text-gray-500"
+                  className="text-[14px] px-3 py-1 uppercase tracking-wider text-gray-500"
                   style={{ border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
                   Cancel
@@ -429,7 +430,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
         {/* Player Requests (GM sees pending, players see own) */}
         {pendingRequests.length > 0 && (
           <div>
-            <div className="text-[12px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
+            <div className="text-[16px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
               color: '#D0A030',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
@@ -446,24 +447,24 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
 
         {/* Forge Items */}
         {loading ? (
-          <div className="text-center py-8 text-[13px]" style={{
+          <div className="text-center py-8 text-[14px]" style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
             color: 'rgba(255,204,120,0.3)',
           }}>Loading forge...</div>
         ) : items.length === 0 && pendingRequests.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-[13px] mb-1" style={{
+            <div className="text-[14px] mb-1" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: 'rgba(255,204,120,0.3)',
             }}>Forge is empty</div>
-            <div className="text-[11px]" style={{
+            <div className="text-[14px]" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
               color: 'rgba(255,255,255,0.15)',
             }}>{isGM ? 'Create designs for your campaign — skills, items, nectars, and more.' : 'Your GM hasn\'t published any designs yet.'}</div>
           </div>
         ) : (
           <div>
-            <div className="text-[12px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
+            <div className="text-[16px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
               color: '#ffcc78',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
@@ -491,7 +492,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
         {/* Resolved requests (collapsed) */}
         {resolvedRequests.length > 0 && (
           <div>
-            <div className="text-[12px] uppercase tracking-wider mb-2" style={{
+            <div className="text-[16px] uppercase tracking-wider mb-2" style={{
               color: '#666',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
@@ -504,6 +505,9 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
             </div>
           </div>
         )}
+
+        {/* Material Designer */}
+        {isGM && <MaterialDesigner />}
       </div>
     </div>
   );
@@ -536,7 +540,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Type badge */}
-          <span className="text-[10px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
+          <span className="text-[14px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             letterSpacing: '0.05em',
             backgroundColor: `${TYPE_COLORS[item.type] || '#888'}20`,
@@ -547,17 +551,17 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
             {isItemType && itemSubType ? itemSubType.replace('_', ' ') : item.type}
           </span>
           {/* Name */}
-          <span className="text-sm text-white truncate" style={{
+          <span className="text-[15px] text-white truncate" style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
           }}>{item.name}</span>
           {/* Governor badges (skills) */}
           {governors.length > 0 && (
-            <div className="flex gap-px flex-shrink-0">
+            <div className="flex gap-0.5 flex-shrink-0">
               {governors.map(gov => (
-                <span key={gov} className="text-[7px] px-0.5" style={{
+                <span key={gov} className="text-[11px] px-1 py-0.5" style={{
                   backgroundColor: `${GOV_COLOR[gov] || '#888'}30`,
                   color: GOV_COLOR[gov] || '#888',
-                  borderRadius: '1px',
+                  borderRadius: '2px',
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 }}>{GOV_ABBREV[gov] || gov}</span>
               ))}
@@ -567,12 +571,12 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
           {isItemType && (
             <div className="flex gap-1 flex-shrink-0">
               {material && (
-                <span className="text-[8px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                <span className="text-[12px] px-1.5 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                   {material}
                 </span>
               )}
               {rarity && rarity !== 'common' && (
-                <span className="text-[8px] px-1 py-0.5 uppercase" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '2px', color: 'rgba(255,204,120,0.6)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+                <span className="text-[12px] px-1.5 py-0.5 uppercase" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '2px', color: 'rgba(255,204,120,0.6)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
                   {rarity.replace('_', ' ')}
                 </span>
               )}
@@ -580,14 +584,14 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
           )}
           {/* Description preview */}
           {description && !isItemType && (
-            <span className="text-[11px] text-gray-500 truncate" style={{
+            <span className="text-[14px] text-gray-500 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{description}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Status badge */}
-          <span className="text-[10px] px-1.5 py-0.5 uppercase" style={{
+          <span className="text-[14px] px-1.5 py-0.5 uppercase" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             color: STATUS_COLORS[item.status] || '#888',
             border: `1px solid ${STATUS_COLORS[item.status] || '#888'}40`,
@@ -602,12 +606,12 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
                 <>
                   <button
                     onClick={() => onPublish(item.id)}
-                    className="text-[10px] px-1.5 py-0.5 uppercase"
+                    className="text-[14px] px-1.5 py-0.5 uppercase"
                     style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   >Publish</button>
                   <button
                     onClick={() => onDelete(item.id)}
-                    className="text-[10px] px-1.5 py-0.5 uppercase"
+                    className="text-[14px] px-1.5 py-0.5 uppercase"
                     style={{ color: '#E8585A', border: '1px solid rgba(232,88,90,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   >Delete</button>
                 </>
@@ -617,13 +621,13 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
                   {onPlace && (
                     <button
                       onClick={onPlace}
-                      className="text-[10px] px-1.5 py-0.5 uppercase"
+                      className="text-[14px] px-1.5 py-0.5 uppercase"
                       style={{ color: '#ffcc78', border: '1px solid rgba(255,204,120,0.4)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                     >Place on Canvas</button>
                   )}
                   <button
                     onClick={() => onUnpublish(item.id)}
-                    className="text-[10px] px-1.5 py-0.5 uppercase"
+                    className="text-[14px] px-1.5 py-0.5 uppercase"
                     style={{ color: '#888', border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   >Unpublish</button>
                 </>
@@ -654,7 +658,7 @@ function RequestRow({ request, isGM, onResolve, onRefresh }: {
     }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-[10px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
+          <span className="text-[14px] px-1.5 py-0.5 uppercase flex-shrink-0" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             letterSpacing: '0.05em',
             backgroundColor: `${TYPE_COLORS[request.type] || '#888'}20`,
@@ -664,29 +668,29 @@ function RequestRow({ request, isGM, onResolve, onRefresh }: {
           }}>
             {request.type}
           </span>
-          <span className="text-sm text-white truncate" style={{
+          <span className="text-[15px] text-white truncate" style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
           }}>{request.name}</span>
           {governors.length > 0 && (
-            <div className="flex gap-px flex-shrink-0">
+            <div className="flex gap-0.5 flex-shrink-0">
               {governors.map(gov => (
-                <span key={gov} className="text-[7px] px-0.5" style={{
+                <span key={gov} className="text-[11px] px-1 py-0.5" style={{
                   backgroundColor: `${GOV_COLOR[gov] || '#888'}30`,
                   color: GOV_COLOR[gov] || '#888',
-                  borderRadius: '1px',
+                  borderRadius: '2px',
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 }}>{GOV_ABBREV[gov] || gov}</span>
               ))}
             </div>
           )}
           {description && (
-            <span className="text-[11px] text-gray-500 truncate" style={{
+            <span className="text-[13px] text-gray-500 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{description}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[10px] px-1.5 py-0.5 uppercase" style={{
+          <span className="text-[14px] px-1.5 py-0.5 uppercase" style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             color: STATUS_COLORS[request.status] || '#888',
             border: `1px solid ${STATUS_COLORS[request.status] || '#888'}40`,
@@ -698,18 +702,18 @@ function RequestRow({ request, isGM, onResolve, onRefresh }: {
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => onResolve(request.id, 'approved')}
-                className="text-[10px] px-1.5 py-0.5 uppercase"
+                className="text-[14px] px-1.5 py-0.5 uppercase"
                 style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
               >Approve</button>
               <button
                 onClick={() => onResolve(request.id, 'denied')}
-                className="text-[10px] px-1.5 py-0.5 uppercase"
+                className="text-[14px] px-1.5 py-0.5 uppercase"
                 style={{ color: '#E8585A', border: '1px solid rgba(232,88,90,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
               >Deny</button>
             </div>
           )}
           {request.gmNotes && (
-            <span className="text-[10px] text-gray-500 italic max-w-32 truncate" style={{
+            <span className="text-[14px] text-gray-500 italic max-w-32 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{request.gmNotes}</span>
           )}
@@ -836,11 +840,11 @@ function ItemCreateFields({
     <div className="space-y-2 border-t pt-2" style={{ borderColor: '#3a3a4e' }}>
       {/* Item Sub-type */}
       <div className="flex gap-2 items-center">
-        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0">Sub-type:</label>
+        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Sub-type:</label>
         <div className="flex flex-wrap gap-1">
           {ITEM_SUBTYPES.map(t => (
             <button key={t} type="button" onClick={() => setItemSubType(t)}
-              className="text-[9px] px-1.5 py-0.5 uppercase"
+              className="text-[14px] px-1.5 py-0.5 uppercase"
               style={{
                 borderRadius: '2px',
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -857,9 +861,9 @@ function ItemCreateFields({
 
       {/* Primary Material Selection */}
       <div className="flex gap-2 items-center">
-        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0">Primary:</label>
+        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Primary:</label>
         <select value={itemMaterial} onChange={e => handleMaterialChange(e.target.value)}
-          className="flex-1 text-[12px] px-2 py-1 border" style={inputStyle}
+          className="flex-1 text-[14px] px-2 py-1 border" style={inputStyle}
         >
           <option value="" style={{ backgroundColor: '#1a1a2e' }}>None (custom)</option>
           {materialNames.map(name => (
@@ -870,9 +874,9 @@ function ItemCreateFields({
 
       {/* Secondary Material Selection */}
       <div className="flex gap-2 items-center">
-        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0">Second:</label>
+        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Second:</label>
         <select value={itemSecondaryMaterial} onChange={e => handleMaterialChange(e.target.value, true)}
-          className="flex-1 text-[12px] px-2 py-1 border" style={inputStyle}
+          className="flex-1 text-[14px] px-2 py-1 border" style={inputStyle}
         >
           <option value="" style={{ backgroundColor: '#1a1a2e' }}>None</option>
           {materialNames.filter(n => n !== itemMaterial).map(name => (
@@ -884,17 +888,17 @@ function ItemCreateFields({
       {/* Material Summary */}
       {effectiveMat && (
         <div className="flex flex-wrap gap-1 ml-16">
-          <span className="text-[9px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#22ab94' }}>
+          <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#22ab94' }}>
             {effectiveMat.resistType} R{effectiveMat.baseResist}
           </span>
-          <span className="text-[9px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#ffcc78' }}>
+          <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#ffcc78' }}>
             T{effectiveMat.techLevel}
           </span>
-          <span className="text-[9px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#c0c0c0' }}>
+          <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#c0c0c0' }}>
             W{effectiveMat.baseWeight}
           </span>
           {effectiveMat.mods.map(mod => (
-            <span key={mod} className="text-[8px] px-1 py-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '2px', color: 'rgba(255,255,255,0.5)' }}>
+            <span key={mod} className="text-[14px] px-1 py-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '2px', color: 'rgba(255,255,255,0.5)' }}>
               {mod}
             </span>
           ))}
@@ -904,24 +908,24 @@ function ItemCreateFields({
       {/* Stats Row */}
       <div className="grid grid-cols-4 gap-2">
         <div>
-          <label className="text-[9px] text-gray-500 block">Weight (0-10)</label>
+          <label className="text-[14px] text-gray-500 block">Weight (0-10)</label>
           <input type="number" min={0} max={10} value={itemWeightLevel} onChange={e => setItemWeightLevel(Number(e.target.value))}
-            className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
         </div>
         <div>
-          <label className="text-[9px] text-gray-500 block">Tech (1-10)</label>
+          <label className="text-[14px] text-gray-500 block">Tech (1-10)</label>
           <input type="number" min={1} max={10} value={itemTechLevel} onChange={e => setItemTechLevel(Number(e.target.value))}
-            className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
         </div>
         <div>
-          <label className="text-[9px] text-gray-500 block">KV Value</label>
+          <label className="text-[14px] text-gray-500 block">KV Value</label>
           <input type="number" min={0} value={itemValue} onChange={e => setItemValue(Number(e.target.value))}
-            className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
         </div>
         <div>
-          <label className="text-[9px] text-gray-500 block">Rarity</label>
+          <label className="text-[14px] text-gray-500 block">Rarity</label>
           <select value={itemRarity} onChange={e => setItemRarity(e.target.value as ItemRarity)}
-            className="w-full text-[10px] px-1 py-0.5 border" style={inputStyle}>
+            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
             {RARITY_OPTIONS.map(r => (
               <option key={r} value={r} style={{ backgroundColor: '#1a1a2e' }}>{r.replace('_', ' ')}</option>
             ))}
@@ -932,33 +936,33 @@ function ItemCreateFields({
       {/* Weapon Fields */}
       {itemSubType === 'weapon' && (
         <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(232,88,90,0.2)' }}>
-          <div className="text-[10px] uppercase tracking-wider" style={{ color: '#E8585A', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+          <div className="text-[15px] uppercase tracking-wider" style={{ color: '#E8585A', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
             Weapon — Damage (P:S:H/D\C:B:E)
           </div>
           <div className="grid grid-cols-7 gap-1">
             {DAMAGE_KEYS.map(key => (
               <div key={key}>
-                <label className="text-[8px] text-gray-500 block text-center">{DAMAGE_ABBREV[key]}</label>
+                <label className="text-[14px] text-gray-500 block text-center">{DAMAGE_ABBREV[key]}</label>
                 <input type="number" min={0} value={weaponDamage[key] || 0}
                   onChange={e => setWeaponDamage({ ...weaponDamage, [key]: Number(e.target.value) })}
-                  className="w-full text-[11px] px-1 py-0.5 border text-center" style={inputStyle} />
+                  className="w-full text-[14px] px-1 py-0.5 border text-center" style={inputStyle} />
               </div>
             ))}
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[9px] text-gray-500 block">Range</label>
+              <label className="text-[14px] text-gray-500 block">Range</label>
               <select value={weaponRange} onChange={e => setWeaponRange(e.target.value)}
-                className="w-full text-[11px] px-1 py-0.5 border" style={inputStyle}>
+                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
                 {['melee', 'short', 'medium', 'long'].map(r => (
                   <option key={r} value={r} style={{ backgroundColor: '#1a1a2e' }}>{r}</option>
                 ))}
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-[9px] text-gray-500 block">Target Attr</label>
+              <label className="text-[14px] text-gray-500 block">Target Attr</label>
               <select value={weaponTarget} onChange={e => setWeaponTarget(e.target.value)}
-                className="w-full text-[11px] px-1 py-0.5 border" style={inputStyle}>
+                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
                 <option value="" style={{ backgroundColor: '#1a1a2e' }}>—</option>
                 {['clout', 'celerity', 'constitution'].map(a => (
                   <option key={a} value={a} style={{ backgroundColor: '#1a1a2e' }}>{a}</option>
@@ -968,11 +972,11 @@ function ItemCreateFields({
           </div>
           {/* Weapon Properties */}
           <div>
-            <label className="text-[9px] text-gray-500 block mb-1">Properties</label>
+            <label className="text-[14px] text-gray-500 block mb-1">Properties</label>
             <div className="flex flex-wrap gap-1">
               {WEAPON_PROPERTIES.map(prop => (
                 <button key={prop} type="button" onClick={() => toggleWeaponProp(prop)}
-                  className="text-[8px] px-1.5 py-0.5 uppercase"
+                  className="text-[13px] px-2 py-1 uppercase"
                   style={{
                     borderRadius: '2px',
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -990,33 +994,33 @@ function ItemCreateFields({
       {/* Armor Fields */}
       {itemSubType === 'armor' && (
         <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(62,120,192,0.2)' }}>
-          <div className="text-[10px] uppercase tracking-wider" style={{ color: '#3E78C0', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+          <div className="text-[15px] uppercase tracking-wider" style={{ color: '#3E78C0', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
             Armor
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[9px] text-gray-500 block">Layer</label>
+              <label className="text-[14px] text-gray-500 block">Layer</label>
               <select value={armorLayer} onChange={e => handleArmorLayerChange(e.target.value as typeof armorLayer)}
-                className="w-full text-[11px] px-1 py-0.5 border" style={inputStyle}>
+                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
                 <option value="clothing" style={{ backgroundColor: '#1a1a2e' }}>Clothing (0.5x, 3 layers)</option>
                 <option value="lightArmor" style={{ backgroundColor: '#1a1a2e' }}>Light Armor (1x, 1 layer)</option>
                 <option value="heavyArmor" style={{ backgroundColor: '#1a1a2e' }}>Heavy Armor (1.5x, -1 Cel)</option>
               </select>
             </div>
             <div style={{ width: 80 }}>
-              <label className="text-[9px] text-gray-500 block">Resistance</label>
+              <label className="text-[14px] text-gray-500 block">Resistance</label>
               <input type="number" min={0} value={armorResistance}
                 onChange={e => setArmorResistance(Number(e.target.value))}
-                className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
             </div>
           </div>
           {/* Covered Parts */}
           <div>
-            <label className="text-[9px] text-gray-500 block mb-1">Coverage</label>
+            <label className="text-[14px] text-gray-500 block mb-1">Coverage</label>
             <div className="flex flex-wrap gap-1">
               {BODY_PARTS.map(part => (
                 <button key={part} type="button" onClick={() => toggleCoveredPart(part)}
-                  className="text-[8px] px-1.5 py-0.5"
+                  className="text-[13px] px-2 py-1"
                   style={{
                     borderRadius: '2px',
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -1034,25 +1038,25 @@ function ItemCreateFields({
       {/* Prima Materia Fields */}
       {itemSubType === 'prima_materia' && (
         <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(112,80,168,0.2)' }}>
-          <div className="text-[10px] uppercase tracking-wider" style={{ color: '#7050A8', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+          <div className="text-[15px] uppercase tracking-wider" style={{ color: '#7050A8', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
             Prima Materia
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[9px] text-gray-500 block">School</label>
+              <label className="text-[14px] text-gray-500 block">School</label>
               <input type="text" value={pmSchool} onChange={e => setPmSchool(e.target.value)}
                 placeholder="Alteration, Restoration..."
-                className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
             </div>
             <div style={{ width: 60 }}>
-              <label className="text-[9px] text-gray-500 block">Level</label>
+              <label className="text-[14px] text-gray-500 block">Level</label>
               <input type="number" min={1} max={10} value={pmLevel} onChange={e => setPmLevel(Number(e.target.value))}
-                className="w-full text-[12px] px-1 py-0.5 border" style={inputStyle} />
+                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
             </div>
           </div>
           <div className="flex gap-3 items-center">
             <button type="button" onClick={() => setPmStable(!pmStable)}
-              className="text-[9px] px-2 py-0.5"
+              className="text-[14px] px-2 py-0.5"
               style={{
                 borderRadius: '2px',
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -1065,9 +1069,9 @@ function ItemCreateFields({
             </button>
             {pmStable && (
               <div className="flex items-center gap-1">
-                <label className="text-[9px] text-gray-500">Charges:</label>
+                <label className="text-[14px] text-gray-500">Charges:</label>
                 <input type="number" min={0} value={pmCharges} onChange={e => setPmCharges(Number(e.target.value))}
-                  className="text-[12px] px-1 py-0.5 border" style={{ ...inputStyle, width: 50 }} />
+                  className="text-[14px] px-1 py-0.5 border" style={{ ...inputStyle, width: 50 }} />
               </div>
             )}
           </div>
@@ -1076,16 +1080,344 @@ function ItemCreateFields({
 
       {/* GM Notes */}
       <div className="flex gap-2 items-start">
-        <label className="text-[11px] text-gray-400 w-14 flex-shrink-0 pt-1">Notes:</label>
+        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0 pt-1">Notes:</label>
         <input
           type="text"
           value={itemNotes}
           onChange={e => setItemNotes(e.target.value)}
           placeholder="GM notes (hidden from players)..."
-          className="flex-1 bg-transparent outline-none text-[11px] text-gray-400 px-2 py-1 border"
+          className="flex-1 bg-transparent outline-none text-[14px] text-gray-400 px-2 py-1 border"
           style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
         />
       </div>
+    </div>
+  );
+}
+
+// ── Material Designer ────────────────────────────────────────────────────
+
+const ALL_MODS: MaterialMod[] = [
+  'Dampening', 'Heat Resistant', 'Cold Resistant', 'Decay Resistant', 'Energy Resistant',
+  'Piercing Resistant', 'Slashing Resistant', 'Bashing Resistant', 'Proof',
+  'Vulnerable', 'Heat Intolerance', 'Cold Intolerance', 'Flammable', 'Combustible',
+  'Flexible', 'Restrictive', 'Protective', 'Brittle', 'Fragile',
+  'Sharp', 'Absorbent', 'Unrepairable', 'Conductive', 'Insulating',
+];
+
+const MOD_COLORS: Record<string, string> = {
+  // Resistances — green
+  'Dampening': '#4ade80', 'Heat Resistant': '#4ade80', 'Cold Resistant': '#4ade80',
+  'Decay Resistant': '#4ade80', 'Energy Resistant': '#4ade80', 'Piercing Resistant': '#4ade80',
+  'Slashing Resistant': '#4ade80', 'Bashing Resistant': '#4ade80', 'Proof': '#22d3ee',
+  // Vulnerabilities — red/orange
+  'Vulnerable': '#f87171', 'Heat Intolerance': '#f87171', 'Cold Intolerance': '#f87171',
+  'Flammable': '#fb923c', 'Combustible': '#ef4444',
+  // Physical — blue/white
+  'Flexible': '#60a5fa', 'Restrictive': '#f87171', 'Protective': '#22d3ee',
+  'Brittle': '#fb923c', 'Fragile': '#fb923c', 'Sharp': '#c4b5fd',
+  'Absorbent': '#60a5fa', 'Unrepairable': '#f87171', 'Conductive': '#fbbf24', 'Insulating': '#60a5fa',
+};
+
+function MaterialDesigner() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [expandedMaterial, setExpandedMaterial] = useState<string | null>(null);
+
+  // Create form state
+  const [newName, setNewName] = useState('');
+  const [newResistType, setNewResistType] = useState<ResistType>('hard');
+  const [newBaseResist, setNewBaseResist] = useState(15);
+  const [newTechLevel, setNewTechLevel] = useState(3);
+  const [newBaseWeight, setNewBaseWeight] = useState(3);
+  const [newValueRating, setNewValueRating] = useState(3);
+  const [newMods, setNewMods] = useState<Set<MaterialMod>>(new Set());
+  const [newDesc, setNewDesc] = useState('');
+  const [customMaterials, setCustomMaterials] = useState<Material[]>([]);
+
+  const allMaterials = [...Object.values(MATERIAL_CATALOG), ...customMaterials];
+
+  const toggleMod = (mod: MaterialMod) => {
+    const next = new Set(newMods);
+    if (next.has(mod)) next.delete(mod); else next.add(mod);
+    setNewMods(next);
+  };
+
+  const handleCreate = () => {
+    if (!newName.trim()) return;
+    const mat: Material = {
+      name: newName.trim(),
+      resistType: newResistType,
+      baseResist: newBaseResist,
+      techLevel: newTechLevel,
+      baseWeight: newBaseWeight,
+      valueRating: newValueRating,
+      mods: Array.from(newMods) as MaterialMod[],
+      description: newDesc.trim() || undefined,
+    };
+    setCustomMaterials(prev => [...prev, mat]);
+    // Reset form
+    setNewName('');
+    setNewBaseResist(15);
+    setNewTechLevel(3);
+    setNewBaseWeight(3);
+    setNewValueRating(3);
+    setNewMods(new Set());
+    setNewDesc('');
+    setShowCreate(false);
+  };
+
+  const inputStyle = {
+    borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace',
+    background: 'transparent', outline: 'none', color: 'white',
+  };
+
+  return (
+    <div className="border-t pt-4" style={{ borderColor: 'rgba(255,204,120,0.15)' }}>
+      {/* Header (always visible) */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between mb-2"
+      >
+        <div className="text-[16px] uppercase tracking-wider flex items-center gap-2" style={{
+          color: '#22ab94',
+          fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+        }}>
+          <span>{'\u2B23'}</span>
+          Material Catalog ({allMaterials.length})
+        </div>
+        <span style={{ color: '#22ab94', fontSize: 14 }}>{isOpen ? '\u25B2' : '\u25BC'}</span>
+      </button>
+
+      {isOpen && (
+        <div className="space-y-2">
+          {/* Create button */}
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="px-3 py-1.5 text-[13px] uppercase tracking-wider transition-colors"
+            style={{
+              fontFamily: 'var(--font-terminal), Consolas, monospace',
+              color: '#22ab94',
+              border: '1px solid rgba(34,171,148,0.4)',
+              backgroundColor: showCreate ? 'rgba(34,171,148,0.15)' : 'transparent',
+              borderRadius: '2px',
+            }}
+          >
+            + New Material
+          </button>
+
+          {/* Create Form */}
+          {showCreate && (
+            <div className="p-4 border space-y-3" style={{ borderColor: 'rgba(34,171,148,0.3)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+              <div className="text-[15px] uppercase tracking-wider" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+                Design New Material
+              </div>
+
+              {/* Name */}
+              <div className="flex gap-2 items-center">
+                <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Name:</label>
+                <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                  placeholder="Material name..."
+                  className="flex-1 text-[14px] px-2 py-1 border" style={inputStyle} autoFocus />
+              </div>
+
+              {/* Resist Type */}
+              <div className="flex gap-2 items-center">
+                <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Type:</label>
+                <div className="flex gap-2">
+                  {(['soft', 'hard'] as ResistType[]).map(rt => (
+                    <button key={rt} type="button" onClick={() => setNewResistType(rt)}
+                      className="text-[14px] px-3 py-1 uppercase"
+                      style={{
+                        borderRadius: '2px',
+                        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                        backgroundColor: newResistType === rt ? '#22ab94' : '#2a2a3e',
+                        color: newResistType === rt ? 'white' : '#666',
+                        border: `1px solid ${newResistType === rt ? '#22ab94' : '#3a3a4e'}`,
+                      }}
+                    >{rt}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-[12px] text-gray-500 block">Resist (1-50)</label>
+                  <input type="number" min={1} max={50} value={newBaseResist} onChange={e => setNewBaseResist(Number(e.target.value))}
+                    className="w-full text-[14px] px-1 py-1 border" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="text-[12px] text-gray-500 block">Tech (1-10)</label>
+                  <input type="number" min={1} max={10} value={newTechLevel} onChange={e => setNewTechLevel(Number(e.target.value))}
+                    className="w-full text-[14px] px-1 py-1 border" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="text-[12px] text-gray-500 block">Weight (1-6)</label>
+                  <input type="number" min={1} max={6} value={newBaseWeight} onChange={e => setNewBaseWeight(Number(e.target.value))}
+                    className="w-full text-[14px] px-1 py-1 border" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="text-[12px] text-gray-500 block">Value (1-10)</label>
+                  <input type="number" min={1} max={10} value={newValueRating} onChange={e => setNewValueRating(Number(e.target.value))}
+                    className="w-full text-[14px] px-1 py-1 border" style={inputStyle} />
+                </div>
+              </div>
+
+              {/* Modifiers */}
+              <div>
+                <label className="text-[12px] text-gray-500 block mb-1">Modifiers</label>
+                <div className="flex flex-wrap gap-1">
+                  {ALL_MODS.map(mod => (
+                    <button key={mod} type="button" onClick={() => toggleMod(mod)}
+                      className="text-[12px] px-2 py-0.5 transition-colors"
+                      style={{
+                        borderRadius: '2px',
+                        fontFamily: 'var(--font-terminal), Consolas, monospace',
+                        backgroundColor: newMods.has(mod) ? `${MOD_COLORS[mod] || '#888'}25` : '#2a2a3e',
+                        color: newMods.has(mod) ? (MOD_COLORS[mod] || '#888') : '#555',
+                        border: `1px solid ${newMods.has(mod) ? `${MOD_COLORS[mod] || '#888'}50` : '#3a3a4e'}`,
+                      }}
+                    >{mod}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="flex gap-2 items-start">
+                <label className="text-[14px] text-gray-400 w-16 flex-shrink-0 pt-1">Desc:</label>
+                <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)}
+                  placeholder="Flavor text..."
+                  className="flex-1 text-[14px] px-2 py-1 border" style={inputStyle} />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleCreate} disabled={!newName.trim()}
+                  className="text-[14px] px-3 py-1 uppercase tracking-wider"
+                  style={{
+                    color: newName.trim() ? '#22ab94' : '#666',
+                    border: `1px solid ${newName.trim() ? 'rgba(34,171,148,0.4)' : '#3a3a4e'}`,
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  }}
+                >Create</button>
+                <button onClick={() => setShowCreate(false)}
+                  className="text-[14px] px-3 py-1 uppercase tracking-wider text-gray-500"
+                  style={{ border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                >Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Material List */}
+          <div className="space-y-1">
+            {allMaterials.map(mat => {
+              const isCustom = customMaterials.includes(mat);
+              const isExpanded = expandedMaterial === mat.name;
+              return (
+                <div key={mat.name}
+                  className="border transition-colors cursor-pointer"
+                  style={{
+                    borderRadius: '2px',
+                    backgroundColor: isExpanded ? '#1a1a2e' : '#131320',
+                    borderColor: isCustom ? 'rgba(34,171,148,0.3)' : '#2a2a3e',
+                    padding: isExpanded ? '10px 12px' : '6px 12px',
+                  }}
+                  onClick={() => setExpandedMaterial(isExpanded ? null : mat.name)}
+                >
+                  {/* Compact row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[15px] text-white" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                        {mat.name}
+                      </span>
+                      <span className="text-[12px] px-1.5 py-0.5 uppercase" style={{
+                        borderRadius: '2px',
+                        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                        backgroundColor: mat.resistType === 'soft' ? 'rgba(96,165,250,0.15)' : 'rgba(251,191,36,0.15)',
+                        color: mat.resistType === 'soft' ? '#60a5fa' : '#fbbf24',
+                        border: `1px solid ${mat.resistType === 'soft' ? 'rgba(96,165,250,0.3)' : 'rgba(251,191,36,0.3)'}`,
+                      }}>
+                        {mat.resistType}
+                      </span>
+                      {isCustom && (
+                        <span className="text-[11px] px-1 py-0.5" style={{
+                          borderRadius: '2px', backgroundColor: 'rgba(34,171,148,0.15)',
+                          color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                        }}>custom</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[13px]" style={{ color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                        R{mat.baseResist}
+                      </span>
+                      <span className="text-[13px]" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                        T{mat.techLevel}
+                      </span>
+                      <span className="text-[13px]" style={{ color: '#c0c0c0', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                        W{mat.baseWeight}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: '#3a3a4e' }}>
+                      {mat.description && (
+                        <div className="text-[13px]" style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                          {mat.description}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-4 gap-3 text-center">
+                        <div>
+                          <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Resist</div>
+                          <div className="text-[16px] font-bold" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.baseResist}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Tech</div>
+                          <div className="text-[16px] font-bold" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.techLevel}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Weight</div>
+                          <div className="text-[16px] font-bold" style={{ color: '#c0c0c0', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.baseWeight}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Value</div>
+                          <div className="text-[16px] font-bold" style={{ color: '#c4b5fd', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.valueRating}</div>
+                        </div>
+                      </div>
+                      {mat.mods.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {mat.mods.map(mod => (
+                            <span key={mod} className="text-[12px] px-2 py-0.5" style={{
+                              borderRadius: '2px',
+                              fontFamily: 'var(--font-terminal), Consolas, monospace',
+                              backgroundColor: `${MOD_COLORS[mod] || '#888'}15`,
+                              color: MOD_COLORS[mod] || '#888',
+                              border: `1px solid ${MOD_COLORS[mod] || '#888'}30`,
+                            }}>{mod}</span>
+                          ))}
+                        </div>
+                      )}
+                      {isCustom && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCustomMaterials(prev => prev.filter(m => m.name !== mat.name));
+                            setExpandedMaterial(null);
+                          }}
+                          className="text-[13px] px-2 py-1 uppercase tracking-wider"
+                          style={{ color: '#E8585A', border: '1px solid rgba(232,88,90,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                        >Delete</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
