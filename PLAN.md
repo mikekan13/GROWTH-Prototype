@@ -1,7 +1,22 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-11
+Last updated: 2026-03-12
 Current phase: Phase 3 (Session Tools) — Skeleton Systems Pass
+
+## Session 2026-03-12: Canvas Bug Sweep
+**Completed:**
+- Fixed React hooks ordering violation in CharacterCard (useCallbacks after early return)
+- Fixed DiceOverlay hit div blocking all canvas clicks/cursors (pointer-events only when dice exist)
+- Fixed DiceOverlay passThrough only forwarding mousedown (now disables hit div through full click cycle)
+- Refactored zoom system: camera {x,y} + zoom as single source of truth, viewBox derived (no more float drift)
+- Fixed tether anchor measurement (card-wrapper-relative instead of foreignObject-relative, zoom-independent)
+- Moved tether lines behind card, anchor dots on top with radio-button style (⊙)
+- Fixed KRMA line crossing detection to use card edge instead of center (per card type/size)
+- Fixed dice context menu reliability (synchronous open, capture-phase close, Escape support)
+- CampaignTerminal stays mounted when hidden (dice event listeners persist)
+- Enhanced debug overlay (Ctrl+D): camera info, mouse SVG coords, drift detector, zoom percentage
+- Deleted unused debug scripts (check-roles.ts, fix-role.ts)
+- Zoom range: 1.0 (max in) to 6.0 (max out)
 
 ---
 

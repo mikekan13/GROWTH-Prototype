@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems)
+Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
 
 ## Services (Business Logic)
 
