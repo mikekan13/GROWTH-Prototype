@@ -376,6 +376,21 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  // ── Hooks that must run unconditionally (before any early return) ─────────
+
+  const handleAttributeChange = useCallback((attrName: AttributeName, newValue: number) => {
+    if (!onCharacterUpdate || !data) return;
+    const charData = data as unknown as GrowthCharacter;
+    const result = updateAttribute(charData, attrName, newValue);
+    if (result.changes.length > 0) {
+      onCharacterUpdate(node.id, result.character, result.changes);
+    }
+  }, [onCharacterUpdate, data, node.id]);
+
+  const handleBarDragState = useCallback((dragging: boolean) => {
+    setIsBarDragging(dragging);
+  }, []);
+
   // ── Context Menu Portal ───────────────────────────────────────────────────
 
   const contextMenu = showContextMenu && typeof window !== 'undefined' && createPortal(
@@ -555,17 +570,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const spiritAction = (attributes?.flow?.current || 0) + (attributes?.frequency?.current || 0) + (attributes?.focus?.current || 0);
   const soulAction = (attributes?.willpower?.current || 0) + (attributes?.wisdom?.current || 0) + (attributes?.wit?.current || 0);
 
-  // Handler for attribute bar changes
-  const handleAttributeChange = useCallback((attrName: AttributeName, newValue: number) => {
-    if (!onCharacterUpdate || !data) return;
-    // Reconstruct a GrowthCharacter from the node's characterData
-    const charData = data as unknown as GrowthCharacter;
-    const result = updateAttribute(charData, attrName, newValue);
-    if (result.changes.length > 0) {
-      onCharacterUpdate(node.id, result.character, result.changes);
-    }
-  }, [onCharacterUpdate, data, node.id]);
-
   // Helper to check conditions for a given attribute
   const getConditionState = (attrName: AttributeName) => {
     const conditionKey = CONDITION_KEYS[attrName];
@@ -574,10 +578,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       conditionLabel: CONDITION_LABELS[attrName],
     };
   };
-
-  const handleBarDragState = useCallback((dragging: boolean) => {
-    setIsBarDragging(dragging);
-  }, []);
 
   return (
     <div className="relative" ref={cardRef}>

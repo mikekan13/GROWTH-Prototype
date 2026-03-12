@@ -889,25 +889,24 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             </div>
           )}
 
-          {/* Panel content */}
-          {showTerminal && (
-            <div className="h-full border-t" style={{
-              borderColor: 'rgba(34, 171, 148, 0.4)',
-              backgroundColor: 'rgba(10, 10, 26, 0.95)',
-              backdropFilter: 'blur(8px)',
-            }}>
-              <CampaignTerminal
-                campaignId={campaign.id}
-                visible={showTerminal}
-                character={parsedCharacter}
-                onCharacterUpdate={(charId, char, changes) => handleCharacterUpdate(charId, char, changes)}
-                onRevert={() => router.refresh()}
-                userId={userId}
-                username={username}
-                userRole={userRole}
-              />
-            </div>
-          )}
+          {/* Panel content — always mounted so event listeners stay active */}
+          <div className="h-full border-t" style={{
+            borderColor: 'rgba(34, 171, 148, 0.4)',
+            backgroundColor: 'rgba(10, 10, 26, 0.95)',
+            backdropFilter: 'blur(8px)',
+            display: showTerminal ? 'block' : 'none',
+          }}>
+            <CampaignTerminal
+              campaignId={campaign.id}
+              visible={showTerminal}
+              character={parsedCharacter}
+              onCharacterUpdate={(charId, char, changes) => handleCharacterUpdate(charId, char, changes)}
+              onRevert={() => router.refresh()}
+              userId={userId}
+              username={username}
+              userRole={userRole}
+            />
+          </div>
         </div>
       </main>
 

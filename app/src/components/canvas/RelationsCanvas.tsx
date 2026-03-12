@@ -113,6 +113,18 @@ export default function RelationsCanvas({
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Zoom constants ──
+  // zoom < 1 = zoomed IN (smaller viewBox), zoom > 1 = zoomed OUT (larger viewBox)
+  const BASE_WIDTH = 1386;
+  const BASE_HEIGHT = 924;
+  const MIN_ZOOM = 1.0;   // max zoom IN — 1x base magnification (viewBox = 1386x924)
+  const MAX_ZOOM = 6.0;   // max zoom OUT — 1/6 magnification (viewBox = 8316x5544)
+  const ZOOM_IN_FACTOR = 0.9;
+  const ZOOM_OUT_FACTOR = 1.1;
+
+  // Round zoom to 4 decimal places to prevent floating-point drift
+  const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) * 1e4) / 1e4;
+
   // ── localStorage helpers ──
   const storageKey = (key: string) => `canvas-${campaignId}-${key}`;
 
@@ -130,11 +142,33 @@ export default function RelationsCanvas({
   }
 
   // ── Core canvas state ──
+  // Camera stores only position + zoom; viewBox width/height are ALWAYS derived from zoom.
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
-  const [viewBox, setViewBox] = useState(() => loadJSON('viewBox', { x: -693, y: -462, width: 1386, height: 924 }));
-  const [zoom, setZoom] = useState(() => Math.max(0.08, Math.min(1.5, loadJSON('zoom', 1))));
+  const [zoom, setZoom] = useState(() => {
+    const stored = loadJSON('zoom', 1);
+    return clampZoom(stored);
+  });
+  const [camera, setCamera] = useState(() => {
+    // Migrate from old viewBox storage or load camera position
+    const oldVB = loadJSON<{ x: number; y: number; width?: number; height?: number } | null>('viewBox', null);
+    const cam = loadJSON<{ x: number; y: number } | null>('camera', null);
+    if (cam) return cam;
+    if (oldVB) {
+      // Clean up old key after migration
+      try { localStorage.removeItem(storageKey('viewBox')); } catch { /* ignore */ }
+      return { x: oldVB.x, y: oldVB.y };
+    }
+    return { x: -BASE_WIDTH / 2, y: -BASE_HEIGHT / 2 };
+  });
+  // viewBox is derived — never set width/height independently
+  const viewBox = {
+    x: camera.x,
+    y: camera.y,
+    width: BASE_WIDTH * zoom,
+    height: BASE_HEIGHT * zoom,
+  };
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0, viewBoxX: 0, viewBoxY: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -208,7 +242,7 @@ export default function RelationsCanvas({
   const persistState = useCallback(() => {
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
-      saveJSON('viewBox', viewBox);
+      saveJSON('camera', camera);
       saveJSON('zoom', zoom);
       saveJSON('positions', [...nodePositions.entries()]);
       saveJSON('zIndices', [...nodeZIndices.entries()]);
@@ -219,15 +253,15 @@ export default function RelationsCanvas({
       saveJSON('panelOffsets', [...panelOffsets.entries()]);
     }, 300);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewBox, zoom, nodePositions, nodeZIndices, expandedNodes, inventoryOpenNodes, inventoryOffsets, panelOpenNodes, panelOffsets]);
+  }, [camera, zoom, nodePositions, nodeZIndices, expandedNodes, inventoryOpenNodes, inventoryOffsets, panelOpenNodes, panelOffsets]);
 
   useEffect(() => {
     persistState();
   }, [persistState]);
 
   // Measure circle positions from DOM once after expand/panel changes settle.
-  // Stored as offsets from the foreignObject's top-left in SVG units, so they
-  // don't change with zoom/pan/drag — just add current card position at render time.
+  // Stored as offsets from the card wrapper's top-left in SVG units (cardWidth × cardHeight),
+  // so they don't change with zoom/pan/drag — just add cardLeft/cardTop at render time.
   useEffect(() => {
     const timer = setTimeout(() => {
       const svg = svgRef.current;
@@ -237,18 +271,23 @@ export default function RelationsCanvas({
       circles.forEach((el) => {
         const panelName = el.getAttribute('data-panel-circle');
         if (!panelName) return;
-        const fo = el.closest('foreignObject');
+        // Find the card wrapper div (fixed dimensions, zoom-independent)
+        const wrapper = el.closest('[data-card-wrapper]') as HTMLElement | null;
+        if (!wrapper) return;
+        const fo = wrapper.closest('foreignObject');
         if (!fo) return;
         const foW = parseFloat(fo.getAttribute('width') || '1');
-        const foH = parseFloat(fo.getAttribute('height') || '1');
         const foRect = fo.getBoundingClientRect();
+        // SVG-units-per-screen-pixel ratio (same for both axes since foreignObject scales uniformly)
+        const svgPerPx = foW / foRect.width;
+        const wrapperRect = wrapper.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
-        // Circle center relative to foreignObject top-left, in screen pixels
-        const relScreenX = (elRect.left + elRect.width / 2) - foRect.left;
-        const relScreenY = (elRect.top + elRect.height / 2) - foRect.top;
-        // Convert screen-relative to SVG-unit-relative (foreignObject maps foW SVG units → foRect.width screen px)
-        const dx = (relScreenX / foRect.width) * foW;
-        const dy = (relScreenY / foRect.height) * foH;
+        // Circle center relative to card wrapper top-left, in screen pixels
+        const relScreenX = (elRect.left + elRect.width / 2) - wrapperRect.left;
+        const relScreenY = (elRect.top + elRect.height / 2) - wrapperRect.top;
+        // Convert to SVG units
+        const dx = relScreenX * svgPerPx;
+        const dy = relScreenY * svgPerPx;
         circleOffsetsRef.current.set(panelName, { dx, dy });
       });
       circleOffsetVersion.current += 1;
@@ -329,6 +368,8 @@ export default function RelationsCanvas({
   const [fps, setFps] = useState(0);
   const fpsFramesRef = useRef(0);
   const fpsLastTimeRef = useRef(performance.now());
+  const [debugMouse, setDebugMouse] = useState({ sx: 0, sy: 0, cx: 0, cy: 0 });
+  const visibleNodesRef = useRef(0);
 
   // FPS counter
   useEffect(() => {
@@ -346,6 +387,24 @@ export default function RelationsCanvas({
   useEffect(() => {
     fpsFramesRef.current++;
   });
+
+  // Mouse position tracking for debug overlay
+  useEffect(() => {
+    if (!showDebug) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const fx = (e.clientX - rect.left) / rect.width;
+      const fy = (e.clientY - rect.top) / rect.height;
+      setDebugMouse({
+        sx: e.clientX, sy: e.clientY,
+        cx: Math.round(viewBox.x + fx * viewBox.width),
+        cy: Math.round(viewBox.y + fy * viewBox.height),
+      });
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, [showDebug, camera.x, camera.y, zoom]);
 
   // ── Node dragging state ──
   const [dragNodeId, setDragNodeId] = useState<string | null>(null);
@@ -614,9 +673,22 @@ export default function RelationsCanvas({
 
         if (startY === undefined || !pos || !onEntityCrossLine) continue;
 
+        // Use the card's EDGE for line crossing, not the center.
+        // The leading edge depends on drag direction:
+        //   dragging UP (crystallize) → bottom edge = pos.y + halfH
+        //   dragging DOWN (dissolve)  → top edge    = pos.y - halfH
+        const node_ = nodes.find(n => n.id === nodeId);
+        const isExp = expandedNodes.has(nodeId);
+        const halfH = node_?.type === 'character' ? (isExp ? 250 : 120)
+                    : node_?.type === 'location'  ? (isExp ? 350 : 90)
+                    : node_?.type === 'item'      ? (isExp ? 300 : 80)
+                    : 100;
+        const bottomEdge = pos.y + halfH;
+        const topEdge = pos.y - halfH;
+
         const crossed =
-          (startY > 0 && pos.y <= 0) ? 'crystallize' as const :
-          (startY <= 0 && pos.y > 0) ? 'dissolve' as const : null;
+          (startY > 0 && topEdge <= 0) ? 'crystallize' as const :
+          (startY <= 0 && bottomEdge > 0) ? 'dissolve' as const : null;
 
         if (!crossed) continue;
 
@@ -656,7 +728,7 @@ export default function RelationsCanvas({
         y: viewBox.y + ((clientY - rect.top) / rect.height) * viewBox.height,
       };
     },
-    [viewBox]
+    [camera, zoom]
   );
 
   // ── Connection styling ────────────────────────────────────────────────────
@@ -711,12 +783,12 @@ export default function RelationsCanvas({
       if (isBackground) {
         setIsPanning(true);
         setIsDragging(true);
-        setPanStart({ x: e.clientX, y: e.clientY, viewBoxX: viewBox.x, viewBoxY: viewBox.y });
+        setPanStart({ x: e.clientX, y: e.clientY, viewBoxX: camera.x, viewBoxY: camera.y });
         e.preventDefault();
         e.stopPropagation();
       }
     },
-    [viewBox.x, viewBox.y]
+    [camera.x, camera.y]
   );
 
   const handleMouseMove = useCallback(
@@ -748,12 +820,12 @@ export default function RelationsCanvas({
 
       if (!panRafRef.current) {
         panRafRef.current = requestAnimationFrame(() => {
-          setViewBox((prev) => ({ ...prev, x: newX, y: newY }));
+          setCamera({ x: newX, y: newY });
           panRafRef.current = 0;
         });
       }
     },
-    [isPanning, isDragging, panStart, viewBox, dragNodeId, dragStartSvg, clientToSvg]
+    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, clientToSvg]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -810,24 +882,26 @@ export default function RelationsCanvas({
 
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
+      // Mouse position in SVG coordinates
       const svgX = viewBox.x + (mouseX / rect.width) * viewBox.width;
       const svgY = viewBox.y + (mouseY / rect.height) * viewBox.height;
 
-      const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
-      const newZoom = Math.max(0.08, Math.min(1.5, zoom * zoomFactor));
+      const zoomFactor = e.deltaY > 0 ? ZOOM_OUT_FACTOR : ZOOM_IN_FACTOR;
+      const newZoom = clampZoom(zoom * zoomFactor);
 
       if (newZoom !== zoom) {
-        const scaleFactor = newZoom / zoom;
+        // Derive width/height from base dimensions — no chained multiplication
+        const newWidth = BASE_WIDTH * newZoom;
+        const newHeight = BASE_HEIGHT * newZoom;
         setZoom(newZoom);
-        setViewBox((prev) => ({
-          x: svgX - (svgX - prev.x) * scaleFactor,
-          y: svgY - (svgY - prev.y) * scaleFactor,
-          width: prev.width * scaleFactor,
-          height: prev.height * scaleFactor,
-        }));
+        // Keep mouse position fixed: svgX must stay at same screen fraction
+        setCamera({
+          x: svgX - (mouseX / rect.width) * newWidth,
+          y: svgY - (mouseY / rect.height) * newHeight,
+        });
       }
     },
-    [viewBox, zoom]
+    [camera, zoom]
   );
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -847,11 +921,11 @@ export default function RelationsCanvas({
         if (selectedNode) {
           const node = nodes.find((n) => n.id === selectedNode);
           if (node) {
-            setViewBox({ x: node.x - 693, y: node.y - 462, width: 1386, height: 924 });
+            setCamera({ x: node.x - BASE_WIDTH / 2, y: node.y - BASE_HEIGHT / 2 });
             setZoom(1);
           }
         } else {
-          setViewBox({ x: -693, y: -462, width: 1386, height: 924 });
+          setCamera({ x: -BASE_WIDTH / 2, y: -BASE_HEIGHT / 2 });
           setZoom(1);
         }
       }
@@ -1008,6 +1082,46 @@ export default function RelationsCanvas({
             opacity={glowPulse}
           />
         )}
+
+        {/* ── Tether lines + panel-end dots (BEFORE card = behind it) ── */}
+        {isInventoryOpen && (() => {
+          const cardLeft = visualX - cardWidth / 2;
+          const cardTop = visualY - cardHeight / 2;
+          const cached = circleOffsetsRef.current.get('inventory');
+          const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 88);
+          const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+          const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
+          const offset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
+          const invPanelH = panelHeightsRef.current.get(`_inv_${node.id}`) || 0;
+          const tetherEndX = anchorX + offset.x;
+          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, invPanelH);
+          return (
+            <>
+              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={4} strokeDasharray="8 5" opacity={0.6} />
+              <circle cx={tetherEndX} cy={tetherEndY} r={5} fill="#ffcc78" opacity={0.8} />
+            </>
+          );
+        })()}
+        {isNodeExpanded && [...nodePanels].map((panelKey) => {
+          const offsetKey = `${node.id}__${panelKey}`;
+          const cardLeft = visualX - cardWidth / 2;
+          const cardTop = visualY - cardHeight / 2;
+          const cached = circleOffsetsRef.current.get(panelKey);
+          const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 200);
+          const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+          const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
+          const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
+          const subPanelH = panelHeightsRef.current.get(offsetKey) || 0;
+          const tetherEndX = anchorX + offset.x;
+          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, subPanelH);
+          return (
+            <React.Fragment key={`tether-${node.id}-${panelKey}`}>
+              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={4} strokeDasharray="8 5" opacity={0.6} />
+              <circle cx={tetherEndX} cy={tetherEndY} r={5} fill="#ffcc78" opacity={0.8} />
+            </React.Fragment>
+          );
+        })}
+
         <foreignObject
           key={`card-${node.id}`}
           x={visualX - cardWidth / 2 - viewBox.width}
@@ -1017,7 +1131,7 @@ export default function RelationsCanvas({
           style={{ overflow: "visible", pointerEvents: "none" }}
         >
           <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-          <div style={{ pointerEvents: "auto" }}>
+          <div data-card-wrapper style={{ pointerEvents: "auto" }}>
           <CharacterCard
             node={charNode}
             isExpanded={isNodeExpanded}
@@ -1054,8 +1168,7 @@ export default function RelationsCanvas({
           </div>
         </foreignObject>
 
-        {/* Inventory sub-panel — draggable with tether line */}
-        {/* ── All tether lines/dots (rendered BEFORE panels so they appear behind) ── */}
+        {/* ── Tether anchor dots (AFTER card = on top, fills in the button like a selection indicator) ── */}
         {isInventoryOpen && (() => {
           const cardLeft = visualX - cardWidth / 2;
           const cardTop = visualY - cardHeight / 2;
@@ -1063,36 +1176,25 @@ export default function RelationsCanvas({
           const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 88);
           const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
-          const offset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
-          const invPanelH = panelHeightsRef.current.get(`_inv_${node.id}`) || 0;
-          const tetherEndX = anchorX + offset.x;
-          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, invPanelH);
           return (
-            <>
-              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
-              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.8} />
-              <circle cx={tetherEndX} cy={tetherEndY} r={4} fill="#ffcc78" opacity={0.8} />
-            </>
+            <g key="anchor-radio-inv" style={{ pointerEvents: 'none' }}>
+              <circle cx={anchorX} cy={anchorY} r={7} fill="none" stroke="#ffcc78" strokeWidth={1.5} opacity={0.8} />
+              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.9} />
+            </g>
           );
         })()}
         {isNodeExpanded && [...nodePanels].map((panelKey) => {
-          const offsetKey = `${node.id}__${panelKey}`;
           const cardLeft = visualX - cardWidth / 2;
           const cardTop = visualY - cardHeight / 2;
           const cached = circleOffsetsRef.current.get(panelKey);
           const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 200);
           const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
-          const offset = panelOffsets.get(offsetKey) || { x: 0, y: 20 };
-          const subPanelH = panelHeightsRef.current.get(offsetKey) || 0;
-          const tetherEndX = anchorX + offset.x;
-          const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, subPanelH);
           return (
-            <React.Fragment key={`tether-${node.id}-${panelKey}`}>
-              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={2} strokeDasharray="6 4" opacity={0.6} />
-              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.8} />
-              <circle cx={tetherEndX} cy={tetherEndY} r={4} fill="#ffcc78" opacity={0.8} />
-            </React.Fragment>
+            <g key={`anchor-radio-${node.id}-${panelKey}`} style={{ pointerEvents: 'none' }}>
+              <circle cx={anchorX} cy={anchorY} r={7} fill="none" stroke="#ffcc78" strokeWidth={1.5} opacity={0.8} />
+              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.9} />
+            </g>
           );
         })}
 
@@ -1957,36 +2059,78 @@ export default function RelationsCanvas({
       />
 
       {/* ── Debug overlay (Ctrl+D) ── */}
-      {showDebug && (
-        <div
-          className="absolute top-2 right-2 rounded-lg p-3 text-xs font-[family-name:var(--font-terminal)]"
-          style={{
-            background: "rgba(0, 0, 0, 0.85)",
-            border: "1px solid var(--accent-teal)",
-            color: "var(--accent-teal)",
-            minWidth: 200,
-            zIndex: 50,
-          }}
-        >
-          <div className="font-bold mb-2 text-[10px] tracking-[0.2em] uppercase border-b border-[var(--accent-teal)]/30 pb-1">
-            DEBUG OVERLAY
+      {showDebug && (() => {
+        const expectedW = BASE_WIDTH * zoom;
+        const expectedH = BASE_HEIGHT * zoom;
+        const driftW = Math.abs(viewBox.width - expectedW);
+        const driftH = Math.abs(viewBox.height - expectedH);
+        const hasDrift = driftW > 0.01 || driftH > 0.01;
+        const zoomPct = Math.round((1 / zoom) * 100);
+        const Row = ({ label, value, warn }: { label: string; value: React.ReactNode; warn?: boolean }) => (
+          <div className="flex justify-between gap-4">
+            <span className="opacity-60">{label}</span>
+            <span className={warn ? 'text-red-400' : ''}>{value}</span>
           </div>
-          <div className="space-y-1">
-            <div className="flex justify-between"><span>FPS:</span><span className={fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}>{fps}</span></div>
-            <div className="flex justify-between"><span>Zoom:</span><span>{zoom.toFixed(2)}x</span></div>
-            <div className="flex justify-between"><span>ViewBox:</span><span>{Math.round(viewBox.x)},{Math.round(viewBox.y)}</span></div>
-            <div className="flex justify-between"><span>VB Size:</span><span>{Math.round(viewBox.width)}x{Math.round(viewBox.height)}</span></div>
-            <div className="flex justify-between"><span>Nodes:</span><span>{nodes.length}</span></div>
-            <div className="flex justify-between"><span>Expanded:</span><span>{expandedNodes.size}</span></div>
-            <div className="flex justify-between"><span>Max Z:</span><span>{maxZIndex}</span></div>
-            <div className="flex justify-between"><span>Panning:</span><span>{isPanning ? 'YES' : 'no'}</span></div>
-            <div className="flex justify-between"><span>Dragging:</span><span>{dragNodeId || 'none'}</span></div>
+        );
+        return (
+          <div
+            className="absolute top-2 right-2 rounded-lg p-3 text-xs font-[family-name:var(--font-terminal)]"
+            style={{
+              background: "rgba(0, 0, 0, 0.92)",
+              border: "1px solid var(--accent-teal)",
+              color: "var(--accent-teal)",
+              minWidth: 240,
+              zIndex: 50,
+              pointerEvents: 'auto',
+              userSelect: 'text',
+            }}
+          >
+            <div className="font-bold mb-2 text-[10px] tracking-[0.2em] uppercase border-b border-[var(--accent-teal)]/30 pb-1">
+              CANVAS DEBUG
+            </div>
+
+            {/* Performance */}
+            <div className="space-y-0.5 mb-2">
+              <div className="text-[8px] tracking-[0.15em] uppercase opacity-40 mb-0.5">PERFORMANCE</div>
+              <Row label="FPS" value={<span className={fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}>{fps}</span>} />
+              <Row label="Nodes" value={`${nodes.length} total`} />
+              <Row label="Expanded" value={expandedNodes.size} />
+              <Row label="Panels" value={[...panelOpenNodes.values()].reduce((a, s) => a + s.size, 0)} />
+            </div>
+
+            {/* Camera */}
+            <div className="space-y-0.5 mb-2 pt-1 border-t border-[var(--accent-teal)]/20">
+              <div className="text-[8px] tracking-[0.15em] uppercase opacity-40 mb-0.5">CAMERA</div>
+              <Row label="Zoom" value={`${zoom.toFixed(4)}x (${zoomPct}%)`} />
+              <Row label="Range" value={`${MIN_ZOOM}–${MAX_ZOOM}`} />
+              <Row label="Cam X,Y" value={`${camera.x.toFixed(1)}, ${camera.y.toFixed(1)}`} />
+              <Row label="VB Size" value={`${Math.round(viewBox.width)}x${Math.round(viewBox.height)}`} />
+              <Row label="Base" value={`${BASE_WIDTH}x${BASE_HEIGHT}`} />
+              {hasDrift && <Row label="DRIFT!" value={`w:${driftW.toFixed(4)} h:${driftH.toFixed(4)}`} warn />}
+            </div>
+
+            {/* Mouse */}
+            <div className="space-y-0.5 mb-2 pt-1 border-t border-[var(--accent-teal)]/20">
+              <div className="text-[8px] tracking-[0.15em] uppercase opacity-40 mb-0.5">MOUSE (SVG)</div>
+              <Row label="World" value={`${debugMouse.cx}, ${debugMouse.cy}`} />
+              <Row label="Screen" value={`${debugMouse.sx}, ${debugMouse.sy}`} />
+            </div>
+
+            {/* State */}
+            <div className="space-y-0.5 pt-1 border-t border-[var(--accent-teal)]/20">
+              <div className="text-[8px] tracking-[0.15em] uppercase opacity-40 mb-0.5">STATE</div>
+              <Row label="Panning" value={isPanning ? 'YES' : 'no'} />
+              <Row label="Dragging" value={dragNodeId || 'none'} />
+              <Row label="Selected" value={selectedNode ? selectedNode.slice(0, 8) + '...' : 'none'} />
+              <Row label="Max Z" value={maxZIndex} />
+            </div>
+
+            <div className="mt-2 pt-1 border-t border-[var(--accent-teal)]/30 text-[8px] opacity-30">
+              Ctrl+D to toggle | Space to reset
+            </div>
           </div>
-          <div className="mt-2 pt-1 border-t border-[var(--accent-teal)]/30 text-[8px] text-[var(--accent-teal)]/50">
-            Ctrl+D to toggle
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Node details panel (bottom-left) ── */}
       {selectedNodeData && (

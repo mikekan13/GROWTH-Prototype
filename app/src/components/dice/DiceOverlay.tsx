@@ -52,6 +52,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
   const initialized = useRef(false);
 
   const [active, setActive] = useState(false);
+  const [hasDice, setHasDice] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const { queue, dequeue } = useDiceQueue();
@@ -191,6 +192,12 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
     }
   }, [ensureInitialized]);
 
+  // ── Dice presence tracking (controls hit div pointer-events) ────────
+
+  const syncHasDice = useCallback(() => {
+    setHasDice(!!animatorRef.current?.hasDice());
+  }, []);
+
   // ── Process queue (from dice service rolls) ─────────────────────────
 
   useEffect(() => {
@@ -211,9 +218,10 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
       requestAnimationFrame(() => {
         if (!ensureInitialized()) return;
         animatorRef.current!.start(result);
+        syncHasDice();
       });
     });
-  }, [queue, dequeue, ensureInitialized]);
+  }, [queue, dequeue, ensureInitialized, syncHasDice]);
 
   // ── Context menu handlers ───────────────────────────────────────────
 
@@ -226,67 +234,60 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
     const opt = DIE_OPTIONS.find(d => d.type === dieType);
     const color = opt?.color ?? 'white';
     animatorRef.current.spawnDie(dieType, color, contextMenu.x, contextMenu.y);
+    syncHasDice();
     closeContextMenu();
-  }, [contextMenu, closeContextMenu]);
+  }, [contextMenu, closeContextMenu, syncHasDice]);
 
   const handleRemoveDie = useCallback(() => {
     if (!contextMenu || !animatorRef.current) return;
     animatorRef.current.removeDieAt(contextMenu.x, contextMenu.y);
+    syncHasDice();
     closeContextMenu();
-  }, [contextMenu, closeContextMenu]);
+  }, [contextMenu, closeContextMenu, syncHasDice]);
 
   const handleRemoveAll = useCallback(() => {
     if (!animatorRef.current) return;
     animatorRef.current.removeAllDice();
+    syncHasDice();
     closeContextMenu();
-  }, [closeContextMenu]);
+  }, [closeContextMenu, syncHasDice]);
 
   // ── Document-level contextmenu listener ─────────────────────────────
-  // Attached to document in capture phase so it fires before anything else.
-  // Checks if the right-click is within the Relations Canvas container.
+  // Capture phase so it fires before card context menus.
+  // Uses cached container ref when available, falls back to DOM search.
 
   useEffect(() => {
     const onContextMenu = (e: MouseEvent) => {
-      // Find the container on each right-click (handles DOM changes)
-      const container = findCanvasContainer();
+      // Use cached container, fall back to DOM search
+      const container = containerElRef.current || findCanvasContainer();
       if (!container) return;
 
-      // Check if click is within the canvas container bounds
       const rect = container.getBoundingClientRect();
       if (
         e.clientX < rect.left || e.clientX > rect.right ||
         e.clientY < rect.top || e.clientY > rect.bottom
       ) return;
 
-      // Don't hijack right-click on card context menus (they have their own)
+      // Don't hijack right-click on existing dice menu or card context menus
       const target = e.target as HTMLElement;
       if (target.closest('[data-dice-menu]')) return;
 
-      // Must preventDefault synchronously
       e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
 
-      const clientX = e.clientX;
-      const clientY = e.clientY;
+      // Synchronous state update — no RAF delay
+      const animator = animatorRef.current;
+      const hasDie = animator?.hasDieAt(e.clientX, e.clientY) ?? false;
 
-      requestAnimationFrame(() => {
-        if (!ensureInitialized()) return;
-
-        const animator = animatorRef.current!;
-        const hasDie = animator.hasDieAt(clientX, clientY);
-
-        setContextMenu({
-          x: clientX,
-          y: clientY,
-          mode: hasDie ? 'remove' : 'spawn',
-        });
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        mode: hasDie ? 'remove' : 'spawn',
       });
     };
 
     document.addEventListener('contextmenu', onContextMenu, true);
     return () => document.removeEventListener('contextmenu', onContextMenu, true);
-  }, [findCanvasContainer, ensureInitialized]);
+  }, [findCanvasContainer]);
 
   // ── Mouse interaction: left-click grab ──────────────────────────────
 
@@ -296,6 +297,9 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
 
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
+
+      // Close dice menu on any left click
+      setContextMenu(null);
 
       const animator = animatorRef.current;
       if (!animator || !animator.hasDice()) {
@@ -332,22 +336,34 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
     };
   }, [active]);
 
-  // Close context menu on outside click
+  // Close context menu on any interaction outside the menu
   useEffect(() => {
     if (!contextMenu) return;
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('[data-dice-menu]')) return;
-      closeContextMenu();
+
+    const close = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-dice-menu]')) return;
+      setContextMenu(null);
     };
+    const closeOnKey = (e: Event) => {
+      if ((e as KeyboardEvent).key === 'Escape') setContextMenu(null);
+    };
+
+    // Small delay so the triggering right-click doesn't immediately close the menu
     const timer = setTimeout(() => {
-      window.addEventListener('mousedown', handleClick);
-    }, 0);
+      // Capture phase catches events even if other handlers call stopPropagation
+      window.addEventListener('mousedown', close, true);
+      window.addEventListener('contextmenu', close, true);
+      window.addEventListener('keydown', closeOnKey, true);
+    }, 50);
+
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('mousedown', close, true);
+      window.removeEventListener('contextmenu', close, true);
+      window.removeEventListener('keydown', closeOnKey, true);
     };
-  }, [contextMenu, closeContextMenu]);
+  }, [contextMenu]);
 
   // ── Resize ────────────────────────────────────────────────────────────
 
@@ -438,7 +454,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
           style={{
             position: 'absolute',
             inset: 0,
-            pointerEvents: active ? 'auto' : 'none',
+            pointerEvents: (active && hasDice) ? 'auto' : 'none',
           }}
         />
 
@@ -508,22 +524,20 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
 }
 
 
-function passThrough(hitDiv: HTMLElement, originalEvent: MouseEvent): void {
+function passThrough(hitDiv: HTMLElement, _originalEvent: MouseEvent): void {
+  // Disable pointer-events so the full mousedown→mouseup→click cycle reaches
+  // the element underneath. Re-enable only after mouseup so buttons get their
+  // onClick fired.
   hitDiv.style.pointerEvents = 'none';
 
-  const below = document.elementFromPoint(originalEvent.clientX, originalEvent.clientY);
-  if (below && below !== hitDiv) {
-    below.dispatchEvent(new MouseEvent('mousedown', {
-      bubbles: true,
-      cancelable: true,
-      clientX: originalEvent.clientX,
-      clientY: originalEvent.clientY,
-      button: originalEvent.button,
-      buttons: originalEvent.buttons,
-    }));
-  }
-
-  requestAnimationFrame(() => {
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
     hitDiv.style.pointerEvents = 'auto';
-  });
+    window.removeEventListener('mouseup', restore, true);
+  };
+  window.addEventListener('mouseup', restore, true);
+  // Safety: restore after 2s even if mouseup never fires (e.g. mouse left window)
+  setTimeout(restore, 2000);
 }
