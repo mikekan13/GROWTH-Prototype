@@ -23,7 +23,6 @@ import {
   getMysteryTexture,
   getRandomGlitchTexture,
   readUpFaceIndex,
-  readUpFaceValue,
   prewarmTextures,
   type DiceMeshResult,
 } from './DiceMesh';
@@ -188,16 +187,11 @@ function getGlowTexture(): THREE.CanvasTexture {
   return glowTextureCache;
 }
 
-// Pillar color hex values for die glow
-const GLOW_COLORS: Record<DieColor, number> = {
-  red: 0xE8585A,
-  blue: 0x4080D0,
-  purple: 0x9070D0,
-  teal: 0x2DB8A0,
-  gold: 0xD0A030,
-  white: 0xFFFFFF,
-  black: 0xC02020,
-};
+// Pillar color hex values for die glow (reserved for future glow effects)
+// const GLOW_COLORS: Record<DieColor, number> = {
+//   red: 0xE8585A, blue: 0x4080D0, purple: 0x9070D0, teal: 0x2DB8A0,
+//   gold: 0xD0A030, white: 0xFFFFFF, black: 0xC02020,
+// };
 
 export class DiceAnimator {
   private scene: DiceScene;
@@ -306,12 +300,6 @@ export class DiceAnimator {
 
     ad.targetValue = this.randomValue(ad.dieType);
 
-    // Each die gets evenly spaced orbit offset
-    const count = this.grabbedDice.length;
-    const orbitOffset = count * (Math.PI * 2 / Math.max(count + 1, 2));
-
-    // Redistribute all orbit offsets evenly
-    const total = count + 1;
     const speed = 15 + Math.random() * 10;
     const grabbed: GrabbedDie = {
       ad,
@@ -440,7 +428,7 @@ export class DiceAnimator {
       this.updateGrabbedDice();
     }
 
-    const allSettled = this.physics.step(dt);
+    this.physics.step(dt);
 
     // Process each throw batch independently
     if (this.grabbedDice.length === 0) {
@@ -635,7 +623,7 @@ export class DiceAnimator {
     }
   }
 
-  private onMouseUp(_e: MouseEvent): void {
+  private onMouseUp(_: MouseEvent): void {
     if (this.grabbedDice.length === 0) return;
 
     const flingVel = this.computeFlingVelocity();

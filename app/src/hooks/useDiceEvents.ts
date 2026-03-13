@@ -15,7 +15,7 @@ import { diceEvents } from '@/lib/dice-events';
  */
 export function useDiceEvents(onRoll: (result: RollResult) => void): void {
   const callbackRef = useRef(onRoll);
-  callbackRef.current = onRoll;
+  useEffect(() => { callbackRef.current = onRoll; });
 
   useEffect(() => {
     const handler = (result: RollResult) => callbackRef.current(result);
@@ -57,5 +57,6 @@ export function useDiceQueue(): {
     rerender();
   }, [rerender]);
 
+  // eslint-disable-next-line react-hooks/refs -- intentional: ref is source of truth, state triggers re-render
   return { queue: queueRef.current, dequeue, clear };
 }

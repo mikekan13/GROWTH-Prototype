@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    const { user } = await requireAuth();
+    await requireAuth();
     const params = req.nextUrl.searchParams;
 
     const campaignId = params.get('campaignId');

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { ChangeLogEntry, ChangeActor, ChangeCategory } from '@/types/changelog';
 
 interface ChangeLogPanelProps {

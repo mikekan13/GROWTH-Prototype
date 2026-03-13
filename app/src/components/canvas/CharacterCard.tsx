@@ -147,17 +147,15 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
   const barRef = useRef<HTMLDivElement>(null);
   const editable = !!attrName && !!onAttributeChange;
 
-  // Use refs for drag state to avoid re-render mid-drag
-  const draggingRef = useRef(false);
-  const [, forceRender] = useState(0);
+  // Use state for drag tracking to avoid ref-during-render lint errors
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleLeverMouseDown = useCallback((e: React.MouseEvent) => {
     if (!editable || !barRef.current) return;
     e.preventDefault();
     e.stopPropagation();
-    draggingRef.current = true;
+    setIsDragging(true);
     onDragStateChange?.(true);
-    forceRender(n => n + 1);
 
     // Capture barRef at drag start so it stays stable through re-renders
     const bar = barRef.current;
@@ -174,17 +172,14 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
       onAttributeChange!(attr, valueFromX(me.clientX));
     };
     const onUp = () => {
-      draggingRef.current = false;
+      setIsDragging(false);
       onDragStateChange?.(false);
-      forceRender(n => n + 1);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   }, [editable, attrName, max, onAttributeChange, onDragStateChange]);
-
-  const isDragging = draggingRef.current;
 
   const inner = (
     <div className={`flex items-center gap-2 ${isFrequency ? 'rounded' : ''}`}
@@ -311,6 +306,21 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     }
   }, [showContextMenu]);
 
+  // ── Hooks that must run unconditionally (before any early return) ─────────
+
+  const handleAttributeChange = useCallback((attrName: AttributeName, newValue: number) => {
+    if (!onCharacterUpdate || !node?.characterData) return;
+    const charData = node.characterData as unknown as GrowthCharacter;
+    const result = updateAttribute(charData, attrName, newValue);
+    if (result.changes.length > 0) {
+      onCharacterUpdate(node.id, result.character, result.changes);
+    }
+  }, [onCharacterUpdate, node]);
+
+  const handleBarDragState = useCallback((dragging: boolean) => {
+    setIsBarDragging(dragging);
+  }, []);
+
   if (!node?.id || !node?.name) return null;
 
   const data = node.characterData;
@@ -375,21 +385,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
-
-  // ── Hooks that must run unconditionally (before any early return) ─────────
-
-  const handleAttributeChange = useCallback((attrName: AttributeName, newValue: number) => {
-    if (!onCharacterUpdate || !data) return;
-    const charData = data as unknown as GrowthCharacter;
-    const result = updateAttribute(charData, attrName, newValue);
-    if (result.changes.length > 0) {
-      onCharacterUpdate(node.id, result.character, result.changes);
-    }
-  }, [onCharacterUpdate, data, node.id]);
-
-  const handleBarDragState = useCallback((dragging: boolean) => {
-    setIsBarDragging(dragging);
-  }, []);
 
   // ── Context Menu Portal ───────────────────────────────────────────────────
 

@@ -30,8 +30,7 @@ const DIE_BODY_COLORS: Record<DieColor, { base: number; emissive: number; edgeHe
 
 const numberTextureCache = new Map<string, THREE.CanvasTexture>();
 
-// Gold for settled highlight — matches KRMA identity, pops on every die
-const SETTLE_HIGHLIGHT_COLOR = '#D0A030';
+// Gold for settled highlight — matches KRMA identity (see HIGHLIGHT_COLORS below)
 
 type HighlightStyle = 'gold' | 'red' | 'green';
 

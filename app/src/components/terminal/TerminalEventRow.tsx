@@ -307,7 +307,7 @@ function ChatRow({ event, payload }: { event: TerminalEvent; payload: ChatPayloa
 
 // ── Command Row ────────────────────────────────────────────────────────────
 
-function CommandRow({ event, payload }: { event: TerminalEvent; payload: CommandPayload }) {
+function CommandRow({ event: _event, payload }: { event: TerminalEvent; payload: CommandPayload }) {
   return (
     <div className="px-2 py-1" style={{ opacity: 0.7 }}>
       <div className="text-[13px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>

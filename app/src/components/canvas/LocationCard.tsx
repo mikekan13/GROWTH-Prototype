@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { GrowthLocation, LocationType } from '@/types/location';
 import { LOCATION_TYPE_ICONS, LOCATION_TYPE_COLORS } from '@/types/location';
@@ -27,7 +27,7 @@ interface LocationCardProps {
 
 const DANGER_COLORS = ['#4ade80', '#4ade80', '#a3e635', '#facc15', '#facc15', '#f59e0b', '#f97316', '#ef4444', '#dc2626', '#991b1b'];
 
-export default function LocationCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate, onPositionChange, onDragOffsetChange }: LocationCardProps) {
+export default function LocationCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate: _onUpdate, onPositionChange, onDragOffsetChange }: LocationCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });

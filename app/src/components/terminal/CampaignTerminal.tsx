@@ -61,9 +61,9 @@ export default function CampaignTerminal({
   character,
   onCharacterUpdate,
   onRevert,
-  userId,
-  username,
-  userRole,
+  userId: _userId,
+  username: _username,
+  userRole: _userRole,
 }: CampaignTerminalProps) {
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,6 @@ export default function CampaignTerminal({
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<CommandInputHandle>(null);
-  const lastFetchRef = useRef<string | null>(null);
 
   // ── Fetch merged events ──────────────────────────────────────────────────
 
@@ -565,7 +564,6 @@ export default function CampaignTerminal({
     }
 
     const groups: EventGroup[] = [];
-    const sessionMap = new Map(sessions.map(s => [s.id, s]));
 
     // Group events by sessionId
     const bySession = new Map<string | null, TerminalEvent[]>();

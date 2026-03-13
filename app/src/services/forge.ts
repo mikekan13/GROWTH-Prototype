@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
-import type { SkillGovernor } from '@/types/growth';
+// SkillGovernor type used indirectly via SKILL_GOVERNORS
 import { SKILL_GOVERNORS } from '@/types/growth';
 
 // ── Forge Item Types ──────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ export async function listForgeItems(
   }));
 }
 
-export async function getForgeItem(itemId: string, userId: string, userRole: string) {
+export async function getForgeItem(itemId: string, userId: string, _userRole: string) {
   const item = await prisma.forgeItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Forge item');
 

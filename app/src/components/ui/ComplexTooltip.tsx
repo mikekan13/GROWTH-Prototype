@@ -47,10 +47,19 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
 
   const LOCK_DELAY = 500;
 
+  const closeAll = () => {
+    setIsVisible(false);
+    setIsPositionLocked(false);
+    setLockProgress(0);
+    setNestedTooltip(null);
+    lockStartTimeRef.current = 0;
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+  };
+
   const updateLockProgress = () => {
     if (!lockStartTimeRef.current || isPositionLocked) return;
 
-    const elapsed = Date.now() - lockStartTimeRef.current;
+    const elapsed = Date.now() - lockStartTimeRef.current; // eslint-disable-line react-hooks/purity
     const progress = Math.min(elapsed / LOCK_DELAY, 1);
     setLockProgress(progress);
 
@@ -76,7 +85,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
     setLockProgress(0);
     updatePosition(e);
 
-    lockStartTimeRef.current = Date.now();
+    lockStartTimeRef.current = Date.now(); // eslint-disable-line react-hooks/purity
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     animationFrameRef.current = requestAnimationFrame(updateLockProgress);
   };
@@ -86,7 +95,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
 
     if (!isPositionLocked) {
       updatePosition(e);
-      lockStartTimeRef.current = Date.now();
+      lockStartTimeRef.current = Date.now(); // eslint-disable-line react-hooks/purity
       setLockProgress(0);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = requestAnimationFrame(updateLockProgress);
@@ -98,15 +107,6 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
       if (tooltipRef.current.contains(e.relatedTarget)) return;
     }
     closeAll();
-  };
-
-  const closeAll = () => {
-    setIsVisible(false);
-    setIsPositionLocked(false);
-    setLockProgress(0);
-    setNestedTooltip(null);
-    lockStartTimeRef.current = 0;
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
   };
 
   const handleTooltipMouseEnter = () => {

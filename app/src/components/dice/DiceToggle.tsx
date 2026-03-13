@@ -5,17 +5,23 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const STORAGE_KEY = 'growth_dice_3d_enabled';
 
 export function DiceToggle() {
   const [enabled, setEnabled] = useState(true);
+  const hydrated = useRef(false);
 
   useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) setEnabled(stored !== 'false');
-  }, []);
+    if (stored !== null) {
+      const val = stored !== 'false';
+      if (val !== enabled) setEnabled(val); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = () => {
     const next = !enabled;

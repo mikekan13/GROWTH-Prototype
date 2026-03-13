@@ -303,7 +303,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
 
       const animator = animatorRef.current;
       if (!animator || !animator.hasDice()) {
-        passThrough(hitDiv, e);
+        passThrough(hitDiv);
         return;
       }
 
@@ -312,7 +312,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
         e.stopPropagation();
         e.preventDefault();
       } else {
-        passThrough(hitDiv, e);
+        passThrough(hitDiv);
       }
     };
 
@@ -502,7 +502,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
                     {label}
                   </button>
                 ))}
-                {animatorRef.current?.hasDice() && (
+                {hasDice && (
                   <>
                     <div className="border-t border-zinc-800 my-1" />
                     <button
@@ -524,7 +524,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
 }
 
 
-function passThrough(hitDiv: HTMLElement, _originalEvent: MouseEvent): void {
+function passThrough(hitDiv: HTMLElement): void {
   // Disable pointer-events so the full mousedown→mouseup→click cycle reaches
   // the element underneath. Re-enable only after mouseup so buttons get their
   // onClick fired.

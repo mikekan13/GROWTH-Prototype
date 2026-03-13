@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from 'react';
-import type { HeldItemData, GrowthWorldItem, WorldItemType } from '@/types/item';
+import type { HeldItemData } from '@/types/item';
 import { ITEM_TYPE_ICONS, RARITY_COLORS, formatDamage, getConditionLabel, getConditionColor } from '@/types/item';
 import { getWeightLabel } from '@/types/material';
 
@@ -54,8 +54,6 @@ function matchesFilter(item: HeldItemData, filter: FilterType): boolean {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function InventoryCard({
-  characterId: _characterId,
-  characterName: _characterName,
   carryLevel,
   items,
   isDropTarget,

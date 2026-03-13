@@ -6,7 +6,7 @@
  */
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/errors';
+import { NotFoundError, ForbiddenError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import { executeTransaction } from './ledger';
 import type { WalletType, WalletSummary, TransactionRecord, TransactionMetadata } from '@/types/krma';

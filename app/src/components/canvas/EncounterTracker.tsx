@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import type { GrowthEncounter, EncounterParticipant, EncounterPhase, EncounterType } from '@/types/encounter';
-import { ACTION_TYPE_COLORS, ENCOUNTER_TYPE_ICONS } from '@/types/encounter';
+import { ENCOUNTER_TYPE_ICONS } from '@/types/encounter';
 
 interface EncounterTrackerProps {
   encounter: {

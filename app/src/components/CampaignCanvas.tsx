@@ -294,7 +294,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // Debounced save: collect rapid changes and persist once after settling
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, changes: string[]) => {
+  const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, _changes: string[]) => {
     // Recompute augments from equipped items + traits before saving
     const { character: augmented } = recomputeAugments(character);
 

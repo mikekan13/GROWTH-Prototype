@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { canViewCharacter, canEditCharacter } from '@/lib/permissions';
 import { createDefaultCharacter } from '@/lib/defaults';
 import { createChangeLogEntry } from '@/services/changelog';

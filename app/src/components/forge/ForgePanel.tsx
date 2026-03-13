@@ -77,7 +77,7 @@ const GOV_COLOR: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: ForgePanelProps) {
+export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceItem }: ForgePanelProps) {
   const [items, setItems] = useState<ForgeItem[]>([]);
   const [requests, setRequests] = useState<PlayerRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,7 +131,7 @@ export default function ForgePanel({ campaignId, isGM, userId, onPlaceItem }: Fo
     setLoading(false);
   }, [campaignId, activeType]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]); // eslint-disable-line react-hooks/set-state-in-effect
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -640,7 +640,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
   );
 }
 
-function RequestRow({ request, isGM, onResolve, onRefresh }: {
+function RequestRow({ request, isGM, onResolve, onRefresh: _onRefresh }: {
   request: PlayerRequest;
   isGM: boolean;
   onResolve: (id: string, status: 'approved' | 'denied') => void;

@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import crypto from 'crypto';
 import { prisma } from '@/lib/db';
-import { ValidationError, ConflictError, InsufficientBalanceError, LedgerIntegrityError, NotFoundError } from '@/lib/errors';
+import { ValidationError, InsufficientBalanceError, LedgerIntegrityError, NotFoundError } from '@/lib/errors';
 import {
   VOID_WALLET_ID,
   GENESIS_CHECKSUM_SEED,

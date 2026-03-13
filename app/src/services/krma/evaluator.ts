@@ -8,7 +8,7 @@
  * is a separate system — it stamps KV on traits at creation time.
  */
 import crypto from 'crypto';
-import type { GrowthCharacter, GrowthSkill, SkillGovernor } from '@/types/growth';
+import type { GrowthCharacter } from '@/types/growth';
 import {
   EVALUATOR_VERSION,
   KV_PER_ATTRIBUTE_LEVEL,

@@ -90,7 +90,6 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
-  const [newSkillLevel, setNewSkillLevel] = useState(1);
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillGovs, setNewSkillGovs] = useState<Set<SkillGovernor>>(new Set());
 
@@ -106,7 +105,6 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
   useEffect(() => {
     if (!showAddForm || !campaignId || !isGM) return;
     let cancelled = false;
-    setForgeLoading(true);
     fetch(`/api/campaigns/${campaignId}/forge?type=skill`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
@@ -168,7 +166,6 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
 
   const resetForm = () => {
     setNewSkillName('');
-    setNewSkillLevel(1);
     setNewSkillDesc('');
     setNewSkillGovs(new Set());
     setSelectedForgeSkill(null);
@@ -180,7 +177,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
   const canSubmit = newSkillName.trim() && newSkillGovs.size > 0;
 
   // Governor selector (shared between add and request forms)
-  const GovernorSelector = () => (
+  const governorSelector = (
     <div className="space-y-1">
       <label className="text-[9px] text-gray-400">Governors (at least one):</label>
       <div className="flex flex-wrap gap-1">
@@ -223,7 +220,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
           </div>
           <div className="flex items-center gap-1">
             {isEditable && (
-              <button onClick={e => { e.stopPropagation(); setShowAddForm(!showAddForm); setShowRequestForm(false); }} onMouseDown={e => e.stopPropagation()}
+              <button onClick={e => { e.stopPropagation(); const opening = !showAddForm; setShowAddForm(opening); if (opening) setForgeLoading(true); setShowRequestForm(false); }} onMouseDown={e => e.stopPropagation()}
                 className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: '#ffcc78' }}>
                 +
               </button>
@@ -394,7 +391,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                   className="w-full bg-transparent outline-none text-[10px] text-gray-300 px-1 py-0.5 border-b"
                   style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 />
-                <GovernorSelector />
+                {governorSelector}
                 <div className="flex gap-2">
                   <button
                     onClick={e => { e.stopPropagation(); handleRequestSkill(); }}

@@ -7,7 +7,7 @@
  * Flow: RollRequest → DiceService.roll() → RollResult → event bus → terminal + 3D renderer
  */
 
-import type { FateDie } from './growth';
+// FateDie type not directly used in this file
 
 // ── Die Types ─────────────────────────────────────────────────────────────
 

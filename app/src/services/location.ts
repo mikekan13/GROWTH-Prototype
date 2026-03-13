@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 
 // --- Schemas ---
@@ -20,7 +20,7 @@ export const updateLocationSchema = z.object({
 
 // --- Default Data ---
 
-function createDefaultLocation(name: string): Record<string, unknown> {
+function createDefaultLocation(_name: string): Record<string, unknown> {
   return {
     description: '',
     tags: [],

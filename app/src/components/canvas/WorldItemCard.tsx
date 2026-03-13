@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { GrowthWorldItem, WorldItemType, ItemRarity } from '@/types/item';
+import type { GrowthWorldItem, WorldItemType } from '@/types/item';
 import { ITEM_TYPE_ICONS, RARITY_COLORS, formatDamage, getConditionLabel, getConditionColor } from '@/types/item';
 import { getWeightLabel } from '@/types/material';
 
@@ -28,7 +28,7 @@ interface WorldItemCardProps {
   onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
 }
 
-export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate, onPositionChange, onDragOffsetChange }: WorldItemCardProps) {
+export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate: _onUpdate, onPositionChange, onDragOffsetChange }: WorldItemCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });

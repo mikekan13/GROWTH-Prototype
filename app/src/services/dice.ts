@@ -46,15 +46,6 @@ function dieTypeFromSides(sides: number): DieType | 'flat' {
   return map[sides] || 'd20';
 }
 
-function colorForSource(source: RollSource): DieColor {
-  // Default colors based on roll source — can be overridden per DieSpec
-  switch (source.type) {
-    case 'death_save': return 'black';
-    case 'quick_roll': return 'teal';
-    default: return 'white';
-  }
-}
-
 // ── Core Roll Execution ───────────────────────────────────────────────────
 
 function executeRoll(request: RollRequest): RollResult {

@@ -102,7 +102,7 @@ export default function RelationsCanvas({
   onCharacterUpdate,
   onCreateLocation,
   onDeleteLocation,
-  onLocationUpdate,
+  onLocationUpdate: _onLocationUpdate,
   onCreateItem,
   onDeleteItem,
   onItemUpdate,
@@ -369,7 +369,6 @@ export default function RelationsCanvas({
   const fpsFramesRef = useRef(0);
   const fpsLastTimeRef = useRef(performance.now());
   const [debugMouse, setDebugMouse] = useState({ sx: 0, sy: 0, cx: 0, cy: 0 });
-  const visibleNodesRef = useRef(0);
 
   // FPS counter
   useEffect(() => {
@@ -404,6 +403,7 @@ export default function RelationsCanvas({
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox is derived from camera+zoom; using those deps directly avoids infinite loops
   }, [showDebug, camera.x, camera.y, zoom]);
 
   // ── Node dragging state ──
@@ -716,6 +716,7 @@ export default function RelationsCanvas({
     }
 
     prevDraggingRef.current = currentDragging;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: viewBox deps would cause infinite loops
   }, [dragOffsets, nodePositions, nodes, onEntityCrossLine, moveNodeY, crystallizedEntityIds]);
 
   /** Convert client-space coords to SVG world coords */
@@ -728,6 +729,7 @@ export default function RelationsCanvas({
         y: viewBox.y + ((clientY - rect.top) / rect.height) * viewBox.height,
       };
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
     [camera, zoom]
   );
 
@@ -825,6 +827,7 @@ export default function RelationsCanvas({
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
     [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, clientToSvg]
   );
 
@@ -901,6 +904,7 @@ export default function RelationsCanvas({
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
     [camera, zoom]
   );
 
@@ -1321,8 +1325,6 @@ export default function RelationsCanvas({
           const panelCenterX = anchorX + offset.x;
           const panelTopY = clampPanelY(anchorY + offset.y, visualY, subPanelH);
           const panelW = 440;
-          const tetherEndX = panelCenterX;
-          const tetherEndY = panelTopY + 20;
 
           const charData = node.characterData as Record<string, unknown> || {};
 
