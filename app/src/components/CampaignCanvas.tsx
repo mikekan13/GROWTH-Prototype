@@ -10,6 +10,7 @@ import type { GrowthLocation } from '@/types/location';
 import type { GrowthWorldItem } from '@/types/item';
 import { calculateCharacterTKV, calculateItemKV, calculateLocationKV } from '@/lib/kv-calculator';
 import { recomputeAugments } from '@/lib/character-actions';
+import type { CanvasFolder } from '@/types/canvas';
 
 function formatKrma(value: string): string {
   return Number(value).toLocaleString();
@@ -79,6 +80,46 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
   const router = useRouter();
+
+  // ── Folder state (persisted to localStorage) ──
+  const folderStorageKey = `canvas-${campaign.id}-folders`;
+  const [folders, setFolders] = useState<CanvasFolder[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(folderStorageKey);
+      if (raw) return JSON.parse(raw) as CanvasFolder[];
+    } catch { /* ignore */ }
+    return [];
+  });
+
+  const handleFoldersChange = useCallback((newFolders: CanvasFolder[]) => {
+    setFolders(newFolders);
+    try { localStorage.setItem(folderStorageKey, JSON.stringify(newFolders)); } catch { /* ignore */ }
+  }, [folderStorageKey]);
+
+  // Keep folder nodeIds in sync — remove deleted nodes
+  useEffect(() => {
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const cleaned = folders.map(f => ({
+      ...f,
+      nodeIds: f.nodeIds.filter(id => nodeIds.has(id)),
+    }));
+    const changed = cleaned.some((f, i) => f.nodeIds.length !== folders[i].nodeIds.length);
+    if (changed) handleFoldersChange(cleaned);
+  }, [nodes, folders, handleFoldersChange]);
+
+  // Auto-add new characters to party folder
+  useEffect(() => {
+    const partyFolder = folders.find(f => f.type === 'party');
+    if (!partyFolder) return;
+    const charIds = nodes.filter(n => n.type === 'character').map(n => n.id);
+    const missing = charIds.filter(id => !partyFolder.nodeIds.includes(id));
+    if (missing.length > 0) {
+      handleFoldersChange(folders.map(f =>
+        f.id === partyFolder.id ? { ...f, nodeIds: [...f.nodeIds, ...missing] } : f
+      ));
+    }
+  }, [nodes, folders, handleFoldersChange]);
 
   // Forge items (published, for Canvas toolbox "Place from Forge")
   const [forgeItems, setForgeItems] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown> }>>([]);
@@ -648,6 +689,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onCreateItemFromForge={handleCreateItemFromForge}
             forgeItems={forgeItems}
             onEntityCrossLine={handleEntityCrossLine}
+            folders={folders}
+            onFoldersChange={handleFoldersChange}
+            onRestComplete={() => router.refresh()}
           />
         )}
 
@@ -902,6 +946,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               character={parsedCharacter}
               onCharacterUpdate={(charId, char, changes) => handleCharacterUpdate(charId, char, changes)}
               onRevert={() => router.refresh()}
+              onRestComplete={() => router.refresh()}
               userId={userId}
               username={username}
               userRole={userRole}

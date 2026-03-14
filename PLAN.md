@@ -238,11 +238,12 @@ Status: IN PROGRESS
 - [x] **Command system** — `/roll`, `/check`, `/deathsave`, `/spend`, `/restore`, `/session`, `/inject` commands parsed client-side, execute via character-actions.ts + DiceService, results posted to terminal.
 - [x] **Forge system (bones)** — ForgeItem + PlayerRequest models, ForgeService with CRUD + Zod validation, ForgePanel UI in campaign Forge tab. GM creates skill/item/nectar/blossom/thorn templates (draft→published), players submit requests. 6 API routes.
 - [x] **Skill system redesign** — Freeform skills with attribute governors (no categories/combat flag). Governor badges (pillar-colored), max output readout, player request flow from SkillsCard.
+- [x] **Rest & Recovery (2026-03-13)** — Short rest (spend 1 Frequency → restore 1 to all other pools) and Long rest (full refill). GM-initiated via `/rest short|long` terminal command or Party folder REST button. API route `POST /api/campaigns/[id]/rest` with per-character results. Validates Overwhelmed condition and Frequency=0. Creates changelog entries + campaign events.
+- [x] **Card Folders / Party Group (2026-03-13)** — Canvas grouping system: cards grouped into folders with visual bounding box (dashed SVG rect), drag-all-together, and auto-add new characters. Party folder type has REST button opening RestPanel with character checkboxes, short/long toggle, warnings for Overwhelmed/F=0. Party always stays above KRMA line. Created via toolbox "Create Party" button. Persisted to localStorage.
 - [ ] **Editable skills in SkillsCard** — Add/remove/level skills directly in the sub-panel, wire to character-actions + changelog
 - [ ] **Dice roller UX** — Skill check rolls from SkillsCard (click skill → roll), effort spending integrated
 - [ ] **Traits** — Blossoms/Thorns/Nectars that modify rolls and drive attribute changes
 - [ ] Damage tracking (hit locations, conditions auto-applied)
-- [ ] Short/long rest recovery
 - [x] **Skeleton Systems Pass (2026-03-09)** — Created structural skeletons for all major remaining systems:
   - [x] **Location system** — Prisma model, types (`types/location.ts`), service, 2 API routes (CRUD), LocationCard canvas component (compact/expanded)
   - [x] **World item system** — Prisma model, types (`types/item.ts`), service, 2 API routes (CRUD), WorldItemCard canvas component with damage (P:S:H/D\C:B:E), armor, prima materia support
@@ -497,6 +498,18 @@ AI co-GM system. Too complex for 3-month beta. Will be its own service connectin
 - **Files changed**: `ForgePanel.tsx`, `WorldItemCard.tsx`, `types/item.ts`, `docs/module_registry.md`, `PLAN.md`
 - Full `next build` passes clean
 - **Next**: Encumbrance enforcement, armor integration with damage system, item equip slots
+
+### 2026-03-13: Rest & Recovery + Card Folders / Party Group
+- **Rest pure functions**: `restShort()` (spend 1 Frequency → restore 1 to all other pools, checks Overwhelmed + F=0) and `restLong()` (full refill, clear all conditions) in `character-actions.ts`
+- **Rest API route**: `POST /api/campaigns/[id]/rest` — accepts `{ type, characterIds? }`, GM-only, applies rest to selected or all characters, creates changelog entries + campaign game event, returns per-character results
+- **Terminal command**: `/rest short` and `/rest long` — calls REST API server-side, refreshes all characters on completion
+- **Card Folders**: New canvas primitive — `CanvasFolder` type with `party` and `group` types. Persisted to localStorage per campaign. Visual: dashed SVG rect bounding box behind grouped cards. Drag folder header to move all member cards together.
+- **Party folder**: Special folder type with REST action button in header. Auto-adds new characters to party. Party cards enforced above KRMA line (y < -130). Created via toolbox "Create Party" button (only shown if no party exists and characters are on canvas).
+- **RestPanel component**: Floating popup from party folder header. Short/Long rest toggle, character checkboxes with select all, warnings for Overwhelmed and F=0 conditions, Frequency display per character, apply button, results view with per-attribute changes.
+- **Files created**: `types/canvas.ts`, `components/canvas/RestPanel.tsx`, `components/canvas/FolderGroup.tsx`, `api/campaigns/[id]/rest/route.ts`
+- **Files changed**: `lib/character-actions.ts`, `lib/terminal-commands.ts`, `components/terminal/CampaignTerminal.tsx`, `components/canvas/RelationsCanvas.tsx`, `components/CampaignCanvas.tsx`, `docs/module_registry.md`
+- Full `next build` passes clean (40 routes)
+- **Next**: Skill Check Flow from UI (3B.1), Editable skills in SkillsCard (3B.5)
 
 ### Questions for Mike (when he returns)
 1. **Portrait art style**: Should all portraits share one style (painterly fantasy)? Or should each campaign set its own?

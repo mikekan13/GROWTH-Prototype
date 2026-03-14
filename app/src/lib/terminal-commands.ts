@@ -15,6 +15,8 @@
  *   /deathsave [dr:<n>]                               — Death save (server-side)
  *   /spend <attribute> <amount>                       — Spend from attribute pool (client-side)
  *   /restore <attribute> <amount>                     — Restore to attribute pool (client-side)
+ *   /rest short                                        — Short rest (all chars, costs 1 Frequency)
+ *   /rest long                                         — Long rest (all chars, full refill)
  *   /session start [name]                             — Start a new game session
  *   /session end                                      — End the current session
  *   /inject list|clear|remove|ensure-success|...      — (Godhead) Manage injections (server-side)
@@ -27,7 +29,7 @@ import { parseDie } from './dice-utils';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-/** Intent for a server-side dice API call. CampaignTerminal handles execution. */
+/** Intent for a server-side API call. CampaignTerminal handles execution. */
 export interface DiceApiIntent {
   endpoint: string;
   method: 'GET' | 'POST' | 'DELETE';
@@ -44,6 +46,12 @@ export interface DiceApiIntent {
   };
 }
 
+/** Intent for a server-side rest API call. CampaignTerminal handles execution. */
+export interface RestApiIntent {
+  type: 'short' | 'long';
+  characterIds?: string[];
+}
+
 export interface CommandResult {
   /** Updated character data (null if command doesn't modify character) */
   character: GrowthCharacter | null;
@@ -55,6 +63,8 @@ export interface CommandResult {
   error?: string;
   /** If set, caller should make this API call instead of posting events directly */
   diceApiCall?: DiceApiIntent;
+  /** If set, caller should make the rest API call and refresh all characters */
+  restApiCall?: RestApiIntent;
 }
 
 // ── Parser ─────────────────────────────────────────────────────────────────
@@ -111,6 +121,8 @@ export function executeCommand(
       return executeSpend(args, character);
     case 'restore':
       return executeRestore(args, character);
+    case 'rest':
+      return executeRest(args);
     case 'session':
       return executeSession(args);
     case 'inject':
@@ -402,6 +414,22 @@ function executeRestore(args: ParsedArgs, character: GrowthCharacter | null): Co
     character: result.character,
     changes: result.changes,
     events: [{ type: 'command', payload: cmdPayload }],
+  };
+}
+
+// ── /rest ─────────────────────────────────────────────────────────────────
+
+function executeRest(args: ParsedArgs): CommandResult {
+  const restType = args.positional[0];
+  if (restType !== 'short' && restType !== 'long') {
+    return makeError('/rest', 'Usage: /rest short — or /rest long');
+  }
+
+  return {
+    character: null,
+    changes: [],
+    events: [],
+    restApiCall: { type: restType },
   };
 }
 

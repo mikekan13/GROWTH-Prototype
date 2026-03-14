@@ -20,6 +20,9 @@ import WorldItemCard from "./WorldItemCard";
 import type { WorldItemNodeData } from "./WorldItemCard";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
+import type { CanvasFolder } from "@/types/canvas";
+import { FolderGroupRect } from "./FolderGroup";
+import FolderGroup from "./FolderGroup";
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -85,6 +88,9 @@ interface RelationsCanvasProps {
   onItemTransfer?: (itemId: string, holderId: string | null) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
   onEntityCrossLine?: (event: LineCrossingEvent, moveNode: (nodeId: string, y: number) => void) => void;
+  folders?: CanvasFolder[];
+  onFoldersChange?: (folders: CanvasFolder[]) => void;
+  onRestComplete?: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -109,18 +115,35 @@ export default function RelationsCanvas({
   onItemTransfer,
   onCreateItemFromForge,
   onEntityCrossLine,
+  folders = [],
+  onFoldersChange,
+  onRestComplete,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ── Zoom constants ──
   // zoom < 1 = zoomed IN (smaller viewBox), zoom > 1 = zoomed OUT (larger viewBox)
-  const BASE_WIDTH = 1386;
   const BASE_HEIGHT = 924;
-  const MIN_ZOOM = 1.0;   // max zoom IN — 1x base magnification (viewBox = 1386x924)
-  const MAX_ZOOM = 6.0;   // max zoom OUT — 1/6 magnification (viewBox = 8316x5544)
+  const MIN_ZOOM = 1.0;   // max zoom IN — 1x base magnification
+  const MAX_ZOOM = 6.0;   // max zoom OUT
   const ZOOM_IN_FACTOR = 0.9;
   const ZOOM_OUT_FACTOR = 1.1;
+
+  // Track container size so viewBox matches actual aspect ratio (prevents SVG letterboxing)
+  const [containerSize, setContainerSize] = useState({ width: 1386, height: 924 });
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setContainerSize({ width, height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // BASE_WIDTH adapts to container aspect ratio so SVG fills it completely
+  const BASE_WIDTH = Math.round(BASE_HEIGHT * (containerSize.width / containerSize.height));
 
   // Round zoom to 4 decimal places to prevent floating-point drift
   const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) * 1e4) / 1e4;
@@ -410,6 +433,18 @@ export default function RelationsCanvas({
   const [dragNodeId, setDragNodeId] = useState<string | null>(null);
   const [dragStartSvg, setDragStartSvg] = useState<{ x: number; y: number } | null>(null);
 
+  // ── Folder dragging state ──
+  const [dragFolderId, setDragFolderId] = useState<string | null>(null);
+  const [folderDragStartSvg, setFolderDragStartSvg] = useState<{ x: number; y: number } | null>(null);
+
+  // Keep refs to avoid stale closures in mouse handlers
+  const foldersRef = useRef(folders);
+  foldersRef.current = folders;
+  const nodePositionsRef = useRef(nodePositions);
+  nodePositionsRef.current = nodePositions;
+  const expandedNodesRef = useRef(expandedNodes);
+  expandedNodesRef.current = expandedNodes;
+
   // Refs for RAF throttling
   const animationRafRef = useRef<number>(0);
   const panRafRef = useRef<number>(0);
@@ -498,6 +533,20 @@ export default function RelationsCanvas({
     }
   }, [nodes, expandedNodes]);
 
+  // Clamp drag offset Y for nodes inside party folders — bottom edge can't cross KRMA line (y=0)
+  const clampPartyDragY = useCallback((nodeId: string, offsetY: number): number => {
+    const partyFolder = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
+    if (!partyFolder) return offsetY;
+    const pos = nodePositionsRef.current.get(nodeId);
+    if (!pos || pos.y >= 0) return offsetY; // only clamp nodes above line
+    // bottomH: how far below center the card extends (120 compact, 480 expanded)
+    const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
+    const PARTY_LINE_BUFFER = 50;
+    // Card bottom edge after drag: pos.y + offsetY + bottomH  must stay ≤ -PARTY_LINE_BUFFER
+    const maxOffsetY = -PARTY_LINE_BUFFER - bottomH - pos.y;
+    return Math.min(offsetY, maxOffsetY);
+  }, [expandedNodes]);
+
   // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card.
   // For crystallized panels (above line), the BOTTOM edge (panelY + panelHeight) must not cross below the line.
   // For fluid panels (below line), the TOP edge (panelY) must not cross above the line.
@@ -557,9 +606,20 @@ export default function RelationsCanvas({
       }
     };
 
+    // Collect nodeIds that should NOT deflect the KRMA line:
+    // - nodes in collapsed folders (hidden)
+    // - nodes in party folders (permanently above line)
+    const excludedNodeIds = new Set<string>();
+    for (const f of folders) {
+      if (f.collapsed || f.type === 'party') {
+        for (const nid of f.nodeIds) excludedNodeIds.add(nid);
+      }
+    }
+
     // 1) Active drag: line wraps around the card
     let dragDeflection = 0;
     for (const [nodeId, offset] of dragOffsets) {
+      if (excludedNodeIds.has(nodeId)) continue; // skip hidden nodes
       const basePos = nodePositions.get(nodeId);
       if (!basePos) continue;
       const cardX = basePos.x + offset.x;
@@ -597,14 +657,21 @@ export default function RelationsCanvas({
     }
 
     return dragDeflection + pluckDeflection;
-  }, [dragOffsets, nodePositions, getCardHalfWidth]);
+  }, [dragOffsets, nodePositions, getCardHalfWidth, folders]);
 
   // Detect when a card leaves the line's zone (passes through or releases) → trigger pluck
   const prevNearLineRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     // Which nodes are currently deflecting the line?
+    const excludedNodeIds = new Set<string>();
+    for (const f of folders) {
+      if (f.collapsed) {
+        for (const nid of f.nodeIds) excludedNodeIds.add(nid);
+      }
+    }
     const currentNear = new Set<string>();
     for (const [nodeId, offset] of dragOffsets) {
+      if (excludedNodeIds.has(nodeId)) continue;
       const basePos = nodePositions.get(nodeId);
       if (!basePos) continue;
       const cardY = basePos.y + offset.y;
@@ -672,6 +739,10 @@ export default function RelationsCanvas({
         dragStartYRef.current.delete(nodeId);
 
         if (startY === undefined || !pos || !onEntityCrossLine) continue;
+
+        // Nodes in party folders can never cross the KRMA line
+        const inPartyFolder = folders.some(f => f.type === 'party' && f.nodeIds.includes(nodeId));
+        if (inPartyFolder) continue;
 
         // Use the card's EDGE for line crossing, not the center.
         // The leading edge depends on drag direction:
@@ -795,11 +866,78 @@ export default function RelationsCanvas({
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
+      // ── Folder drag (moves all member nodes together) ──
+      if (dragFolderId && folderDragStartSvg) {
+        const current = clientToSvg(e.clientX, e.clientY);
+        const dx = current.x - folderDragStartSvg.x;
+        let dy = current.y - folderDragStartSvg.y;
+        const folder = folders.find(f => f.id === dragFolderId);
+        if (folder) {
+          // Find the folder's current bottom edge (lowest node bottom + padding)
+          // and clamp dy so the folder bottom never crosses y=0
+          const curPositions = nodePositionsRef.current;
+          const FOLDER_PADDING = 30;
+          const LINE_GAP = 20; // gap between folder bottom and KRMA line
+
+          if (folder.type === 'party') {
+            // Compute the folder's actual visual bottom edge
+            // Must match FolderGroup's calcContentBounds + getDisplayBounds logic
+            const curExpanded = expandedNodesRef.current;
+            let minY = Infinity, maxBottom = -Infinity;
+            for (const nodeId of folder.nodeIds) {
+              const pos = curPositions.get(nodeId);
+              if (!pos) continue;
+              const isExp = curExpanded.has(nodeId);
+              const topH = isExp ? 250 : 120;
+              const bottomH = isExp ? 480 : 120;
+              minY = Math.min(minY, pos.y - topH);
+              maxBottom = Math.max(maxBottom, pos.y + bottomH);
+            }
+            if (maxBottom > -Infinity) {
+              const HEADER_HEIGHT = 64;
+              const contentTop = minY - FOLDER_PADDING - HEADER_HEIGHT;
+              const contentMinH = (maxBottom - minY) + FOLDER_PADDING * 2 + HEADER_HEIGHT;
+              const displayH = Math.max(contentMinH, folder.userHeight || 0);
+              const folderVisualBottom = contentTop + displayH;
+              // folderVisualBottom + dy must stay ≤ -LINE_GAP
+              const maxDy = -LINE_GAP - folderVisualBottom;
+              if (dy > maxDy) dy = maxDy;
+            }
+          } else {
+            // Non-party folders: prevent crossing in either direction
+            for (const nodeId of folder.nodeIds) {
+              const pos = curPositions.get(nodeId);
+              if (!pos) continue;
+              const isExp = expandedNodes.has(nodeId);
+              const bottomH = isExp ? 480 : 120;
+              const topH = isExp ? 250 : 120;
+              if (pos.y < 0) {
+                const maxDy = -(pos.y + bottomH + FOLDER_PADDING + LINE_GAP);
+                if (dy > maxDy) dy = maxDy;
+              }
+              if (pos.y > 0) {
+                const minDy = -(pos.y - topH - FOLDER_PADDING - LINE_GAP);
+                if (dy < minDy) dy = minDy;
+              }
+            }
+          }
+          setDragOffsets((prev) => {
+            const next = new Map(prev);
+            for (const nodeId of folder.nodeIds) {
+              next.set(nodeId, { x: dx, y: dy });
+            }
+            return next;
+          });
+        }
+        return;
+      }
+
       // ── Node drag ──
       if (dragNodeId && dragStartSvg) {
         const current = clientToSvg(e.clientX, e.clientY);
         const dx = current.x - dragStartSvg.x;
-        const dy = current.y - dragStartSvg.y;
+        let dy = current.y - dragStartSvg.y;
+
         setDragOffsets((prev) => {
           const next = new Map(prev);
           next.set(dragNodeId, { x: dx, y: dy });
@@ -828,10 +966,44 @@ export default function RelationsCanvas({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
-    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, clientToSvg]
+    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg]
   );
 
   const handleMouseUp = useCallback(() => {
+    // ── Finish folder drag (moves all member nodes) ──
+    if (dragFolderId) {
+      const folder = folders.find(f => f.id === dragFolderId);
+      if (folder) {
+        setNodePositions((prev) => {
+          const next = new Map(prev);
+          for (const nodeId of folder.nodeIds) {
+            const offset = dragOffsets.get(nodeId);
+            const basePos = prev.get(nodeId);
+            if (offset && basePos) {
+              let newY = basePos.y + offset.y;
+              // Party folders: enforce above KRMA line (y < 0 in SVG)
+              if (folder.type === 'party' && newY > -130) {
+                newY = -130;
+              }
+              next.set(nodeId, { x: basePos.x + offset.x, y: newY });
+              onNodePositionChange?.(nodeId, basePos.x + offset.x, newY);
+            }
+          }
+          return next;
+        });
+        setDragOffsets((prev) => {
+          const next = new Map(prev);
+          for (const nodeId of folder.nodeIds) {
+            next.delete(nodeId);
+          }
+          return next;
+        });
+      }
+      setDragFolderId(null);
+      setFolderDragStartSvg(null);
+      return;
+    }
+
     // ── Finish node drag ──
     if (dragNodeId) {
       const offset = dragOffsets.get(dragNodeId);
@@ -860,11 +1032,11 @@ export default function RelationsCanvas({
 
     setIsPanning(false);
     setIsDragging(false);
-  }, [dragNodeId, dragOffsets, nodePositions, onNodePositionChange]);
+  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange]);
 
   // Global mouse listeners for pan / drag
   useEffect(() => {
-    const needListeners = (isPanning && isDragging) || dragNodeId !== null;
+    const needListeners = (isPanning && isDragging) || dragNodeId !== null || dragFolderId !== null;
     if (needListeners) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
@@ -873,7 +1045,7 @@ export default function RelationsCanvas({
         document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [isPanning, isDragging, dragNodeId, handleMouseMove, handleMouseUp]);
+  }, [isPanning, isDragging, dragNodeId, dragFolderId, handleMouseMove, handleMouseUp]);
 
   // ── Zoom handler ──────────────────────────────────────────────────────────
 
@@ -1147,21 +1319,29 @@ export default function RelationsCanvas({
             onInventoryToggle={toggleInventory}
             onPanelToggle={togglePanel}
             onPositionChange={(nodeId, x, y) => {
+              // Clamp party folder nodes above KRMA line
+              let clampedY = y;
+              const inParty = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
+              if (inParty && y >= 0) {
+                const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
+                clampedY = -(bottomH + 50);
+              }
               setNodePositions((prev) => {
                 const next = new Map(prev);
-                next.set(nodeId, { x, y });
+                next.set(nodeId, { x, y: clampedY });
                 return next;
               });
-              onNodePositionChange?.(nodeId, x, y);
+              onNodePositionChange?.(nodeId, x, clampedY);
               bringNodeToFront(nodeId);
             }}
             onDragOffsetChange={(nodeId, offsetX, offsetY) => {
+              const clampedY = clampPartyDragY(nodeId, offsetY);
               setDragOffsets((prev) => {
                 const next = new Map(prev);
-                if (offsetX === 0 && offsetY === 0) {
+                if (offsetX === 0 && clampedY === 0) {
                   next.delete(nodeId);
                 } else {
-                  next.set(nodeId, { x: offsetX, y: offsetY });
+                  next.set(nodeId, { x: offsetX, y: clampedY });
                 }
                 return next;
               });
@@ -1728,9 +1908,56 @@ export default function RelationsCanvas({
         {/* ── Connections (behind nodes) ── */}
         {connections.map((c) => renderConnection(c))}
 
+        {/* ── Folder backgrounds (behind cards) ── */}
+        {folders.map(folder => {
+          const nodeTypes = new Map(nodes.map(n => [n.id, n.type]));
+          const folderChars = nodes
+            .filter(n => folder.nodeIds.includes(n.id) && n.type === 'character' && n.characterData)
+            .map(n => ({
+              id: n.id,
+              name: n.name,
+              data: n.characterData as unknown as GrowthCharacter,
+            }));
+          return (
+            <FolderGroupRect
+              key={`folder-bg-${folder.id}`}
+              folder={folder}
+              nodePositions={nodePositions}
+              dragOffsets={dragOffsets}
+              nodeTypes={nodeTypes}
+              expandedNodes={expandedNodes}
+              characters={folderChars}
+              svgRef={svgRef}
+              viewBox={viewBox}
+              showActionsMenu={false}
+              onFolderResize={(folderId, width, height) => {
+                const updated = folders.map(f =>
+                  f.id === folderId ? { ...f, userWidth: width, userHeight: height } : f
+                );
+                onFoldersChange?.(updated);
+              }}
+              onFolderDragStart={(folderId, startSvg) => {
+                setDragFolderId(folderId);
+                setFolderDragStartSvg(startSvg);
+              }}
+              onActionsToggle={(folderId) => {
+                window.dispatchEvent(new CustomEvent('folder-actions-toggle', { detail: { folderId } }));
+              }}
+              onToggleCollapsed={(folderId) => {
+                const updated = folders.map(f =>
+                  f.id === folderId ? { ...f, collapsed: !f.collapsed } : f
+                );
+                onFoldersChange?.(updated);
+              }}
+            />
+          );
+        })}
+
         {/* ── Character nodes (foreignObject cards) — sorted by z-index ── */}
+        {/* Hide nodes inside collapsed folders */}
         {nodes
           .filter((n) => n.type === "character")
+          .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
             const position = getNodePosition(node.id, node.x, node.y);
@@ -1761,6 +1988,7 @@ export default function RelationsCanvas({
         {/* ── Location nodes (foreignObject cards) — sorted by z-index ── */}
         {nodes
           .filter((n) => n.type === "location" && n.locationData)
+          .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
             const position = getNodePosition(node.id, node.x, node.y);
@@ -1838,12 +2066,13 @@ export default function RelationsCanvas({
                       bringNodeToFront(nodeId);
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
+                      const clampedY = clampPartyDragY(nodeId, offsetY);
                       setDragOffsets((prev) => {
                         const next = new Map(prev);
-                        if (offsetX === 0 && offsetY === 0) {
+                        if (offsetX === 0 && clampedY === 0) {
                           next.delete(nodeId);
                         } else {
-                          next.set(nodeId, { x: offsetX, y: offsetY });
+                          next.set(nodeId, { x: offsetX, y: clampedY });
                         }
                         return next;
                       });
@@ -1859,6 +2088,7 @@ export default function RelationsCanvas({
         {/* ── Item nodes (foreignObject cards) — only unassigned items, sorted by z-index ── */}
         {nodes
           .filter((n) => n.type === "item" && n.itemData && !n.holderId)
+          .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
             const position = getNodePosition(node.id, node.x, node.y);
@@ -1955,17 +2185,18 @@ export default function RelationsCanvas({
                       setDraggingItemId(null);
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
+                      const clampedY = clampPartyDragY(nodeId, offsetY);
                       setDragOffsets((prev) => {
                         const next = new Map(prev);
-                        if (offsetX === 0 && offsetY === 0) {
+                        if (offsetX === 0 && clampedY === 0) {
                           next.delete(nodeId);
                         } else {
-                          next.set(nodeId, { x: offsetX, y: offsetY });
+                          next.set(nodeId, { x: offsetX, y: clampedY });
                         }
                         return next;
                       });
                       // Track which item is being dragged for drop-target highlighting
-                      if (offsetX !== 0 || offsetY !== 0) {
+                      if (offsetX !== 0 || clampedY !== 0) {
                         setDraggingItemId(nodeId);
                       }
                     }}
@@ -2054,11 +2285,61 @@ export default function RelationsCanvas({
         viewBox={viewBox}
         zoom={zoom}
         forgeItems={forgeItems}
+        folders={folders}
+        nodes={nodes}
         onCreateCharacter={onCreateCharacter}
         onCreateLocation={onCreateLocation}
         onCreateItem={onCreateItem}
         onCreateItemFromForge={onCreateItemFromForge}
+        onCreateParty={(nodeIds) => {
+          const newFolder: CanvasFolder = {
+            id: `folder-${Date.now()}`,
+            name: 'Party',
+            type: 'party',
+            nodeIds,
+            color: '#22ab94',
+          };
+          onFoldersChange?.([...folders, newFolder]);
+        }}
       />
+
+      {/* ── Folder header overlays ── */}
+      {folders.map(folder => {
+        const folderChars = nodes
+          .filter(n => folder.nodeIds.includes(n.id) && n.type === 'character' && n.characterData)
+          .map(n => ({
+            id: n.id,
+            name: n.name,
+            data: n.characterData as unknown as GrowthCharacter,
+          }));
+        const nodeTypes = new Map(nodes.map(n => [n.id, n.type]));
+
+        return (
+          <FolderGroup
+            key={`folder-header-${folder.id}`}
+            folder={folder}
+            nodePositions={nodePositions}
+            dragOffsets={dragOffsets}
+            nodeTypes={nodeTypes}
+            expandedNodes={expandedNodes}
+            characters={folderChars}
+            campaignId={campaignId}
+            viewBox={viewBox}
+            zoom={zoom}
+            onFolderDragStart={(folderId, startSvg) => {
+              setDragFolderId(folderId);
+              setFolderDragStartSvg(startSvg);
+            }}
+            onRemoveFromFolder={(folderId, nodeId) => {
+              const updated = folders.map(f =>
+                f.id === folderId ? { ...f, nodeIds: f.nodeIds.filter(id => id !== nodeId) } : f
+              );
+              onFoldersChange?.(updated);
+            }}
+            onRestComplete={() => onRestComplete?.()}
+          />
+        );
+      })}
 
       {/* ── Debug overlay (Ctrl+D) ── */}
       {showDebug && (() => {
@@ -2233,18 +2514,24 @@ function CanvasToolbox({
   viewBox,
   zoom,
   forgeItems,
+  folders,
+  nodes,
   onCreateCharacter,
   onCreateLocation,
   onCreateItem,
   onCreateItemFromForge,
+  onCreateParty,
 }: {
   viewBox: { x: number; y: number; width: number; height: number };
   zoom: number;
   forgeItems?: ForgeItemSummary[];
+  folders?: CanvasFolder[];
+  nodes?: CanvasNode[];
   onCreateCharacter?: (name: string) => void;
   onCreateLocation?: (name: string, type: string) => void;
   onCreateItem?: (name: string, type: string) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
+  onCreateParty?: (nodeIds: string[]) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showForgeItems, setShowForgeItems] = useState(false);
@@ -2260,7 +2547,7 @@ function CanvasToolbox({
 
   // Scale with zoom like SVG foreignObject cards do.
   // zoom=1 is the default; zoom<1 = zoomed out (smaller), zoom>1 = zoomed in (larger).
-  const toolScale = 0.4 / zoom;
+  const toolScale = 1.2 / zoom;
 
   return (
     <div
@@ -2358,6 +2645,36 @@ function CanvasToolbox({
               }}
             />
           </div>
+
+          {/* Create Party folder */}
+          {!(folders || []).some(f => f.type === 'party') && (nodes || []).filter(n => n.type === 'character').length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <button
+                onClick={() => {
+                  const charNodeIds = (nodes || []).filter(n => n.type === 'character').map(n => n.id);
+                  onCreateParty?.(charNodeIds);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  background: 'rgba(88,42,114,0.2)',
+                  border: '1px solid rgba(88,42,114,0.4)',
+                  borderRadius: 6,
+                  color: '#b4a7d6',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                <span>{'\u2694'}</span> CREATE PARTY
+              </button>
+            </div>
+          )}
 
           {/* Place from Forge */}
           {publishedItems.length > 0 && (

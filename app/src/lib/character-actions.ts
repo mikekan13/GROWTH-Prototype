@@ -298,6 +298,83 @@ export function updateSkill(
   return { character: c, changes };
 }
 
+// ── Rest Actions ──────────────────────────────────────────────────────────
+
+const ALL_ATTRIBUTES: AttributeName[] = [
+  'clout', 'celerity', 'constitution',
+  'flow', 'frequency', 'focus',
+  'willpower', 'wisdom', 'wit',
+];
+
+export interface RestResult extends ActionResult {
+  applied: boolean;
+  reason?: string;
+}
+
+/**
+ * Short Rest: deplete 1 Frequency → restore 1 point to every other attribute pool.
+ * Cannot rest if Overwhelmed (Willpower=0) or Frequency current=0.
+ */
+export function restShort(character: GrowthCharacter): RestResult {
+  // Check Overwhelmed condition
+  if (character.conditions.overwhelmed) {
+    return { character, changes: [], applied: false, reason: 'Overwhelmed (Willpower depleted — cannot take Short Rest)' };
+  }
+
+  // Check Frequency available
+  const freq = character.attributes.frequency;
+  if (!freq || freq.current <= 0) {
+    return { character, changes: [], applied: false, reason: 'Frequency depleted (no pool to spend)' };
+  }
+
+  // Spend 1 Frequency
+  let result = spendAttribute(character, 'frequency', 1);
+  const changes = [...result.changes];
+
+  // Restore 1 to every other attribute
+  for (const attr of ALL_ATTRIBUTES) {
+    if (attr === 'frequency') continue;
+    const restoreResult = restoreAttribute(result.character, attr, 1);
+    result = { character: restoreResult.character, changes: [] };
+    changes.push(...restoreResult.changes);
+  }
+
+  return { character: result.character, changes, applied: true };
+}
+
+/**
+ * Long Rest: refill ALL attribute pools (including Frequency) to max.
+ * Clears all depletion conditions. No cost, no restrictions.
+ */
+export function restLong(character: GrowthCharacter): RestResult {
+  const c = deepCloneCharacter(character);
+  const changes: string[] = [];
+
+  for (const attrName of ALL_ATTRIBUTES) {
+    const attr = c.attributes[attrName];
+    if (!attr) continue;
+
+    const max = attrName === 'frequency'
+      ? attr.level
+      : getPoolMax(attr as { level: number; augmentPositive?: number; augmentNegative?: number });
+
+    if (attr.current < max) {
+      const old = attr.current;
+      attr.current = max;
+      changes.push(`${attrName}: ${old} → ${max}`);
+    }
+
+    // Clear depletion condition
+    const conditionKey = DEPLETION_CONDITIONS[attrName];
+    if (conditionKey && c.conditions[conditionKey]) {
+      c.conditions[conditionKey] = false;
+      changes.push(`Condition cleared: ${conditionKey}`);
+    }
+  }
+
+  return { character: c, changes, applied: true };
+}
+
 // ── Augment Recomputation ──────────────────────────────────────────────────
 
 interface InventoryItemLike {

@@ -39,8 +39,8 @@ Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
 | ChangeLog Utils | `lib/changelog-utils.ts` | Pure diff/summary utilities: diffObjects (deep object comparison), inferCategory (maps changed fields to changelog categories), summarizeChanges (generates human-readable descriptions from FieldChange arrays) |
 | Dice | `lib/dice.ts` | Crypto-RNG dice primitives: rollDie (rejection sampling), rollDice (batch), rollSkillDie, rollFateDie, skilledCheck, unskilledCheck. Uses crypto.getRandomValues() for uniform distribution |
 | Dice Events | `lib/dice-events.ts` | Pub/sub event bus for roll results. Subscribers: terminal log, 3D overlay, roll history. DiceService emits after every roll |
-| Character Actions | `lib/character-actions.ts` | Pure functions for character state mutations: attribute CRUD (update/spend/restore/setLevel), skill CRUD (add/remove/updateLevel/update with governors), performSkillCheck (rolls dice + spends effort). Returns { character, changes[] } for audit trail |
-| Terminal Commands | `lib/terminal-commands.ts` | Command parser + executor for Campaign Terminal: /roll, /check, /deathsave, /spend, /restore, /session, /inject. /check and /deathsave use DiceService, /inject manages Godhead overrides |
+| Character Actions | `lib/character-actions.ts` | Pure functions for character state mutations: attribute CRUD (update/spend/restore/setLevel), skill CRUD (add/remove/updateLevel/update with governors), rest (restShort/restLong). Returns { character, changes[] } for audit trail |
+| Terminal Commands | `lib/terminal-commands.ts` | Command parser + executor for Campaign Terminal: /roll, /check, /deathsave, /spend, /restore, /rest, /session, /inject. /check and /deathsave use DiceService, /rest calls campaign REST API, /inject manages Godhead overrides |
 | KV Calculator | `lib/kv-calculator.ts` | Client-side KRMA Value calculation utilities for character/entity valuation |
 
 ## Components
@@ -49,7 +49,9 @@ Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
 |-------|-----------|---------|
 | Character Display | CharacterSheet, AttributeBlock, MagicSection, SkillsSection, VitalsSection, InventorySection | Full character sheet rendering |
 | Character Builder | CharacterBuilder | 4-step wizard (Identity → Origin → Attributes → WTH) |
-| Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, localStorage persistence |
+| Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, folder groups, localStorage persistence |
+| Canvas | FolderGroup | Card grouping system — visual bounding box, drag-all-together, party type with REST button |
+| Canvas | RestPanel | GM rest UI — short/long toggle, character checkboxes with warnings (Overwhelmed/F=0), apply + results |
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel showing real CampaignItems (HeldItemData). Weight level display, carry capacity tracking, condition/material/damage info, equip toggle, remove-from-inventory button, drop-target highlighting |
 | Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, Roll button, Request button (player), add form (GM). No categories or combat flags |
@@ -102,7 +104,7 @@ Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
 | useDiceEvents | `hooks/useDiceEvents.ts` | Subscribe to dice roll events from DiceService event bus |
 | useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
 
-## API Routes (39 total)
+## API Routes (40 total)
 
 | Route | Methods | Service |
 |-------|---------|---------|
@@ -120,6 +122,7 @@ Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
 | /api/changelog | GET | ChangeLogService (query with filters: campaignId, characterId, actor, category, pagination) |
 | /api/changelog/[id]/revert | POST | ChangeLogService (revert entry with conflict detection) |
 | /api/campaigns/[id]/events | GET, POST | CampaignEventService (create + query campaign events with type/session filters) |
+| /api/campaigns/[id]/rest | POST | Rest system (short/long rest for selected characters, GM-only, creates changelog + game event) |
 | /api/campaigns/[id]/sessions | GET, POST | CampaignEventService (list sessions, start/end session) |
 | /api/campaigns/[id]/forge | GET, POST | ForgeService (list + create forge items, GM-only create, players see published only) |
 | /api/campaigns/[id]/forge/[itemId] | GET, PATCH, DELETE | ForgeService (get/update/delete forge item, GM-only edit, delete draft only) |

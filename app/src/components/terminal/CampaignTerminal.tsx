@@ -7,7 +7,7 @@ import type { CommandInputHandle } from './CommandInput';
 import type { TerminalEvent, TerminalFilter, ChangeLogPayload, GameSessionInfo } from '@/types/terminal';
 import type { ChangeLogEntry } from '@/types/changelog';
 import type { GrowthCharacter } from '@/types/growth';
-import { executeCommand, type DiceApiIntent } from '@/lib/terminal-commands';
+import { executeCommand, type DiceApiIntent, type RestApiIntent } from '@/lib/terminal-commands';
 import { spendAttribute, type AttributeName } from '@/lib/character-actions';
 import { diceEvents } from '@/lib/dice-events';
 import type { RollResult } from '@/types/dice';
@@ -24,6 +24,8 @@ interface CampaignTerminalProps {
   onCharacterUpdate?: (characterId: string, character: GrowthCharacter, changes: string[]) => void;
   /** Called on revert to refresh canvas */
   onRevert?: () => void;
+  /** Called after a rest completes so parent can refresh all character data */
+  onRestComplete?: () => void;
   /** Current user info */
   userId?: string;
   username?: string;
@@ -61,6 +63,7 @@ export default function CampaignTerminal({
   character,
   onCharacterUpdate,
   onRevert,
+  onRestComplete,
   userId: _userId,
   username: _username,
   userRole: _userRole,
@@ -515,6 +518,36 @@ export default function CampaignTerminal({
       return;
     }
 
+    // If command returned a rest API intent, execute server-side
+    if (result.restApiCall) {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/rest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: result.restApiCall.type,
+            characterIds: result.restApiCall.characterIds,
+          }),
+        });
+        if (res.ok) {
+          onRestComplete?.();
+          fetchEvents();
+        } else {
+          const err = await res.json();
+          await fetch(`/api/campaigns/${campaignId}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'command',
+              payload: { kind: 'command', input: `/rest ${result.restApiCall.type}`, result: err.error || 'Rest failed', success: false },
+            }),
+          });
+          fetchEvents();
+        }
+      } catch { /* silent */ }
+      return;
+    }
+
     // If command modified character (spend/restore), push update
     if (result.character && character && onCharacterUpdate) {
       onCharacterUpdate(character.id, result.character, result.changes);
@@ -537,7 +570,7 @@ export default function CampaignTerminal({
     }
 
     fetchEvents();
-  }, [campaignId, character, onCharacterUpdate, fetchEvents, fetchSessions, executeDiceApiCall]);
+  }, [campaignId, character, onCharacterUpdate, onRestComplete, fetchEvents, fetchSessions, executeDiceApiCall]);
 
   const toggleSessionCollapse = (sessionId: string) => {
     setCollapsedSessions(prev => {
