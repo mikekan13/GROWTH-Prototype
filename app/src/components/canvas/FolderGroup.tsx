@@ -305,7 +305,7 @@ export function FolderGroupRect({
       <text
         x={bounds.x + 8}
         y={bounds.y - 6}
-        fill={color}
+        fill={folder.type === 'party' ? '#22ab94' : color}
         fontSize={labelFontSize}
         fontWeight={700}
         fontFamily="var(--font-terminal), Consolas, monospace"
@@ -313,7 +313,7 @@ export function FolderGroupRect({
         style={{ pointerEvents: 'none' }}
       >
         {folder.type === 'party' ? '\u2694 ' : '\u25A1 '}{folder.name.toUpperCase()}
-        <tspan fill={`${color}99`} fontSize={countFontSize} dx={6}>
+        <tspan fill={`${folder.type === 'party' ? '#22ab94' : color}99`} fontSize={countFontSize} dx={6}>
           ({folder.nodeIds.length})
         </tspan>
       </text>
