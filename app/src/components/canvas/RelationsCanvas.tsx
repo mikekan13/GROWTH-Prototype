@@ -21,7 +21,7 @@ import type { WorldItemNodeData } from "./WorldItemCard";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
-import { FolderGroupRect } from "./FolderGroup";
+import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions } from "./FolderGroup";
 import FolderGroup from "./FolderGroup";
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
@@ -350,6 +350,32 @@ export default function RelationsCanvas({
       }
     }
 
+    // When EXPANDING a card inside a party folder, push all folder nodes up
+    // if the expanded card's bottom edge would cross the KRMA line (y=0)
+    if (!isCollapsing && node) {
+      const partyFolder = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
+      if (partyFolder) {
+        setNodePositions((positions) => {
+          const pos = positions.get(nodeId);
+          if (!pos) return positions;
+          // bottomH after expansion (character=480, location=350, item=300)
+          const expandedBottomH: Record<string, number> = { character: 480, location: 350, item: 300 };
+          const bottomH = expandedBottomH[node.type] || 480;
+          const bottomEdge = pos.y + bottomH;
+          if (bottomEdge > 0) {
+            const pushUp = bottomEdge;
+            const next = new Map(positions);
+            for (const nid of partyFolder.nodeIds) {
+              const p = next.get(nid);
+              if (p) next.set(nid, { x: p.x, y: p.y - pushUp });
+            }
+            return next;
+          }
+          return positions;
+        });
+      }
+    }
+
     if (isCollapsing) {
       setExpandedNodes((prev) => {
         const next = new Set(prev);
@@ -470,6 +496,8 @@ export default function RelationsCanvas({
   // ── Folder dragging state ──
   const [dragFolderId, setDragFolderId] = useState<string | null>(null);
   const [folderDragStartSvg, setFolderDragStartSvg] = useState<{ x: number; y: number } | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+  const dropTargetRef = useRef<string | null>(null);
 
   // Keep refs to avoid stale closures in mouse handlers
   const foldersRef = useRef(folders);
@@ -575,11 +603,56 @@ export default function RelationsCanvas({
     if (!pos || pos.y >= 0) return offsetY; // only clamp nodes above line
     // bottomH: how far below center the card extends (120 compact, 480 expanded)
     const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
-    const PARTY_LINE_BUFFER = 50;
+    const PARTY_LINE_BUFFER = 10;
     // Card bottom edge after drag: pos.y + offsetY + bottomH  must stay ≤ -PARTY_LINE_BUFFER
     const maxOffsetY = -PARTY_LINE_BUFFER - bottomH - pos.y;
     return Math.min(offsetY, maxOffsetY);
   }, [expandedNodes]);
+
+  // Check if a dragged node overlaps a folder and update drop target highlight
+  const checkFolderDropTarget = useCallback((nodeId: string, offsetX: number, offsetY: number) => {
+    const basePos = nodePositionsRef.current.get(nodeId);
+    if (!basePos) { setDropTargetFolderId(null); dropTargetRef.current = null; return; }
+    const dropX = basePos.x + offsetX;
+    const dropY = basePos.y + offsetY;
+    const curFolders = foldersRef.current;
+    const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+    const MIN_FW = 620, MIN_FH = 120;
+    let hitFolder: string | null = null;
+    for (const f of curFolders) {
+      if (f.nodeIds.includes(nodeId)) continue;
+      if (f.collapsed) continue;
+      const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
+      let bounds: { x: number; y: number; width: number; height: number };
+      if (content) {
+        const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
+        const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
+        const bpX = f.posX ?? content.x;
+        const bpY = f.posY ?? content.y;
+        const cRight = content.x + content.minWidth;
+        const cBottom = content.y + content.minHeight;
+        const rEdge = Math.max(bpX + MIN_FW, bpX + (f.userWidth || 0), cRight);
+        const bEdge = Math.max(bpY + MIN_FH, bpY + (f.userHeight || 0), cBottom);
+        let w = rEdge - anchorX;
+        let h = bEdge - anchorY;
+        if (f.type === 'party') { const maxH = -anchorY; if (maxH > 0 && h > maxH) h = maxH; }
+        bounds = { x: anchorX, y: anchorY, width: w, height: h };
+      } else {
+        const w = Math.max(MIN_FW, f.userWidth || 0);
+        const h = Math.max(MIN_FH, f.userHeight || 0);
+        bounds = { x: f.posX ?? -w / 2, y: f.posY ?? (f.type === 'party' ? -(h + 40) : 100), width: w, height: h };
+      }
+      const insetX = Math.min(30, bounds.width * 0.1);
+      const insetY = Math.min(30, bounds.height * 0.1);
+      if (dropX >= bounds.x + insetX && dropX <= bounds.x + bounds.width - insetX &&
+          dropY >= bounds.y + insetY && dropY <= bounds.y + bounds.height - insetY) {
+        hitFolder = f.id;
+        break;
+      }
+    }
+    setDropTargetFolderId(hitFolder);
+    dropTargetRef.current = hitFolder;
+  }, [nodes]);
 
   // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card.
   // For crystallized panels (above line), the BOTTOM edge (panelY + panelHeight) must not cross below the line.
@@ -905,17 +978,17 @@ export default function RelationsCanvas({
         const current = clientToSvg(e.clientX, e.clientY);
         const dx = current.x - folderDragStartSvg.x;
         let dy = current.y - folderDragStartSvg.y;
-        const folder = folders.find(f => f.id === dragFolderId);
+        const folder = foldersRef.current.find(f => f.id === dragFolderId);
         if (folder) {
           // Find the folder's current bottom edge (lowest node bottom + padding)
           // and clamp dy so the folder bottom never crosses y=0
           const curPositions = nodePositionsRef.current;
           const FOLDER_PADDING = 30;
-          const LINE_GAP = 20; // gap between folder bottom and KRMA line
+          const LINE_GAP = 0; // folder bottom flush with KRMA line
 
           if (folder.type === 'party') {
             const curExpanded = expandedNodesRef.current;
-            const HEADER_HEIGHT = 64;
+            const HEADER_HEIGHT = 80;
             let minY = Infinity, maxBottom = -Infinity;
             for (const nodeId of folder.nodeIds) {
               const pos = curPositions.get(nodeId);
@@ -927,17 +1000,24 @@ export default function RelationsCanvas({
               maxBottom = Math.max(maxBottom, pos.y + bottomH);
             }
             if (maxBottom > -Infinity) {
-              const contentTop = minY - FOLDER_PADDING - HEADER_HEIGHT;
-              let folderVisualBottom: number;
+              // Compute the unclamped visual bottom — must match FolderGroupRect bounds.
+              // The bottom edge is the max of: posY+MIN_FOLDER_H, posY+userHeight, contentBottom.
+              // We clamp dy so NONE of these exceed y=0, preventing the render clamp
+              // from auto-shrinking the folder instead of the drag stopping.
+              const MIN_FOLDER_H = 120;
+              const contentBottom = maxBottom + FOLDER_PADDING;
+              const posY = folder.posY ?? (minY - FOLDER_PADDING - HEADER_HEIGHT);
+              let folderBottom: number;
               if (folder.collapsed) {
-                // Collapsed: just the header bar
-                folderVisualBottom = contentTop + HEADER_HEIGHT;
+                folderBottom = (minY - FOLDER_PADDING - HEADER_HEIGHT) + HEADER_HEIGHT;
               } else {
-                const contentMinH = (maxBottom - minY) + FOLDER_PADDING * 2 + HEADER_HEIGHT;
-                const displayH = Math.max(contentMinH, folder.userHeight || 0);
-                folderVisualBottom = contentTop + displayH;
+                folderBottom = Math.max(
+                  posY + MIN_FOLDER_H,
+                  posY + (folder.userHeight || 0),
+                  contentBottom
+                );
               }
-              const maxDy = -LINE_GAP - folderVisualBottom;
+              const maxDy = -LINE_GAP - folderBottom;
               if (dy > maxDy) dy = maxDy;
             }
           } else {
@@ -960,9 +1040,12 @@ export default function RelationsCanvas({
           }
           setDragOffsets((prev) => {
             const next = new Map(prev);
+            // Set individual node offsets for non-empty folders
             for (const nodeId of folder.nodeIds) {
               next.set(nodeId, { x: dx, y: dy });
             }
+            // Always set folder pseudo-key so anchor translates with content
+            next.set(`__folder__${folder.id}`, { x: dx, y: dy });
             return next;
           });
         }
@@ -980,6 +1063,60 @@ export default function RelationsCanvas({
           next.set(dragNodeId, { x: dx, y: dy });
           return next;
         });
+
+        // Check if dragged node overlaps a folder it's not already in
+        const basePos = nodePositionsRef.current.get(dragNodeId);
+        if (basePos) {
+          const dropX = basePos.x + dx;
+          const dropY = basePos.y + dy;
+          const curFolders = foldersRef.current;
+          const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+          let hitFolder: string | null = null;
+          const MIN_FOLDER_W = 620;
+          const MIN_FOLDER_H = 120;
+          const HEADER_HT = 80;
+          for (const f of curFolders) {
+            if (f.nodeIds.includes(dragNodeId)) continue; // already in this folder
+            if (f.collapsed) continue; // can't drop into collapsed
+            const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
+            let bounds: { x: number; y: number; width: number; height: number };
+            if (content) {
+              // Match the visual bounds computation from FolderGroupRect
+              const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
+              const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
+              const basePosX = f.posX ?? content.x;
+              const basePosY = f.posY ?? content.y;
+              const contentRight = content.x + content.minWidth;
+              const contentBottom = content.y + content.minHeight;
+              const rightEdge = Math.max(basePosX + MIN_FOLDER_W, basePosX + (f.userWidth || 0), contentRight);
+              const bottomEdge = Math.max(basePosY + MIN_FOLDER_H, basePosY + (f.userHeight || 0), contentBottom);
+              let w = rightEdge - anchorX;
+              let h = bottomEdge - anchorY;
+              if (f.type === 'party') {
+                const maxH = -anchorY;
+                if (maxH > 0 && h > maxH) h = maxH;
+              }
+              bounds = { x: anchorX, y: anchorY, width: w, height: h };
+            } else {
+              // Empty folder — use stored/default position for drop detection
+              const w = Math.max(MIN_FOLDER_W, f.userWidth || 0);
+              const h = Math.max(MIN_FOLDER_H, f.userHeight || 0);
+              const fx = f.posX ?? -w / 2;
+              const fy = f.posY ?? (f.type === 'party' ? -(h + 40) : 100);
+              bounds = { x: fx, y: fy, width: w, height: h };
+            }
+            // Inset the hit area so cards must be clearly inside, not just near the edge
+            const insetX = Math.min(30, bounds.width * 0.1);
+            const insetY = Math.min(30, bounds.height * 0.1);
+            if (dropX >= bounds.x + insetX && dropX <= bounds.x + bounds.width - insetX &&
+                dropY >= bounds.y + insetY && dropY <= bounds.y + bounds.height - insetY) {
+              hitFolder = f.id;
+              break;
+            }
+          }
+          setDropTargetFolderId(hitFolder);
+          dropTargetRef.current = hitFolder;
+        }
         return;
       }
 
@@ -1009,32 +1146,66 @@ export default function RelationsCanvas({
   const handleMouseUp = useCallback(() => {
     // ── Finish folder drag (moves all member nodes) ──
     if (dragFolderId) {
-      const folder = folders.find(f => f.id === dragFolderId);
+      const folder = foldersRef.current.find(f => f.id === dragFolderId);
       if (folder) {
-        setNodePositions((prev) => {
-          const next = new Map(prev);
-          for (const nodeId of folder.nodeIds) {
-            const offset = dragOffsets.get(nodeId);
-            const basePos = prev.get(nodeId);
-            if (offset && basePos) {
-              let newY = basePos.y + offset.y;
-              // Party folders: enforce above KRMA line (y < 0 in SVG)
-              if (folder.type === 'party' && newY > -130) {
-                newY = -130;
+        if (folder.nodeIds.length > 0) {
+          // Get the offset from the first node to apply to posX/posY
+          const firstOffset = dragOffsets.get(folder.nodeIds[0]);
+          setNodePositions((prev) => {
+            const next = new Map(prev);
+            for (const nodeId of folder.nodeIds) {
+              const offset = dragOffsets.get(nodeId);
+              const basePos = prev.get(nodeId);
+              if (offset && basePos) {
+                let newY = basePos.y + offset.y;
+                // Party folders: enforce above KRMA line (y < 0 in SVG)
+                if (folder.type === 'party' && newY > -130) {
+                  newY = Math.min(newY, -130);
+                }
+                next.set(nodeId, { x: basePos.x + offset.x, y: newY });
+                onNodePositionChange?.(nodeId, basePos.x + offset.x, newY);
               }
-              next.set(nodeId, { x: basePos.x + offset.x, y: newY });
-              onNodePositionChange?.(nodeId, basePos.x + offset.x, newY);
+            }
+            return next;
+          });
+          setDragOffsets((prev) => {
+            const next = new Map(prev);
+            for (const nodeId of folder.nodeIds) {
+              next.delete(nodeId);
+            }
+            next.delete(`__folder__${folder.id}`);
+            return next;
+          });
+          // Also move the folder anchor position
+          if (firstOffset && (firstOffset.x !== 0 || firstOffset.y !== 0)) {
+            const curPosX = folder.posX;
+            const curPosY = folder.posY;
+            if (curPosX != null && curPosY != null) {
+              const updated = foldersRef.current.map(f =>
+                f.id === folder.id ? { ...f, posX: curPosX + firstOffset.x, posY: curPosY + firstOffset.y } : f
+              );
+              onFoldersChange?.(updated);
             }
           }
-          return next;
-        });
-        setDragOffsets((prev) => {
-          const next = new Map(prev);
-          for (const nodeId of folder.nodeIds) {
-            next.delete(nodeId);
+        } else {
+          // Empty folder: commit position from pseudo-key offset
+          const pseudoKey = `__folder__${folder.id}`;
+          const offset = dragOffsets.get(pseudoKey);
+          if (offset) {
+            const MIN_FOLDER_H = 120;
+            const curX = folder.posX ?? -(Math.max(620, folder.userWidth || 0)) / 2;
+            const curY = folder.posY ?? (folder.type === 'party' ? -(MIN_FOLDER_H + 40) : 100);
+            const updated = foldersRef.current.map(f =>
+              f.id === folder.id ? { ...f, posX: curX + offset.x, posY: curY + offset.y } : f
+            );
+            onFoldersChange?.(updated);
           }
-          return next;
-        });
+          setDragOffsets((prev) => {
+            const next = new Map(prev);
+            next.delete(pseudoKey);
+            return next;
+          });
+        }
       }
       setDragFolderId(null);
       setFolderDragStartSvg(null);
@@ -1057,6 +1228,16 @@ export default function RelationsCanvas({
           onNodePositionChange?.(dragNodeId, newX, newY);
         }
       }
+      // If dropped onto a folder, add the node to it
+      const dropTarget = dropTargetRef.current;
+      if (dropTarget) {
+        const updated = foldersRef.current.map(f =>
+          f.id === dropTarget ? { ...f, nodeIds: [...f.nodeIds, dragNodeId] } : f
+        );
+        onFoldersChange?.(updated);
+        setDropTargetFolderId(null);
+        dropTargetRef.current = null;
+      }
       setDragOffsets((prev) => {
         const next = new Map(prev);
         next.delete(dragNodeId);
@@ -1067,9 +1248,11 @@ export default function RelationsCanvas({
       return;
     }
 
+    setDropTargetFolderId(null);
+    dropTargetRef.current = null;
     setIsPanning(false);
     setIsDragging(false);
-  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange]);
+  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange, onFoldersChange]);
 
   // Global mouse listeners for pan / drag
   useEffect(() => {
@@ -1345,8 +1528,15 @@ export default function RelationsCanvas({
             showInventory={isInventoryOpen}
             isDropTarget={isDropTarget}
             openPanels={nodePanels}
+            folderId={folders.find(f => f.nodeIds.includes(node.id))?.id ?? null}
             onToggleExpand={toggleExpand}
             onDelete={onDeleteCharacter}
+            onRemoveFromFolder={(folderId, nodeId) => {
+              const updated = foldersRef.current.map(f =>
+                f.id === folderId ? { ...f, nodeIds: f.nodeIds.filter(id => id !== nodeId) } : f
+              );
+              onFoldersChange?.(updated);
+            }}
             onInventoryToggle={toggleInventory}
             onPanelToggle={togglePanel}
             onPositionChange={(nodeId, x, y) => {
@@ -1355,7 +1545,7 @@ export default function RelationsCanvas({
               const inParty = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
               if (inParty && y >= 0) {
                 const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
-                clampedY = -(bottomH + 50);
+                clampedY = -(bottomH + 10);
               }
               setNodePositions((prev) => {
                 const next = new Map(prev);
@@ -1364,6 +1554,55 @@ export default function RelationsCanvas({
               });
               onNodePositionChange?.(nodeId, x, clampedY);
               bringNodeToFront(nodeId);
+
+              // NOTE: Do NOT update folder posX/posY here. posX/posY are only set by
+              // explicit resize handles and folder drag — card movement within the folder
+              // is handled by auto-sizing in the bounds computation (content.x/content.y).
+
+              // Check if dropped onto a folder — add to it
+              const curFolders = foldersRef.current;
+              const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+              const MIN_FW = 620;
+              const MIN_FH = 120;
+              for (const f of curFolders) {
+                if (f.nodeIds.includes(nodeId)) continue;
+                if (f.collapsed) continue;
+                const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
+                let bounds: { x: number; y: number; width: number; height: number };
+                if (content) {
+                  const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
+                  const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
+                  const bpX = f.posX ?? content.x;
+                  const bpY = f.posY ?? content.y;
+                  const cRight = content.x + content.minWidth;
+                  const cBottom = content.y + content.minHeight;
+                  const rEdge = Math.max(bpX + MIN_FW, bpX + (f.userWidth || 0), cRight);
+                  const bEdge = Math.max(bpY + MIN_FH, bpY + (f.userHeight || 0), cBottom);
+                  let w = rEdge - anchorX;
+                  let h = bEdge - anchorY;
+                  if (f.type === 'party') {
+                    const maxH = -anchorY;
+                    if (maxH > 0 && h > maxH) h = maxH;
+                  }
+                  bounds = { x: anchorX, y: anchorY, width: w, height: h };
+                } else {
+                  const w = Math.max(MIN_FW, f.userWidth || 0);
+                  const h = Math.max(MIN_FH, f.userHeight || 0);
+                  const fx = f.posX ?? -w / 2;
+                  const defaultY = f.type === 'party' ? -(h + 40) : 100;
+                  bounds = { x: fx, y: defaultY, width: w, height: h };
+                }
+                const insetX2 = Math.min(30, bounds.width * 0.1);
+                const insetY2 = Math.min(30, bounds.height * 0.1);
+                if (x >= bounds.x + insetX2 && x <= bounds.x + bounds.width - insetX2 &&
+                    clampedY >= bounds.y + insetY2 && clampedY <= bounds.y + bounds.height - insetY2) {
+                  const updated = curFolders.map(ff =>
+                    ff.id === f.id ? { ...ff, nodeIds: [...ff.nodeIds, nodeId] } : ff
+                  );
+                  onFoldersChange?.(updated);
+                  break;
+                }
+              }
             }}
             onDragOffsetChange={(nodeId, offsetX, offsetY) => {
               const clampedY = clampPartyDragY(nodeId, offsetY);
@@ -1376,6 +1615,7 @@ export default function RelationsCanvas({
                 }
                 return next;
               });
+              checkFolderDropTarget(nodeId, offsetX, clampedY);
             }}
             onCharacterUpdate={onCharacterUpdate}
           />
@@ -1961,12 +2201,13 @@ export default function RelationsCanvas({
               svgRef={svgRef}
               viewBox={viewBox}
               showActionsMenu={false}
-              onFolderResize={(folderId, width, height) => {
-                const updated = folders.map(f =>
-                  f.id === folderId ? { ...f, userWidth: width, userHeight: height } : f
+              onFolderResize={(folderId, width, height, posX) => {
+                const updated = foldersRef.current.map(f =>
+                  f.id === folderId ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}) } : f
                 );
                 onFoldersChange?.(updated);
               }}
+              isDropTarget={dropTargetFolderId === folder.id}
               onFolderDragStart={(folderId, startSvg) => {
                 setDragFolderId(folderId);
                 setFolderDragStartSvg(startSvg);
@@ -1975,12 +2216,12 @@ export default function RelationsCanvas({
                 window.dispatchEvent(new CustomEvent('folder-actions-toggle', { detail: { folderId } }));
               }}
               onToggleCollapsed={(folderId) => {
-                const f = folders.find(ff => ff.id === folderId);
+                const f = foldersRef.current.find(ff => ff.id === folderId);
                 // When expanding a party folder, push nodes up if expanded size would cross KRMA line
                 if (f && f.type === 'party' && f.collapsed) {
                   const FOLDER_PADDING = 30;
-                  const HEADER_HEIGHT = 64;
-                  const LINE_GAP = 20;
+                  const HEADER_HEIGHT = 80;
+                  const LINE_GAP = 0;
                   let minY = Infinity, maxBottom = -Infinity;
                   for (const nodeId of f.nodeIds) {
                     const pos = nodePositions.get(nodeId);
@@ -2007,7 +2248,7 @@ export default function RelationsCanvas({
                     }
                   }
                 }
-                const updated = folders.map(ff =>
+                const updated = foldersRef.current.map(ff =>
                   ff.id === folderId ? { ...ff, collapsed: !ff.collapsed } : ff
                 );
                 onFoldersChange?.(updated);
@@ -2139,6 +2380,7 @@ export default function RelationsCanvas({
                         }
                         return next;
                       });
+                      checkFolderDropTarget(nodeId, offsetX, clampedY);
                     }}
                   />
                 </div>
@@ -2258,6 +2500,7 @@ export default function RelationsCanvas({
                         }
                         return next;
                       });
+                      checkFolderDropTarget(nodeId, offsetX, clampedY);
                       // Track which item is being dragged for drop-target highlighting
                       if (offsetX !== 0 || clampedY !== 0) {
                         setDraggingItemId(nodeId);
@@ -2355,14 +2598,31 @@ export default function RelationsCanvas({
         onCreateItem={onCreateItem}
         onCreateItemFromForge={onCreateItemFromForge}
         onCreateParty={(nodeIds) => {
+          // Compute initial anchor from node positions
+          let minX = Infinity, minY = Infinity;
+          const PADDING = 30;
+          const HEADER_HEIGHT = 64;
+          for (const nid of nodeIds) {
+            const pos = nodePositionsRef.current.get(nid);
+            if (!pos) continue;
+            const isExp = expandedNodesRef.current.has(nid);
+            const halfW = isExp ? 960 : 260;
+            const topH = isExp ? 250 : 120;
+            minX = Math.min(minX, pos.x - halfW);
+            minY = Math.min(minY, pos.y - topH);
+          }
+          const anchorX = minX === Infinity ? -310 : minX - PADDING;
+          const anchorY = minY === Infinity ? -200 : minY - PADDING - HEADER_HEIGHT;
           const newFolder: CanvasFolder = {
             id: `folder-${Date.now()}`,
             name: 'Party',
             type: 'party',
             nodeIds,
             color: '#22ab94',
+            posX: anchorX,
+            posY: anchorY,
           };
-          onFoldersChange?.([...folders, newFolder]);
+          onFoldersChange?.([...foldersRef.current, newFolder]);
         }}
       />
 
@@ -2394,7 +2654,7 @@ export default function RelationsCanvas({
               setFolderDragStartSvg(startSvg);
             }}
             onRemoveFromFolder={(folderId, nodeId) => {
-              const updated = folders.map(f =>
+              const updated = foldersRef.current.map(f =>
                 f.id === folderId ? { ...f, nodeIds: f.nodeIds.filter(id => id !== nodeId) } : f
               );
               onFoldersChange?.(updated);
@@ -2610,7 +2870,7 @@ function CanvasToolbox({
 
   // Scale with zoom like SVG foreignObject cards do.
   // zoom=1 is the default; zoom<1 = zoomed out (smaller), zoom>1 = zoomed in (larger).
-  const toolScale = (isExpanded ? 1.8 : 2.7) / zoom;
+  const toolScale = (isExpanded ? 2.4 : 3.6) / zoom;
 
   return (
     <div

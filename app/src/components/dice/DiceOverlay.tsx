@@ -18,16 +18,17 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import type { DieType, DieColor } from '@/types/dice';
 import { useDiceQueue } from '@/hooks/useDiceEvents';
 import { DiceAnimator } from './DiceAnimator';
+import { CtxMenuPanel, CtxMenuStreamLabel } from '@/components/ui/ContextMenu';
 
 const STORAGE_KEY = 'growth_dice_3d_enabled';
 
 // Each die type has a canonical GROWTH pillar color and shape glyph
 const DIE_OPTIONS: { type: DieType; label: string; color: DieColor; hex: string; glyph: string }[] = [
-  { type: 'd4', label: 'D4', color: 'red', hex: '#E8585A', glyph: '▲' },
-  { type: 'd6', label: 'D6', color: 'teal', hex: '#2DB8A0', glyph: '■' },
-  { type: 'd8', label: 'D8', color: 'blue', hex: '#4080D0', glyph: '◆' },
-  { type: 'd12', label: 'D12', color: 'purple', hex: '#7050A8', glyph: '⬟' },
-  { type: 'd20', label: 'D20', color: 'gold', hex: '#D0A030', glyph: '⬢' },
+  { type: 'd4', label: 'd4', color: 'red', hex: '#E8585A', glyph: '▲' },
+  { type: 'd6', label: 'd6', color: 'teal', hex: '#2DB8A0', glyph: '■' },
+  { type: 'd8', label: 'd8', color: 'blue', hex: '#4080D0', glyph: '◆' },
+  { type: 'd12', label: 'd12', color: 'purple', hex: '#7050A8', glyph: '⬟' },
+  { type: 'd20', label: 'd20', color: 'gold', hex: '#D0A030', glyph: '⬢' },
 ];
 
 interface ContextMenuState {
@@ -36,6 +37,10 @@ interface ContextMenuState {
   mode: 'spawn' | 'remove';
 }
 
+/**
+ * Text-based ^v^v border on all 4 sides.
+ * ^ chars are black, v chars are white. Soft white glow on the whole frame.
+ */
 function is3DEnabled(): boolean {
   if (typeof window === 'undefined') return true;
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -271,6 +276,7 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
       // Don't hijack right-click on existing dice menu or card context menus
       const target = e.target as HTMLElement;
       if (target.closest('[data-dice-menu]')) return;
+      if (target.closest('[data-card-wrapper]')) return;
 
       e.preventDefault();
 
@@ -470,30 +476,28 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
             }}
             onMouseDown={e => e.stopPropagation()}
           >
+            <CtxMenuStreamLabel />
             {contextMenu.mode === 'remove' ? (
-              <div className="bg-zinc-900 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[140px]">
+              <CtxMenuPanel>
                 <button
-                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 font-[Consolas,monospace]"
+                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-white/10 font-[Consolas,monospace]"
                   onClick={handleRemoveDie}
                 >
-                  Put away
+                  pUT AWAY
                 </button>
                 <button
-                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-400 hover:bg-zinc-700 font-[Consolas,monospace]"
+                  className="w-full px-3 py-1.5 text-left text-sm text-zinc-400 hover:bg-white/10 font-[Consolas,monospace]"
                   onClick={handleRemoveAll}
                 >
-                  Put away all
+                  pUT AWAY ALL
                 </button>
-              </div>
+              </CtxMenuPanel>
             ) : (
-              <div className="bg-zinc-900 border border-zinc-700 rounded-md shadow-xl py-1 min-w-[140px]">
-                <div className="px-3 py-1 text-xs text-zinc-500 font-[Consolas,monospace] border-b border-zinc-800">
-                  Pull out a die
-                </div>
+              <CtxMenuPanel title="pULL OUT A dIE">
                 {DIE_OPTIONS.map(({ type, label, hex, glyph }) => (
                   <button
                     key={type}
-                    className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-700 font-[Consolas,monospace] flex items-center gap-2"
+                    className="w-full px-3 py-1.5 text-left text-sm text-zinc-200 hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
                     onClick={() => handleSpawnDie(type)}
                   >
                     <span className="text-base leading-none flex-shrink-0" style={{ color: hex }}>
@@ -504,16 +508,16 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
                 ))}
                 {hasDice && (
                   <>
-                    <div className="border-t border-zinc-800 my-1" />
+                    <div style={{ borderTop: '1px solid #333', margin: '4px 0' }} />
                     <button
-                      className="w-full px-3 py-1.5 text-left text-sm text-zinc-400 hover:bg-zinc-700 font-[Consolas,monospace]"
+                      className="w-full px-3 py-1.5 text-left text-sm text-zinc-400 hover:bg-white/10 font-[Consolas,monospace]"
                       onClick={handleRemoveAll}
                     >
-                      Put away all
+                      pUT AWAY ALL
                     </button>
                   </>
                 )}
-              </div>
+              </CtxMenuPanel>
             )}
           </div>
         )}

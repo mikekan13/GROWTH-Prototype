@@ -87,7 +87,29 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     if (typeof window === 'undefined') return [];
     try {
       const raw = localStorage.getItem(folderStorageKey);
-      if (raw) return JSON.parse(raw) as CanvasFolder[];
+      if (raw) {
+        const parsed = JSON.parse(raw) as CanvasFolder[];
+        // Migrate: initialize posX/posY for folders that don't have them
+        let migrated = false;
+        const result = parsed.map(f => {
+          if (f.posX == null || f.posY == null) {
+            migrated = true;
+            // Compute from node positions if possible, otherwise use defaults
+            const MIN_W = 620;
+            const MIN_H = 120;
+            return {
+              ...f,
+              posX: f.posX ?? -MIN_W / 2,
+              posY: f.posY ?? (f.type === 'party' ? -(MIN_H + 40) : 100),
+            };
+          }
+          return f;
+        });
+        if (migrated) {
+          try { localStorage.setItem(folderStorageKey, JSON.stringify(result)); } catch { /* ignore */ }
+        }
+        return result;
+      }
     } catch { /* ignore */ }
     return [];
   });
@@ -106,19 +128,6 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }));
     const changed = cleaned.some((f, i) => f.nodeIds.length !== folders[i].nodeIds.length);
     if (changed) handleFoldersChange(cleaned);
-  }, [nodes, folders, handleFoldersChange]);
-
-  // Auto-add new characters to party folder
-  useEffect(() => {
-    const partyFolder = folders.find(f => f.type === 'party');
-    if (!partyFolder) return;
-    const charIds = nodes.filter(n => n.type === 'character').map(n => n.id);
-    const missing = charIds.filter(id => !partyFolder.nodeIds.includes(id));
-    if (missing.length > 0) {
-      handleFoldersChange(folders.map(f =>
-        f.id === partyFolder.id ? { ...f, nodeIds: [...f.nodeIds, ...missing] } : f
-      ));
-    }
   }, [nodes, folders, handleFoldersChange]);
 
   // Forge items (published, for Canvas toolbox "Place from Forge")
