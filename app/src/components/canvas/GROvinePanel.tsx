@@ -87,33 +87,41 @@ export default function GROvinePanel({
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             style={{
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              color: '#22ab94',
-              width: 20,
-              height: 20,
-              borderRadius: 2,
+              background: '#22ab9422',
+              border: '1px solid #22ab9455',
+              color: '#F5F4EF',
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
               cursor: 'pointer',
-              fontSize: 10,
+              fontSize: 24,
+              lineHeight: '1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {isCollapsed ? '+' : '\u2212'}
+            {isCollapsed ? '\u2295' : '\u2297'}
           </button>
           {onClose && (
             <button
               onClick={onClose}
               style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: 'none',
-                color: '#fff',
-                width: 20,
-                height: 20,
-                borderRadius: 2,
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#F5F4EF',
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
                 cursor: 'pointer',
-                fontSize: 10,
+                fontSize: 24,
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              &times;
+              {'\u2297'}
             </button>
           )}
         </div>

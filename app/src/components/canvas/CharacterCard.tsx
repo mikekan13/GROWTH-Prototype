@@ -438,17 +438,22 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
           {/* Main Content */}
           <div className="flex-1 flex flex-col" style={{ height: '220px' }}>
-            {/* Name + TKV */}
-            <div className="flex items-center justify-between mb-1" style={{ height: '24px' }}>
+            {/* Name */}
+            <div className="flex items-center mb-1" style={{ height: '24px' }}>
               <div className="font-bold truncate" style={{ fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '14px', color: '#ffcc78' }}>
                 {node.name}
               </div>
-              <div className="flex items-center justify-center rounded" style={{
-                backgroundColor: '#002f6c', minWidth: '50px', height: '20px',
-                fontSize: '10px', color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', paddingLeft: '4px', paddingRight: '4px'
-              }}>
-                T&#x049C;V {tkv}
-              </div>
+            </div>
+            {/* TKV — top-right corner */}
+            <div className="absolute flex flex-col overflow-hidden" style={{
+              top: '0px', right: '0px',
+              minWidth: '64px',
+              border: '2px solid #ffcc78',
+              borderBottomLeftRadius: '6px', borderTopRightRadius: '8px', zIndex: 5,
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+            }}>
+              <div className="flex items-center justify-center" style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: '12px', lineHeight: '1', letterSpacing: '0.08em', padding: '3px 8px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
+              <div className="flex items-center justify-center" style={{ backgroundColor: '#b4a7d6', color: '#582a72', fontSize: '17px', lineHeight: '1.1', padding: '2px 8px' }}>{tkv}</div>
             </div>
 
             {/* WTH Levels */}
@@ -961,7 +966,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
           {/* ── TKV Box (centered under portrait) ── */}
           <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '530px', border: '3px solid #ffcc78', zIndex: 10 }}>
-            <div className="w-full flex items-center justify-center" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', height: '28px' }}>T&#x049C;V</div>
+            <div className="w-full flex items-center justify-center" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', height: '28px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
             <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#582a72', height: '34px' }}>{tkv}</div>
           </div>
 

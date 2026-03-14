@@ -319,27 +319,61 @@ export default function RelationsCanvas({
   }, [expandedNodes, panelOpenNodes, inventoryOpenNodes]);
 
   const toggleExpand = useCallback((nodeId: string) => {
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-        // Close all sub-panels and inventory when collapsing
-        setInventoryOpenNodes((inv) => {
-          const nextInv = new Set(inv);
-          nextInv.delete(nodeId);
-          return nextInv;
+    const isCollapsing = expandedNodes.has(nodeId);
+    const node = nodes.find(n => n.id === nodeId);
+
+    // Shift center so left edge stays pinned when card width changes
+    // cardWidth values must match those in the render section
+    if (node) {
+      // [expandedW, compactW, expandedH, compactH]
+      const sizes: Record<string, [number, number, number, number]> = {
+        character: [1920, 520, 500, 240],
+        location: [480, 320, 700, 180],
+        item: [420, 280, 600, 160],
+      };
+      const s = sizes[node.type];
+      if (s) {
+        const [expandedW, compactW, expandedH, compactH] = s;
+        const dx = isCollapsing
+          ? (compactW - expandedW) / 2
+          : (expandedW - compactW) / 2;
+        const dy = isCollapsing
+          ? (compactH - expandedH) / 2
+          : (expandedH - compactH) / 2;
+        setNodePositions((positions) => {
+          const pos = positions.get(nodeId);
+          if (!pos) return positions;
+          const nextPositions = new Map(positions);
+          nextPositions.set(nodeId, { x: pos.x + dx, y: pos.y + dy });
+          return nextPositions;
         });
-        setPanelOpenNodes((panels) => {
-          const nextPanels = new Map(panels);
-          nextPanels.delete(nodeId);
-          return nextPanels;
-        });
-      } else {
-        next.add(nodeId);
       }
-      return next;
-    });
-  }, []);
+    }
+
+    if (isCollapsing) {
+      setExpandedNodes((prev) => {
+        const next = new Set(prev);
+        next.delete(nodeId);
+        return next;
+      });
+      setInventoryOpenNodes((inv) => {
+        const nextInv = new Set(inv);
+        nextInv.delete(nodeId);
+        return nextInv;
+      });
+      setPanelOpenNodes((panels) => {
+        const nextPanels = new Map(panels);
+        nextPanels.delete(nodeId);
+        return nextPanels;
+      });
+    } else {
+      setExpandedNodes((prev) => {
+        const next = new Set(prev);
+        next.add(nodeId);
+        return next;
+      });
+    }
+  }, [nodes, expandedNodes]);
 
   const toggleInventory = useCallback((nodeId: string) => {
     setInventoryOpenNodes((prev) => {
@@ -1188,15 +1222,9 @@ export default function RelationsCanvas({
     const cardWidth = isNodeExpanded ? 1920 : 520;
     const cardHeight = isNodeExpanded ? 500 : 240;
 
-    // When dragging, card scales 105% from center — apply same to tether anchors
     const isDraggingNode = dragOffsets.has(node.id);
-    const scaleAnchor = (ax: number, ay: number) => {
-      if (!isDraggingNode) return { x: ax, y: ay };
-      return {
-        x: visualX + (ax - visualX) * 1.05,
-        y: visualY + (ay - visualY) * 1.05,
-      };
-    };
+    // Character cards don't visually scale during drag, so anchors stay 1:1
+    const scaleAnchor = (ax: number, ay: number) => ({ x: ax, y: ay });
 
     const charNode: CharacterNodeData = {
       id: node.id,
@@ -2029,7 +2057,7 @@ export default function RelationsCanvas({
             const position = getNodePosition(node.id, node.x, node.y);
             const isNodeExpanded = expandedNodes.has(node.id);
             const isDraggingNode = dragOffsets.has(node.id);
-            const cardWidth = isNodeExpanded ? 500 : 340;
+            const cardWidth = isNodeExpanded ? 480 : 320;
             const cardHeight = isNodeExpanded ? 700 : 180;
 
             // Margin scales with viewport so culling works at all zoom levels
@@ -2129,7 +2157,7 @@ export default function RelationsCanvas({
             const position = getNodePosition(node.id, node.x, node.y);
             const isNodeExpanded = expandedNodes.has(node.id);
             const isDraggingNode = dragOffsets.has(node.id);
-            const cardWidth = isNodeExpanded ? 440 : 300;
+            const cardWidth = isNodeExpanded ? 420 : 280;
             const cardHeight = isNodeExpanded ? 600 : 160;
 
             // Margin scales with viewport so culling works at all zoom levels
@@ -2582,7 +2610,7 @@ function CanvasToolbox({
 
   // Scale with zoom like SVG foreignObject cards do.
   // zoom=1 is the default; zoom<1 = zoomed out (smaller), zoom>1 = zoomed in (larger).
-  const toolScale = 1.2 / zoom;
+  const toolScale = (isExpanded ? 1.8 : 2.7) / zoom;
 
   return (
     <div
@@ -2596,58 +2624,85 @@ function CanvasToolbox({
         userSelect: 'none',
       }}
     >
+      {/* Glitch overlay */}
+      <style>{`
+        @keyframes toolGlitch {
+          0%, 92% { clip-path: none; transform: none; opacity: 0; }
+          93% { clip-path: inset(20% 0 60% 0); transform: translateX(-2px); opacity: 0.6; }
+          94% { clip-path: inset(50% 0 20% 0); transform: translateX(2px); opacity: 0.4; }
+          95% { clip-path: inset(10% 0 70% 0); transform: translateX(-1px) skewX(2deg); opacity: 0.5; }
+          96% { clip-path: none; transform: none; opacity: 0; }
+          97% { clip-path: inset(40% 0 30% 0); transform: translateX(1px); opacity: 0.3; }
+          98%, 100% { clip-path: none; transform: none; opacity: 0; }
+        }
+      `}</style>
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        animation: 'toolGlitch 4s infinite',
+        background: 'linear-gradient(90deg, transparent 0%, rgba(208,160,48,0.12) 20%, rgba(255,255,255,0.06) 50%, rgba(208,160,48,0.12) 80%, transparent 100%)',
+        mixBlendMode: 'screen',
+        zIndex: 1,
+      }} />
       {/* Collapsed: compact pill */}
       {!isExpanded ? (
         <button
           onClick={() => setIsExpanded(true)}
           style={{
-            background: 'linear-gradient(135deg, #22ab94 0%, #1e9b82 100%)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: 4,
+            background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+            border: '1px solid #D0A030',
+            borderRadius: 2,
             padding: '6px 16px',
-            color: 'white',
+            color: '#D0A030',
             fontSize: 11,
             fontWeight: 700,
             letterSpacing: '0.08em',
             cursor: 'pointer',
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
-            boxShadow: '0 4px 20px rgba(34, 171, 148, 0.4)',
+            fontFamily: 'var(--font-header), "Bebas Neue", sans-serif',
+            boxShadow: '0 4px 18px rgba(34, 171, 148, 0.2)',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-            <path d="M12 2L3 7v6c0 5.55 3.84 9.74 9 9.74s9-4.19 9-9.74V7l-7-5z" />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D0A030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
           </svg>
-          {'\u049C'} TOOLS
+          TOOLS
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D0A030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'scaleX(-1)' }}>
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+          </svg>
         </button>
       ) : (
         <div
           style={{
-            background: 'linear-gradient(135deg, rgba(34,171,148,0.95) 0%, rgba(30,155,130,0.95) 100%)',
+            background: 'linear-gradient(135deg, rgba(10,10,10,0.97) 0%, rgba(26,26,26,0.97) 100%)',
             backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: 4,
+            border: '1px solid #D0A030',
+            borderRadius: 2,
             padding: 12,
             minWidth: 220,
-            boxShadow: '0 8px 32px rgba(34, 171, 148, 0.4), 0 2px 8px rgba(0,0,0,0.3)',
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
+            boxShadow: '0 6px 28px rgba(34, 171, 148, 0.2), 0 2px 8px rgba(0,0,0,0.3)',
+            fontFamily: 'var(--font-header), "Bebas Neue", sans-serif',
           }}
         >
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                <path d="M12 2L3 7v6c0 5.55 3.84 9.74 9 9.74s9-4.19 9-9.74V7l-7-5z" />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D0A030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
-              <span style={{ color: 'white', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>{'\u049C'} TOOLS</span>
+              <span style={{ color: '#D0A030', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>TOOLS</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D0A030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'scaleX(-1)' }}>
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
             </div>
             <button
               onClick={() => { setIsExpanded(false); setShowForgeItems(false); }}
-              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 4, width: 20, height: 20, cursor: 'pointer', color: 'white', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: '#D0A03022', border: '1px solid #D0A03055', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', color: '#F5F4EF', fontSize: 24, lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              &times;
+              {'\u2297'}
             </button>
           </div>
 
@@ -2662,7 +2717,7 @@ function CanvasToolbox({
               }}
             />
             <ToolboxButton
-              icon={<span style={{ fontSize: 13 }}>{'\uD83D\uDCCD'}</span>}
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>}
               label="Location"
               color="#7050A8"
               onClick={() => {
@@ -2671,7 +2726,7 @@ function CanvasToolbox({
               }}
             />
             <ToolboxButton
-              icon={<span style={{ fontSize: 13 }}>{'\u2694'}</span>}
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" /><line x1="6" y1="2" x2="6" y2="4" /><line x1="10" y1="2" x2="10" y2="4" /><line x1="14" y1="2" x2="14" y2="4" /></svg>}
               label="Item"
               color="#ffcc78"
               onClick={() => {
@@ -2781,17 +2836,19 @@ function ToolboxButton({ icon, label, color, onClick }: { icon: React.ReactNode;
       style={{
         flex: 1,
         padding: '6px 4px',
-        background: 'rgba(255,255,255,0.12)',
-        border: '1px solid rgba(255,255,255,0.25)',
-        borderRadius: 8,
-        color: color || 'white',
-        fontSize: 9,
+        background: 'linear-gradient(135deg, #22ab94 0%, #1e9b82 100%)',
+        border: '1px solid rgba(34,171,148,0.5)',
+        borderRadius: 2,
+        color: '#fdfdfd',
+        fontSize: 12,
         fontWeight: 600,
         cursor: 'pointer',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 3,
+        textAlign: 'center',
         letterSpacing: '0.05em',
         fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
       }}

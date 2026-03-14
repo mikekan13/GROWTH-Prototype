@@ -145,7 +145,6 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
           }}
           onMouseDown={handleMouseDown}
           onContextMenu={handleContextMenu}
-          onClick={() => !isDragging && onToggleExpand(node.id)}
         >
           {/* Header */}
           <div style={{
@@ -212,6 +211,31 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             </div>
           )}
         </div>
+        {/* Expand button — bottom-right corner */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: '-16px',
+            right: '-21px',
+            width: 36,
+            height: 36,
+            background: '#7050A8',
+            border: 'none',
+            borderRadius: '50%',
+            color: '#F5F4EF',
+            fontSize: 24,
+            lineHeight: '1',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}
+          title="Expand item card"
+        >{'\u2295'}</button>
         {contextMenu}
       </div>
     );
@@ -268,18 +292,19 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             style={{
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.15)',
-              color: 'rgba(255,255,255,0.5)',
-              width: 24,
-              height: 24,
-              borderRadius: 3,
+              color: '#F5F4EF',
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
               cursor: 'pointer',
-              fontSize: 14,
+              fontSize: 24,
+              lineHeight: '1',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            &minus;
+            {'\u2297'}
           </button>
         </div>
 

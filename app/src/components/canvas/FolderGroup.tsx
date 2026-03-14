@@ -59,7 +59,7 @@ interface FolderGroupProps {
 const FOLDER_PADDING = 30;
 const HEADER_HEIGHT = 64;
 const SOUL_BLUE = '#002f6c';
-const HANDLE_SIZE = 14;
+const HANDLE_SIZE = 18;
 
 // ── Shared bounds calculation ──
 
@@ -231,12 +231,12 @@ export function FolderGroupRect({
 
   const color = folder.type === 'party' ? SOUL_BLUE : (folder.color || SOUL_BLUE);
   const collapsed = !!folder.collapsed;
-  const labelFontSize = 20;
-  const countFontSize = 14;
+  const labelFontSize = 36;
+  const countFontSize = 32;
   const btnW = 120;
   const btnH = 32;
   const btnFontSize = 14;
-  const toggleSize = 28;
+  const toggleSize = 36;
 
   // TKV: sum of all characters' TKV in this folder
   const folderChars = characters.filter(c => folder.nodeIds.includes(c.id));
@@ -270,10 +270,9 @@ export function FolderGroupRect({
           height={displayHeight}
           rx={8}
           ry={8}
-          fill={`${color}08`}
-          stroke={`${color}44`}
+          fill="#19191930"
+          stroke="#22ab9444"
           strokeWidth={2}
-          strokeDasharray="12 6"
         />
       )}
       {/* Header background */}
@@ -296,7 +295,7 @@ export function FolderGroupRect({
           y={bounds.y + HEADER_HEIGHT - 8}
           width={bounds.width}
           height={8}
-          fill={`${color}18`}
+          fill="#19191930"
           style={{ pointerEvents: 'none' }}
         />
       )}
@@ -312,51 +311,33 @@ export function FolderGroupRect({
         letterSpacing="0.12em"
         style={{ pointerEvents: 'none' }}
       >
-        {folder.type === 'party' ? '\u2694 ' : '\u25A1 '}{folder.name.toUpperCase()}
+        {folder.type === 'party' ? <><tspan letterSpacing="-0.53em">{'\u265F'}<tspan fontSize="1.15em">{'\u265F'}</tspan>{'\u265F'}</tspan>{' '}</> : '\u25A1 '}{folder.name.toUpperCase()}
         <tspan fill={`${folder.type === 'party' ? '#22ab94' : color}99`} fontSize={countFontSize} dx={6}>
           ({folder.nodeIds.length})
         </tspan>
       </text>
 
-      {/* TKV readout — label above header, number centered in header */}
-      <text
-        x={bounds.x + bounds.width / 2}
-        y={bounds.y - 4}
-        fill="#D0A030"
-        fontSize={28}
-        fontWeight={700}
-        fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif"
-        textAnchor="middle"
-        style={{ pointerEvents: 'none' }}
+      {/* TKV readout — standard red label over purple number */}
+      <foreignObject
+        x={bounds.x + bounds.width / 2 - 80}
+        y={bounds.y - 28}
+        width={160}
+        height={72}
+        style={{ pointerEvents: 'none', overflow: 'visible' }}
       >
-        T&#x049C;V
-      </text>
-      <rect
-        x={bounds.x + bounds.width / 2 - 60}
-        y={bounds.y + HEADER_HEIGHT / 2 - 20}
-        width={120}
-        height={40}
-        rx={3}
-        fill="#582a72"
-        fillOpacity={1}
-        stroke="#D0A030"
-        strokeWidth={1}
-        strokeOpacity={0.4}
-        style={{ pointerEvents: 'none' }}
-      />
-      <text
-        x={bounds.x + bounds.width / 2}
-        y={bounds.y + HEADER_HEIGHT / 2}
-        fill="#D0A030"
-        fontSize={32}
-        fontWeight={700}
-        fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif"
-        textAnchor="middle"
-        dominantBaseline="middle"
-        style={{ pointerEvents: 'none' }}
-      >
-        {totalTKV.toLocaleString()}
-      </text>
+        <div style={{
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          border: '2px solid #ffcc78', borderRadius: 4,
+          fontFamily: "'Bebas Neue', var(--font-bebas-neue), sans-serif",
+        }}>
+          <div style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: 20, textAlign: 'center', lineHeight: '1', padding: '5px 10px', letterSpacing: '0.08em' }}>
+            T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V
+          </div>
+          <div style={{ backgroundColor: '#b4a7d6', color: '#582a72', fontSize: 28, textAlign: 'center', lineHeight: '1.1', padding: '4px 10px', fontWeight: 700 }}>
+            {totalTKV.toLocaleString()}
+          </div>
+        </div>
+      </foreignObject>
 
       {/* ACTIONS button — inside header, left side */}
       {folder.type === 'party' && (
@@ -411,7 +392,7 @@ export function FolderGroupRect({
             border: `1px solid ${color}55`,
             borderRadius: '50%',
             color: '#F5F4EF',
-            fontSize: 18,
+            fontSize: 24,
             lineHeight: '1',
             cursor: 'pointer',
             display: 'flex',
@@ -433,7 +414,7 @@ export function FolderGroupRect({
             width={HANDLE_SIZE}
             height={40}
             rx={3}
-            fill={`${color}${resizing?.edge === 'right' ? '66' : '22'}`}
+            fill={`${color}${resizing?.edge === 'right' ? 'aa' : '66'}`}
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
@@ -445,7 +426,7 @@ export function FolderGroupRect({
             width={40}
             height={HANDLE_SIZE}
             rx={3}
-            fill={`${color}${resizing?.edge === 'bottom' ? '66' : '22'}`}
+            fill={`${color}${resizing?.edge === 'bottom' ? 'aa' : '66'}`}
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
@@ -457,7 +438,7 @@ export function FolderGroupRect({
             width={HANDLE_SIZE}
             height={HANDLE_SIZE}
             rx={3}
-            fill={`${color}${resizing?.edge === 'corner' ? '66' : '22'}`}
+            fill={`${color}${resizing?.edge === 'corner' ? 'aa' : '66'}`}
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
