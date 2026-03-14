@@ -58,7 +58,7 @@ interface FolderGroupProps {
 
 const FOLDER_PADDING = 30;
 const HEADER_HEIGHT = 64;
-const TERMINAL = '#22ab94';
+const SOUL_BLUE = '#002f6c';
 const HANDLE_SIZE = 14;
 
 // ── Shared bounds calculation ──
@@ -229,7 +229,7 @@ export function FolderGroupRect({
 
   if (!bounds) return null;
 
-  const color = folder.color || TERMINAL;
+  const color = folder.type === 'party' ? SOUL_BLUE : (folder.color || SOUL_BLUE);
   const collapsed = !!folder.collapsed;
   const labelFontSize = 20;
   const countFontSize = 14;
@@ -284,7 +284,8 @@ export function FolderGroupRect({
         height={HEADER_HEIGHT}
         rx={8}
         ry={8}
-        fill={`${color}${collapsed ? '60' : '40'}`}
+        fill={color}
+        fillOpacity={1}
         style={{ cursor: 'grab', pointerEvents: 'auto' }}
         onMouseDown={handleHeaderDrag}
       />
@@ -536,7 +537,7 @@ export default function FolderGroup({
   const topFraction = (btnSvgY - viewBox.y) / viewBox.height;
 
   const folderChars = characters.filter(c => folder.nodeIds.includes(c.id));
-  const color = folder.color || TERMINAL;
+  const color = folder.type === 'party' ? SOUL_BLUE : (folder.color || SOUL_BLUE);
 
   return (
     <div

@@ -880,9 +880,8 @@ export default function RelationsCanvas({
           const LINE_GAP = 20; // gap between folder bottom and KRMA line
 
           if (folder.type === 'party') {
-            // Compute the folder's actual visual bottom edge
-            // Must match FolderGroup's calcContentBounds + getDisplayBounds logic
             const curExpanded = expandedNodesRef.current;
+            const HEADER_HEIGHT = 64;
             let minY = Infinity, maxBottom = -Infinity;
             for (const nodeId of folder.nodeIds) {
               const pos = curPositions.get(nodeId);
@@ -894,12 +893,16 @@ export default function RelationsCanvas({
               maxBottom = Math.max(maxBottom, pos.y + bottomH);
             }
             if (maxBottom > -Infinity) {
-              const HEADER_HEIGHT = 64;
               const contentTop = minY - FOLDER_PADDING - HEADER_HEIGHT;
-              const contentMinH = (maxBottom - minY) + FOLDER_PADDING * 2 + HEADER_HEIGHT;
-              const displayH = Math.max(contentMinH, folder.userHeight || 0);
-              const folderVisualBottom = contentTop + displayH;
-              // folderVisualBottom + dy must stay ≤ -LINE_GAP
+              let folderVisualBottom: number;
+              if (folder.collapsed) {
+                // Collapsed: just the header bar
+                folderVisualBottom = contentTop + HEADER_HEIGHT;
+              } else {
+                const contentMinH = (maxBottom - minY) + FOLDER_PADDING * 2 + HEADER_HEIGHT;
+                const displayH = Math.max(contentMinH, folder.userHeight || 0);
+                folderVisualBottom = contentTop + displayH;
+              }
               const maxDy = -LINE_GAP - folderVisualBottom;
               if (dy > maxDy) dy = maxDy;
             }
@@ -1944,8 +1947,40 @@ export default function RelationsCanvas({
                 window.dispatchEvent(new CustomEvent('folder-actions-toggle', { detail: { folderId } }));
               }}
               onToggleCollapsed={(folderId) => {
-                const updated = folders.map(f =>
-                  f.id === folderId ? { ...f, collapsed: !f.collapsed } : f
+                const f = folders.find(ff => ff.id === folderId);
+                // When expanding a party folder, push nodes up if expanded size would cross KRMA line
+                if (f && f.type === 'party' && f.collapsed) {
+                  const FOLDER_PADDING = 30;
+                  const HEADER_HEIGHT = 64;
+                  const LINE_GAP = 20;
+                  let minY = Infinity, maxBottom = -Infinity;
+                  for (const nodeId of f.nodeIds) {
+                    const pos = nodePositions.get(nodeId);
+                    if (!pos) continue;
+                    const isExp = expandedNodes.has(nodeId);
+                    minY = Math.min(minY, pos.y - (isExp ? 250 : 120));
+                    maxBottom = Math.max(maxBottom, pos.y + (isExp ? 480 : 120));
+                  }
+                  if (maxBottom > -Infinity) {
+                    const contentTop = minY - FOLDER_PADDING - HEADER_HEIGHT;
+                    const contentMinH = (maxBottom - minY) + FOLDER_PADDING * 2 + HEADER_HEIGHT;
+                    const displayH = Math.max(contentMinH, f.userHeight || 0);
+                    const folderBottom = contentTop + displayH;
+                    if (folderBottom > -LINE_GAP) {
+                      const pushUp = folderBottom + LINE_GAP;
+                      setNodePositions(prev => {
+                        const next = new Map(prev);
+                        for (const nodeId of f.nodeIds) {
+                          const pos = prev.get(nodeId);
+                          if (pos) next.set(nodeId, { x: pos.x, y: pos.y - pushUp });
+                        }
+                        return next;
+                      });
+                    }
+                  }
+                }
+                const updated = folders.map(ff =>
+                  ff.id === folderId ? { ...ff, collapsed: !ff.collapsed } : ff
                 );
                 onFoldersChange?.(updated);
               }}
