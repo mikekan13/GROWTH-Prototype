@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import GrowthLogo from './GrowthLogo';
@@ -12,9 +13,53 @@ interface DashboardShellProps {
   children: React.ReactNode;
 }
 
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+const VIEW_ROLES = [
+  { key: 'ADMIN', label: 'Admin', color: 'var(--accent-teal)' },
+  { key: 'WATCHER', label: 'Watcher', color: 'var(--accent-gold)' },
+  { key: 'TRAILBLAZER', label: 'Trailblazer', color: 'var(--pillar-spirit)' },
+] as const;
+
 export default function DashboardShell({ username, role, children }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const isAdmin = role === 'ADMIN';
+  const [viewAs, setViewAs] = useState<string | null>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+
+  // Read view_as_role cookie on mount
+  useEffect(() => {
+    if (isAdmin) {
+      const cookie = getCookie('view_as_role');
+      if (cookie && cookie !== 'ADMIN') setViewAs(cookie);
+    }
+  }, [isAdmin]);
+
+  const effectiveRole = (isAdmin && viewAs) ? viewAs : role;
+
+  const handleViewAs = useCallback(async (targetRole: string) => {
+    const clearMode = targetRole === 'ADMIN';
+    await fetch('/api/auth/view-as', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: clearMode ? null : targetRole }),
+    });
+    setViewAs(clearMode ? null : targetRole);
+    setSwitcherOpen(false);
+
+    // Navigate to the target role's dashboard
+    const dashPaths: Record<string, string> = {
+      TRAILBLAZER: '/trailblazer',
+      WATCHER: '/watcher',
+      ADMIN: '/terminal',
+    };
+    router.push(dashPaths[targetRole] || '/terminal');
+    router.refresh();
+  }, [router]);
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -27,14 +72,14 @@ export default function DashboardShell({ username, role, children }: DashboardSh
     WATCHER: 'Watcher Console',
     GODHEAD: 'Terminal Admin',
     ADMIN: 'Terminal Admin',
-  }[role] || 'Dashboard';
+  }[effectiveRole] || 'Dashboard';
 
   const roleColor = {
     TRAILBLAZER: 'var(--pillar-spirit)',
     WATCHER: 'var(--accent-gold)',
     GODHEAD: 'var(--accent-teal)',
     ADMIN: 'var(--accent-teal)',
-  }[role] || 'var(--accent-teal)';
+  }[effectiveRole] || 'var(--accent-teal)';
 
   // Role-specific dashboard path
   const dashboardPath = {
@@ -42,14 +87,14 @@ export default function DashboardShell({ username, role, children }: DashboardSh
     WATCHER: '/watcher',
     GODHEAD: '/terminal',
     ADMIN: '/terminal',
-  }[role] || '/trailblazer';
+  }[effectiveRole] || '/trailblazer';
 
   const dashboardLabel = {
     TRAILBLAZER: 'Portal',
     WATCHER: 'Console',
     GODHEAD: 'Terminal',
     ADMIN: 'Terminal',
-  }[role] || 'Dashboard';
+  }[effectiveRole] || 'Dashboard';
 
   // Build nav items based on role
   const navItems: { href: string; label: React.ReactNode; key: string }[] = [
@@ -66,6 +111,27 @@ export default function DashboardShell({ username, role, children }: DashboardSh
 
   return (
     <div className="h-screen bg-black relative overflow-x-clip flex flex-col">
+      {/* View-As indicator banner */}
+      {isAdmin && viewAs && (
+        <div
+          className="shrink-0 flex items-center justify-center gap-3 py-1 text-[9px] uppercase tracking-[0.25em] font-[family-name:var(--font-terminal)]"
+          style={{
+            background: 'linear-gradient(90deg, rgba(208,168,48,0.15), rgba(208,168,48,0.25), rgba(208,168,48,0.15))',
+            borderBottom: '1px solid rgba(208,168,48,0.3)',
+            color: 'var(--accent-gold)',
+          }}
+        >
+          <span style={{ fontSize: '8px' }}>{'\u26A0'}</span>
+          Viewing as {viewAs}
+          <button
+            onClick={() => handleViewAs('ADMIN')}
+            className="px-2 py-0.5 border text-[8px] tracking-[0.15em] transition-colors hover:bg-white/10"
+            style={{ borderColor: 'rgba(208,168,48,0.4)', color: 'var(--accent-gold)' }}
+          >
+            Exit
+          </button>
+        </div>
+      )}
       {/* Blocky colored accents — positioned relative to content column via calc */}
       {/* Left gutter blocks — anchored to left edge of content (50% - 28rem) */}
       <div className="fixed top-[80px] z-0" style={{ left: 'calc(50% - 34rem)', width: '120px', height: '80px', background: 'rgba(247,82,95,0.10)' }} />
@@ -126,6 +192,57 @@ export default function DashboardShell({ username, role, children }: DashboardSh
                 <GlitchText text="[PATTERN RECOGNITION: Active]" className="text-white/20" />
               </span>
             </div>
+            {/* Admin View-As Switcher */}
+            {isAdmin && (
+              <div className="relative ml-2">
+                <button
+                  onClick={() => setSwitcherOpen(!switcherOpen)}
+                  className="flex items-center gap-1.5 px-2 py-1 border text-[8px] uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] transition-all"
+                  style={{
+                    borderColor: viewAs ? 'rgba(208,168,48,0.6)' : 'rgba(45,184,160,0.3)',
+                    color: viewAs ? 'var(--accent-gold)' : 'rgba(45,184,160,0.5)',
+                    background: viewAs ? 'rgba(208,168,48,0.08)' : 'transparent',
+                  }}
+                >
+                  <span style={{ fontSize: '10px' }}>{viewAs ? '\u25C9' : '\u25CE'}</span>
+                  {viewAs ? `Viewing: ${viewAs}` : 'View As'}
+                  <span style={{ fontSize: '7px', marginLeft: '2px' }}>{switcherOpen ? '\u25B4' : '\u25BE'}</span>
+                </button>
+                {switcherOpen && (
+                  <>
+                  <div className="fixed inset-0 z-[99]" onClick={() => setSwitcherOpen(false)} />
+                  <div
+                    className="absolute top-full left-0 mt-1 z-[100] border bg-[#0a0a0a] min-w-[140px]"
+                    style={{ borderColor: 'rgba(45,184,160,0.3)' }}
+                  >
+                    {VIEW_ROLES.map(vr => {
+                      const isActive = (viewAs === vr.key) || (!viewAs && vr.key === 'ADMIN');
+                      return (
+                        <button
+                          key={vr.key}
+                          onClick={() => handleViewAs(vr.key)}
+                          className="w-full text-left px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] transition-colors flex items-center gap-2"
+                          style={{
+                            color: isActive ? vr.color : 'rgba(255,255,255,0.4)',
+                            background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'rgba(255,255,255,0.05)' : 'transparent'; }}
+                        >
+                          <span style={{ color: vr.color, fontSize: '6px' }}>{isActive ? '\u25A0' : '\u25A1'}</span>
+                          {vr.label}
+                        </button>
+                      );
+                    })}
+                    <div className="border-t mx-2 my-0.5" style={{ borderColor: 'rgba(45,184,160,0.15)' }} />
+                    <div className="px-3 py-1 text-[7px] font-[family-name:var(--font-terminal)] text-white/20 tracking-wider">
+                      ADMIN PERSPECTIVE SHIFT
+                    </div>
+                  </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Center: Navigation */}
