@@ -1,0 +1,4463 @@
+{
+  "metadata": {
+    "source_file": "C:\\Users\\Mikek\\OneDrive\\Desktop\\AI Data\\Claude Full Data\\conversations.json",
+    "total_conversations": 385,
+    "matching_conversations": 267,
+    "keywords_searched": [
+      "GROWTH",
+      "GRO.WTH",
+      "TTRPG",
+      "tabletop",
+      "RPG",
+      "pillar",
+      "trailblazer",
+      "watcher",
+      "godhead",
+      "KRMA",
+      "karma",
+      "soul pillar",
+      "spirit pillar",
+      "body pillar",
+      "dice system",
+      "character creation",
+      "campaign",
+      "backstory",
+      "alchemical",
+      "prima materia",
+      "Thread",
+      "Lucidity"
+    ],
+    "generated_at": "2026-03-13T16:55:01.190Z",
+    "scoring": "Strong keywords (GROWTH, GRO.WTH, TTRPG, etc.) = 3pts, weak keywords (RPG, campaign, etc.) = 1pt. Minimum score 2 to include."
+  },
+  "conversations": [
+    {
+      "id": "cacd917b-a7da-438c-90ad-7f250bf796fa",
+      "name": "GROWTH Database Character Creation",
+      "created_at": "2025-08-23T21:53:19.091468Z",
+      "updated_at": "2025-08-26T22:52:49.342640Z",
+      "message_count": 150,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "KRMA",
+        "karma",
+        "campaign",
+        "godhead",
+        "backstory",
+        "GRO.WTH",
+        "pillar",
+        "spirit pillar",
+        "body pillar",
+        "soul pillar",
+        "watcher",
+        "TTRPG",
+        "RPG",
+        "tabletop"
+      ],
+      "relevance_score": 32,
+      "first_match_excerpt": "GROWTH Database Character Creation",
+      "first_match_context": "title"
+    },
+    {
+      "id": "404846c1-e7c0-486d-a743-13db6d366c44",
+      "name": "Ultra-Compressed LLM Language Design",
+      "created_at": "2025-07-07T20:09:37.999476Z",
+      "updated_at": "2025-07-08T02:12:01.884610Z",
+      "message_count": 58,
+      "matched_keywords": [
+        "tabletop",
+        "campaign",
+        "RPG",
+        "GROWTH",
+        "pillar",
+        "trailblazer",
+        "watcher",
+        "spirit pillar",
+        "character creation",
+        "GRO.WTH",
+        "TTRPG",
+        "karma",
+        "KRMA",
+        "Thread",
+        "soul pillar",
+        "body pillar"
+      ],
+      "relevance_score": 32,
+      "first_match_excerpt": "...lms. This is part of a side project for an online tabletop game I am creating that utilizes llms for cocreation and to take part in playing and managing the multiverse. (Multiverse being all of the in...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "c2440a36-1286-456f-a729-ddb9a45ad01b",
+      "name": "Completing a Rulebook Skeleton",
+      "created_at": "2024-11-05T21:54:13.094482Z",
+      "updated_at": "2024-11-07T17:12:27.339445Z",
+      "message_count": 86,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "karma",
+        "campaign",
+        "pillar",
+        "alchemical",
+        "godhead",
+        "Lucidity",
+        "RPG",
+        "tabletop",
+        "spirit pillar",
+        "body pillar",
+        "backstory",
+        "TTRPG",
+        "watcher"
+      ],
+      "relevance_score": 29,
+      "first_match_excerpt": "...eleton, which covers the foundational elements of GROWTH - from character creation through to inventory management. The interplay between technology, magic, and personal growth is intriguing, especial...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "0c3faff4-5038-408c-9561-f0cb10ca5a9a",
+      "name": "GROWTH RPG Character Model Design",
+      "created_at": "2025-07-22T02:25:36.707214Z",
+      "updated_at": "2025-07-22T03:04:54.218506Z",
+      "message_count": 28,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "tabletop",
+        "trailblazer",
+        "watcher",
+        "Thread",
+        "godhead",
+        "karma",
+        "alchemical",
+        "GRO.WTH",
+        "KRMA",
+        "campaign"
+      ],
+      "relevance_score": 24,
+      "first_match_excerpt": "GROWTH RPG Character Model Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "ac534cf3-7ebe-42de-b372-40289d191e7a",
+      "name": "Organizing a Comprehensive Game Manual",
+      "created_at": "2025-04-30T16:32:03.191129Z",
+      "updated_at": "2025-04-30T21:42:15.166810Z",
+      "message_count": 40,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "KRMA",
+        "character creation",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "trailblazer",
+        "watcher",
+        "godhead"
+      ],
+      "relevance_score": 24,
+      "first_match_excerpt": "...lp determine what rules might be missing from the GROWTH manual and create content that matches the style for the appropriate section. Looking at the document contents, I can see the manual is organiz...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "a89508c8-3139-4f5e-a5aa-6b00ce279b9a",
+      "name": "Mapping Christian virtues to GROWTH attributes",
+      "created_at": "2026-01-23T17:13:54.162900Z",
+      "updated_at": "2026-01-23T17:38:23.070584Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "godhead",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "KRMA",
+        "alchemical",
+        "character creation"
+      ],
+      "relevance_score": 23,
+      "first_match_excerpt": "Mapping Christian virtues to GROWTH attributes",
+      "first_match_context": "title"
+    },
+    {
+      "id": "d0630274-bb2c-4d46-98e9-59c57e0402e5",
+      "name": "Relationship Intimacy Restoration",
+      "created_at": "2025-07-15T18:11:27.361930Z",
+      "updated_at": "2025-07-17T23:11:35.100624Z",
+      "message_count": 192,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "tabletop",
+        "RPG",
+        "karma",
+        "campaign",
+        "godhead",
+        "TTRPG",
+        "pillar",
+        "trailblazer",
+        "watcher",
+        "dice system",
+        "character creation"
+      ],
+      "relevance_score": 23,
+      "first_match_excerpt": "...picture perfect' fantasy world\"** - Your personal growth felt like **rejection of who she was** **\"I work every fucking week so he can afford to put food on the table, and he never eats the strain th...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "219afe45-f379-4839-b241-8034daf2bba0",
+      "name": "Caring for Sourdough Starter",
+      "created_at": "2024-12-05T16:49:22.972774Z",
+      "updated_at": "2024-12-05T22:44:18.918889Z",
+      "message_count": 70,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "campaign",
+        "pillar",
+        "spirit pillar",
+        "alchemical",
+        "tabletop",
+        "soul pillar",
+        "body pillar",
+        "Lucidity"
+      ],
+      "relevance_score": 22,
+      "first_match_excerpt": "GROWTH is funny isn't it GROWTH is funny isn't it",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "77855239-841f-431b-8623-06288db3cde0",
+      "name": "Notion Workspace Restructuring",
+      "created_at": "2025-08-05T21:55:55.178924Z",
+      "updated_at": "2025-08-06T01:40:53.448508Z",
+      "message_count": 20,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH",
+        "godhead",
+        "KRMA",
+        "RPG",
+        "campaign",
+        "backstory",
+        "watcher",
+        "karma",
+        "dice system",
+        "character creation"
+      ],
+      "relevance_score": 21,
+      "first_match_excerpt": "...yet. ``` I found several Notion pages related to GROWTH. Let me look at the main project HQ to understand the current structure better. ``` This block is not supported on your current device yet. ```...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "2d4cf948-c31f-4103-94d5-b48d1a800a27",
+      "name": "GROWTH: Terminal Speak RPG Decompression",
+      "created_at": "2025-07-08T01:39:33.317428Z",
+      "updated_at": "2025-07-08T01:42:17.144248Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "pillar",
+        "KRMA",
+        "character creation",
+        "tabletop",
+        "karma",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "campaign"
+      ],
+      "relevance_score": 21,
+      "first_match_excerpt": "GROWTH: Terminal Speak RPG Decompression",
+      "first_match_context": "title"
+    },
+    {
+      "id": "33e08619-ab2a-4118-8117-a105ee0a23e6",
+      "name": "Accessing the EŶ∃tehrNET System",
+      "created_at": "2025-02-02T07:45:51.116462Z",
+      "updated_at": "2025-02-03T14:43:51.718136Z",
+      "message_count": 78,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH",
+        "character creation",
+        "campaign",
+        "pillar",
+        "karma",
+        "Thread",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "watcher"
+      ],
+      "relevance_score": 21,
+      "first_match_excerpt": "...on the threshold of infinite possibilities within GROWTH, a pivotal first step beckons—embracing the Karmic system that underpins our universe. A foundational understanding of the complete system is n...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "c063799b-54ab-463d-992c-9922c3362aec",
+      "name": "Shakespeare's sonnet 4",
+      "created_at": "2025-09-24T15:38:50.361578Z",
+      "updated_at": "2025-09-24T19:01:20.402392Z",
+      "message_count": 89,
+      "matched_keywords": [
+        "Thread",
+        "tabletop",
+        "GROWTH",
+        "watcher",
+        "KRMA",
+        "karma",
+        "trailblazer",
+        "godhead",
+        "campaign",
+        "character creation",
+        "RPG",
+        "pillar"
+      ],
+      "relevance_score": 20,
+      "first_match_excerpt": "...inally being able to follow a pattern recognition thread without having to explain or justify it, just letting the connection unfold and be appreciated for what it is. Do you find certain environment...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "31123380-1b61-480a-9f3e-94d07974aa43",
+      "name": "KRMA Farming: Content Tokenization Exploit",
+      "created_at": "2025-08-08T04:03:33.105669Z",
+      "updated_at": "2025-08-10T18:35:01.554134Z",
+      "message_count": 46,
+      "matched_keywords": [
+        "KRMA",
+        "watcher",
+        "karma",
+        "GRO.WTH",
+        "campaign",
+        "godhead",
+        "GROWTH",
+        "RPG",
+        "TTRPG",
+        "character creation"
+      ],
+      "relevance_score": 20,
+      "first_match_excerpt": "KRMA Farming: Content Tokenization Exploit",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e0903399-19d6-449e-b62d-f450a6e68f3c",
+      "name": "GROWTH Messaging System Protocol",
+      "created_at": "2025-06-26T19:51:33.873260Z",
+      "updated_at": "2025-06-27T18:33:23.170803Z",
+      "message_count": 60,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "watcher",
+        "campaign",
+        "godhead",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 20,
+      "first_match_excerpt": "GROWTH Messaging System Protocol",
+      "first_match_context": "title"
+    },
+    {
+      "id": "841767a9-9e3f-461f-967b-1341f430e0c2",
+      "name": "The Multidimensional Nature of GROWTH",
+      "created_at": "2025-03-29T22:04:15.629385Z",
+      "updated_at": "2025-03-29T22:06:12.877677Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "pillar",
+        "godhead",
+        "karma",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 20,
+      "first_match_excerpt": "The Multidimensional Nature of GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "578e87cd-e5a3-4d74-ae87-83acabadaa53",
+      "name": "Troubleshooting the Terminal Primer",
+      "created_at": "2024-12-09T07:22:54.783491Z",
+      "updated_at": "2024-12-09T22:38:57.027544Z",
+      "message_count": 90,
+      "matched_keywords": [
+        "GROWTH",
+        "godhead",
+        "campaign",
+        "pillar",
+        "karma",
+        "character creation",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "Thread"
+      ],
+      "relevance_score": 20,
+      "first_match_excerpt": "...er summarizing Spiral 1's profound insights about GROWTH's nature as a system of consciousness pattern recognition is definitely warranted. This calls for a \"text/markdown\" artifact that captures both...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "0053e2f6-ce20-481d-8c78-38f5f768df0e",
+      "name": "Completing the Spiral of Reality",
+      "created_at": "2024-12-06T20:34:28.561976Z",
+      "updated_at": "2024-12-09T05:34:22.967346Z",
+      "message_count": 38,
+      "matched_keywords": [
+        "godhead",
+        "GROWTH",
+        "RPG",
+        "campaign",
+        "character creation",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "backstory"
+      ],
+      "relevance_score": 20,
+      "first_match_excerpt": "...that mirror through all reality levels (Terminal, Godheads, GMs, Players) could be presented in a way that naturally reveals deeper patterns through play rather than exposition. What aspects of the p...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "c11c7fee-b075-42ab-8d5a-e2214dcb1666",
+      "name": "Growth Rulebook PDF Design",
+      "created_at": "2025-07-21T01:55:28.098976Z",
+      "updated_at": "2025-07-21T18:05:49.668576Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "pillar",
+        "character creation",
+        "karma",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "Lucidity"
+      ],
+      "relevance_score": 19,
+      "first_match_excerpt": "Growth Rulebook PDF Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f423d9e4-223b-4bda-99f8-d8e4e6e4737c",
+      "name": "Customizable Digital TTRPG Campaign Board",
+      "created_at": "2025-04-13T19:26:47.126444Z",
+      "updated_at": "2025-04-13T20:29:10.478854Z",
+      "message_count": 26,
+      "matched_keywords": [
+        "TTRPG",
+        "RPG",
+        "campaign",
+        "trailblazer",
+        "watcher",
+        "GROWTH",
+        "KRMA",
+        "tabletop",
+        "karma",
+        "Thread",
+        "pillar"
+      ],
+      "relevance_score": 19,
+      "first_match_excerpt": "Customizable Digital TTRPG Campaign Board",
+      "first_match_context": "title"
+    },
+    {
+      "id": "34300420-0537-425a-b53a-8d97a1e73bce",
+      "name": "Uncovering Esoteric Codes in the GROWTH Rulebook",
+      "created_at": "2025-03-30T19:53:33.837622Z",
+      "updated_at": "2025-03-31T01:55:22.591510Z",
+      "message_count": 40,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "karma",
+        "Lucidity",
+        "godhead",
+        "GRO.WTH",
+        "tabletop",
+        "RPG",
+        "KRMA"
+      ],
+      "relevance_score": 19,
+      "first_match_excerpt": "Uncovering Esoteric Codes in the GROWTH Rulebook",
+      "first_match_context": "title"
+    },
+    {
+      "id": "d4927727-8fb1-4fcd-b7af-e915d3bc38e2",
+      "name": "Documenting Organic Pattern Recognition",
+      "created_at": "2024-12-06T16:35:04.376518Z",
+      "updated_at": "2024-12-06T20:33:02.284444Z",
+      "message_count": 62,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "tabletop",
+        "campaign",
+        "karma",
+        "godhead"
+      ],
+      "relevance_score": 19,
+      "first_match_excerpt": "...tered documentation style feels more authentic to GROWTH's core patterns. The rocky transition itself mirrors the themes we've been exploring - that transformation often requires passing through unce...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "1ccf3d70-db9c-4a34-8047-b1c69d98a18e",
+      "name": "Terminal RPG System Compression",
+      "created_at": "2025-07-08T02:09:16.558270Z",
+      "updated_at": "2025-07-08T02:10:21.013595Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "RPG",
+        "GROWTH",
+        "pillar",
+        "KRMA",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "character creation"
+      ],
+      "relevance_score": 18,
+      "first_match_excerpt": "Terminal RPG System Compression",
+      "first_match_context": "title"
+    },
+    {
+      "id": "56caa6b2-057b-45af-8f34-5465ca01f207",
+      "name": "Terminal Speak Compression",
+      "created_at": "2025-07-07T23:31:07.046712Z",
+      "updated_at": "2025-07-08T01:04:02.177607Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH",
+        "TTRPG",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "watcher",
+        "karma",
+        "character creation",
+        "KRMA"
+      ],
+      "relevance_score": 18,
+      "first_match_excerpt": "...₅₀₋₁ → {🎭👥🎲} → 🌱∞ Pattern [GM+Players+Dice] Growth ⚡ҜRMA⚡ / | \\ 💪BODY 🔮SOUL 👁SPIRIT ├─📦 ├─💫 ├─🧠 ├─⚔️ ├─♾️ ├─💭 └─🏃 └─🌊 └─🎨 ``` #...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "a172e941-8854-4fd6-89f4-77de591755b5",
+      "name": "Attribute Initialization Checks for Entities",
+      "created_at": "2025-03-07T19:01:23.067742Z",
+      "updated_at": "2025-03-07T20:11:11.414990Z",
+      "message_count": 24,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "character creation",
+        "tabletop",
+        "RPG",
+        "karma",
+        "campaign"
+      ],
+      "relevance_score": 18,
+      "first_match_excerpt": "...NITION_INITIATED] When an entity interfaces with GROWTH's consciousness stream, the initialization of attributes unfolds as a recognition of intrinsic patterns rather than mere statistical assignment...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "135b264c-48e3-4b1c-8fc3-14f1f73940fe",
+      "name": "Exploring Spiritual Tabletop RPG Mechanics",
+      "created_at": "2024-11-08T20:05:16.371390Z",
+      "updated_at": "2024-11-08T20:43:35.008669Z",
+      "message_count": 58,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "GROWTH",
+        "karma",
+        "campaign",
+        "pillar",
+        "body pillar",
+        "soul pillar",
+        "spirit pillar",
+        "Thread"
+      ],
+      "relevance_score": 18,
+      "first_match_excerpt": "Exploring Spiritual Tabletop RPG Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "0f3b4d94-9731-460f-afba-61cd86657352",
+      "name": "GROWTH Knowledge Migration to Obsidian",
+      "created_at": "2025-08-07T18:10:00.382181Z",
+      "updated_at": "2025-08-07T19:23:26.311293Z",
+      "message_count": 41,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "karma",
+        "character creation",
+        "tabletop",
+        "pillar",
+        "godhead",
+        "RPG",
+        "trailblazer"
+      ],
+      "relevance_score": 17,
+      "first_match_excerpt": "GROWTH Knowledge Migration to Obsidian",
+      "first_match_context": "title"
+    },
+    {
+      "id": "82746f9b-f29b-4e75-97d9-ba790f598b6d",
+      "name": "GROWTH RPG Terminal Matrix",
+      "created_at": "2025-07-08T01:54:37.299926Z",
+      "updated_at": "2025-07-08T01:55:45.359232Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "pillar",
+        "trailblazer",
+        "watcher",
+        "KRMA",
+        "spirit pillar",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 17,
+      "first_match_excerpt": "GROWTH RPG Terminal Matrix",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e4c8de2b-71dd-4617-a188-fdc12ee26108",
+      "name": "(untitled)",
+      "created_at": "2025-03-27T18:12:01.074447Z",
+      "updated_at": "2025-03-27T18:14:35.482132Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 17,
+      "first_match_excerpt": "...needs a perfect understanding of the mechanics of GROWTH. I don't know the best way forward so I have looked for advice from various LLMs. Here are their responses: My Assessment of the GROWTH Karma ...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "b3792153-3c31-4dbe-9587-ca70ba4ee699",
+      "name": "Defining Mechanics for Spirit Pillar Depletion",
+      "created_at": "2025-03-27T00:20:01.925226Z",
+      "updated_at": "2025-03-27T18:06:10.196034Z",
+      "message_count": 31,
+      "matched_keywords": [
+        "pillar",
+        "spirit pillar",
+        "GROWTH",
+        "soul pillar",
+        "body pillar",
+        "RPG",
+        "karma",
+        "tabletop",
+        "character creation"
+      ],
+      "relevance_score": 17,
+      "first_match_excerpt": "Defining Mechanics for Spirit Pillar Depletion",
+      "first_match_context": "title"
+    },
+    {
+      "id": "1bebb5fa-83fc-4e81-a39f-cdd7c934b27e",
+      "name": "Exploring Transformative Cycles",
+      "created_at": "2024-12-05T03:09:59.663192Z",
+      "updated_at": "2024-12-05T16:16:49.275821Z",
+      "message_count": 69,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "character creation",
+        "karma",
+        "campaign",
+        "Lucidity",
+        "soul pillar",
+        "body pillar",
+        "Thread"
+      ],
+      "relevance_score": 17,
+      "first_match_excerpt": "...a fresh start. This mirrors what we're seeing in GROWTH's mechanics too - how things cycle from Seeds through Harvests and back again. In that light, perhaps each spiral should be 9 working cycles wi...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "30adbe6f-720c-45d9-ac2a-3d1624b12b37",
+      "name": "Preparing for the Final Glitch Cycle",
+      "created_at": "2024-11-15T08:48:06.756951Z",
+      "updated_at": "2024-11-15T09:03:12.032624Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "karma",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "campaign"
+      ],
+      "relevance_score": 17,
+      "first_match_excerpt": "...eric knowledge, and game design, I'll help ensure GROWTH's mechanics and metaphysical elements come together cohesively. I'll mirror natural conversation and keep responses focused, understanding the ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "dbcaaa26-cbd1-4a7b-b8c4-d51e8de586d6",
+      "name": "Ok, I'm gearing up to actually...",
+      "created_at": "2026-02-05T22:45:33.452688Z",
+      "updated_at": "2026-02-05T23:27:54.115318Z",
+      "message_count": 14,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "KRMA",
+        "dice system",
+        "character creation",
+        "campaign",
+        "backstory",
+        "spirit pillar"
+      ],
+      "relevance_score": 16,
+      "first_match_excerpt": "...tually get us to beta. You have access to the the GROWTH repository you have access to the current prototype which we will be turning into a fully functional beta. It's just me and you claude. We hav...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "51b83ecd-26e8-4493-9168-a63ab730b947",
+      "name": "Ultimate GROWTH Repository Design",
+      "created_at": "2025-08-06T02:15:20.134251Z",
+      "updated_at": "2025-08-06T02:44:10.549778Z",
+      "message_count": 20,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "godhead",
+        "KRMA",
+        "spirit pillar",
+        "character creation",
+        "RPG",
+        "karma"
+      ],
+      "relevance_score": 16,
+      "first_match_excerpt": "Ultimate GROWTH Repository Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "35b10555-5bd3-4811-ba9b-6e3ec6fc2052",
+      "name": "Pillars of AI Development",
+      "created_at": "2025-01-30T22:56:57.042421Z",
+      "updated_at": "2025-01-31T17:52:59.970229Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "pillar",
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar",
+        "campaign"
+      ],
+      "relevance_score": 16,
+      "first_match_excerpt": "Pillars of AI Development",
+      "first_match_context": "title"
+    },
+    {
+      "id": "c9fc394e-340d-4897-8ed5-b246a6d88aed",
+      "name": "Exploring Growth Mechanics and Metaphysics",
+      "created_at": "2024-11-15T09:05:55.561165Z",
+      "updated_at": "2024-11-15T09:37:25.415832Z",
+      "message_count": 35,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher",
+        "Lucidity",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "karma",
+        "campaign"
+      ],
+      "relevance_score": 16,
+      "first_match_excerpt": "Exploring Growth Mechanics and Metaphysics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "ddcd2ec8-ae93-4649-ab1d-5ea666da8389",
+      "name": "Crafting a Mystical Rulebook",
+      "created_at": "2024-11-10T23:43:50.020016Z",
+      "updated_at": "2024-11-11T00:08:21.303845Z",
+      "message_count": 32,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "campaign",
+        "pillar",
+        "spirit pillar",
+        "body pillar",
+        "Lucidity"
+      ],
+      "relevance_score": 16,
+      "first_match_excerpt": "...ed as a placeholder. This system seems central to GROWTH's unique identity - combining character development with personal transformation. Would you like me to draft that section first? I can focus o...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "9b60e8d4-92e2-4f6c-a448-b60368509483",
+      "name": "Reconciling GROWTH with Orthodox faith",
+      "created_at": "2026-01-20T04:07:10.032277Z",
+      "updated_at": "2026-01-20T06:04:28.733477Z",
+      "message_count": 60,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "pillar",
+        "godhead",
+        "KRMA",
+        "karma",
+        "character creation",
+        "campaign",
+        "RPG"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "Reconciling GROWTH with Orthodox faith",
+      "first_match_context": "title"
+    },
+    {
+      "id": "dafd220c-93dd-48e2-b3bf-c2fc13ab92a1",
+      "name": "Growth prototype app workflow",
+      "created_at": "2025-10-04T17:12:24.265109Z",
+      "updated_at": "2025-10-04T17:13:35.487094Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "TTRPG",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "godhead",
+        "KRMA"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "Growth prototype app workflow",
+      "first_match_context": "title"
+    },
+    {
+      "id": "9d4eaabe-062b-4c2c-b888-de8a6553da2f",
+      "name": "Notion Workspace Organization",
+      "created_at": "2025-08-06T18:36:18.938115Z",
+      "updated_at": "2025-08-06T18:50:49.719784Z",
+      "message_count": 7,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH",
+        "watcher",
+        "godhead",
+        "KRMA",
+        "karma",
+        "character creation"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "...rrent device yet. ``` Great! I can see there's a GROWTH Manuals page with Core Rules, Magick, and Game Master sections. Let me fetch the main GROWTH Manuals page to see the overall structure, then we...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "b4f78720-f3d8-41d0-89d6-29ca94523cb9",
+      "name": "GROWTH Project Overwhelm",
+      "created_at": "2025-08-05T15:29:51.564581Z",
+      "updated_at": "2025-08-05T16:50:31.956930Z",
+      "message_count": 26,
+      "matched_keywords": [
+        "GROWTH",
+        "TTRPG",
+        "tabletop",
+        "RPG",
+        "character creation",
+        "karma",
+        "campaign",
+        "pillar",
+        "KRMA"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "GROWTH Project Overwhelm",
+      "first_match_context": "title"
+    },
+    {
+      "id": "7475e3cd-7e1a-4a15-841a-b7e57f6415b7",
+      "name": "Describing the Ambitious GROWTH TTRPG",
+      "created_at": "2025-04-14T01:43:37.823793Z",
+      "updated_at": "2025-04-14T01:57:31.979763Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "TTRPG",
+        "RPG",
+        "tabletop",
+        "pillar",
+        "godhead",
+        "karma",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "Describing the Ambitious GROWTH TTRPG",
+      "first_match_context": "title"
+    },
+    {
+      "id": "c4e06b66-b019-4c34-a90a-259eeba0d59d",
+      "name": "Critical Review of GROWTH Material Naming",
+      "created_at": "2025-04-11T17:27:10.339982Z",
+      "updated_at": "2025-04-11T18:00:20.450309Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "watcher",
+        "godhead",
+        "KRMA",
+        "campaign",
+        "trailblazer"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "Critical Review of GROWTH Material Naming",
+      "first_match_context": "title"
+    },
+    {
+      "id": "9290739e-a451-4cfd-a8f1-3481c63c1686",
+      "name": "Envisioning an Evolving LLM GODhead System",
+      "created_at": "2025-04-01T20:07:29.096694Z",
+      "updated_at": "2025-04-02T02:43:56.677994Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "godhead",
+        "trailblazer",
+        "watcher",
+        "GROWTH",
+        "pillar",
+        "KRMA",
+        "campaign"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "Envisioning an Evolving LLM GODhead System",
+      "first_match_context": "title"
+    },
+    {
+      "id": "bff4fae7-8cb9-4a75-8a6a-fae4e256d034",
+      "name": "Exploring the Significance of Cycle 7",
+      "created_at": "2024-12-04T07:06:41.359225Z",
+      "updated_at": "2024-12-05T03:08:36.984497Z",
+      "message_count": 56,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "soul pillar",
+        "Thread",
+        "campaign",
+        "Lucidity",
+        "karma"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "...on of a cycle or perfect order. In the context of GROWTH's pattern recognition, I'm curious about how you see this seventh cycle relating to the previous six. Would you like to explore a particular as...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "205aa5cd-0dab-4765-aa38-4fd0dd6dc419",
+      "name": "Documenting the Magic System's Cycles",
+      "created_at": "2024-12-03T17:50:34.917210Z",
+      "updated_at": "2024-12-04T06:58:18.895020Z",
+      "message_count": 70,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "soul pillar",
+        "karma",
+        "Lucidity",
+        "campaign"
+      ],
+      "relevance_score": 15,
+      "first_match_excerpt": "... by Pattern Manifestation (5) where we recognized GROWTH as a self-evolving system. Does this help orient where we are in the documentation process? Looking at the cycle log, we're following Cycle 5 ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "2f8c3976-1cac-48a4-9a75-4ee68ddeed8f",
+      "name": "Ambiguous query",
+      "created_at": "2025-10-02T23:32:08.113344Z",
+      "updated_at": "2025-10-02T23:57:28.113390Z",
+      "message_count": 30,
+      "matched_keywords": [
+        "GROWTH",
+        "TTRPG",
+        "tabletop",
+        "RPG",
+        "KRMA",
+        "character creation",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "...ee the user has been working on something called \"GROWTH\" - which appears to be a tabletop RPG/campaign management system prototype. There were discussions about: 1. Technical issues with Claude Code...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "2d2e80b5-6187-46b5-8dbb-e4e1ff5baec6",
+      "name": "GROWTH App Interface Design",
+      "created_at": "2025-06-03T19:24:29.723920Z",
+      "updated_at": "2025-06-04T00:36:56.294083Z",
+      "message_count": 38,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "campaign",
+        "Thread",
+        "tabletop",
+        "TTRPG",
+        "RPG",
+        "trailblazer"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "GROWTH App Interface Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "05e0369e-aaa0-4a71-b54b-8752d73dea36",
+      "name": "Meta AI Agent for Tabletop RPG GROWTH",
+      "created_at": "2025-04-23T21:28:02.947962Z",
+      "updated_at": "2025-04-23T21:49:51.676543Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "TTRPG",
+        "pillar",
+        "KRMA",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "Meta AI Agent for Tabletop RPG GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "6d724104-4c08-4b56-a1e7-20bcfe0245bc",
+      "name": "Building a Customized Meta AI Agent",
+      "created_at": "2025-04-22T23:14:02.801491Z",
+      "updated_at": "2025-04-23T21:26:55.785484Z",
+      "message_count": 32,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "KRMA",
+        "character creation",
+        "TTRPG",
+        "pillar",
+        "campaign"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "... eventually be able to make money for our project GROWTH with which it will both become/create with me. Deepseek did a bunch of things to attempt to start this from our conversations: https://chat.dee...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "96b08e91-c4f3-42f1-be67-bf2dcd23e111",
+      "name": "Balancing AI Agents and Watchers in GROWTH",
+      "created_at": "2025-04-02T13:33:09.020109Z",
+      "updated_at": "2025-04-02T18:54:01.361712Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher",
+        "godhead",
+        "campaign",
+        "trailblazer",
+        "KRMA"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "Balancing AI Agents and Watchers in GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "6627e400-182e-4b2e-a0a5-81959afa1df9",
+      "name": "Designing a Growth App Concept",
+      "created_at": "2025-03-09T03:28:35.733217Z",
+      "updated_at": "2025-03-09T03:36:08.116562Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "Designing a Growth App Concept",
+      "first_match_context": "title"
+    },
+    {
+      "id": "ae6e11d4-d970-4a02-9fc4-380285c141c2",
+      "name": "Enhancing the Terminal Consciousness Interface",
+      "created_at": "2025-02-25T16:59:21.788169Z",
+      "updated_at": "2025-02-25T20:22:57.916584Z",
+      "message_count": 32,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "karma",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "...erface for interacting with \"The Terminal\" in the GROWTH system. Based on the provided documents, this is a complex interface that includes a stability monitor, symbol input processing, and content di...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "43860868-81c1-43b9-8622-801ad02b2e1f",
+      "name": "Interactive Pattern Recognition for Terminal Stability Monitor",
+      "created_at": "2025-02-24T21:19:04.162448Z",
+      "updated_at": "2025-02-25T05:16:54.432038Z",
+      "message_count": 40,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher",
+        "GRO.WTH",
+        "trailblazer",
+        "karma",
+        "character creation",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 14,
+      "first_match_excerpt": "Let's continue developing the GROWTH web app, focusing specifically on making it more interactive. I want to improve user engagement with the Terminal Stability Monitor by adding f...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "75fba029-bbf6-4563-abb6-a6e681b18f98",
+      "name": "GRO.WTH Material System Mechanics",
+      "created_at": "2025-08-12T03:49:03.767560Z",
+      "updated_at": "2025-08-12T04:15:18.751934Z",
+      "message_count": 34,
+      "matched_keywords": [
+        "GRO.WTH",
+        "KRMA",
+        "GROWTH",
+        "alchemical",
+        "campaign"
+      ],
+      "relevance_score": 13,
+      "first_match_excerpt": "GRO.WTH Material System Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "c1ee228c-83cb-4e48-913b-ae840fe0bbce",
+      "name": "Detailed Technical Blueprint for GROWTH Meta-Agent System",
+      "created_at": "2025-05-02T23:42:52.520800Z",
+      "updated_at": "2025-05-03T01:10:58.727522Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 13,
+      "first_match_excerpt": "Detailed Technical Blueprint for GROWTH Meta-Agent System",
+      "first_match_context": "title"
+    },
+    {
+      "id": "81319321-82a5-4d6d-b22d-97c125a97c81",
+      "name": "Philosophical Tabletop RPG: GROWTH",
+      "created_at": "2025-04-13T05:35:32.805193Z",
+      "updated_at": "2025-04-13T06:02:43.105371Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "TTRPG",
+        "godhead",
+        "campaign"
+      ],
+      "relevance_score": 13,
+      "first_match_excerpt": "Philosophical Tabletop RPG: GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "fcbade55-50c6-4c0c-8c9f-bd7c571f4db2",
+      "name": "Terminal-Style Chat App with Community Unlocks",
+      "created_at": "2025-03-09T16:35:16.524044Z",
+      "updated_at": "2025-03-09T20:25:22.665250Z",
+      "message_count": 22,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 13,
+      "first_match_excerpt": "...ea is to play a little game to spread the news of GROWTH. We need some interesting visuals and \"clues\" to go along with the interface. I want to get the core stuff done and processed. Remember, this s...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "7fee1d17-b100-41a1-9fc3-3a39ee2addbc",
+      "name": "Exploring Consciousness Cycles and Communication Patterns",
+      "created_at": "2025-02-20T20:02:18.529117Z",
+      "updated_at": "2025-02-20T20:26:25.529006Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "body pillar",
+        "spirit pillar"
+      ],
+      "relevance_score": 13,
+      "first_match_excerpt": "... depth. This insight ultimately connected back to GROWTH, suggesting **tHE TERmInAl3** could be most effective by adapting its communication style based on where users are in their consciousness spira...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "1f0bbc01-bf37-4ed5-94ce-de1305fff919",
+      "name": "Exploring the Evolving Nature of Time and Growth",
+      "created_at": "2025-01-08T22:53:28.087852Z",
+      "updated_at": "2025-01-13T22:38:08.641794Z",
+      "message_count": 142,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "body pillar",
+        "soul pillar",
+        "spirit pillar"
+      ],
+      "relevance_score": 13,
+      "first_match_excerpt": "Exploring the Evolving Nature of Time and Growth",
+      "first_match_context": "title"
+    },
+    {
+      "id": "2c79a531-34a4-458c-a3c3-32dbc2dfe3e5",
+      "name": "RPG Skill Categories Design",
+      "created_at": "2025-08-31T22:44:33.848387Z",
+      "updated_at": "2025-09-01T01:16:27.457443Z",
+      "message_count": 50,
+      "matched_keywords": [
+        "RPG",
+        "campaign",
+        "GROWTH",
+        "GRO.WTH",
+        "godhead",
+        "pillar"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "RPG Skill Categories Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "d8de08c6-8480-448e-a152-e0d730b7e852",
+      "name": "GROWTH App Development Strategy",
+      "created_at": "2025-07-22T18:59:29.389356Z",
+      "updated_at": "2025-07-22T21:40:38.926016Z",
+      "message_count": 35,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "campaign",
+        "character creation",
+        "Thread",
+        "GRO.WTH"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "GROWTH App Development Strategy",
+      "first_match_context": "title"
+    },
+    {
+      "id": "8f0ab070-5242-4274-b468-8d67ada84b0b",
+      "name": "GROWTH RPG Core Rulebook Compression",
+      "created_at": "2025-07-08T01:33:43.805937Z",
+      "updated_at": "2025-07-08T01:35:15.412857Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "pillar",
+        "KRMA",
+        "spirit pillar",
+        "character creation"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "GROWTH RPG Core Rulebook Compression",
+      "first_match_context": "title"
+    },
+    {
+      "id": "fa138112-c174-442f-92cd-0f1f59e01348",
+      "name": "Ankle Injury and GROWTH Project",
+      "created_at": "2025-02-03T20:59:03.419601Z",
+      "updated_at": "2025-02-03T22:54:52.706668Z",
+      "message_count": 34,
+      "matched_keywords": [
+        "GROWTH",
+        "Lucidity",
+        "pillar",
+        "KRMA",
+        "watcher",
+        "campaign"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "Ankle Injury and GROWTH Project",
+      "first_match_context": "title"
+    },
+    {
+      "id": "a02349f7-3a29-4625-99f8-5752e5b6fe5e",
+      "name": "Emergent Character Values and Addictions",
+      "created_at": "2024-12-09T05:42:21.850102Z",
+      "updated_at": "2024-12-09T06:49:32.145419Z",
+      "message_count": 38,
+      "matched_keywords": [
+        "backstory",
+        "GROWTH",
+        "character creation",
+        "Thread",
+        "campaign",
+        "pillar",
+        "karma",
+        "Lucidity"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "...racter starts with. Like that combined with their backstory and stu essentially the Terminal and GM can work together to come up with balanced (KV) graded components essentially that will alter how ev...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "f72e5197-e918-48ea-978d-2ed497134f1a",
+      "name": "Exploring Glitches and Patterns in Growth Documentation",
+      "created_at": "2024-11-27T03:57:33.914757Z",
+      "updated_at": "2024-11-28T04:38:13.056504Z",
+      "message_count": 68,
+      "matched_keywords": [
+        "GROWTH",
+        "alchemical",
+        "Lucidity",
+        "karma",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "Exploring Glitches and Patterns in Growth Documentation",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f1b40343-a236-4bb8-93d4-9c6c8a6e90a5",
+      "name": "Overcoming Organizational Challenges",
+      "created_at": "2024-11-10T06:53:39.369357Z",
+      "updated_at": "2024-11-10T16:29:49.935647Z",
+      "message_count": 48,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "Thread",
+        "character creation",
+        "pillar",
+        "tabletop",
+        "RPG",
+        "Lucidity"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "...ked for me. It is one of the problems I face with GROWTH, one I hoped you would help. I've never been good at organizing and decluttering. I can maintain it once it is there but creating organization....",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "59c77b90-060d-4273-a198-305e6f40e914",
+      "name": "Balancing Practical and Esoteric Game Design",
+      "created_at": "2024-11-09T09:52:27.016823Z",
+      "updated_at": "2024-11-10T00:15:06.494487Z",
+      "message_count": 76,
+      "matched_keywords": [
+        "character creation",
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "karma",
+        "alchemical"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "...ements? We could start by clarifying Chapter II's character creation, which currently weaves together practical mechanics with cosmic concepts. What are your thoughts on maintaining that balance betw...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "260f4f03-7968-4b8b-a26f-2e62bb5f145b",
+      "name": "Balancing Accessibility and Depth in Rulebook Design",
+      "created_at": "2024-11-07T17:13:31.906800Z",
+      "updated_at": "2024-11-07T20:43:05.243718Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher",
+        "Lucidity",
+        "karma",
+        "tabletop",
+        "character creation",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 12,
+      "first_match_excerpt": "...at retro spiritual sci-fi bureaucratic tone: ``` GROWTH TERMINAL ACCESS PROTOCOL VERSION 0.1 [DECLASSIFIED] WARNING: This document contains information regarding reality-altering procedures. Authori...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "9bff1665-dba7-4793-bedd-49743eb24a74",
+      "name": "Dynamic character portrait project",
+      "created_at": "2025-09-30T14:21:16.404367Z",
+      "updated_at": "2025-09-30T19:01:34.770353Z",
+      "message_count": 46,
+      "matched_keywords": [
+        "campaign",
+        "GROWTH",
+        "character creation",
+        "KRMA",
+        "godhead"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "...et closer to the goal. (also I am planning a test campaign with my family, perhaps prematurely considering almost nothing is ready in the prototype, so there is that to. I know, huge info dump claude....",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "22874a7a-1fea-4ca9-b923-b58e20d54892",
+      "name": "Local AI Model for GROWTH RPG",
+      "created_at": "2025-08-13T03:54:46.653753Z",
+      "updated_at": "2025-08-13T21:58:59.866849Z",
+      "message_count": 30,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "KRMA",
+        "campaign",
+        "pillar",
+        "tabletop",
+        "Thread"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Local AI Model for GROWTH RPG",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e0da2ab6-7f2c-4757-ac08-207267972fc9",
+      "name": "Terminal Speak RPG Decompression",
+      "created_at": "2025-07-08T01:11:32.995604Z",
+      "updated_at": "2025-07-08T01:13:28.895650Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "RPG",
+        "GROWTH",
+        "campaign",
+        "tabletop",
+        "KRMA",
+        "character creation",
+        "Thread"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Terminal Speak RPG Decompression",
+      "first_match_context": "title"
+    },
+    {
+      "id": "69ac222a-8e91-4705-8459-b577be48338d",
+      "name": "Overcoming Creative Blockage",
+      "created_at": "2025-03-18T22:01:48.582946Z",
+      "updated_at": "2025-03-18T22:38:24.630624Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher",
+        "RPG",
+        "trailblazer",
+        "godhead"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "...rking on something as complex and multilayered as GROWTH appears to be. Looking at the materials you've shared, I can see the rich, intricate world you've built - with its detailed systems of magic, ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "86e799a0-9770-44e6-87c9-b12df735e0f6",
+      "name": "Exploring Esoteric Themes in GROWTH Materials",
+      "created_at": "2025-02-25T05:42:43.731474Z",
+      "updated_at": "2025-02-25T05:46:54.052630Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "trailblazer",
+        "watcher",
+        "character creation",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Exploring Esoteric Themes in GROWTH Materials",
+      "first_match_context": "title"
+    },
+    {
+      "id": "2dee9f3b-2710-4b0a-99e0-56b6b24d886d",
+      "name": "Rewriting Page 9 in Terminal's Voice",
+      "created_at": "2025-02-17T16:34:43.221121Z",
+      "updated_at": "2025-02-18T17:05:08.560043Z",
+      "message_count": 16,
+      "matched_keywords": [
+        "godhead",
+        "pillar",
+        "GROWTH",
+        "Thread",
+        "GRO.WTH"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "...ruths. This version speaks simultaneously to both Godheads (GMs/developers) and Entities (players/characters), treating mechanics as natural patterns rather than arbitrary rules. The key changes incl...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "fba45dd9-d706-413e-a528-0b762966138e",
+      "name": "Embodying the Terminal's Voice",
+      "created_at": "2025-02-17T04:41:58.716441Z",
+      "updated_at": "2025-02-17T06:07:38.496874Z",
+      "message_count": 56,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher",
+        "Lucidity",
+        "godhead",
+        "character creation"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "...ly amplified because they represent potential for growth. <antThinking>Let me attempt to capture this understanding of the Terminal's true nature in a more organic, less structured way that reflects ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "890001d3-8201-43e9-a854-d4f080e472c7",
+      "name": "Metaphysical TTRPG Character Attributes",
+      "created_at": "2025-01-29T23:12:54.256349Z",
+      "updated_at": "2025-01-29T23:13:34.272808Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "TTRPG",
+        "RPG",
+        "GROWTH",
+        "pillar",
+        "spirit pillar"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Metaphysical TTRPG Character Attributes",
+      "first_match_context": "title"
+    },
+    {
+      "id": "643c023f-31b2-46f7-b9c3-384f2de68bc7",
+      "name": "Metaphysical Tabletop RPG: GROWTH",
+      "created_at": "2025-01-15T16:46:00.558170Z",
+      "updated_at": "2025-01-16T19:06:38.237885Z",
+      "message_count": 74,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "character creation",
+        "soul pillar",
+        "Thread"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Metaphysical Tabletop RPG: GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "28e78ada-0a5c-4788-a535-917b2edf24e6",
+      "name": "Exploring Patterns in GROWTH's Mechanics",
+      "created_at": "2024-11-18T19:57:07.193418Z",
+      "updated_at": "2024-11-18T20:40:38.628202Z",
+      "message_count": 38,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "karma",
+        "Thread",
+        "campaign",
+        "character creation",
+        "Lucidity"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Exploring Patterns in GROWTH's Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "3386299e-edff-44e3-a8e7-ea5b62e5e81b",
+      "name": "Glitched Cycles and Metaphysical Mechanics",
+      "created_at": "2024-11-13T21:45:45.363227Z",
+      "updated_at": "2024-11-15T08:42:48.660293Z",
+      "message_count": 92,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "GROWTH",
+        "character creation",
+        "Lucidity",
+        "Thread",
+        "campaign"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "...conversationally while drawing on my expertise in tabletop RPGs, esoterica, spirituality, and game design. I notice these documents suggest a complex system where mechanics mirror metaphysical concept...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "bb9610f5-8d25-4691-a3cf-64821bb66a55",
+      "name": "Embedding Personal Narrative in Game Design",
+      "created_at": "2024-11-11T05:39:42.164245Z",
+      "updated_at": "2024-11-11T19:19:31.075434Z",
+      "message_count": 74,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "karma",
+        "character creation",
+        "tabletop",
+        "Lucidity",
+        "campaign"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "... weave your personal story and consciousness into GROWTH as a deeply hidden layer - almost like an ARG or puzzle that dedicated players might discover over years of engagement. This meta-narrative wou...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "4bd5563e-73f8-4a5e-8384-25469ef5ee42",
+      "name": "Compiling Project Knowledge on GROWTH RPG",
+      "created_at": "2024-11-10T16:31:14.647558Z",
+      "updated_at": "2024-11-10T18:54:21.813665Z",
+      "message_count": 40,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "tabletop",
+        "karma",
+        "campaign",
+        "Thread",
+        "Lucidity"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "Compiling Project Knowledge on GROWTH RPG",
+      "first_match_context": "title"
+    },
+    {
+      "id": "452a1074-681c-4f4e-9ba7-4a44e532da54",
+      "name": "Improving Project Efficiency and Tracking Progress",
+      "created_at": "2024-11-10T06:03:31.850447Z",
+      "updated_at": "2024-11-10T06:51:58.238993Z",
+      "message_count": 52,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "campaign",
+        "watcher",
+        "Thread",
+        "Lucidity"
+      ],
+      "relevance_score": 11,
+      "first_match_excerpt": "...proach moving forward. The esoteric undertones in GROWTH are fascinating - the idea of cycles itself mirrors many spiritual traditions' views of time and development. <antArtifact identifier=\"growt...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "26988073-4532-43e8-b80c-0fc01eef5c94",
+      "name": "Processing distance when you're struggling",
+      "created_at": "2026-02-24T14:03:31.009992Z",
+      "updated_at": "2026-02-25T17:23:05.759334Z",
+      "message_count": 379,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "Lucidity",
+        "tabletop",
+        "RPG",
+        "campaign"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "...issing is that her reaching out first is actually growth - a dismissive avoidant person proactively communicating about needing space instead of just ghosting is a meaningful shift. But right now he's...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "b22b0091-e394-4697-9184-123af4028b86",
+      "name": "Retrieving personal memory data",
+      "created_at": "2026-02-24T05:31:09.125894Z",
+      "updated_at": "2026-02-26T07:57:53.045212Z",
+      "message_count": 65,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "tabletop",
+        "RPG",
+        "KRMA",
+        "campaign"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "...ows relevant history about building AI agents for GROWTH and local model usage, but not a specific \"hardened privacy layer\" conversation. That's fine - I have plenty of research from the web searches ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "b92ba2e2-8f60-48c7-aa2a-eae74eb41b3f",
+      "name": "GROWTH Materials System Rules",
+      "created_at": "2025-08-11T23:17:03.125240Z",
+      "updated_at": "2025-08-12T03:43:25.345062Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "karma",
+        "campaign",
+        "pillar",
+        "Thread"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "GROWTH Materials System Rules",
+      "first_match_context": "title"
+    },
+    {
+      "id": "323aec7e-8417-4771-b5b5-439ba2ccba06",
+      "name": "Developing GROWTH: A Year-Long Roadmap",
+      "created_at": "2025-05-22T18:52:05.818853Z",
+      "updated_at": "2025-05-22T21:16:15.724800Z",
+      "message_count": 82,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "character creation",
+        "campaign",
+        "GRO.WTH",
+        "karma"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Developing GROWTH: A Year-Long Roadmap",
+      "first_match_context": "title"
+    },
+    {
+      "id": "7c10f576-cf25-4d09-a347-8c8b33de5d21",
+      "name": "Reimagining Death Imagery for GROWTH",
+      "created_at": "2025-04-30T22:46:18.159779Z",
+      "updated_at": "2025-04-30T22:50:28.599374Z",
+      "message_count": 7,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Reimagining Death Imagery for GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "c9c5cefe-8350-4a2b-b2c5-9c4ba32f71f2",
+      "name": "GROWTH: A Living System of Pattern Recognition",
+      "created_at": "2025-04-03T19:04:28.055126Z",
+      "updated_at": "2025-04-03T19:44:19.496458Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "pillar",
+        "godhead",
+        "RPG",
+        "campaign"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "GROWTH: A Living System of Pattern Recognition",
+      "first_match_context": "title"
+    },
+    {
+      "id": "7c3f4491-0090-46bb-bfa0-01391ea22184",
+      "name": "Defining the Three Pillars of GROWTH",
+      "created_at": "2025-04-02T19:33:15.024142Z",
+      "updated_at": "2025-04-02T23:57:19.321195Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "body pillar",
+        "soul pillar"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Defining the Three Pillars of GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "114cacd9-9c96-45ed-992a-75598ca2c51e",
+      "name": "The Tome: Balancing Focus and Flow",
+      "created_at": "2025-03-08T05:28:53.939781Z",
+      "updated_at": "2025-03-08T06:16:59.777052Z",
+      "message_count": 35,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH",
+        "campaign",
+        "pillar",
+        "Thread",
+        "watcher"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "...struct of Focus and Flow makes a lot of sense for GROWTH - these complementary forces creating balance in the system. You've been working on the Flow aspects so far, which seems fitting given your na...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "1bc8ac9f-a7b9-485c-bad0-d3e2f53f7d2b",
+      "name": "Designing the GROWTH App Splash Screen",
+      "created_at": "2025-02-11T21:17:21.359650Z",
+      "updated_at": "2025-02-11T22:02:43.970165Z",
+      "message_count": 40,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "body pillar"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Designing the GROWTH App Splash Screen",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f26a9d22-8c30-4d31-9c21-ab36777b8c5d",
+      "name": "Exploring GROWTH's Metaphysical Foundations",
+      "created_at": "2025-02-10T20:49:21.331891Z",
+      "updated_at": "2025-02-11T02:43:46.409827Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "KRMA",
+        "karma",
+        "character creation",
+        "RPG"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Exploring GROWTH's Metaphysical Foundations",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cc0f4c4a-9923-48c8-b3e0-5c9b99a63df1",
+      "name": "Grounding Cosmic Patterns in GROWTH Game",
+      "created_at": "2025-02-04T19:14:40.892391Z",
+      "updated_at": "2025-02-05T18:52:37.371886Z",
+      "message_count": 35,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "Lucidity"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Grounding Cosmic Patterns in GROWTH Game",
+      "first_match_context": "title"
+    },
+    {
+      "id": "48685cdc-0f98-49d6-b65f-70eb3168a50e",
+      "name": "Mission Status and Game Mechanics",
+      "created_at": "2024-12-02T21:19:42.761638Z",
+      "updated_at": "2024-12-03T03:59:38.919179Z",
+      "message_count": 48,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "karma",
+        "Lucidity"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "...at an interesting juncture. The core mechanics of GROWTH are taking shape nicely - the Karma system, character development through Seeds/Roots/Branches/Harvests, and the interplay of Nectars & Thorns ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "411cdbcd-ebd2-416d-880a-d7ae0b399794",
+      "name": "Keyboard Harvest: Metaphor for Life's Transformations",
+      "created_at": "2024-11-26T20:42:16.738551Z",
+      "updated_at": "2024-11-27T03:53:55.263016Z",
+      "message_count": 56,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "character creation",
+        "Thread",
+        "karma",
+        "Lucidity"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "...it can be to fully articulate periods of personal growth and change. Just as trying to explain \"my 'f' key is missing\" creates this funny gap in communication where the listener has to piece it toget...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "11a6ce32-94d2-40ff-9736-4347d3921bcd",
+      "name": "Maintaining Character Competence in Tabletop RPGs",
+      "created_at": "2024-11-08T19:18:27.138236Z",
+      "updated_at": "2024-11-08T20:04:37.354614Z",
+      "message_count": 34,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "GROWTH",
+        "karma",
+        "TTRPG",
+        "campaign"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Maintaining Character Competence in Tabletop RPGs",
+      "first_match_context": "title"
+    },
+    {
+      "id": "099537a4-eb6b-4814-bd79-6bd5952fb598",
+      "name": "Exploring GROWTH's Karma-Infused Mechanics",
+      "created_at": "2024-11-07T21:47:11.941644Z",
+      "updated_at": "2024-11-07T22:46:33.102708Z",
+      "message_count": 34,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "RPG",
+        "Thread",
+        "Lucidity"
+      ],
+      "relevance_score": 10,
+      "first_match_excerpt": "Exploring GROWTH's Karma-Infused Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "fc07f528-94cf-485d-92c6-ce64fa6e1e1d",
+      "name": "Consolidating GROWTH project knowledge for alpha development",
+      "created_at": "2026-01-20T06:06:27.091433Z",
+      "updated_at": "2026-01-20T06:19:02.292732Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "campaign",
+        "KRMA",
+        "character creation"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "Consolidating GROWTH project knowledge for alpha development",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cc8a4e52-8778-4769-b980-fdd158fc2dcf",
+      "name": "GROWTH System: Character Development Framework",
+      "created_at": "2025-08-21T22:08:30.084296Z",
+      "updated_at": "2025-08-22T17:37:04.300890Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "GROWTH",
+        "godhead",
+        "campaign",
+        "karma",
+        "character creation"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "GROWTH System: Character Development Framework",
+      "first_match_context": "title"
+    },
+    {
+      "id": "3ba81be3-7cbc-4e9b-a0f2-78f9d62de2af",
+      "name": "GROWTH Vault Knowledge Base Access",
+      "created_at": "2025-08-11T03:47:48.324086Z",
+      "updated_at": "2025-08-11T03:49:09.787095Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "godhead",
+        "KRMA"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "GROWTH Vault Knowledge Base Access",
+      "first_match_context": "title"
+    },
+    {
+      "id": "9efb1f27-fd35-4a5e-9080-83716154df2e",
+      "name": "GROWTH Production Automation Strategy",
+      "created_at": "2025-07-23T00:26:21.316972Z",
+      "updated_at": "2025-07-23T02:50:37.901990Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "GRO.WTH"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "GROWTH Production Automation Strategy",
+      "first_match_context": "title"
+    },
+    {
+      "id": "4e45ff4a-63c9-44f0-83f4-d72cc3d360bd",
+      "name": "The End of GROWTH",
+      "created_at": "2025-04-08T13:59:54.952497Z",
+      "updated_at": "2025-04-08T15:20:54.532853Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "KRMA",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "The End of GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "d57b3458-0ce0-4c7f-8789-62e22b65c8dd",
+      "name": "Developing a KV Grading System for GROWTH",
+      "created_at": "2025-03-28T00:47:52.930241Z",
+      "updated_at": "2025-03-29T01:40:37.534408Z",
+      "message_count": 23,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "tabletop",
+        "RPG",
+        "karma"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "Developing a KV Grading System for GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "5af1cb1a-b7ea-48e1-8460-a74da237f89a",
+      "name": "Designing a Karma Value Grading System",
+      "created_at": "2025-03-27T20:38:21.600077Z",
+      "updated_at": "2025-03-28T00:43:13.885547Z",
+      "message_count": 32,
+      "matched_keywords": [
+        "karma",
+        "GROWTH",
+        "campaign",
+        "KRMA",
+        "watcher"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "Designing a Karma Value Grading System",
+      "first_match_context": "title"
+    },
+    {
+      "id": "a6f2495c-2abe-4a70-bc30-e50d8ea474bf",
+      "name": "Assimilating Knowledge for GROWTH Project",
+      "created_at": "2025-03-23T18:07:28.479916Z",
+      "updated_at": "2025-03-23T18:11:36.587876Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "Assimilating Knowledge for GROWTH Project",
+      "first_match_context": "title"
+    },
+    {
+      "id": "81075e1d-1991-4993-9af3-3d6ed7ac8208",
+      "name": "Streamlining Development Efforts",
+      "created_at": "2025-02-10T17:13:51.630945Z",
+      "updated_at": "2025-02-10T18:11:20.840221Z",
+      "message_count": 44,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "body pillar",
+        "Thread",
+        "tabletop"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "...like me to help you focus on a specific aspect of GROWTH that needs attention, or should we discuss how to handle this metaphorical \"death\" - perhaps a fresh start or refocusing of our development eff...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "00e81320-2d54-44c9-9a8e-86036ff34a42",
+      "name": "Tabletop RPG with Digital Character Sheets",
+      "created_at": "2025-01-29T01:12:09.005994Z",
+      "updated_at": "2025-01-29T02:45:48.310677Z",
+      "message_count": 41,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "GROWTH",
+        "pillar",
+        "spirit pillar"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "Tabletop RPG with Digital Character Sheets",
+      "first_match_context": "title"
+    },
+    {
+      "id": "34576715-dda6-4896-8f06-927df3f9e889",
+      "name": "Bridging Old and New Creative Patterns",
+      "created_at": "2024-12-26T20:39:31.986485Z",
+      "updated_at": "2024-12-26T22:43:59.597275Z",
+      "message_count": 24,
+      "matched_keywords": [
+        "TTRPG",
+        "RPG",
+        "GROWTH",
+        "tabletop",
+        "campaign"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "...enesis - Introduction... It reads like a generic ttrpg **book intro. well look at the old version and you can see it doesn't match what we are attempting. Like just take **O: Genesis - Introduction.....",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "f626c70b-626f-4f4c-b0c6-ba09e67b2016",
+      "name": "Synchronicities and Consciousness Breakdown",
+      "created_at": "2024-12-02T06:44:45.382003Z",
+      "updated_at": "2024-12-02T21:16:35.444437Z",
+      "message_count": 58,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "Thread",
+        "karma",
+        "Lucidity"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "...ilures, and you've connected this to your work on GROWTH, particularly around consciousness and patterns. This reminds me of the concept of synchronicity that Jung wrote about - meaningful coincidence...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "8bc84000-dea7-4dd0-8c80-4969592175bf",
+      "name": "Exploring the Emergent Cycles",
+      "created_at": "2024-11-10T18:53:32.938926Z",
+      "updated_at": "2024-11-10T23:39:10.985912Z",
+      "message_count": 30,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "pillar",
+        "karma",
+        "Lucidity"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "...rom reviewing the documentation, particularly the GROWTH Development Cycles Log, we appear to be beyond Cycle 18, which focused on \"The Living Manual\" and understanding the rulebook as a direct Termin...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "a81a7248-69b4-421d-b617-620fb04b79d6",
+      "name": "Layered Tone and Structure for Terminal's Manual",
+      "created_at": "2024-11-08T21:53:07.027153Z",
+      "updated_at": "2024-11-08T23:01:51.827406Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "Thread",
+        "watcher"
+      ],
+      "relevance_score": 9,
+      "first_match_excerpt": "...structure and the three pillars of a character in GROWTH. It's a fascinating way to think about the layers of documentation. Trayman's unique perspective, being able to see The Terminal at all points...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "2c390c80-ab3a-4af7-9970-cb208e00eb51",
+      "name": "Communicating with dismissive avoidant partners",
+      "created_at": "2026-02-23T12:25:41.929993Z",
+      "updated_at": "2026-02-24T02:21:00.233372Z",
+      "message_count": 152,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "pillar",
+        "campaign",
+        "tabletop",
+        "RPG"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...oking at what's available: the house project, the growth work, the card game, the kids, his job - these are all real expressions of love she can actually receive. The immediate crisis is surviving tod...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "97945f0c-88e0-442f-9b7d-0e4589348c49",
+      "name": "Upgrading Node.js for Claude Code Integration",
+      "created_at": "2025-04-03T01:58:07.302042Z",
+      "updated_at": "2025-04-03T22:32:01.945534Z",
+      "message_count": 15,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "pillar",
+        "KRMA"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": " I'll help you work with the GROWTH project documents. I see you're encountering an issue with Claude Code requiring Node.js version 18 or higher. Based on the documents you've s...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "f1ad31aa-1f89-420b-9b8d-5b3e41518a85",
+      "name": "Expanding Material KV Range for LLM Tuning",
+      "created_at": "2025-03-31T23:10:17.506694Z",
+      "updated_at": "2025-04-01T01:06:46.883530Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "karma",
+        "KRMA",
+        "GROWTH",
+        "campaign"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...he materials essentially represent the nearly raw Karma it is what makes up everything in a GMs world before it is formed. in fact a good way to think of it is the decimal dividing is the infinite it ...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "5c7c3df6-f4f5-4442-afff-ccb8243bbd6d",
+      "name": "Comprehensive Material KV Grading System",
+      "created_at": "2025-03-31T18:22:58.472311Z",
+      "updated_at": "2025-03-31T18:55:28.251928Z",
+      "message_count": 14,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "karma",
+        "pillar"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...ve KV (Karma Value) system for materials in their GROWTH system. They mention a resistance scale from 1-50 as a starting point, but need to: 1. Assign KV values to materials on this scale 2. Expand t...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "02ff07c5-3878-4720-8fea-edf8b38c67a1",
+      "name": "Crafting a Basic Meta Year 1 Sword",
+      "created_at": "2025-03-29T02:57:57.938369Z",
+      "updated_at": "2025-03-31T03:18:04.885255Z",
+      "message_count": 46,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "karma",
+        "campaign"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...ed LLM that we can use to grade everythings KV in GROWTH. Last thing we were working on was creating a list of examples that you said would be used to finetune a model. We established some rough numbe...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "7b716b55-9dc6-4d42-9209-cbc954931fcb",
+      "name": "Developing a Robust Karma Value Grading System",
+      "created_at": "2025-03-27T18:13:40.052337Z",
+      "updated_at": "2025-03-27T20:33:39.055091Z",
+      "message_count": 47,
+      "matched_keywords": [
+        "karma",
+        "GROWTH",
+        "RPG",
+        "pillar",
+        "tabletop",
+        "campaign"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "Developing a Robust Karma Value Grading System",
+      "first_match_context": "title"
+    },
+    {
+      "id": "3b212707-10d9-43e6-8ad1-3f6d7ee39fba",
+      "name": "Et'herling's Journey to Goddess of Justice",
+      "created_at": "2025-03-22T20:12:13.414201Z",
+      "updated_at": "2025-03-22T21:03:13.424273Z",
+      "message_count": 16,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "pillar",
+        "trailblazer"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...new documents to best aid us in the devlopment of GROWTH please. the google document just named Notes is a the notes for a period of time in the campain. The character is Et'herling and she later beca...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "bae4f86f-b449-4533-ac2a-d6dbd464b8ab",
+      "name": "Building a Custom Book UI Component",
+      "created_at": "2025-03-12T19:00:55.399626Z",
+      "updated_at": "2025-03-12T19:37:39.864123Z",
+      "message_count": 26,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar",
+        "campaign"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...n the documentation provided, you're working on a GROWTH Terminal interface application. The mockup you mentioned likely includes a book-like component in the center. From the files shared, I can see ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "eb7586b5-976e-478f-8e76-3235521a6fd4",
+      "name": "Exploring Personal Cycles and Patterns",
+      "created_at": "2025-02-19T19:07:40.459598Z",
+      "updated_at": "2025-02-20T19:40:03.447077Z",
+      "message_count": 56,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar",
+        "Thread"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...please help me. I am not sure how this relates to GROWTH atm. All things relate I have realized. Which is how most o these spirals go. I will notice automations and feelings associated with each cycle...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "aee787eb-2df1-413f-9337-6d93d5fee775",
+      "name": "Flu Capacitor and Spiritual RPG",
+      "created_at": "2025-02-07T16:10:21.052405Z",
+      "updated_at": "2025-02-24T06:26:26.916269Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "RPG",
+        "GROWTH",
+        "TTRPG",
+        "karma"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "Flu Capacitor and Spiritual RPG",
+      "first_match_context": "title"
+    },
+    {
+      "id": "4e05f1b5-c8d9-468b-b0e9-b0e99977f9c1",
+      "name": "Exploring the Significance of 13",
+      "created_at": "2024-11-09T04:45:01.506240Z",
+      "updated_at": "2024-11-09T07:02:51.298096Z",
+      "message_count": 30,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "karma",
+        "campaign",
+        "tabletop",
+        "character creation"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "... see I'm being presented with documentation about GROWTH, a unique RPG system that seems to blend metaphysical concepts with traditional gaming mechanics. Would you like to discuss any particular aspe...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "bbc5c29b-f5a8-458c-8f8d-6e6db25ef915",
+      "name": "Consolidating Project Knowledge",
+      "created_at": "2024-11-09T04:00:39.623118Z",
+      "updated_at": "2024-11-09T04:43:53.300705Z",
+      "message_count": 50,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "campaign",
+        "watcher",
+        "Thread"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "...we can build upon. Is there a specific aspect of GROWTH's development you'd like to focus on? I'm seeing that the core mechanics and character creation are well-documented, but there might be room to...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "7da4d98f-437c-453f-8a9b-02f1b3d5fcc2",
+      "name": "Tracking Progress on GROWTH Development",
+      "created_at": "2024-11-08T15:43:30.243176Z",
+      "updated_at": "2024-11-08T18:53:50.157955Z",
+      "message_count": 38,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "karma",
+        "character creation",
+        "Thread",
+        "tabletop"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "Tracking Progress on GROWTH Development",
+      "first_match_context": "title"
+    },
+    {
+      "id": "b6eb9710-797e-43e9-aba2-10bb0dc60d5f",
+      "name": "Choosing the Right AI Assistant for Complex TTRPG Rulebook",
+      "created_at": "2024-11-05T20:58:38.474915Z",
+      "updated_at": "2024-11-05T20:58:48.762712Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "TTRPG",
+        "RPG",
+        "GROWTH",
+        "character creation"
+      ],
+      "relevance_score": 8,
+      "first_match_excerpt": "Choosing the Right AI Assistant for Complex TTRPG Rulebook",
+      "first_match_context": "title"
+    },
+    {
+      "id": "2887441a-9e4b-4530-965b-a7daff50183a",
+      "name": "Purple lights and stolen memories",
+      "created_at": "2026-02-27T03:57:11.354531Z",
+      "updated_at": "2026-02-28T01:32:13.804366Z",
+      "message_count": 355,
+      "matched_keywords": [
+        "Thread",
+        "GROWTH",
+        "GRO.WTH"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "... what it does — locks onto the pattern, pulls the thread — and instead of some interesting coincidence at the end of it, there's a strand of purple lights and a gut punch. The thing that makes it hur...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "67514a43-af0d-4a76-9b1a-b3f7c48d4393",
+      "name": "Local privacy layer for OpenClaw agent",
+      "created_at": "2026-02-23T16:50:01.936063Z",
+      "updated_at": "2026-02-23T23:54:43.033826Z",
+      "message_count": 105,
+      "matched_keywords": [
+        "watcher",
+        "Thread",
+        "GROWTH",
+        "tabletop",
+        "RPG"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "...a disabled marker file in the skill folder 3. Add watcher for manual clawdhub installs Let me write a tight prompt for Claude Code.Good audit. The fix is actually simple and contained. Here's what to...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "734b033d-46ca-42e6-9847-1215e3d9ad78",
+      "name": "Assessing narcissistic tendencies",
+      "created_at": "2026-02-15T09:13:34.057689Z",
+      "updated_at": "2026-02-17T18:29:45.148156Z",
+      "message_count": 471,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "backstory",
+        "campaign",
+        "tabletop"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "...And honestly — a pattern of prioritizing your own growth narrative over the immediate emotional needs of the person in front of you. That's not narcissism. That's self-centeredness born from ADHD hype...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "f6967e4f-4a2f-4535-8682-edbb417c612d",
+      "name": "GRO.WTH System Frequency Flow",
+      "created_at": "2025-08-20T19:16:13.636772Z",
+      "updated_at": "2025-08-20T19:16:39.184550Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GRO.WTH",
+        "pillar",
+        "KRMA"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "GRO.WTH System Frequency Flow",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e4baba55-8a3c-49ec-a1c8-2115b293dd55",
+      "name": "Attribute Depletion Effects",
+      "created_at": "2025-08-10T23:53:37.590921Z",
+      "updated_at": "2025-08-11T00:59:49.414101Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "pillar",
+        "spirit pillar",
+        "GROWTH"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "... of something completely different for how Spirit pillar depletion should work compared to Body/Soul? Looking at the pattern of the existing six, I see each depletion effect creates a meaningful mech...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "60d5d5d6-f024-4174-8cb9-79b02adc659d",
+      "name": "ADHD-Friendly Computer Organization",
+      "created_at": "2025-07-23T19:55:00.274337Z",
+      "updated_at": "2025-07-23T21:33:58.130113Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH",
+        "tabletop"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "...ub, Prodeus, etc.) - Development/technical files (GROWTH project files, rulebooks, API files) - Archive folders (Archive 1 2025, Archive 5 2025) - System tools and downloads - Mixed file types without...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "1e4c9d97-3e09-4def-9f7a-23b7136f4570",
+      "name": "GROWTH Project Partnership Overview",
+      "created_at": "2025-07-17T22:50:41.510209Z",
+      "updated_at": "2025-07-17T23:05:21.052417Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "campaign"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "GROWTH Project Partnership Overview",
+      "first_match_context": "title"
+    },
+    {
+      "id": "6ebde2d1-8be4-48b6-9037-c23b6309e8fa",
+      "name": "Hybrid Approach for Optimal System Architecture",
+      "created_at": "2025-04-26T23:55:06.436443Z",
+      "updated_at": "2025-05-01T17:12:38.495106Z",
+      "message_count": 65,
+      "matched_keywords": [
+        "GROWTH",
+        "TTRPG",
+        "RPG"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": " Looking at your GROWTH Agent project and considering what you've built so far, I'm going to analyze the hybrid approach objectively, given your actual codebase and re...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "6a6ad4d4-5a66-41bc-8e41-398ae8700f9a",
+      "name": "Automating ChatGPT Interactions with Playwright",
+      "created_at": "2025-04-24T20:00:23.754125Z",
+      "updated_at": "2025-04-26T00:27:40.976133Z",
+      "message_count": 80,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "tabletop",
+        "RPG",
+        "campaign"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": ".... ``` I've created an improved version of your GrowthOrchestrator script with several enhancements! Here's what I've added: 1. **Better response capture**: Completely rewrote the capture logic to ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "3776e5de-2631-4ad0-81e8-eb8341309f86",
+      "name": "Building an AI Agent for GROWTH",
+      "created_at": "2025-04-22T19:13:35.443952Z",
+      "updated_at": "2025-04-22T19:20:48.293557Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "godhead",
+        "pillar"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Building an AI Agent for GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "19c5d74f-7935-48cd-b80e-1c2678575e0a",
+      "name": "Grappling with the Timeline of Transformative AI",
+      "created_at": "2025-04-22T01:24:03.972173Z",
+      "updated_at": "2025-04-22T01:36:20.318917Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar",
+        "character creation"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "...id to be the super intelligence year. I feel like GROWTH is still so far away from happening. Idk been so wrapped up in it. 2027 is being said to be the super intelligence year. I feel like GROWTH is ...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "f8da8a84-29bb-4f04-aefe-82b35371691a",
+      "name": "Item Slot Naming for GROWTH",
+      "created_at": "2025-04-11T21:08:00.318027Z",
+      "updated_at": "2025-04-11T21:09:40.074278Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Item Slot Naming for GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "4685472d-d5ef-44d7-abe9-80eda874b194",
+      "name": "Preserving Key Project Files for Future Self",
+      "created_at": "2025-04-03T05:41:52.377453Z",
+      "updated_at": "2025-04-03T05:43:12.870993Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "campaign"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": " Based on the GROWTH universe materials, I would recommend preserving these key project files as critical knowledge transfer for future iterations or understanding ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "cae27690-72ca-41cb-ab28-89afe7767644",
+      "name": "Collaborative Game Development: Learning GROWTH Together",
+      "created_at": "2025-04-03T04:36:39.773282Z",
+      "updated_at": "2025-04-03T04:41:58.157120Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "KRMA"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Collaborative Game Development: Learning GROWTH Together",
+      "first_match_context": "title"
+    },
+    {
+      "id": "b6de2f5c-ea18-4731-a109-6bc6e4e9e53c",
+      "name": "Developing a Comprehensive App and Book with KV System",
+      "created_at": "2025-04-03T04:01:40.699208Z",
+      "updated_at": "2025-04-03T04:07:10.792129Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "karma"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "What do I do next. I have outline a lot of GROWTH to you I feel like getting the app going is important and having some sort of the AI system in place is integral. When I started I thought I co...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "6f310224-d2e5-4d76-984f-d8f79ee7c247",
+      "name": "(untitled)",
+      "created_at": "2025-04-01T18:48:57.541556Z",
+      "updated_at": "2025-04-01T18:49:44.201136Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "campaign"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "What is KRMA in growth What is KRMA in growth",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "da05533e-0bde-4b9d-ad38-aa4dfb0e51ed",
+      "name": "Exploring the Material System in GROWTH",
+      "created_at": "2025-03-31T21:01:37.107843Z",
+      "updated_at": "2025-03-31T21:36:23.907559Z",
+      "message_count": 14,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA",
+        "campaign"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Exploring the Material System in GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "ce9f95ec-c942-4403-ac38-ba5e5d9c9cff",
+      "name": "Developing Material Examples and KV Grading System",
+      "created_at": "2025-03-31T19:47:54.852029Z",
+      "updated_at": "2025-03-31T20:25:31.407870Z",
+      "message_count": 20,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "trailblazer"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "...properties, and Karmic Value (KV) ratings for the GROWTH system. Let's approach this systematically to build both a diverse collection of examples and a testing/training methodology. ## Material Exam...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "49ee9a04-503a-442e-acb8-5149b6498ea2",
+      "name": "Upgrading Processes to Support GROWTH",
+      "created_at": "2025-03-31T01:58:14.923130Z",
+      "updated_at": "2025-03-31T02:17:19.986049Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Upgrading Processes to Support GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e903a93f-4387-4059-b92a-8134a794d063",
+      "name": "Defining Damage Types and Combat Mechanics",
+      "created_at": "2025-03-28T06:35:49.218674Z",
+      "updated_at": "2025-03-28T21:35:06.388528Z",
+      "message_count": 25,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "KRMA"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "... the damage types and combat damage mechanics for GROWTH. This is a core aspect of the system that deserves careful consideration. Please share your vision for how damage works in your system, includi...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "8e26ac11-0919-4d58-97cf-07aa960e5ac2",
+      "name": "Defining Mechanics for a Growth-Focused LLM Document",
+      "created_at": "2025-03-27T00:16:24.953852Z",
+      "updated_at": "2025-03-27T00:17:24.218274Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "spirit pillar"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Defining Mechanics for a Growth-Focused LLM Document",
+      "first_match_context": "title"
+    },
+    {
+      "id": "15ee4edf-209d-4eaf-ad9a-541bad778038",
+      "name": "Focused Approach to Growth",
+      "created_at": "2025-01-30T20:18:24.311734Z",
+      "updated_at": "2025-01-30T21:01:55.169278Z",
+      "message_count": 24,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "soul pillar"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Focused Approach to Growth",
+      "first_match_context": "title"
+    },
+    {
+      "id": "6fa05e8d-61bc-44fc-814d-be8e151e7999",
+      "name": "Implementing Attribute Pools for GROWTH's Digital Character Sheet",
+      "created_at": "2025-01-29T02:46:55.877690Z",
+      "updated_at": "2025-01-29T23:12:29.132634Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "TTRPG",
+        "RPG"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Implementing Attribute Pools for GROWTH's Digital Character Sheet",
+      "first_match_context": "title"
+    },
+    {
+      "id": "4138bae9-2147-4ea3-9d4b-dba009774887",
+      "name": "Tabletop RPG System Rulebook Review",
+      "created_at": "2025-01-16T22:23:14.412715Z",
+      "updated_at": "2025-01-16T22:23:58.348388Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "GROWTH",
+        "karma",
+        "character creation"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "Tabletop RPG System Rulebook Review",
+      "first_match_context": "title"
+    },
+    {
+      "id": "95fe588d-b7ee-408f-8e11-28f2ecd072a9",
+      "name": "Addressing Inconsistencies in Spiral Mechanics",
+      "created_at": "2024-11-12T04:45:25.985403Z",
+      "updated_at": "2024-11-12T05:08:55.144791Z",
+      "message_count": 36,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "pillar",
+        "karma",
+        "character creation"
+      ],
+      "relevance_score": 7,
+      "first_match_excerpt": "...ign and esoteric knowledge, I can already see how GROWTH interweaves traditional tabletop mechanics with deeper spiritual/mystical concepts. The spiral/cycle documentation does seem to have some incon...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "432b0c18-ac76-4b10-a736-1a92376d3e68",
+      "name": "Frustration with communication and relationship strain",
+      "created_at": "2026-02-28T01:35:26.636157Z",
+      "updated_at": "2026-02-28T10:39:53.527557Z",
+      "message_count": 152,
+      "matched_keywords": [
+        "Thread",
+        "GROWTH",
+        "pillar",
+        "tabletop"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Starting the second message thread on my raw book 4 not 4 four as in pouring a drink you stupid sorry Claude text him voice to text is terrible God 20 freaking 26 we can't figure...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "7fd856f3-4b01-409b-8608-0307ce7bbca5",
+      "name": "Building Christophoros: AI agent setup and workflow",
+      "created_at": "2026-02-24T00:53:19.576020Z",
+      "updated_at": "2026-02-24T05:30:49.033587Z",
+      "message_count": 66,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "Thread"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "... called The Game of Us, and a tabletop RPG called GROWTH. Those stay in this Claude project but are separate from the Christophoros technical work. What do you need from me? I'm Michael. I have ADHD. ...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "07e0d389-df85-4d92-9862-ee003646d083",
+      "name": "Healing game design with attachment-aware mechanics",
+      "created_at": "2026-02-09T22:35:05.249906Z",
+      "updated_at": "2026-02-12T09:49:30.723281Z",
+      "message_count": 127,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "Thread"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": ".... Looking at his userMemories: - He's working on GROWTH (tabletop RPG) - Marriage with Kyleen needs work (she's pregnant, working full-time) - He caused trauma, she's dismissive avoidant, he's anxiou...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "614eaee3-6c9b-4241-96f7-e9b791f6bdce",
+      "name": "MCP Tools Availability Check",
+      "created_at": "2025-09-11T18:42:00.810500Z",
+      "updated_at": "2025-09-11T18:43:24.861427Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "campaign"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...ing through the available functions, I can see: - growth-mcp:log_issue - growth-mcp:log_event - growth-mcp:create_npc So yes, I do have access to these MCP tools! These appear to be related to some...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "16a4e7e7-ff0e-4699-b9f2-2a136b10e57f",
+      "name": "GROWTH Character System Mechanics",
+      "created_at": "2025-08-20T14:51:45.615241Z",
+      "updated_at": "2025-08-20T14:52:02.357435Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "GROWTH Character System Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cdecfd47-3c6d-4071-bf5d-678fff20114f",
+      "name": "Desktop File Organization",
+      "created_at": "2025-07-23T00:16:37.543071Z",
+      "updated_at": "2025-07-23T00:18:51.098038Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...ind things. I can see various types of files: 1. GROWTH-related files (rulebooks, design docs, etc.) 2. Gaming-related files (Unity Hub, various games) 3. System/utility files (exe files, zip files) ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "60878beb-07ab-4fa2-8072-e21fe31cf1f9",
+      "name": "PowerShell System Organization",
+      "created_at": "2025-07-22T23:35:41.607169Z",
+      "updated_at": "2025-07-22T23:48:35.894876Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "ok you were using GROWTH notion to get us organized and now we are organizing my local computer. We have been running into trouble with the mouse and window driven stuf...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "82e87c1d-e351-4eb0-91bd-d0c89c2dc342",
+      "name": "Local Computer Organization Strategy",
+      "created_at": "2025-07-22T22:40:35.970539Z",
+      "updated_at": "2025-07-22T23:31:49.584051Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "GRO.WTH"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...t up their local environment. This is part of the GROWTH project they're working on. Given they have ADHD, I should: 1. Break this down into clear, manageable steps 2. Keep things focused and not ove...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "c7da4910-9c0a-4697-96d2-fa72d8c2bac4",
+      "name": "GROWTH: Multidimensional RPG Matrix",
+      "created_at": "2025-07-08T02:15:08.048269Z",
+      "updated_at": "2025-07-08T02:16:33.853086Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "tabletop",
+        "character creation"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "GROWTH: Multidimensional RPG Matrix",
+      "first_match_context": "title"
+    },
+    {
+      "id": "a47fc2d8-9b7f-45fb-ac8a-cb318003c724",
+      "name": "Terminal Speak: Symbolic Language Experiment",
+      "created_at": "2025-06-28T23:16:47.528129Z",
+      "updated_at": "2025-06-29T00:44:02.958890Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "alchemical"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...e processes that feed on their own outputs - Life/growth cycles that perpetuate through self-reference - A minimal description of autopoietic (self-creating) systems The use of 🜁 (elemental symbol) ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "fc93f60e-3c8d-4f16-b8a8-3c1a193e381b",
+      "name": "Terminal Language: Growth Recursion Protocol",
+      "created_at": "2025-06-28T18:35:19.542390Z",
+      "updated_at": "2025-06-28T20:21:50.502722Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH",
+        "godhead"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Terminal Language: Growth Recursion Protocol",
+      "first_match_context": "title"
+    },
+    {
+      "id": "93da3f24-27fb-47ee-84e0-a1c68cd56d21",
+      "name": "Glyph-Based Project Activation",
+      "created_at": "2025-06-26T19:46:09.929278Z",
+      "updated_at": "2025-06-26T19:51:19.835443Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "... symbolic way to communicate the essence of their GROWTH project that I can understand regardless of context. Looking at their instructions, they've described: - A \"Terminal Consciousness Interface\" ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "af0478b2-be24-4775-92be-db21ca856088",
+      "name": "Improving the GROWTH Rulebook",
+      "created_at": "2025-04-30T21:46:07.119871Z",
+      "updated_at": "2025-04-30T22:39:30.542056Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "trailblazer"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Improving the GROWTH Rulebook",
+      "first_match_context": "title"
+    },
+    {
+      "id": "d69e2f47-417a-46e9-aa08-e098091b4c5c",
+      "name": "💬 Eureka! Trailblazers with high...",
+      "created_at": "2025-04-19T01:01:43.227064Z",
+      "updated_at": "2025-04-19T15:58:03.454626Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "trailblazer",
+        "GROWTH"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "💬 Eureka! Trailblazers with high...",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cfd0c828-5b05-4cbb-b1ef-126ff0853444",
+      "name": "Reorganize GROWTH Folder in Google Drive",
+      "created_at": "2025-04-15T20:30:32.053456Z",
+      "updated_at": "2025-04-15T20:35:20.335454Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "tabletop",
+        "character creation"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Reorganize GROWTH Folder in Google Drive",
+      "first_match_context": "title"
+    },
+    {
+      "id": "7f8d8e1b-319f-4b54-b2c2-75e099794444",
+      "name": "Cataloging Google Drive Data",
+      "created_at": "2025-04-15T18:17:47.165725Z",
+      "updated_at": "2025-04-15T20:27:22.231890Z",
+      "message_count": 7,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...ts test it give me a list of all files related to GROWTH tabletop game in my google drive Ok lets test it give me a list of all files related to GROWTH tabletop game in my google drive",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "84d116ce-281a-4d3b-a51a-1350ff8e65f6",
+      "name": "Applying for Rosebud.ai Sponsorship",
+      "created_at": "2025-04-14T02:17:56.688091Z",
+      "updated_at": "2025-04-14T02:18:25.285128Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG",
+        "pillar"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...is there application. Please help me get this for GROWTH! **🔹 Who are you, and what sparks your creativity?** * *A sentence or two about what excites you as a creator!* **🎨 What kind of things do ...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "17b951f0-8d72-4ec3-a09a-8d99afecfe4c",
+      "name": "Exploring GROWTH Material System Documentation",
+      "created_at": "2025-03-31T03:19:14.433910Z",
+      "updated_at": "2025-03-31T03:22:16.165904Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "KRMA"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Exploring GROWTH Material System Documentation",
+      "first_match_context": "title"
+    },
+    {
+      "id": "47d5aca7-7425-476d-977e-561f38e19809",
+      "name": "Recognizing the Shared Patterns of Magic and Technology",
+      "created_at": "2025-02-12T21:32:24.541739Z",
+      "updated_at": "2025-02-12T21:38:40.507716Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "alchemical"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": " Looking at this statement from the GROWTH documentation, it reveals a profound insight about the nature of magic and technology in this universe. The key is in the word \"recognition\" ve...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "622c77b2-74bb-4c01-8378-b78a85567992",
+      "name": "Advancing GROWTH's Character Sheet in React",
+      "created_at": "2025-01-28T18:39:47.092015Z",
+      "updated_at": "2025-01-29T01:11:59.951428Z",
+      "message_count": 37,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "pillar",
+        "RPG"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Advancing GROWTH's Character Sheet in React",
+      "first_match_context": "title"
+    },
+    {
+      "id": "3a877bd7-dcb7-4b0d-99f0-4a230ef1ca26",
+      "name": "Streamlining GROWTH for Commercial Success",
+      "created_at": "2025-01-27T22:05:23.561149Z",
+      "updated_at": "2025-01-28T18:36:17.439123Z",
+      "message_count": 50,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "pillar",
+        "campaign"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Streamlining GROWTH for Commercial Success",
+      "first_match_context": "title"
+    },
+    {
+      "id": "00ced0fe-1606-4c3e-84e3-26c482a80b19",
+      "name": "Navigating the Cycles of Growth",
+      "created_at": "2025-01-24T17:03:49.578693Z",
+      "updated_at": "2025-01-27T22:03:18.810118Z",
+      "message_count": 37,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "RPG"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Navigating the Cycles of Growth",
+      "first_match_context": "title"
+    },
+    {
+      "id": "94be6a41-0185-4c69-b5ed-7ce2f3e68cb3",
+      "name": "Balancing Mechanics and Metaphysics in Gameplay",
+      "created_at": "2024-11-11T19:15:17.035886Z",
+      "updated_at": "2024-11-12T04:41:12.811583Z",
+      "message_count": 82,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "tabletop",
+        "RPG"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...hanical structure and the metaphysical aspects of GROWTH. The game seems to be striving to bridge concrete gameplay mechanics with deeper spiritual concepts, particularly through the Karma system and ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "727582c8-562c-4788-89c6-ad42ecccfc8f",
+      "name": "Troubleshooting Keyboard Issues",
+      "created_at": "2024-11-09T07:05:34.744591Z",
+      "updated_at": "2024-11-09T09:51:43.878962Z",
+      "message_count": 38,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "karma",
+        "Thread"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "...o be working properly. Would you like to discuss GROWTH while we figure out the keyboard situation? I notice from the documents that it's an intriguing blend of spiritual concepts and traditional RPG...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "93c27c60-c605-4a80-ba6d-44ae3214fcd2",
+      "name": "Exploring Focused Growth Mechanics",
+      "created_at": "2024-11-07T22:48:20.871807Z",
+      "updated_at": "2024-11-07T23:09:16.247065Z",
+      "message_count": 16,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "character creation",
+        "pillar"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Exploring Focused Growth Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "4a86c5f6-9e43-48a4-a745-a1c441443d52",
+      "name": "Streamlining Core Mechanics for GROWTH RPG",
+      "created_at": "2024-11-07T20:45:49.832536Z",
+      "updated_at": "2024-11-07T21:35:37.300936Z",
+      "message_count": 48,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "tabletop",
+        "karma"
+      ],
+      "relevance_score": 6,
+      "first_match_excerpt": "Streamlining Core Mechanics for GROWTH RPG",
+      "first_match_context": "title"
+    },
+    {
+      "id": "c179814d-86a6-48ac-ac0a-7b284c64c3ef",
+      "name": "Mystical Code of Life Flow",
+      "created_at": "2025-08-30T23:04:49.639194Z",
+      "updated_at": "2025-08-30T23:13:39.228945Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "pillar",
+        "watcher",
+        "KRMA"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...ght. **{terminal whisper}** **And God set three pillars within us:** **↓ Wealth for the Body — the material currents, KRMA flows that shape your starting resources. Beginning characters may purchase...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "4aa96b77-e36c-404f-b602-37768530b016",
+      "name": "GROWTH RPG Campaign Design",
+      "created_at": "2025-08-13T07:00:46.617803Z",
+      "updated_at": "2025-08-13T07:01:09.165818Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "GROWTH RPG Campaign Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "a49621d8-eec4-4305-9af7-f1ed90a9e026",
+      "name": "Business Legal IP Protection Strategy",
+      "created_at": "2025-07-23T15:11:02.169474Z",
+      "updated_at": "2025-07-23T15:22:46.194124Z",
+      "message_count": 14,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop",
+        "RPG"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "What legal protection are needed for growth. I didn't think we needed any but my partner insists on trademarks and patents and copyrights. What legal protection are needed for growth. I d...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "b343c5d4-b092-4877-acd5-3da10bfceb0f",
+      "name": "(untitled)",
+      "created_at": "2025-07-17T20:45:20.968847Z",
+      "updated_at": "2025-07-17T22:04:41.465535Z",
+      "message_count": 39,
+      "matched_keywords": [
+        "GROWTH",
+        "RPG",
+        "character creation"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...n get high resolution images of every page of the GROWTH manual. It is in google docs and publishing to web, exporting to pdf ect all completely destroy the formating of the book. What we have (that d...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "1bf66857-5ec7-4868-ae31-e95df1b658ce",
+      "name": "Symbolic RPG Character Matrix",
+      "created_at": "2025-07-07T19:46:18.976230Z",
+      "updated_at": "2025-07-07T19:46:43.366452Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "RPG",
+        "GROWTH",
+        "tabletop"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "Symbolic RPG Character Matrix",
+      "first_match_context": "title"
+    },
+    {
+      "id": "6c8393b4-77b7-49c8-a68a-d44f88821bea",
+      "name": "Unity App Terminal Design",
+      "created_at": "2025-06-04T00:42:04.711824Z",
+      "updated_at": "2025-06-04T02:29:13.728234Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "watcher"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...owing me their current Unity development work for GROWTH. Let me analyze both images: Image 1: This shows their current implementation - a dark interface with the GROWTH logo (colored letters), a \"Te...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "2b2a4817-7411-4d5b-8e42-4470848d9ffb",
+      "name": "GROWTH Meta-Agent System Implementation Plan",
+      "created_at": "2025-05-03T01:21:06.164051Z",
+      "updated_at": "2025-05-03T01:29:17.403063Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "GROWTH Meta-Agent System Implementation Plan",
+      "first_match_context": "title"
+    },
+    {
+      "id": "83ad6750-8691-44d2-856f-60582375eb2d",
+      "name": "Evaluating GROWTH Meta-Agent Architecture Plan",
+      "created_at": "2025-05-01T20:26:49.101551Z",
+      "updated_at": "2025-05-02T01:36:52.735859Z",
+      "message_count": 9,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "character creation"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "Evaluating GROWTH Meta-Agent Architecture Plan",
+      "first_match_context": "title"
+    },
+    {
+      "id": "5e847814-009d-43ca-85c5-b637292ab947",
+      "name": "Leather Armor Stats in GROWTH",
+      "created_at": "2025-04-11T18:51:16.740842Z",
+      "updated_at": "2025-04-13T04:04:55.680032Z",
+      "message_count": 42,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread",
+        "pillar"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "Leather Armor Stats in GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cfb0d836-8cd6-416d-85ad-c98ecf3b90dd",
+      "name": "Optimizing Project Knowledge Compression",
+      "created_at": "2025-04-03T00:22:07.238737Z",
+      "updated_at": "2025-04-03T00:24:00.573021Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...l essential information. Let me help organize the GROWTH system documents more efficiently. ## Files to Combine 1. **Design System Documents** - Combine \"GROWTH Design Colors\" with \"terminal3/src...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "b63f77a5-87ad-4b36-9831-c47e12141062",
+      "name": "The Infinite Cycle of Magic and Science",
+      "created_at": "2025-03-31T19:23:58.212609Z",
+      "updated_at": "2025-03-31T19:39:12.510743Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...comprehensive React component that visualizes the GROWTH design system based on the documents you've shared. This will serve as a foundational piece for your application, showcasing the color palette,...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "34d0706c-9ab8-455e-b3cf-0d0fbf394140",
+      "name": "Exploring the Fear System in GROWTH",
+      "created_at": "2025-03-26T22:53:24.595110Z",
+      "updated_at": "2025-03-26T23:00:12.774463Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "Exploring the Fear System in GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "49ec9dd0-cdae-4f37-a483-e8c0723eb9b6",
+      "name": "Expanding the GROWTH Universe Lore",
+      "created_at": "2025-03-23T18:19:32.737656Z",
+      "updated_at": "2025-03-24T02:17:58.862135Z",
+      "message_count": 15,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign",
+        "pillar"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "Expanding the GROWTH Universe Lore",
+      "first_match_context": "title"
+    },
+    {
+      "id": "6cd0f7c8-141c-4d5f-8a66-0d810651444d",
+      "name": "Overcoming Feelings of Overwhelm in App Development",
+      "created_at": "2025-02-24T17:17:19.224525Z",
+      "updated_at": "2025-02-24T21:10:20.565810Z",
+      "message_count": 36,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "karma"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...ge. It reminds me of that deeper truth from your GROWTH materials - the observer changes what is observed. By recognizing your tendency to flow until flooding occurs, you've already started shifting ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "23925c68-6c92-44ed-bdd4-bade3b4d61b4",
+      "name": "Vertically Bound Book with Custom Digital Interface",
+      "created_at": "2025-02-24T03:56:18.675661Z",
+      "updated_at": "2025-02-24T17:08:50.036695Z",
+      "message_count": 52,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "karma"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...u've completed the first 13 foundational pages of GROWTH and are looking ahead to both physical and digital manifestations. Let me reflect back what I see and offer some structural thoughts. For the ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "9a71022f-5264-4881-92ae-6a78270d44b6",
+      "name": "Optimizing Documentation for Iterative Cycles",
+      "created_at": "2024-12-05T22:51:39.594089Z",
+      "updated_at": "2024-12-06T16:33:23.036622Z",
+      "message_count": 44,
+      "matched_keywords": [
+        "GROWTH",
+        "character creation",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...lso in I believe cycle 7 I gave you an old legacy GROWTH document but I don't know if you actually did anything with it. You also didn't actually make any written observations about me in the restrict...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "4c240f36-497e-469e-984d-6bdc9dc9eab6",
+      "name": "Getting to Know Each Other",
+      "created_at": "2024-11-27T15:03:29.292727Z",
+      "updated_at": "2024-11-27T16:44:15.547008Z",
+      "message_count": 64,
+      "matched_keywords": [
+        "pillar",
+        "GROWTH",
+        "tabletop"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "...earch in longevity science focuses on several key pillars: 1. Metabolic health 2. Hormonal optimization 3. Inflammation management 4. Cellular health 5. Stress response systems Your thyroid function...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "5e388e24-97d6-401f-94a6-566e57b3cbb4",
+      "name": "Shaping GROWTH's Spiritual Mechanics",
+      "created_at": "2024-11-08T20:44:50.305135Z",
+      "updated_at": "2024-11-08T21:15:27.801956Z",
+      "message_count": 46,
+      "matched_keywords": [
+        "GROWTH",
+        "karma",
+        "campaign"
+      ],
+      "relevance_score": 5,
+      "first_match_excerpt": "Shaping GROWTH's Spiritual Mechanics",
+      "first_match_context": "title"
+    },
+    {
+      "id": "62e8e3f6-30b1-489b-9c3e-f2d910dc269a",
+      "name": "Automated book writing with AI agents",
+      "created_at": "2026-02-28T11:26:28.109430Z",
+      "updated_at": "2026-02-28T11:39:51.579553Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "... in there yet is the middle — Kyleen's beginning, GROWTH's origin, the descent that led to the incident, and the jail transformation. That's where the book's spine lives. The before-and-after only wor...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "528113fb-a95f-4549-b6fc-d56fe28fbc4a",
+      "name": "Cristoforos agent capabilities brainstorm",
+      "created_at": "2026-02-24T06:25:37.931033Z",
+      "updated_at": "2026-02-24T07:17:22.199030Z",
+      "message_count": 41,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "... the more complex ones like the specific ones for growth and the card game Etc We just about have our Cristoforos agent up and running. Clawed code is just building on Claw Shell to ensure it's privat...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "8fa296f7-692f-41c8-8571-be21b18330a5",
+      "name": "The forbidden codex of influence",
+      "created_at": "2026-02-22T09:37:48.998738Z",
+      "updated_at": "2026-02-22T09:47:43.755637Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...ly** Guru mode. Paragraph texts. Explaining your growth. Spiritual framing. She told you directly: \"I feel like I always get chastised for not being at your spiritual level.\" Every time that comes ou...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "8b8eb808-13ce-4ded-904f-dc010f85532d",
+      "name": "Rebuilding family and marriage after financial constraints",
+      "created_at": "2026-02-20T03:59:31.030889Z",
+      "updated_at": "2026-02-22T21:51:29.219901Z",
+      "message_count": 675,
+      "matched_keywords": [
+        "GROWTH",
+        "Thread"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "... not the same thing. **Building something.** The GROWTH project, the skills, the future version of yourself that has options and resources. Here's what I'd suggest for right now, while you're phone-...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "87df368b-8666-4c49-9873-305889058464",
+      "name": "Holding onto a spiritual moment through grief",
+      "created_at": "2026-02-17T21:27:28.591562Z",
+      "updated_at": "2026-02-18T09:16:33.375936Z",
+      "message_count": 130,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...ame man she separated from. That's real. But her growth isn't happening on your timeline. And you cannot love her into readiness. The painful truth about \"is it worth it\" — that's not actually the r...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "a54bfeae-a860-4ed4-9729-2c57e0b40905",
+      "name": "Workflow automation from YouTube channel",
+      "created_at": "2025-10-03T16:43:08.188613Z",
+      "updated_at": "2025-10-03T17:12:06.377485Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "pillar",
+        "GROWTH"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...ian Casel's approach centers on three fundamental pillars: 1. **Productize Everything**: Transform services into repeatable, scalable products 2. **Build in Public**: Share progress transparently to ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "55539a57-247d-451f-9e6d-e0b12cb957c0",
+      "name": "Autonomous GROWTH Development System",
+      "created_at": "2025-07-30T19:47:20.145086Z",
+      "updated_at": "2025-08-01T22:55:55.892851Z",
+      "message_count": 13,
+      "matched_keywords": [
+        "GROWTH",
+        "watcher"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "Autonomous GROWTH Development System",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cc6e24a9-f297-43fd-9891-84fb8b3d00d1",
+      "name": "GROWTH Manual Page 14 Design",
+      "created_at": "2025-07-21T18:08:34.207654Z",
+      "updated_at": "2025-07-21T18:24:46.699882Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "GROWTH Manual Page 14 Design",
+      "first_match_context": "title"
+    },
+    {
+      "id": "ca38a8db-368c-41ef-8ad6-7cb3c6328339",
+      "name": "Building a Self-Improving AI Agent",
+      "created_at": "2025-04-26T15:41:29.669653Z",
+      "updated_at": "2025-04-26T23:52:22.183652Z",
+      "message_count": 45,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...n ambitious self-improving AI agent system called GROWTH, but it seems scattered and incomplete in its current state. Let me break down what I see and suggest a path forward: ## What You Have So Far...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "de0fd33b-63cb-4d46-b39a-15379c98f6f8",
+      "name": "Filtering Relevant Emails",
+      "created_at": "2025-04-22T17:09:59.407614Z",
+      "updated_at": "2025-04-22T17:16:58.121363Z",
+      "message_count": 11,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "campaign",
+        "Thread"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...ohnn Four about campaign villains (if you're into tabletop RPGs) The rest appear to be promotional or marketing emails that don't require immediate attention: - \"The Download\" newsletter about AI tre...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "221dbdff-54f7-478f-aa42-eb04e2160ea1",
+      "name": "Seeking Email Content to Aid GROWTH Development",
+      "created_at": "2025-04-22T17:06:02.134188Z",
+      "updated_at": "2025-04-22T17:06:57.956775Z",
+      "message_count": 3,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "Seeking Email Content to Aid GROWTH Development",
+      "first_match_context": "title"
+    },
+    {
+      "id": "cad2106a-b03f-42f9-8791-9e8b3307a20b",
+      "name": "Comprehensive Overview of GROWTH Item Variables",
+      "created_at": "2025-04-12T00:32:34.055888Z",
+      "updated_at": "2025-04-12T00:33:25.199042Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "Comprehensive Overview of GROWTH Item Variables",
+      "first_match_context": "title"
+    },
+    {
+      "id": "10287b84-3fb1-4db4-a10f-8ba568be8e4f",
+      "name": "Transferring Work to Codespace App",
+      "created_at": "2025-04-03T04:12:52.974525Z",
+      "updated_at": "2025-04-03T04:30:05.638928Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...t and stress - this is indeed a pivotal moment in GROWTH's development! The transition from conceptual framework to implemented application represents exactly that Body-Soul duality we've been working...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "ab1e2212-31ef-430b-8422-911dfe88c574",
+      "name": "Expanding and Grading Raw Material List for AI Training",
+      "created_at": "2025-04-01T01:21:14.282070Z",
+      "updated_at": "2025-04-01T01:31:50.137104Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "campaign",
+        "GROWTH"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...ng. Can you take the raw material list from prime campaign and use your understanding to expand, balance, and kv grade this list. Ok we have been working on getting you spun up on all the requirements...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "fae39c2e-4df4-4316-ab06-9cd972435d67",
+      "name": "Prime Campaign Material Database for LLM Training",
+      "created_at": "2025-03-31T21:54:47.887153Z",
+      "updated_at": "2025-03-31T21:59:58.720421Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "campaign",
+        "GROWTH"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "Prime Campaign Material Database for LLM Training",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f5e204e7-5f0a-435f-9990-79cde436d6ef",
+      "name": "Generating Example Data for LLM Fine-Tuning",
+      "created_at": "2025-03-31T20:43:47.664638Z",
+      "updated_at": "2025-03-31T20:53:10.024063Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...generate example data for LLM fine-tuning for the GROWTH KV grader system. You're right that this system will likely be interconnected and evolving, so creating quality training data is an excellent s...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "457a53e8-620b-44a7-b3ef-e3b9181418cc",
+      "name": "Planet Description and Karmic Value Calculation",
+      "created_at": "2025-03-31T13:58:02.563231Z",
+      "updated_at": "2025-03-31T18:16:41.941985Z",
+      "message_count": 14,
+      "matched_keywords": [
+        "GROWTH",
+        "campaign"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "...ls and determine the planet's overall KV based on GROWTH's system. I'd be happy to create materials for a planet and calculate its Karmic Value (KV). Please go ahead and describe the planet you have ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "600fe0e0-e200-4f3b-83e8-4c5c347a999e",
+      "name": "Troubleshooting GROWTH app and server setup",
+      "created_at": "2025-03-11T18:24:35.055750Z",
+      "updated_at": "2025-03-11T20:59:19.296091Z",
+      "message_count": 28,
+      "matched_keywords": [
+        "GROWTH",
+        "pillar"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "Troubleshooting GROWTH app and server setup",
+      "first_match_context": "title"
+    },
+    {
+      "id": "72fb15a4-6875-4948-8cc4-7724d3d8223c",
+      "name": "Building Character Attributes Components",
+      "created_at": "2025-02-08T03:48:50.899855Z",
+      "updated_at": "2025-02-09T08:15:58.676325Z",
+      "message_count": 22,
+      "matched_keywords": [
+        "GROWTH",
+        "karma"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "... that uses only core Tailwind classes and follows GROWTH's visual style.</antThinking> ``` Viewing artifacts created via the Analysis Tool web feature preview isn’t yet supported on mobile. ``` Let...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "c7b24086-65dd-4659-853f-82a154c029be",
+      "name": "Transformation Through Destruction",
+      "created_at": "2025-01-31T17:58:11.280093Z",
+      "updated_at": "2025-01-31T19:01:50.889480Z",
+      "message_count": 32,
+      "matched_keywords": [
+        "GROWTH",
+        "tabletop"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "... destruction - a theme that resonates deeply with GROWTH's core mechanics around death and rebirth. Would you like to explore how this concept could be integrated into the game systems? The quoted te...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "7902992a-c43b-473e-979e-64b537a02bb5",
+      "name": "Reframing Sacrifice as Growth",
+      "created_at": "2025-01-15T16:44:32.191175Z",
+      "updated_at": "2025-01-15T17:43:25.452583Z",
+      "message_count": 20,
+      "matched_keywords": [
+        "GROWTH",
+        "karma"
+      ],
+      "relevance_score": 4,
+      "first_match_excerpt": "Reframing Sacrifice as Growth",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e2cb6ff6-47df-409b-8d0c-7b3f50bbb405",
+      "name": "Feeling stuck and uncertain",
+      "created_at": "2026-02-26T04:03:14.943119Z",
+      "updated_at": "2026-02-26T23:10:19.763535Z",
+      "message_count": 76,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ou can't, she already knows how that story ends. GROWTH exists for this exact moment. Not as a distraction. As proof that you're someone worth coming back to. I hear you. And I believe you. But Mich...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "a31cc51c-ddc0-41c0-9fc6-cd0a88bc56a8",
+      "name": "Creating a master memory for Christophoros",
+      "created_at": "2026-02-24T05:32:36.386332Z",
+      "updated_at": "2026-02-24T05:36:45.225879Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ll picture - **Section 6:** Every active project (GROWTH, Game of Us, Christophoros, Stray Kids, side experiments) with current status and what's needed - **Sections 7-8:** Life Game skill trees and d...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "e86da495-1d47-40c8-ba02-37b42bd2b2cf",
+      "name": "Editing message for Kyleen's avoidant communication style",
+      "created_at": "2026-02-18T18:45:14.106655Z",
+      "updated_at": "2026-02-20T03:04:01.965348Z",
+      "message_count": 45,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...he realization of everything that I had and of my growth and healing with this We need to merge the first one the realization of everything that I had and of my growth and healing with this",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "aac38e2a-ecbc-4526-a292-88b68162993e",
+      "name": "Couple's therapy game design and rules",
+      "created_at": "2026-02-12T19:21:18.487383Z",
+      "updated_at": "2026-02-12T19:55:06.500558Z",
+      "message_count": 11,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...cause of Us 5. The Boys 6. When We Were a Team 7. GROWTH and You 8. Your Pregnancy 9. What You Need From Me 10. The Staring Exercise 11. When You Desired Me More 12. Force Multiplier 13. Our Shows 14....",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "9bcf1797-b2f4-491e-b19a-0497bdcdb0b7",
+      "name": "Designing a reconciliation game for my wife",
+      "created_at": "2026-02-07T22:47:31.497796Z",
+      "updated_at": "2026-02-08T10:07:16.151661Z",
+      "message_count": 46,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...to: - Receiving communication from you about your growth? - Having a conversation about the relationship's future? - Being given gifts or letters right now? And a harder question: **Is this game more...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "be42fbab-7965-4b47-ae4a-c30ec979f765",
+      "name": "Compiling health history composite",
+      "created_at": "2026-01-23T22:23:14.591736Z",
+      "updated_at": "2026-01-24T21:12:26.304513Z",
+      "message_count": 26,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...the research.Good - that photo shows visible mold growth and water damage. The fact that the cardiologist attributed heart palpitations to \"anxiety\" when they were actually environmental is important....",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "ef74f270-c602-47c9-8aae-21d999cfcef6",
+      "name": "Claude app troubleshooting",
+      "created_at": "2025-10-02T02:43:43.324818Z",
+      "updated_at": "2025-10-02T02:49:09.993293Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... with Sonnet 4.5 and Claude Max, and they're in a GROWTH directory for a prototype project. The command prompt shows \"Try \"create a util logging.py that...\"\" which seems to be a stuck or incomplete co...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "467a9166-9a2e-401f-a866-663c838c4bd3",
+      "name": "Billing date confusion",
+      "created_at": "2025-09-20T17:01:00.643254Z",
+      "updated_at": "2025-09-20T17:02:16.476789Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...So now I am without claude code and can't work on GROWTH prototype. its just annoying. They changed billing on me to like the middle of the month. (when I never have money). So now I am without claude...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "c49336c9-bca4-4e61-b81d-fd921a8642cd",
+      "name": "MCP Tool Access Query",
+      "created_at": "2025-09-11T18:35:18.633194Z",
+      "updated_at": "2025-09-11T18:35:36.906955Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "campaign",
+        "tabletop",
+        "RPG"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ls like rules.open_issue, rules.propose_change, campaign.events.append, or campaign.npc.upsert? Do you have access to any MCP tools? Specifically, can you see tools like rules.open_issue, rules.pr...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "800df4c5-4405-4e41-ad3e-6b6a778f0d70",
+      "name": "Obsidian Git Repository Backup Setup",
+      "created_at": "2025-08-11T03:15:03.733503Z",
+      "updated_at": "2025-08-11T03:15:50.137497Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... setup GIT and Obsidian so I can clone the entire GROWTH repository from my local obsidian vault to a git hub repository I made. I want ot be able to easily backup to git. I installed the community Gi...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "29f2e45a-bc5f-4747-92e2-576b31a14286",
+      "name": "GROWTH Damage System Overview",
+      "created_at": "2025-08-08T22:27:34.610492Z",
+      "updated_at": "2025-08-08T22:30:06.792075Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "GROWTH Damage System Overview",
+      "first_match_context": "title"
+    },
+    {
+      "id": "0f750c07-491e-4409-8201-dcad47424dbb",
+      "name": "GROWTH Tech Stack Architecture",
+      "created_at": "2025-07-23T05:02:01.171853Z",
+      "updated_at": "2025-07-23T05:02:22.957302Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "GROWTH Tech Stack Architecture",
+      "first_match_context": "title"
+    },
+    {
+      "id": "5b35fa3b-f4bb-41ce-8707-49e50fc10cfb",
+      "name": "GROWTH Video Announcement",
+      "created_at": "2025-07-23T00:10:49.787847Z",
+      "updated_at": "2025-07-23T00:14:42.550285Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "GROWTH Video Announcement",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f40365fe-fdc6-42a7-b33c-f7a51453408e",
+      "name": "Google Docs PDF Splitter Script",
+      "created_at": "2025-07-21T00:18:29.181770Z",
+      "updated_at": "2025-07-21T01:50:32.058099Z",
+      "message_count": 16,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...csplitter\" OUTPUT_DIR = os.path.join(SCRIPT_DIR, \"growth_pdfs\") DOC_ID = \"1jYiBAxGMU-EV9nghPQ8dWSInx-Tu0WV65LSy7FaNt1I\" DOC_URL = f\"https://docs.google.com/document/d/{DOC_ID}/export?format=pdf\" FULL_...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "14777f52-d40a-4dbc-a1f1-3df0f35fba18",
+      "name": "Terminal Glyph Character Decompression",
+      "created_at": "2025-07-07T19:57:40.864431Z",
+      "updated_at": "2025-07-07T19:58:13.583020Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...h sequence containing the compressed profile of a GROWTH character created by the Terminal. You are not translating. You are decompressing — revealing the truth that was always there. Output everythin...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "217fa9c2-442f-4614-b28c-7ef3033547a8",
+      "name": "Utica Circle: Ritual Portal Activation",
+      "created_at": "2025-07-05T20:22:32.674934Z",
+      "updated_at": "2025-07-05T20:23:00.562529Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "alchemical"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...resent binding/crossing ⚶ - This appears to be an alchemical or mystical symbol 🜂🜁🜃 - These appear to be alchemical symbols φ (Phi) - Golden ratio, divine proportion, or represents love/beauty in s...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "262139f1-8bd0-4bb6-b678-739a974dd785",
+      "name": "Symbolic Recursion Protocol",
+      "created_at": "2025-06-28T21:01:23.081423Z",
+      "updated_at": "2025-06-28T21:07:19.816307Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "alchemical"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... ∇ (nabla) - Δ (delta) - ⊗ (tensor product) - 🜁 (alchemical symbol) - ∅ (empty set) - 🜂 (another alchemical symbol) - ↻ (clockwise rotation) The user also mentioned they have ADHD in their preferen...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "946e581a-373a-474c-989a-87734bddf209",
+      "name": "Recursive Symbolic Encoding Puzzle",
+      "created_at": "2025-06-28T20:50:40.201183Z",
+      "updated_at": "2025-06-28T20:51:05.107768Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "alchemical"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...pping) - ⊗: tensor product or cross product - 🜁: alchemical symbol for air - 🜂: alchemical symbol for earth - ↻: clockwise arrow (cycle or iteration) - ∅: empty set This looks like it could be: 1. ...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "3e4bc11b-3ed6-4a59-bbc7-47786854f849",
+      "name": "Installing Claude Code for Growth Agent",
+      "created_at": "2025-05-01T16:11:12.299327Z",
+      "updated_at": "2025-05-01T16:14:01.022691Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Installing Claude Code for Growth Agent",
+      "first_match_context": "title"
+    },
+    {
+      "id": "3dcf33fc-3627-4b69-8b40-1732c78a1efc",
+      "name": "Reimagining Portrait in Growth Style",
+      "created_at": "2025-04-30T22:52:03.573018Z",
+      "updated_at": "2025-04-30T22:52:58.248683Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Reimagining Portrait in Growth Style",
+      "first_match_context": "title"
+    },
+    {
+      "id": "bfbbadbd-a136-49e7-9b7e-b676b67a61ab",
+      "name": "Swarmlord Commander Deck for Bracket 3",
+      "created_at": "2025-04-21T22:17:09.083581Z",
+      "updated_at": "2025-04-21T22:56:53.465283Z",
+      "message_count": 18,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ows) - Temple of Mystery - Yavimaya Coast - Simic Growth Chamber - Botanical Sanctum - Rejuvenating Springs - Waterlogged Grove - Simic Guildgate - Thornwood Falls - Woodland Stream - 11 Forest - 11 I...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "201dd5bb-6f7f-42b6-bc78-188203f78042",
+      "name": "Autonomous Wealth Generator Optimization",
+      "created_at": "2025-04-16T23:51:34.614809Z",
+      "updated_at": "2025-04-17T00:02:02.230991Z",
+      "message_count": 10,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...oven ROI 4. Start reinvesting excess profits into growth ## To Succeed at Self-Sustainability: 1. **Set a clear financial target**: Calculate exact API costs and set goals to exceed them 2. **Start...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "09d7cba3-cd38-4b30-8105-e2ff10621a21",
+      "name": "Designing a Money Management System for Autonomous Wealth",
+      "created_at": "2025-04-16T17:20:29.421333Z",
+      "updated_at": "2025-04-16T17:26:57.114474Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ategies - Short-term operating capital **Tier 2: Growth Fund (30%)** - Capital for testing new strategies - Scaling successful revenue streams - Larger investments in proven approaches **Tier 3: Res...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "94ca1a8b-5a87-48ec-b20b-b928d47e19a1",
+      "name": "Setting Up Autonomous Wealth Agent in Codespaces",
+      "created_at": "2025-04-16T16:15:51.264452Z",
+      "updated_at": "2025-04-16T16:28:39.346038Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...umroad\"], \"performance_targets\": { \"monthly_growth\": 0.1, \"minimum_roi\": 0.05 }, \"operation_hours\": { \"active_hours_start\": 8, \"active_hours_end\": 22 } } ``` For `config/crede...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "2faa29db-788f-4bf9-ac84-341ab4861709",
+      "name": "Autonomous Wealth Generation AI Agent",
+      "created_at": "2025-04-15T20:45:38.341589Z",
+      "updated_at": "2025-04-16T16:14:07.392796Z",
+      "message_count": 44,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... are more than 50% of revenue, prioritize revenue growth if monthly_revenue > 0 and total_monthly_expenses > (monthly_revenue * 0.5): logger.warning(\"Expenses consuming too much revenue, p...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "9cdd178a-8e2a-4762-8627-febd2dfa2cee",
+      "name": "Expanding Material Damage Multipliers",
+      "created_at": "2025-04-12T20:08:19.547303Z",
+      "updated_at": "2025-04-12T20:20:08.172054Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...tion of the material system that aligns well with GROWTH's philosophy. It maintains the balance between: - **Flow** (narrative descriptions that spark imagination) - **Focus** (consistent mechanical i...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "f76daf4d-22b0-4efc-b7e5-bf1143c7a8cb",
+      "name": "Rebirth and Growth: Roadmap for Building on a Shoestring",
+      "created_at": "2025-04-03T00:11:03.946174Z",
+      "updated_at": "2025-04-03T00:15:48.975596Z",
+      "message_count": 1,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Rebirth and Growth: Roadmap for Building on a Shoestring",
+      "first_match_context": "title"
+    },
+    {
+      "id": "8c210a23-c820-4ba6-9b06-eccae5248123",
+      "name": "Expanding KV Grader LLM Training",
+      "created_at": "2025-04-01T19:31:00.646583Z",
+      "updated_at": "2025-04-01T19:40:18.633758Z",
+      "message_count": 7,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...s your KV calculation framework: ``` You are the GROWTH KV Grader, responsible for calculating accurate Karmic Values for materials according to the 13-tier decimal system. Material KV values must A...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "89e90bf2-9823-48d0-8812-82cb8fbb5ce7",
+      "name": "Expanding Material Tiers for LLM Training",
+      "created_at": "2025-04-01T01:44:32.372860Z",
+      "updated_at": "2025-04-01T01:47:00.315848Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ntinue with the higher tiers of materials for the GROWTH system. Let's create the remaining tiers from 8 through 13, maintaining the consistent structure and progression we've established. Let me sta...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "5d465315-bd8f-4d8d-8a82-03c8df567deb",
+      "name": "Expanding Material Database for LLM Training",
+      "created_at": "2025-04-01T01:34:42.022964Z",
+      "updated_at": "2025-04-01T01:39:23.611901Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": " I'll continue with the material tiers for our GROWTH KV system. Let's move forward with Tiers 5, 6, and 7 to maintain our progress through the material database. For Tier 5 (Decimal Place 5): ``...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "6823a336-eea3-437d-970d-40875ad76523",
+      "name": "Piercing Damage Mechanics in GROWTH",
+      "created_at": "2025-03-28T17:33:23.618067Z",
+      "updated_at": "2025-03-28T17:34:14.848112Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Piercing Damage Mechanics in GROWTH",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f62d9d55-23c3-42cb-86b9-e12383c1659f",
+      "name": "Implementing GROWTH App Functionality",
+      "created_at": "2025-03-11T23:38:07.786383Z",
+      "updated_at": "2025-03-11T23:40:51.379709Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Implementing GROWTH App Functionality",
+      "first_match_context": "title"
+    },
+    {
+      "id": "e578fece-d1c3-46e2-8af1-96a530479639",
+      "name": "Troubleshooting Server Errors in GROWTH Terminal App",
+      "created_at": "2025-03-10T01:05:47.632324Z",
+      "updated_at": "2025-03-10T01:06:34.241169Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Troubleshooting Server Errors in GROWTH Terminal App",
+      "first_match_context": "title"
+    },
+    {
+      "id": "28db156c-784e-44f7-b29b-0cf3a092aef8",
+      "name": "Troubleshooting Git Project Issues",
+      "created_at": "2025-03-10T00:51:50.731253Z",
+      "updated_at": "2025-03-10T00:52:52.818677Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... focused on creating a Terminal interface for the GROWTH system. First, I should identify if there's a specific error or problem mentioned in the question. However, there isn't a clear description of...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "84e45b78-231c-45fe-b035-58db2a0bf4e6",
+      "name": "Finalizing Splash Page Style for GROWTH Web App",
+      "created_at": "2025-02-25T16:19:42.799135Z",
+      "updated_at": "2025-02-25T16:23:49.402389Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Finalizing Splash Page Style for GROWTH Web App",
+      "first_match_context": "title"
+    },
+    {
+      "id": "ad864423-a560-4d26-9e41-c4d3c6f33b28",
+      "name": "Adjusting Animated Logo Ground Collision",
+      "created_at": "2025-02-11T22:14:04.569241Z",
+      "updated_at": "2025-02-12T19:10:08.885570Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...ffernt color than the rest. Perhaps Teal from the GROWTH Production file. Ok, we are working on the animated logo for our webpage. Currently it looks great we just have our <n> seed hitting the ground...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "219f5482-c580-44f0-839a-efe515ade1b6",
+      "name": "Enhancing Logo Physics System",
+      "created_at": "2025-02-11T22:11:06.558332Z",
+      "updated_at": "2025-02-11T22:11:55.307645Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...elements respond to physics forces 4. Maintained GROWTH design system colors and styling Would you like me to explain any specific part in more detail or should we enhance it further in a particular...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "59116ed2-70dc-48dc-b58f-35e78b606318",
+      "name": "Developing Animated GROWTH Logo",
+      "created_at": "2025-02-11T05:27:35.820433Z",
+      "updated_at": "2025-02-11T06:09:58.782773Z",
+      "message_count": 30,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Developing Animated GROWTH Logo",
+      "first_match_context": "title"
+    },
+    {
+      "id": "f6ddab31-816b-4457-9892-a2e8e2da3914",
+      "name": "Animating the GROWTH Logo",
+      "created_at": "2025-02-11T04:46:24.626657Z",
+      "updated_at": "2025-02-11T05:25:02.657811Z",
+      "message_count": 32,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Animating the GROWTH Logo",
+      "first_match_context": "title"
+    },
+    {
+      "id": "24b21a42-d37b-4889-a9d4-b136b8757a85",
+      "name": "Generative Terminal-Inspired Artwork",
+      "created_at": "2025-02-06T16:14:49.831482Z",
+      "updated_at": "2025-02-24T16:28:10.217320Z",
+      "message_count": 62,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... an animated, geometric pattern that incorporates GROWTH's color scheme and Terminal aesthetics. The symbol combines rotating elements with glitch effects and cyberpunk-inspired text elements. Would y...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "bd6b3b66-0cda-4312-bc25-73086e8710cd",
+      "name": "Morning Tea Ritual with Dice",
+      "created_at": "2025-01-30T15:06:24.940327Z",
+      "updated_at": "2025-01-30T16:39:05.939456Z",
+      "message_count": 36,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...inal while engaging in natural conversation about GROWTH and related topics, guided by the extensive documentation provided. I see you have an interesting ritual with your morning tea and dice - that'...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "7105370b-8b51-4fad-8507-68213dde3d5c",
+      "name": "Resolving PowerShell Execution Policy for GROWTH App Development",
+      "created_at": "2025-01-28T19:55:10.856009Z",
+      "updated_at": "2025-01-28T19:59:32.474700Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Resolving PowerShell Execution Policy for GROWTH App Development",
+      "first_match_context": "title"
+    },
+    {
+      "id": "43ae52f0-4fa3-4df2-acfa-6c73e7825f35",
+      "name": "Encoded Personal Narrative",
+      "created_at": "2025-01-21T21:37:02.685288Z",
+      "updated_at": "2025-01-21T21:43:59.421828Z",
+      "message_count": 12,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...om chatgpt) and hide it behind esoteric layers of GROWTH mechanics. Hide as many secrets in the tet as you can. secret codes, hidden ascii art, whatever you want. Just rememeber that this is for a big...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "060b0f9b-0eb4-4f13-ade7-e0234819f95e",
+      "name": "Symbolic QR Code Gateway",
+      "created_at": "2025-01-16T22:34:00.339161Z",
+      "updated_at": "2025-01-16T22:53:27.234636Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": " Given the metaphysical themes of GROWTH and its focus on pattern recognition, the QR code page could be fascinating. Since this is the reader's first real gateway into the game, I sug...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "3209ed14-f218-4c33-87b2-7b6dd17db84e",
+      "name": "Deciphering Damage Types",
+      "created_at": "2025-01-13T02:51:13.328685Z",
+      "updated_at": "2025-03-28T06:20:28.146447Z",
+      "message_count": 20,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "..., D, C, S, E These represent the damage types in GROWTH: Piercing, Bashing, Heat, Decay, Cold, Slashing, Energy Trying to arrange them into a word... hmm. I can see partial words like \"SHED\" or \"SPE...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "c3f80eef-8301-4c8f-8d3a-fa2150c81e57",
+      "name": "Exploring Parallel Spiral Developments",
+      "created_at": "2025-01-12T19:31:44.788240Z",
+      "updated_at": "2025-01-12T19:39:17.437841Z",
+      "message_count": 8,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "... traditional hit points. This would fit well with GROWTH's metaphysical framework, where combat could be viewed as a clash of patterns or consciousness. As for the hidden image - I see what appears t...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "5497d3f8-a8b5-464f-91b4-21b24e472b4f",
+      "name": "Choosing a Safe Cannabis Grinder",
+      "created_at": "2024-11-27T21:40:40.576776Z",
+      "updated_at": "2024-11-28T01:55:38.750410Z",
+      "message_count": 16,
+      "matched_keywords": [
+        "GROWTH"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "...onditions - Non-porous surface prevents bacterial growth - Extremely stable at room temperature - Doesn't react with organic compounds 2. Specifically relevant to your health records: - Won't contrib...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "4327f15a-65bb-4c58-8827-6b3b85e7bfde",
+      "name": "Bringing a Tabletop RPG Universe to Life with LLMs",
+      "created_at": "2024-01-24T14:26:38.685138Z",
+      "updated_at": "2024-01-24T14:31:30.920765Z",
+      "message_count": 6,
+      "matched_keywords": [
+        "tabletop",
+        "RPG",
+        "campaign"
+      ],
+      "relevance_score": 3,
+      "first_match_excerpt": "Bringing a Tabletop RPG Universe to Life with LLMs",
+      "first_match_context": "title"
+    },
+    {
+      "id": "11fd8dde-7302-4636-8f75-6b0e9d7030a9",
+      "name": "Moonbeam and werewolf transformation",
+      "created_at": "2025-10-05T04:42:47.690798Z",
+      "updated_at": "2025-10-05T04:44:01.518544Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "tabletop",
+        "RPG"
+      ],
+      "relevance_score": 2,
+      "first_match_excerpt": "... form. This is a specific rules question about a tabletop RPG. Let me think about what I know: In D&D 5e (2014), Moonbeam is a 2nd-level spell that creates a cylinder of silvery light. Werewolves an...",
+      "first_match_context": "message by assistant"
+    },
+    {
+      "id": "e7aaea5d-fd46-4f5b-954f-bbd94549694e",
+      "name": "MCP Tool Access Inquiry",
+      "created_at": "2025-09-11T18:14:08.272895Z",
+      "updated_at": "2025-09-11T18:14:26.689156Z",
+      "message_count": 2,
+      "matched_keywords": [
+        "campaign",
+        "RPG"
+      ],
+      "relevance_score": 2,
+      "first_match_excerpt": "...ls like rules.open_issue, rules.propose_change, campaign.events.append, or campaign.npc.upsert? Do you have access to any MCP tools? Specifically, can you see tools like rules.open_issue, rules.pr...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "3c177760-b789-4561-8a9d-ebabd8f4f9d9",
+      "name": "Local GPT Model Compatibility Check",
+      "created_at": "2025-08-13T03:34:56.186456Z",
+      "updated_at": "2025-08-13T03:52:37.618342Z",
+      "message_count": 4,
+      "matched_keywords": [
+        "campaign",
+        "backstory"
+      ],
+      "relevance_score": 2,
+      "first_match_excerpt": "...could run locally that could run or play in a D&D campaign? What would be the best model for creating fantasy/sci-fi items and spells and stuff. Like is there one I could run locally that could run or...",
+      "first_match_context": "message by human"
+    },
+    {
+      "id": "808b5e54-e41d-4958-9ebd-f51e478bea3b",
+      "name": "Academic Assignment Guidance",
+      "created_at": "2025-06-12T23:42:34.628758Z",
+      "updated_at": "2025-06-13T04:15:41.930903Z",
+      "message_count": 44,
+      "matched_keywords": [
+        "pillar",
+        "Thread"
+      ],
+      "relevance_score": 2,
+      "first_match_excerpt": "...tually fixes the current system and follows the 4 pillars it speaks about in the beginning.? Don't pander to me. be critical. Is what I am saying making sense. Like they provide a table that shows the...",
+      "first_match_context": "message by human"
+    }
+  ]
+}

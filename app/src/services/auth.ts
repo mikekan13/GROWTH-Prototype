@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { AuthError, ConflictError } from '@/lib/errors';
-import { hashPassword, verifyPassword, createSession, getRoleDashboard } from '@/lib/auth';
+import { hashPassword, verifyPassword, createSession } from '@/lib/auth';
 import { validateAccessCode } from '@/services/access-code';
 
 // --- Schemas ---
@@ -35,7 +35,7 @@ export async function loginUser(input: z.infer<typeof loginSchema>) {
 
   return {
     user: { id: user.id, username: user.username, role: user.role },
-    redirect: getRoleDashboard(user.role),
+    redirect: user.role === 'ADMIN' ? '/terminal' : '/hub',
   };
 }
 
@@ -82,6 +82,6 @@ export async function registerUser(input: z.infer<typeof registerSchema>) {
 
   return {
     user: { id: user.id, username: user.username, role: user.role },
-    redirect: getRoleDashboard(user.role),
+    redirect: user.role === 'ADMIN' ? '/terminal' : '/hub',
   };
 }

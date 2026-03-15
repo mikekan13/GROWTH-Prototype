@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, getRoleDashboard } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import AuthForm from '@/components/AuthForm';
 import GrowthLogo from '@/components/GrowthLogo';
 import GlitchText from '@/components/GlitchText';
@@ -7,7 +7,7 @@ import GlitchText from '@/components/GlitchText';
 export default async function Home() {
   const session = await getSession();
   if (session) {
-    redirect(getRoleDashboard(session.user.role));
+    redirect(session.user.role === 'ADMIN' ? '/terminal' : '/hub');
   }
 
   return (

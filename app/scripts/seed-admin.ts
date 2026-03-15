@@ -1,5 +1,5 @@
 /**
- * Seed the admin (GODHEAD) user.
+ * Seed the admin (ADMIN) user.
  * Usage: npx tsx scripts/seed-admin.ts
  */
 import { prisma } from '../src/lib/db';
@@ -9,7 +9,7 @@ async function main() {
   const username = 'Mikekan13';
   const email = 'admin@growth.local';
   const password = 'admin';
-  const role = 'GODHEAD';
+  const role = 'ADMIN';
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ username }, { email }] },
@@ -34,7 +34,7 @@ async function main() {
     return newUser;
   });
 
-  console.log(`Created GODHEAD user: ${user.username} (id: ${user.id})`);
+  console.log(`Created ADMIN user: ${user.username} (id: ${user.id})`);
 }
 
 main()

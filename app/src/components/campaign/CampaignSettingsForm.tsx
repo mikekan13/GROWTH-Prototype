@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import EyetehrnetLogo from '@/components/EyetehrnetLogo';
 
 const PROFILE_FIELDS = [
   { key: 'firstName', label: 'First Name' },
@@ -319,8 +320,9 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
 
       {/* EŶ∃tehrNET Listing */}
       <div className="border-t border-[var(--accent-teal)]/20 pt-6 space-y-4">
-        <h3 className="text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-header)] text-[var(--accent-teal)]/80">
-          {'EŶ∃tehrNET Listing'}
+        <h3 className="flex items-center gap-2">
+          <EyetehrnetLogo scale={0.65} />
+          <span className="text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-header)] text-[var(--accent-teal)]/80">Listing</span>
         </h3>
 
         <div>

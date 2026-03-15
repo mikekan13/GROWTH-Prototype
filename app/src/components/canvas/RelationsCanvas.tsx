@@ -999,12 +999,12 @@ export default function RelationsCanvas({
               minY = Math.min(minY, pos.y - topH);
               maxBottom = Math.max(maxBottom, pos.y + bottomH);
             }
+            const MIN_FOLDER_H = 120;
             if (maxBottom > -Infinity) {
               // Compute the unclamped visual bottom — must match FolderGroupRect bounds.
               // The bottom edge is the max of: posY+MIN_FOLDER_H, posY+userHeight, contentBottom.
               // We clamp dy so NONE of these exceed y=0, preventing the render clamp
               // from auto-shrinking the folder instead of the drag stopping.
-              const MIN_FOLDER_H = 120;
               const contentBottom = maxBottom + FOLDER_PADDING;
               const posY = folder.posY ?? (minY - FOLDER_PADDING - HEADER_HEIGHT);
               let folderBottom: number;
@@ -1017,6 +1017,14 @@ export default function RelationsCanvas({
                   contentBottom
                 );
               }
+              const maxDy = -LINE_GAP - folderBottom;
+              if (dy > maxDy) dy = maxDy;
+            } else {
+              // Empty party folder: clamp based on folder posY + height
+              const posY = folder.posY ?? -(MIN_FOLDER_H + HEADER_HEIGHT);
+              const folderBottom = folder.collapsed
+                ? posY + HEADER_HEIGHT
+                : posY + Math.max(MIN_FOLDER_H, folder.userHeight || 0);
               const maxDy = -LINE_GAP - folderBottom;
               if (dy > maxDy) dy = maxDy;
             }
@@ -1193,10 +1201,21 @@ export default function RelationsCanvas({
           const offset = dragOffsets.get(pseudoKey);
           if (offset) {
             const MIN_FOLDER_H = 120;
+            const HEADER_HEIGHT = 80;
             const curX = folder.posX ?? -(Math.max(620, folder.userWidth || 0)) / 2;
             const curY = folder.posY ?? (folder.type === 'party' ? -(MIN_FOLDER_H + 40) : 100);
+            let newY = curY + offset.y;
+            // Clamp empty party folder above KRMA line
+            if (folder.type === 'party') {
+              const folderBottom = folder.collapsed
+                ? newY + HEADER_HEIGHT
+                : newY + Math.max(MIN_FOLDER_H, folder.userHeight || 0);
+              if (folderBottom > 0) {
+                newY = newY - folderBottom;
+              }
+            }
             const updated = foldersRef.current.map(f =>
-              f.id === folder.id ? { ...f, posX: curX + offset.x, posY: curY + offset.y } : f
+              f.id === folder.id ? { ...f, posX: curX + offset.x, posY: newY } : f
             );
             onFoldersChange?.(updated);
           }

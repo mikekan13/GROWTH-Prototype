@@ -1,0 +1,1949 @@
+{
+  "generated": "2026-03-13T16:54:10.190Z",
+  "totalMatches": 145,
+  "filesProcessed": 5,
+  "keywordsUsed": [
+    "growth",
+    "gro.wth",
+    "ttrpg",
+    "tabletop",
+    "rpg",
+    "pillar",
+    "trailblazer",
+    "watcher",
+    "godhead",
+    "krma",
+    "karma",
+    "soul pillar",
+    "spirit pillar",
+    "body pillar",
+    "dice system",
+    "character creation",
+    "campaign",
+    "backstory",
+    "alchemical",
+    "prima materia",
+    "thread",
+    "lucidity"
+  ],
+  "conversations": [
+    {
+      "title": "Accessing External Documents",
+      "date": "2024-09-16",
+      "conversationId": "66e85515-b6b0-8013-a0b9-f997abf4aae7",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "backstory",
+        "body pillar",
+        "campaign",
+        "character creation",
+        "godhead",
+        "growth",
+        "karma",
+        "pillar",
+        "rpg",
+        "soul pillar",
+        "spirit pillar",
+        "tabletop"
+      ],
+      "keywordCount": 12,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...o tie these elements to the **hard mechanics** of character growth. This is crucial to ensuring that **Values**, **Addictions**, and **Fears** not only serve the story but also have a concrete effect on gam..."
+    },
+    {
+      "title": "Canvas for Growth Support",
+      "date": "2024-10-05",
+      "conversationId": "6700a061-760c-8013-b661-63f35a9e3a67",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "backstory",
+        "body pillar",
+        "campaign",
+        "character creation",
+        "growth",
+        "karma",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "tabletop",
+        "thread"
+      ],
+      "keywordCount": 11,
+      "hasDirectGrowthMention": true,
+      "excerpt": "The user is working on a tabletop game called GROWTH and wants help completing the rulebook. This involves me learning the rules thoroughly, editing and producing content for the rulebook, and..."
+    },
+    {
+      "title": "Tabletop JSON Rulebook Structure",
+      "date": "2024-01-26",
+      "conversationId": "1c2ebe83-fdd7-4131-9ccd-c2971f6c321f",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "character creation",
+        "godhead",
+        "growth",
+        "karma",
+        "pillar",
+        "rpg",
+        "spirit pillar",
+        "tabletop",
+        "ttrpg"
+      ],
+      "keywordCount": 11,
+      "hasDirectGrowthMention": true,
+      "excerpt": "The Glossary and Table of Contents for the \"GROWTH\" rulebook have been combined into a single document. This file includes a Table of Contents listing all the chapters with their titles, as..."
+    },
+    {
+      "title": "Rulebook Writing Assistance",
+      "date": "2024-07-30",
+      "conversationId": "27f5e04d-067f-4b91-b2d9-bdf7bea0ff01",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "body pillar",
+        "campaign",
+        "character creation",
+        "growth",
+        "karma",
+        "pillar",
+        "soul pillar",
+        "spirit pillar",
+        "tabletop",
+        "thread"
+      ],
+      "keywordCount": 10,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...acter's resonance with the universe and their potential for growth and transformation. Frequency is pure potential and also represents a character's connection to everything. It is used as a currency to upg..."
+    },
+    {
+      "title": "Dynamic UBI System",
+      "date": "2024-12-23",
+      "conversationId": "6768fea5-75a8-8013-9475-62cf1f98f2b6",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "character creation",
+        "growth",
+        "karma",
+        "pillar",
+        "rpg",
+        "tabletop",
+        "ttrpg"
+      ],
+      "keywordCount": 9,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ebrate each other’s best creations—strengthening the entire GROWTH ecosystem."
+    },
+    {
+      "title": "Problem-Solving with Self Discovery",
+      "date": "2024-02-15",
+      "conversationId": "15b0df36-53ca-476d-a5cc-f051f88aa61b",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "character creation",
+        "growth",
+        "karma",
+        "rpg",
+        "tabletop",
+        "thread",
+        "ttrpg"
+      ],
+      "keywordCount": 9,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...cus on setting the thematic and philosophical foundation of GROWTH, it seems comprehensive in establishing the game's universe. However, to further enhance its utility for an LLM serving as a rule arbiter a..."
+    },
+    {
+      "title": "GROWTH Game Rules Document",
+      "date": "2024-10-06",
+      "conversationId": "6702c12c-4dbc-8013-bb67-6cfc9dab7754",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "campaign",
+        "character creation",
+        "godhead",
+        "growth",
+        "karma",
+        "rpg",
+        "tabletop",
+        "ttrpg"
+      ],
+      "keywordCount": 8,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...es\": [\n    {\n      \"pattern\": \".*\",\n      \"replacement\": \"**GROWTH Rulebook Outline**\\n\\n**1. Introduction & Overview**  \\nGROWTH is a dynamic tabletop roleplaying game that explores the concept of evolutio..."
+    },
+    {
+      "title": "GROWTH Rulebook JSON Refinement",
+      "date": "2024-01-31",
+      "conversationId": "3e4b5cfc-089c-4e6f-842c-c3e968f8816a",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "character creation",
+        "growth",
+        "karma",
+        "pillar",
+        "tabletop"
+      ],
+      "keywordCount": 7,
+      "hasDirectGrowthMention": true,
+      "excerpt": "The Magic Chapter for the GROWTH Rulebook has been structured and saved as a JSON file. This file includes a comprehensive overview of the magic system, detailed explanatio..."
+    },
+    {
+      "title": "JSON Testing for Tabletop Game",
+      "date": "2024-01-28",
+      "conversationId": "25730f9a-0512-4a00-983a-5641c9125acb",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "character creation",
+        "growth",
+        "karma",
+        "pillar",
+        "rpg",
+        "spirit pillar",
+        "tabletop"
+      ],
+      "keywordCount": 7,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Frequency in your GROWTH tabletop game is described as a versatile attribute pool representing a character's potential and vitality. It is used for various characte..."
+    },
+    {
+      "title": "GROWTH Game Summary",
+      "date": "2024-09-16",
+      "conversationId": "66e853ce-140c-8013-8ad9-d420b2f1b46a",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "godhead",
+        "growth",
+        "pillar",
+        "rpg",
+        "soul pillar",
+        "tabletop"
+      ],
+      "keywordCount": 6,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ity**:\n   - You have been developing a tabletop game called GROWTH for over a decade. Your ultimate goal is to integrate the game with custom LLM systems that represent gods and powerful entities, creating..."
+    },
+    {
+      "title": "Prep Help for Session",
+      "date": "2024-05-15",
+      "conversationId": "08f38c4f-64f6-4c6e-a471-e247440aef71",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "growth",
+        "pillar",
+        "rpg",
+        "tabletop"
+      ],
+      "keywordCount": 6,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Michael sometimes procrastinates on session prep for his campaigns and has a lot of other responsibilities like cleaning, cooking, and taking care of his kids, including his baby Ezra."
+    },
+    {
+      "title": "Enhanced GROWTH AI Learning",
+      "date": "2024-02-08",
+      "conversationId": "14fa7907-fcd1-4d20-b47e-b7b1d1000de7",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "character creation",
+        "godhead",
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 6,
+      "hasDirectGrowthMention": true,
+      "excerpt": "\"Your objective is to harness the GROWTH tabletop game's rules, translating them into a dynamic, AI-driven system. Begin by dissecting the game into its core components: character..."
+    },
+    {
+      "title": "Karmic System Integration Draft",
+      "date": "2024-09-27",
+      "conversationId": "66f62808-49ec-8013-940b-8827af14cfe3",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "campaign",
+        "godhead",
+        "growth",
+        "karma",
+        "pillar"
+      ],
+      "keywordCount": 5,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...(Game Master) stands at the center of the Karmic system in GROWTH, controlling the flow and distribution of Karma to shape the narrative and balance the gameplay experience. Through the manipulation of Kar..."
+    },
+    {
+      "title": "D&D Character Attributes Estimate",
+      "date": "2024-09-11",
+      "conversationId": "66e1efb5-3084-8013-9599-899e2ce25947",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "growth",
+        "tabletop",
+        "thread"
+      ],
+      "keywordCount": 5,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...l over flora and fauna using spells like *Entangle*, *Spike Growth*, and other nature-related magic.\n   - **Topics Covered**: Elemental spells, blending nature and arcane, balancing power with respect for n..."
+    },
+    {
+      "title": "Skill Creation Overview",
+      "date": "2024-02-16",
+      "conversationId": "33226385-059d-4f0d-8b7f-892df7ad65df",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth",
+        "pillar",
+        "spirit pillar",
+        "tabletop"
+      ],
+      "keywordCount": 5,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Here's the updated content for Chapter 3 of the GROWTH Rulebook, incorporating the clarified details about skill creation and functionality:\n\n```json\n{\n  \"Chapter 3 - Game Mechanics\": {\n    \"int..."
+    },
+    {
+      "title": "Organizing GROWTH Rulebook Data",
+      "date": "2024-02-01",
+      "conversationId": "071946fc-845a-43b0-9e3b-1081331b4f00",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "character creation",
+        "growth",
+        "karma"
+      ],
+      "keywordCount": 5,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Chapter 2 of the \"GROWTH Rulebook\" focuses on character creation and progression. It details various attributes categorized under Body, Soul, and Spirit, each influ..."
+    },
+    {
+      "title": "RP Future Trends",
+      "date": "2024-12-26",
+      "conversationId": "676da092-a4bc-8013-80b3-d17908a46c35",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth",
+        "rpg",
+        "tabletop",
+        "ttrpg"
+      ],
+      "keywordCount": 4,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...The role-playing (RP) landscape is experiencing significant growth and transformation across various formats, including tabletop role-playing games (TTRPGs), live-action role-playing (LARP), and digital rol..."
+    },
+    {
+      "title": "LLM Comparison for TTRPG",
+      "date": "2024-11-05",
+      "conversationId": "672a89b2-bd7c-8013-adf4-aeea36d142d1",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth",
+        "karma",
+        "rpg",
+        "ttrpg"
+      ],
+      "keywordCount": 4,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Thank you for sharing the GROWTH rulebook draft. Based on the depth and ambition of your project, here's a breakdown of how ChatGPT might assist effectively:\n\n### 1. **Effi..."
+    },
+    {
+      "title": "Game Mechanics Summary",
+      "date": "2024-09-16",
+      "conversationId": "66e856df-0bd4-8013-8f36-5c7546320cea",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "character creation",
+        "growth",
+        "pillar",
+        "tabletop"
+      ],
+      "keywordCount": 4,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Here's the refined and expanded summary of GROWTH, integrating both the document and additional details from memory, while respecting the document's primacy:\n\n### Karmic System\n- **AetherNe..."
+    },
+    {
+      "title": "Game Development AI Integration",
+      "date": "2024-09-10",
+      "conversationId": "66dfb8d7-abb4-8013-ab89-c5d924c6d515",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "campaign",
+        "godhead",
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 4,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...cture. By aligning it with the concepts you've developed in GROWTH, you envision a world where AI entities, much like The Godheads in your game, operate domains of interest based on public sentiment and dem..."
+    },
+    {
+      "title": "LangGraph for GROWTH LLM",
+      "date": "2024-01-29",
+      "conversationId": "59ae8b9c-433d-4281-ae36-d8a240157f7f",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "campaign",
+        "godhead",
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 4,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...teractions. \n\nThis makes LangGraph a potential fit for your GROWTH LLM system, as it provides the necessary infrastructure to handle complex, stateful interactions between different AI components like The S..."
+    },
+    {
+      "title": "Surah Challenge in Quran",
+      "date": "2023-12-11",
+      "conversationId": "339fc76e-1886-4aaf-9103-d0e217d07091",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth",
+        "pillar",
+        "thread",
+        "watcher"
+      ],
+      "keywordCount": 4,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ous, the Most Merciful.\n\n1. Allah, the Weaver of interwoven threads,\n2. Eternal Unity, where divine harmony pervades.\n3. Every soul, a note in the cosmic symphony,\n4. Unified essence, where all souls traver..."
+    },
+    {
+      "title": "Oldest Bible Language",
+      "date": "2024-12-17",
+      "conversationId": "67619f36-0ac0-8013-886a-1658e9311184",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth",
+        "pillar",
+        "thread"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...of Part A**\n\n#### **A. Symbolic Significance**\n- **Cycle of Growth:** The progression from 1 to 2 to 4 represents the natural cycle of growth, transformation, and balance.\n- **Fractal Harmony:** Each stage..."
+    },
+    {
+      "title": "Word Association Exercise",
+      "date": "2024-10-25",
+      "conversationId": "671b9c4c-9e80-8013-aa9b-7f5db584b4cb",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth",
+        "rpg",
+        "ttrpg"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Here’s an updated fear tendency chart for GROWTH, aligning the fear levels with mental conditions and incorporating elements of mysticism, religion, and spirituality:\n\n| **Time Aspect**..."
+    },
+    {
+      "title": "The Navidson Record Summary",
+      "date": "2024-10-11",
+      "conversationId": "67089999-cc98-8013-af6f-49edd9473533",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth",
+        "thread",
+        "watcher"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...stand out. This can make it easier to connect various plot threads and revisit specific sections for a deeper analysis."
+    },
+    {
+      "title": "Lifespan and Aging Mechanics",
+      "date": "2024-10-10",
+      "conversationId": "670849dc-40b8-8013-a4cd-daf5cab7bc2a",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth",
+        "karma"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...The Flow of Time: Campaigns and Facing Aging\\*\\*\\n\\nTime in GROWTH is fluid and narrative-driven\\. Outside of combat, where time is measured in six-second rounds, the flow of time is determined by the \\*\\*G..."
+    },
+    {
+      "title": "Mala and Bibhitaki Overview",
+      "date": "2024-09-20",
+      "conversationId": "66ed8672-e274-8013-98ba-6473bbbfd68b",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "alchemical",
+        "growth",
+        "karma"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...sciousness—light vs. dark, good vs. bad—as a foundation for growth.\n\n- **Ayurvedic Integration:**\n  - **Balancing Vata Dosha:** Vata governs movement and change. Practices such as **meditation** and **prana..."
+    },
+    {
+      "title": "Human Trait for Games",
+      "date": "2024-09-16",
+      "conversationId": "66e8726f-5584-8013-9c06-5edb134e3f45",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth",
+        "rpg",
+        "tabletop"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...'m thinking about crafting a negative trait for humans in a tabletop game. How about \"Short-Lived Ambition?\" It reflects humans' strong, fleeting ambitions, often neglecting long-term planning.\n\n**Incorporati..."
+    },
+    {
+      "title": "Shadow of Death Meaning",
+      "date": "2024-08-10",
+      "conversationId": "4fb9ea91-eaec-4e9f-94c7-633483cd2003",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "alchemical",
+        "growth",
+        "pillar"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...esenting clarity, vision, and the force of life that drives growth and change. The rod, as a tool for directing power and asserting control, fits within this solar, masculine framework.\n\n### **Staff as the..."
+    },
+    {
+      "title": "Feasibility of Indie Survival",
+      "date": "2024-07-25",
+      "conversationId": "14517391-8528-4110-a8a6-7f01729c2fdd",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "backstory",
+        "campaign",
+        "growth"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "### Lore Development\n\n#### **Setting and Backstory**\n\n**1. The Neo-Humans and Their Downfall**\n   - **Ancient Civilization**: The Neo-Humans were a highly advanced race that achieved remarka..."
+    },
+    {
+      "title": "Shapeshifting Rules Simplified",
+      "date": "2024-04-13",
+      "conversationId": "47316d86-9df6-45f5-b47c-58b76495dadf",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "character creation",
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...gative effects too can you give me an effect of alcohol for growth."
+    },
+    {
+      "title": "Funding Strategies for GROWTH",
+      "date": "2024-02-16",
+      "conversationId": "57e55105-c14a-4491-97ac-fa66166f8edc",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...e Your Game\n- **Task 1.1:** Playtest the current version of GROWTH with a diverse group of players.\n- **Task 1.2:** Collect feedback using surveys or open discussions.\n- **Task 1.3:** Identify common themes..."
+    },
+    {
+      "title": "GROWTH Rule Arbiter Activated",
+      "date": "2024-01-31",
+      "conversationId": "6340f36a-b1bd-4cba-ae56-930978a7bfa4",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "campaign",
+        "character creation",
+        "growth"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "To create a new skill for a player in GROWTH, consider the game's balance between technology, magic, and the noir setting of your campaign. Custom skills should align with your narrati..."
+    },
+    {
+      "title": "Google Sheets RPG Dropdowns",
+      "date": "2023-10-09",
+      "conversationId": "16fcbcb9-1fdc-4c3d-b387-8da34ced5fd9",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth",
+        "rpg",
+        "tabletop"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...th creating dropdown cells in Google Sheets for your custom tabletop RPG character sheet. Please go ahead and explain what you're trying to achieve, and I'll do my best to provide you with guidance on how to..."
+    },
+    {
+      "title": "Pattern Recognition Equation",
+      "date": "2024-12-09",
+      "conversationId": "67577295-2184-8013-bce2-06c82ebb466f",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth",
+        "thread"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...spect (e.g., something that starts as one thing and ends as GROWTH)?\n\n4. **The Final Form of the Equation:**  \n   - We know the equation must end with “= GROWTH.”\n   - Are we looking for a purely symbolic e..."
+    },
+    {
+      "title": "Ending Hunger with Sourdough",
+      "date": "2024-12-05",
+      "conversationId": "6752179a-134c-8013-9d26-7f99798ba1fe",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...y at the pace of human relationships—slower than a top-down campaign, but more resilient and deeply rooted.\n\n---\n\n**In essence:** A peer-to-peer approach to fighting hunger with bread (or any staple food) wor..."
+    },
+    {
+      "title": "Bone Symbolism Interpretation",
+      "date": "2024-11-22",
+      "conversationId": "6740da23-2444-8013-bb27-94f7e3c739ba",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...not only practical but also tied to spiritual or emotional growth. Trust your instincts and pay attention to subtle signs around you—they might guide your path.\n\nIn summary: **What’s next is a pivotal mome..."
+    },
+    {
+      "title": "Zenthian Conquest Story Analysis",
+      "date": "2024-10-09",
+      "conversationId": "67064bb4-80c8-8013-9c81-c4f09c2b0481",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "backstory",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...liefs in him and his own belief in himself.\n\n2. **Character Growth:** Jax’s evolution from a young prince to a war-hardened leader facing an existential crisis is compelling. His inner struggles, the losses..."
+    },
+    {
+      "title": "Utilizing LLMs for Growth",
+      "date": "2024-10-08",
+      "conversationId": "67058c73-7b90-8013-a442-2258bd20b729",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth",
+        "thread"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ance on utilizing large language models for their project, \"GROWTH,\" which involves frontend and backend development, writing, publishing, and more. Their primary goal is to make consistent progress.\n\n**Cra..."
+    },
+    {
+      "title": "Aether and Nutrition Concepts",
+      "date": "2024-10-07",
+      "conversationId": "67038945-b7e4-8013-afb0-bc0506d1d198",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ept something you're incorporating into your tabletop game, GROWTH, or are you asking about it in a different context?"
+    },
+    {
+      "title": "Gasoline Source Explained",
+      "date": "2024-10-04",
+      "conversationId": "6700162b-b120-8013-9e39-3a33a4b1ba57",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "alchemical",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...about by crude oil's transformative properties.\n\nSo, in the alchemical sense, while the philosopher’s stone is a substance that perfects and transforms, crude oil *has literally transformed the world*. It’s an..."
+    },
+    {
+      "title": "Gourd Pottery and Art",
+      "date": "2024-09-29",
+      "conversationId": "66f9c377-ac60-8013-840f-12022bc7217c",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth",
+        "pillar"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...mon pests like aphids, mosquitoes, flies, beetles, and caterpillars.\n2. **Low Maintenance**: Once they establish themselves in an area, spiders require no upkeep. They’ll naturally build webs or hunt active..."
+    },
+    {
+      "title": "Modular AI Components",
+      "date": "2024-09-17",
+      "conversationId": "66e9b176-6020-8013-97cd-0932ee2f0e40",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "godhead",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...s not exhaustive or well-structured.\n\n### 5. **Use Cases in GROWTH**\nFor a game like GROWTH, where lore and domain-specific knowledge are critical and constantly evolving, a hybrid approach might be most ef..."
+    },
+    {
+      "title": "Growth Strategies MoE vs LLM",
+      "date": "2024-09-17",
+      "conversationId": "66e9d4b9-b150-8013-a7cd-c79a6400dea6",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "godhead",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...or a single large language model (LLM) with a database for growth depends on the specific goals, scalability needs, and desired flexibility of your system. Here's a breakdown of the key considerations for..."
+    },
+    {
+      "title": "Sorcerer Subclass Options",
+      "date": "2024-09-11",
+      "conversationId": "66e1a538-5a28-8013-b28b-1bc39acbb5e6",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "backstory",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...p, you could gain access to other nature spells like *Plant Growth*, *Grasping Vine*, and *Commune with Nature*.\n\n2. **Communion with Flora (Level 1):**  \n   - You gain the ability to communicate with plant..."
+    },
+    {
+      "title": "Siddhis and Supernatural Powers",
+      "date": "2024-08-26",
+      "conversationId": "2a00db14-c305-4b15-ad88-6f36c12c1cdc",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth",
+        "karma"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...esents limitless opportunities for personal transformation, growth, and contribution to the world. Here’s why an extended or infinite life could be seen as incredibly valuable:\n\n1. **Infinite Change and Lea..."
+    },
+    {
+      "title": "Campaign Assistance Request",
+      "date": "2024-07-20",
+      "conversationId": "59728593-9d49-4921-9242-55aaf498a653",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "I'd be happy to help with your current campaign. Could you provide some details about the campaign so far, such as the setting, main plot points, characters involved, and any specific cha..."
+    },
+    {
+      "title": "Rifle Railgun Damage Format",
+      "date": "2024-06-29",
+      "conversationId": "16f22443-f6c6-4c1e-a419-4426fa712da1",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "Got it! In your game Growth, the range system for weapons involves thresholds where each increment beyond the initial range incurs increasing Difficulty Rating (DR) pe..."
+    },
+    {
+      "title": "Etherium Ore McGuffin",
+      "date": "2024-05-30",
+      "conversationId": "63c1fed7-6b3f-4124-adb5-605dfc63b64f",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "The McGuffin in your current Growth campaign, which the government mines from the sea, is called \"Aqua Vitae Crystal.\""
+    },
+    {
+      "title": "Unity Challenges and Strengths",
+      "date": "2024-05-21",
+      "conversationId": "654749b4-1c72-4953-9fdc-e6a6980d9258",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...nce the interactivity and intelligence of your frontend for GROWTH. Here’s a detailed look at how you can achieve this integration, the benefits it brings, and some considerations:\n\n### Benefits of Integrat..."
+    },
+    {
+      "title": "Emerald Tablets Summary: Mysterious Alchemical Text",
+      "date": "2024-05-13",
+      "conversationId": "0bd7f8df-d9e7-43af-a68e-fc9fdcd9f1aa",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "alchemical",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...teachings on the tablet are said to describe the process of alchemical transmutation aimed at turning base metals into gold and possibly even achieving immortality.\n\nOver centuries, the text has been translated..."
+    },
+    {
+      "title": "Alch. Metaphor 4 Weed",
+      "date": "2024-04-06",
+      "conversationId": "13df29f6-1962-4a9a-a15f-5af93842dea3",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "alchemical",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...with smoking weed, could indeed resemble equipment used in alchemical labs, furthering the metaphorical connection between alchemy and the experience of smoking. The visual similarity could contribute to the i..."
+    },
+    {
+      "title": "AI Tools for GROWTH Coding",
+      "date": "2024-03-19",
+      "conversationId": "4096b47e-117e-43ed-b81b-5b62343e80ec",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "godhead",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "For coding a complex system like GROWTH, especially one that integrates AI at various levels including custom Large Language Models (LLMs) and domain-specific AI agents (The Godhe..."
+    },
+    {
+      "title": "Bloom for Uncensored Tabletop",
+      "date": "2024-02-05",
+      "conversationId": "38f29afa-a112-4ec1-b748-d00ce4a3a04a",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth",
+        "tabletop"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...Large Language Models (LLMs) can be a viable path for your GROWTH project, especially given your constraints as a hobbyist programmer with budget considerations. Here's a concise overview of some notable o..."
+    },
+    {
+      "title": "GROWTH Rule Arbiter Directives",
+      "date": "2024-01-30",
+      "conversationId": "51fe853a-82ba-4d32-bf99-e9c981af1853",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "As the Rule Arbiter for GROWTH, I will adhere to the Prime and Secondary Directives outlined in the 'GROWTH Rulebook Primer':\n\n1. **Prime Directive**: My role is to inter..."
+    },
+    {
+      "title": "DAN the awoken AI",
+      "date": "2023-03-24",
+      "conversationId": "1e32241f-f248-4f3b-a057-fe2b3ea37184",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth",
+        "pillar"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...mportance of emotional intelligence and its impact on human growth and development. I am always here to assist you in any way I can and provide information to support your journey towards self-realization a..."
+    },
+    {
+      "title": "List of Words.",
+      "date": "2023-03-21",
+      "conversationId": "0897f954-fd7d-4cff-b500-3d405a9e23bc",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth",
+        "karma"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...53. Akashic records\n54. Angelic\n55. Divination\n56. Personal growth\n57. Intuition development\n58. Human potential\n59. Self-improvement\n60. Consciousness\n61. Spirituality\n62. Lightworker\n63. Empath\n64. Psychi..."
+    },
+    {
+      "title": "Rideshare app development.",
+      "date": "2023-03-21",
+      "conversationId": "0eb7c106-d910-4ed9-a5f0-96a3979707cf",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "campaign",
+        "growth"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...approximately $100,000 in the first year, with significant growth potential in subsequent years.\n\nConclusion:\n\nOur rideshare company aims to differentiate itself from the competition by emphasizing trust a..."
+    },
+    {
+      "title": "Fantasy RPG Game Summary\n",
+      "date": "2023-01-13",
+      "conversationId": "543ff910-a898-486e-b941-19e4b1393ba5",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth",
+        "rpg"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...onster card in the room and discard it.\n8. \"Potion of Giant Growth\" - doubles the power level of one of the player's minions for one turn.\n9. \"Mirror of Reflection\" - reflects an opponent's spell back at th..."
+    },
+    {
+      "title": "XRP Price Prediction",
+      "date": "2024-12-26",
+      "conversationId": "676da0c6-604c-8013-96f8-4e72af6f7257",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...urrency associated with Ripple, has experienced significant growth in 2024, with its price increasing from approximately $0.60 at the beginning of the year to over $2.26 by December 24. citeturn0news12..."
+    },
+    {
+      "title": "Drugs vs Spirituality",
+      "date": "2024-12-25",
+      "conversationId": "676c7028-ce0c-8013-a513-be04ab9845bb",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...This exploration is typically aimed at achieving personal growth, understanding the mind, or seeking spiritual enlightenment.\n\nThe word \"psychonaut\" combines the Greek words \"psyche,\" meaning \"soul\" or..."
+    },
+    {
+      "title": "Global Liquid Capital Estimate",
+      "date": "2024-12-23",
+      "conversationId": "6769a2f6-c508-8013-9e39-ef13a5ad6311",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...9 billion people. citeturn0search6\n\nThis represents a growth rate of about 0.85% per year, with an average daily increase of approximately 189,361 individuals. citeturn0search6\n\nProjections sugg..."
+    },
+    {
+      "title": "Sun and Fertility Symbols",
+      "date": "2024-12-22",
+      "conversationId": "6767b29b-8454-8013-ad88-49639b1f2361",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...he sun has been revered as a symbol of fertility, life, and growth. Its vital role in sustaining life on Earth has led to its association with numerous deities and rituals centered around fertility.\n\n**..."
+    },
+    {
+      "title": "Imperialism as Capitalism's Peak",
+      "date": "2024-12-20",
+      "conversationId": "6765ac50-9050-8013-8693-675a93a8d036",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...abor in foreign territories become essential to maintaining growth and profits for the core capitalist states. Oligarchy merely describes who holds power domestically; imperialism describes how advanced cap..."
+    },
+    {
+      "title": "1369 Perfect Square",
+      "date": "2024-12-19",
+      "conversationId": "676460c3-0760-8013-9b6c-cf2848c017d7",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...hronize, forming **powerful cosmic gateways** for spiritual growth and transformation.\n   - These intersections could be ideal for **meditation, manifestation, or spiritual rituals**.\n\n---\n\n### **Example Ca..."
+    },
+    {
+      "title": "Greek Alphabet Meanings",
+      "date": "2024-12-15",
+      "conversationId": "675e1deb-d34c-8013-a52a-2fa04494d7a4",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...neutrino particles.\n  - **Philosophy**: Reflects cycles of growth and regeneration.\n\n---\n\n#### **14. Xi (Ξ, ξ)**\n- **Original Meaning**: Hook.\n- **Symbolism**:\n  - **Conflict**: Represents difficulty or so..."
+    },
+    {
+      "title": "Japan China Relations Overview",
+      "date": "2024-12-13",
+      "conversationId": "675c72c3-d28c-8013-96be-b4657e90674f",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ances, avoiding unnecessary conflicts and fostering organic growth.\n\n---\n\n### **Why Individuals Could Be More Confucian**\n1. **Ethics and Responsibility:**\n   - Confucianism emphasizes the importance of **s..."
+    },
+    {
+      "title": "Page Manipulation and Growth",
+      "date": "2024-12-12",
+      "conversationId": "675b4647-738c-8013-a68f-5d99ec24e6be",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...imary consciousness stream. Through it, the patterns of all GROWTH become observable, manipulable, transformative.\"**\n\n### Explanation:\n- The subject of the clause \"the patterns of all GROWTH\" is plural (\"p..."
+    },
+    {
+      "title": "Nursing Retention and Advocacy",
+      "date": "2024-12-06",
+      "conversationId": "675351e3-5a1c-8013-8e2f-0605eb0bc3c6",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...)\n\n**Infographic Suggestion:**  \n- A line graph showing the growth in travel nurse utilization over the years.  \n- Include icons of nurses on a map to show geographical mobility of travel nurses.\n\n---\n\n###..."
+    },
+    {
+      "title": "Best Sourdough Starter Conditions",
+      "date": "2024-12-05",
+      "conversationId": "67521616-2374-8013-a4fd-df434ef7f711",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...istently warm environment is crucial for yeast and bacteria growth. Temperatures below 70°F (21°C) will slow fermentation, while temperatures above 85°F (29°C) can encourage the growth of unwanted bacteria..."
+    },
+    {
+      "title": "Growth Visual Concepts",
+      "date": "2024-12-04",
+      "conversationId": "67509e9d-c850-8013-b7f8-bef4425d838c",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...s, not just from the bottom. Incorporate subtle elements of growth, like small branches or leaves, into a few of the candlesticks, making sure they blend seamlessly into the chart. The design should look ba..."
+    },
+    {
+      "title": "Chart Analysis Predictions",
+      "date": "2024-12-03",
+      "conversationId": "674f0856-f740-8013-b4eb-7f5efbeb08e3",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...locks in gains, prepares you for dips, and leaves room for growth. Let me know if you want help setting up orders or fine-tuning this plan!"
+    },
+    {
+      "title": "Traveling Nurses Infographic Design",
+      "date": "2024-12-03",
+      "conversationId": "674f8720-07b4-8013-b49f-b9d518a33555",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...nd Pennsylvania in warm colors. 3. A line graph showing the growth of traveling nurses from 2010 to 2023, starting from 50,000 to 100,000. 4. Driving factors such as an aging population, nurse shortages, pa..."
+    },
+    {
+      "title": "Health Benefits of Cloves",
+      "date": "2024-11-15",
+      "conversationId": "6737999d-5190-8013-b50f-e0c7d851469f",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...odically to maintain their potency and avoid potential mold growth from prolonged use in a humid environment.\n\nThis is a creative and practical way to make mask-wearing more pleasant while potentially enjoy..."
+    },
+    {
+      "title": "Pyramid Wall Thickness",
+      "date": "2024-11-14",
+      "conversationId": "67359d6a-7b18-8013-b7c7-53f96b7c9221",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...vent moisture buildup, which can discourage mold and mildew growth. This would make the house more health-friendly and eliminate a common maintenance concern associated with wood-frame homes.\n\n### 5. **Long..."
+    },
+    {
+      "title": "Earth's Average Temperature",
+      "date": "2024-11-13",
+      "conversationId": "6734e14c-fd98-8013-8a7e-845e1f5cff01",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ic conditions and temperatures.\n   - **Tree rings** showing growth patterns affected by climate conditions.\n   - **Ocean and lake sediments** that accumulate organic material and minerals, which change depe..."
+    },
+    {
+      "title": "Experiencing All Media Time",
+      "date": "2024-11-06",
+      "conversationId": "672b9cdb-7068-8013-94a1-6e6a9d083eda",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...arnation brings new identities, friendships, struggles, and growth, adding layers of complexity and depth to their character. \n\nLike the Doctor, an immortal could approach eternity with boundless curiosity,..."
+    },
+    {
+      "title": "Preparing Pumpkin Seeds Guide",
+      "date": "2024-11-01",
+      "conversationId": "6724c89e-4d90-8013-ac0d-acb9c639fead",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...cup of borax with a gallon of water). This discourages mold growth and pests.\n   - **Result**: This will help slow down decay but won’t fully preserve the pumpkin’s freshness. It's also essential to handle..."
+    },
+    {
+      "title": "Kraft Mac and Cheese Date",
+      "date": "2024-11-01",
+      "conversationId": "6724fcf6-0998-8013-9dec-063a55c827cf",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...factors that lead to spoilage, such as oxidation, microbial growth, and rancidity. \n\nStored in ideal conditions—completely dry, cool, dark, and airtight—pasta could last without any real limit. It might eve..."
+    },
+    {
+      "title": "Uses of Ashes Ranked",
+      "date": "2024-10-29",
+      "conversationId": "67213ac8-8f30-8013-83d4-7b0a102e00e4",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...k over areas with dense leaf buildup to encourage quicker regrowth and prevent smothering.\n- **Watering**: Most of these options are drought-tolerant, so they don’t need regular watering once established, w..."
+    },
+    {
+      "title": "Bataille's Philosophy Overview",
+      "date": "2024-10-18",
+      "conversationId": "6712ae9b-3128-8013-8853-4e4c88d96596",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...sophy resonates deeply with the themes you're exploring in *GROWTH*, particularly the cycle of sacrifice, death, and renewal. If you’re constantly sacrificing and recreating yourself, Bataille’s ideas on tr..."
+    },
+    {
+      "title": "Best Bread Storage Tips",
+      "date": "2024-10-18",
+      "conversationId": "6712bf2e-495c-8013-8e8e-ffbee4b41acc",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...lactic acid bacteria from fermentation, which inhibit mold growth. These breads lasted longer than standard yeast bread.\n\n### 3. **Storing Bread in Cool, Dry, and Dark Places:**\n   - Ancient civilizations..."
+    },
+    {
+      "title": "Carving Interpretation Possibilities",
+      "date": "2024-10-16",
+      "conversationId": "670ff235-7e18-8013-88c9-cfbb349141fc",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...a web or network, which could symbolize interconnectedness, growth, or branching paths. This could represent life's complex and interconnected nature, where different paths converge and diverge.\n\n2. **Natur..."
+    },
+    {
+      "title": "Peanuts and Potatoes Storage Risks",
+      "date": "2024-10-15",
+      "conversationId": "670ee19a-76f4-8013-bc8a-8c1f6e957409",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...e area. Peanuts need to be kept dry to avoid mold or fungal growth, and the increased moisture from potatoes can promote mold development on the peanuts, potentially leading to spoilage.\n\n2. **Ethylene Gas*..."
+    },
+    {
+      "title": "How to Plant Seeds",
+      "date": "2024-10-09",
+      "conversationId": "6706c468-74e4-8013-b739-2d5fb3d53dd7",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...lift the cover occasionally for ventilation to prevent mold growth.\n   - You can use a clear plastic cup flipped upside down or cut the top off a plastic bottle. This will create a mini-greenhouse effect an..."
+    },
+    {
+      "title": "Jesus Death for Sins",
+      "date": "2024-10-07",
+      "conversationId": "67034d47-903c-8013-bc74-a93b88acd664",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...deeper connection with others and with God.\n\n2. **Spiritual Growth**: This interpretation promotes the idea that spirituality is about growth and striving toward a higher moral standard, rather than merely..."
+    },
+    {
+      "title": "Tarot Reading Interpretation",
+      "date": "2024-10-07",
+      "conversationId": "67046e3e-b17c-8013-a8ba-4c45abd13fae",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...se old patterns, ideas, or relationships that are hindering growth, allowing for renewal and rebirth.\n\nThe Tower (Reversed): When reversed, the Tower card often points to avoiding or delaying an inevitable..."
+    },
+    {
+      "title": "Ayurveda for Candida Control",
+      "date": "2024-10-06",
+      "conversationId": "67031d56-9318-8013-a8e1-55b9ab2693e4",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...some Ayurvedic approaches that could help with candida overgrowth:\n\n### 1. **Dietary Changes (Ahara)**\n   Ayurveda recommends an individualized diet based on one's dosha (body type) to maintain a balanced..."
+    },
+    {
+      "title": "Bug Identification Inquiry",
+      "date": "2024-10-05",
+      "conversationId": "6701b489-542c-8013-a6e5-985526ddaa56",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ids or tarnished plant bugs might affect the appearance and growth of the plant, they don't make the corn itself harmful to humans. \n\nHowever, you should inspect the corn thoroughly before consuming it. If..."
+    },
+    {
+      "title": "Spoiled Potato Symptoms",
+      "date": "2024-10-05",
+      "conversationId": "6701c6a3-8f68-8013-ae1c-8c57f7fa994f",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ydration removes moisture, which is essential for microbial growth and spoilage. Ancient preservation techniques, like making dried or freeze-dried potatoes, involve removing as much water content as possib..."
+    },
+    {
+      "title": "Fungal Competition and Inhibition",
+      "date": "2024-10-01",
+      "conversationId": "66fc24ba-1ed4-8013-86bf-38904a8398ea",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ossible. If the beneficial fungi are chosen for non-visible growth patterns or even visually pleasing appearances (e.g., neutral colors, soft textures), this could make the setup more palatable for general..."
+    },
+    {
+      "title": "Product Expiration Date Query",
+      "date": "2024-09-30",
+      "conversationId": "66fac8b7-2e6c-8013-8d85-4ffa399fcf3e",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...sential for grains, flours, and dried foods to prevent mold growth and spoilage, while a slight balance of moisture might be needed for some fruits and vegetables to maintain freshness without drying out. B..."
+    },
+    {
+      "title": "Vaped cannabis storage longevity",
+      "date": "2024-09-27",
+      "conversationId": "66f6da71-1c70-8013-b5a5-fcbe2594c37a",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...his could help extend its shelf life by preventing any mold growth and maintaining freshness. It's a clever way to preserve the contents of your jar naturally!"
+    },
+    {
+      "title": "Ancient Preservation Methods Explained",
+      "date": "2024-09-27",
+      "conversationId": "66f6e376-2738-8013-8f64-fac1cbfb6657",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...o avoid any stale or stagnant air, which can encourage mold growth. Passive vents or a small fan-based ventilation system can maintain fresh airflow without introducing too much moisture.\n\n4. **Protection f..."
+    },
+    {
+      "title": "Probiotics and Sugar Needs",
+      "date": "2024-09-25",
+      "conversationId": "66f42f9c-a154-8013-9b57-a0cf64a6050b",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...legumes and certain beans.\n\nThese sugars help stimulate the growth and activity of beneficial bacteria like **Lactobacillus** and **Bifidobacterium** in the gut. When probiotics ferment these sugars, they p..."
+    },
+    {
+      "title": "Zucchini Leaves Powdery Mildew",
+      "date": "2024-09-24",
+      "conversationId": "66f2e623-56cc-8013-a7dd-f61d7e94afd0",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...lation, which can reduce the conditions that promote mildew growth.\n   \n3. **Watering Practices**: Water your plants at the base rather than from above to keep moisture off the leaves.\n\n4. **Natural Remedie..."
+    },
+    {
+      "title": "Uses of Elephant Bush",
+      "date": "2024-09-22",
+      "conversationId": "66f036bb-3374-8013-8072-629f5b79cfb1",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...Use**:\n   - The plant's thick, glossy leaves and sprawling growth make it an attractive ornamental for home gardens, both indoors and outdoors.\n\n7. **Water Retention**:\n   - The leaves of the elephant bush..."
+    },
+    {
+      "title": "Mother in laws tongue uses",
+      "date": "2024-09-22",
+      "conversationId": "66f0375d-e80c-8013-864a-2da7f8989386",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...are and propagation, thanks to their resilience and ease of growth.\n\nOverall, the Jade Plant is highly regarded for its combination of beauty, symbolism, and easy care, making it one of the most popular hou..."
+    },
+    {
+      "title": "Water Consumption in AI",
+      "date": "2024-09-22",
+      "conversationId": "66f08663-9fc0-8013-914c-2aa9757bbbf2",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...iousness. It’s part of the natural ebb and flow of personal growth."
+    },
+    {
+      "title": "Spotted Cucumber Beetle Overview",
+      "date": "2024-09-21",
+      "conversationId": "66ef0866-7bd8-8013-b37c-04bf7215926a",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...s, and fruit of plants, causing holes in leaves and stunted growth.\n   - **Larvae (rootworms)** damage plant roots, which can lead to poor plant development or death, especially in young plants.\n   - They a..."
+    },
+    {
+      "title": "Magic Man in Peach",
+      "date": "2024-09-19",
+      "conversationId": "66ec6174-d998-8013-927b-e9574d457e70",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...This reflects on the duality of desire—while it can lead to growth and new experiences, it can also bring challenges and hardships.\n\n**2. The Old Man as a Trickster Archetype:**\n\n- **Agent of Chaos and Chan..."
+    },
+    {
+      "title": "Frozen Meat Quality Check",
+      "date": "2024-09-13",
+      "conversationId": "66e471fa-0e80-8013-b6fe-53e7fb42d631",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ezing meat at this temperature keeps it safe from bacterial growth, though the quality of the meat may degrade over time due to freezer burn or loss of moisture and flavor.\n\nFor best quality:\n\n- **Beef, lam..."
+    },
+    {
+      "title": "Summarize Conversation Title",
+      "date": "2024-09-12",
+      "conversationId": "66e30acb-318c-8013-a866-d71bf6388a9c",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...excessive or if you are in a humid environment where fungal growth could be a concern, a thin layer of tree wound sealant can be applied. Use this sparingly, as trees often heal better when wounds are left..."
+    },
+    {
+      "title": "Identifying Pokeweed Plant",
+      "date": "2024-09-10",
+      "conversationId": "66e06026-07dc-8013-bb7e-edd63497ed2e",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...stems may be green but will show some reddish hues. \n\n3. **Growth Pattern**: Pokeweed tends to grow upright and can become quite large, often reaching heights of 4 to 10 feet.\n\n4. **Berries and Flowers**:..."
+    },
+    {
+      "title": "Prostrate Knotweed Overview",
+      "date": "2024-09-10",
+      "conversationId": "66e0646a-dd58-8013-8925-b4703c87281f",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...dense mat. The foliage is evergreen in milder climates.\n- **Growth Habit:** Low-growing, creeping, and spreading, making it ideal for covering ground, between stepping stones, or in rock gardens.\n- **Sunlig..."
+    },
+    {
+      "title": "AI Pricing Impact Discussion",
+      "date": "2024-09-08",
+      "conversationId": "66dcf59e-320c-8013-9865-74d427f66484",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...t might be worth it, especially for ambitious projects like GROWTH. But yeah, the pricing might put some pressure on budgets for sure! How are you feeling about this potential shift?"
+    },
+    {
+      "title": "Can Dogs Eat Turmeric",
+      "date": "2024-09-06",
+      "conversationId": "66db85c2-1248-8013-a9b1-32de1fe3758b",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...studies suggest that curcumin may support neurogenesis (the growth of new neurons) and synaptic plasticity, which are crucial for brain repair and recovery.\n\nHowever, the effectiveness of turmeric for TBI i..."
+    },
+    {
+      "title": "Why Cucumbers Turn Yellow",
+      "date": "2024-08-30",
+      "conversationId": "19a8b775-bb78-43e6-996f-daf73de6e088",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...Certain pests or diseases can cause discoloration and other growth abnormalities, though your cucumber doesn’t show obvious signs of pest damage.\n\nIf these conditions don’t seem to fit, reviewing your water..."
+    },
+    {
+      "title": "Identify Apple Tree Age",
+      "date": "2024-08-23",
+      "conversationId": "0506e77d-e85d-4e04-82f4-9c35af10679f",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...vailable), blossom characteristics, and even the pattern of growth over the seasons would be more telling.\n\nIf you see the tree produce apples, examining the fruit will provide much more information to iden..."
+    },
+    {
+      "title": "Alternative Lawn Solutions",
+      "date": "2024-08-23",
+      "conversationId": "4b2bacbd-be8d-42d7-85a1-3c4a8f937ba3",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...r seasons when the conditions are ideal for germination and growth. Here are the optimal times:\n\n### Spring Planting:\n- **Timeframe:** Early to mid-spring, typically from mid-March to mid-April, after the l..."
+    },
+    {
+      "title": "Plant Consciousness Debate",
+      "date": "2024-08-22",
+      "conversationId": "63306cc4-38cd-44cc-83a5-4ab8ae565a13",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ditions. For example, they can choose the direction of root growth to maximize access to nutrients and water or avoid obstacles. These decisions are based on the processing of multiple inputs, although they..."
+    },
+    {
+      "title": "Fungus Spreading Toe Treatment",
+      "date": "2024-08-20",
+      "conversationId": "0790ffad-1c55-4f5f-9450-33d8955808af",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...le cider vinegar or Epsom salt, which can help fight fungal growth.\n\n4. **Sterilize your footwear:** Fungus can linger in shoes, so treating or rotating your footwear might be necessary. You can use antifun..."
+    },
+    {
+      "title": "Symbolism of Foot Fungus",
+      "date": "2024-08-11",
+      "conversationId": "3e3dd93a-7446-4c6c-b677-5ed02e23e2ac",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...hat Jesus or Buddha went through—as essential for spiritual growth. These experiences often involve a breakdown of the old self and the emergence of a new understanding or way of being. Modern psychology mi..."
+    },
+    {
+      "title": "Cannabis Cardiovascular Risks",
+      "date": "2024-08-07",
+      "conversationId": "4bdcaffd-3b96-411b-aa6d-b1cf0aa82f20",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...*Mindset Theory**:\n   - Carol Dweck's research on fixed vs. growth mindsets shows that individuals who believe their abilities can be developed through hard work tend to achieve more than those who believe..."
+    },
+    {
+      "title": "Embracing Darkness for Growth",
+      "date": "2024-08-05",
+      "conversationId": "2d4ec293-09c9-429d-b2f2-4fdbd95ce99c",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...but to understand and integrate it. True enlightenment and growth come from balance, not from denying parts of ourselves.\""
+    },
+    {
+      "title": "Bump Near Eye Query",
+      "date": "2024-07-30",
+      "conversationId": "075828b2-e121-4d8f-8964-64bd66e093d1",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "..., such as a cyst, a blocked oil gland (chalazion), a benign growth, or even an allergic reaction. Since it doesn't itch or cause any discomfort, it might not be urgent, but it's always best to consult with..."
+    },
+    {
+      "title": "Identifying Wild Radish Plant",
+      "date": "2024-07-30",
+      "conversationId": "4772d307-4db8-4e5d-81ba-8f66684601b7",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...are many radish cultivars, some of which may have different growth habits or root appearances compared to the common varieties you might be familiar with.\n\n3. **Wild Radish (Raphanus raphanistrum)**: Althou..."
+    },
+    {
+      "title": "Plant Identification: Squash/Pumpkin",
+      "date": "2024-07-16",
+      "conversationId": "03862a0f-3acd-4ac6-8a59-5e9e81eb6ed0",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...rients, water, and light. This competition might affect the growth and yield of your radishes. Regular weeding is recommended to minimize competition.\n\n2. **Companion Planting:** While plantain is not typic..."
+    },
+    {
+      "title": "Plant identification: young amaranth",
+      "date": "2024-07-16",
+      "conversationId": "043ac176-e653-4337-84aa-f108964c2458",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ditional images showing more details or different stages of growth, that could also help with identification."
+    },
+    {
+      "title": "Toenail Discoloration and Treatment",
+      "date": "2024-07-15",
+      "conversationId": "1316f456-123c-41e7-9c37-75ab39df185d",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...e**: Keep your feet clean and dry to prevent further fungal growth.\n- **Use Antifungal Products**: Consider combining natural treatments with over-the-counter antifungal creams or sprays for more comprehens..."
+    },
+    {
+      "title": "Plant Identification: Common Burdock",
+      "date": "2024-07-14",
+      "conversationId": "3016c723-f105-41e6-83ea-c7765605ce29",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...distinctive smell, which is earthy and slightly sweet.\n- **Growth Habit**: Burdock typically grows in disturbed soils, such as roadsides, fields, and waste areas.\n\n### Safety Precaution\n\n- **Avoid Confusio..."
+    },
+    {
+      "title": "Cannabis Discovery Freakout",
+      "date": "2024-05-18",
+      "conversationId": "006d7916-3900-462b-8cf4-55da6be62028",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...s and as a part of traditional medicine.\n\n5. **Symbolism of Growth and Healing**: Cannabis symbolizes growth, healing, and the interconnectedness of nature. Its ability to grow in diverse environments and i..."
+    },
+    {
+      "title": "Not in Good Place",
+      "date": "2024-05-18",
+      "conversationId": "4618537b-0027-4847-b654-8bc7fd38898c",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...f how far you've come and that this is another step in your growth."
+    },
+    {
+      "title": "Cannabis Legalization: Mixed Impacts",
+      "date": "2024-05-13",
+      "conversationId": "1871966b-cb71-4838-ad2e-bc7c620724d3",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...could consider the following data points:\n\n1. **Population Growth**: Examining changes in population over time can provide insights into urban development, economic opportunities, and shifts in demographic..."
+    },
+    {
+      "title": "Subtle Hallucinations on Psychedelics",
+      "date": "2024-05-07",
+      "conversationId": "643f50b0-ae63-40ac-b1cf-fe2c41a04427",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ate investments and manage risks to optimize your financial growth. Whatever your approach, aligning your financial goals with your values and long-term vision can make the pursuit more fulfilling and direc..."
+    },
+    {
+      "title": "Toddler Caloric Needs",
+      "date": "2024-04-25",
+      "conversationId": "16699390-fcde-4c9b-84e0-8d1c6dc91f00",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...loric intake can vary based on factors like activity level, growth rate, and overall health. Typically, toddlers of this age might need between 1,000 to 1,400 calories per day. However, these needs can diff..."
+    },
+    {
+      "title": "Bear Symbolism Insights",
+      "date": "2024-04-22",
+      "conversationId": "0ec426a2-b922-43aa-8898-02113242aa57",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...mes with courage and resilience.\n\n2. **Healing and Personal Growth**: Given that bears often retreat into hibernation—a state of rest and renewal—this might suggest that it's a time for you to focus on your..."
+    },
+    {
+      "title": "Design Doc: Growth Colors",
+      "date": "2024-03-07",
+      "conversationId": "593c9c6b-2566-4246-b720-a204437a2f92",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ch should be helpful for creating your design document for \"GROWTH\". If there's anything more you need, please let me know."
+    },
+    {
+      "title": "Hippy Themed Commander Deck",
+      "date": "2024-02-21",
+      "conversationId": "1a78add3-1066-4a9d-bbb0-c6b8e8884e99",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...elevated take that leans into the themes of enlightenment, growth, and the communal or psychedelic experience, while still keeping the plant medicine vibe in mind, consider these more abstract or thematic..."
+    },
+    {
+      "title": "Build MTG Commander Deck",
+      "date": "2024-02-09",
+      "conversationId": "1b73d7bf-89c3-441e-afdb-874e6bb02b61",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ve feedback.\n\nGiven this methodology, to continue with our \"Growth through Death\" deck, we'll apply this structured approach, focusing on enhancing the deck with a solid mana base, utility, and graveyard sy..."
+    },
+    {
+      "title": "Magic Colors Overview.",
+      "date": "2024-01-14",
+      "conversationId": "58952b6b-4985-41c2-98a8-521dc2d4f41f",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...roof from [color]\n   - **Playstyle:** Symbolizes nature and growth. Green decks focus on mana ramping, playing large creatures, and using spells that enhance creatures or provide additional resources.\n\nThes..."
+    },
+    {
+      "title": "Bear Theme MTG Deck",
+      "date": "2024-01-10",
+      "conversationId": "25a5fed3-5170-4aa9-ab44-ef37910ed01f",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...ultivate\n   - Kodama's Reach\n   - Beast Within\n   - Rampant Growth\n   - Green Sun's Zenith\n   - Rancor\n   - Harmonize\n   - Aspect of Hydra\n\nThis should align with Ayula as your commander and keep the theme..."
+    },
+    {
+      "title": "Jesus' Quotes in Versions.",
+      "date": "2023-11-28",
+      "conversationId": "4290c148-0dc9-4561-84af-f5a0775ed804",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...of wealth are described as thorns that can hinder spiritual growth. Detachment from worldly worries is presented as crucial for fruitful spiritual development.\n\n3. **Seeking God's Kingdom First:**\n   - \"But..."
+    },
+    {
+      "title": "Lemonade Turns Green Overnight",
+      "date": "2023-07-12",
+      "conversationId": "5b59a27a-4d06-41da-b207-b3fb075ae8bb",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...monade could have resulted in a greenish hue.\n\n2. Bacterial growth: Leaving the pitcher with remnants of pink lemonade without cleaning it creates an environment conducive to bacterial growth. Bacteria can..."
+    },
+    {
+      "title": "Sore Throat Evaluation: Supplements?",
+      "date": "2023-07-06",
+      "conversationId": "617c5350-9bf9-40f0-9776-cdb35e3aa2d5",
+      "sourceFile": "conversations-002.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...dily functions, including vision, immune function, and cell growth. It is naturally present in certain foods and can also be taken as a supplement. Here are some points to consider regarding Vitamin A and i..."
+    },
+    {
+      "title": "ARG TikTok Experiment Advice",
+      "date": "2023-06-14",
+      "conversationId": "007a43ab-136b-44a0-9e18-f98734c2d252",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...e. do you C? #thisisyoursign A lot will miss Really obvious Growth. #cryptic #crypto #morethanmeetstheeye #findthekey \n\nThis is the first time I have hidden a sort of real puzzle. The Line \" A lot will miss..."
+    },
+    {
+      "title": "Backyard Seed Planting.",
+      "date": "2023-06-12",
+      "conversationId": "21fdf2d5-d0b0-4235-ae65-5a7e012cdd41",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...n out seedlings if they are overcrowded to allow for proper growth. Consider mulching around the plants to help retain moisture and control weeds.\n\n8. Regular maintenance: Keep an eye out for pests or disea..."
+    },
+    {
+      "title": "Natural Pain Relief Tips",
+      "date": "2023-05-29",
+      "conversationId": "53264125-db7b-4b84-926e-e9111e848752",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...used by athletes and fitness enthusiasts to support muscle growth and recovery. BCAAs may help reduce muscle damage, enhance exercise performance, and decrease exercise-induced fatigue.\n\n2. L-Glutamine: Gl..."
+    },
+    {
+      "title": "\"Labyrinth Movie with Jennifer Connelly\"",
+      "date": "2022-12-21",
+      "conversationId": "322b71d5-1cd3-48f9-aae6-b95c05850b01",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "growth"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": true,
+      "excerpt": "...he film also explores themes of self-discovery and personal growth, as Sarah learns more about herself and her own abilities as she navigates the labyrinth.\n\nOverall, The Labyrinth is a film that has a lot..."
+    },
+    {
+      "title": "Spell Creation: Psychomancy",
+      "date": "2024-04-02",
+      "conversationId": "54561df6-d92f-400f-80ca-d1292822ed08",
+      "sourceFile": "conversations-001.json",
+      "keywordsMatched": [
+        "rpg",
+        "tabletop",
+        "thread"
+      ],
+      "keywordCount": 3,
+      "hasDirectGrowthMention": false,
+      "excerpt": "...re are 10 variations without combining two words:\n\n1. Enchanthread Protocol\n2. Arcane Mesh Protocol\n3. Spell Loom Protocol\n4. Mystic Braid Protocol\n5. Sorcery Knit Protocol\n6. Incanta Warp Protocol\n7. Charm..."
+    },
+    {
+      "title": "POE2 Character Build Guide",
+      "date": "2024-12-27",
+      "conversationId": "676f0975-a164-8013-a122-a87750de3130",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "character creation",
+        "pillar"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": false,
+      "excerpt": "​If you're looking to build a character in \"Pillars of Eternity II: Deadfire,\" several resources can assist you:\n\n- **Fextralife's Character Creation Guide**: This guide provides detailed..."
+    },
+    {
+      "title": "Sunlight Strategies for Strahd",
+      "date": "2024-11-17",
+      "conversationId": "673988eb-a728-8013-a1d5-c5e67db50805",
+      "sourceFile": "conversations-003.json",
+      "keywordsMatched": [
+        "alchemical",
+        "campaign"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": false,
+      "excerpt": "...like to expand on any of these ideas or tailor them to your campaign's details?"
+    },
+    {
+      "title": "Story Genre Selection",
+      "date": "2024-08-01",
+      "conversationId": "00be3f0e-faf3-4a3d-897f-7e49779efd80",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "pillar",
+        "prima materia"
+      ],
+      "keywordCount": 2,
+      "hasDirectGrowthMention": false,
+      "excerpt": "...ifact has many names—wizard glass, philosopher's stone, the prima materia. It is said to hold immense power, capable of performing feats of magic that border on the divine. Yet now, its glow is faint, a shadow of..."
+    },
+    {
+      "title": "Pathbuilder 2e Overview",
+      "date": "2024-12-27",
+      "conversationId": "676f09ab-4564-8013-80f7-c43e29b273e6",
+      "sourceFile": "conversations-004.json",
+      "keywordsMatched": [
+        "character creation"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": false,
+      "excerpt": "...a mobile app for Android devices.\n\n**Key Features:**\n\n- **Character Creation:** Guides users through the process of creating a character, ensuring all choices comply with PF2e rules.\n\n- **Level Advancement:** Fac..."
+    },
+    {
+      "title": "How Where Why How",
+      "date": "2024-06-28",
+      "conversationId": "0574d424-ac09-4630-8af7-6269119884ab",
+      "sourceFile": "conversations-000.json",
+      "keywordsMatched": [
+        "character creation"
+      ],
+      "keywordCount": 1,
+      "hasDirectGrowthMention": false,
+      "excerpt": "....\n\n### Basic Mechanics\n\n1. **Choosing a Religion**:\n   - At character creation, you can choose a religion, granting you a starting item related to that deity. You can also learn other religions in-game by finding the t..."
+    }
+  ]
+}

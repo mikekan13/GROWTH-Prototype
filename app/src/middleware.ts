@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PROTECTED_PATHS = ['/trailblazer', '/watcher', '/terminal'];
+const PROTECTED_PATHS = ['/trailblazer', '/watcher', '/terminal', '/profile/edit', '/campaign'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get('session_token')?.value;
 
-  // Protect dashboard routes
+  // Protect dashboard and authenticated routes
   if (PROTECTED_PATHS.some(p => pathname.startsWith(p))) {
     if (!sessionToken) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
-  // Redirect logged-in users away from home
+  // Redirect logged-in users away from home to feed
   if (pathname === '/' && sessionToken) {
     // Let the page component handle the redirect based on role
     return NextResponse.next();
@@ -23,5 +23,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/trailblazer/:path*', '/watcher/:path*', '/terminal/:path*'],
+  matcher: ['/', '/trailblazer/:path*', '/watcher/:path*', '/terminal/:path*', '/profile/edit', '/campaign/:path*'],
 };

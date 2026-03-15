@@ -1,14 +1,58 @@
 # GRO.WTH AI Systems
 
-Last updated: 2026-03-07
+Last updated: 2026-03-14
 
 ## Current Status
 
-No AI systems are active in the app yet. All AI features are planned and will be implemented in phases following the "manual-first" development principle.
+Two AI systems are now active, both running via Ollama (gemma2:9b, local).
+
+### Active: Application AI (QoL)
+
+**Purpose**: Help GMs design application prompts and help players expand backstory responses.
+
+**Architecture**: `src/ai/application-ai.ts` → `src/ai/providers/ollama.ts` → Ollama REST API
+
+**Functions**:
+- `suggestApplicationPrompts(campaign)` — AI generates 5 tailored backstory prompts from campaign context
+- `expandApplicationResponse(prompt, response, campaign)` — Expands player's short answer into rich narrative prose
+
+**Classification**: Quality-of-life (metered on basic tier, unlimited on premium, local-model-eligible)
+
+### Active: Campaign Co-pilot (QoL, Beta)
+
+**Purpose**: AI assistant embedded in the Campaign Terminal. Answers questions about characters, rules, the campaign world. Can create items, skills, and locations via action intents.
+
+**Architecture**: `src/ai/copilot/` — pre-retrieval pattern
+```
+User message → Context Assembler → Relevant data fetched → Prompt built → Ollama chat → Action parser → Response
+```
+
+**Components**:
+- `copilot-service.ts` — Main orchestrator (conversation loop, history, context assembly)
+- `context-assembler.ts` — Builds entity index, finds mentions in user message, fetches full details for matches
+- `rules-search.ts` — Keyword search across GRO.WTH Repository markdown files (70+ files)
+- `action-parser.ts` — Parses structured action blocks from AI responses
+
+**Context Assembly (lean)**:
+- Campaign summary always included (names only — small)
+- Entity details fetched only when mentioned in user's message
+- Rules searched only when rules-related keywords detected
+- Last 20 conversation messages for continuity
+
+**Actions** (GM-only, require confirmation):
+- `create_forge_item` — skills, items, nectars, blossoms, thorns
+- `create_location` — settlements, dungeons, etc.
+- `create_campaign_item` — weapons, armor, artifacts, etc.
+
+**Data**: `CopilotMessage` model persists conversation history per campaign.
+
+**UI**: "Co-pilot" tab in Campaign Terminal panel, accessible to both GMs and players.
+
+**Classification**: Quality-of-life (local-model-eligible)
 
 ## Planned Systems
 
-### 1. Portrait Pipeline (Phase A-D)
+### Portrait Pipeline (Phase A-D)
 
 **Purpose**: Generate and maintain consistent character portraits from narrative data.
 
@@ -16,45 +60,46 @@ No AI systems are active in the app yet. All AI features are planned and will be
 
 **Detailed design**: See `PORTRAIT-PIPELINE.md` in project root.
 
-**Data flow**:
-```
-Character Data → Prompt Template Engine → ComfyUI API → FLUX.2 + PuLID → Portrait Image → Storage
-```
-
-**Inputs**: Character description, backstory, equipment, vitals, conditions, traits
-**Outputs**: Portrait image (1024x1024), identity embedding for consistency
-**Dependencies**: ComfyUI (local), FLUX.2 Dev model, PuLID weights
-
-### 2. Backstory AI Assistant (future)
-
-**Purpose**: Help players expand their backstory responses using campaign context.
-
-**Inputs**: Player's partial backstory text, campaign worldContext, campaign themes
-**Outputs**: Expanded text suggestions (player accepts/rejects)
-**Constraint**: AI expands existing text, never overwrites. Player always has final say.
-
-### 3. Rule Arbiter (future — Phase 6+)
+### Rule Arbiter (future — Phase 6+)
 
 **Purpose**: AI copilot that monitors game state and suggests mechanical outcomes.
 
 **Inputs**: Session events (eventually via microphone → transcription → interpretation)
-**Outputs**: Suggested attribute changes, damage, conditions
-**Constraint**: Manual override always available. GM is final authority. AI asks "why" when corrected and learns.
+**Constraint**: Manual override always available. GM is final authority.
 
-### 4. Oracle (future — separate project)
+### Oracle (future — separate project)
 
-**Purpose**: Full AI co-GM system.
+**Purpose**: Full AI co-GM system (the GODHEAD role).
+**Status**: Deferred beyond beta. Will be its own service connecting via API.
 
-**Status**: Deferred beyond 3-month beta timeline. Will be its own service connecting via API.
-
-## Directory Structure
+## Provider Architecture
 
 ```
 src/ai/
-  portraits/     ← Portrait pipeline integration (Phase A-D)
-  prompts/       ← Prompt templates for AI systems
-  (future additions as systems are built)
+  types.ts              — AIProvider interface, ChatMessage, GenerateOptions
+  providers/
+    ollama.ts           — Ollama HTTP client (generateText + chat), server-only
+    index.ts            — getAIProvider() factory (AI_PROVIDER env var)
+  prompts/
+    application.ts      — Prompt templates for application suggest + expand
+  application-ai.ts     — Public API for application features
+  copilot/
+    types.ts            — CopilotAction, CopilotContext, EntityIndex
+    context-assembler.ts — Campaign data retrieval + entity matching
+    rules-search.ts     — GRO.WTH Repository keyword search
+    action-parser.ts    — Parse action blocks from AI responses
+    copilot-service.ts  — Main service (message handling, history)
 ```
+
+## Subscription Tier Classification
+
+| Feature | Type | Basic Tier | Premium Tier | Local Model |
+|---------|------|-----------|-------------|-------------|
+| KRMA Validator | System-required | Always | Always | No (cloud only) |
+| Application AI | QoL | Metered | Unlimited | Yes |
+| Campaign Co-pilot | QoL | Metered | Unlimited | Yes |
+| Portrait Generation | QoL | Metered | Unlimited | Yes |
+| Rule Arbiter | System-required | Always | Always | No (cloud only) |
 
 ## Design Principles
 
@@ -62,3 +107,5 @@ src/ai/
 2. **AI is copilot, not authority** — Players and GMs can always override
 3. **Isolated from domain logic** — AI code lives in /ai, called via services
 4. **Local-first** — Run on local hardware during alpha/beta, cloud option later
+5. **Centralized co-pilot** — AI is overhead assistant, not per-field buttons
+6. **Lean context** — Pre-retrieve only relevant data, never front-load everything

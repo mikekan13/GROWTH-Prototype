@@ -64,6 +64,27 @@ export async function listListedCampaigns(filters?: z.infer<typeof listingFilter
         gmUser: {
           select: { username: true },
         },
+        members: {
+          select: {
+            user: {
+              select: { username: true },
+            },
+          },
+          take: 8,
+        },
+        characters: {
+          select: {
+            userId: true,
+            data: true,
+            status: true,
+            user: { select: { username: true } },
+          },
+        },
+        sessions: {
+          select: { number: true, startedAt: true, name: true },
+          orderBy: { number: 'desc' as const },
+          take: 1,
+        },
         _count: {
           select: { members: true },
         },
@@ -83,8 +104,21 @@ export async function listListedCampaigns(filters?: z.infer<typeof listingFilter
       description: c.listingDescription,
       tags: c.listingTags ? JSON.parse(c.listingTags) as string[] : [],
       gmUsername: c.gmUser.username,
+      members: c.members.map(m => {
+        const char = c.characters.find(ch => ch.user.username === m.user.username);
+        let tkv = 0;
+        if (char?.data) {
+          try { tkv = Number(JSON.parse(char.data).tkv) || 0; } catch { /* ignore */ }
+        }
+        return { username: m.user.username, tkv };
+      }),
       memberCount: c._count.members,
       maxTrailblazers: c.maxTrailblazers,
+      lastSession: c.sessions[0] ? {
+        number: c.sessions[0].number,
+        name: c.sessions[0].name,
+        date: c.sessions[0].startedAt,
+      } : null,
       createdAt: c.createdAt,
     })),
     total,

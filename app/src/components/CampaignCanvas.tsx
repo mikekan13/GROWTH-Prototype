@@ -19,6 +19,7 @@ function formatKrma(value: string): string {
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
 const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr: false });
+const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -61,8 +62,8 @@ interface CampaignCanvasProps {
   userCharacter?: { id: string; name: string; data: string } | null;
 }
 
-type Tab = 'canvas' | 'forge' | 'encounters' | 'essence';
-// Tab was renamed from 'relations' to 'canvas' (2026-03-11)
+type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry';
+// Tab was renamed from 'relations' to 'canvas' (2026-03-11), 'essence' to 'tapestry' (2026-03-14)
 
 const MIN_TERMINAL_HEIGHT = 150;
 const MAX_TERMINAL_FRACTION = 0.8;
@@ -567,7 +568,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     { key: 'canvas', label: 'Canvas' },
     { key: 'forge', label: 'Forge' },
     { key: 'encounters', label: 'Encounters' },
-    { key: 'essence', label: 'Essence' },
+    { key: 'tapestry', label: 'Tapestry' },
   ];
 
   return (
@@ -605,6 +606,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 <span className="text-white/30 text-[9px] font-[family-name:var(--font-terminal)]">
                   {campaign.genre}
                 </span>
+              )}
+              {campaign.inviteCode && (
+                <div className="text-[9px] text-white/30 font-[family-name:var(--font-terminal)]">
+                  Invite: <span className="text-[var(--accent-gold)]/60">{campaign.inviteCode}</span>
+                </div>
               )}
             </div>
           </div>
@@ -669,10 +675,17 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 </div>
               </div>
             )}
-            {campaign.inviteCode && (
-              <div className="text-[10px] text-white/40 font-[family-name:var(--font-terminal)]">
-                Invite: <span className="text-[var(--accent-gold)]">{campaign.inviteCode}</span>
-              </div>
+            {isGM && (
+              <Link
+                href={`/watcher/campaign/${campaign.id}/settings`}
+                className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--accent-teal)]/30 text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] hover:border-[var(--accent-teal)]/60 transition-colors"
+                title="Campaign Settings"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </Link>
             )}
           </div>
         </div>
@@ -761,140 +774,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           </div>
         )}
 
-        {activeTab === 'essence' && (
-          <div className="h-full overflow-y-auto p-6" style={{ background: 'var(--surface-dark)' }}>
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="text-center mb-8">
-                <div className="text-[var(--accent-teal)] text-xs font-[family-name:var(--font-terminal)] tracking-[0.3em] uppercase mb-1">
-                  Campaign Essence
-                </div>
-                <div className="text-white/20 text-[9px] font-[family-name:var(--font-terminal)]">
-                  GRO.vines &middot; Narrative Threads &middot; Character Arcs
-                </div>
-              </div>
-
-              {/* GRO.vines overview */}
-              <div>
-                <div className="text-[var(--accent-teal)] text-[10px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-3 border-b border-[var(--accent-teal)]/20 pb-1">
-                  Active GRO.vines
-                </div>
-                {nodes.filter(n => n.type === 'character' && n.characterData).map(node => {
-                  const charData = node.characterData as Record<string, unknown>;
-                  const grovines = (charData?.grovines as Array<{ id: string; goal: string; resistance: string; opportunity: string; status: string }>) || [];
-                  const active = grovines.filter(v => v.status === 'active');
-                  if (active.length === 0) return null;
-                  return (
-                    <div key={node.id} className="mb-4">
-                      <div className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider uppercase mb-2">
-                        {node.name}
-                      </div>
-                      {active.map(vine => (
-                        <div key={vine.id} className="ml-4 mb-2 p-3 border-l-2 border-[var(--accent-teal)]/30" style={{ background: 'rgba(34,171,148,0.05)' }}>
-                          <div className="text-white text-[11px] font-bold mb-1">{vine.goal}</div>
-                          <div className="grid grid-cols-3 gap-3 text-[9px]">
-                            <div>
-                              <span className="text-[#4ade80] font-bold">G</span>
-                              <span className="text-white/40 ml-1">{vine.goal.length > 30 ? `${vine.goal.substring(0, 30)}...` : vine.goal}</span>
-                            </div>
-                            <div>
-                              <span className="text-[#E8585A] font-bold">R</span>
-                              <span className="text-white/40 ml-1">{vine.resistance || 'Hidden'}</span>
-                            </div>
-                            <div>
-                              <span className="text-[#ffcc78] font-bold">O</span>
-                              <span className="text-white/40 ml-1">{vine.opportunity || 'Awaiting'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-                {nodes.filter(n => n.type === 'character' && n.characterData).every(n => {
-                  const charData = n.characterData as Record<string, unknown>;
-                  const grovines = (charData?.grovines as Array<{ status: string }>) || [];
-                  return grovines.filter(v => v.status === 'active').length === 0;
-                }) && (
-                  <div className="text-center py-8 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
-                    No active GRO.vines. Characters can set goals during play or Harvests.
-                  </div>
-                )}
-              </div>
-
-              {/* Traits overview */}
-              <div>
-                <div className="text-[var(--accent-gold)] text-[10px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-3 border-b border-[var(--accent-gold)]/20 pb-1">
-                  Nectars &middot; Blossoms &middot; Thorns
-                </div>
-                {nodes.filter(n => n.type === 'character' && n.characterData).map(node => {
-                  const charData = node.characterData as Record<string, unknown>;
-                  const traits = (charData?.traits as Array<{ name: string; type: string; description: string }>) || [];
-                  if (traits.length === 0) return null;
-                  const nectars = traits.filter(t => t.type === 'nectar');
-                  const blossoms = traits.filter(t => t.type === 'blossom');
-                  const thorns = traits.filter(t => t.type === 'thorn');
-                  return (
-                    <div key={node.id} className="mb-4">
-                      <div className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider uppercase mb-2">
-                        {node.name}
-                      </div>
-                      <div className="ml-4 flex flex-wrap gap-2">
-                        {nectars.map((t, i) => (
-                          <span key={`n-${i}`} className="px-2 py-1 text-[8px] uppercase tracking-wider border rounded-sm" style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.08)' }}>
-                            {t.name}
-                          </span>
-                        ))}
-                        {blossoms.map((t, i) => (
-                          <span key={`b-${i}`} className="px-2 py-1 text-[8px] uppercase tracking-wider border rounded-sm" style={{ color: '#ffcc78', borderColor: 'rgba(255,204,120,0.3)', background: 'rgba(255,204,120,0.08)' }}>
-                            {t.name}
-                          </span>
-                        ))}
-                        {thorns.map((t, i) => (
-                          <span key={`t-${i}`} className="px-2 py-1 text-[8px] uppercase tracking-wider border rounded-sm" style={{ color: '#E8585A', borderColor: 'rgba(232,88,90,0.3)', background: 'rgba(232,88,90,0.08)' }}>
-                            {t.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Harvests overview */}
-              <div>
-                <div className="text-[var(--pillar-body)] text-[10px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-3 border-b border-[var(--pillar-body)]/20 pb-1">
-                  Harvest Log
-                </div>
-                {nodes.filter(n => n.type === 'character' && n.characterData).map(node => {
-                  const charData = node.characterData as Record<string, unknown>;
-                  const harvests = (charData?.harvests as Array<{ id: string; name: string; status: string; activity: string }>) || [];
-                  if (harvests.length === 0) return null;
-                  return (
-                    <div key={node.id} className="mb-3">
-                      <div className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider uppercase mb-1">
-                        {node.name}
-                      </div>
-                      {harvests.map(h => (
-                        <div key={h.id} className="ml-4 mb-1 text-[9px] flex items-center gap-2">
-                          <span className={`w-1.5 h-1.5 rounded-full ${h.status === 'completed' ? 'bg-[#4ade80]' : h.status === 'active' ? 'bg-[#ffcc78]' : 'bg-white/20'}`} />
-                          <span className="text-white/60">{h.name}</span>
-                          <span className="text-white/30">&mdash; {h.activity}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-                {nodes.filter(n => n.type === 'character' && n.characterData).every(n => {
-                  const charData = n.characterData as Record<string, unknown>;
-                  return ((charData?.harvests as unknown[]) || []).length === 0;
-                }) && (
-                  <div className="text-center py-4 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
-                    No harvests recorded yet.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        {activeTab === 'tapestry' && (
+          <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} />
         )}
 
         {/* Campaign Terminal — resizable bottom overlay */}

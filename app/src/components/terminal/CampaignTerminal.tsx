@@ -12,6 +12,7 @@ import { spendAttribute, type AttributeName } from '@/lib/character-actions';
 import { diceEvents } from '@/lib/dice-events';
 import type { RollResult } from '@/types/dice';
 import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
+import CopilotChat from './CopilotChat';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export default function CampaignTerminal({
   username: _username,
   userRole: _userRole,
 }: CampaignTerminalProps) {
+  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<TerminalFilter>('all');
@@ -651,23 +653,56 @@ export default function CampaignTerminal({
               </span>
             )}
           </div>
-          <button
-            onClick={() => { fetchEvents(); fetchSessions(); }}
-            className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-            style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: '#22ab94',
-              border: '1px solid rgba(34, 171, 148, 0.4)',
-              backgroundColor: 'transparent',
-            }}
-            onMouseOver={e => (e.currentTarget.style.backgroundColor = 'rgba(34, 171, 148, 0.15)')}
-            onMouseOut={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            REFRESH
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Mode toggle: Terminal / Co-pilot */}
+            <div className="flex" style={{ border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}>
+              <button
+                onClick={() => setTerminalMode('terminal')}
+                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
+                style={{
+                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                  letterSpacing: '0.05em',
+                  color: terminalMode === 'terminal' ? '#0a0a1a' : '#888',
+                  backgroundColor: terminalMode === 'terminal' ? '#22ab94' : 'transparent',
+                }}
+              >
+                Terminal
+              </button>
+              <button
+                onClick={() => setTerminalMode('copilot')}
+                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
+                style={{
+                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                  letterSpacing: '0.05em',
+                  color: terminalMode === 'copilot' ? '#0a0a1a' : '#D0A030',
+                  backgroundColor: terminalMode === 'copilot' ? '#D0A030' : 'transparent',
+                  borderLeft: '1px solid rgba(34,171,148,0.4)',
+                }}
+              >
+                Co-pilot
+              </button>
+            </div>
+            {terminalMode === 'terminal' && (
+              <button
+                onClick={() => { fetchEvents(); fetchSessions(); }}
+                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
+                style={{
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  color: '#22ab94',
+                  border: '1px solid rgba(34, 171, 148, 0.4)',
+                  backgroundColor: 'transparent',
+                }}
+                onMouseOver={e => (e.currentTarget.style.backgroundColor = 'rgba(34, 171, 148, 0.15)')}
+                onMouseOut={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                REFRESH
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Filter buttons */}
+        {/* Filter buttons (terminal mode only) */}
+        {terminalMode === 'terminal' && (
         <div className="flex gap-1 flex-wrap">
           {FILTERS.map(f => (
             <button
@@ -688,8 +723,22 @@ export default function CampaignTerminal({
             </button>
           ))}
         </div>
+        )}
       </div>
 
+      {/* Co-pilot Chat */}
+      {terminalMode === 'copilot' && (
+        <CopilotChat
+          campaignId={campaignId}
+          visible={visible && terminalMode === 'copilot'}
+          userId={_userId}
+          username={_username}
+          userRole={_userRole}
+        />
+      )}
+
+      {/* Event Feed (terminal mode only) */}
+      {terminalMode === 'terminal' && (<>
       {/* Event Feed */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
         {loading && events.length === 0 && (
@@ -779,6 +828,7 @@ export default function CampaignTerminal({
         onSubmit={handleCommandSubmit}
         placeholder={character ? `Type a message or /command as ${character.name}...` : 'Type a message or /command...'}
       />
+      </>)}
     </div>
   );
 }

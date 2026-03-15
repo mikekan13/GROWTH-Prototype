@@ -5,6 +5,7 @@ import DashboardShell from '@/components/DashboardShell';
 import JoinCampaign from '@/components/JoinCampaign';
 import RedeemCode from '@/components/RedeemCode';
 import Link from 'next/link';
+import EyetehrnetLogo from '@/components/EyetehrnetLogo';
 
 export default async function TrailblazerDashboard() {
   const session = await getSession();
@@ -154,7 +155,7 @@ export default async function TrailblazerDashboard() {
         {/* Browse Campaigns */}
         <div className="p-4 bg-[var(--accent-teal)]/5 border border-[var(--accent-teal)]/20 flex items-center justify-between">
           <div>
-            <div className="text-sm font-bold text-[var(--surface-dark)]">{'EŶ∃tehrNET'}</div>
+            <div className="text-sm font-bold text-[var(--surface-dark)]"><EyetehrnetLogo scale={0.75} /></div>
             <div className="text-xs text-[var(--surface-dark)]/40">Browse open campaigns and apply</div>
           </div>
           <Link
