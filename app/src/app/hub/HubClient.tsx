@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import CampaignCard from '@/components/hub/CampaignCard';
-import HubFilters from '@/components/hub/HubFilters';
 
 interface CampaignListing {
   id: string;
@@ -21,22 +20,19 @@ interface CampaignListing {
 export default function HubClient() {
   const [campaigns, setCampaigns] = useState<CampaignListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [genres, setGenres] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Endless feed: repeat campaigns to fill the feed
-  const REPEAT_COUNT = 20; // repeat the list to simulate endless
+  const REPEAT_COUNT = 20;
   const feedItems = campaigns.length > 0
     ? Array.from({ length: REPEAT_COUNT }, (_, i) => campaigns.map(c => ({ ...c, _feedKey: `${i}-${c.id}` }))).flat()
     : [];
 
-  const fetchCampaigns = useCallback(async (search = '', genre = '') => {
+  const fetchCampaigns = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (search) params.set('search', search);
-      if (genre) params.set('genre', genre);
       params.set('limit', '50');
 
       const res = await fetch(`/api/hub?${params}`);
@@ -44,28 +40,16 @@ export default function HubClient() {
         const data = await res.json();
         setCampaigns(data.campaigns);
         setCurrentIndex(0);
-
-        const uniqueGenres = [...new Set(data.campaigns.map((c: CampaignListing) => c.genre).filter(Boolean))] as string[];
-        if (uniqueGenres.length > genres.length) {
-          setGenres(uniqueGenres);
-        }
       }
     } finally {
       setLoading(false);
     }
-  }, [genres.length]);
+  }, []);
 
   useEffect(() => {
     fetchCampaigns();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const [filterTimer, setFilterTimer] = useState<NodeJS.Timeout | null>(null);
-  function handleFilter(search: string, genre: string) {
-    if (filterTimer) clearTimeout(filterTimer);
-    const t = setTimeout(() => fetchCampaigns(search, genre), 300);
-    setFilterTimer(t);
-  }
 
   function scrollTo(index: number) {
     const clamped = Math.max(0, Math.min(index, feedItems.length - 1));
@@ -146,11 +130,6 @@ export default function HubClient() {
           </button>
         </div>
       )}
-
-      {/* Fixed filters at bottom */}
-      <div className="shrink-0">
-        <HubFilters genres={genres} onFilter={handleFilter} />
-      </div>
     </div>
   );
 }

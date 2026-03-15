@@ -181,7 +181,7 @@ async function main() {
 
     const gm = pick(WATCHER_NAMES);
     const genre = pick(GENRES);
-    const maxTb = 3 + Math.floor(Math.random() * 4); // 3-6
+    const maxTb = 2 + Math.floor(Math.random() * 4); // 2-5
     const memberCount = Math.floor(Math.random() * (maxTb + 1));
     const memberNames = pickN(allPlayerNames, memberCount);
     const tags = pickN(TAGS_POOL, 2 + Math.floor(Math.random() * 4));

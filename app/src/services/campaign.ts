@@ -24,7 +24,7 @@ export const updateCampaignSchema = z.object({
   description: z.string().max(2000).optional(),
   worldContext: z.string().max(5000).optional(),
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'ARCHIVED']).optional(),
-  maxTrailblazers: z.number().int().min(1).max(50).optional(),
+  maxTrailblazers: z.number().int().min(1).max(5).optional(),
   customPrompts: z.array(z.string().max(500)).max(20).optional(),
 });
 

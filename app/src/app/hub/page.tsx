@@ -9,14 +9,12 @@ export default async function HubPage() {
 
   const content = (
     <div className="max-w-4xl mx-auto h-full relative flex flex-col overflow-hidden">
-      {/* Logo banner — overlaid, cards scroll beneath */}
-      <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
-        <div className="pointer-events-auto">
-          <HubLogo />
-        </div>
+      {/* Logo — in flow, takes its natural height */}
+      <div className="shrink-0 relative z-20">
+        <HubLogo />
       </div>
 
-      {/* Cards + filters — full height, scrolls under logo */}
+      {/* Cards feed — fills remaining height below logo */}
       <div className="flex-1 min-h-0 flex flex-col">
         <HubClient />
       </div>
