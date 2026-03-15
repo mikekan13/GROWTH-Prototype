@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
+Last updated: 2026-03-15 (EŶ∃tehrNET social platform)
 
 ## Services (Business Logic)
 
@@ -25,6 +25,8 @@ Last updated: 2026-03-12 (Canvas bug sweep + zoom refactor)
 | KRMA Crystallization | `services/krma/crystallization.ts` | Crystallize/dissolve entities across KRMA line. Ledger stored as campaign events. Prevents double-crystallization. Pool tracking | Prisma, permissions |
 | DiceService | `services/dice.ts` | Single entry point for all dice rolling. Skilled/unskilled checks, death saves, fear checks, contested rolls, quick rolls, custom rolls. Integrates crypto RNG, Godhead injection, event bus | dice lib, dice-events, dice-injection |
 | DiceInjectionRegistry | `services/dice-injection.ts` | Godhead override system. Register/remove/apply injections that silently modify die results. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp, hidden modifier. Audit-logged | dice types |
+| ProfileService | `services/profile.ts` | Get/update trailblazer profile, get/update watcher profile (WATCHER+ only), public profile view (strips topicsToAvoid) | Prisma, permissions |
+| HubService | `services/hub.ts` | List LISTED campaigns (public, filterable), campaign listing detail (public), update listing (GM-only), apply to campaign (auth, creates member+application atomically with profile snapshot) | Prisma, permissions |
 
 ## Infrastructure (lib/)
 

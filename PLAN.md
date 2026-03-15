@@ -1,7 +1,28 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-12
-Current phase: Phase 3 (Session Tools) — Skeleton Systems Pass
+Last updated: 2026-03-15
+Current phase: Phase 4 (EŶ∃tehrNET Social Platform)
+
+## Session 2026-03-15: EŶ∃tehrNET Social Platform Backbone
+**Completed:**
+- Schema migration: User.profile (JSON TrailblazerProfile), User.watcherProfile (JSON WatcherProfile), Campaign listing fields (listingStatus, listingDescription, listingTags, requiredFields), CampaignApplication.profileSnapshot
+- Profile service + 3 API routes: GET/PUT /api/profile (own), GET /api/profile/[username] (public, strips topicsToAvoid)
+- Hub service + 4 API routes: GET /api/hub (public listing), GET /api/hub/[id] (public detail), POST /api/hub/[id]/apply (auth, atomic member+application), GET/PUT /api/campaigns/[id]/listing (GM manages)
+- Profile edit page (/profile/edit): structured form with identity, experience, playstyle, availability sections + watcher profile form for GMs
+- Public profile page (/profile/[username]): works with or without auth, shows watcher profile + listed campaigns for GMs
+- Hub page (/hub): public campaign browser with search/filter, campaign cards with player count, genre, GM link
+- Campaign listing detail (/hub/[id]): full description, tags, required fields, GM profile, apply button with state checks
+- Apply flow (/hub/[id]/apply): profile summary with completeness indicator + campaign questions, atomic submission
+- Listing management in campaign settings: listing status toggle (UNLISTED/LISTED/CLOSED), description, tags, required profile fields selector
+- Navigation: username links to /profile/edit, EŶ∃tehrNET link in header, Browse Campaigns prominent on trailblazer dashboard
+- Updated docs: module_registry.md, database_schema.md
+
+**Next session:**
+- Step 12: Clean up Tapestry tab (clear ApplicationTemplateEditor/ReviewPanel, keep GRO.vines)
+- Application review: GM sees profileSnapshot + campaign answers + completeness indicator
+- End-to-end testing of full flow (register → edit profile → browse hub → apply → GM review)
+
+---
 
 ## Session 2026-03-12: Canvas Bug Sweep
 **Completed:**

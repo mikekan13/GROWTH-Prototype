@@ -1,6 +1,6 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-03-09 (Skeleton Systems — Location, CampaignItem, Encounter)
+Last updated: 2026-03-15 (EŶ∃tehrNET profiles + listings)
 Source of truth: `app/prisma/schema.prisma`
 
 ## Models
@@ -8,12 +8,18 @@ Source of truth: `app/prisma/schema.prisma`
 ### User
 Core account. Roles determine interface access.
 - `role`: TRAILBLAZER (default) | WATCHER | ADMIN | GODHEAD
+- `profile`: JSON<TrailblazerProfile> — firstName, pronouns, bio, experienceLevel, systemsPlayed[], playstylePreferences[], playstyleNotes, conflictStyle, topicsToAvoid, availableDays[], preferredTime, timezone, sessionLength, frequency
+- `watcherProfile`: JSON<WatcherProfile> — gmExperience, gmStyle, campaignPhilosophy, sessionZeroApproach, preferredGroupSize, contentWarningPolicy (WATCHER+ only)
 - Relations: campaigns (as GM), characters, memberships, wallet, sessions, redeemed access codes
 
 ### Campaign
 GM-created game world container.
 - `worldContext`: Free-text world description for AI backstory assistance
 - `customPrompts`: JSON array of GM-defined backstory prompts (appended to defaults)
+- `listingStatus`: UNLISTED (default) | LISTED | CLOSED — controls EŶ∃tehrNET hub visibility
+- `listingDescription`: Public-facing campaign pitch (separate from internal description)
+- `listingTags`: JSON string[] — tags for hub filtering
+- `requiredFields`: JSON string[] — profile fields GM requires from applicants
 - `maxTrailblazers`: Seat limit (default 5, maps to subscription model)
 - `inviteCode`: 8-char hex code for player enrollment
 - Relations: characters, members (CampaignMember)
@@ -21,7 +27,11 @@ GM-created game world container.
 ### CampaignMember
 Player enrollment in a campaign (no character yet).
 - Unique constraint: one membership per user per campaign
-- Created when player redeems invite code
+- Created when player redeems invite code or applies via EŶ∃tehrNET hub
+
+### CampaignApplication (updated)
+- `profileSnapshot`: JSON snapshot of applicant's profile at time of application
+- Created atomically with CampaignMember when applying through hub
 
 ### Character
 Player character with full game data.

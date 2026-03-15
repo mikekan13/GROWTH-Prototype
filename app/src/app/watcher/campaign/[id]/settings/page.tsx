@@ -26,6 +26,14 @@ export default async function CampaignSettingsPage({ params }: { params: Promise
     ? JSON.parse(campaign.customPrompts)
     : [];
 
+  const listingTags: string[] = campaign.listingTags
+    ? JSON.parse(campaign.listingTags as string)
+    : [];
+
+  const requiredFields: string[] = campaign.requiredFields
+    ? JSON.parse(campaign.requiredFields as string)
+    : [];
+
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
       <div className="max-w-3xl mx-auto space-y-6">
@@ -52,8 +60,13 @@ export default async function CampaignSettingsPage({ params }: { params: Promise
             inviteCode: campaign.inviteCode ?? '',
             customPrompts,
             currentMemberCount: campaign._count.members,
+            listingStatus: campaign.listingStatus || 'UNLISTED',
+            listingDescription: campaign.listingDescription || '',
+            listingTags,
+            requiredFields,
           }}
         />
+
       </div>
     </DashboardShell>
   );

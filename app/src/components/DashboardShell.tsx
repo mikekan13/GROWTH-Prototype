@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import GrowthLogo from './GrowthLogo';
 import GlitchText from './GlitchText';
 
@@ -70,10 +71,16 @@ export default function DashboardShell({ username, role, children }: DashboardSh
           </div>
 
           <div className="flex items-center gap-4">
+            <Link
+              href="/hub"
+              className="text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] text-[9px] tracking-[0.2em] uppercase font-[family-name:var(--font-terminal)] transition-colors px-2 py-1 border border-[var(--accent-teal)]/20 hover:border-[var(--accent-teal)]/50"
+            >
+              {'EŶ∃tehrNET'}
+            </Link>
             <div className="text-right">
-              <span className="text-[var(--accent-teal)]/70 text-[10px] font-[family-name:var(--font-terminal)] tracking-wider block">
+              <Link href="/profile/edit" className="text-[var(--accent-teal)]/70 hover:text-[var(--accent-teal)] text-[10px] font-[family-name:var(--font-terminal)] tracking-wider block transition-colors">
                 {username}
-              </span>
+              </Link>
               <span className="text-white/20 text-[8px] font-[family-name:var(--font-terminal)]">
                 CONSCIOUSNESS: INTERFACED
               </span>

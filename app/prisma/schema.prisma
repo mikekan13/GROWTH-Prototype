@@ -8,55 +8,82 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  username     String     @unique
-  email        String     @unique
-  passwordHash String
-  role         String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
-  campaigns    Campaign[]       @relation("GMCampaigns")
-  characters   Character[]
-  memberships  CampaignMember[]
-  wallet       Wallet?
-  sessions     Session[]
-  accessCodes  AccessCode[]
-  createdAt    DateTime   @default(now())
+  id             String     @id @default(cuid())
+  username       String     @unique
+  email          String     @unique
+  passwordHash   String
+  role           String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
+  profile        String?    // JSON<TrailblazerProfile>
+  watcherProfile String?    // JSON<WatcherProfile> (GM-specific, only for WATCHER/ADMIN roles)
+  campaigns      Campaign[]       @relation("GMCampaigns")
+  characters     Character[]
+  memberships    CampaignMember[]
+  wallet         Wallet?
+  sessions       Session[]
+  accessCodes    AccessCode[]
+  createdAt      DateTime   @default(now())
 }
 
 model Campaign {
-  id              String           @id @default(cuid())
-  name            String
-  genre           String?
-  themes          String?          // JSON array
-  description     String?
-  worldContext    String?          // World description for AI context
-  customPrompts   String?          // JSON array of GM-defined backstory prompts
-  gmUser          User             @relation("GMCampaigns", fields: [gmUserId], references: [id])
-  gmUserId        String
-  inviteCode      String?          @unique
-  status          String           @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
-  maxTrailblazers Int              @default(5)
-  characters      Character[]
-  members         CampaignMember[]
-  changeLogs      ChangeLog[]
-  sessions        GameSession[]
-  events          CampaignEvent[]
-  forgeItems      ForgeItem[]
-  playerRequests  PlayerRequest[]
-  locations       Location[]
-  campaignItems   CampaignItem[]
-  encounters      Encounter[]
-  createdAt       DateTime         @default(now())
+  id                  String               @id @default(cuid())
+  name                String
+  genre               String?
+  themes              String?              // JSON array
+  description         String?
+  worldContext        String?              // World description for AI context
+  customPrompts       String?              // JSON array of GM-defined backstory prompts (legacy)
+  applicationTemplate String?              // JSON: [{ id, prompt, required, category }]
+  listingStatus       String               @default("UNLISTED") // UNLISTED | LISTED | CLOSED
+  listingDescription  String?              // Public-facing campaign pitch
+  listingTags         String?              // JSON string[]
+  requiredFields      String?              // JSON string[] — profile fields GM requires from applicants
+  gmUser              User                 @relation("GMCampaigns", fields: [gmUserId], references: [id])
+  gmUserId            String
+  inviteCode          String?              @unique
+  status              String               @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  maxTrailblazers     Int                  @default(5)
+  characters          Character[]
+  members             CampaignMember[]
+  applications        CampaignApplication[]
+  copilotMessages     CopilotMessage[]
+  changeLogs          ChangeLog[]
+  sessions            GameSession[]
+  events              CampaignEvent[]
+  forgeItems          ForgeItem[]
+  playerRequests      PlayerRequest[]
+  locations           Location[]
+  campaignItems       CampaignItem[]
+  encounters          Encounter[]
+  createdAt           DateTime             @default(now())
 }
 
 model CampaignMember {
-  id         String   @id @default(cuid())
-  campaign   Campaign @relation(fields: [campaignId], references: [id])
-  campaignId String
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
-  joinedAt   DateTime @default(now())
+  id          String               @id @default(cuid())
+  campaign    Campaign             @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  user        User                 @relation(fields: [userId], references: [id])
+  userId      String
+  application CampaignApplication?
+  joinedAt    DateTime             @default(now())
 
   @@unique([campaignId, userId])
+}
+
+model CampaignApplication {
+  id          String         @id @default(cuid())
+  campaign    Campaign       @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  member      CampaignMember @relation(fields: [memberId], references: [id])
+  memberId    String         @unique
+  responses       String         // JSON: [{ promptId, prompt, response, aiExpanded? }]
+  profileSnapshot String?        // JSON: snapshot of profile at application time
+  status          String         @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REVISION | DENIED
+  gmNotes         String?
+  characterId     String?        // linked after GM builds character
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([campaignId, status])
 }
 
 model Character {
@@ -320,6 +347,21 @@ model Encounter {
 
   @@index([campaignId])
   @@index([campaignId, status])
+}
+
+model CopilotMessage {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  role       String   // user | assistant
+  content    String
+  userId     String?
+  username   String?
+  actions    String?  // JSON: CopilotAction[] — proposed actions
+  metadata   String?  // JSON: retrieval context, tokens used, etc.
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, createdAt])
 }
 
 model AccessCode {

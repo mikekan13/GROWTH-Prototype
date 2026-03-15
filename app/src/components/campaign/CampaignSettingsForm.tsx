@@ -3,6 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+const PROFILE_FIELDS = [
+  { key: 'firstName', label: 'First Name' },
+  { key: 'pronouns', label: 'Pronouns' },
+  { key: 'bio', label: 'Bio' },
+  { key: 'experienceLevel', label: 'Experience Level' },
+  { key: 'systemsPlayed', label: 'Systems Played' },
+  { key: 'playstylePreferences', label: 'Playstyle' },
+  { key: 'conflictStyle', label: 'Conflict Style' },
+  { key: 'availableDays', label: 'Available Days' },
+  { key: 'timezone', label: 'Timezone' },
+];
+
+const LISTING_STATUSES = ['UNLISTED', 'LISTED', 'CLOSED'] as const;
+
 interface CampaignSettingsFormProps {
   campaignId: string;
   initialData: {
@@ -14,6 +28,10 @@ interface CampaignSettingsFormProps {
     inviteCode: string;
     customPrompts: string[];
     currentMemberCount: number;
+    listingStatus: string;
+    listingDescription: string;
+    listingTags: string[];
+    requiredFields: string[];
   };
 }
 
@@ -32,6 +50,12 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
   const [maxTrailblazers, setMaxTrailblazers] = useState(initialData.maxTrailblazers);
   const [inviteCode, setInviteCode] = useState(initialData.inviteCode);
   const [customPrompts, setCustomPrompts] = useState<string[]>(initialData.customPrompts);
+  const [listingStatus, setListingStatus] = useState(initialData.listingStatus);
+  const [listingDescription, setListingDescription] = useState(initialData.listingDescription);
+  const [listingTags, setListingTags] = useState<string[]>(initialData.listingTags);
+  const [tagInput, setTagInput] = useState('');
+  const [requiredFields, setRequiredFields] = useState<string[]>(initialData.requiredFields);
+  const [savingListing, setSavingListing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
@@ -91,6 +115,42 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
     } finally {
       setRegenerating(false);
     }
+  }
+
+  async function handleSaveListing() {
+    setSavingListing(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/listing`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingStatus, listingDescription, listingTags, requiredFields }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to save listing');
+        return;
+      }
+      setSuccess('Listing updated.');
+    } catch {
+      setError('Network error');
+    } finally {
+      setSavingListing(false);
+    }
+  }
+
+  function addTag() {
+    const t = tagInput.trim();
+    if (!t || listingTags.includes(t)) return;
+    setListingTags([...listingTags, t]);
+    setTagInput('');
+  }
+
+  function toggleRequiredField(key: string) {
+    setRequiredFields(prev =>
+      prev.includes(key) ? prev.filter(f => f !== key) : [...prev, key]
+    );
   }
 
   function addPrompt() {
@@ -255,6 +315,94 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
             ))}
           </div>
         )}
+      </div>
+
+      {/* EŶ∃tehrNET Listing */}
+      <div className="border-t border-[var(--accent-teal)]/20 pt-6 space-y-4">
+        <h3 className="text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-header)] text-[var(--accent-teal)]/80">
+          {'EŶ∃tehrNET Listing'}
+        </h3>
+
+        <div>
+          <label className={labelClass}>Listing Status</label>
+          <select value={listingStatus} onChange={e => setListingStatus(e.target.value)} className={inputClass}>
+            {LISTING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <p className="text-[10px] text-[var(--surface-dark)]/40 mt-1">
+            LISTED = visible on the public hub. UNLISTED = invite-only. CLOSED = no new applications.
+          </p>
+        </div>
+
+        <div>
+          <label className={labelClass}>Listing Description (public pitch)</label>
+          <textarea
+            value={listingDescription}
+            onChange={e => setListingDescription(e.target.value)}
+            maxLength={5000}
+            rows={4}
+            className={inputClass}
+            style={{ resize: 'vertical' }}
+            placeholder="Write a compelling pitch for potential players..."
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Tags</label>
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+              placeholder="Add a tag..."
+              maxLength={50}
+              className={inputClass + ' flex-1'}
+            />
+            <button type="button" onClick={addTag} className="px-3 py-1 bg-[var(--accent-teal)]/20 border border-[var(--accent-teal)]/40 text-[var(--accent-teal)] text-xs hover:bg-[var(--accent-teal)]/30">
+              Add
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {listingTags.map(tag => (
+              <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--surface-dark)]/5 border border-[var(--surface-dark)]/15 text-xs">
+                {tag}
+                <button type="button" onClick={() => setListingTags(listingTags.filter(t => t !== tag))} className="text-[var(--pillar-body)] hover:text-[var(--pillar-body)]/80">&times;</button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className={labelClass}>Required Profile Fields</label>
+          <p className="text-[10px] text-[var(--surface-dark)]/40 mb-2">
+            Select which profile fields applicants must have filled in
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PROFILE_FIELDS.map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => toggleRequiredField(f.key)}
+                className={`px-2 py-1 text-xs border transition-colors ${
+                  requiredFields.includes(f.key)
+                    ? 'bg-[var(--accent-gold)]/20 border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                    : 'border-[var(--surface-dark)]/20 text-[var(--surface-dark)]/50 hover:border-[var(--surface-dark)]/40'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveListing}
+          disabled={savingListing}
+          className="px-6 py-2 bg-[var(--accent-teal)] text-black text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] hover:bg-[var(--accent-teal)]/80 disabled:opacity-50 transition-colors"
+        >
+          {savingListing ? 'Saving...' : 'Save Listing'}
+        </button>
       </div>
 
       {/* Save */}
