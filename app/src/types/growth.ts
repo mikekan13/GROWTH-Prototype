@@ -96,6 +96,31 @@ export interface GrowthCreation {
 
 export type FateDie = 'd4' | 'd6' | 'd8' | 'd12' | 'd20';
 
+// Seed — starting template for entity creation
+// 48 canonical seeds parsed from Character Creation Examples.csv
+export interface GrowthSeed {
+  name: string;
+  description: string;
+  baseFateDie: FateDie;
+  frequency: number;           // Starting frequency level
+  healthLevel: number;         // Starting health level (1-10)
+  baseResist: number;          // Base body resistance
+  attributes: {
+    clout: number;
+    celerity: number;
+    constitution: number;
+    focus: number;
+    flow: number;
+    willpower: number;
+    wisdom: number;
+    wit: number;
+  };
+  skills: string[];            // Starting skill names
+  nectars: string[];           // Starting nectar names
+  thorns: string[];            // Starting thorn names
+  seedKV: number;              // Total Seed KRMA Value
+}
+
 // Attribute names that can govern skills (all except Frequency)
 export type SkillGovernor =
   | 'clout' | 'celerity' | 'constitution'

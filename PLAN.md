@@ -1,7 +1,45 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-04-04
-Current phase: Phase 5 (God-Head Architecture)
+Last updated: 2026-04-05
+Current phase: Phase 5 (Entity Creation + Forge Authoring)
+
+## Session 2026-04-04/05: Entity Creation System — Session A (Partial)
+**Completed:**
+- `GrowthSeed` interface in `types/growth.ts` — full seed type with attributes, die, frequency, health, resist, skills, nectars, thorns, KV
+- `lib/seed-catalog.ts` — 48 seeds parsed from CSV with lookup helpers (`SEED_BY_NAME`, `getSeed()`, `SEED_KV_RANGE`, `FATE_DIE_VALUE`)
+- Tapestry Entities sub-tab replaces GRO.vines tab — `components/tapestry/EntitiesPanel.tsx`
+- Entity list API — `services/entity.ts` with `listCampaignEntities()`, `createDraftEntity()`, `saveDraftStep()`, `loadDraftEntity()`
+- API routes: `GET/POST /api/campaigns/[id]/entities`, `GET/PATCH /api/campaigns/[id]/entities/[entityId]`
+- Entity Creation Wizard overlay — `components/entity/EntityCreationWizard.tsx`
+  - Full-screen overlay within campaign canvas (no page navigation)
+  - 9-step breadcrumb (Describe, Seed, Root, Branches, Attributes, WTH, Skills, Traits, Goals, Review)
+  - Step 1 (Describe): name, description prompt, target KV with presets, "Generate Prompt" button (placeholder), "Manual Creation" skip
+  - Step 2 (Seed): browsable catalog of 48 seeds with search, fate die filter, sort, attribute display (pillar-colored), KV, expand for details
+  - Step 3 (Root): **NEEDS REWORK** — was built as a direct stat form, but should be a block selector like seeds
+  - Draft persistence: creates DRAFT Character record on "Create Entity", saves on step transitions, resume from entity list
+- Forge service updated — added `seed`, `root`, `branch` to `FORGE_ITEM_TYPES` with Zod schemas
+- Global catalog service — `listGlobalCatalog()`, `pullFromGlobalCatalog()` in `services/forge.ts`
+- Global catalog API — `GET /api/forge/global`, `POST /api/campaigns/[id]/forge/pull`
+
+**CRITICAL REALIZATION — Forge authoring must come first:**
+- GMs don't directly set stats on forge items. They DESCRIBE what they want.
+- God-heads (Kai) evaluate descriptions and author the mechanical stats + KV.
+- Flow: GM describes → Eth'erling routes → God-head authors blueprint → Kai evaluates KV → GM confirms
+- The entity creation wizard's block-selection steps (root, branch, skills, traits) depend on blocks existing in the campaign's forge
+- The Forge creation UI needs the God-head evaluation pipeline before entity creation can work properly
+
+**What needs to be reverted/reworked:**
+- `RootStep` in EntityCreationWizard — remove the direct stat form, replace with forge block selector
+- Root/branch Zod schemas in forge.ts are fine (they validate the OUTPUT of God-head authoring, not GM input)
+
+**Next session: Forge Authoring Pipeline**
+- Build the Forge creation flow: GM describes → God-head evaluates → GM confirms
+- Root/Branch/Seed creation forms in ForgePanel (narrative input, not stat forms)
+- Global catalog browser modal in Forge (search global items, "Pull" to campaign)
+- Wire Kai evaluator to generate stats + KV from GM descriptions
+- Then return to entity wizard and wire block selectors for root/branch/etc.
+
+---
 
 ## Session 2026-04-04 (b): God-Head Phase 2 — Goal System + Custodian + Resistance
 **Completed:**

@@ -7,7 +7,7 @@ import { SKILL_GOVERNORS } from '@/types/growth';
 
 // ── Forge Item Types ──────────────────────────────────────────────────────
 
-export const FORGE_ITEM_TYPES = ['skill', 'item', 'nectar', 'blossom', 'thorn'] as const;
+export const FORGE_ITEM_TYPES = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'] as const;
 export type ForgeItemType = typeof FORGE_ITEM_TYPES[number];
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────
@@ -73,9 +73,80 @@ const forgeTraitDataSchema = z.object({
   source: z.string().max(200).optional(),
 });
 
+// Root/Branch attribute schema — starting levels (not augments)
+const attributeLevelsSchema = z.object({
+  clout: z.number().int().min(0).max(20).default(0),
+  celerity: z.number().int().min(0).max(20).default(0),
+  constitution: z.number().int().min(0).max(20).default(0),
+  focus: z.number().int().min(0).max(20).default(0),
+  flow: z.number().int().min(0).max(20).default(0),
+  willpower: z.number().int().min(0).max(20).default(0),
+  wisdom: z.number().int().min(0).max(20).default(0),
+  wit: z.number().int().min(0).max(20).default(0),
+});
+
+// Seed augment schema — augments added to attributes
+const attributeAugmentsSchema = z.object({
+  clout: z.number().int().min(0).max(30).default(0),
+  celerity: z.number().int().min(0).max(30).default(0),
+  constitution: z.number().int().min(0).max(30).default(0),
+  focus: z.number().int().min(0).max(30).default(0),
+  flow: z.number().int().min(0).max(30).default(0),
+  willpower: z.number().int().min(0).max(30).default(0),
+  wisdom: z.number().int().min(0).max(30).default(0),
+  wit: z.number().int().min(0).max(30).default(0),
+});
+
+const forgeSkillEntrySchema = z.object({
+  name: z.string().min(1).max(100),
+  level: z.number().int().min(1).max(20),
+});
+
+const forgeSeedDataSchema = z.object({
+  description: z.string().max(2000),
+  baseFateDie: z.enum(['d4', 'd6', 'd8', 'd12', 'd20']),
+  frequency: z.number().int().min(0).max(200),
+  healthLevel: z.number().int().min(1).max(10),
+  baseResist: z.number().int().min(0).max(50),
+  attributes: attributeAugmentsSchema,
+  skills: z.array(z.string().max(100)).max(10).default([]),
+  nectars: z.array(z.string().max(100)).max(10).default([]),
+  thorns: z.array(z.string().max(100)).max(10).default([]),
+});
+
+const forgeRootDataSchema = z.object({
+  description: z.string().max(2000),
+  frequency: z.number().int(),
+  ageAdded: z.number().int().min(0),
+  attributes: attributeLevelsSchema,
+  wealthLevel: z.number().int().min(1).max(10),
+  healthLevel: z.number().int(),
+  techLevel: z.number().int(),
+  skills: z.array(forgeSkillEntrySchema).max(20).default([]),
+  nectars: z.array(z.string().max(100)).max(10).default([]),
+  thorns: z.array(z.string().max(100)).max(10).default([]),
+  seedRequirement: z.string().max(100).default(''),
+});
+
+const forgeBranchDataSchema = z.object({
+  description: z.string().max(2000),
+  frequency: z.number().int(),
+  ageAdded: z.number().int().min(0),
+  attributes: attributeLevelsSchema,
+  healthLevel: z.number().int().default(0),
+  techLevel: z.number().int().default(0),
+  skills: z.array(forgeSkillEntrySchema).max(20).default([]),
+  nectars: z.array(z.string().max(100)).max(10).default([]),
+  thorns: z.array(z.string().max(100)).max(10).default([]),
+  requirements: z.string().max(200).default(''),
+});
+
 // Data schema depends on type
 function validateForgeData(type: string, data: unknown) {
   switch (type) {
+    case 'seed': return forgeSeedDataSchema.parse(data);
+    case 'root': return forgeRootDataSchema.parse(data);
+    case 'branch': return forgeBranchDataSchema.parse(data);
     case 'skill': return forgeSkillDataSchema.parse(data);
     case 'item': return forgeItemDataSchema.parse(data);
     case 'nectar':
@@ -411,4 +482,83 @@ export async function resolvePlayerRequest(
   });
 
   return { ...updated, data: JSON.parse(updated.data) };
+}
+
+// ── Global Catalog ──────────────────────────────────────────────────────
+
+export async function listGlobalCatalog(
+  type?: string,
+  search?: string,
+) {
+  const where: Record<string, unknown> = { isGlobal: true };
+  if (type) where.type = type;
+  if (search) {
+    where.name = { contains: search };
+  }
+
+  const items = await prisma.forgeItem.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      data: true,
+      useCount: true,
+      authorUserId: true,
+    },
+    orderBy: { useCount: 'desc' },
+    take: 50,
+  });
+
+  return items.map(item => ({
+    ...item,
+    data: JSON.parse(item.data),
+  }));
+}
+
+export async function pullFromGlobalCatalog(
+  globalItemId: string,
+  campaignId: string,
+  userId: string,
+  userRole: string,
+) {
+  await assertCampaignGM(campaignId, userId, userRole);
+
+  const globalItem = await prisma.forgeItem.findUnique({
+    where: { id: globalItemId },
+  });
+
+  if (!globalItem || !globalItem.isGlobal) {
+    throw new NotFoundError('Global item not found');
+  }
+
+  // Check if already pulled into this campaign
+  const existing = await prisma.forgeItem.findFirst({
+    where: { campaignId, sourceGlobalId: globalItemId },
+  });
+  if (existing) {
+    return { ...existing, data: JSON.parse(existing.data), alreadyExists: true };
+  }
+
+  // Create campaign-scoped copy
+  const copy = await prisma.forgeItem.create({
+    data: {
+      campaignId,
+      type: globalItem.type,
+      name: globalItem.name,
+      status: 'published',
+      data: globalItem.data,
+      createdBy: userId,
+      sourceGlobalId: globalItemId,
+      isGlobal: false,
+    },
+  });
+
+  // Increment use count on global source
+  await prisma.forgeItem.update({
+    where: { id: globalItemId },
+    data: { useCount: { increment: 1 } },
+  });
+
+  return { ...copy, data: JSON.parse(copy.data), alreadyExists: false };
 }

@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-04-04 (God-head Phase 2 — Goal system + custodian + resistance)
+Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 
 ## Services (Business Logic)
 
@@ -13,7 +13,8 @@ Last updated: 2026-04-04 (God-head Phase 2 — Goal system + custodian + resista
 | AccessCodeService | `services/access-code.ts` | Code generation, validation, redemption | Prisma, permissions |
 | ChangeLogService | `services/changelog.ts` | Create changelog entries with diff/coalescence (5s window), query with pagination and filters, revert with conflict detection | Prisma, changelog-utils |
 | CampaignEventService | `services/campaign-event.ts` | Campaign event CRUD (dice rolls, chat, commands, game events), session management (start/end/list), auto-assigns events to active session | Prisma |
-| ForgeService | `services/forge.ts` | ForgeItem CRUD (skill/item/nectar/blossom/thorn blueprints), publish/unpublish, PlayerRequest CRUD, global catalog support, Zod validation per type | Prisma, permissions |
+| ForgeService | `services/forge.ts` | ForgeItem CRUD (seed/root/branch/skill/item/nectar/blossom/thorn blueprints), publish/unpublish, PlayerRequest CRUD, global catalog (list + pull), Zod validation per type | Prisma, permissions |
+| EntityService | `services/entity.ts` | Campaign entity listing (excludes GODHEAD), draft creation, step save/load for creation wizard | Prisma, permissions, defaults |
 | EntityContextService | `services/context/entity-context.ts` | Build token-efficient context string for any entity (Character). Used by God-heads. Includes identity, attributes, goals, inventory, relationships. | Prisma |
 | GoalContextService | `services/context/goal-context.ts` | Build focused context window for a goal by traversing EntityRelationship graph (2-hop max). Returns only connected entities. | Prisma, EntityContextService |
 | LocationService | `services/location.ts` | Location CRUD (settlement/wilderness/dungeon/building/POI/region), GM-only create/update/delete, Zod validation | Prisma, permissions |

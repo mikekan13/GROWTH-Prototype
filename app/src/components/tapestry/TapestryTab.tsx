@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import EntitiesPanel from './EntitiesPanel';
 
 interface CanvasNode {
   id: string;
@@ -43,7 +44,7 @@ interface TemplatePrompt {
   category: string;
 }
 
-type SubTab = 'applications' | 'grovines';
+type SubTab = 'applications' | 'entities';
 
 const CATEGORIES = ['backstory', 'character', 'personality', 'mechanics', 'meta', 'interest', 'safety', 'other'];
 
@@ -526,11 +527,11 @@ function GrovinesPanel({ nodes }: { nodes: CanvasNode[] }) {
 
 // --- Main TapestryTab ---
 export default function TapestryTab({ campaignId, isGM, nodes }: TapestryTabProps) {
-  const [subTab, setSubTab] = useState<SubTab>(isGM ? 'applications' : 'grovines');
+  const [subTab, setSubTab] = useState<SubTab>(isGM ? 'applications' : 'entities');
 
   const subTabs: { key: SubTab; label: string; gmOnly?: boolean }[] = [
     ...(isGM ? [{ key: 'applications' as SubTab, label: 'Applications', gmOnly: true }] : []),
-    { key: 'grovines', label: 'GRO.vines' },
+    { key: 'entities', label: 'Entities' },
   ];
 
   return (
@@ -561,8 +562,8 @@ export default function TapestryTab({ campaignId, isGM, nodes }: TapestryTabProp
           {subTab === 'applications' && isGM && (
             <ApplicationsPanel campaignId={campaignId} />
           )}
-          {subTab === 'grovines' && (
-            <GrovinesPanel nodes={nodes} />
+          {subTab === 'entities' && (
+            <EntitiesPanel campaignId={campaignId} isGM={isGM} />
           )}
         </div>
       </div>
