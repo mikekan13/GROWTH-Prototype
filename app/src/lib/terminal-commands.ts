@@ -257,7 +257,6 @@ function executeDeathSave(args: ParsedArgs, character: GrowthCharacter | null): 
   if (!character) return makeError('/deathsave', 'No character selected');
 
   const fateDie = character.creation?.seed?.baseFateDie || 'd6';
-  const healthLevel = character.attributes?.constitution?.level ?? 1;
   const ladyDeathDr = parseInt(args.named.dr || '10');
 
   return {
@@ -270,7 +269,6 @@ function executeDeathSave(args: ParsedArgs, character: GrowthCharacter | null): 
       body: {
         characterId: character.identity?.name || 'unknown',
         fateDie,
-        healthLevel,
         dr: ladyDeathDr,
       },
       context: { input: `/deathsave dr:${ladyDeathDr}` },

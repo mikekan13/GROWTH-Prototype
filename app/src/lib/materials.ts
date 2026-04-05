@@ -15,7 +15,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Linen',
     resistType: 'soft',
     baseResist: 6,
-    techLevel: 1,
+
     baseWeight: 1,
     valueRating: 2,
     mods: ['Flammable', 'Absorbent'],
@@ -26,7 +26,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Wool',
     resistType: 'soft',
     baseResist: 8,
-    techLevel: 1,
+
     baseWeight: 2,
     valueRating: 3,
     mods: ['Absorbent', 'Heat Resistant'],
@@ -37,7 +37,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Leather',
     resistType: 'soft',
     baseResist: 17,
-    techLevel: 2,
+
     baseWeight: 2,
     valueRating: 3,
     mods: ['Flexible'],
@@ -48,7 +48,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Hardened Leather',
     resistType: 'soft',
     baseResist: 22,
-    techLevel: 3,
+
     baseWeight: 3,
     valueRating: 4,
     mods: ['Protective'],
@@ -59,7 +59,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Silk',
     resistType: 'soft',
     baseResist: 10,
-    techLevel: 3,
+
     baseWeight: 1,
     valueRating: 6,
     mods: ['Flexible', 'Slashing Resistant'],
@@ -70,7 +70,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Hide',
     resistType: 'soft',
     baseResist: 14,
-    techLevel: 1,
+
     baseWeight: 3,
     valueRating: 2,
     mods: ['Cold Resistant'],
@@ -81,7 +81,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Canvas',
     resistType: 'soft',
     baseResist: 8,
-    techLevel: 2,
+
     baseWeight: 2,
     valueRating: 2,
     mods: ['Absorbent'],
@@ -94,7 +94,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Wood',
     resistType: 'hard',
     baseResist: 12,
-    techLevel: 1,
+
     baseWeight: 2,
     valueRating: 1,
     mods: ['Flammable'],
@@ -105,7 +105,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Bone',
     resistType: 'hard',
     baseResist: 14,
-    techLevel: 1,
+
     baseWeight: 2,
     valueRating: 1,
     mods: ['Brittle'],
@@ -116,7 +116,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Stone',
     resistType: 'hard',
     baseResist: 20,
-    techLevel: 1,
+
     baseWeight: 5,
     valueRating: 1,
     mods: ['Brittle', 'Heat Resistant'],
@@ -127,7 +127,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Bronze',
     resistType: 'hard',
     baseResist: 24,
-    techLevel: 3,
+
     baseWeight: 4,
     valueRating: 4,
     mods: ['Conductive'],
@@ -138,7 +138,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Iron',
     resistType: 'hard',
     baseResist: 28,
-    techLevel: 4,
+
     baseWeight: 4,
     valueRating: 3,
     mods: ['Conductive'],
@@ -149,7 +149,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Steel',
     resistType: 'hard',
     baseResist: 34,
-    techLevel: 5,
+
     baseWeight: 4,
     valueRating: 5,
     mods: ['Sharp'],
@@ -160,7 +160,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Copper',
     resistType: 'hard',
     baseResist: 16,
-    techLevel: 2,
+
     baseWeight: 4,
     valueRating: 3,
     mods: ['Conductive', 'Flexible'],
@@ -171,7 +171,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Silver',
     resistType: 'hard',
     baseResist: 18,
-    techLevel: 3,
+
     baseWeight: 4,
     valueRating: 7,
     mods: ['Conductive'],
@@ -182,7 +182,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Gold',
     resistType: 'hard',
     baseResist: 10,
-    techLevel: 3,
+
     baseWeight: 5,
     valueRating: 9,
     mods: ['Conductive', 'Flexible'],
@@ -193,7 +193,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Crystal',
     resistType: 'hard',
     baseResist: 15,
-    techLevel: 4,
+
     baseWeight: 3,
     valueRating: 6,
     mods: ['Brittle', 'Energy Resistant'],
@@ -204,7 +204,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Obsidian',
     resistType: 'hard',
     baseResist: 12,
-    techLevel: 2,
+
     baseWeight: 3,
     valueRating: 3,
     mods: ['Sharp', 'Brittle'],
@@ -217,7 +217,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Chainmail',
     resistType: 'hard',
     baseResist: 30,
-    techLevel: 5,
+
     baseWeight: 4,
     valueRating: 5,
     mods: ['Flexible', 'Slashing Resistant'],
@@ -228,7 +228,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Plate',
     resistType: 'hard',
     baseResist: 40,
-    techLevel: 6,
+
     baseWeight: 5,
     valueRating: 7,
     mods: ['Protective', 'Restrictive'],
@@ -239,7 +239,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Mithril',
     resistType: 'hard',
     baseResist: 38,
-    techLevel: 8,
+
     baseWeight: 2,
     valueRating: 9,
     mods: ['Flexible', 'Protective'],
@@ -250,7 +250,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Darkwood',
     resistType: 'hard',
     baseResist: 20,
-    techLevel: 6,
+
     baseWeight: 1,
     valueRating: 7,
     mods: ['Heat Resistant'],
@@ -261,7 +261,7 @@ export const MATERIAL_CATALOG: Record<string, Material> = {
     name: 'Dragonscale',
     resistType: 'hard',
     baseResist: 45,
-    techLevel: 9,
+
     baseWeight: 3,
     valueRating: 10,
     mods: ['Heat Resistant', 'Protective', 'Sharp'],
@@ -282,7 +282,6 @@ export function getMaterial(name: string): Material | undefined {
  * Calculate combined properties when two materials are used together.
  * Per repository rules:
  *   Final Resist = (Primary + Subordinate) / 2 (rounded)
- *   Tech Level = highest
  *   Resist Type = primary's type
  *   Mods = union of both (deduped)
  *   Weight = average (rounded)
@@ -294,19 +293,11 @@ export function combineMaterials(primary: Material, subordinate: Material): Mate
     name: `${primary.name}/${subordinate.name}`,
     resistType: primary.resistType,
     baseResist: Math.round((primary.baseResist + subordinate.baseResist) / 2),
-    techLevel: Math.max(primary.techLevel, subordinate.techLevel),
     baseWeight: Math.round((primary.baseWeight + subordinate.baseWeight) / 2),
     valueRating: Math.round((primary.valueRating + subordinate.valueRating) / 2),
     mods: combinedMods,
     description: `${primary.name} with ${subordinate.name} components.`,
   };
-}
-
-/**
- * Get all materials at or below a given tech level.
- */
-export function getAvailableMaterials(maxTechLevel: number): Material[] {
-  return Object.values(MATERIAL_CATALOG).filter(m => m.techLevel <= maxTechLevel);
 }
 
 /**

@@ -9,7 +9,6 @@ export type WorldItemType = 'weapon' | 'armor' | 'accessory' | 'consumable' | 't
 export interface GrowthWorldItem {
   description: string;
   material?: string;            // Primary material (e.g. "Steel", "Leather", "Gold")
-  techLevel?: number;           // 1-10: Required tech level to use
   weightLevel?: number;         // 0-10: Weight category
   condition?: number;           // 1-4: Undamaged(4), Worn(3), Broken(2), Destroyed(1)
   rarity?: ItemRarity;

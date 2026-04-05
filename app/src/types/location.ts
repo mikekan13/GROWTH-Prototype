@@ -8,8 +8,6 @@ export type LocationType = 'settlement' | 'wilderness' | 'dungeon' | 'building' 
 export interface GrowthLocation {
   description: string;
   environment?: string;        // Climate, terrain, atmosphere
-  techLevel?: number;          // 1-10: Available technology at this location
-  wealthLevel?: number;        // 1-10: General prosperity
   population?: string;         // Narrative description (e.g. "sparse", "bustling city")
   dangerLevel?: number;        // 1-10: General threat level
   controlledBy?: string;       // Faction, NPC name, or "contested"

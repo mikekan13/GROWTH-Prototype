@@ -190,12 +190,6 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
               {data.dangerLevel != null && (
                 <StatPill label="DNG" value={data.dangerLevel} color={DANGER_COLORS[Math.min(data.dangerLevel - 1, 9)]} />
               )}
-              {data.techLevel != null && (
-                <StatPill label="TCH" value={data.techLevel} color="#22ab94" />
-              )}
-              {data.wealthLevel != null && (
-                <StatPill label="WLT" value={data.wealthLevel} color="#ffcc78" />
-              )}
               {data.population && (
                 <span style={{
                   padding: '2px 6px',
@@ -335,15 +329,13 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
           {/* Stats Grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
+            gridTemplateColumns: '1fr',
             gap: 8,
             marginBottom: 12,
             padding: '8px 0',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}>
-            <StatBlock label="Tech Level" value={data.techLevel ?? '-'} color="#22ab94" />
-            <StatBlock label="Wealth Level" value={data.wealthLevel ?? '-'} color="#ffcc78" />
             <StatBlock label="Danger" value={data.dangerLevel ?? '-'} color={data.dangerLevel ? DANGER_COLORS[Math.min(data.dangerLevel - 1, 9)] : '#808080'} />
           </div>
 

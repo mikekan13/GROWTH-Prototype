@@ -92,7 +92,7 @@ KV values are assigned through two distinct tracks depending on whether the crea
 
 | Track | Applies To | Assigned By | Properties |
 |-------|-----------|-------------|------------|
-| **Deterministic** | Attribute levels, skill levels, WTH levels, language acquisition, reroll costs | Formula (versioned, hashable) | Reproducible, auditable, version-controlled |
+| **Deterministic** | Attribute levels, skill levels (1:1), bodyResist (2:1), fate die (5/10/20/40/80), age floor, language acquisition, reroll costs | Formula (versioned, hashable) | Reproducible, auditable, version-controlled |
 | **Non-deterministic** | Nectars, Thorns, item abilities, custom Roots/Branches, NPC abilities, any GM-authored creation | AI Agent: **God of Chaos and Balance** | Graded at creation time, stamped immutably, auditable via AI reasoning trace |
 
 **Deterministic track:** A versioned function that takes structured inputs (attribute value, skill level, etc.) and outputs a KV. The formula is not yet defined but must be:
@@ -301,7 +301,7 @@ Every transaction has a machine-readable `reason` code. The following types are 
 | `REROLL_COST` | Player wallet | Campaign wallet | FLUID | Death save reroll, critical failure reroll, etc. |
 | `SKILL_ADVANCE` | Player wallet | Character wallet | LOCK | KRMA spent advancing a skill level |
 | `ATTRIBUTE_ENHANCE` | Player wallet | Character wallet | LOCK | KRMA spent increasing an attribute |
-| `WEALTH_CHANGE` | Player wallet | Character wallet | LOCK | KRMA spent/refunded changing WTH levels |
+| ~~`WEALTH_CHANGE`~~ | ~~Player wallet~~ | ~~Character wallet~~ | ~~LOCK~~ | ~~WTH levels removed 2026-04-05. Characters use fatedAge from seed instead.~~ |
 | `RARE_ITEM_ACCESS` | Player wallet | Campaign wallet | FLUID | Purchasing access to rare equipment |
 | `STORY_INFLUENCE` | Player wallet | Campaign wallet | FLUID | Spending KRMA for minor story influence |
 | `DIVINE_FAVOR` | Player wallet | Campaign wallet | FLUID | Deity-dependent special favor |
@@ -409,24 +409,11 @@ From the repository (KRMA_Costs_Table.md):
 | Any Attribute +1 | 25 KRMA | Multiple purchases |
 | Any Attribute +2 | 50 KRMA | Once per attribute |
 
-### 4.5 WTH Level Cost Table
+### 4.5 ~~WTH Level Cost Table~~ (REMOVED 2026-04-05)
 
-From GROWTH-DESIGN-TRUTH.md §3:
-
-| Level | KRMA Cost |
-|-------|-----------|
-| 1 | -30 KRMA (reduces TKV) |
-| 2 | -20 KRMA |
-| 3 | -10 KRMA |
-| 4 | 0 (baseline) |
-| 5 | 0 (baseline) |
-| 6 | 10 KRMA |
-| 7 | 20 KRMA |
-| 8 | 30 KRMA |
-| 9 | 40 KRMA |
-| 10 | 50 KRMA |
-
-**Note:** Levels below 4 have *negative* cost, meaning they reduce the character's TKV, effectively returning KRMA. This is a design choice: weaker characters are cheaper.
+> **WTH levels (Wealth/Tech/Health) have been removed from the character model.** Characters now use `fatedAge` (set by seed) instead of separate W/T/H level scales. The GROWTH acronym still stands (Goals/Resistance/Opportunity/Wealth/Tech/Health) but W/T/H are campaign-level narrative descriptors, not per-character mechanical levels with KRMA costs.
+>
+> Body resistance to death is now handled by `bodyResist` (priced at 2:1 KRMA ratio) and the Fate Die (priced at 5/10/20/40/80 for d4/d6/d8/d12/d20).
 
 ---
 
@@ -769,11 +756,11 @@ The KRMA system interacts with the following subsystems. Each interface is defin
 | KrmaTransaction model | `prisma/schema.prisma:99-106` | Schema defined, migration applied |
 | User→Wallet relation | `prisma/schema.prisma:19` | Schema defined |
 | TKV on GrowthCharacter | `types/growth.ts:281` | Type defined, optional field |
-| GrowthLevels (WTH) | `types/growth.ts:57-64` | Type defined with cost comments |
+| ~~GrowthLevels (WTH)~~ | ~~`types/growth.ts:57-64`~~ | ~~Removed 2026-04-05. Characters use fatedAge instead~~ |
 | GROvine reward type | `types/growth.ts:176` | `'nectar' | 'krma'` enum |
 | HarvestCard krmaChange | `components/canvas/HarvestCard.tsx:11` | UI displays KRMA changes |
 | CharacterSheet TKV display | `components/character/CharacterSheet.tsx:62` | UI renders TKV |
-| CharacterBuilder WTH costs | `components/character/CharacterBuilder.tsx:245` | UI documents costs |
+| ~~CharacterBuilder WTH costs~~ | ~~`components/character/CharacterBuilder.tsx:245`~~ | ~~WTH step removed 2026-04-05~~ |
 | KRMA Line (canvas) | `components/canvas/RelationsCanvas.tsx:1064-1248` | Visual element rendered |
 | CSS variables | `app/globals.css:21,41` | `--krma-gold: #FFCC78` |
 | PLAN.md Phase 4 | `PLAN.md:241-250` | Planned, not started |

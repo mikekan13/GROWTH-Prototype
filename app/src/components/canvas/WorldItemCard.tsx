@@ -318,7 +318,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
           {/* Stats row */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr',
+            gridTemplateColumns: '1fr 1fr 1fr',
             gap: 6,
             marginBottom: 10,
             padding: '8px 0',
@@ -327,7 +327,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
           }}>
             <MiniStat label="Condition" value={conditionLabel} color={conditionColor} />
             <MiniStat label="Weight" value={data.weightLevel != null ? `${data.weightLevel} (${getWeightLabel(data.weightLevel)})` : '-'} color="#c0c0c0" />
-            <MiniStat label="Tech" value={data.techLevel ?? '-'} color="#22ab94" />
+
             <MiniStat label="Value" value={data.value != null ? `${data.value} KV` : '-'} color="#ffcc78" />
           </div>
 

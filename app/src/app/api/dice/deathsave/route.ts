@@ -10,12 +10,11 @@ export const dynamic = 'force-dynamic';
 const DeathSaveSchema = z.object({
   characterId: z.string(),
   fateDie: z.enum(['d4', 'd6', 'd8', 'd12', 'd20']),
-  healthLevel: z.number().int().min(0),
   dr: z.number().int().min(1).default(10),
 });
 
 /**
- * POST /api/dice/deathsave — Death save roll (FD + Health Level vs DR)
+ * POST /api/dice/deathsave — Death save roll (Fate Die vs DR)
  * Server-side only. Result is authoritative.
  */
 export async function POST(request: NextRequest) {
@@ -27,7 +26,6 @@ export async function POST(request: NextRequest) {
     const result = DiceService.deathSave({
       characterId: params.characterId,
       fateDie: params.fateDie as FateDie,
-      healthLevel: params.healthLevel,
       ladyDeathDr: params.dr,
     });
 
@@ -44,7 +42,6 @@ export async function POST(request: NextRequest) {
       success: result.success,
       margin: result.margin,
       timestamp: result.timestamp,
-      metadata: { healthLevel: params.healthLevel },
     });
   } catch (error) {
     return errorResponse(error);

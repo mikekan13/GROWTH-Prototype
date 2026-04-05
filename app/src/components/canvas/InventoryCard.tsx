@@ -360,7 +360,7 @@ function InventoryItemRow({
           <div className="grid grid-cols-4 gap-1 mt-2">
             <MiniStat label="Weight" value={`${data.weightLevel ?? 0} (${weightLabel})`} color="#c0c0c0" />
             <MiniStat label="Condition" value={conditionLabel} color={conditionColor} />
-            <MiniStat label="Tech" value={data.techLevel ?? '-'} color="#22ab94" />
+
             <MiniStat label="Rarity" value={data.rarity ? data.rarity.replace('_', ' ') : 'common'} color={rarityColor} />
           </div>
 

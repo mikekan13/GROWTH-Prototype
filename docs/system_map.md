@@ -1,6 +1,6 @@
 # GRO.WTH System Map
 
-Last updated: 2026-03-10 (KRMA Crystallization + Skeleton Systems + Dice Engine)
+Last updated: 2026-04-05 (WTH removal, KV pricing confirmed)
 
 ## Architecture Overview
 
@@ -49,7 +49,7 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 ### Character System
 - GrowthCharacter data stored as JSON in SQLite
 - Character lifecycle: DRAFT → SUBMITTED → APPROVED → ACTIVE → DEAD/RETIRED
-- 4-step GM builder: Identity → Origin → Attributes → WTH
+- 4-step GM builder: Identity → Origin → Attributes → Review
 - Files: `services/character.ts`, `components/character/`
 
 ### Backstory System
@@ -160,8 +160,8 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - **Core ledger** (`services/krma/ledger.ts`): Append-only transaction engine with SHA-256 checksum chain, idempotent, atomic single + batch execution
 - **Wallets** (`services/krma/wallet.ts`): USER, CAMPAIGN, CHARACTER, BURN, LADY_DEATH types. Fund/defund campaigns, transaction history, global metrics
 - **Genesis**: 100B KRMA seeded across 4 reserves (Terminal 75%, Balance 12.5%, Mercy 6.25%, Severity 6.25%)
-- **TKV evaluator** (`services/krma/evaluator.ts`): Deterministic character value calculator (pillar breakdown, skills, WTH, traits). Versioned + hashable
-- **Death split** (`services/krma/death-split.ts`): Multi-transaction death process — Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch
+- **TKV evaluator** (`services/krma/evaluator.ts`): Deterministic character value calculator (pillar breakdown, skills, bodyResist, fate die, traits, age floor). Versioned + hashable
+- **Death split** (`services/krma/death-split.ts`): Multi-transaction death process — Body (incl. bodyResist)→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch
 - **Reconciliation** (`services/krma/reconciliation.ts`): Balance reconciliation, global supply invariant check, checksum chain verification, full audit
 - **Crystallization** (`services/krma/crystallization.ts`): Crystallize/dissolve entities across KRMA line. Ledger stored as campaign events. Prevents double-crystallization. Pool tracking
 - **KV Calculator** (`lib/kv-calculator.ts`): Client-side KV calculation utilities

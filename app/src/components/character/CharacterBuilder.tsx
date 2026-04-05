@@ -41,10 +41,6 @@ export default function CharacterBuilder({ campaigns }: { campaigns: Campaign[] 
     willpower: 1, wisdom: 1, wit: 1,
   });
 
-  // WTH levels
-  const [wealth, setWealth] = useState(4);
-  const [tech, setTech] = useState(4);
-  const [health, setHealth] = useState(4);
 
   function addBranch() {
     setBranches([...branches, { name: '', description: '' }]);
@@ -74,7 +70,7 @@ export default function CharacterBuilder({ campaigns }: { campaigns: Campaign[] 
     const charData: GrowthCharacter = {
       ...createDefaultCharacter(name),
       identity: { name, background: seedDesc },
-      levels: { wealthLevel: wealth, techLevel: tech, healthLevel: health },
+
       attributes: {
         clout: { level: attrs.clout, current: attrs.clout, augmentPositive: 0, augmentNegative: 0 },
         celerity: { level: attrs.celerity, current: attrs.celerity, augmentPositive: 0, augmentNegative: 0 },
@@ -238,35 +234,13 @@ export default function CharacterBuilder({ campaigns }: { campaigns: Campaign[] 
       </div>
     </div>,
 
-    // Step 3: WTH Levels
-    <div key="wth" className="space-y-4">
-      <div className="section-badge inline-block">Step 4: WTH Levels (1-10)</div>
-      <p className="text-xs text-[var(--surface-dark)]/60">
-        4 = baseline (0 KRMA cost). Below 4 costs negative KRMA. Above 5 costs 10 KRMA per level.
-      </p>
-      <div className="space-y-3">
-        {[
-          { label: 'Wealth', value: wealth, set: setWealth, color: 'var(--krma-gold)' },
-          { label: 'Tech', value: tech, set: setTech, color: 'var(--accent-teal)' },
-          { label: 'Health', value: health, set: setHealth, color: 'var(--pillar-body)', note: '10 = immortal' },
-        ].map(({ label, value, set, color, note }) => (
-          <div key={label} className="flex items-center gap-4">
-            <span className="text-sm w-20" style={{ color }}>{label}</span>
-            <input type="range" min={1} max={10} value={value} onChange={e => set(parseInt(e.target.value))}
-              className="flex-1" />
-            <span className="text-sm w-8 text-center">{value}</span>
-            {note && <span className="text-[10px] text-[var(--surface-dark)]/40">{note}</span>}
-          </div>
-        ))}
-      </div>
-    </div>,
   ];
 
   return (
     <div className="max-w-2xl mx-auto">
       {/* Progress */}
       <div className="flex gap-1 mb-6">
-        {['Identity', 'Origin', 'Attributes', 'WTH'].map((label, i) => (
+        {['Identity', 'Origin', 'Attributes'].map((label, i) => (
           <button
             key={i}
             onClick={() => setStep(i)}

@@ -22,7 +22,7 @@ export interface CharacterNodeData {
   characterData?: {
     identity?: { name?: string };
     tkv?: number | string;
-    levels?: { wealthLevel?: number; techLevel?: number; healthLevel?: number };
+
     attributes?: {
       clout?: { level: number; current: number; augmentPositive?: number; augmentNegative?: number };
       celerity?: { level: number; current: number; augmentPositive?: number; augmentNegative?: number };
@@ -329,7 +329,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   if (!node?.id || !node?.name) return null;
 
   const data = node.characterData;
-  const levels = data?.levels;
+
   const attributes = data?.attributes;
   const conditions = data?.conditions;
   const seed = data?.creation?.seed;
@@ -476,19 +476,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               <div className="flex items-center justify-center" style={{ backgroundColor: '#b4a7d6', color: '#582a72', fontSize: '17px', lineHeight: '1.1', padding: '2px 8px' }}>{tkv}</div>
             </div>
 
-            {/* WTH Levels */}
-            <div className="flex gap-1 mb-2">
-              {[
-                { label: 'W', value: levels?.wealthLevel || 4, bg: '#22ab94' },
-                { label: 'T', value: levels?.techLevel || 4, bg: '#002f6c' },
-                { label: 'H', value: levels?.healthLevel || 4, bg: '#f7525f' },
-              ].map(l => (
-                <div key={l.label} className="flex items-center justify-center rounded" style={{
-                  backgroundColor: l.bg, width: '28px', height: '18px',
-                  fontSize: '10px', color: 'white', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif'
-                }}>{l.label}{l.value}</div>
-              ))}
-            </div>
 
             {/* 3 Pillar Attribute Bars (vertical, compact view) */}
             <div className="flex gap-1 flex-1">
@@ -649,61 +636,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 &#x2B22;{seed?.baseFateDie?.replace('d', '') || '6'}
               </span>
             </div>
-          </div>
-
-          {/* Buffer */}
-          <div className="flex flex-col" style={{ width: '13px' }}>
-            <div style={{ height: '14px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '15px', backgroundColor: '#582a72' }} />
-          </div>
-
-          {/* Wealth Level */}
-          <div className="flex flex-col" style={{ width: '276px' }}>
-            <div className="flex">
-              <div className="px-2 py-1 text-white flex items-center justify-center flex-1" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '12px' }}>
-                {levels?.wealthLevel || 4} - Baseline
-              </div>
-              <div className="flex items-center gap-2 py-1" style={{ backgroundColor: '#582a72', paddingLeft: '8px', paddingRight: '4px' }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="flex items-center justify-center" style={{ width: '20px', height: '20px', border: '2px solid #ffcc78' }} onMouseDown={e => e.stopPropagation()}>
-                    <div style={{ width: '10px', height: '10px', border: '1px solid #ffcc78' }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={{ backgroundColor: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '12px', padding: '2px 0', color: 'white', textAlign: 'center', marginTop: '-2px', zIndex: 10, position: 'relative' }}>WEALTH LEVEL</div>
-          </div>
-
-          {/* Buffer */}
-          <div className="flex flex-col" style={{ width: '13px' }}>
-            <div style={{ height: '14px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '15px', backgroundColor: '#582a72' }} />
-          </div>
-
-          {/* Tech Level */}
-          <div className="flex flex-col" style={{ width: '276px' }}>
-            <div className="flex">
-              <div className="px-2 py-1 text-white flex items-center justify-center flex-1" style={{ backgroundColor: '#582a72', fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '12px' }}>
-                {levels?.techLevel || 4} - Baseline
-              </div>
-            </div>
-            <div style={{ backgroundColor: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '12px', padding: '2px 0', color: 'white', textAlign: 'center' }}>TECH LEVEL</div>
-          </div>
-
-          {/* Buffer */}
-          <div className="flex flex-col" style={{ width: '13px' }}>
-            <div style={{ height: '14px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '15px', backgroundColor: '#582a72' }} />
-          </div>
-
-          {/* Health Level */}
-          <div className="flex flex-col" style={{ width: '276px' }}>
-            <div className="flex">
-              <div className="px-2 py-1 text-white flex items-center justify-center flex-1" style={{ backgroundColor: '#002f6c', fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '12px' }}>
-                {levels?.healthLevel || 4} - Baseline
-              </div>
-            </div>
-            <div style={{ backgroundColor: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '12px', padding: '2px 0', color: 'white', textAlign: 'center' }}>HEALTH LEVEL</div>
           </div>
 
           {/* Buffer */}

@@ -65,15 +65,6 @@ export interface GrowthConditions {
   incoherent: boolean;  // Wit 0
 }
 
-// WTH System - Meta-progression levels (1-10), slow-moving across campaigns
-export interface GrowthLevels {
-  wealthLevel: number;  // 1-10: Narrative purchasing power (4 = baseline 0 KV)
-  techLevel: number;    // 1-10: What you can build/invent/use (4 = baseline 0 KV)
-  healthLevel: number;  // 1-10: Resistance to Lady Death, fated age (10 = immortal)
-  // Levels below 4 cost negative KRMA (reduce TKV)
-  // Levels above 5 cost 10 KRMA per level
-}
-
 // Character Creation
 export interface GrowthCreation {
   seed: {
@@ -103,7 +94,7 @@ export interface GrowthSeed {
   description: string;
   baseFateDie: FateDie;
   frequency: number;           // Starting frequency level
-  healthLevel: number;         // Starting health level (1-10)
+  fatedAge: number;            // Natural lifespan in years (e.g., Human ~80, Elf ~500)
   baseResist: number;          // Base body resistance
   attributes: {
     clout: number;
@@ -253,7 +244,7 @@ export interface GrowthItem {
   name: string;
   weightLevel: number;    // 0-10
   condition: number;      // 1-4
-  techLevel: number;      // Required tech level
+  // Items no longer gated by tech level — campaign setting determines available technology
   description?: string;
   quantity?: number;
 }
@@ -313,7 +304,7 @@ export interface GrowthBackstory {
 // Complete Character Interface
 export interface GrowthCharacter {
   identity: GrowthIdentity;
-  levels: GrowthLevels;
+  fatedAge: number;            // Natural lifespan from seed (years)
   tkv?: number;               // Total KRMA Value
   conditions: GrowthConditions;
   attributes: GrowthAttributes;

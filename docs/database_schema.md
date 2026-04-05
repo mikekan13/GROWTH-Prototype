@@ -315,8 +315,8 @@ Supplementary metadata for God-head entities. Links to a Character record (unive
 See `types/growth.ts` for full interface. Key sections:
 - `identity`: name, age, fatedAge, background, description
 - `attributes`: 9 attributes across 3 pillars (Body/Spirit/Soul)
-- `levels`: wealthLevel, techLevel, healthLevel (1-10)
 - `creation`: seed, root, branches
+- Note: WTH levels (wealthLevel/techLevel/healthLevel) removed 2026-04-05. Characters use fatedAge (from seed) instead.
 - `skills`, `magic`, `traits`, `grovines`, `fears`, `vitals`, `inventory`
 
 ### CharacterBackstory.responses

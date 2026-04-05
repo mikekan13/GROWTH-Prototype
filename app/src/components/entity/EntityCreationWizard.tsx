@@ -29,7 +29,6 @@ const STEPS = [
   { key: 'seed', label: 'Seed' },
   { key: 'roots', label: 'Root & Branches' },
   { key: 'attributes', label: 'Attributes' },
-  { key: 'wth', label: 'WTH Levels' },
   { key: 'skills', label: 'Skills' },
   { key: 'traits', label: 'Traits' },
   { key: 'goals', label: 'Goals' },

@@ -305,7 +305,8 @@ These numbers are starting points. Adjust through playtesting:
 | GRO.vine cycle length | ~1 month | 2 weeks - 2 months | God-head spending rate |
 | Death mortality rate | 20%/year | 10-40% | Lady Death income, spirit package volume |
 | Avg frequency at death | 120 | 60-250 | Lady Death income |
-| WTH curves | See WTH table | Multipliers adjustable | Character build costs |
-| Body resist KRMA ratio | TBD | 1:1 to 1:2 | Seed pricing |
-| Skill level KRMA ratio | TBD | 1:1 to 1:3 | Character advancement cost |
-| Fate Die KRMA value | TBD | face value to 10x | Seed pricing |
+| Body resist KRMA ratio | **2:1 (confirmed)** | — | Seed pricing |
+| Skill level KRMA ratio | **1:1 (confirmed)** | — | Character advancement cost |
+| Fate Die KRMA value | **5/10/20/40/80 (confirmed)** | — | Seed pricing |
+
+> **Note (2026-04-05):** WTH curves row removed. Per-character Wealth/Tech/Health levels were removed from the character model. Death resistance is handled by bodyResist (2:1) and Fate Die (5/10/20/40/80 for d4/d6/d8/d12/d20). Characters have fatedAge from their seed instead.

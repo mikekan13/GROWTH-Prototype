@@ -249,12 +249,11 @@ export class DiceService {
   }
 
   /**
-   * Death save: FD + Health Level ONLY. No effort, no modifiers, nothing else.
+   * Death save: Fate Die roll vs Lady Death's DR. Pure FD, no modifiers.
    */
   static deathSave(params: {
     characterId: string;
     fateDie: FateDie;
-    healthLevel: number;
     ladyDeathDr?: number;
   }): RollResult {
     const fdSides = parseDie(params.fateDie);
@@ -270,8 +269,8 @@ export class DiceService {
       }],
       dr: params.ladyDeathDr,
       effort: 0,
-      flatModifiers: params.healthLevel, // Health Level is the ONLY modifier
-      metadata: { healthLevel: params.healthLevel },
+      flatModifiers: 0,
+      metadata: {},
     };
 
     return executeRoll(request);

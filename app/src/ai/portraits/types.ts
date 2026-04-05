@@ -136,9 +136,6 @@ export interface PortraitCharacterData {
   // T6: Environment
   environment?: EnvironmentContext;
 
-  // T7: Meta-derived
-  wealthLevel?: number;                   // 1-10, influences gear quality appearance
-  techLevel?: number;                     // 1-10, influences tech aesthetic
 }
 
 export interface VisibleEquipment {

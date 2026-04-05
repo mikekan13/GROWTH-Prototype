@@ -35,15 +35,15 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - description: string (1-2 sentences, vivid)
   - baseFateDie: "d4"|"d6"|"d8"|"d12"|"d20" (higher = more chaotic/powerful)
   - frequency: integer 0-200 (creation cost in Frequency points; powerful seeds cost more)
-  - healthLevel: integer 1-10 (physical hardiness)
+  - fatedAge: integer (species natural lifespan — e.g. Human ~80, Elven ~500, Dwarven ~350)
   - baseResist: integer 0-50 (innate resistance to damage)
   - attributes: { clout, celerity, constitution, focus, flow, willpower, wisdom, wit } — each integer 0-30, augments added to base. Total should be 50-80 for balanced seeds.
   - skills: string[] (up to 10 innate skill names)
   - nectars: string[] (up to 10 positive traits — racial/species advantages)
   - thorns: string[] (up to 10 negative traits — racial/species disadvantages)
 
-  Balance guidelines: Human baseline has total attributes=50, frequency=40, healthLevel=4, baseResist=15, KV=225.
-  Elven: attrs=69, freq=30, health=5, resist=13, KV=255. Dwarven: attrs=63, freq=30, health=6, resist=18, KV=580.
+  Balance guidelines: Human baseline has total attributes=50, frequency=40, fatedAge=80, baseResist=15, KV=225.
+  Elven: attrs=69, freq=30, fatedAge=500, resist=13, KV=255. Dwarven: attrs=63, freq=30, fatedAge=350, resist=18, KV=580.
   More powerful seeds cost more frequency. Most seeds have 0-1 nectars and 0-1 thorns. Many have none.
   Only add nectars/thorns if they are truly character-defining species traits.`,
 
@@ -52,17 +52,14 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - frequency: integer (cost in Frequency; skilled roots cost 20-60)
   - ageAdded: integer 0+ (years this root adds to character age)
   - attributes: { clout, celerity, constitution, focus, flow, willpower, wisdom, wit } — each integer 0-20, base levels from training
-  - wealthLevel: integer 1-10 (economic status this root provides)
-  - healthLevel: integer (additional health from this root's lifestyle)
-  - techLevel: integer (technology familiarity level)
   - skills: array of { name: string, level: integer 1-20 } (up to 20 skills learned)
   - nectars: string[] (advantages from this background)
   - thorns: string[] (disadvantages or obligations)
   - seedRequirement: string (which seed type this root requires, or "" for any)
 
   Balance: A typical root has 3-6 skills at levels 2-8 (NEVER above 12), total attribute points 10-25.
-  Frequency = (total attribute points) + (total skill levels) + (WTH curve costs) - (ageAdded × 2).
-  Age is usually 16-21 for a root (childhood). Wealth 1-5 typical. Tech/Health usually baseline.
+  Frequency = (total attribute points) + (total skill levels) - (ageAdded × 2).
+  Age is usually 16-21 for a root (childhood).
   Most roots have NO nectars or thorns unless the GM specifically describes something character-defining.`,
 
   branch: `Generate a JSON object with these fields:
@@ -70,15 +67,13 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - frequency: integer (cost; specialized branches cost more)
   - ageAdded: integer 0+ (additional years of training)
   - attributes: { clout, celerity, constitution, focus, flow, willpower, wisdom, wit } — each integer 0-20, additional levels
-  - healthLevel: integer (health modifier, can be 0)
-  - techLevel: integer (tech modifier, can be 0)
   - skills: array of { name: string, level: integer 1-20 } (up to 20 specialized skills)
   - nectars: string[] (specialization advantages)
   - thorns: string[] (specialization costs/drawbacks)
   - requirements: string (prerequisites like "Root: Soldier" or "")
 
   Balance: Branches are narrower than roots — 2-4 skills at levels 3-10 (specialist, NEVER above 12), total attributes 5-15.
-  Frequency = (total attribute points) + (total skill levels) + (WTH costs) - (ageAdded × 2).
+  Frequency = (total attribute points) + (total skill levels) - (ageAdded × 2).
   Branches represent focused training AFTER a root. Most have NO nectars/thorns.`,
 
   skill: `Generate a JSON object with these fields:
@@ -91,7 +86,6 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - description: string (what it looks like and does)
   - itemType: "weapon"|"armor"|"accessory"|"consumable"|"tool"|"artifact"|"prima_materia"|"misc"
   - material: string (e.g. "Steel", "Ironwood", "Dragonbone")
-  - techLevel: integer 1-10
   - weightLevel: integer 0-10
   - condition: integer 1-4 (4=pristine, 1=broken)
   - rarity: "common"|"uncommon"|"rare"|"very_rare"|"legendary"|"artifact"
@@ -126,16 +120,8 @@ COSTING RULES:
 - 1 skill level = 1 KV (regular skills)
 - 2 KV per magic/supernatural skill level
 - Age on roots: every year of age = -2 KV (frequency reduction). Root age represents childhood (usually 16-21 years).
-- Root frequency = sum of all costs (attributes + skills + WTH costs) minus age reduction
-
-WTH LEVEL CURVE (Wealth, Tech, Health):
-These use an exponential curve: Level KV = 50 × (1.6 ^ (Level - 1))
-| Level 1=50 | Level 2=80 | Level 3=130 | Level 4=210 | Level 5=340 |
-| Level 6=550 | Level 7=880 | Level 8=1400 | Level 9=2200 | Level 10=3500 |
-
-WTH levels are MASSIVE costs. Most roots have modest WTH:
-- Wealth 1-5 is typical for roots. Higher requires extreme drawbacks.
-- Tech and Health usually stay at baseline or change minimally on roots/branches.
+- Root frequency = sum of all costs (attributes + skills) minus age reduction
+- Body Resist: 1 KV per point of base resist
 
 SKILL LEVEL SCALE:
 - 1-5: Novice to competent (basic training)
@@ -154,9 +140,9 @@ NECTARS & THORNS — EXTREMELY RARE:
 - Examples: "Dark Sight" (see in darkness), "Long Lifespan Frailty" (age penalty)
 
 REFERENCE SEEDS (from canonical catalog):
-- Human: attrs total=50, freq=40, health=4, resist=15, KV=225
-- Elven: attrs total=69, freq=30, health=5, resist=13, KV=255
-- Dwarven: attrs total=63, freq=30, health=6, resist=18, KV=580
+- Human: attrs total=50, freq=40, fatedAge=80, resist=15, KV=225
+- Elven: attrs total=69, freq=30, fatedAge=500, resist=13, KV=255
+- Dwarven: attrs total=63, freq=30, fatedAge=350, resist=18, KV=580
 - Seeds with higher total attributes or better stats cost more frequency
 
 BALANCE PHILOSOPHY:

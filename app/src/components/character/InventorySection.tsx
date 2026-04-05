@@ -29,7 +29,6 @@ export default function InventorySection({ inventory }: { inventory: GrowthInven
             <div className="flex gap-3 text-xs text-[var(--surface-dark)]/40">
               <span>W{item.weightLevel}</span>
               <span>C{item.condition}/4</span>
-              <span>T{item.techLevel}</span>
             </div>
           </div>
         ))}

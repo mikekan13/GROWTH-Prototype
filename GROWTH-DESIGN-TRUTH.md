@@ -79,14 +79,17 @@ This is the definitive acronym. It has TWO functions:
 - **O = Opportunity** — What the character can act on
 These three elements define each GRO.vine (a narrative thread/storyline for a character). A character's active GRO.vines are the core of their ongoing story.
 
-### WTH = Meta-Level Scales (1-10 per character)
-- **W = Wealth Level** (1-10) — Narrative purchasing power (4 = baseline)
-- **T = Tech Level** (1-10) — What you can build/invent/use (4 = baseline)
-- **H = Health Level** (1-10) — Resistance to Lady Death, determines fated age (10 = immortal)
+### WTH = ~~Meta-Level Scales~~ (REMOVED from character model 2026-04-05)
 
-Levels below 4 cost negative KRMA (reduce character TKV). Levels above 5 cost 10 KRMA per level.
+> **Per-character WTH levels were removed 2026-04-05.** W/T/H remain as campaign-level narrative descriptors but are no longer per-character mechanical levels with KRMA costs. Death resistance is now handled by `bodyResist` (2:1 KRMA ratio) and the Fate Die (5/10/20/40/80 for d4/d6/d8/d12/d20). Characters have `fatedAge` set by their seed instead of a Health level.
 
-Health Level is the most significant KV cost in Seeds. Health Level + Fate Die fights Lady Death's roll.
+~~- **W = Wealth Level** (1-10) — Narrative purchasing power (4 = baseline)~~
+~~- **T = Tech Level** (1-10) — What you can build/invent/use (4 = baseline)~~
+~~- **H = Health Level** (1-10) — Resistance to Lady Death, determines fated age (10 = immortal)~~
+
+~~Levels below 4 cost negative KRMA (reduce character TKV). Levels above 5 cost 10 KRMA per level.~~
+
+~~Health Level is the most significant KV cost in Seeds. Health Level + Fate Die fights Lady Death's roll.~~
 
 ### GRO.vine Capacity
 - Average: 3 active GRO.vines per character
@@ -349,7 +352,7 @@ These are recurring themes Mike has stated across many conversations:
 - **"Discovered, not created"** — Mike insists the patterns in GROWTH were found, not invented. Over-defining things kills their magic.
 - **Guided Freedom** — Use KRMA costs to create natural pathways without building walls. No hard caps, only soft guidance through economics.
 - **"Safety-seeking is itself a kind of death"** — Players with high Frequency tend to hoard points to avoid death instead of spending on growth. The system should encourage spending.
-- **GRO is the campaign. WTH is the arc.** — Attributes, skills, GRO.vines — that's the character within a campaign, changing constantly. WTH levels (Wealth/Tech/Health) sit above that — slow-moving meta-progression that spans campaigns, even across deaths and reincarnations. Wealth might shift if you find a fortune. Tech might rise 1-2 levels over a whole campaign through research and invention. Health is the most immovable — at level 10 you're immortal (can still be killed, but won't die of age). The dot in GRO.WTH is the threshold between what changes within a story and what persists across stories.
+- **GRO is the campaign. WTH is the arc.** — Attributes, skills, GRO.vines — that's the character within a campaign, changing constantly. The dot in GRO.WTH is the threshold between what changes within a story and what persists across stories. *(Note: Per-character WTH levels were removed 2026-04-05. W/T/H are now campaign-level narrative context, not per-character mechanical scales. Death resistance uses bodyResist + Fate Die instead.)*
 - **Fundamentally anti-capitalist** — Crypto-style ledger rewarding creativity, keeping data ownership with individuals. "People who play GROWTH own GROWTH."
 - **The game is a parable** — A safe version of the spiritual journey Mike went through. Not preaching, but facilitating discovery.
 
@@ -452,7 +455,7 @@ All original questions resolved. Answers recorded below:
 7. **Reversible book** — Still the plan (Flow front-to-back for lore, Focus back-to-front for mechanics, Balance synthesizes in middle). But the book is not the focus now — each page takes 7+ days. Focus is on the app. AI may help speed up page creation later.
 
 Previously resolved:
-- ~~GROWTH acronym~~ — Confirmed: Goals/Resistance/Opportunity/Wealth/Tech/Health
+- ~~GROWTH acronym~~ — Confirmed: Goals/Resistance/Opportunity/Wealth/Tech/Health (WTH per-character levels removed 2026-04-05; acronym stands, levels don't)
 - ~~Soul/Spirit swap applied to repo~~ — No, repository still uses pre-swap labels (noted in CLAUDE.md)
 - ~~Database choice~~ — Prisma + SQLite (beta) → PostgreSQL (production)
 

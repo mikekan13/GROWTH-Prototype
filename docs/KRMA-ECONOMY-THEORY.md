@@ -306,18 +306,14 @@ Thorns are placed by the **opposing God-head** (the one representing resistance 
 - **Retention bonuses**: Milestone lump sums (6mo: 1,000, 1yr: 1,500, 2yr: 2,500, 3yr: 3,000, 5yr: 5,000)
 - Full math model: `docs/KRMA-ECONOMY-MATH-MODEL.md`
 
-### 3. WTH Curves — Three Separate Scales
-Expense ordering: **W < T < H** (Wealth cheapest, Health most expensive)
+### 3. ~~WTH Curves~~ (REMOVED 2026-04-05)
 
-- **Wealth** = campaign-scoped (own everything in a campaign)
-- **Tech** = metaverse-scoped (use/create anything)
-- **Health** = existence-scoped (persist forever, opt out of natural death)
-
-Each level roughly doubles in cost. See `docs/KRMA-ECONOMY-MATH-MODEL.md` for full curve tables.
-
-- Human (W3/T4/H4): ~91 KRMA in WTH
-- Health 10 (immortality): ~3,990 cumulative — an entire god-tier character's investment
-- Wealth 10: ~720 cumulative — achievable late-game
+> **WTH levels were removed from the character model on 2026-04-05.** Per-character Wealth/Tech/Health level scales no longer exist. Death resistance is now handled by `bodyResist` (2:1 KRMA ratio) and the Fate Die (5/10/20/40/80 for d4/d6/d8/d12/d20). Characters have `fatedAge` (set by seed) instead of a Health level. The GROWTH acronym remains but W/T/H are campaign-level narrative context, not per-character mechanical levels.
+>
+> ~~Expense ordering: **W < T < H** (Wealth cheapest, Health most expensive)~~
+> ~~Human (W3/T4/H4): ~91 KRMA in WTH~~
+> ~~Health 10 (immortality): ~3,990 cumulative~~
+> ~~Wealth 10: ~720 cumulative~~
 
 ### 4. Nectar Breakdown Tax — Goes to GM
 When a player declines a nectar and breaks it down to frequency:

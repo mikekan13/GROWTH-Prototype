@@ -29,7 +29,6 @@ function createDefaultItem(): Record<string, unknown> {
     description: '',
     condition: 4,
     weightLevel: 1,
-    techLevel: 4,
     tags: [],
   };
 }

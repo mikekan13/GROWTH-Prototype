@@ -70,10 +70,6 @@ export function extractPortraitData(
 
     // T6: Environment (set per-generation, not from character data)
     environment: undefined,
-
-    // T7: Meta
-    wealthLevel: charData.levels?.wealthLevel,
-    techLevel: charData.levels?.techLevel,
   };
 }
 

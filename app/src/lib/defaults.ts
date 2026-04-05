@@ -5,11 +5,7 @@ export function createDefaultCharacter(name: string): GrowthCharacter {
     identity: {
       name,
     },
-    levels: {
-      wealthLevel: 4,
-      techLevel: 4,
-      healthLevel: 4,
-    },
+    fatedAge: 80,  // Default human lifespan
     conditions: {
       weak: false,
       clumsy: false,

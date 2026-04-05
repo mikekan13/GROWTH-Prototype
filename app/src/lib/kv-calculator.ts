@@ -11,9 +11,16 @@ import {
   KV_PER_ATTRIBUTE_LEVEL,
   KV_PER_SKILL_LEVEL,
   KV_PER_MAGIC_SKILL_LEVEL,
-  WTH_COSTS,
   type TKVBreakdown,
 } from '@/types/krma';
+
+/** Body Resist costs 2 KRMA per point */
+const KV_PER_BODY_RESIST = 2;
+
+/** Fate Die KV — roughly doubling per step */
+export const FATE_DIE_KV: Record<string, number> = {
+  'd4': 5, 'd6': 10, 'd8': 20, 'd12': 40, 'd20': 80,
+};
 
 // ── Character TKV ──
 
@@ -64,13 +71,8 @@ export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown 
   }
   const magicTotal = magicSkills.reduce((sum, s) => sum + s.kv, 0);
 
-  const wthLevels = {
-    wealth: WTH_COSTS[character.levels.wealthLevel] ?? 0,
-    tech: WTH_COSTS[character.levels.techLevel] ?? 0,
-    health: WTH_COSTS[character.levels.healthLevel] ?? 0,
-    subtotal: 0,
-  };
-  wthLevels.subtotal = wthLevels.wealth + wthLevels.tech + wthLevels.health;
+  const bodyResistValue = (character.vitals?.baseResist ?? 0) * KV_PER_BODY_RESIST;
+  const bodyResist = { total: bodyResistValue, rate: KV_PER_BODY_RESIST };
 
   const traits = character.traits.map(t => ({
     name: t.name,
@@ -81,7 +83,7 @@ export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown 
   const traitsTotal = traits.reduce((sum, t) => sum + t.kv, 0);
 
   const total = body.subtotal + spirit.subtotal + soul.subtotal
-    + skillsTotal + magicTotal + wthLevels.subtotal + traitsTotal;
+    + skillsTotal + magicTotal + bodyResistValue + traitsTotal;
 
   return {
     version: 1,
@@ -89,7 +91,7 @@ export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown 
     body, spirit, soul,
     skills, skillsTotal,
     magicSkills, magicTotal,
-    wthLevels,
+    bodyResist,
     traits, traitsTotal,
   };
 }
@@ -117,13 +119,12 @@ export function calculateItemKV(item: GrowthWorldItem): number {
 
 /** Calculate KV for a location (placeholder — manual values until AI grading) */
 export function calculateLocationKV(location: GrowthLocation): number {
-  // Danger + wealth + features = rough KV
+  // Danger + features + connections = rough KV
   const dangerKV = (location.dangerLevel ?? 1) * 2;
-  const wealthKV = (location.wealthLevel ?? 1);
   const featureKV = (location.features?.length ?? 0) * 2;
   const connectionKV = (location.connections?.length ?? 0);
 
-  return Math.max(1, dangerKV + wealthKV + featureKV + connectionKV);
+  return Math.max(1, dangerKV + featureKV + connectionKV);
 }
 
 // ── Internal Helpers ──

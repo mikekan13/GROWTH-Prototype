@@ -41,7 +41,6 @@ export interface Material {
   name: string;
   resistType: ResistType;
   baseResist: number;       // 1-50: Inherent durability
-  techLevel: number;        // 1-10: Required tech sophistication to work with
   baseWeight: number;       // 1-6: Base weight category (Featherlight → Hefty)
   valueRating: number;      // 1-10: Rarity/desirability
   mods: MaterialMod[];      // Special properties inherited by items made from this material
@@ -51,7 +50,6 @@ export interface Material {
 /**
  * When combining materials for an item:
  *   Final Resist = (Primary Resist + Subordinate Resist) / 2 (rounded)
- *   Tech Level = Highest among components
  *   Resist Type = Primary material's type
  *   Mods = Union of all component mods (duplicates listed once)
  *   Weight = Average of component weights + item-type modifier + Flexible/Restrictive

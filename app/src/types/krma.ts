@@ -95,12 +95,8 @@ export const KV_PER_SKILL_LEVEL = 1;
 /** KV cost per magic school skill level */
 export const KV_PER_MAGIC_SKILL_LEVEL = 2;
 
-/** WTH level KRMA costs (level → KV cost) */
-export const WTH_COSTS: Record<number, number> = {
-  1: -30, 2: -20, 3: -10,
-  4: 0, 5: 0,
-  6: 10, 7: 20, 8: 30, 9: 40, 10: 50,
-};
+// WTH_COSTS removed — WTH system cut 2026-04-05
+// Wealth → campaign currency, Tech → skills, Health → fatedAge on seed
 
 // ── Pillar Classification (for death split routing) ──
 
@@ -150,7 +146,7 @@ export interface TKVBreakdown {
   skillsTotal: number;
   magicSkills: Array<{ school: string; kv: number }>;
   magicTotal: number;
-  wthLevels: { wealth: number; tech: number; health: number; subtotal: number };
+  bodyResist: { total: number; rate: number };  // Body resist KV (2 KRMA per point)
   traits: Array<{ name: string; kv: number; type: string; deathClassification?: 'kept' | 'destroyed' }>;
   traitsTotal: number;
 }

@@ -323,26 +323,3 @@ function buildEnvironmentBlock(env?: EnvironmentContext): string {
   return parts.filter(Boolean).join(', ');
 }
 
-// ============================================================
-// T7: Meta-Derived (from attribute levels)
-// ============================================================
-
-/** Derive visual cues from wealth/tech levels */
-export function deriveMetaInfluence(wealthLevel?: number, techLevel?: number): string {
-  const parts: string[] = [];
-
-  if (wealthLevel !== undefined) {
-    if (wealthLevel <= 2) parts.push('threadbare clothing, poverty');
-    else if (wealthLevel <= 4) parts.push('simple practical attire');
-    else if (wealthLevel <= 6) parts.push('well-made quality attire');
-    else if (wealthLevel <= 8) parts.push('fine craftsmanship, expensive materials');
-    else parts.push('opulent luxurious attire, masterwork quality');
-  }
-
-  if (techLevel !== undefined) {
-    if (techLevel >= 7) parts.push('advanced technological accessories');
-    else if (techLevel >= 5) parts.push('some mechanical or alchemical tools');
-  }
-
-  return parts.join(', ');
-}

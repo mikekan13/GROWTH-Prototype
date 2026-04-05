@@ -101,7 +101,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
   const [itemMaterial, setItemMaterial] = useState('');
   const [itemRarity, setItemRarity] = useState<ItemRarity>('common');
   const [itemWeightLevel, setItemWeightLevel] = useState(1);
-  const [itemTechLevel, setItemTechLevel] = useState(4);
   const [itemValue, setItemValue] = useState(0);
   const [itemSecondaryMaterial, setItemSecondaryMaterial] = useState('');
   const [itemNotes, setItemNotes] = useState('');
@@ -166,7 +165,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
       data.itemType = itemSubType;
       data.rarity = itemRarity;
       data.weightLevel = itemWeightLevel;
-      data.techLevel = itemTechLevel;
       data.condition = 4; // Undamaged by default
       if (itemMaterial) data.material = itemMaterial;
       if (itemSecondaryMaterial) data.material = `${itemMaterial}/${itemSecondaryMaterial}`;
@@ -612,7 +610,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   itemSecondaryMaterial={itemSecondaryMaterial} setItemSecondaryMaterial={setItemSecondaryMaterial}
                   itemRarity={itemRarity} setItemRarity={setItemRarity}
                   itemWeightLevel={itemWeightLevel} setItemWeightLevel={setItemWeightLevel}
-                  itemTechLevel={itemTechLevel} setItemTechLevel={setItemTechLevel}
                   itemValue={itemValue} setItemValue={setItemValue}
                   itemNotes={itemNotes} setItemNotes={setItemNotes}
                   weaponDamage={weaponDamage} setWeaponDamage={(v) => setWeaponDamage(v as typeof weaponDamage)}
@@ -1076,17 +1073,8 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
           {result.data.frequency != null ? (
             <StatBadge label="Freq" value={String(result.data.frequency)} color="#7050A8" />
           ) : null}
-          {result.data.healthLevel != null ? (
-            <StatBadge label="HP Lvl" value={String(result.data.healthLevel)} color="#E8585A" />
-          ) : null}
           {result.data.baseResist != null ? (
             <StatBadge label="Resist" value={String(result.data.baseResist)} color="#3E78C0" />
-          ) : null}
-          {result.data.wealthLevel != null ? (
-            <StatBadge label="Wealth" value={String(result.data.wealthLevel)} color="#D0A030" />
-          ) : null}
-          {result.data.techLevel != null ? (
-            <StatBadge label="Tech" value={String(result.data.techLevel)} color="#22ab94" />
           ) : null}
           {result.data.ageAdded != null ? (
             <StatBadge label="Age+" value={String(result.data.ageAdded)} color="#888" />
@@ -1270,7 +1258,6 @@ function ItemCreateFields({
   itemSecondaryMaterial, setItemSecondaryMaterial,
   itemRarity, setItemRarity,
   itemWeightLevel, setItemWeightLevel,
-  itemTechLevel, setItemTechLevel,
   itemValue, setItemValue,
   itemNotes, setItemNotes,
   weaponDamage, setWeaponDamage,
@@ -1290,7 +1277,6 @@ function ItemCreateFields({
   itemSecondaryMaterial: string; setItemSecondaryMaterial: (v: string) => void;
   itemRarity: ItemRarity; setItemRarity: (v: ItemRarity) => void;
   itemWeightLevel: number; setItemWeightLevel: (v: number) => void;
-  itemTechLevel: number; setItemTechLevel: (v: number) => void;
   itemValue: number; setItemValue: (v: number) => void;
   itemNotes: string; setItemNotes: (v: string) => void;
   weaponDamage: Record<string, number>; setWeaponDamage: (v: Record<string, number>) => void;
@@ -1329,14 +1315,12 @@ function ItemCreateFields({
     if (pMat && sMat) {
       const combined = combineMaterials(pMat, sMat);
       setItemWeightLevel(combined.baseWeight);
-      setItemTechLevel(combined.techLevel);
       if (itemSubType === 'armor') {
         const mult = ARMOR_LAYER_RULES[armorLayer].resistMultiplier;
         setArmorResistance(Math.round(combined.baseResist * mult));
       }
     } else if (pMat) {
       setItemWeightLevel(pMat.baseWeight);
-      setItemTechLevel(pMat.techLevel);
       if (itemSubType === 'armor') {
         const mult = ARMOR_LAYER_RULES[armorLayer].resistMultiplier;
         setArmorResistance(Math.round(pMat.baseResist * mult));
@@ -1425,9 +1409,6 @@ function ItemCreateFields({
           <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#22ab94' }}>
             {effectiveMat.resistType} R{effectiveMat.baseResist}
           </span>
-          <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#ffcc78' }}>
-            T{effectiveMat.techLevel}
-          </span>
           <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#c0c0c0' }}>
             W{effectiveMat.baseWeight}
           </span>
@@ -1444,11 +1425,6 @@ function ItemCreateFields({
         <div>
           <label className="text-[14px] text-gray-500 block">Weight (0-10)</label>
           <input type="number" min={0} max={10} value={itemWeightLevel} onChange={e => setItemWeightLevel(Number(e.target.value))}
-            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
-        </div>
-        <div>
-          <label className="text-[14px] text-gray-500 block">Tech (1-10)</label>
-          <input type="number" min={1} max={10} value={itemTechLevel} onChange={e => setItemTechLevel(Number(e.target.value))}
             className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
         </div>
         <div>
@@ -1661,7 +1637,6 @@ function MaterialDesigner() {
   const [newName, setNewName] = useState('');
   const [newResistType, setNewResistType] = useState<ResistType>('hard');
   const [newBaseResist, setNewBaseResist] = useState(15);
-  const [newTechLevel, setNewTechLevel] = useState(3);
   const [newBaseWeight, setNewBaseWeight] = useState(3);
   const [newValueRating, setNewValueRating] = useState(3);
   const [newMods, setNewMods] = useState<Set<MaterialMod>>(new Set());
@@ -1682,7 +1657,6 @@ function MaterialDesigner() {
       name: newName.trim(),
       resistType: newResistType,
       baseResist: newBaseResist,
-      techLevel: newTechLevel,
       baseWeight: newBaseWeight,
       valueRating: newValueRating,
       mods: Array.from(newMods) as MaterialMod[],
@@ -1692,7 +1666,6 @@ function MaterialDesigner() {
     // Reset form
     setNewName('');
     setNewBaseResist(15);
-    setNewTechLevel(3);
     setNewBaseWeight(3);
     setNewValueRating(3);
     setNewMods(new Set());
@@ -1774,15 +1747,10 @@ function MaterialDesigner() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-[12px] text-gray-500 block">Resist (1-50)</label>
                   <input type="number" min={1} max={50} value={newBaseResist} onChange={e => setNewBaseResist(Number(e.target.value))}
-                    className="w-full text-[14px] px-1 py-1 border" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="text-[12px] text-gray-500 block">Tech (1-10)</label>
-                  <input type="number" min={1} max={10} value={newTechLevel} onChange={e => setNewTechLevel(Number(e.target.value))}
                     className="w-full text-[14px] px-1 py-1 border" style={inputStyle} />
                 </div>
                 <div>
@@ -1885,9 +1853,6 @@ function MaterialDesigner() {
                       <span className="text-[13px]" style={{ color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                         R{mat.baseResist}
                       </span>
-                      <span className="text-[13px]" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                        T{mat.techLevel}
-                      </span>
                       <span className="text-[13px]" style={{ color: '#c0c0c0', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                         W{mat.baseWeight}
                       </span>
@@ -1902,14 +1867,10 @@ function MaterialDesigner() {
                           {mat.description}
                         </div>
                       )}
-                      <div className="grid grid-cols-4 gap-3 text-center">
+                      <div className="grid grid-cols-3 gap-3 text-center">
                         <div>
                           <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Resist</div>
                           <div className="text-[16px] font-bold" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.baseResist}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Tech</div>
-                          <div className="text-[16px] font-bold" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.techLevel}</div>
                         </div>
                         <div>
                           <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Weight</div>

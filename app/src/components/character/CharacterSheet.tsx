@@ -23,7 +23,7 @@ const CONDITION_MAP: Record<string, string> = {
 };
 
 export default function CharacterSheet({ character }: CharacterSheetProps) {
-  const { identity, attributes, levels, creation, conditions, traits, grovines, fears } = character;
+  const { identity, attributes, creation, conditions, traits, grovines, fears } = character;
   const activeConditions = Object.entries(conditions).filter(([, v]) => v);
   const nectars = traits.filter(t => t.type === 'nectar');
   const blossoms = traits.filter(t => t.type === 'blossom');
@@ -42,24 +42,18 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
           </span>
         </div>
 
-        {/* WTH Levels + TKV */}
+        {/* TKV + Fated Age */}
         <div className="flex gap-6 mt-3 text-sm">
-          <div>
-            <span className="text-white/40 uppercase text-xs">Wealth</span>
-            <span className="ml-2 text-[var(--krma-gold)]">{levels.wealthLevel}</span>
-          </div>
-          <div>
-            <span className="text-white/40 uppercase text-xs">Tech</span>
-            <span className="ml-2 text-[var(--accent-teal)]">{levels.techLevel}</span>
-          </div>
-          <div>
-            <span className="text-white/40 uppercase text-xs">Health</span>
-            <span className="ml-2 text-[var(--pillar-body)]">{levels.healthLevel}</span>
-          </div>
           {character.tkv !== undefined && (
-            <div className="ml-auto">
+            <div>
               <span className="text-white/40 uppercase text-xs">TKV</span>
               <span className="ml-2 text-[var(--krma-gold)] font-bold">{character.tkv}</span>
+            </div>
+          )}
+          {character.fatedAge !== undefined && (
+            <div className="ml-auto">
+              <span className="text-white/40 uppercase text-xs">Fated Age</span>
+              <span className="ml-2 text-[var(--pillar-body)]">{character.fatedAge}</span>
             </div>
           )}
         </div>

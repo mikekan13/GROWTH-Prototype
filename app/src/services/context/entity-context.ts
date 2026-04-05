@@ -79,9 +79,6 @@ export async function buildEntityContext(entityId: string): Promise<string> {
     }
   }
 
-  // ── Levels (WTH) ──
-  lines.push(`\n--- Levels ---`);
-  lines.push(`Wealth: ${data.levels.wealthLevel} | Tech: ${data.levels.techLevel} | Health: ${data.levels.healthLevel}`);
   if (data.tkv !== undefined) lines.push(`TKV: ${data.tkv}`);
 
   // ── Attributes ──

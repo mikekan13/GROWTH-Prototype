@@ -22,7 +22,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | EncounterService | `services/encounter.ts` | Encounter CRUD (combat/social/exploration/puzzle/event), round/phase tracking, GM-only | Prisma, permissions |
 | KRMA Ledger | `services/krma/ledger.ts` | Core transaction engine — ALL KRMA mutations. Append-only, checksummed, idempotent, atomic. Single/batch execution. | Prisma, krma types |
 | KRMA Wallet | `services/krma/wallet.ts` | Wallet CRUD (user/campaign/character/system), fund/defund campaigns, transaction history, global metrics | Prisma, ledger, permissions |
-| KRMA Evaluator | `services/krma/evaluator.ts` | Deterministic KV calculator (TKV breakdown by pillar, skills, WTH, traits). Death split calculator (component-level routing by pillar/governor). Versioned + hashable. | krma types, growth types |
+| KRMA Evaluator | `services/krma/evaluator.ts` | Deterministic KV calculator (TKV breakdown by pillar, skills, bodyResist at 2:1, fate die pricing 5/10/20/40/80, trait guardrails, root age floor validation). Death split calculator (component-level routing by pillar/governor, bodyResist routes with Body). Versioned + hashable. | krma types, growth types |
 | KRMA Death Split | `services/krma/death-split.ts` | Orchestrates multi-transaction death process: Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch. | ledger, wallet, evaluator |
 | KRMA Reconciliation | `services/krma/reconciliation.ts` | Balance reconciliation, global supply invariant check, checksum chain verification, full audit | Prisma, ledger |
 | KRMA Crystallization | `services/krma/crystallization.ts` | Crystallize/dissolve entities across KRMA line. Ledger stored as campaign events. Prevents double-crystallization. Pool tracking | Prisma, permissions |
@@ -57,7 +57,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | Group | Components | Purpose |
 |-------|-----------|---------|
 | Character Display | CharacterSheet, AttributeBlock, MagicSection, SkillsSection, VitalsSection, InventorySection | Full character sheet rendering |
-| Character Builder | CharacterBuilder | 4-step wizard (Identity → Origin → Attributes → WTH) |
+| Character Builder | CharacterBuilder | 4-step wizard (Identity → Origin → Attributes → Review) |
 | Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, folder groups, localStorage persistence |
 | Canvas | FolderGroup | Card grouping system — visual bounding box, drag-all-together, party type with REST button |
 | Canvas | RestPanel | GM rest UI — short/long toggle, character checkboxes with warnings (Overwhelmed/F=0), apply + results |
@@ -95,7 +95,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 
 | File | Contents |
 |------|----------|
-| `types/growth.ts` | GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthLevels, GrowthCreation, GrowthSkill (with SkillGovernor[], no categories/combat flag), GrowthMagic, GrowthTrait, GROvine, GrowthFear, GrowthVitals, GrowthInventory, SKILL_GOVERNORS, PILLARS constant |
+| `types/growth.ts` | GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthCreation, GrowthSkill (with SkillGovernor[], no categories/combat flag), GrowthMagic, GrowthTrait, GROvine, GrowthFear, GrowthVitals, GrowthInventory, SKILL_GOVERNORS, PILLARS constant. Note: GrowthLevels (WTH) removed 2026-04-05; characters use fatedAge instead |
 | `types/krma.ts` | WalletType, KrmaState, ActorType, TransactionReason (30+ codes), genesis constants (supply, distribution, burn cap), KV evaluator constants, pillar classification helpers, TKVBreakdown, DeathSplitManifest, WalletSummary, TransactionRecord, ReconciliationReport |
 | `types/changelog.ts` | ChangeActor (player, gm, ai_copilot, system), ChangeCategory, FieldChange (field/oldValue/newValue), ChangeLogEntry (full DB record type), query/create/revert input types |
 | `types/terminal.ts` | TerminalEvent (unified event type), TerminalEventType, TerminalPayload (discriminated union), payload types (ChangeLogPayload, DiceRollPayload, ChatPayload, CommandPayload, AIMessagePayload, GameEventPayload), GameSessionInfo, TerminalFilter |
