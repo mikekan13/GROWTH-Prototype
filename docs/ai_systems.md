@@ -50,6 +50,39 @@ User message → Context Assembler → Relevant data fetched → Prompt built �
 
 **Classification**: Quality-of-life (local-model-eligible)
 
+### Active: Claude AI Provider (God-head Operations)
+
+**Purpose**: Deep reasoning AI for God-head operations — custodian assignment, resistance generation, future blueprint evaluation and council routing.
+
+**Architecture**: `src/ai/providers/claude.ts` → Anthropic Messages API (v1/messages)
+
+**Configuration**:
+- `ANTHROPIC_API_KEY` — Required for God-head operations
+- `ANTHROPIC_MODEL` — Default: `claude-sonnet-4-20250514`
+- `ANTHROPIC_API_URL` — Default: `https://api.anthropic.com`
+
+**Accessed via**: `getGodheadProvider()` from `src/ai/providers/index.ts` — always returns Claude, regardless of default `AI_PROVIDER` setting.
+
+**Classification**: System-required (always cloud, not local-model-eligible). God-heads need deep reasoning that local models cannot provide.
+
+### Design Note: Resistance is Entity-Based
+
+Resistance is NOT auto-generated text. The GM creates entities (NPCs, creatures, locations) and assigns them as resistance to goals via EntityRelationship edges (`resisted_by`). Resistance entities have their own GRO.vines and custodian God-heads, creating a natural adversarial graph. God-heads see the full resistance graph to understand cross-entity dynamics.
+
+**Service**: `src/services/goal-resistance.ts` — assign/remove/list resistance entities
+**API**: `GET/POST/DELETE /api/goals/[id]/resistance`
+
+### Active: God-head Custodian Assignment
+
+**Purpose**: Determine which God-head picks up a new GRO.vine based on domain alignment.
+
+**Architecture**: `src/services/goal-custodian.ts` → `buildGoalContext()` → Claude AI → JSON parse → assign
+
+**God-heads** (seeded):
+- **Lady Death** (BALANCE) — Death, decay, karmic recycling, endings, transformation
+- **Kai** (BALANCE) — Value, balance, karmic evaluation, creation, ambition
+- **Eth'erling** (BALANCE) — Justice, routing, cosmic judgment, moral dilemmas (default fallback)
+
 ## Planned Systems
 
 ### Portrait Pipeline (Phase A — In Progress)

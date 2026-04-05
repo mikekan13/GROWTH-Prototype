@@ -3,6 +3,36 @@
 Last updated: 2026-04-04
 Current phase: Phase 5 (God-Head Architecture)
 
+## Session 2026-04-04 (b): God-Head Phase 2 — Goal System + Custodian + Resistance
+**Completed:**
+- Goal CRUD service (`services/goal.ts`) — create, update, abandon, complete, fail, list by character/campaign, Zod schemas, 5-active-goal limit
+- Goal API routes — `GET/POST /api/goals`, `GET/PATCH/DELETE /api/goals/[id]`, `POST /api/goals/[id]/resistance`
+- Claude AI provider (`ai/providers/claude.ts`) — Anthropic Messages API integration for God-head deep reasoning
+- `getGodheadProvider()` in providers/index.ts — always returns Claude, separate from QoL Ollama provider
+- Entity-based resistance system (`services/goal-resistance.ts`) — GM assigns entities (NPCs, creatures, locations) as resistance to goals via EntityRelationship edges ('resisted_by'). Resistance entities have their own GRO.vines + custodians, creating adversarial graph
+- God-head custodian assignment (`services/goal-custodian.ts`) — AI reads goal + context, matches to God-head domain, assigns custodian
+- Seeded 3 God-head entities via `scripts/seed-godheads.ts`:
+  - Lady Death (BALANCE) — death, decay, karmic recycling, endings
+  - Kai (BALANCE) — value, balance, karmic evaluation, creation
+  - Eth'erling (BALANCE) — justice, routing, cosmic judgment, moral dilemmas
+  - Each has: Character record (entityType: GODHEAD, no campaign), GodHead metadata (system prompt + domain), KRMA wallet
+- GoalCard component (`components/canvas/GoalCard.tsx`) — view/expand goals, resistance entity display, milestone tracking, custodian display, GM-only create/abandon. No player complete/fail (God-heads determine those via campaign context)
+- GoalCard is NOT a canvas panel tab — goals display on main character sheet body, managed in Tapestry
+- Added `GODHEAD` wallet type to `types/krma.ts`
+- Updated docs: module_registry.md, ai_systems.md
+- Clean TypeScript build (zero errors)
+
+**Next session (God-Head Phase 3 — Tapestry + Opportunity + Nectar):**
+- Wire goal creation into character/NPC creation flow (goals established at entity creation)
+- Build Tapestry tab goal monitoring view (GM sees all entity goals, assigns resistance entities)
+- Wire custodian auto-assignment on goal creation
+- Opportunity generation — God-head generates contextual opportunities for goals
+- Nectar bestowal on milestone completion (KRMA transaction + ForgeItem linkage)
+- God-head context evaluation loop (custodian reads campaign events → determines complete/fail)
+- Abandon KRMA cost implementation (amount TBD)
+
+---
+
 ## Session 2026-04-04: God-Head Architecture Foundation (Phase 0 + Phase 1)
 **Completed:**
 - Core Architecture Document v2 reviewed and mapped against existing codebase

@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-04-04 (God-head architecture foundation)
+Last updated: 2026-04-04 (God-head Phase 2 — Goal system + custodian + resistance)
 
 ## Services (Business Logic)
 
@@ -29,6 +29,9 @@ Last updated: 2026-04-04 (God-head architecture foundation)
 | DiceInjectionRegistry | `services/dice-injection.ts` | Godhead override system. Register/remove/apply injections that silently modify die results. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp, hidden modifier. Audit-logged | dice types |
 | ProfileService | `services/profile.ts` | Get/update trailblazer profile, get/update watcher profile (WATCHER+ only), public profile view (strips topicsToAvoid) | Prisma, permissions |
 | HubService | `services/hub.ts` | List LISTED campaigns (public, filterable), campaign listing detail (public), update listing (GM-only), apply to campaign (auth, creates member+application atomically with profile snapshot) | Prisma, permissions |
+| GoalService | `services/goal.ts` | Goal CRUD (create/update/abandon/complete/fail), Zod schemas, 5-active-goal limit, custodian assignment storage, resistance prompt storage. Character goals with priority, milestones, God-head custodianship | Prisma, permissions |
+| GoalResistanceService | `services/goal-resistance.ts` | Entity-based resistance management. GM assigns entities (NPCs, creatures, locations) as resistance to goals via EntityRelationship edges ('resisted_by'). List/assign/remove resistance entities. | Prisma, permissions |
+| GoalCustodianService | `services/goal-custodian.ts` | AI-driven God-head custodian assignment. Reads goal + context, matches to God-head domain, assigns custodian to goal | GoalContextService, Claude provider, GoalService |
 
 ## Infrastructure (lib/)
 
@@ -68,6 +71,7 @@ Last updated: 2026-04-04 (God-head architecture foundation)
 | Canvas Cards | MagicCard | Character magic sub-panel — mercy/severity/balance spell display |
 | Canvas Cards | BackstoryCard | Character backstory sub-panel — structured prompt responses, narrative view |
 | Canvas Cards | HarvestCard | Harvest log sub-panel — GROvine completion history across characters |
+| Canvas Cards | GoalCard | Goal management sub-panel — create/view/abandon/complete/fail goals, priority selector, milestone tracking, custodian display, resistance prompts (GM-only), status filters |
 | Canvas Cards | CampaignCanvas | Campaign page wrapper that loads characters, locations, items and renders RelationsCanvas with tabs (Relations/Forge/Essence/Encounters) |
 | Change Log | ChangeLogPanel | (Legacy — absorbed into Campaign Terminal) Bottom overlay panel, retained as reference |
 | Terminal | CampaignTerminal | Unified campaign activity feed — merges changelog + campaign events. Resizable bottom overlay, session grouping, filter toggles, auto-poll (5s). Replaces ChangeLogPanel |

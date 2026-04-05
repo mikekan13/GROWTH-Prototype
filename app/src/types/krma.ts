@@ -7,7 +7,7 @@
 
 // ── Wallet Types ──
 
-export type WalletType = 'USER' | 'RESERVE' | 'CAMPAIGN' | 'CHARACTER' | 'BURN' | 'LADY_DEATH';
+export type WalletType = 'USER' | 'RESERVE' | 'CAMPAIGN' | 'CHARACTER' | 'BURN' | 'LADY_DEATH' | 'GODHEAD';
 
 // ── Transaction Enums ──
 

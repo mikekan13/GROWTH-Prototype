@@ -92,14 +92,14 @@ QR code credentials from physical rulebook.
 
 ### Wallet
 KRMA currency holder. Every unit of KRMA lives in exactly one wallet.
-- `walletType`: USER | RESERVE | CAMPAIGN | CHARACTER | BURN | LADY_DEATH
+- `walletType`: USER | RESERVE | CAMPAIGN | CHARACTER | BURN | LADY_DEATH | GODHEAD
 - `ownerType`: Kept for backwards compat; `walletType` is canonical
 - `label`: Reserve: "Terminal","Mercy","Balance","Severity"; System: "Burn Sink","Lady Death"
 - `ownerId`: Unique per user (USER wallets)
 - `campaignId`: For CAMPAIGN wallets
 - `characterId`: For CHARACTER wallets
 - `frozen`: Admin hold flag
-- **Cardinality**: 4 RESERVE, 1 BURN, 1 LADY_DEATH, 1 per user, 1 per campaign, 1 per character
+- **Cardinality**: 4 RESERVE, 1 BURN, 1 LADY_DEATH, 1 per God-head (GODHEAD), 1 per user, 1 per campaign, 1 per character
 - **Genesis**: 100B KRMA distributed to reserves (Terminal 75%, Balance 12.5%, Mercy 6.25%, Severity 6.25%)
 
 ### KrmaTransaction
