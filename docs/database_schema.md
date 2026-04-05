@@ -1,6 +1,6 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-03-15 (EŶ∃tehrNET profiles + listings)
+Last updated: 2026-04-04 (God-head architecture foundation)
 Source of truth: `app/prisma/schema.prisma`
 
 ## Models
@@ -34,11 +34,46 @@ Player enrollment in a campaign (no character yet).
 - Created atomically with CampaignMember when applying through hub
 
 ### Character
-Player character with full game data.
+Universal entity sheet — players, NPCs, creatures, and God-heads all use the same model.
+- `entityType`: PLAYER_CHARACTER (default) | NPC | CREATURE | GODHEAD
+- `campaignId`: Nullable — God-heads and global NPCs may have no campaign
 - `data`: JSON string containing `GrowthCharacter` (see types/growth.ts)
 - `portrait`: Path to portrait image (null until generated)
 - `status`: DRAFT → SUBMITTED → APPROVED → ACTIVE → DEAD | RETIRED
-- Relations: backstory (optional)
+- Ownership: Player owns PCs, GM owns NPCs, Admin owns God-heads
+- Relations: backstory (optional), portraitGenerations[], personaLock (optional), godHead (optional), goals[]
+
+### PortraitGeneration
+AI-generated portrait history for a character. One record per generation attempt.
+- `characterId`: FK to Character (cascade delete)
+- `imagePath`: Relative path to generated image (e.g. `portraits/{charId}/{genId}.png`)
+- `thumbnailPath`: Smaller version for lists/tokens
+- `prompt` / `negativePrompt`: Exact prompts used for generation
+- `seed`: Random seed (for reproducibility)
+- `model`: Model identifier (e.g. "flux1-dev-Q4_0")
+- `steps`: Inference steps
+- `pulidWeight`: PuLID identity strength (null for first generation)
+- `styleLoraName` / `styleLoraWeight`: Style LoRA if used
+- `generationTimeMs`: Wall clock time for generation
+- `stateSnapshot`: JSON<PortraitCharacterData> — character visual state at generation time
+- `status`: pending → completed → accepted | archived | failed
+- `isCurrentPortrait`: Boolean — true for the active portrait (at most one per character)
+- `campaignId`: Campaign context
+- Indexes: characterId, (characterId + isCurrentPortrait)
+
+### PersonaLock
+Permanent identity anchor for a character. Stores the reference image and metadata
+used by PuLID to maintain the same face across all future generations.
+- `characterId`: Unique FK to Character (one lock per character, cascade delete)
+- `referenceImagePath`: Path to the locked portrait image
+- `embeddingPath`: Path to PuLID face embedding file (Phase B)
+- `lockedPrompt`: The exact prompt that produced the accepted portrait
+- `lockedSeed`: Seed of the accepted generation
+- `bodyDescription`: Full body description for non-facial consistency (hair, scars, tattoos, build)
+- `styleLora` / `loraStrength`: Style config at lock time
+- `pulidWeight`: PuLID strength (default 0.8)
+- `lockVersion`: Increments on re-lock (rare — major narrative transformation)
+- `previousLockId`: Points to archived lock for history
 
 ### CharacterBackstory
 Structured backstory responses from player.
@@ -144,19 +179,32 @@ Activity event in a campaign (dice rolls, chat, commands, AI messages, game even
 - Relations: campaign, session (GameSession, optional)
 - Indexes: `(campaignId, createdAt)`, `(sessionId)`
 
-### ForgeItem
-Campaign-level design template (skill, item, nectar, blossom, thorn). Created by GM in the Forge.
+### ForgeItem (Blueprint)
+Design template (skill, item, nectar, blossom, thorn). Can be campaign-scoped or global catalog.
 - `id`: String (cuid)
-- `campaignId`: String — which campaign this design belongs to
+- `campaignId`: String (nullable) — null for global catalog items
 - `type`: String — `skill` | `item` | `nectar` | `blossom` | `thorn`
 - `name`: String — design name (unique per campaign + type)
-- `status`: String — `draft` | `published`
+- `status`: String — `draft` | `published` | `global`
 - `data`: JSON — type-specific details (e.g., skill: `{ governors, description }`)
 - `createdBy`: String — userId of the GM who created it
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
-- Relations: campaign, requests (PlayerRequest[])
-- Indexes: `(campaignId, type)`, `(campaignId, status)`, `@@unique([campaignId, name, type])`
+- **Global catalog fields:**
+  - `isGlobal`: Boolean — true = lives in global catalog
+  - `sourceGlobalId`: String (nullable) — if this is a campaign instance of a global blueprint
+  - `authorUserId`: String (nullable) — original author for royalty tracking
+- **Authorship economy:**
+  - `useCount`: Int — times instantiated across campaigns
+  - `royaltyRate`: Float (default 0.01) — KRMA fraction paid to author on reuse
+- **Blueprint decay (Lady Death):**
+  - `lastUsedAt`: DateTime (nullable) — last instantiation
+  - `decayStatus`: String — ACTIVE | FLAGGED | DISSOLVING | DISSOLVED
+  - `flaggedAt`: DateTime (nullable)
+- **Karmic evaluation (Kai):**
+  - `relationshipTags`: JSON — `[{ blueprintId, interactionType, synergyRisk }]`
+  - `karmicValue`: BigInt (nullable) — locked value assigned by Kai
+  - `evaluatedAt`: DateTime (nullable)
+- Relations: campaign (optional), requests (PlayerRequest[])
+- Indexes: `(campaignId, type)`, `(campaignId, status)`, `(isGlobal, type)`, `(authorUserId)`, `(decayStatus)`, `@@unique([campaignId, name, type])`
 
 ### PlayerRequest
 Player request for a new campaign component. Submitted from SkillsCard (or future panels), reviewed by GM in the Forge.
@@ -216,6 +264,50 @@ Combat, social, or exploration encounter. Tracks three-phase resolution (Intenti
 ### Session
 Auth session token.
 - 7-day expiration, cleaned up on logout or expiry
+
+### Goal
+Core gameplay loop entity. Tracks a character's narrative goal with God-head custodianship.
+- `characterId`: String — the entity that owns this goal (PC, NPC, God-head)
+- `campaignId`: String (nullable) — God-head meta-goals may be campaign-independent
+- `description`: String — plain language goal ("Find my father's killer")
+- `status`: ACTIVE | COMPLETED | FAILED | ABANDONED
+- `priority`: Int 1-5
+- **God-head custodianship:**
+  - `custodianId`: String (nullable) — GodHead.id that adopted this goal
+  - `custodianName`: String (nullable) — cached display name
+  - `pillar`: String (nullable) — MERCY | BALANCE | SEVERITY
+- **Resistance:**
+  - `resistancePrompt`: String (nullable) — auto-generated prompt to GM
+  - `resistancePlan`: String (nullable) — GM's response
+- **Progress:**
+  - `milestones`: JSON — `[{ id, description, completed, nectarAwarded?, completedAt? }]`
+  - `nectarsEarned`: Int
+  - `completedAt`: DateTime (nullable)
+- Indexes: `(characterId, status)`, `(campaignId, status)`, `(custodianId)`
+
+### EntityRelationship
+Graph edge connecting any two entities in the campaign. Enables God-head context queries.
+- `campaignId`: String (nullable) — null for cross-campaign relationships (God-head networks)
+- `sourceId` / `sourceType`: Source node (CHARACTER, NPC, LOCATION, ITEM, GODHEAD, GOAL)
+- `targetId` / `targetType`: Target node
+- `relationshipType`: String — ally, rival, parent, guardian, custodian, located_at, owns, created_by, etc.
+- `strength`: Int 1-10 (default 5)
+- `bidirectional`: Boolean (default false)
+- `data`: JSON (nullable) — relationship-specific metadata
+- Unique constraint: `(sourceId, targetId, relationshipType)`
+- Indexes: `(campaignId)`, `(sourceId, sourceType)`, `(targetId, targetType)`
+
+### GodHead
+Supplementary metadata for God-head entities. Links to a Character record (universal sheet).
+- `name`: String (unique) — "Lady Death", "Kai", "Eth'erling"
+- `domain`: String — "Death, decay, karmic recycling, blueprint maintenance"
+- `pillar`: String — MERCY | BALANCE | SEVERITY
+- `characterId`: String (unique) — FK to Character record
+- `systemPrompt`: String — core personality + domain authority for Claude API calls
+- `temperature`: Float (default 0.7)
+- `active`: Boolean (default true)
+- `walletId`: String (nullable) — God-head's KRMA wallet
+- God-heads use Claude (cloud API) for reasoning, not Ollama
 
 ## JSON Field Schemas
 

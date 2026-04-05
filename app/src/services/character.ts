@@ -93,10 +93,10 @@ export async function updateCharacter(
   // Log changes asynchronously (non-blocking)
   if (beforeData && input.data) {
     createChangeLogEntry({
-      campaignId: character.campaignId,
+      campaignId: character.campaignId!,
       characterId,
       characterName: character.name,
-      actor: character.campaign.gmUserId === userId ? 'gm' : 'player',
+      actor: character.campaign?.gmUserId === userId ? 'gm' : 'player',
       actorUserId: userId,
       source: 'manual_change',
       beforeData,

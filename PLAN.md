@@ -1,7 +1,70 @@
 # GRO.WTH — Build Plan
 
-Last updated: 2026-03-15
-Current phase: Phase 4 (EŶ∃tehrNET Social Platform)
+Last updated: 2026-04-04
+Current phase: Phase 5 (God-Head Architecture)
+
+## Session 2026-04-04: God-Head Architecture Foundation (Phase 0 + Phase 1)
+**Completed:**
+- Core Architecture Document v2 reviewed and mapped against existing codebase
+- Mike answered 7 key design questions (Claude for AI, universal sheets, global catalog, infra-first)
+- Prisma migration `godhead_architecture_foundation`:
+  - `Character.entityType` field (PLAYER_CHARACTER, NPC, CREATURE, GODHEAD)
+  - `Character.campaignId` made nullable (God-heads have no campaign)
+  - `Goal` model — core gameplay loop with custodianship, resistance, milestones
+  - `EntityRelationship` model — typed graph edges between any entities
+  - `GodHead` model — metadata linking to Character record + systemPrompt + domain + pillar
+  - `ForgeItem` extended — global catalog (isGlobal, sourceGlobalId), authorship economy (authorUserId, useCount, royaltyRate), blueprint decay (lastUsedAt, decayStatus, flaggedAt), karmic evaluation (relationshipTags, karmicValue, evaluatedAt)
+- Context services:
+  - `services/context/entity-context.ts` — buildEntityContext(entityId): full character context string for God-heads
+  - `services/context/goal-context.ts` — buildGoalContext(goalId, campaignId): graph-traversal context (2-hop, token-efficient)
+  - `services/context/index.ts` — barrel exports
+- Null-safety fixes across 10 files for Character.campaignId nullable change
+- Updated permissions helpers to accept nullable campaign
+- ForgeItem service: added global item guards on all campaign-scoped operations
+- Architecture plan: `GODHEAD-ARCHITECTURE-PLAN.md`
+- Updated docs: database_schema.md, module_registry.md, ai_systems.md
+- Clean TypeScript build (zero errors)
+
+**Next session (God-Head Phase 2 — Goal System):**
+- Goal CRUD service + Zod schemas + API routes
+- Resistance prompt auto-generation (AI reads goal context → prompts GM)
+- Goal panel UI on character card (canvas)
+- Seed God-head Character records (Lady Death, Kai, Eth'erling) with system prompts
+- God-head custodian assignment logic (AI determines who picks up GRO.vines)
+
+---
+
+## Session 2026-03-15 (b): Portrait Pipeline Phase A — Service Layer
+**Completed:**
+- Full research: hardware assessment (RTX 4060 8GB), character consistency (12 approaches evaluated), toolchain comparison (ComfyUI wins), art style consistency
+- Corrected PORTRAIT-PIPELINE.md error: FLUX.2 Dev (32B) is NOT viable on 8GB VRAM → FLUX.1 Dev (12B, Q4_0 GGUF) is the correct model
+- Architecture plan: `docs/PORTRAIT-ARCHITECTURE-PLAN.md` — full technical design with Mike's answers incorporated
+- Research docs: `docs/CHARACTER-CONSISTENCY-RESEARCH.md`, `docs/STYLE-CONSISTENCY-RESEARCH.md`, `docs/research-local-image-gen-2026.md`
+- Service layer (7 files in `src/ai/portraits/`):
+  - `types.ts` — all interfaces (provider, portrait input/result, persona lock, stub pipeline schemas)
+  - `style-config.ts` — style bible prompt, 4-layer negative prompts, 10 campaign theme modifiers
+  - `prompt-builder.ts` — 7-tier visual weight translation (identity → equipment → wounds → narrative → traits → environment → meta)
+  - `character-adapter.ts` — Prisma Character + GrowthCharacter JSON → flat PortraitCharacterData
+  - `state-diff.ts` — visual change detection (equipment, wounds, conditions, traits, identity, environment)
+  - `portrait-service.ts` — orchestrator (generate, accept, lock persona, check changes, history, delete)
+  - `providers/local.ts` — ComfyUI REST client (queue, poll, download, upload, workflow injection, VRAM management)
+  - `providers/cloud.ts` — stub with subscription tier comments
+  - `providers/index.ts` — factory with local/cloud fallback
+- Prisma migration: `PortraitGeneration` + `PersonaLock` models
+- 6 API routes under `/api/portraits/` (generate, history, accept, lock, status, provider)
+- Setup script: `scripts/setup-portrait-pipeline.ps1` (ComfyUI install, model download, custom nodes)
+- Workflow README with node naming conventions
+- Updated docs: ai_systems.md, module_registry.md, database_schema.md
+- Clean TypeScript build (zero errors)
+
+**Next session (Portrait Phase A continued):**
+- Install ComfyUI + download models (~15 GB) using setup script
+- Design character-portrait workflow in ComfyUI GUI, export as API JSON
+- Test end-to-end: generate a portrait from an existing character
+- Build "Generate Portrait" button on character sheet UI
+- Phase B planning: PuLID integration, persona lock UI, auto-installer
+
+---
 
 ## Session 2026-03-15: EŶ∃tehrNET Social Platform Backbone
 **Completed:**

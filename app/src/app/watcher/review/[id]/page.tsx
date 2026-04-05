@@ -28,8 +28,8 @@ export default async function ReviewBackstoryPage({ params }: { params: Promise<
     return (
       <DashboardShell username={session.user.username} role={session.user.role}>
         <div className="max-w-2xl mx-auto space-y-4">
-          <Link href={`/watcher/campaign/${character.campaign.id}`} className="text-xs text-[var(--surface-dark)]/40 hover:text-[var(--surface-dark)]/60 uppercase tracking-wider">
-            &larr; {character.campaign.name}
+          <Link href={`/watcher/campaign/${character.campaign?.id}`} className="text-xs text-[var(--surface-dark)]/40 hover:text-[var(--surface-dark)]/60 uppercase tracking-wider">
+            &larr; {character.campaign?.name}
           </Link>
           <div className="highlight-bar">No backstory submitted yet for {character.name}.</div>
         </div>
@@ -41,10 +41,10 @@ export default async function ReviewBackstoryPage({ params }: { params: Promise<
     <DashboardShell username={session.user.username} role={session.user.role}>
       <div className="max-w-2xl mx-auto">
         <Link
-          href={`/watcher/campaign/${character.campaign.id}`}
+          href={`/watcher/campaign/${character.campaign?.id}`}
           className="text-xs text-[var(--surface-dark)]/40 hover:text-[var(--surface-dark)]/60 uppercase tracking-wider"
         >
-          &larr; {character.campaign.name}
+          &larr; {character.campaign?.name}
         </Link>
         <div className="mt-4">
           <BackstoryReview

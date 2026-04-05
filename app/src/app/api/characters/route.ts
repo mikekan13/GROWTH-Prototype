@@ -12,7 +12,7 @@ export async function GET() {
         id: c.id,
         name: c.name,
         status: c.status,
-        campaignName: c.campaign.name,
+        campaignName: c.campaign?.name ?? null,
         updatedAt: c.updatedAt,
       })),
     });

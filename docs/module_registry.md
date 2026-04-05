@@ -1,6 +1,6 @@
 # GRO.WTH Module Registry
 
-Last updated: 2026-03-15 (EŶ∃tehrNET social platform)
+Last updated: 2026-04-04 (God-head architecture foundation)
 
 ## Services (Business Logic)
 
@@ -13,7 +13,9 @@ Last updated: 2026-03-15 (EŶ∃tehrNET social platform)
 | AccessCodeService | `services/access-code.ts` | Code generation, validation, redemption | Prisma, permissions |
 | ChangeLogService | `services/changelog.ts` | Create changelog entries with diff/coalescence (5s window), query with pagination and filters, revert with conflict detection | Prisma, changelog-utils |
 | CampaignEventService | `services/campaign-event.ts` | Campaign event CRUD (dice rolls, chat, commands, game events), session management (start/end/list), auto-assigns events to active session | Prisma |
-| ForgeService | `services/forge.ts` | ForgeItem CRUD (skill/item/nectar/blossom/thorn templates), publish/unpublish, PlayerRequest CRUD (create/edit/resolve), Zod validation per type | Prisma, permissions |
+| ForgeService | `services/forge.ts` | ForgeItem CRUD (skill/item/nectar/blossom/thorn blueprints), publish/unpublish, PlayerRequest CRUD, global catalog support, Zod validation per type | Prisma, permissions |
+| EntityContextService | `services/context/entity-context.ts` | Build token-efficient context string for any entity (Character). Used by God-heads. Includes identity, attributes, goals, inventory, relationships. | Prisma |
+| GoalContextService | `services/context/goal-context.ts` | Build focused context window for a goal by traversing EntityRelationship graph (2-hop max). Returns only connected entities. | Prisma, EntityContextService |
 | LocationService | `services/location.ts` | Location CRUD (settlement/wilderness/dungeon/building/POI/region), GM-only create/update/delete, Zod validation | Prisma, permissions |
 | CampaignItemService | `services/campaign-item.ts` | World item CRUD (weapon/armor/accessory/consumable/tool/artifact/prima_materia/misc), holder/location assignment, drag-and-drop inventory transfer via holderId, GM-only | Prisma, permissions |
 | EncounterService | `services/encounter.ts` | Encounter CRUD (combat/social/exploration/puzzle/event), round/phase tracking, GM-only | Prisma, permissions |
@@ -106,7 +108,21 @@ Last updated: 2026-03-15 (EŶ∃tehrNET social platform)
 | useDiceEvents | `hooks/useDiceEvents.ts` | Subscribe to dice roll events from DiceService event bus |
 | useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
 
-## API Routes (40 total)
+## AI — Portrait Pipeline
+
+| Module | File | Purpose | Dependencies |
+|--------|------|---------|-------------|
+| PortraitTypes | `ai/portraits/types.ts` | All interfaces: PortraitInput, PersonaLock, provider types, stub pipeline schemas | — |
+| StyleConfig | `ai/portraits/style-config.ts` | Style bible prompt, negative prompts (4 layers), campaign theme modifiers | types |
+| PromptBuilder | `ai/portraits/prompt-builder.ts` | Character data → structured prompt (7 visual weight tiers: identity, body, equipment, status, narrative, traits, environment) | types, style-config |
+| CharacterAdapter | `ai/portraits/character-adapter.ts` | Prisma Character + GrowthCharacter JSON → flat PortraitCharacterData | types, growth types |
+| StateDiff | `ai/portraits/state-diff.ts` | Compare two character states, detect visual changes (equipment/wounds/traits/identity/environment) | types |
+| PortraitService | `ai/portraits/portrait-service.ts` | Main orchestrator: generate, accept, lock persona, check visual changes, portrait history | Prisma, providers, prompt-builder, character-adapter, state-diff |
+| LocalProvider | `ai/portraits/providers/local.ts` | ComfyUI REST client: queue prompts, poll history, download images, upload references, VRAM management (Ollama unload) | types, prompt-builder, style-config |
+| CloudProvider | `ai/portraits/providers/cloud.ts` | Stub for future cloud-based generation | types |
+| ProviderFactory | `ai/portraits/providers/index.ts` | getPortraitProvider() factory with local/cloud fallback | local, cloud |
+
+## API Routes (46 total)
 
 | Route | Methods | Service |
 |-------|---------|---------|
@@ -150,3 +166,9 @@ Last updated: 2026-03-15 (EŶ∃tehrNET social platform)
 | /api/campaigns/[id]/items/[itemId] | GET, PATCH, DELETE | CampaignItemService (get/update/delete item, GM-only) |
 | /api/campaigns/[id]/encounters | GET, POST | EncounterService (list + create encounters, GM-only create) |
 | /api/campaigns/[id]/encounters/[encounterId] | GET, PATCH, DELETE | EncounterService (get/update/delete encounter, GM-only) |
+| /api/portraits/generate | POST | PortraitService (queue portrait generation for a character) |
+| /api/portraits/history | GET | PortraitService (portrait history for a character) |
+| /api/portraits/accept | POST | PortraitService (accept portrait as current) |
+| /api/portraits/lock | POST | PortraitService (persona lock — permanent identity anchor) |
+| /api/portraits/status | GET | PortraitService (check for visual state changes) |
+| /api/portraits/provider | GET | PortraitService (provider health/status check) |

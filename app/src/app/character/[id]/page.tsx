@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { canViewCharacter } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import CharacterSheet from '@/components/character/CharacterSheet';
+import PortraitPanel from '@/components/character/PortraitPanel';
 import type { GrowthCharacter } from '@/types/growth';
 
 export default async function CharacterPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,8 +31,9 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
       <div className="mb-4 text-xs text-[var(--surface-dark)]/40 uppercase tracking-wider">
-        {character.campaign.name} | {character.status}
+        {character.campaign?.name ?? 'No Campaign'} | {character.status}
       </div>
+      <PortraitPanel characterId={character.id} currentPortrait={character.portrait} />
       <CharacterSheet character={data} />
     </DashboardShell>
   );

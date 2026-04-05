@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import GrowthLogo from './GrowthLogo';
@@ -98,14 +98,27 @@ export default function DashboardShell({ username, role, children }: DashboardSh
 
   // Build nav items based on role
   const navItems: { href: string; label: React.ReactNode; key: string }[] = [
-    { href: '/hub', label: <EyetehrnetLogo scale={0.55} />, key: 'hub' },
+    { href: '/hub', label: <EyetehrnetLogo scale={1.1} />, key: 'hub' },
     { href: dashboardPath, label: dashboardLabel, key: 'dashboard' },
-    { href: '/profile/edit', label: 'Profile', key: 'profile' },
   ];
+
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [userMenuOpen]);
 
   function isActive(href: string) {
     if (href === '/hub') return pathname === '/hub' || pathname.startsWith('/hub/');
-    if (href === '/profile/edit') return pathname.startsWith('/profile');
     return pathname.startsWith(href);
   }
 
@@ -192,63 +205,23 @@ export default function DashboardShell({ username, role, children }: DashboardSh
                 <GlitchText text="[PATTERN RECOGNITION: Active]" className="text-white/20" />
               </span>
             </div>
-            {/* Admin View-As Switcher */}
-            {isAdmin && (
-              <div className="relative ml-2">
-                <button
-                  onClick={() => setSwitcherOpen(!switcherOpen)}
-                  className="flex items-center gap-1.5 px-2 py-1 border text-[8px] uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] transition-all"
-                  style={{
-                    borderColor: viewAs ? 'rgba(208,168,48,0.6)' : 'rgba(45,184,160,0.3)',
-                    color: viewAs ? 'var(--accent-gold)' : 'rgba(45,184,160,0.5)',
-                    background: viewAs ? 'rgba(208,168,48,0.08)' : 'transparent',
-                  }}
-                >
-                  <span style={{ fontSize: '10px' }}>{viewAs ? '\u25C9' : '\u25CE'}</span>
-                  {viewAs ? `Viewing: ${viewAs}` : 'View As'}
-                  <span style={{ fontSize: '7px', marginLeft: '2px' }}>{switcherOpen ? '\u25B4' : '\u25BE'}</span>
-                </button>
-                {switcherOpen && (
-                  <>
-                  <div className="fixed inset-0 z-[99]" onClick={() => setSwitcherOpen(false)} />
-                  <div
-                    className="absolute top-full left-0 mt-1 z-[100] border bg-[#0a0a0a] min-w-[140px]"
-                    style={{ borderColor: 'rgba(45,184,160,0.3)' }}
-                  >
-                    {VIEW_ROLES.map(vr => {
-                      const isActive = (viewAs === vr.key) || (!viewAs && vr.key === 'ADMIN');
-                      return (
-                        <button
-                          key={vr.key}
-                          onClick={() => handleViewAs(vr.key)}
-                          className="w-full text-left px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] transition-colors flex items-center gap-2"
-                          style={{
-                            color: isActive ? vr.color : 'rgba(255,255,255,0.4)',
-                            background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'rgba(255,255,255,0.05)' : 'transparent'; }}
-                        >
-                          <span style={{ color: vr.color, fontSize: '6px' }}>{isActive ? '\u25A0' : '\u25A1'}</span>
-                          {vr.label}
-                        </button>
-                      );
-                    })}
-                    <div className="border-t mx-2 my-0.5" style={{ borderColor: 'rgba(45,184,160,0.15)' }} />
-                    <div className="px-3 py-1 text-[7px] font-[family-name:var(--font-terminal)] text-white/20 tracking-wider">
-                      ADMIN PERSPECTIVE SHIFT
-                    </div>
-                  </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Center: Navigation */}
           <nav className="flex items-center gap-1">
             {navItems.map(item => {
               const active = isActive(item.href);
+              if (item.key === 'hub') {
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className={`transition-opacity px-2 py-1 ${active ? 'opacity-100' : 'opacity-50 hover:opacity-80'}`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              }
               return (
                 <Link
                   key={item.key}
@@ -265,22 +238,59 @@ export default function DashboardShell({ username, role, children }: DashboardSh
             })}
           </nav>
 
-          {/* Right: User + logout */}
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <Link href={`/profile/${username}`} className="text-[var(--accent-teal)]/70 hover:text-[var(--accent-teal)] text-[10px] font-[family-name:var(--font-terminal)] tracking-wider block transition-colors">
-                {username}
-              </Link>
-              <span className="text-white/20 text-[8px] font-[family-name:var(--font-terminal)]">
-                CONSCIOUSNESS: INTERFACED
-              </span>
-            </div>
+          {/* Right: User dropdown */}
+          <div className="relative" ref={userMenuRef}>
             <button
-              onClick={handleLogout}
-              className="text-[var(--pillar-body)]/40 hover:text-[var(--pillar-body)] text-[9px] tracking-[0.2em] uppercase font-[family-name:var(--font-terminal)] transition-colors px-2 py-1 border border-[var(--pillar-body)]/20 hover:border-[var(--pillar-body)]/50"
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 transition-colors"
             >
-              Disconnect
+              <div className="text-right">
+                <span className="text-[var(--accent-teal)]/70 hover:text-[var(--accent-teal)] text-[10px] font-[family-name:var(--font-terminal)] tracking-wider block transition-colors">
+                  {username}
+                </span>
+                <span className="text-white/20 text-[8px] font-[family-name:var(--font-terminal)]">
+                  CONSCIOUSNESS: INTERFACED
+                </span>
+              </div>
+              <span className="text-[var(--accent-teal)]/40 text-[7px]">{userMenuOpen ? '\u25B4' : '\u25BE'}</span>
             </button>
+            {userMenuOpen && (
+              <div
+                className="absolute top-full right-0 mt-1 z-[100] border bg-[#0a0a0a] min-w-[140px]"
+                style={{ borderColor: 'rgba(45,184,160,0.3)' }}
+              >
+                <Link
+                  href="/profile/edit"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="w-full text-left px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] transition-colors flex items-center gap-2 text-white/40 hover:text-[var(--accent-teal)]"
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span className="text-[var(--accent-teal)] text-[6px]">&#x25A1;</span>
+                  Profile
+                </Link>
+                <Link
+                  href={`/profile/${username}`}
+                  onClick={() => setUserMenuOpen(false)}
+                  className="w-full text-left px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] transition-colors flex items-center gap-2 text-white/40 hover:text-[var(--accent-teal)]"
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span className="text-[var(--accent-teal)] text-[6px]">&#x25A1;</span>
+                  Public Profile
+                </Link>
+                <div className="border-t mx-2 my-0.5" style={{ borderColor: 'rgba(45,184,160,0.15)' }} />
+                <button
+                  onClick={() => { setUserMenuOpen(false); handleLogout(); }}
+                  className="w-full text-left px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] transition-colors flex items-center gap-2 text-[var(--pillar-body)]/40 hover:text-[var(--pillar-body)]"
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span className="text-[var(--pillar-body)] text-[6px]">&#x25A1;</span>
+                  Disconnect
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -289,7 +299,7 @@ export default function DashboardShell({ username, role, children }: DashboardSh
       </header>
 
       {/* Content area — fills remaining height, children handle their own scrolling */}
-      <main className="flex-1 min-h-0 overflow-hidden px-8">
+      <main className="flex-1 min-h-0 overflow-auto px-8">
         {children}
       </main>
 
@@ -305,6 +315,54 @@ export default function DashboardShell({ username, role, children }: DashboardSh
           REALITY LEVEL: Primary Translation
         </span>
       </footer>
+
+      {/* Admin View-As — fixed bottom-right overlay */}
+      {isAdmin && (
+        <div className="fixed bottom-4 right-4 z-[200]">
+          <button
+            onClick={() => setSwitcherOpen(!switcherOpen)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] transition-all"
+            style={{
+              borderColor: viewAs ? 'rgba(208,168,48,0.6)' : 'rgba(45,184,160,0.3)',
+              color: viewAs ? 'var(--accent-gold)' : 'rgba(45,184,160,0.5)',
+              background: viewAs ? 'rgba(208,168,48,0.12)' : 'rgba(0,0,0,0.85)',
+              border: `1px solid ${viewAs ? 'rgba(208,168,48,0.6)' : 'rgba(45,184,160,0.3)'}`,
+            }}
+          >
+            <span style={{ fontSize: '10px' }}>{viewAs ? '\u25C9' : '\u25CE'}</span>
+            {viewAs ? viewAs : 'View As'}
+          </button>
+          {switcherOpen && (
+            <>
+              <div className="fixed inset-0 z-[199]" onClick={() => setSwitcherOpen(false)} />
+              <div
+                className="absolute bottom-full right-0 mb-1 z-[200] border bg-[#0a0a0a] min-w-[140px]"
+                style={{ borderColor: 'rgba(45,184,160,0.3)' }}
+              >
+                {VIEW_ROLES.map(vr => {
+                  const active = (viewAs === vr.key) || (!viewAs && vr.key === 'ADMIN');
+                  return (
+                    <button
+                      key={vr.key}
+                      onClick={() => handleViewAs(vr.key)}
+                      className="w-full text-left px-3 py-1.5 text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] transition-colors flex items-center gap-2"
+                      style={{
+                        color: active ? vr.color : 'rgba(255,255,255,0.4)',
+                        background: active ? 'rgba(255,255,255,0.05)' : 'transparent',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active ? 'rgba(255,255,255,0.05)' : 'transparent'; }}
+                    >
+                      <span style={{ color: vr.color, fontSize: '6px' }}>{active ? '\u25A0' : '\u25A1'}</span>
+                      {vr.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

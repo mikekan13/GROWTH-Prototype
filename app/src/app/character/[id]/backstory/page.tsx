@@ -30,7 +30,7 @@ export default async function BackstoryPage({ params }: { params: Promise<{ id: 
     ? JSON.parse(character.backstory.responses)
     : undefined;
 
-  const customPrompts = character.campaign.customPrompts
+  const customPrompts = character.campaign?.customPrompts
     ? JSON.parse(character.campaign.customPrompts)
     : undefined;
 
@@ -38,7 +38,7 @@ export default async function BackstoryPage({ params }: { params: Promise<{ id: 
     <DashboardShell username={session.user.username} role={session.user.role}>
       <div className="max-w-2xl mx-auto">
         <div className="text-xs text-[var(--surface-dark)]/40 uppercase tracking-wider mb-4">
-          {character.campaign.name}
+          {character.campaign?.name ?? 'No Campaign'}
         </div>
         <BackstoryEditor
           characterId={character.id}

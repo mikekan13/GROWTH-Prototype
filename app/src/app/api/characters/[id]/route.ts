@@ -18,7 +18,7 @@ export async function GET(
         status: character.status,
         data: JSON.parse(character.data),
         portrait: character.portrait,
-        campaignName: character.campaign.name,
+        campaignName: character.campaign?.name ?? null,
         backstory: character.backstory,
       },
     });

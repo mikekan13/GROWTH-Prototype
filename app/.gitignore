@@ -45,3 +45,6 @@ next-env.d.ts
 # database
 *.db
 *.db-journal
+
+# generated portraits (local, not committed)
+/public/portraits/

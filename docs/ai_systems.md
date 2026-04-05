@@ -1,6 +1,6 @@
 # GRO.WTH AI Systems
 
-Last updated: 2026-03-14
+Last updated: 2026-04-04
 
 ## Current Status
 
@@ -52,13 +52,44 @@ User message → Context Assembler → Relevant data fetched → Prompt built �
 
 ## Planned Systems
 
-### Portrait Pipeline (Phase A-D)
+### Portrait Pipeline (Phase A — In Progress)
 
-**Purpose**: Generate and maintain consistent character portraits from narrative data.
+**Purpose**: Generate and maintain consistent character portraits from narrative data. Portraits are dynamic — they update as equipment, wounds, conditions, and traits change.
 
-**Architecture**: ComfyUI + FLUX.2 Dev (GGUF quantized) + PuLID v2
+**Architecture**: ComfyUI + FLUX.1 Dev Q4_0 GGUF (12B params, 8GB VRAM) + PuLID Flux II (identity preservation)
 
-**Detailed design**: See `PORTRAIT-PIPELINE.md` in project root.
+**Core Concept — Persona Lock**: On first portrait generation, player cycles until satisfied, then "locks" the identity. The reference image + face embedding + locked prompt are stored permanently. All future regenerations use PuLID to inject the locked identity, producing the same person in different states.
+
+**Components**:
+```
+src/ai/portraits/
+  types.ts              — All interfaces (PortraitInput, PersonaLock, provider types, stub pipeline schemas)
+  style-config.ts       — Style bible prompt, negative prompts (4 layers), campaign theme modifiers
+  prompt-builder.ts     — Character data → prompt translation (7 visual weight tiers)
+  character-adapter.ts  — Prisma Character → PortraitCharacterData flattening
+  state-diff.ts         — Detects visual changes between portrait states (equipment/wounds/traits/etc.)
+  portrait-service.ts   — Main orchestrator (generate, accept, lock, diff, history)
+  providers/
+    index.ts            — Provider factory (local vs cloud, with fallback)
+    local.ts            — ComfyUI REST/WebSocket client, VRAM management (Ollama unload)
+    cloud.ts            — Stub (future: BFL API, Replicate)
+  workflows/
+    README.md           — How to create ComfyUI workflow JSON files
+    character-portrait.json     — (Phase A: manual creation in ComfyUI GUI)
+    character-portrait-pulid.json — (Phase B: with PuLID identity injection)
+```
+
+**API Routes** (6 routes):
+- `POST /api/portraits/generate` — Queue generation
+- `GET /api/portraits/history` — Portrait history for a character
+- `POST /api/portraits/accept` — Set as current portrait
+- `POST /api/portraits/lock` — Persona lock
+- `GET /api/portraits/status` — Check for visual changes
+- `GET /api/portraits/provider` — Provider health check
+
+**Database Models**: `PortraitGeneration` (generation history + state snapshots), `PersonaLock` (identity anchor + body description)
+
+**Detailed design**: See `PORTRAIT-PIPELINE.md` and `docs/PORTRAIT-ARCHITECTURE-PLAN.md`
 
 ### Rule Arbiter (future — Phase 6+)
 
@@ -67,16 +98,46 @@ User message → Context Assembler → Relevant data fetched → Prompt built �
 **Inputs**: Session events (eventually via microphone → transcription → interpretation)
 **Constraint**: Manual override always available. GM is final authority.
 
-### Oracle (future — separate project)
+### God-Head Council (Phase 0 Schema — DONE, services next)
 
-**Purpose**: Full AI co-GM system (the GODHEAD role).
-**Status**: Deferred beyond beta. Will be its own service connecting via API.
+**Purpose**: AI agents that ARE the game. God-heads author blueprints, evaluate karmic cost, assign custodianship to player goals, generate opportunities, process death. They use the same universal character sheet as players/NPCs.
+
+**AI Model**: Claude (cloud API via Anthropic) — God-heads need deep reasoning, not Ollama.
+
+**MVP God-heads**: Lady Death (Balance), Kai (Balance), Eth'erling (Balance) — all KRMA-integral.
+
+**Schema (built 2026-04-04)**:
+- `Goal` model — player goals with God-head custodianship, resistance prompts, milestones
+- `EntityRelationship` model — typed graph edges between any entities (2-hop traversal)
+- `GodHead` model — metadata linking to Character record + systemPrompt + domain + pillar
+- `Character.entityType` — PLAYER_CHARACTER | NPC | CREATURE | GODHEAD
+- `ForgeItem` extended — global catalog, authorship royalties, decay tracking, karmic evaluation
+
+**Context Services (built 2026-04-04)**:
+- `services/context/entity-context.ts` — `buildEntityContext(entityId)`: queries DB, returns clean context string (identity, attributes, goals, inventory, relationships)
+- `services/context/goal-context.ts` — `buildGoalContext(goalId, campaignId)`: follows EntityRelationship edges from goal entity (2-hop max), returns focused context window of connected entities only
+
+**Build Order (remaining)**:
+1. Goal CRUD service + API routes + resistance generator
+2. God-head custodian assignment (AI determines who picks up GRO.vines)
+3. Opportunity generation (God-head reads goal context → generates opportunity)
+4. Blueprint relationship tagger (for Kai evaluation)
+5. Karmic evaluator — Kai (scope/frequency/reversibility/specificity/synergy scoring)
+6. Council router — Eth'erling (GM request → existing search → domain route → Kai value → confirm)
+7. Lady Death — death processor + blueprint decay
+
+**Design doc**: `GODHEAD-ARCHITECTURE-PLAN.md`
+
+### Oracle (superseded by God-Head Council)
+
+**Purpose**: Originally planned as full AI co-GM system. Now replaced by the God-Head Council architecture — multiple specialized AI agents with domain authority, not a single monolithic oracle.
+**Status**: Concept absorbed into God-Head Council system.
 
 ## Provider Architecture
 
 ```
 src/ai/
-  types.ts              — AIProvider interface, ChatMessage, GenerateOptions
+  types.ts              — AIProvider interface (text generation), ChatMessage, GenerateOptions
   providers/
     ollama.ts           — Ollama HTTP client (generateText + chat), server-only
     index.ts            — getAIProvider() factory (AI_PROVIDER env var)
@@ -89,6 +150,15 @@ src/ai/
     rules-search.ts     — GRO.WTH Repository keyword search
     action-parser.ts    — Parse action blocks from AI responses
     copilot-service.ts  — Main service (message handling, history)
+  portraits/            — IMAGE generation (separate provider pattern from text AI)
+    types.ts            — ImageGenerationProvider interface, all portrait types
+    style-config.ts     — Style bible, negatives, campaign modifiers
+    prompt-builder.ts   — Character data → image prompt (7 tiers)
+    character-adapter.ts — Prisma model → portrait data adapter
+    state-diff.ts       — Visual change detection
+    portrait-service.ts — Main orchestrator
+    providers/          — Local (ComfyUI) + Cloud (stub)
+    workflows/          — ComfyUI JSON workflow templates
 ```
 
 ## Subscription Tier Classification
@@ -96,6 +166,7 @@ src/ai/
 | Feature | Type | Basic Tier | Premium Tier | Local Model |
 |---------|------|-----------|-------------|-------------|
 | KRMA Validator | System-required | Always | Always | No (cloud only) |
+| God-Head Council | System-required | Always | Always | No (Claude cloud) |
 | Application AI | QoL | Metered | Unlimited | Yes |
 | Campaign Co-pilot | QoL | Metered | Unlimited | Yes |
 | Portrait Generation | QoL | Metered | Unlimited | Yes |

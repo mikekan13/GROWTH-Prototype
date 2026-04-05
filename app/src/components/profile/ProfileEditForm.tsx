@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 
 const EXPERIENCE_LEVELS = ['New to TTRPGs', 'A few sessions', '1-2 years', '3-5 years', '5-10 years', '10+ years'];
 const PLAYSTYLE_OPTIONS = ['Roleplay', 'Tactical Combat', 'Exploration', 'Problem-Solving', 'Story-Driven', 'Sandbox', 'Political Intrigue', 'Horror/Survival'];
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const FREQUENCY_OPTIONS = ['Weekly', 'Biweekly', 'Monthly', 'Flexible'];
 const SESSION_LENGTH_OPTIONS = ['1-2 hours', '2-3 hours', '3-4 hours', '4+ hours', 'Flexible'];
 
@@ -72,17 +73,18 @@ export default function ProfileEditForm({ initial, onSave }: ProfileEditFormProp
     }
   }
 
-  const inputClass = 'w-full bg-[var(--surface-dark)]/5 border border-[var(--surface-dark)]/20 p-2 text-sm font-[family-name:var(--font-terminal)] focus:border-[var(--accent-teal)] focus:outline-none';
-  const labelClass = 'text-[10px] uppercase tracking-[0.2em] text-[var(--surface-dark)]/50 font-[family-name:var(--font-terminal)] mb-1 block';
-  const sectionClass = 'space-y-3';
-  const sectionTitle = 'text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-header)] text-[var(--surface-dark)]/70 border-b border-[var(--surface-dark)]/10 pb-1 mb-3';
+  const cardClass = 'rounded-xl p-5 space-y-4' as const;
+  const cardStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' };
+  const inputClass = 'w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/25 font-[family-name:var(--font-terminal)] focus:border-[var(--accent-teal)] focus:ring-1 focus:ring-[var(--accent-teal)]/30 focus:outline-none transition-colors';
+  const labelClass = 'text-xs text-white/50 font-[family-name:var(--font-terminal)] mb-1.5 block';
+  const sectionTitle = 'text-sm font-[family-name:var(--font-header)] text-white/80 tracking-wider uppercase mb-1';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Identity */}
-      <div className={sectionClass}>
+      <div className={cardClass} style={cardStyle}>
         <h3 className={sectionTitle}>Identity</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>First Name</label>
             <input className={inputClass} value={profile.firstName || ''} onChange={e => update('firstName', e.target.value)} placeholder="Optional" />
@@ -94,94 +96,122 @@ export default function ProfileEditForm({ initial, onSave }: ProfileEditFormProp
         </div>
         <div>
           <label className={labelClass}>Bio</label>
-          <textarea className={inputClass + ' min-h-[80px] resize-y'} value={profile.bio || ''} onChange={e => update('bio', e.target.value)} placeholder="Tell others about yourself..." maxLength={2000} />
+          <textarea className={inputClass + ' min-h-[100px] resize-y'} value={profile.bio || ''} onChange={e => update('bio', e.target.value)} placeholder="Tell others about yourself..." maxLength={2000} />
         </div>
       </div>
 
       {/* Experience */}
-      <div className={sectionClass}>
+      <div className={cardClass} style={cardStyle}>
         <h3 className={sectionTitle}>Experience</h3>
         <div>
           <label className={labelClass}>Experience Level</label>
           <select className={inputClass} value={profile.experienceLevel || ''} onChange={e => update('experienceLevel', e.target.value)}>
-            <option value="">Select...</option>
+            <option value="">Select your experience...</option>
             {EXPERIENCE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
         <div>
           <label className={labelClass}>Systems Played</label>
           <div className="flex gap-2 mb-2">
-            <input className={inputClass + ' flex-1'} value={systemInput} onChange={e => setSystemInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSystem())} placeholder="Type a system name and press Enter" />
-            <button onClick={addSystem} className="px-3 py-1 bg-[var(--accent-teal)]/20 border border-[var(--accent-teal)]/40 text-[var(--accent-teal)] text-xs hover:bg-[var(--accent-teal)]/30">Add</button>
+            <input
+              className={inputClass + ' flex-1'}
+              value={systemInput}
+              onChange={e => setSystemInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSystem())}
+              placeholder="Type a system name and press Enter"
+            />
+            <button onClick={addSystem} className="px-4 py-2 rounded-lg bg-[var(--accent-teal)]/20 text-[var(--accent-teal)] text-sm font-[family-name:var(--font-terminal)] hover:bg-[var(--accent-teal)]/30 transition-colors">
+              Add
+            </button>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {(profile.systemsPlayed || []).map(s => (
-              <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--pillar-soul)]/10 border border-[var(--pillar-soul)]/20 text-xs">
-                {s}
-                <button onClick={() => update('systemsPlayed', (profile.systemsPlayed || []).filter(x => x !== s))} className="text-[var(--pillar-body)] hover:text-[var(--pillar-body)]/80 ml-1">&times;</button>
-              </span>
-            ))}
-          </div>
+          {(profile.systemsPlayed || []).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {(profile.systemsPlayed || []).map(s => (
+                <span key={s} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--pillar-soul)]/15 text-[var(--pillar-soul)] text-xs font-[family-name:var(--font-terminal)]">
+                  {s}
+                  <button onClick={() => update('systemsPlayed', (profile.systemsPlayed || []).filter(x => x !== s))} className="text-white/40 hover:text-[var(--pillar-body)] transition-colors">&times;</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Playstyle */}
-      <div className={sectionClass}>
+      <div className={cardClass} style={cardStyle}>
         <h3 className={sectionTitle}>Playstyle</h3>
         <div>
-          <label className={labelClass}>Preferences</label>
+          <label className={labelClass}>What do you enjoy?</label>
           <div className="flex flex-wrap gap-2">
-            {PLAYSTYLE_OPTIONS.map(p => (
-              <button
-                key={p}
-                onClick={() => toggleArrayItem('playstylePreferences', p)}
-                className={`px-2 py-1 text-xs border transition-colors ${
-                  (profile.playstylePreferences || []).includes(p)
-                    ? 'bg-[var(--accent-teal)]/20 border-[var(--accent-teal)] text-[var(--accent-teal)]'
-                    : 'border-[var(--surface-dark)]/20 text-[var(--surface-dark)]/50 hover:border-[var(--surface-dark)]/40'
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+            {PLAYSTYLE_OPTIONS.map(p => {
+              const selected = (profile.playstylePreferences || []).includes(p);
+              return (
+                <button
+                  key={p}
+                  onClick={() => toggleArrayItem('playstylePreferences', p)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-[family-name:var(--font-terminal)] transition-all ${
+                    selected
+                      ? 'bg-[var(--accent-teal)] text-white'
+                      : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
+                  }`}
+                >
+                  {selected && <span className="mr-1">&#x2713;</span>}
+                  {p}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div>
           <label className={labelClass}>Playstyle Notes</label>
-          <textarea className={inputClass + ' min-h-[60px] resize-y'} value={profile.playstyleNotes || ''} onChange={e => update('playstyleNotes', e.target.value)} placeholder="Anything else about how you like to play..." maxLength={1000} />
+          <textarea className={inputClass + ' min-h-[70px] resize-y'} value={profile.playstyleNotes || ''} onChange={e => update('playstyleNotes', e.target.value)} placeholder="Anything else about how you like to play..." maxLength={1000} />
         </div>
         <div>
           <label className={labelClass}>Conflict Style</label>
-          <textarea className={inputClass + ' min-h-[40px] resize-y'} value={profile.conflictStyle || ''} onChange={e => update('conflictStyle', e.target.value)} placeholder="How do you handle in-character conflict or PvP?" maxLength={500} />
+          <input className={inputClass} value={profile.conflictStyle || ''} onChange={e => update('conflictStyle', e.target.value)} placeholder="How do you handle in-character conflict or PvP?" maxLength={500} />
         </div>
+      </div>
+
+      {/* Safety */}
+      <div className={cardClass} style={{ background: 'rgba(232,88,90,0.04)', border: '1px solid rgba(232,88,90,0.12)' }}>
+        <div className="flex items-center gap-2">
+          <h3 className={sectionTitle} style={{ color: 'var(--pillar-body)', marginBottom: 0 }}>Safety</h3>
+          <span className="text-[10px] text-[var(--pillar-body)]/50 font-[family-name:var(--font-terminal)] px-2 py-0.5 rounded-full bg-[var(--pillar-body)]/10">
+            Confidential
+          </span>
+        </div>
+        <p className="text-xs text-white/30 -mt-2">Only visible to GMs reviewing your application. Never shown publicly.</p>
         <div>
-          <label className={labelClass}>Topics to Avoid <span className="text-[var(--pillar-body)]/60">(confidential — never shown publicly)</span></label>
-          <textarea className={inputClass + ' min-h-[40px] resize-y border-[var(--pillar-body)]/20'} value={profile.topicsToAvoid || ''} onChange={e => update('topicsToAvoid', e.target.value)} placeholder="Any themes or content you prefer to avoid..." maxLength={1000} />
+          <label className={labelClass}>Topics to Avoid</label>
+          <textarea className={inputClass + ' min-h-[70px] resize-y'} style={{ borderColor: 'rgba(232,88,90,0.2)' }} value={profile.topicsToAvoid || ''} onChange={e => update('topicsToAvoid', e.target.value)} placeholder="Any themes or content you prefer to avoid..." maxLength={1000} />
         </div>
       </div>
 
       {/* Availability */}
-      <div className={sectionClass}>
+      <div className={cardClass} style={cardStyle}>
         <h3 className={sectionTitle}>Availability</h3>
         <div>
           <label className={labelClass}>Available Days</label>
-          <div className="flex flex-wrap gap-2">
-            {DAYS.map(d => (
-              <button
-                key={d}
-                onClick={() => toggleArrayItem('availableDays', d)}
-                className={`px-2 py-1 text-xs border transition-colors ${
-                  (profile.availableDays || []).includes(d)
-                    ? 'bg-[var(--accent-teal)]/20 border-[var(--accent-teal)] text-[var(--accent-teal)]'
-                    : 'border-[var(--surface-dark)]/20 text-[var(--surface-dark)]/50 hover:border-[var(--surface-dark)]/40'
-                }`}
-              >
-                {d.slice(0, 3)}
-              </button>
-            ))}
+          <div className="flex gap-1.5">
+            {DAYS.map((d, i) => {
+              const selected = (profile.availableDays || []).includes(DAY_FULL[i]);
+              return (
+                <button
+                  key={d}
+                  onClick={() => toggleArrayItem('availableDays', DAY_FULL[i])}
+                  className={`flex-1 py-2 rounded-lg text-xs font-[family-name:var(--font-terminal)] transition-all ${
+                    selected
+                      ? 'bg-[var(--accent-teal)] text-white'
+                      : 'bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50'
+                  }`}
+                >
+                  {d}
+                </button>
+              );
+            })}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>Preferred Time</label>
             <input className={inputClass} value={profile.preferredTime || ''} onChange={e => update('preferredTime', e.target.value)} placeholder="e.g. Evenings, after 7pm" />
@@ -191,7 +221,7 @@ export default function ProfileEditForm({ initial, onSave }: ProfileEditFormProp
             <input className={inputClass} value={profile.timezone || ''} onChange={e => update('timezone', e.target.value)} placeholder="e.g. EST, UTC-5" />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>Session Length</label>
             <select className={inputClass} value={profile.sessionLength || ''} onChange={e => update('sessionLength', e.target.value)}>
@@ -210,15 +240,15 @@ export default function ProfileEditForm({ initial, onSave }: ProfileEditFormProp
       </div>
 
       {/* Save */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-2">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-2 bg-[var(--accent-teal)] text-white text-sm font-[family-name:var(--font-terminal)] tracking-wider uppercase hover:bg-[var(--accent-teal)]/80 disabled:opacity-50 transition-colors"
+          className="px-8 py-3 rounded-lg bg-[var(--accent-teal)] text-white text-sm font-[family-name:var(--font-terminal)] tracking-wider uppercase hover:brightness-110 disabled:opacity-50 transition-all"
         >
-          {saving ? 'Saving...' : 'Save Profile'}
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
         </button>
-        {saved && <span className="text-xs text-[var(--accent-teal)]">Saved</span>}
+        {saved && <span className="text-sm text-[var(--accent-teal)] animate-pulse">Changes saved</span>}
       </div>
     </div>
   );

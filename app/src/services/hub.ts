@@ -66,12 +66,14 @@ export async function listListedCampaigns(filters?: z.infer<typeof listingFilter
         },
         members: {
           select: {
+            userId: true,
             user: {
               select: { username: true },
             },
           },
-          take: 8,
+          take: 9,
         },
+        gmUserId: true,
         characters: {
           select: {
             userId: true,
@@ -104,15 +106,18 @@ export async function listListedCampaigns(filters?: z.infer<typeof listingFilter
       description: c.listingDescription,
       tags: c.listingTags ? JSON.parse(c.listingTags) as string[] : [],
       gmUsername: c.gmUser.username,
-      members: c.members.map(m => {
-        const char = c.characters.find(ch => ch.user.username === m.user.username);
-        let tkv = 0;
-        if (char?.data) {
-          try { tkv = Number(JSON.parse(char.data).tkv) || 0; } catch { /* ignore */ }
-        }
-        return { username: m.user.username, tkv };
-      }),
-      memberCount: c._count.members,
+      members: c.members
+        .filter(m => m.userId !== c.gmUserId)
+        .slice(0, 8)
+        .map(m => {
+          const char = c.characters.find(ch => ch.user.username === m.user.username);
+          let tkv = 0;
+          if (char?.data) {
+            try { tkv = Number(JSON.parse(char.data).tkv) || 0; } catch { /* ignore */ }
+          }
+          return { username: m.user.username, tkv };
+        }),
+      memberCount: Math.max(0, c._count.members - (c.members.some(m => m.userId === c.gmUserId) ? 1 : 0)),
       maxTrailblazers: c.maxTrailblazers,
       lastSession: c.sessions[0] ? {
         number: c.sessions[0].number,

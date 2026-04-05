@@ -174,6 +174,7 @@ export async function getForgeItem(itemId: string, userId: string, _userRole: st
   const item = await prisma.forgeItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Forge item');
 
+  if (!item.campaignId) throw new ForbiddenError('Global items cannot be accessed through campaign forge');
   await assertCampaignMember(item.campaignId, userId);
 
   const campaign = await prisma.campaign.findUnique({ where: { id: item.campaignId }, select: { gmUserId: true } });
@@ -219,6 +220,7 @@ export async function updateForgeItem(
 ) {
   const item = await prisma.forgeItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Forge item');
+  if (!item.campaignId) throw new ForbiddenError('Global items cannot be modified through campaign forge');
 
   await assertCampaignGM(item.campaignId, userId, userRole);
 
@@ -240,6 +242,7 @@ export async function updateForgeItem(
 export async function publishForgeItem(itemId: string, userId: string, userRole: string) {
   const item = await prisma.forgeItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Forge item');
+  if (!item.campaignId) throw new ForbiddenError('Global items use a different publish flow');
 
   await assertCampaignGM(item.campaignId, userId, userRole);
 
@@ -254,6 +257,7 @@ export async function publishForgeItem(itemId: string, userId: string, userRole:
 export async function unpublishForgeItem(itemId: string, userId: string, userRole: string) {
   const item = await prisma.forgeItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Forge item');
+  if (!item.campaignId) throw new ForbiddenError('Global items use a different publish flow');
 
   await assertCampaignGM(item.campaignId, userId, userRole);
 
@@ -268,6 +272,7 @@ export async function unpublishForgeItem(itemId: string, userId: string, userRol
 export async function deleteForgeItem(itemId: string, userId: string, userRole: string) {
   const item = await prisma.forgeItem.findUnique({ where: { id: itemId } });
   if (!item) throw new NotFoundError('Forge item');
+  if (!item.campaignId) throw new ForbiddenError('Global items cannot be deleted through campaign forge');
 
   await assertCampaignGM(item.campaignId, userId, userRole);
 

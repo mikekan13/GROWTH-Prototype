@@ -116,7 +116,7 @@ export default async function TrailblazerDashboard() {
                       {char.name}
                     </Link>
                     <span className="text-xs text-[var(--surface-dark)]/40 ml-2">
-                      in {char.campaign.name}
+                      in {char.campaign?.name ?? 'No Campaign'}
                     </span>
                     {char.backstory && (
                       <span className={`text-[10px] uppercase tracking-wider ml-2 ${

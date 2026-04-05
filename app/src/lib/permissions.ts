@@ -15,15 +15,15 @@ export function canManageCampaign(userId: string, userRole: string, campaign: { 
 export function canViewCharacter(
   userId: string,
   userRole: string,
-  character: { userId: string; campaign: { gmUserId: string } },
+  character: { userId: string; campaign?: { gmUserId: string } | null },
 ): boolean {
-  return character.userId === userId || character.campaign.gmUserId === userId || isAdminRole(userRole);
+  return character.userId === userId || character.campaign?.gmUserId === userId || isAdminRole(userRole);
 }
 
 export function canEditCharacter(
   userId: string,
   userRole: string,
-  character: { userId: string; campaign: { gmUserId: string } },
+  character: { userId: string; campaign?: { gmUserId: string } | null },
 ): boolean {
-  return character.userId === userId || character.campaign.gmUserId === userId || isAdminRole(userRole);
+  return character.userId === userId || character.campaign?.gmUserId === userId || isAdminRole(userRole);
 }
