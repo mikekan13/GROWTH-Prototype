@@ -3,6 +3,37 @@
 Last updated: 2026-04-05
 Current phase: Phase 5 (Entity Creation + Forge Authoring)
 
+## Session 2026-04-05 (b): Forge Authoring Pipeline + Entity Wizard Root Wiring
+**Completed:**
+- **Forge Authoring Service** (`services/forge-authoring.ts`) — Kai AI authoring pipeline:
+  - GM provides name + narrative description → Kai (Claude) generates mechanical stats + KV estimate
+  - Type-specific schema guidance for all forge types (seed/root/branch/skill/item/traits)
+  - `authorForgeItem()` — calls Kai, parses JSON response, returns structured result for GM review
+  - `confirmForgeAuthoring()` — GM accepts blueprint → persisted as draft ForgeItem with karmicValue
+  - System prompt uses Kai's God-head record if seeded, with fallback default
+- **Forge Author API** (`api/campaigns/[id]/forge/author/route.ts`):
+  - `POST` — GM describes → returns AI-generated stats + reasoning + suggestedKV (not persisted)
+  - `PUT` — GM confirms → creates draft ForgeItem
+- **ForgePanel UI updated** (`components/forge/ForgePanel.tsx`):
+  - Added seed/root/branch to type filter tabs and create form type selector
+  - AI-authored types show narrative textarea + "Ask Kai" button instead of direct stat fields
+  - Loading state while Kai thinks
+  - `KaiReviewPanel` sub-component: displays generated blueprint with stat badges, attributes, skills, nectars/thorns, KV estimate, Kai's reasoning
+  - GM actions: Accept Blueprint (confirm), Reforge (retry), Discard (reject)
+  - Manual types (skill, item, traits) unchanged
+- **Entity Wizard Root Selection** wired (`components/entity/EntityCreationWizard.tsx`):
+  - RootStep fetches published roots from campaign forge API
+  - Browsable list with name, description preview, frequency cost
+  - Selected root shows full stat breakdown (attributes, skills, nectars, thorns)
+  - Empty state directs GM to create roots via Forge tab
+  - Replaced placeholder "coming next session" text
+
+**Next session priorities:**
+- Test end-to-end with ANTHROPIC_API_KEY set: create a root via Forge → Kai authors → accept → appears in entity wizard
+- Wire remaining wizard steps (branches, skills, traits) to forge item selectors
+- Global catalog browser modal (search + pull to campaign)
+- Forge item detail/edit panel (view full stats, edit before publish)
+
 ## Session 2026-04-04/05: Entity Creation System — Session A (Partial)
 **Completed:**
 - `GrowthSeed` interface in `types/growth.ts` — full seed type with attributes, die, frequency, health, resist, skills, nectars, thorns, KV
@@ -13,31 +44,12 @@ Current phase: Phase 5 (Entity Creation + Forge Authoring)
 - Entity Creation Wizard overlay — `components/entity/EntityCreationWizard.tsx`
   - Full-screen overlay within campaign canvas (no page navigation)
   - 9-step breadcrumb (Describe, Seed, Root, Branches, Attributes, WTH, Skills, Traits, Goals, Review)
-  - Step 1 (Describe): name, description prompt, target KV with presets, "Generate Prompt" button (placeholder), "Manual Creation" skip
-  - Step 2 (Seed): browsable catalog of 48 seeds with search, fate die filter, sort, attribute display (pillar-colored), KV, expand for details
-  - Step 3 (Root): **NEEDS REWORK** — was built as a direct stat form, but should be a block selector like seeds
-  - Draft persistence: creates DRAFT Character record on "Create Entity", saves on step transitions, resume from entity list
-- Forge service updated — added `seed`, `root`, `branch` to `FORGE_ITEM_TYPES` with Zod schemas
-- Global catalog service — `listGlobalCatalog()`, `pullFromGlobalCatalog()` in `services/forge.ts`
-- Global catalog API — `GET /api/forge/global`, `POST /api/campaigns/[id]/forge/pull`
-
-**CRITICAL REALIZATION — Forge authoring must come first:**
-- GMs don't directly set stats on forge items. They DESCRIBE what they want.
-- God-heads (Kai) evaluate descriptions and author the mechanical stats + KV.
-- Flow: GM describes → Eth'erling routes → God-head authors blueprint → Kai evaluates KV → GM confirms
-- The entity creation wizard's block-selection steps (root, branch, skills, traits) depend on blocks existing in the campaign's forge
-- The Forge creation UI needs the God-head evaluation pipeline before entity creation can work properly
-
-**What needs to be reverted/reworked:**
-- `RootStep` in EntityCreationWizard — remove the direct stat form, replace with forge block selector
-- Root/branch Zod schemas in forge.ts are fine (they validate the OUTPUT of God-head authoring, not GM input)
-
-**Next session: Forge Authoring Pipeline**
-- Build the Forge creation flow: GM describes → God-head evaluates → GM confirms
-- Root/Branch/Seed creation forms in ForgePanel (narrative input, not stat forms)
-- Global catalog browser modal in Forge (search global items, "Pull" to campaign)
-- Wire Kai evaluator to generate stats + KV from GM descriptions
-- Then return to entity wizard and wire block selectors for root/branch/etc.
+  - Step 1 (Describe): name, description prompt, target KV with presets
+  - Step 2 (Seed): browsable catalog of 48 seeds with search, fate die filter, sort
+  - Step 3 (Root): **WIRED** — now fetches from campaign forge published roots
+  - Draft persistence: creates DRAFT Character record, saves on step transitions
+- Forge service — seed/root/branch types with Zod schemas
+- Global catalog service + API
 
 ---
 

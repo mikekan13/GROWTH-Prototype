@@ -83,6 +83,25 @@ Resistance is NOT auto-generated text. The GM creates entities (NPCs, creatures,
 - **Kai** (BALANCE) — Value, balance, karmic evaluation, creation, ambition
 - **Eth'erling** (BALANCE) — Justice, routing, cosmic judgment, moral dilemmas (default fallback)
 
+### Active: Forge Authoring Pipeline (Kai)
+
+**Purpose**: GMs describe what they want narratively → Kai (God-head) generates balanced mechanical stats + KRMA Value estimate → GM reviews and confirms or reforges.
+
+**Architecture**: `src/services/forge-authoring.ts` → build type-specific prompt with schema guidance → Claude AI → JSON parse → return for GM review → confirm persists as draft ForgeItem
+
+**Supports all forge types**: seed, root, branch, skill, item, nectar, blossom, thorn
+
+**Flow**:
+1. GM enters name + narrative description in ForgePanel (textarea, not stat fields)
+2. `POST /api/campaigns/[id]/forge/author` → `authorForgeItem()` → Kai generates stats
+3. `KaiReviewPanel` displays: stat badges, attributes, skills, nectars/thorns, KV estimate, Kai's reasoning
+4. GM accepts → `PUT /api/campaigns/[id]/forge/author` → `confirmForgeAuthoring()` → draft ForgeItem created
+5. GM can then publish the item for use in entity creation wizard
+
+**Key design rule**: GMs describe, God-heads author mechanics. The Forge creation form is a narrative prompt + name, NOT stat fields.
+
+**Balance guidance**: Type-specific schema templates with reference ranges (e.g., Human seed = 50 total attributes, frequency 40, KV 225). Every seed must have at least one Thorn.
+
 ## Planned Systems
 
 ### Portrait Pipeline (Phase A — In Progress)

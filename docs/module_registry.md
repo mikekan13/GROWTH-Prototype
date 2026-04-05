@@ -33,6 +33,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | GoalService | `services/goal.ts` | Goal CRUD (create/update/abandon/complete/fail), Zod schemas, 5-active-goal limit, custodian assignment storage, resistance prompt storage. Character goals with priority, milestones, God-head custodianship | Prisma, permissions |
 | GoalResistanceService | `services/goal-resistance.ts` | Entity-based resistance management. GM assigns entities (NPCs, creatures, locations) as resistance to goals via EntityRelationship edges ('resisted_by'). List/assign/remove resistance entities. | Prisma, permissions |
 | GoalCustodianService | `services/goal-custodian.ts` | AI-driven God-head custodian assignment. Reads goal + context, matches to God-head domain, assigns custodian to goal | GoalContextService, Claude provider, GoalService |
+| ForgeAuthoringService | `services/forge-authoring.ts` | Kai AI authoring pipeline. GM provides name + narrative description → Kai (Claude) generates mechanical stats + KV → GM reviews and confirms. Supports all forge types (seed/root/branch/skill/item/traits). Confirm flow persists as draft ForgeItem | Claude provider, ForgeService schemas, Prisma, permissions |
 
 ## Infrastructure (lib/)
 
@@ -150,6 +151,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | /api/campaigns/[id]/forge | GET, POST | ForgeService (list + create forge items, GM-only create, players see published only) |
 | /api/campaigns/[id]/forge/[itemId] | GET, PATCH, DELETE | ForgeService (get/update/delete forge item, GM-only edit, delete draft only) |
 | /api/campaigns/[id]/forge/[itemId]/publish | POST, DELETE | ForgeService (publish/unpublish forge item, GM-only) |
+| /api/campaigns/[id]/forge/author | POST, PUT | ForgeAuthoringService (POST: GM describes → Kai generates stats for review; PUT: GM confirms → persists as draft ForgeItem) |
 | /api/campaigns/[id]/requests | GET, POST | ForgeService (list + create player requests, players see own only) |
 | /api/campaigns/[id]/requests/[requestId] | PATCH | ForgeService (player edit or GM resolve with approve/deny/modify) |
 | /api/krma/wallets/me | GET | KRMA Wallet (authenticated user's wallet balance) |

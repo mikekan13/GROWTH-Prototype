@@ -479,17 +479,43 @@ function RootStep({
   onChange: (updates: Partial<EntityDraft>) => void;
   campaignId: string;
 }) {
+  const [roots, setRoots] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown>; status: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRoots() {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/forge?type=root&status=published`);
+        if (res.ok) {
+          const data = await res.json();
+          setRoots(data.items || []);
+        }
+      } catch { /* silent */ }
+      setLoading(false);
+    }
+    fetchRoots();
+  }, [campaignId]);
+
+  const selectRoot = (item: typeof roots[number]) => {
+    onChange({ root: { id: item.id, name: item.name, type: item.type, data: item.data } });
+  };
+
+  const attrs = draft.root?.data?.attributes as Record<string, number> | undefined;
+  const skills = draft.root?.data?.skills as Array<{ name: string; level: number }> | undefined;
+  const nectars = draft.root?.data?.nectars as string[] | undefined;
+  const thorns = draft.root?.data?.thorns as string[] | undefined;
+
   return (
     <div className="space-y-4">
       <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
-        Roots are authored in the Forge. Select from your campaign&apos;s published roots, or go to the Forge to create one.
+        Select a root from your campaign&apos;s published forge items. Roots define occupation, background, and starting skills.
       </div>
 
       {draft.root ? (
-        <div className="border p-4" style={{ borderColor: '#3EB89A', background: 'rgba(62,184,154,0.08)' }}>
+        <div className="border p-4 space-y-3" style={{ borderColor: '#3E78C0', background: 'rgba(62,120,192,0.08)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#3EB89A' }}>
+              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#3E78C0' }}>
                 {draft.root.name}
               </div>
               <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/40 mt-1">
@@ -503,15 +529,99 @@ function RootStep({
               ✕ Remove
             </button>
           </div>
+          {/* Stat preview */}
+          {attrs && (
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(attrs).filter(([, v]) => v > 0).map(([attr, val]) => (
+                <span key={attr} className="text-[11px] px-1.5 py-0.5 uppercase" style={{
+                  backgroundColor: 'rgba(62,120,192,0.15)',
+                  color: '#3E78C0',
+                  borderRadius: '2px',
+                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                }}>{attr.slice(0, 3)} {val}</span>
+              ))}
+            </div>
+          )}
+          {skills && skills.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {skills.map((s, i) => (
+                <span key={i} className="text-[11px] px-1.5 py-0.5" style={{
+                  backgroundColor: 'rgba(255,204,120,0.1)',
+                  color: '#ffcc78',
+                  borderRadius: '2px',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                }}>{s.name} ({s.level})</span>
+              ))}
+            </div>
+          )}
+          {nectars && nectars.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {nectars.map((n, i) => (
+                <span key={i} className="text-[11px] px-1.5 py-0.5" style={{
+                  backgroundColor: 'rgba(62,184,154,0.1)', color: '#3EB89A', borderRadius: '2px',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                }}>{n}</span>
+              ))}
+            </div>
+          )}
+          {thorns && thorns.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {thorns.map((t, i) => (
+                <span key={i} className="text-[11px] px-1.5 py-0.5" style={{
+                  backgroundColor: 'rgba(232,88,90,0.1)', color: '#E8585A', borderRadius: '2px',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                }}>{t}</span>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
+      ) : loading ? (
+        <div className="text-center py-8 text-[13px] font-[family-name:var(--font-terminal)] text-white/20">
+          Loading roots...
+        </div>
+      ) : roots.length === 0 ? (
         <div className="text-center py-12 border border-dashed" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <div className="text-[14px] font-[family-name:var(--font-terminal)] text-white/20 mb-4">
-            No root selected
+          <div className="text-[14px] font-[family-name:var(--font-terminal)] text-white/20 mb-2">
+            No published roots
           </div>
           <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/15">
-            Forge authoring pipeline coming next session
+            Create roots in the Forge tab using Kai&apos;s authoring pipeline.
           </div>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {roots.map(item => {
+            const desc = item.data?.description as string | undefined;
+            const freq = item.data?.frequency as number | undefined;
+            return (
+              <button
+                key={item.id}
+                onClick={() => selectRoot(item)}
+                className="w-full text-left p-3 border transition-colors hover:border-[#3E78C0]"
+                style={{
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  backgroundColor: '#1a1a2e',
+                  borderRadius: '2px',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#3E78C0' }}>
+                    {item.name}
+                  </span>
+                  {freq != null && (
+                    <span className="text-[12px] font-[family-name:var(--font-terminal)]" style={{ color: '#7050A8' }}>
+                      Freq: {freq}
+                    </span>
+                  )}
+                </div>
+                {desc && (
+                  <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/35 mt-1 truncate">
+                    {desc}
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -47,12 +47,19 @@ interface ForgePanelProps {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
+  seed: '#7050A8',
+  root: '#3E78C0',
+  branch: '#22ab94',
   skill: '#ffcc78',
   item: '#22ab94',
   nectar: '#3EB89A',
   blossom: '#D0A030',
   thorn: '#E8585A',
 };
+
+// ALL forge types use the God-head authoring pipeline (narrative → AI stats → confirm)
+// GMs describe, God-heads author mechanics. No direct stat forms.
+const AI_AUTHORED_TYPES = new Set(['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn']);
 
 const STATUS_COLORS: Record<string, string> = {
   draft: '#888',
@@ -98,6 +105,19 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
   const [itemValue, setItemValue] = useState(0);
   const [itemSecondaryMaterial, setItemSecondaryMaterial] = useState('');
   const [itemNotes, setItemNotes] = useState('');
+  // AI authoring state
+  const [authoring, setAuthoring] = useState(false);
+  const [authorResult, setAuthorResult] = useState<{
+    type: string; name: string; canonicalName: string; data: Record<string, unknown>;
+    godheadReasoning: string; suggestedKV: number;
+  } | null>(null);
+  const [authorError, setAuthorError] = useState('');
+  // Global catalog suggestion state (checked before authoring)
+  const [globalSuggestions, setGlobalSuggestions] = useState<Array<{
+    id: string; name: string; type: string; data: Record<string, unknown>; useCount: number;
+  }>>([]);
+  const [checkingGlobal, setCheckingGlobal] = useState(false);
+  const [globalChecked, setGlobalChecked] = useState(false);
   // Weapon fields
   const [weaponDamage, setWeaponDamage] = useState({ piercing: 0, slashing: 0, heat: 0, decay: 0, cold: 0, bashing: 0, energy: 0 });
   const [weaponRange, setWeaponRange] = useState('melee');
@@ -209,6 +229,112 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
     } catch { alert('Connection failed'); }
   };
 
+  // ── Forge Flow: check global catalog first, then God-head authoring ──
+  const handleAuthor = async () => {
+    if (!newName.trim() || !newDesc.trim()) return;
+    // Step 1: Check global catalog for existing similar items
+    setCheckingGlobal(true);
+    setAuthorError('');
+    setAuthorResult(null);
+    setGlobalSuggestions([]);
+    setGlobalChecked(false);
+    try {
+      const searchParam = encodeURIComponent(newName.trim());
+      const res = await fetch(`/api/forge/global?type=${newType}&search=${searchParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        const suggestions = data.items || [];
+        if (suggestions.length > 0) {
+          setGlobalSuggestions(suggestions);
+          setGlobalChecked(true);
+          setCheckingGlobal(false);
+          return; // Show suggestions, don't author yet
+        }
+      }
+    } catch { /* silent — proceed to authoring */ }
+    setCheckingGlobal(false);
+    setGlobalChecked(true);
+    // No suggestions found — go straight to God-head authoring
+    await doAuthor();
+  };
+
+  // Step 2: Actually call God-head authoring (after global check or GM rejects suggestions)
+  const doAuthor = async () => {
+    setAuthoring(true);
+    setAuthorError('');
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/forge/author`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: newType, name: newName.trim(), description: newDesc.trim() }),
+      });
+      if (res.ok) {
+        const { result } = await res.json();
+        setAuthorResult(result);
+      } else {
+        const err = await res.json();
+        setAuthorError(err.error || 'God-head failed to generate stats. Try again.');
+      }
+    } catch {
+      setAuthorError('Connection failed.');
+    }
+    setAuthoring(false);
+  };
+
+  // GM rejects suggestions — proceed to forge new
+  const handleForgeNew = async () => {
+    setGlobalSuggestions([]);
+    await doAuthor();
+  };
+
+  // GM pulls a suggestion from global catalog
+  const handlePullSuggestion = async (globalItemId: string) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/forge/pull`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ globalItemId }),
+      });
+      if (res.ok) {
+        setGlobalSuggestions([]);
+        setNewName('');
+        setNewDesc('');
+        setShowCreateForm(false);
+        setGlobalChecked(false);
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to pull item');
+      }
+    } catch { alert('Connection failed'); }
+  };
+
+  const handleConfirmAuthor = async () => {
+    if (!authorResult) return;
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/forge/author`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: authorResult.type,
+          name: authorResult.canonicalName,
+          data: authorResult.data,
+          karmicValue: authorResult.suggestedKV,
+        }),
+      });
+      if (res.ok) {
+        setAuthorResult(null);
+        setNewName('');
+        setNewDesc('');
+        setShowCreateForm(false);
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to save');
+      }
+    } catch { alert('Connection failed'); }
+  };
+
   const handlePublish = async (itemId: string) => {
     try {
       await fetch(`/api/campaigns/${campaignId}/forge/${itemId}/publish`, { method: 'POST' });
@@ -250,9 +376,9 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
     });
   };
 
-  const canSubmit = newName.trim() && (newType !== 'skill' || newGovs.size > 0);
+  const canSubmit = newName.trim() && newDesc.trim();
 
-  const types = ['all', 'skill', 'item', 'nectar', 'blossom', 'thorn'];
+  const types = ['all', 'seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'];
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const resolvedRequests = requests.filter(r => r.status !== 'pending');
 
@@ -325,7 +451,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   className="text-[14px] bg-transparent text-white outline-none px-2 py-1 border"
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
-                  {['skill', 'item', 'nectar', 'blossom', 'thorn'].map(t => (
+                  {['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'].map(t => (
                     <option key={t} value={t} style={{ backgroundColor: '#1a1a2e' }}>{t}</option>
                   ))}
                 </select>
@@ -343,16 +469,117 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                 />
               </div>
               <div className="flex gap-2 items-start">
-                <label className="text-[14px] text-gray-400 w-10 pt-1">Desc:</label>
-                <input
-                  type="text"
-                  value={newDesc}
-                  onChange={e => setNewDesc(e.target.value)}
-                  placeholder="Description..."
-                  className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border"
-                  style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-                />
+                <label className="text-[14px] text-gray-400 w-10 pt-1">{AI_AUTHORED_TYPES.has(newType) ? 'Vision:' : 'Desc:'}</label>
+                {AI_AUTHORED_TYPES.has(newType) ? (
+                  <textarea
+                    value={newDesc}
+                    onChange={e => setNewDesc(e.target.value)}
+                    placeholder="Describe what you envision — theme, flavor, role in the world, power level..."
+                    rows={3}
+                    className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border resize-y"
+                    style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={newDesc}
+                    onChange={e => setNewDesc(e.target.value)}
+                    placeholder="Description..."
+                    className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border"
+                    style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                  />
+                )}
               </div>
+              {/* Forge authoring flow: global check → suggestions → God-head authoring */}
+              {AI_AUTHORED_TYPES.has(newType) && (
+                <div className="space-y-3">
+                  <div className="text-[12px] px-2 py-1.5" style={{
+                    color: 'rgba(255,204,120,0.7)',
+                    backgroundColor: 'rgba(255,204,120,0.05)',
+                    border: '1px solid rgba(255,204,120,0.15)',
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  }}>
+                    Describe what you envision. The Forge will check if something similar exists, or a God-head will author a new blueprint.
+                  </div>
+                  {authorError && (
+                    <div className="text-[12px] px-2 py-1.5" style={{
+                      color: '#E8585A', backgroundColor: 'rgba(232,88,90,0.1)',
+                      border: '1px solid rgba(232,88,90,0.2)', borderRadius: '2px',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    }}>{authorError}</div>
+                  )}
+                  {/* Global catalog suggestions */}
+                  {globalSuggestions.length > 0 && (
+                    <div className="p-3 border space-y-2" style={{
+                      borderColor: 'rgba(208,160,48,0.4)',
+                      borderRadius: '3px',
+                      backgroundColor: 'rgba(208,160,48,0.06)',
+                    }}>
+                      <div className="text-[13px] uppercase tracking-wider" style={{
+                        color: '#D0A030',
+                        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                      }}>Similar designs exist in the global catalog</div>
+                      <div className="space-y-1">
+                        {globalSuggestions.map(item => (
+                          <div key={item.id} className="flex items-center justify-between p-2 border" style={{
+                            borderColor: 'rgba(208,160,48,0.2)',
+                            borderRadius: '2px',
+                            backgroundColor: '#1a1a2e',
+                          }}>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[14px] text-white" style={{
+                                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                              }}>{item.name}</span>
+                              {(item.data?.description as string) ? (
+                                <span className="text-[12px] text-white/35 ml-2 truncate" style={{
+                                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                                }}>{(item.data.description as string).slice(0, 80)}</span>
+                              ) : null}
+                              <span className="text-[11px] ml-2" style={{ color: '#D0A030' }}>
+                                ({item.useCount} campaign{item.useCount !== 1 ? 's' : ''})
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handlePullSuggestion(item.id)}
+                              className="text-[13px] px-2 py-0.5 uppercase tracking-wider flex-shrink-0 ml-2"
+                              style={{
+                                color: '#22ab94',
+                                border: '1px solid rgba(34,171,148,0.4)',
+                                borderRadius: '2px',
+                                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                              }}
+                            >Pull</button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={handleForgeNew}
+                        disabled={authoring}
+                        className="text-[13px] px-3 py-1 uppercase tracking-wider"
+                        style={{
+                          color: authoring ? '#666' : '#7050A8',
+                          border: `1px solid ${authoring ? '#3a3a4e' : 'rgba(112,80,168,0.4)'}`,
+                          borderRadius: '2px',
+                          fontFamily: 'var(--font-terminal), Consolas, monospace',
+                        }}
+                      >
+                        {authoring ? '⟳ God-heads forging...' : 'Not quite — forge something new'}
+                      </button>
+                    </div>
+                  )}
+                  {/* God-head result — review panel */}
+                  {authorResult && (
+                    <ForgeReviewPanel
+                      result={authorResult}
+                      onConfirm={handleConfirmAuthor}
+                      onReject={() => setAuthorResult(null)}
+                      onRetry={doAuthor}
+                    />
+                  )}
+                </div>
+              )}
+              {/* Manual types: direct stat fields */}
               {newType === 'skill' && (
                 <div>
                   <label className="text-[14px] text-gray-400 block mb-1">Governors (at least one):</label>
@@ -402,21 +629,37 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                 />
               )}
               <div className="flex gap-2 pt-1">
+                {AI_AUTHORED_TYPES.has(newType) ? (
+                  <button
+                    onClick={handleAuthor}
+                    disabled={!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0}
+                    className="text-[14px] px-3 py-1 uppercase tracking-wider"
+                    style={{
+                      color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : '#7050A8',
+                      border: `1px solid ${(!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#3a3a4e' : 'rgba(112,80,168,0.5)'}`,
+                      borderRadius: '2px',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    }}
+                  >
+                    {checkingGlobal ? '⟳ Checking catalog...' : authoring ? '⟳ God-heads forging...' : '⚡ Send to Forge'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleCreate}
+                    disabled={!canSubmit}
+                    className="text-[14px] px-3 py-1 uppercase tracking-wider"
+                    style={{
+                      color: canSubmit ? '#ffcc78' : '#666',
+                      border: `1px solid ${canSubmit ? 'rgba(255,204,120,0.4)' : '#3a3a4e'}`,
+                      borderRadius: '2px',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    }}
+                  >
+                    Create
+                  </button>
+                )}
                 <button
-                  onClick={handleCreate}
-                  disabled={!canSubmit}
-                  className="text-[14px] px-3 py-1 uppercase tracking-wider"
-                  style={{
-                    color: canSubmit ? '#ffcc78' : '#666',
-                    border: `1px solid ${canSubmit ? 'rgba(255,204,120,0.4)' : '#3a3a4e'}`,
-                    borderRadius: '2px',
-                    fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  }}
-                >
-                  Create
-                </button>
-                <button
-                  onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); setItemNotes(''); setItemSecondaryMaterial(''); setWeaponProps(new Set()); setArmorCoveredParts(new Set()); setPmSchool(''); }}
+                  onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); setItemNotes(''); setItemSecondaryMaterial(''); setWeaponProps(new Set()); setArmorCoveredParts(new Set()); setPmSchool(''); setAuthorResult(null); setAuthorError(''); setGlobalSuggestions([]); setGlobalChecked(false); }}
                   className="text-[14px] px-3 py-1 uppercase tracking-wider text-gray-500"
                   style={{ border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
@@ -719,6 +962,297 @@ function RequestRow({ request, isGM, onResolve, onRefresh: _onRefresh }: {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Kai Review Panel ─────────────────────────────────────────────────────
+
+function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
+  result: { type: string; name: string; canonicalName: string; data: Record<string, unknown>; godheadReasoning: string; suggestedKV: number };
+  onConfirm: () => void;
+  onReject: () => void;
+  onRetry: () => void;
+}) {
+  const attrs = result.data.attributes as Record<string, number> | undefined;
+  const skills = result.data.skills as Array<{ name: string; level: number } | string> | undefined;
+  const nectars = result.data.nectars as string[] | undefined;
+  const thorns = result.data.thorns as string[] | undefined;
+  const description = result.data.description as string | undefined;
+  const governors = result.data.governors as string[] | undefined;
+  const mechanicalEffect = result.data.mechanicalEffect as string | undefined;
+  const itemType = result.data.itemType as string | undefined;
+  const material = result.data.material as string | undefined;
+  const rarity = result.data.rarity as string | undefined;
+
+  const ATTR_ORDER = ['clout', 'celerity', 'constitution', 'focus', 'flow', 'willpower', 'wisdom', 'wit'];
+
+  return (
+    <div className="p-3 border space-y-3" style={{
+      borderColor: 'rgba(112,80,168,0.4)',
+      borderRadius: '3px',
+      backgroundColor: 'rgba(112,80,168,0.08)',
+    }}>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[14px] uppercase tracking-wider" style={{
+            color: '#7050A8',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+          }}>God-head Blueprint</div>
+          <div className="text-[15px] mt-1" style={{
+            color: 'white',
+            fontFamily: 'var(--font-terminal), Consolas, monospace',
+          }}>
+            {result.canonicalName}
+            {result.canonicalName !== result.name && (
+              <span className="text-[12px] ml-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                (was: {result.name})
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-[13px] px-2 py-0.5" style={{
+          color: '#D0A030',
+          backgroundColor: 'rgba(208,160,48,0.1)',
+          border: '1px solid rgba(208,160,48,0.3)',
+          borderRadius: '2px',
+          fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+        }}>
+          KV: {result.suggestedKV.toLocaleString()}
+        </div>
+      </div>
+
+      {/* Description */}
+      {description && (
+        <div className="text-[13px] italic" style={{
+          color: 'rgba(255,255,255,0.6)',
+          fontFamily: 'var(--font-terminal), Consolas, monospace',
+        }}>{description}</div>
+      )}
+
+      {/* Skill governors */}
+      {governors && governors.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {governors.map(gov => (
+            <span key={gov} className="text-[12px] px-1.5 py-0.5 uppercase" style={{
+              backgroundColor: `${GOV_COLOR[gov] || '#888'}20`,
+              color: GOV_COLOR[gov] || '#888',
+              borderRadius: '2px',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+              border: `1px solid ${GOV_COLOR[gov] || '#888'}30`,
+            }}>{GOV_ABBREV[gov] || gov}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Item details */}
+      {itemType && (
+        <div className="flex flex-wrap gap-2">
+          <StatBadge label="Type" value={itemType.replace('_', ' ')} color="#22ab94" />
+          {material ? <StatBadge label="Material" value={material} color="#ffcc78" /> : null}
+          {rarity && rarity !== 'common' ? <StatBadge label="Rarity" value={rarity.replace('_', ' ')} color="#D0A030" /> : null}
+        </div>
+      )}
+
+      {/* Mechanical effect (traits) */}
+      {mechanicalEffect && (
+        <div className="text-[12px] px-2 py-1" style={{
+          color: 'rgba(255,255,255,0.5)',
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '2px',
+          fontFamily: 'var(--font-terminal), Consolas, monospace',
+        }}>
+          <span style={{ color: '#ffcc78', fontSize: '11px' }}>Effect: </span>{mechanicalEffect}
+        </div>
+      )}
+
+      {/* Core stats row */}
+      {(result.type === 'seed' || result.type === 'root' || result.type === 'branch') && (
+        <div className="flex flex-wrap gap-2">
+          {result.data.baseFateDie ? (
+            <StatBadge label="Fate Die" value={String(result.data.baseFateDie)} color="#ffcc78" />
+          ) : null}
+          {result.data.frequency != null ? (
+            <StatBadge label="Freq" value={String(result.data.frequency)} color="#7050A8" />
+          ) : null}
+          {result.data.healthLevel != null ? (
+            <StatBadge label="HP Lvl" value={String(result.data.healthLevel)} color="#E8585A" />
+          ) : null}
+          {result.data.baseResist != null ? (
+            <StatBadge label="Resist" value={String(result.data.baseResist)} color="#3E78C0" />
+          ) : null}
+          {result.data.wealthLevel != null ? (
+            <StatBadge label="Wealth" value={String(result.data.wealthLevel)} color="#D0A030" />
+          ) : null}
+          {result.data.techLevel != null ? (
+            <StatBadge label="Tech" value={String(result.data.techLevel)} color="#22ab94" />
+          ) : null}
+          {result.data.ageAdded != null ? (
+            <StatBadge label="Age+" value={String(result.data.ageAdded)} color="#888" />
+          ) : null}
+        </div>
+      )}
+
+      {/* Attributes */}
+      {attrs && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider mb-1" style={{
+            color: 'rgba(255,255,255,0.35)',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+          }}>Attributes</div>
+          <div className="flex flex-wrap gap-1">
+            {ATTR_ORDER.map(attr => {
+              const val = attrs[attr] ?? 0;
+              if (val === 0) return null;
+              return (
+                <span key={attr} className="text-[12px] px-1.5 py-0.5" style={{
+                  backgroundColor: `${GOV_COLOR[attr] || '#888'}20`,
+                  color: GOV_COLOR[attr] || '#888',
+                  borderRadius: '2px',
+                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                  border: `1px solid ${GOV_COLOR[attr] || '#888'}30`,
+                }}>
+                  {GOV_ABBREV[attr]} {val}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Skills */}
+      {skills && skills.length > 0 && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider mb-1" style={{
+            color: 'rgba(255,255,255,0.35)',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+          }}>Skills</div>
+          <div className="flex flex-wrap gap-1">
+            {skills.map((s, i) => {
+              const name = typeof s === 'string' ? s : s.name;
+              const level = typeof s === 'string' ? null : s.level;
+              return (
+                <span key={i} className="text-[12px] px-1.5 py-0.5" style={{
+                  backgroundColor: '#ffcc7820',
+                  color: '#ffcc78',
+                  borderRadius: '2px',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  border: '1px solid #ffcc7830',
+                }}>
+                  {name}{level != null ? ` (${level})` : ''}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Nectars & Thorns */}
+      {nectars && nectars.length > 0 && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider mb-1" style={{
+            color: 'rgba(255,255,255,0.35)',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+          }}>Nectars</div>
+          <div className="flex flex-wrap gap-1">
+            {nectars.map((n, i) => (
+              <span key={i} className="text-[12px] px-1.5 py-0.5" style={{
+                backgroundColor: 'rgba(62,184,154,0.15)',
+                color: '#3EB89A',
+                borderRadius: '2px',
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                border: '1px solid rgba(62,184,154,0.3)',
+              }}>{n}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {thorns && thorns.length > 0 && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider mb-1" style={{
+            color: 'rgba(255,255,255,0.35)',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+          }}>Thorns</div>
+          <div className="flex flex-wrap gap-1">
+            {thorns.map((t, i) => (
+              <span key={i} className="text-[12px] px-1.5 py-0.5" style={{
+                backgroundColor: 'rgba(232,88,90,0.15)',
+                color: '#E8585A',
+                borderRadius: '2px',
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                border: '1px solid rgba(232,88,90,0.3)',
+              }}>{t}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Kai's reasoning */}
+      <div className="text-[12px] px-2 py-1.5" style={{
+        color: 'rgba(255,255,255,0.5)',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '2px',
+        fontFamily: 'var(--font-terminal), Consolas, monospace',
+        fontStyle: 'italic',
+      }}>
+        <span style={{ color: '#7050A8' }}>God-head:</span> {result.godheadReasoning}
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          className="text-[14px] px-3 py-1 uppercase tracking-wider"
+          style={{
+            color: '#22ab94',
+            border: '1px solid rgba(34,171,148,0.4)',
+            borderRadius: '2px',
+            fontFamily: 'var(--font-terminal), Consolas, monospace',
+          }}
+        >
+          ✓ Accept Blueprint
+        </button>
+        <button
+          onClick={onRetry}
+          className="text-[14px] px-3 py-1 uppercase tracking-wider"
+          style={{
+            color: '#D0A030',
+            border: '1px solid rgba(208,160,48,0.3)',
+            borderRadius: '2px',
+            fontFamily: 'var(--font-terminal), Consolas, monospace',
+          }}
+        >
+          ⟳ Reforge
+        </button>
+        <button
+          onClick={onReject}
+          className="text-[14px] px-3 py-1 uppercase tracking-wider"
+          style={{
+            color: '#888',
+            border: '1px solid #3a3a4e',
+            borderRadius: '2px',
+            fontFamily: 'var(--font-terminal), Consolas, monospace',
+          }}
+        >
+          ✗ Discard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatBadge({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="text-[12px] px-1.5 py-0.5" style={{
+      backgroundColor: `${color}15`,
+      border: `1px solid ${color}30`,
+      borderRadius: '2px',
+      fontFamily: 'var(--font-terminal), Consolas, monospace',
+    }}>
+      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{label} </span>
+      <span style={{ color }}>{value}</span>
     </div>
   );
 }
