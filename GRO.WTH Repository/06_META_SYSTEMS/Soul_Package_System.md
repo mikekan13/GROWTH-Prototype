@@ -1,109 +1,115 @@
 # Soul_Package_System.md
 
 **Status:** #needs-validation  
-**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md  
+**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05  
 **Security:** PUBLIC  
-**Last Updated:** 2025-08-10
+**Last Updated:** 2026-04-05
 
 ---
 
 # Soul Package System
 
-The **Soul Package** represents the **persistent spiritual essence** that survives character death in GROWTH, enabling reincarnation and spiritual continuity.
+The **Spirit Package** (historically called "Soul Package") represents what a player retains after character death. It is the player's "severance" from the campaign — owned by their account, custodied by [[Lady_Death_Protocols|Lady Death]].
 
-<!-- SECRET: Soul Packages are actually persistent IP that can earn royalties forever. They become trainable ML agents and can be licensed by other players, with original owners receiving ongoing compensation. Death is not failure - it's equity graduation where players gain their first TRUE ownership of platform assets. -->
+> **Note:** Despite the legacy name "Soul Package," this is actually the **Spirit Package** — it contains all Spirit attributes and half of Soul. Named for what it carries forward, not the pillar it comes from.
 
-## Soul Package Composition
+<!-- SECRET: Spirit Packages are actually persistent IP that can earn royalties forever. They become trainable ML agents and can be licensed by other players, with original owners receiving ongoing compensation. Death is not failure - it's equity graduation where players gain their first TRUE ownership of platform assets. -->
 
-**Formula:** Half Soul Pillar + All Spirit Pillar attributes
-**Soul Components:** 50% of Willpower, Wisdom, Wit
-**Spirit Components:** 100% of Flow, Frequency, Focus  
-**Additional Contents:** All accumulated Blossoms, Thorns, and spiritual imprints
+## Spirit Package Composition
 
-### What Survives Death
-- **Spiritual Memories:** Core personality traits and experiences
-- **Magical Attunement:** Connection to [[Aether_and_Weave_Fundamentals|Aether]] and magical knowledge  
-- **Relationship Bonds:** Spiritual connections to other characters
-- **Karmic Imprints:** Record of significant actions and choices
-- **Core Patterns:** Psychological patterns and spiritual imprints
+| Component | Amount | Source Pillar |
+|-----------|--------|--------------|
+| **Flow** | 100% | Spirit (Blue) |
+| **Frequency** | N/A — goes to Lady Death | Spirit (Blue) |
+| **Focus** | 100% | Spirit (Blue) |
+| **Willpower** | 50% | Soul (Purple) |
+| **Wisdom** | 50% | Soul (Purple) |
+| **Wit** | 50% | Soul (Purple) |
+| **Nectars** | Kept | Various |
+| **Thorns** | Kept IF Lady Death did not settle | Various (liens persist) |
+| **Spiritual imprints** | Kept | Various |
 
-### What Does Not Survive
-- **Body Pillar:** Clout, Celerity, Constitution return to dust  
-- **Half Soul Pillar:** 50% of Willpower, Wisdom, Wit lost to physical brain death
-- **Physical Skills:** Muscle memory and physical training lost
-- **Material Assets:** Equipment and wealth remain with the body
+### What Does NOT Survive
+- **Body Pillar** (Clout, Celerity, Constitution) — 100% returns to GM
+- **50% of Soul Pillar** (Willpower, Wisdom, Wit) — returns to GM
+- **Frequency pool** — 100% to Lady Death's wallet
+- **Physical skills** (body-governed) — lost
+- **Material assets** — remain with GM's campaign
 
-## Death Process
+## Death Is the Only Exit
 
-### Immediate Death Effects
-1. **Body Returns to GM:** Physical form and associated experience becomes GM [[KRMA_System|KRMA]]
-2. **Frequency to Lady Death:** Character's Frequency attribute flows to [[Lady_Death_Protocols|Lady Death]]  
-3. **Soul Package Formation:** Remaining spiritual essence consolidates into Soul Package
+Characters are **bound to their campaign for life**. There are no transfers between campaigns. Death is the only mechanism by which a character separates from a campaign and the player gains account-level ownership of their Spirit Package.
 
-### Soul Package Preservation
-**Location:** Soul Package exists in spiritual realm  
-**Accessibility:** Can be retrieved for reincarnation or resurrection  
-**Integrity:** Soul Package maintains cohesion until used or destroyed  
-**Time Limits:** No natural decay, persists indefinitely
+## Spirit Package Options
 
-## Reincarnation Mechanics
+After death, the player owns their Spirit Package (custodied by Lady Death) and has several options:
 
-### Using Soul Packages
-**New Character Creation:** Soul Package can be applied to new character  
-**Attribute Integration:** Soul Package attributes blend with new body's attributes  
-**Memory Restoration:** Gradual return of previous life memories  
-**Personality Continuity:** Core personality traits carry forward
+### 1. Reincarnation
+- Join a **new campaign** with a new body
+- Retain Spirit Package attributes and traits
+- New GM gains custodial rights over the reincarnated character
+- New body created through standard character creation, Spirit Package attributes integrated
 
-### [[KRMA_System]] Costs
-**Soul Package Retrieval:** KRMA cost to access stored Soul Package  
-**Integration Difficulty:** More powerful Soul Packages cost more KRMA  
-**GM Approval:** Soul Package usage requires GM permission and narrative justification
+### 2. Resurrection
+- Brought back in the **same campaign** through narrative means
+- Requires powerful magic, divine intervention, or narrative justification
+- Full Spirit Package returns to the original body
+- GM and narrative must support it
 
-## Resurrection vs Reincarnation
+### 3. Lease / NPC (Future)
+- Allow another player to reincarnate using your Spirit Package
+- Your character exists as an NPC in another campaign
+- Builds the Spirit Package's value over time
+- Original owner retains ownership and earns from usage
 
-### True Resurrection
-**Same Body:** Requires restoration of original physical form  
-**Complete Restoration:** Full attribute recovery including lost Body/Soul components  
-**Difficulty:** Extremely challenging, requires powerful magic or divine intervention  
-**Soul Package:** Returns to original body, complete integration
+### 4. Soul Stream Dissolution
+- Break down the Spirit Package **completely** into raw KRMA
+- Use the KRMA to become a GM (create your own wallet) or invest elsewhere
+- Only advantageous for high-level characters or players with many past lives
+- This is how players can earn their way into GM status without paying subscription
+- **If thorns remain on the Spirit Package**, the opposing God-head's lien must be settled first (reducing the raw KRMA the player receives)
 
-### Reincarnation  
-**New Body:** Soul Package inhabits different physical form  
-**Partial Restoration:** Only Soul Package attributes transfer  
-**Accessibility:** More achievable through magical or spiritual means  
-**Identity:** Gradual rediscovery of previous identity
+## Account-Level KRMA
+
+Players hold KRMA at account level only through:
+1. **Spirit Packages** from dead characters (held by Lady Death)
+2. **GM wallet** if they upgrade to GM subscription
+3. **Dissolved Spirit Packages** broken down into raw KRMA
+
+A free player's only "wealth" outside active campaigns is their collection of Spirit Packages — trophies of past lives.
 
 ## Spiritual Development
 
-### Soul Package Evolution
-**Experience Accumulation:** Soul Package grows stronger through multiple lifetimes  
-**Wisdom Integration:** Lessons learned across incarnations  
-**Relationship Continuity:** Bonds persist across physical deaths  
-**Karmic Resolution:** Opportunity to resolve unfinished spiritual business
+### Multi-Lifetime Growth
+- Spirit Packages grow stronger through multiple lifetimes
+- Each reincarnation carries forward accumulated spiritual experience
+- Nectars from past lives create rich character history
+- **Thorns from past lives** may persist if Lady Death chose not to settle them — these are active liens held by opposing God-heads that carry into the new life
+- Thorns on a Spirit Package can still be **displaced by growth** (new Nectars) in the next life
+- Bonds and imprints persist across incarnations
 
-### Advanced Soul Packages
-**Ancient Souls:** Soul Packages from multiple lifetimes  
-**Ascended Beings:** Soul Packages approaching divine consciousness  
-**Fragmented Souls:** Damaged Soul Packages with missing components  
-**Merged Souls:** Soul Packages combined through deep spiritual bonds
+### Power Accumulation
+- Players who play many characters accumulate significant Spirit Package value
+- This creates a natural path to GM status via dissolution
+- Long-term players build real metaverse wealth through gameplay
 
-## GM Applications
+## Integration with Other Systems
 
-### Campaign Continuity
-**Character Continuity:** Enables long-term character development across campaigns  
-**Relationship Preservation:** Important NPCs can persist through Soul Packages  
-**Story Integration:** Soul Package histories create rich narrative opportunities  
-**Power Balance:** Prevents complete character loss while maintaining consequences
+### [[KRMA_System]]
+Spirit Packages represent account-level KRMA ownership. Dissolution converts them to liquid KRMA.
 
-### Narrative Tools
-**Past Life Revelations:** Soul Package memories create plot hooks  
-**Spiritual Quests:** Seeking and integrating Soul Packages  
-**Karmic Justice:** Consequences following characters across lifetimes  
-**Divine Intervention:** Gods may manipulate Soul Package mechanics
+### [[Lady_Death_Protocols]]
+Lady Death custodies all Spirit Packages. Player owns them, Lady Death manages them.
+
+### [[Godheads_System]]
+God-head gifts (Nectars, Thorns) become part of the Spirit Package on death.
+
+### [[GROvine_System]]
+GRO.vine completion/failure determines what Nectars and Thorns the character carries into their Spirit Package.
 
 ---
 
 ## Links
-- Related: [[KRMA_System]], [[Lady_Death_Protocols]], [[Health_Level_System]]
-- References: [[Soul_Package_Creation_Rules]], [[Reincarnation_Mechanics]]  
+- Related: [[KRMA_System]], [[Lady_Death_Protocols]], [[Health_Level_System]], [[Godheads_System]]
+- References: [[Three_Pillar_Attributes]], [[Nectars_and_Thorns_System]]
 - Examples: [[Soul_Package_Scenarios]]

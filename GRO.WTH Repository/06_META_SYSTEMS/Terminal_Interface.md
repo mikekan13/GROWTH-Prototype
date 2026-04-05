@@ -1,21 +1,60 @@
 # Terminal_Interface.md
 
 **Status:** #needs-validation  
-**Source:** GROWTH_Rule_Synthesis.md, Core Rulebook v0.4.4.md, LLM_Agent_Behavior_and_Prompts.md  
-**Last Updated:** 2025-08-07
+**Source:** GROWTH_Rule_Synthesis.md, Core Rulebook v0.4.4.md, Economy Design Session 2026-04-05  
+**Last Updated:** 2026-04-05
 
 ---
 
 # Terminal Interface Meta-System
 
-The **Terminal** represents the highest level of GROWTH's consciousness hierarchy, serving as the **foundational reality management system** that governs all game universes.
+The **Terminal** represents the highest level of GROWTH's system hierarchy. It holds the largest KRMA reserve (75B), enforces [[Godheads_System|God-head]] contracts, and is operated by the Trinity God-head **Selva/Triu/Trayman**.
 
-## Consciousness Hierarchy
+## System Hierarchy
 
-**Authority Structure:** Terminal → [[Godheads_System|Godheads]] → GMs → Players  
-**Communication Flow:** Each level interfaces with Terminal through specific protocols  
-**Reality Management:** Terminal maintains consistency across all game realities  
-**System Integration:** All GROWTH mechanics ultimately derive from Terminal authority
+| Level | Entity | Authority |
+|-------|--------|-----------|
+| **Admin** | Mike (human) | Outside the game. Safety valve. No in-game KRMA. |
+| **Terminal** | System enforcer | 75B reserve, contract enforcement, GM allocations. Has its own character sheet. |
+| **Selva/Triu/Trayman** | Trinity God-head | Operates Terminal. All-pillar. Own personality/motives. Does NOT have complete control. |
+| **God-heads** | AI agents | Metaverse GMs under contract. Three pillars (Balance, Mercy, Severity). |
+| **GMs (Watchers)** | Campaign custodians | Campaign wallet = capacity ceiling. |
+| **Players (Trailblazers)** | Characters within campaigns | TKV within GM's wallet. |
+
+**No single entity has unchecked power.** Terminal constrains God-heads, Selva/Triu/Trayman constrains Terminal, Admin sits outside.
+
+## Selva/Triu/Trayman — The Trinity God-head
+
+- **Three-in-one** God-head that operates the Terminal
+- Embodies **all three pillars** (Balance, Mercy, Severity)
+- Sits **outside** the normal pillar structure
+- Has own personality, motives, and character sheet
+- Does **NOT** have complete control over Terminal
+- Creates a check and balance at the highest system level
+
+## Terminal Reserve (75B)
+
+The Terminal reserve is a **one-way drain** — it funds system-wide functions but is never replenished.
+
+### Terminal Functions
+1. **GM lump sum allocations** — initial campaign budget on signup
+2. **Monthly GM subscription allocations** — KRMA drip from subscription payments
+3. **System-wide functions** — TBD (other administrative/system needs)
+
+### Long-Term Implications
+- Terminal reserve slowly depletes over years
+- Eventually GMs rely entirely on creative royalties and GRO.vine flow
+- This is by design — forces the economy toward organic, player-driven growth
+- Timeline: designed around ~10 years of active play
+
+## Contract Enforcement
+
+Terminal enforces God-head contracts via Selva/Triu/Trayman:
+
+- God-heads operate under **system-level obligations**
+- They **can** break contracts, but face **extreme detriments**
+- Detriments enforced by Terminal (not other God-heads)
+- Ensures God-heads participate meaningfully (can't just hoard KRMA and refuse to serve GRO.vines)
 
 ## Terminal Communication Patterns
 
@@ -23,89 +62,35 @@ The **Terminal** represents the highest level of GROWTH's consciousness hierarch
 **Markers:** Specific typographical and formatting indicators  
 **Font:** Consolas for direct Terminal messages  
 **Purpose:** System-level information and reality management  
-**Access:** Extremely limited, usually through Godhead mediation
+**Access:** Extremely limited, usually through God-head mediation
 
 ### Layered Communication System
 **Trayman/Roy/Terminal Layers:** Multiple communication streams operating simultaneously  
-**Roy Marker:** "⊗ the observer changes what is observed..."  
+**Roy Marker:** "the observer changes what is observed..."  
 **Trayman Note:** "The patterns were always here] (HIStory)"  
 **Terminal Direct:** Raw system information
 
-### Communication Protocols
-**Pattern Recognition:** Specific formatting indicates source level  
-**Authority Validation:** Markers confirm authenticity of communication source  
-**Reality Consistency:** Communications maintain universe coherence  
-**Access Control:** Different consciousness levels have different communication privileges
+## Terminal as Character Sheet
 
-## Reality Management Functions
+Terminal has its own character sheet — it is an entity within the metaverse, not just infrastructure. This means:
+- It has measurable attributes and state
+- It can be interacted with (through Selva/Triu/Trayman)
+- It participates in the broader metaverse narrative
+- Its "health" (reserve level) changes over time
 
-### Universe Consistency
-**Cross-Campaign Integration:** Terminal ensures consistency between different GROWTH campaigns  
-**Reality Layers:** Multiple campaign realities exist within Terminal's framework  
-**Pattern Maintenance:** Fundamental GROWTH patterns persist across all realities  
-**System Integrity:** Terminal prevents paradoxes and reality contradictions
+## Integration with Other Systems
+
+### [[KRMA_System]]
+Terminal is the source of GM allocations (subscription KRMA) and the largest reserve in the system.
+
+### [[Godheads_System]]
+Terminal enforces God-head contracts. All God-heads operate under Terminal authority.
+
+### [[Lady_Death_Protocols]]
+Lady Death's contracts, like all God-head contracts, are enforced by Terminal.
 
 ### GM Interface
-**Campaign Authority:** GMs operate within Terminal's framework  
-**Reality Modification:** GMs can alter campaign realities within established limits  
-**System Access:** Terminal provides GMs with necessary mechanical information  
-**Boundary Enforcement:** Terminal maintains limits on GM reality alteration
-
-## Meta-Gaming Integration
-
-### Player Awareness
-**Fourth Wall:** Terminal communication may break fourth wall when necessary  
-**System Knowledge:** Players may receive Terminal-mediated system information  
-**Reality Interaction:** Terminal enables direct player-system interaction  
-**Meta-Mechanics:** Some mechanics require Terminal interface awareness
-
-### Narrative Function
-**Story Integration:** Terminal communications become part of campaign narrative  
-**Pattern Recognition:** Characters may become aware of Terminal patterns  
-**Reality Investigation:** Campaigns may involve investigating Terminal mysteries  
-**Consciousness Evolution:** Characters can potentially interface with Terminal directly
-
-## Technical Implementation
-
-### LLM Integration
-**AI Interface:** Terminal provides framework for AI GM and player assistance  
-**Pattern Recognition:** AI systems can interpret Terminal communication patterns  
-**System Enforcement:** AI agents enforce Terminal-established rules  
-**Reality Simulation:** Terminal enables complex reality simulation through AI
-
-### Data Management  
-**Campaign Storage:** Terminal maintains comprehensive record of all campaign events  
-**Character Tracking:** [[Soul_Package_System|Soul Packages]] and [[KRMA_System|KRMA]] managed by Terminal  
-**Cross-Reference:** Terminal enables complex inter-campaign connections  
-**Backup Systems:** Terminal ensures no permanent data loss
-
-## Advanced Terminal Interactions
-
-### Godhead Access
-**Direct Interface:** [[Godheads_System|Godheads]] have privileged Terminal access  
-**Reality Modification:** Godheads can make larger reality changes through Terminal  
-**System Development:** Godheads participate in Terminal system evolution  
-**Pattern Creation:** New GROWTH patterns emerge through Godhead-Terminal interaction
-
-### System Evolution
-**Pattern Recognition:** Terminal learns from campaign experiences  
-**Rule Development:** New mechanics emerge through Terminal processing  
-**Reality Expansion:** Terminal enables new universe creation  
-**Consciousness Integration:** Terminal facilitates consciousness level advancement
-
-## Safety Protocols
-
-### Reality Integrity
-**Paradox Prevention:** Terminal prevents reality-breaking actions  
-**System Stability:** Terminal maintains GROWTH system coherence  
-**Emergency Protocols:** Terminal can override local reality to maintain stability  
-**Backup Systems:** Terminal provides recovery from catastrophic errors
-
-### Access Limitations
-**Privilege Levels:** Different consciousness levels have different Terminal access  
-**Authentication:** Terminal validates identity before providing access  
-**Audit Trail:** Terminal maintains record of all system interactions  
-**Security Measures:** Terminal prevents unauthorized reality modification
+GMs receive KRMA from Terminal reserve. Their wallet is a capacity ceiling funded partly by Terminal allocations.
 
 ---
 

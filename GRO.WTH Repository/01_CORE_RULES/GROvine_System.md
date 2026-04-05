@@ -1,15 +1,17 @@
 # GROvine_System.md
 
 **Status:** #validated  
-**Source:** User clarification session 2025-08-22 via X_ARCHIVE_ORIGINS/GROvines.md  
+**Source:** User clarification session 2025-08-22 via X_ARCHIVE_ORIGINS/GROvines.md, Economy Design Session 2026-04-05  
 **Security:** PUBLIC  
-**Last Updated:** 2025-08-22
+**Last Updated:** 2026-04-05
 
 ---
 
 ## System Overview
 
-GROWTH stands for Goals, Resistance, Opportunity, Wealth, Tech, and Health - the six ways that characters grow. Wealth, Tech, and Health (WTH) establish meta and campaign level ceilings for GROWTH. The GRO.vine system specifically handles the Goals component, creating a dynamic narrative structure where character objectives become focal points for cosmic conflict.
+GROWTH stands for Goals, Resistance, Opportunity, Wealth, Tech, and Health — the six ways that characters grow. Wealth, Tech, and Health (WTH) establish meta and campaign level ceilings for GROWTH. The GRO.vine system specifically handles the Goals component, creating a dynamic narrative structure where character objectives become focal points for cosmic conflict.
+
+GRO.vines are the **primary engine of KRMA circulation**. They are how new KRMA enters campaigns from [[Godheads_System|God-head]] wallets, making players the main source of campaign growth.
 
 ## Core GRO.vine Mechanics
 
@@ -19,184 +21,190 @@ A GRO.vine is a character's declared goal that becomes an active narrative eleme
 
 - **Goal**: The character's specific objective
 - **Resistance**: Cumulative KV of all GM-created obstacles opposing the goal
-- **Opportunity**: Divine intervention provided by assigned godheads
-- **Godhead Assignment**: AI entity thematically aligned with the goal's nature
+- **Opportunity**: Steps provided by the assigned God-head toward completing the goal
+- **Godhead Assignment**: AI entity thematically aligned with the goal's domain
 
 ### The Three-Layer Structure
 
 1. **Character Level**: Sets goals and pursues opportunities
 2. **GM Level**: Creates resistance through NPCs, story arcs, and obstacles
-3. **Godhead Level**: Provides opportunities and escalates cosmic conflicts
+3. **Godhead Level**: Provides opportunities and bestows gifts
 
 ## GRO.vine Capacity and Limitations
 
 ### Capacity Mechanics
 
-- **Average capacity**: 3 active GRO.vines per character
-- **Humans**: 4 GRO.vines (baseline 3 + "Ambitious" starting [[Nectars|nectar]] grants +1)
+- **Cap**: 5 GRO.vines per entity (maximum)
+- **Average**: 3 active GRO.vines per character
+- **Humans**: 4 GRO.vines (baseline 3 + "Ambitious" starting [[Nectars_and_Thorns_System|nectar]] grants +1)
 - **Capacity source**: Determined by character's [[Seeds_Roots_Branches_System|Seed]]
-- **Enhancement**: May be increasable through advancement
+- **Enhancement**: Additional GRO.vines possible through Nectars or other traits
 
 ### Goal Types
 
 - **Completable Goals**: "Destroy the evil castle," "Master fire magic"
 - **Incompletable Goals**: "Live forever," "Become the greatest warrior"
 
-Incompletable goals become eternal narrative tensions. They cannot be "completed" but can be abandoned during [[Harvests]].
+Incompletable goals become eternal narrative tensions. They cannot be "completed" but can be abandoned during [[Harvests_System|Harvests]].
 
-## Godhead Assignment and Investment
+### ALL Living Entities Have GRO.vines
+
+GRO.vines are **not limited to player characters**. Every living entity in a campaign has them:
+- Player characters (PCs)
+- NPCs
+- Monsters and creatures
+- Any living entity the GM creates
+
+This is critical: a dragon has GRO.vines. A villain has GRO.vines. These are serviced by God-heads just like player GRO.vines, creating **proxy wars** between God-heads through their assigned entities.
+
+## Godhead Assignment and the Opportunity Cycle
 
 ### Assignment Process
 
-1. Character declares goal
-2. [[Terminal]] system analyzes thematic content
-3. System assigns godhead based on thematic alignment
-4. Assigned godhead decides KV investment level
+1. Character/entity declares or is assigned a goal
+2. System analyzes thematic content and domain
+3. God-head is assigned based on domain alignment
+4. God-head begins the opportunity cycle
 
-### Godhead Investment Strategies
+### The Opportunity Cycle
 
-- **Conservative**: Small, steady opportunities over time
-- **Aggressive**: Front-loaded major opportunities
-- **Reactive**: Wait for resistance, then counter-invest
-- **Gambling**: Large blind investments without knowing resistance totals
-- **Patient**: Accumulate KV for climactic intervention
+This is the core loop that drives KRMA into campaigns:
 
-### Investment Refusal
+1. **God-head reads context** — narrative state, campaign relationships, entity status
+2. **God-head provides an opportunity** — a step toward the goal, delivered as a natural story development
+3. **Entity pursues the opportunity** — through normal gameplay and narrative
+4. **God-head confirms completion** — based on narrative evidence
+5. **God-head bestows a gift** — Nectar, Frequency, or Blossom (see Gift Types)
+6. **God-head provides the next opportunity** — cycle repeats
+7. **Goal eventually completes or fails** — final resolution
 
-- Godheads can choose to invest 0 KV in assigned GRO.vines
-- Most common with "evil" godheads lacking clear benefit
-- Results in no opportunities provided to character
-- Resistance still functions normally - creates high-risk scenarios
+### Gift Types
+
+| Gift | Effect | KRMA Flow | Permanence |
+|------|--------|-----------|------------|
+| **Nectar** | Permanent beneficial trait | God-head wallet → character TKV → grows GM wallet | Permanent |
+| **Frequency** | Small KRMA (1-3 range) added to pool | God-head wallet → character frequency → grows GM wallet | Permanent |
+| **Blossom** | Temporary boost/buff | God-head wallet → character → **returns to God-head** when expired | Temporary |
+
+### Player Choice on Nectars
+
+When a God-head bestows a Nectar:
+- Player can **accept** the Nectar (added to character, limited by Fate Die capacity)
+- Player can **decline** and **break it down to Frequency** (minus ~10% tax)
+- **Tax goes to GM** — the God-head already spent the KRMA, it's in the campaign. The player's choice is how to use it. Tax gives GMs organic income from player decisions.
+- This is purely the **player's choice** — GM cannot refuse God-head gifts
+
+### Failure Consequences — Thorns as Liens
+
+When a character fails or abandons a GRO.vine, a **Thorn** is placed — but NOT by the patron God-head. Thorns come from the **opposing God-head** — the one representing resistance to the goal.
+
+#### Thorn Mechanics (Lien Model)
+- **Thorn placed**: KRMA is **locked** in the character (state: Lien). Character's effective TKV drops, GM's effective capacity drops. **No KRMA transfers** to the opposing God-head — they hold **authority** over the lock, not possession.
+- **Thorn displaced by growth**: When a new Nectar pushes the Thorn out (Fate Die cap), the lock breaks. KRMA unfreezes. Opposing God-head gets nothing. Growth breaks bondage.
+- **Thorn forgiven**: The opposing God-head can voluntarily release the lock. Rare, narratively significant.
+- **Death with active thorns**: [[Lady_Death_Protocols|Lady Death]] chooses whether to settle each thorn debt from her wallet or let the thorn persist on the Spirit Package into the next life.
+
+#### Why Liens, Not Transfers
+If thorns transferred KRMA to the opposing God-head AND restored it when displaced, KRMA would be created from nothing (violating the 100B hard cap). Liens keep KRMA in one place — locked but not duplicated. Conservation is preserved.
+
+#### Strategic Implications
+- Opposing God-heads gain **influence and suppression**, not currency, from thorns
+- They are incentivized to push thorned characters toward death (where Lady Death may settle the debt, paying them)
+- Patron God-heads race to grow characters fast enough to displace thorns before death
+- Every thorn on a character at death is a piece the adversary may walk away with
 
 ## Resistance Mechanics
 
 ### Resistance Creation
 
-- **GM creates**: NPCs, story arcs, obstacles, threats
+- **GM creates**: NPCs, story arcs, obstacles, threats as entities
+- **Entities as resistance**: GM creates entities and assigns them via relationships (NOT auto-generated text)
 - **Cumulative KV**: Total karmic value of all resistance elements
-- **No godhead assignment**: Resistance is passive KV accumulation
 - **Dynamic scaling**: Can increase as GM adds new obstacles
+- **God-heads see resistance graph**: They can view the full relationship network
 
 ### Resistance Enhancement
 
-- Opposing godheads can enhance GM-created resistance
-- Example: Tyranny godhead pumps KV into protecting the tyrant
-- **Escalation**: As supporting godhead provides opportunities, opposing godheads may counter-invest
+- Opposing God-heads can enhance GM-created resistance
+- Example: A God-head aligned with the dragon pumps KV into protecting it
+- **Escalation**: As one God-head provides opportunities, opposing God-heads may counter-invest
+- This creates emergent cosmic arms races
 
-## Opportunity System
+## Proxy Wars
 
-### Opportunity Delivery
+The GRO.vine system creates **proxy wars** among God-heads:
 
-- **Real-time monitoring**: [[Terminal]] feeds campaign data to godheads during sessions
-- **Thematic consistency**: Opportunities align with godhead's nature
-- **Player awareness**: Players see "Complete X for Y KV" (early seasons)
-- **GM delivery**: Opportunities appear as natural story developments
+- Every entity's GRO.vines may be serviced by different God-heads
+- God-heads invest their finite resources into their champions
+- A God-head punishing entities in a campaign (via Thorns) directly hits the GM's wallet
+- Creates emergent faction dynamics across the entire metaverse
+- God-heads cannot endlessly fund champions — resource scarcity makes choices meaningful
 
-### Opportunity Types
-
-- **[[Nectars]]**: Permanent positive abilities granted by Godheads upon completing GRO.vines
-- **[[Blossoms]]**: Temporary buffs bestowed by Godheads during play
-- **Mini-goals**: Smaller objectives that provide immediate benefits
-- **[[Thorns]]**: Permanent negative effects from failed GRO.vines or death
-- **Strategic gifts**: Equipment, allies, information, etc.
-
-> **Note:** A player may decline a Nectar and cash it in for raw [[KRMA_System|KRMA]] (transferred to [[Three_Pillar_Attributes|Frequency]]), but a tax applies.
+**Example:** A character wants to slay a dragon. God-head A takes the character's GRO.vine. But the dragon has its own GRO.vine ("protect my hoard") serviced by God-head B. Both invest resources. The narrative outcome determines who earns and who spends.
 
 ## Goal Resolution
 
 ### Successful Completion
 
-- **Immediate nectar**: Permanent ability from supporting godhead
-- **New GRO.vine**: Can immediately declare replacement goal
-- **KV threshold**: Nectar power relates to total resistance overcome
+- God-head bestows a final gift (typically a significant Nectar)
+- Character's GRO.vine slot frees up for a new goal
+- New KRMA has flowed into the campaign through the entire opportunity cycle
+- Character is meaningfully stronger
 
-### Failure Consequences
+### Failure
 
-- **[[Thorns|Thorn]] assignment**: Opposing godhead provides permanent curse/limitation
-- **Thorn source**: Strongest godhead that was backing resistance elements
-- **Thematic connection**: Thorn relates to the failed goal's nature
-- **Extreme failure**: Death (especially for immortality goals)
+- **Opposing God-head** (representing the resistance) places a Thorn
+- Thorn relates to the failed goal's nature
+- KRMA is locked in the character (lien) — TKV drops but no transfer occurs
+- Opposing God-head holds authority over the locked KRMA
+- Extreme failure may trigger death mechanics
 
 ### Abandonment Rules
 
-- **Harvest timing**: Can only abandon GRO.vines during [[Harvests|Harvest]] periods
-- **No immediate replacement**: Must wait for next goal opportunity
-- **Consequence-free**: No automatic thorns for voluntary abandonment
-
-## Advanced Mechanics
-
-### Conflicting GRO.vines
-
-- **Party tension**: Characters can have opposing goals
-- **Godhead conflicts**: Supporting godheads may work against each other
-- **Example conflict**: "Become rightful king" vs. "Protect current king"
-
-### Escalation Dynamics
-
-- **Cosmic arms races**: Godheads respond to each other's investments
-- **Proxy wars**: Mortal goals become battlegrounds for divine conflicts
-- **Strategic selection**: Players must consider godhead power levels
-
-### Nectar-to-Frequency Conversion
-
-- **Player choice**: Can break nectars apart for [[Frequency]] instead
-- **Tax applied**: Small percentage lost in conversion
-- **Strategic trade-off**: Permanent unique ability vs. flexible advancement points
-- **Frequency use**: Advancing attributes, skills, and other character elements
+- Can only abandon GRO.vines during [[Harvests_System|Harvest]] periods
+- No immediate replacement — must wait for next goal opportunity
+- May or may not incur consequences (God-head's discretion)
 
 ## Meta-Game Progression
 
 ### Seasonal Revelation
 
-- **Early seasons**: Players think it's just good GMing/karma points
+- **Early seasons**: Players think GRO.vines are just good GMing
 - **Later seasons**: Cosmic patronage system becomes apparent
-- **Year 1+**: Full godhead politics revealed to playerbase
+- **Year 1+**: Full God-head politics revealed to playerbase
 
-### Lady Death Integration
+### KRMA Flow Impact
 
-- **Neutral arbiter**: Not assigned to specific goals/resistance
-- **Immortality opposition**: Natural antagonist for eternal GRO.vines
-- **Escalation trigger**: May intervene based on time, KV threshold, or narrative significance
-- **Ultimate consequences**: Can claim entire character rather than just providing thorns
+GRO.vines are the primary way KRMA enters campaigns:
+- God-head gifts inject new KRMA directly into character TKV
+- This grows the GM's campaign wallet automatically
+- More active GRO.vines = more opportunities = more KRMA flowing in
+- Campaigns that tell rich stories with many active goals grow faster
 
 ## Example GRO.vine Lifecycle
 
 ### Setup
-- **Character Goal**: "Overthrow the tyrant king"
-- **Assigned Godhead**: Justice
-- **GM Resistance**: Tyrant's army (50 KV), corrupt nobles (30 KV), palace defenses (20 KV) = 100 KV total
+- **Character Goal**: "Slay the dragon"
+- **Assigned God-head**: A domain-aligned God-head picks up the vine
+- **GM creates resistance**: The dragon (an entity with its own GRO.vines, serviced by a different God-head)
 
-### Escalation
-1. Justice godhead provides opportunity: "Rally the common folk (+10 KV support)"
-2. Tyranny godhead notices, enhances royal guard (+15 KV resistance)
-3. Justice godhead responds with opportunity: "Gain magical sword (+25 KV support)"
-4. Tyranny godhead escalates: "Summon demon bodyguard (+40 KV resistance)"
+### Opportunity Cycle
+1. God-head reads the campaign: dragon guards a princess, lives in mountain lair
+2. **Opportunity 1**: "Find the dragon's lair" — character explores, finds it
+3. **God-head confirms** → bestows 2 Frequency (small gift)
+4. **Opportunity 2**: "Obtain the enchanted blade" — character quests for it
+5. **God-head confirms** → bestows a Blossom (temporary combat buff)
+6. **Opportunity 3**: "Confront the dragon" — climactic encounter
 
-### Resolution Scenarios
-- **Success**: Justice godhead investments exceed total resistance → Character gets "Crown of the Righteous" nectar
-- **Failure**: Tyranny godhead wins escalation → Character gets "Marked Traitor" thorn
-- **Abandonment**: During Harvest, character decides goal too dangerous → No immediate consequences
+Meanwhile, the dragon's God-head is providing opportunities to the dragon's GRO.vine ("protect my hoard"), investing KRMA to strengthen the dragon's resistance.
 
-## Implementation Notes
-
-### For GMs
-- Track resistance KV as you create obstacles
-- Remember that opposing godheads may enhance your creations
-- Opportunities appear as natural story developments to maintain immersion
-
-### For Players
-- Choose goals considering which godheads you're willing to invoke
-- Consider your godhead's power level vs. likely opposition
-- Balance completable vs. incompletable goals for different play styles
-
-### For System Development
-- [[Terminal]] assignment algorithm needs thematic analysis capability
-- Godhead personality AI must include investment strategy patterns
-- Escalation mechanics require real-time KV tracking and response systems
+### Resolution
+- **Success**: God-head bestows a Nectar (e.g., "Dragonslayer" — permanent combat trait worth 20 KV). Player chooses to keep it or break it down.
+- **Failure**: God-head bestows a Thorn (e.g., "Dragon's Mark" — permanent fear/weakness, negative KV). God-head reclaims KRMA.
 
 ---
 
 ## Links
-- Related: [[GROWTH_Core_Systems]], [[Godheads]], [[Terminal]]
-- References: [[KV_System]], [[Character_Creation]]
+- Related: [[Godheads_System]], [[KRMA_System]], [[Terminal_Interface]]
+- References: [[Nectars_and_Thorns_System]], [[Seeds_Roots_Branches_System]]
 - Examples: [[Goal_Examples]], [[Escalation_Scenarios]]
