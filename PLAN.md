@@ -22,14 +22,11 @@ Current phase: Phase 5 (God-Head Architecture)
 - Updated docs: module_registry.md, ai_systems.md
 - Clean TypeScript build (zero errors)
 
-**Next session (God-Head Phase 3 — Tapestry + Opportunity + Nectar):**
-- Wire goal creation into character/NPC creation flow (goals established at entity creation)
-- Build Tapestry tab goal monitoring view (GM sees all entity goals, assigns resistance entities)
-- Wire custodian auto-assignment on goal creation
-- Opportunity generation — God-head generates contextual opportunities for goals
-- Nectar bestowal on milestone completion (KRMA transaction + ForgeItem linkage)
-- God-head context evaluation loop (custodian reads campaign events → determines complete/fail)
-- Abandon KRMA cost implementation (amount TBD)
+**Next session (Entity Creation System — Session A):**
+- **Major pivot:** Entity creation drives KRMA evaluation. Each creation step produces blueprints that Kai prices.
+- See `ENTITY-CREATION-PLAN.md` for the full 7-session build plan.
+- Session A scope: Seed catalog type + data (48 seeds from CSV), Tapestry Entities sub-tab, entity list by type
+- Canvas "Add Character" will eventually become "Place Entity" (picks from existing, not creation)
 
 ---
 
