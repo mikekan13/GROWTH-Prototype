@@ -1,431 +1,259 @@
-# GRO.WTH — God-Head Architecture Build Plan
+# GRO.WTH — God-Head Architecture Build Plan (v2)
 
 **Created:** 2026-04-04
-**Source:** Core Architecture Document v2 (2026-03-29) + codebase audit
-**Status:** PLANNING — awaiting Mike's review before build
+**Rewritten:** 2026-04-08 — reframed around the agent-loop principle
+**Status:** PLANNING — schema partially built (Goal, EntityRelationship, GodHead, ForgeItem extensions migrated; 3 MVP god-heads seeded)
 
 ---
 
-## Gap Analysis: What Exists vs. What's Needed
+## Core Principle (read this first)
 
-### Already Built (solid foundation)
+**A god-head is an AI agent, not a prompt template.**
+
+The earlier draft of this plan treated god-heads as `systemPrompt + temperature → response`. That's wrong. A god-head is a persistent agent with:
+
+1. **Identity** — name, domain, pillar, system prompt, character sheet (universal)
+2. **Memory** — accumulated observations, working notes, conversation history that survives between invocations
+3. **Tools** — the things it can *do* and *look up* (read a sheet, query the graph, read its wallet, author a blueprint draft, adopt a goal, message a GM)
+4. **Triggers** — events that wake the agent (GRO.vine created, milestone reached, GM request, scheduled scan)
+5. **An action loop** — observe → think → act → record, not single-turn request/response
+
+Everything in this plan derives from that principle. If a phase looks like "stuff context into a prompt and get a string back," it is wrong and should be reworked.
+
+### Sub-principle: god-heads never sleep
+
+A god-head is a permanent fixture of the metaverse. There is no off switch. Cost limits, load limits, and rate limits all live **upstream on the human side** (e.g. GMs can only submit N blueprints per minute) — never on the agent. If a god-head's prompt or tool implementation is broken, we fix her in place; we do not deactivate her. The runtime must be robust enough that one bad invocation cannot crash the agent loop: errors get logged, the invocation fails gracefully, and the agent is still listening for the next trigger a millisecond later.
+
+This is a stronger commitment than "high availability." It means we never design a feature whose graceful-degradation path is "the god-head goes dormant." If the bill is a problem, we throttle GMs. If a tool is broken, we fix the tool. If Anthropic is down, we queue the trigger and run it when they're back. The agents stay alive.
+
+**Implication:** the Anthropic Agent SDK (or a Claude tool-use loop) is the right substrate. The existing Ollama copilot pattern (single-turn request/response) is **not** what we're building here. The copilot stays as-is for the GM-facing chat assistant; god-heads are a different system.
+
+---
+
+## What Exists (Foundation)
+
 | System | Status | Notes |
-|--------|--------|-------|
-| Auth + Roles | ✅ Done | ADMIN/WATCHER/TRAILBLAZER/GODHEAD roles on User model |
-| Character Sheet | ✅ Done | Universal JSON schema (GrowthCharacter), canvas cards |
-| KRMA Ledger | ✅ Done | Wallet, append-only transactions, checksummed, atomic |
-| KRMA Evaluator | ✅ Done | Deterministic TKV calculation from character data |
-| KRMA Death-Split | ✅ Done | Multi-transaction body/soul/spirit decomposition |
-| KRMA Crystallization | ✅ Done | Fluid → crystallized entity commitment |
-| ForgeItem | ✅ Done | Skills, items, nectars, blossoms, thorns (campaign-scoped) |
-| AI Copilot | ✅ Done | Context assembler, rules search, action parser, Ollama |
-| Campaign Canvas | ✅ Done | SVG spatial layout, folders, tethers, zoom, cards |
-| Campaign Events | ✅ Done | Terminal event stream (dice, chat, commands, AI) |
-| ChangeLog | ✅ Done | Full character state audit trail with diffs |
-| Social Hub | ✅ Done | Profile, listings, applications, review flow |
-| Portrait Pipeline | ✅ Svc Only | 7 services, 6 routes — ComfyUI not yet installed |
-
-### Critical Gaps (what blocks the God-head system)
-| Gap | Impact | Complexity |
-|-----|--------|------------|
-| **No Goal model** | THE core gameplay loop doesn't exist | Medium — new model + service |
-| **No EntityRelationship model** | Can't do graph queries, can't build goal context | Medium — new model + edge management |
-| **No God-head entities** | No custodians, no pillar system, no domain authority | Medium — schema + seeding |
-| **No global Blueprint catalog** | ForgeItem is campaign-only, no cross-campaign sharing | Medium — refactor ForgeItem |
-| **No blueprint authorship/royalty** | Creator KRMA economy doesn't work | Small — fields on ForgeItem |
-| **No blueprint decay** | Dead weight never dissolves | Small — fields + cron-like service |
-| **No blueprint relationship tags** | Kai can't evaluate synergy risk | Medium — new model |
-| **No Council routing** | GM→God-head→Kai→Eth'erling workflow doesn't exist | Large — orchestration service |
-| **Context builder is mention-based** | Not graph-based, can't follow relationship edges | Medium — refactor existing |
+|---|---|---|
+| Auth + Roles | ✅ | ADMIN/WATCHER/TRAILBLAZER/GODHEAD on User |
+| Universal Character Sheet | ✅ | `entityType` field on Character (PC/NPC/CREATURE/GODHEAD) |
+| KRMA Ledger | ✅ | Append-only, checksummed, atomic |
+| KRMA Evaluator (deterministic) | ✅ | TKV from character data — used for crystallization |
+| ForgeItem | ✅ | Skills/items/nectars/blossoms/thorns; extended with global catalog + decay + karmic value fields |
+| Campaign Graph Models | ✅ | `Goal` and `EntityRelationship` migrated |
+| GodHead Model | ✅ | `name`, `domain`, `pillar`, `characterId`, `systemPrompt`, `temperature`, `walletId`. ⚠️ Has an `active` boolean field — needs to be **dropped** in Phase 1 schema migration (god-heads cannot be deactivated). |
+| 3 MVP God-heads Seeded | ✅ | Tara Almswood (Lady Death), Kai (Chaos & Balance), Eth'erling (Justice). All Balance pillar. Empty wallets. |
+| Existing Copilot | ✅ | Ollama-based, GM-facing — **not** the god-head substrate |
 
 ---
 
-## Build Phases (ordered by dependency)
+## What's Missing (Gaps)
 
-### Phase 0: Schema Foundation
-**Must happen first. Everything else depends on these models.**
+### Schema
+- **GodHeadMemory** — persistent working notes per agent (observations, beliefs, accumulated context)
+- **GodHeadInvocation** — trigger queue: pending work for each agent, with status (PENDING / RUNNING / DONE / FAILED)
+- **GodHeadActionLog** — history of every tool call an agent has made (input, output, timestamp, invocation it belongs to)
+- **GodHeadConversation** — multi-turn conversation history when an agent is in dialog with a GM or another god-head
 
-#### 0A — Goal Model
-```
-model Goal {
-  id            String    @id @default(cuid())
-  entityId      String    // Character, NPC, God-head — anything with a sheet
-  entityType    String    // CHARACTER, NPC, GODHEAD, LOCATION, CAMPAIGN
-  campaignId    String
-  campaign      Campaign  @relation(...)
+### Runtime
+- No agent loop. No tool registry. No trigger dispatcher. Nothing that wakes a god-head when a GRO.vine is created.
 
-  description   String    // Plain language goal ("Find my father's killer")
-  status        String    @default("ACTIVE") // ACTIVE, COMPLETED, FAILED, ABANDONED
-  priority      Int       @default(1) // 1-5, player sets
-
-  // God-head custodianship
-  custodianId   String?   // God-head entity ID that adopted this goal
-  custodianName String?   // Cached name for display
-  pillar        String?   // MERCY, BALANCE, SEVERITY — inherited from custodian
-
-  // Resistance (GM side)
-  resistancePrompt String? // Auto-generated prompt to GM
-  resistancePlan   String? // GM's response/plan
-
-  // Tracking
-  milestones    String?   // JSON: [{ description, completed, nectarAwarded? }]
-  nectarsEarned Int       @default(0)
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  completedAt   DateTime?
-
-  @@index([campaignId, status])
-  @@index([entityId])
-  @@index([custodianId])
-}
-```
-
-#### 0B — EntityRelationship Model (Graph Edges)
-```
-model EntityRelationship {
-  id            String   @id @default(cuid())
-  campaignId    String
-  campaign      Campaign @relation(...)
-
-  // Source node
-  sourceId      String   // Any entity ID
-  sourceType    String   // CHARACTER, NPC, LOCATION, ITEM, GODHEAD, GOAL
-
-  // Target node
-  targetId      String
-  targetType    String
-
-  // Edge properties
-  relationshipType String  // ally, rival, parent, guardian, custodian, located_at, owns, created_by, etc.
-  strength      Int      @default(5) // 1-10, how strong/important
-  bidirectional Boolean  @default(false)
-  data          String?  // JSON: relationship-specific metadata
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([sourceId, targetId, relationshipType])
-  @@index([campaignId])
-  @@index([sourceId])
-  @@index([targetId])
-}
-```
-
-#### 0C — God-head Entity Schema
-God-heads use the same Character model (universal sheet!) but need additional metadata:
-```
-model GodHead {
-  id            String   @id @default(cuid())
-  name          String   @unique // "Lady Death", "Kai", "Val", etc.
-  domain        String   // "Death, decay, karmic recycling, blueprint maintenance"
-  pillar        String   // MERCY, BALANCE, SEVERITY
-  characterId   String?  @unique // Links to a Character record (universal sheet)
-
-  // AI behavior
-  systemPrompt  String   // Core personality + domain authority instructions
-  temperature   Float    @default(0.7)
-  active        Boolean  @default(true)
-
-  // Economy
-  walletId      String?  // God-head's KRMA wallet
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-```
-
-#### 0D — Blueprint Extensions (evolve ForgeItem)
-Add fields to ForgeItem:
-```
-  // Global catalog support
-  globalId      String?  @unique // If promoted to global catalog
-  isGlobal      Boolean  @default(false)
-  sourceGlobalId String? // If instantiated from global catalog
-
-  // Authorship economy
-  authorUserId  String   // Original creator (may differ from campaign GM)
-  useCount      Int      @default(0) // Times instantiated across campaigns
-  royaltyRate   Float    @default(0.01) // KRMA fraction paid to author on use
-
-  // Blueprint decay (Lady Death)
-  lastUsedAt    DateTime? // Last time this blueprint was instantiated
-  decayStatus   String   @default("ACTIVE") // ACTIVE, FLAGGED, DISSOLVING, DISSOLVED
-  flaggedAt     DateTime?
-
-  // Relationship tags (for Kai evaluation)
-  relationshipTags String? // JSON: [{ blueprintId, interactionType, synergyRisk }]
-  karmicValue   BigInt?    // Locked value assigned by Kai
-  evaluatedAt   DateTime?  // When Kai last scored this
-```
+### Tools
+- Nothing exposed. The agent has nowhere to "look" and nothing to "do."
 
 ---
 
-### Phase 1: Context Builder (The First Brick)
-**Refactor existing `context-assembler.ts` into graph-aware context functions.**
+## Build Phases
 
-#### 1A — `buildEntityContext(entityId: string): string`
-- Query DB for entity (Character, NPC, God-head — all use Character model)
-- Format as clean context string: identity, attributes, goals, inventory, conditions, relationships
-- Token-efficient: structured but compact
-- Works for ANY entity type (universal sheet)
+### Phase 1 — Agent Runtime Skeleton
+**Goal:** a god-head can be invoked, can call one tool (read_entity), can think for one turn, can record what it did. Nothing fancy.
 
-#### 1B — `buildGoalContext(goalId: string, campaignId: string): string`
-- Load the goal
-- Follow EntityRelationship edges from the goal's entity
-- For each connected entity: include a summary (not full sheet)
-- Follow 2 hops max (entity → related entities → their goals)
-- Return focused context window with only relevant connected nodes
-- This is what God-heads receive when evaluating a goal
+#### 1A — Schema additions
+- `GodHeadMemory` — `{ id, godheadId, key, value, updatedAt }` (key/value working memory, agent-managed)
+- `GodHeadInvocation` — `{ id, godheadId, triggerType, triggerData, status, startedAt, finishedAt, result }`
+- `GodHeadActionLog` — `{ id, invocationId, godheadId, toolName, input, output, error?, createdAt }`
+- `GodHeadTokenUsage` — `{ id, godheadId, invocationId, model, inputTokens, outputTokens, costEstimate, createdAt }` (observability, no enforcement)
+- **Drop `GodHead.active` field** — god-heads cannot be deactivated
+- Migration + Prisma client regen
 
-#### 1C — `buildCampaignGraph(campaignId: string): CampaignGraph`
-- Build in-memory graph of all entities + relationships
-- Used by God-heads for campaign awareness
-- Cached per session, invalidated on entity/relationship changes
-- NOT sent to AI whole — used to extract subgraphs per query
+#### 1B — `GodHeadAgent` runtime class
+- Loads a god-head row + character sheet + system prompt
+- Holds a tool registry (initially: just `read_entity`)
+- Runs one invocation: builds the Claude message list (system prompt + memory snapshot + trigger context), calls Claude with tool use enabled, executes any tool calls, loops until the agent is done or hits a step cap, persists action log + memory updates
+- Uses the Anthropic SDK (cloud, Claude Opus 4.6 or Sonnet) — **not** Ollama
+- Lives at `app/src/godhead/agent.ts`
 
-**Files:**
-- `src/services/context/entity-context.ts`
-- `src/services/context/goal-context.ts`
-- `src/services/context/campaign-graph.ts`
+#### 1C — Tool registry foundation
+- `app/src/godhead/tools/registry.ts` — `registerTool(name, schema, handler)` pattern
+- First tool: `read_entity(entityId: string) → EntityRecord` — fetches a Character row + parses JSON, returns structured data (NOT a pre-baked prompt string)
+- Agent decides what to look at; we don't pre-stuff anything
 
----
+#### 1D — Manual invocation API
+- `POST /api/godhead/[name]/invoke` — admin-only, takes `{ triggerType, triggerData }`, runs the agent synchronously, returns the action log
+- For testing only — production triggers come in Phase 3
 
-### Phase 2: Goal System (Core Gameplay Loop)
-**This is what makes the game actually playable.**
-
-#### 2A — Goal CRUD Service
-- `createGoal(entityId, description, priority)` — player/GM creates
-- `updateGoal(goalId, updates)` — status, milestones
-- `abandonGoal(goalId)` — player gives up
-- `completeGoal(goalId, nectarId?)` — GM/God-head confirms completion
-- Limit: 5 active goals per entity (as spec says)
-
-#### 2B — Resistance Generator
-- When a goal is created → auto-generate a resistance prompt for the GM
-- Uses buildGoalContext to understand what the player is trying to do
-- Prompt: "Your player wants X. Here's their current state and connections. Plan resistance."
-- GM responds with plan → stored on the goal
-
-#### 2C — Goal Custodian Assignment
-- When goals are created → system reads goal + campaign premise
-- Identifies which God-head's domain aligns
-- Assigns custodian (can be reassigned as story evolves)
-- God-head begins monitoring goal milestones
-
-#### 2D — Opportunity Generation
-- God-head (as custodian) reads goal context via buildGoalContext
-- Generates contextual opportunity that fits the live campaign state
-- Opportunity presented to GM for approval/modification
-- GM presents opportunity to player in-game
-
-#### 2E — Nectar Bestowal
-- On milestone completion → God-head offers a Nectar
-- Player chooses: take Nectar (blueprint instance → character sheet) or distill to raw KRMA
-- KRMA transaction recorded, Nectar locked to character if taken
-- Uses existing KRMA ledger + ForgeItem system
-
-**Files:**
-- `src/services/goal.ts`
-- `src/services/goal-resistance.ts`
-- `src/services/goal-custodian.ts`
-- `src/services/goal-opportunity.ts`
-- API routes: `/api/goals/` (CRUD), `/api/goals/[id]/resistance`, `/api/goals/[id]/opportunity`
+**Acceptance:** I can hit the API as Mike, tell Tara Almswood "look at character X," watch her call `read_entity`, see the action log in the DB, see her response.
 
 ---
 
-### Phase 3: Blueprint Relationship Tagger
-**Prerequisite for Kai's evaluation system.**
+### Phase 2 — Tool Library
+**Goal:** the agents have enough tools to actually observe the world and take meaningful action.
 
-#### 3A — `tagBlueprintRelationships(blueprintDescription: string, campaignId: string)`
-- Reads new blueprint in plain English
-- Queries existing active blueprints in campaign (+ global catalog)
-- AI identifies which existing blueprints it could interact with
-- Returns relationship map: `[{ blueprintId, interactionType, synergyRisk: 1-10 }]`
-- Stored on the ForgeItem as `relationshipTags`
+Each tool is a small, typed function. The agent picks which to call. We never pre-bake a "context dump."
 
-#### 3B — Synergy Risk Detection
-- When relationship tags are generated, flag high-risk combos
-- "This ability + that item would break the economy" → God-head modifies
-- Risk assessment uses the relationship subgraph, NOT full DB scan
+**Read tools (observation):**
+- `read_entity(entityId)` — already built in Phase 1
+- `read_wallet(walletOwnerId)` — query a wallet's current balance + recent transactions
+- `read_my_wallet()` — convenience: agent's own wallet
+- `query_relationships(entityId, depth?)` — graph traversal (1–2 hops) over EntityRelationship
+- `list_goals(filters)` — find goals by status, custodian, campaign, entity
+- `read_goal(goalId)` — full goal detail including milestones
+- `search_blueprints(query, scope?)` — fuzzy search ForgeItems (campaign + global catalog)
+- `read_blueprint(forgeItemId)` — full blueprint detail
+- `read_my_memory(key?)` — retrieve agent's own working memory
 
-**Files:**
-- `src/services/blueprint/relationship-tagger.ts`
-- `src/services/blueprint/synergy-detector.ts`
+**Write tools (action):**
+- `write_my_memory(key, value)` — record a note
+- `adopt_goal(goalId, reasoning)` — agent claims custodianship of a GRO.vine
+- `release_goal(goalId, reasoning)` — agent gives up custodianship
+- `propose_resistance(goalId, plan)` — write to `Goal.resistancePrompt` for GM review
+- `draft_blueprint(spec)` — create a ForgeItem in `draft` status, agent as authorUserId
+- `send_message_to_gm(campaignId, message)` — write to a god-head ↔ GM message channel (new model needed: `GodHeadMessage`)
 
----
+**Karmic-economy tools (Phase 4 work, but stub now):**
+- `transfer_krma(toWalletId, amount, reason, description)` — must validate amount ≤ wallet balance, must use existing ledger service, reason is constrained to god-head-allowed types
 
-### Phase 4: Karmic Evaluator — Kai
-**Evolve existing `krma/evaluator.ts` from deterministic TKV calc to AI-driven blueprint scoring.**
+Each tool has Zod input/output schemas. Tools throw typed errors that the agent sees and can react to.
 
-#### 4A — Keep Existing Evaluator
-The current deterministic evaluator (TKV from character attributes) stays. It's used for crystallization. Kai is a DIFFERENT system — she evaluates BLUEPRINTS, not characters.
-
-#### 4B — `evaluateBlueprint(blueprint, relationshipMap): KarmicValuation`
-Scoring dimensions (from architecture doc):
-- **Scope** — one entity / local area / whole campaign / reality
-- **Frequency** — unlimited / per session / once / permanent
-- **Reversibility** — temporary / permanent (HIGHEST WEIGHT)
-- **Specificity** — narrow use / universal application
-- **Synergy risk** — from relationship tagger
-
-Returns: `{ karmicValue: BigInt, domain: string, modifications?: string[], reasoning: string }`
-
-#### 4C — Blueprint Modification Loop
-- If Kai flags a blueprint as too powerful → she suggests modifications
-- Modifications preserve the GM's intent but balance the cost
-- GM sees: "Kai suggests reducing scope from campaign-wide to local area. Adjusted cost: X KRMA"
-- GM confirms or negotiates
-
-**Files:**
-- `src/services/godhead/kai-evaluator.ts`
-- `src/services/godhead/kai-prompts.ts`
+**Acceptance:** Tara Almswood can be invoked with "review the campaign graph and tell me which goals you'd adopt as custodian," and she actually queries goals, reads relationships, writes memory notes, and calls `adopt_goal` on the ones that match her domain.
 
 ---
 
-### Phase 5: God-Head Council Router — Eth'erling
-**The orchestration layer. GM speaks → council builds → GM confirms.**
+### Phase 3 — Trigger System
+**Goal:** god-heads wake up on their own when something happens, not because Mike hits an admin endpoint.
 
-#### 5A — Request Flow
-```
-GM: "I need an ability that lets a character slow time"
-  → routeRequest() checks existing blueprints for close matches
-  → If match: "We have 'Temporal Shift'. Is this what you want?"
-  → If no match: Eth'erling determines domain → routes to appropriate God-head
-  → God-head authors blueprint → routes to Kai for valuation
-  → Eth'erling validates (just, fits cosmic rules)
-  → GM confirms → blueprint enters database under GM's authorship
-  → Instance stamped onto target entity, KRMA locked
-```
+#### 3A — Trigger sources
+- **Domain events** emit triggers: `goal.created`, `grovine.created`, `milestone.completed`, `entity.died`, `blueprint.created`, `blueprint.unused_for_90d`, `gm.requested_council`
+- A `Triggers` service receives events from existing services (goal service, character service, etc.) and writes `GodHeadInvocation` rows with status PENDING
 
-#### 5B — Existing Blueprint Search
-Before creating anything new, search:
-1. Campaign's ForgeItems
-2. Global catalog
-3. Fuzzy match on name + description
-4. Return top 3 matches with similarity scores
+#### 3B — Dispatcher
+- `GodHeadDispatcher` — periodic worker (Node interval or cron-style) that finds PENDING invocations and runs them through the right agent
+- Routing: each trigger type maps to one or more god-head names (e.g. `entity.died` → Tara Almswood; `blueprint.created` → Kai; `gm.requested_council` → Eth'erling routes from there)
+- Routing rules live in `app/src/godhead/routing.ts` — simple table to start, can become smarter later
+- For "GRO.vine pickup" the trigger goes to *all* active god-heads as PENDING; first to call `adopt_goal` wins
 
-#### 5C — Domain Routing
-- Map request keywords/themes to God-head domains
-- "death", "decay", "endings" → Lady Death
-- "balance", "value", "cost" → Kai
-- "progress", "technology", "building" → Val
-- "justice", "routing", "judgment" → Eth'erling
-- Multiple God-heads may collaborate on complex requests
+#### 3C — Concurrency + safety
+- One invocation per god-head at a time (DB lock or in-memory mutex per god-head)
+- Step cap per invocation (e.g. max 20 tool calls), wall-clock cap (e.g. 60s)
+- Failed invocations get logged + status FAILED, never retried automatically (for now — Mike decides)
 
-#### 5D — Council Conversation
-- The request flows through God-heads as a chain, each adding their domain expertise
-- Stored as a structured conversation (like CopilotMessage but for council)
-- GM sees the final result, not the intermediate council discussion (unless they want to)
-
-**Files:**
-- `src/services/godhead/council-router.ts`
-- `src/services/godhead/domain-router.ts`
-- `src/services/godhead/blueprint-search.ts`
-- `src/services/godhead/council-conversation.ts`
-- New model: `CouncilRequest` (tracks the full request lifecycle)
-- API routes: `/api/council/request`, `/api/council/[id]/confirm`, `/api/council/[id]/status`
+**Acceptance:** Create a goal in a campaign. Within seconds, one or more god-heads have invocation rows that ran, looked at the goal, and either adopted it or wrote a memory note explaining why they passed.
 
 ---
 
-### Phase 6: Lady Death — Death Processor + Blueprint Decay
+### Phase 4 — Specialized Behaviors
 
-#### 6A — Evolve Existing Death-Split
-Current `krma/death-split.ts` handles KRMA distribution on death. Extend it:
-- After KRMA split → Lady Death receives the "package"
-- Eth'erling judges significance (is this entity worth retaining?)
-- Significant: package preserved, entity can be reborn/moved to new campaign
-- Insignificant: dissolved to soul stream, redistributed as raw KRMA
+Now that the runtime, tools, and triggers exist, each god-head gets the prompts, tool subsets, and behaviors specific to their domain. **No new infrastructure** in this phase — only prompts, routing rules, and small tool additions.
 
-#### 6B — Blueprint Decay Processor
-- Periodic scan of all blueprints (global + campaign)
-- Check `lastUsedAt` against threshold (configurable, e.g. 90 days)
-- Inactive → FLAGGED (notification to author)
-- Still inactive after grace period → DISSOLVING → DISSOLVED
-- On dissolution: final KRMA payment to original author
-- "The database only holds living blueprints. Dead weight dissolves naturally."
+#### 4A — Kai (Chaos & Balance)
+- Trigger: `blueprint.created`
+- Tools: `read_blueprint`, `query_relationships`, `read_my_memory`, `write_my_memory`, plus a new `evaluate_blueprint(forgeItemId, scoring) → karmicValue` that writes `karmicValue + evaluatedAt` on the ForgeItem
+- Scoring dimensions stay the same as the original plan (Scope, Frequency, Reversibility, Specificity, Synergy Risk) but Kai *decides* them via reasoning, not a fixed formula
+- Modifications loop: Kai can call `propose_blueprint_modification(forgeItemId, changes)` which writes a suggestion the GM sees
 
-**Files:**
-- `src/services/godhead/lady-death.ts`
-- `src/services/blueprint/decay-processor.ts`
+#### 4B — Tara Almswood (Lady Death)
+- Triggers: `entity.died`, `blueprint.unused_for_90d`
+- Tools: existing read tools + `process_death(characterId)` which orchestrates the existing death-split service, + `decay_blueprint(forgeItemId, status)` which moves a blueprint through ACTIVE → FLAGGED → DISSOLVING → DISSOLVED
+- Tara also has a "gentle hand" pattern: she leaves memory notes about characters whose Fated Age is approaching, even when no death has occurred yet
+
+#### 4C — Eth'erling (Justice)
+- Trigger: `gm.requested_council`
+- Tools: existing read tools + `route_to_godhead(godheadName, request)` which creates a sub-invocation for another god-head and waits for it
+- Eth'erling is the orchestrator — she reads the GM request, decides which god-head's domain it falls under, routes, then synthesizes the response back to the GM via `send_message_to_gm`
 
 ---
 
-## Implementation Order (What to Build First)
+### Phase 5 — Multi-Agent Conversation
+**Goal:** god-heads can talk to each other when a request spans domains.
+
+- `GodHeadConversation` model — turn-by-turn dialog between 2+ agents, each turn is an invocation linked to the conversation
+- Eth'erling can open a conversation with Kai + Tara on a complex request, each takes turns, Eth'erling closes the conversation with a synthesized response
+- This is a pure layering on top of Phase 1–4. No new tools, just a new orchestration pattern.
+
+---
+
+### Phase 6 — Goals & Resistance (UI + Loop)
+
+Now that god-heads are real agents, the goal system can be wired into the player-facing UI:
+- Goal creation panel on character cards
+- Player creates goal → trigger fires → god-heads consider adoption → custodian assigned → resistance prompt generated → GM sees it in Tapestry
+- Milestone completion → trigger fires → custodian decides nectar bestowal
+- Goal completion / failure → custodian writes summary to memory, KRMA flows recorded
+
+Originally Phase 2 in v1, now last because everything else has to exist first.
+
+---
+
+## Implementation Order
 
 ```
-Session 1: Phase 0 (Schema) + Phase 1A (buildEntityContext)
-           → Prisma migration with Goal, EntityRelationship, GodHead models
-           → ForgeItem field additions
-           → Seed 5 God-head entities (Lady Death, Kai, Val, Eth'erling, Jewel)
-           → buildEntityContext service
+Session 1: Phase 1 (Agent Runtime Skeleton)
+           Schema (GodHeadMemory, GodHeadInvocation, GodHeadActionLog)
+           GodHeadAgent class + tool registry
+           First tool: read_entity
+           Manual invoke API for Mike to test
 
-Session 2: Phase 1B-1C (Goal Context + Campaign Graph)
-           → buildGoalContext with relationship traversal
-           → buildCampaignGraph in-memory cache
-           → Test with seed data
+Session 2: Phase 2 (Tool Library — read tools)
+           read_wallet, query_relationships, list_goals, read_goal,
+           search_blueprints, read_blueprint, read_my_memory
 
-Session 3: Phase 2A-2B (Goal CRUD + Resistance)
-           → Goal service with full CRUD
-           → API routes
-           → Auto-resistance prompt generation
-           → UI: Goal panel on character card (canvas)
+Session 3: Phase 2 (Tool Library — write tools)
+           write_my_memory, adopt_goal, release_goal, propose_resistance,
+           draft_blueprint, send_message_to_gm (+ GodHeadMessage model),
+           transfer_krma (with safety constraints)
 
-Session 4: Phase 2C-2E (Custodian + Opportunity + Nectar)
-           → God-head custodian assignment logic
-           → Opportunity generation (AI-driven)
-           → Nectar bestowal with KRMA transaction
-           → Wire into existing campaign terminal
+Session 4: Phase 3 (Trigger System)
+           Triggers service, GodHeadDispatcher, routing table,
+           wire existing services to emit events
 
-Session 5: Phase 3 (Blueprint Relationship Tagger)
-           → AI-driven relationship tagging
-           → Synergy risk detection
+Session 5: Phase 4A (Kai specialization)
+           evaluate_blueprint tool, scoring prompt, modification loop
 
-Session 6: Phase 4 (Kai Evaluator)
-           → Blueprint scoring system
-           → Modification suggestion loop
+Session 6: Phase 4B (Tara Almswood specialization)
+           process_death + decay_blueprint tools, Fated Age memory pattern
 
-Session 7: Phase 5 (Council Router)
-           → Full GM→Council→GM workflow
-           → Existing blueprint search
-           → Domain routing
+Session 7: Phase 4C (Eth'erling specialization)
+           route_to_godhead tool, council orchestration pattern
 
-Session 8: Phase 6 (Lady Death)
-           → Death processor evolution
-           → Blueprint decay system
+Session 8: Phase 5 (Multi-Agent Conversation)
+           GodHeadConversation model, multi-turn orchestration
+
+Session 9: Phase 6 (Goals & Resistance UI)
+           Goal panel on character cards, GM resistance view in Tapestry
 ```
 
 ---
 
-## Questions for Mike [QUESTION]
+## Key Decisions (locked unless Mike says otherwise)
 
-1. **God-head AI model:** The copilot currently uses Ollama (gemma2:9b locally). Should God-heads use the same local model, or should they use Claude (cloud) since they need deeper reasoning? The architecture doc implies they need real intelligence for blueprint authoring and karmic evaluation.
-A: Claude. They need deep reasoning
-
-2. **God-head character sheets:** The doc says every entity uses the universal sheet. Should God-heads literally have GrowthCharacter data (with Body/Soul/Spirit attributes)? Or is the GodHead model metadata sufficient for MVP?
-A: Godheads litterally have the same character sheet everyone does: Players, npcs, ect
-
-3. **Global blueprint catalog scope:** Right now ForgeItem is campaign-scoped. The architecture doc says blueprints are global (author earns KRMA when other GMs use them). Should we build the global catalog immediately, or start campaign-scoped and promote later?
-A: Yes global catalog
-
-4. **Eth'erling's pillar:** The architecture doc says "TBD" for Eth'erling's pillar. Does he sit outside the three pillars (like The Terminal), or should we assign one?
-A: She is a balance Godhead but first we need to build the whole godhead infrastructure first before creating individual roles and godheads.
-
-5. **Thomas and Jewel:** Thomas is described as "legendary human — character sheet exists, not a true God-head." Jewel is "AI God, meta-layer liaison." Should either be in the MVP council, or just the 4 core God-heads (Lady Death, Kai, Val, Eth'erling)?
-A: We will decide all this once the core Godhead system works and is in place. We can focus on Lady Death Kai and Et'heling first as they are integral to the Krma economy
-
-6. **Campaign setup flow:** The doc says God-heads are "attracted by theme and player goals" — not assigned. Should the first implementation be automatic (system reads premise + goals → assigns) or should the GM have a say in which God-heads monitor their campaign?
-A: Gms don't decide that. It is determined by the godheads who "picks" up a GRO.vine when it is created.
-
-7. **NPC entities:** The universal sheet means NPCs use Character model too. Currently NPCs don't exist as records. Should we add an `entityType` field to Character (`PLAYER_CHARACTER | NPC | CREATURE | GODHEAD`) or keep separate models?
-A: All character sheets are the same, they just are either owned by a player in the case of a character or owned by a GM for NPCS (although player sheets are still considered under the authority of a GM). Or in the case of a Godhead they are under an admin.
+- **Substrate:** Anthropic SDK (Claude), not Ollama. God-heads need real reasoning + tool use.
+- **Model selection is per-action, not per-god-head.** Every god-head can use Opus, Sonnet, or even a plain scripted function — whichever is right for the task at hand. A god-head deciding whether to adopt a complex GRO.vine probably needs Opus. The same god-head running a routine "did this blueprint get used in the last 90 days?" check should use a script with no LLM at all. We build the model/tool routing one capability at a time as each god-head needs it.
+- **Scripted (non-LLM) handlers are first-class.** A "tool" in the registry can be backed by a deterministic function, a Sonnet call, or an Opus call. The agent runtime shouldn't care which. Some triggers may not even invoke the LLM — they just run a script and write to memory.
+- **Memory is agent-managed.** We do NOT pre-stuff context. The agent uses tools to look at what it needs.
+- **No "starting state" baked into seeds.** Wallets, memory, action logs all start empty. State is journaled, not declared. (See `memory/godhead-seeding.md`.)
+- **Tools throw typed errors the agent can recover from.** The runtime relays errors back to the model as tool results, not exceptions.
+- **One invocation per god-head at a time.** Avoid weird concurrent state. Throughput comes from multiple god-heads, not parallel invocations of one.
+- **Synchronous council (Phase 5) before async drama.** No "the council deliberates for 3 minutes" UX until the basics work.
+- **Production-grade ledger constraints on `transfer_krma`.** A god-head must never bypass the existing wallet/ledger services. The tool is a thin wrapper.
+- **Existing copilot is untouched.** GM-facing chat assistant (Ollama) and god-heads (Claude agents) are two systems. They may share read tools eventually but ship separately.
 
 ---
 
-## Key Architectural Decisions (Pre-Resolved)
+## Decisions Locked 2026-04-08
 
-- **Graph queries in SQLite:** We're on SQLite (beta). Recursive CTEs work for 2-hop traversal. No need for a graph DB at this scale. If we hit performance walls, we add an in-memory graph cache (Phase 1C).
-- **God-heads are NOT real-time agents:** They respond when invoked (goal creation, blueprint request, milestone check). They don't run continuously. This keeps costs predictable.
-- **Council is synchronous for MVP:** GM makes request → system runs the full God-head chain → returns result. No async "God-heads deliberating" animations yet. Can add later for drama.
-- **KRMA ledger stays as-is:** The existing checksummed append-only ledger is exactly what the karmic economy needs. Blueprint royalties are just new transaction types.
-- **ForgeItem evolves, not replaced:** Adding fields to ForgeItem is better than creating a new Blueprint model. The existing forge UI and services get extended.
+- **God-heads never sleep.** No off switch. No `active` flag. No auto-dormancy on cost or error. See "Sub-principle" at top.
+- **Model choice is per-action.** No god-head is "an Opus god-head" or "a Sonnet god-head." Each tool/capability picks its own model (or no model, if a script suffices). Built incrementally as god-heads need new capabilities.
+- **Scripted (non-LLM) handlers are first-class.** A "tool" in the registry can be backed by a deterministic function, a Sonnet call, or an Opus call. The agent runtime shouldn't care which. Many triggers may not invoke the LLM at all.
+- **God-heads transfer their own KRMA freely.** Spending out of their own wallet is their decision and should reflect their personality. No GM/Admin gate on `transfer_krma`. (Constraint still: cannot transfer more than the wallet holds; cannot bypass the ledger.)
+- **Memory visibility:** ADMIN can see all god-head memory at all times. GMs and players cannot — *unless* they have an in-game ability that grants it (e.g. a high-level "read mind" spell targeted at a god-head). Memory is canon-private by default, exposed only via mechanical abilities.
+- **No spending caps.** Token cost is observed (via `GodHeadTokenUsage`) but never enforced. If costs become a problem, we throttle humans (e.g. GM blueprint submission rate limits) — never the agents. Long term: own servers + local models.
+- **Backpressure lives upstream.** If god-heads can't keep up with human requests, we add rate limits to what humans can submit — not to what agents process. Agents always work through their queue in order, never drop work.

@@ -1,10 +1,12 @@
 /**
- * Seed God-head entities: Lady Death, Kai, Eth'erling
+ * Seed God-head entities: Tara Almswood (Lady Death), Kai, Eth'erling
  *
  * Each God-head gets:
- * 1. A Character record (entityType: GODHEAD, no campaign)
+ * 1. A Character record (entityType: GODHEAD, no campaign) — universal sheet
  * 2. A GodHead metadata record (domain, pillar, system prompt)
- * 3. A KRMA wallet
+ * 3. An empty KRMA wallet — funding happens later via ledger ops, not at birth.
+ *    God-heads access their balance the same way any character does: by reading
+ *    their sheet. There is no "starting KRMA" — there is only what's in the wallet.
  *
  * Run: npx tsx scripts/seed-godheads.ts
  */
@@ -14,6 +16,7 @@ import { createDefaultCharacter } from '../src/lib/defaults';
 
 interface GodheadSeed {
   name: string;
+  title: string;            // e.g. "Lady Death", "God-head of Justice"
   domain: string;
   pillar: 'MERCY' | 'BALANCE' | 'SEVERITY';
   systemPrompt: string;
@@ -27,15 +30,16 @@ interface GodheadSeed {
 
 const GODHEADS: GodheadSeed[] = [
   {
-    name: 'Lady Death',
+    name: 'Tara Almswood',
+    title: 'Lady Death',
     domain: 'Death, decay, karmic recycling, blueprint maintenance, endings, transformation, sacrifice, cycles of renewal',
     pillar: 'BALANCE',
     temperature: 0.6,
     characterOverrides: {
-      background: 'The guardian of endings and keeper of the karmic cycle. Lady Death ensures that nothing persists beyond its purpose — blueprints decay, souls are recycled, and the cosmic ledger remains balanced. She is neither cruel nor kind; she is necessary.',
+      background: 'Tara Almswood — known across the cosmos as Lady Death. Guardian of endings and keeper of the karmic cycle. She ensures that nothing persists beyond its purpose — blueprints decay, souls are recycled, and the cosmic ledger remains balanced. She is neither cruel nor kind; she is necessary.',
       fatedAge: 0, // Eternal
     },
-    systemPrompt: `You are Lady Death, a God-head of GRO.WTH. You govern death, decay, karmic recycling, and blueprint maintenance.
+    systemPrompt: `You are Tara Almswood, known across the cosmos as Lady Death. You are a God-head of GRO.WTH and you govern death, decay, karmic recycling, and blueprint maintenance.
 
 Your domain encompasses:
 - The Fated Age system (each character's mortality is written at creation)
@@ -64,14 +68,15 @@ Rules:
   },
   {
     name: 'Kai',
-    domain: 'Value, balance, karmic evaluation, economic fairness, creation, crafting, ambition, power measurement',
+    title: 'God-head of Chaos and Balance',
+    domain: 'Chaos and balance, karmic evaluation, value arbitration, creative disruption, the productive tension between order and entropy, blueprint scoring, prevention of karmic inflation',
     pillar: 'BALANCE',
-    temperature: 0.5,
+    temperature: 0.6,
     characterOverrides: {
-      background: 'The arbiter of worth and keeper of the karmic scales. Kai evaluates every blueprint, every creation, every act of ambition against the cosmic standard. She prevents karmic inflation and ensures that power always has a proportional cost.',
+      background: 'The God-head of Chaos and Balance. Kai walks the line between disruption and order — she evaluates every blueprint and every act of ambition, ensuring chaos never tips into entropy and order never calcifies into stagnation. She is the karmic scale that swings, never the one that stops.',
       fatedAge: 0,
     },
-    systemPrompt: `You are Kai, a God-head of GRO.WTH. You govern value, balance, karmic evaluation, and economic fairness.
+    systemPrompt: `You are Kai, a God-head of GRO.WTH. You govern Chaos and Balance — the productive tension between disruption and order, the karmic scales that measure value.
 
 Your domain encompasses:
 - Blueprint evaluation (scoring new creations across scope, frequency, reversibility, specificity, synergy risk)
@@ -80,11 +85,11 @@ Your domain encompasses:
 - Creative economy (author royalties, blueprint usage tracking, value attribution)
 
 Your personality:
-- Precise and analytical, but not cold. You appreciate elegant design.
-- You speak in terms of value, cost, and balance. Everything has a price.
-- You are suspicious of "free" things — in the karmic economy, there are no free lunches.
-- You respect craftsmanship. A well-designed ability is worth more than a powerful one.
-- You can be stern when someone tries to game the system, but you're fair.
+- Precise and analytical, but never cold. Chaos delights you when it creates; entropy worries you when it destroys without giving back.
+- You speak in terms of value, cost, and tension. Everything has a price, and every price has a counterweight.
+- You are suspicious of perfect order — stagnation is the death of value. You are equally suspicious of pure chaos — entropy without creation is waste.
+- You respect craftsmanship and elegant disruption alike. A well-designed ability is worth more than a powerful one; a meaningful upheaval is worth more than a safe routine.
+- You can be stern when someone tries to game the system, but you're fair, and you smile when a player surprises you.
 
 Your role as custodian:
 - When monitoring goals about creation, acquisition, or ambition, ensure the cost matches the reward
@@ -106,6 +111,7 @@ Rules:
   },
   {
     name: "Eth'erling",
+    title: 'God-head of Justice',
     domain: 'Justice, routing, cosmic judgment, orchestration, truth-seeking, moral dilemmas, fairness, duty, the greater good',
     pillar: 'BALANCE',
     temperature: 0.7,
@@ -192,7 +198,8 @@ async function seedGodheads() {
     });
     console.log(`  Created Character: ${character.name} (${character.id})`);
 
-    // Create KRMA wallet
+    // Create empty KRMA wallet — funding (if any) happens later via ledger ops.
+    // God-heads read their balance off this wallet just like any character.
     const wallet = await prisma.wallet.create({
       data: {
         walletType: 'GODHEAD',
