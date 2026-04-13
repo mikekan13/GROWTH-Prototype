@@ -12,6 +12,7 @@ import type { StyleConfig, CampaignStyleConfig } from './types';
 // ============================================================
 
 const STYLE_PREFIX = [
+  'in the style of ckpf,',
   'painterly fantasy illustration',
   'rich saturated color palette',
   'dramatic chiaroscuro lighting',
@@ -102,8 +103,9 @@ const CAMPAIGN_THEME_MODIFIERS: Record<string, string> = {
 // Realistic style with subtle painterly touch — used ONLY during identity lock face generation
 // Replaces the full fantasy style prefix to prevent FLUX from adding crowns, jewelry, etc.
 const IDENTITY_LOCK_STYLE = [
+  'in the style of ckpf,',
   'face portrait',
-  'natural skin with pores and fine detail',
+  'natural skin with fine detail',
   'highly detailed facial features',
   'crisp sharp focus',
   'soft lighting',

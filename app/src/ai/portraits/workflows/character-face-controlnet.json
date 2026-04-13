@@ -25,7 +25,7 @@
   "4": {
     "class_type": "CLIPTextEncodeFlux",
     "inputs": {
-      "clip": ["2", 0],
+      "clip": ["16", 1],
       "clip_l": "",
       "t5xxl": "",
       "guidance": 3.5
@@ -35,7 +35,7 @@
   "5": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["2", 0],
+      "clip": ["16", 1],
       "text": ""
     },
     "_meta": { "title": "Negative" }
@@ -48,6 +48,29 @@
       "batch_size": 1
     },
     "_meta": { "title": "Empty Latent" }
+  },
+
+  "15": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": ["1", 0],
+      "clip": ["16", 1],
+      "lora_name": "painterly-fantasy-ckpf.safetensors",
+      "strength_model": 0.6,
+      "strength_clip": 0.6
+    },
+    "_meta": { "title": "Style LoRA (Painterly Fantasy)" }
+  },
+  "16": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": ["15", 0],
+      "clip": ["15", 1],
+      "lora_name": "extreme-detailer-flux.safetensors",
+      "strength_model": 0.5,
+      "strength_clip": 0.5
+    },
+    "_meta": { "title": "Detail LoRA (Extreme Detailer)" }
   },
 
   "_comment_pulid": "── PuLID: Face Identity Lock ──",
@@ -81,7 +104,7 @@
   "13": {
     "class_type": "ApplyPulidFlux",
     "inputs": {
-      "model": ["1", 0],
+      "model": ["16", 0],
       "pulid_flux": ["10", 0],
       "eva_clip": ["14", 0],
       "face_analysis": ["11", 0],
