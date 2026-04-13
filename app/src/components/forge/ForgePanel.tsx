@@ -88,7 +88,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
   const [items, setItems] = useState<ForgeItem[]>([]);
   const [requests, setRequests] = useState<PlayerRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeType, setActiveType] = useState<string>('all');
+  const [activeType, setActiveType] = useState<string>('seed');
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Create form state
@@ -135,7 +135,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
   const fetchData = useCallback(async () => {
     try {
       const [itemsRes, reqRes] = await Promise.all([
-        fetch(`/api/campaigns/${campaignId}/forge${activeType !== 'all' ? `?type=${activeType}` : ''}`),
+        fetch(`/api/campaigns/${campaignId}/forge?type=${activeType}`),
         fetch(`/api/campaigns/${campaignId}/requests`),
       ]);
       if (itemsRes.ok) {
@@ -376,7 +376,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
 
   const canSubmit = newName.trim() && newDesc.trim();
 
-  const types = ['all', 'seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'];
+  const types = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'];
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const resolvedRequests = requests.filter(r => r.status !== 'pending');
 

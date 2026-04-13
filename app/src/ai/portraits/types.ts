@@ -102,7 +102,11 @@ export interface PortraitCharacterData {
     physicalDescription?: string;          // Free-text description
     skinTone?: string;
     hairColor?: string;
+    hairLength?: string;
+    hairTexture?: string;
     hairStyle?: string;
+    cosmetics?: string;
+    hygiene?: string;
     eyeColor?: string;
     bodyType?: string;                     // Build, height relative descriptors
     distinguishingFeatures?: string[];     // Birthmarks, tattoos, piercings

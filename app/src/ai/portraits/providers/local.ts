@@ -8,6 +8,7 @@ import 'server-only';
  */
 
 import crypto from 'crypto';
+import { spawn, type ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import type {
@@ -20,25 +21,34 @@ import type {
   ComfyUIQueueResponse,
   ComfyUIWorkflowParams,
 } from '../types';
-import { buildPortraitPrompt } from '../prompt-builder';
+import { buildPortraitPrompt, type PromptBuildOptions } from '../prompt-builder';
 import { getDefaultStyleConfig, applyCampaignStyle } from '../style-config';
 
 const COMFYUI_URL = process.env.COMFYUI_URL || 'http://127.0.0.1:8188';
+const COMFYUI_PATH = process.env.COMFYUI_PATH || 'C:/AI/ComfyUI';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
-// Default generation settings
-const DEFAULT_STEPS = 20;
+// Default generation settings — tuned for 8GB VRAM + 16GB RAM
+const DEFAULT_STEPS = 12;
 const DEFAULT_CFG = 3.5;        // Flux uses lower CFG than SDXL
-const DEFAULT_WIDTH = 1024;
-const DEFAULT_HEIGHT = 1024;
+const DEFAULT_WIDTH = 768;
+const DEFAULT_HEIGHT = 768;
 const MODEL_NAME = 'flux1-dev-Q4_0';
 
 // Polling settings
-const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_ATTEMPTS = 120;  // 4 minutes max wait
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_ATTEMPTS = 360;  // 30 minutes max wait (first run loads all models into VRAM)
+
+// Auto-start settings
+const STARTUP_POLL_INTERVAL_MS = 3000;
+const STARTUP_MAX_WAIT_MS = 120_000;  // 2 minutes to start
 
 // Portrait storage root (relative to app/public/)
 const PORTRAIT_ROOT = 'portraits';
+
+// Singleton ComfyUI process — survives across requests
+let comfyProcess: ChildProcess | null = null;
+let comfyStarting = false;
 
 export class LocalProvider implements ImageGenerationProvider {
   name = 'local-comfyui';
@@ -89,7 +99,8 @@ export class LocalProvider implements ImageGenerationProvider {
     const startTime = Date.now();
 
     try {
-      // 1. Ensure VRAM is available (unload Ollama)
+      // 1. Ensure ComfyUI is running and VRAM is available
+      await this.ensureRunning();
       await this.freeVram();
 
       // 2. Build prompt from character data
@@ -115,24 +126,43 @@ export class LocalProvider implements ImageGenerationProvider {
         campaignLoraWeight: input.campaignStyle?.campaignLoraStrength,
       };
 
-      // 4. Load and inject workflow template
-      const workflowName = input.personaLock
-        ? 'character-portrait-pulid'
-        : 'character-portrait';
-      const workflow = await this.loadWorkflow(workflowName);
-      const preparedWorkflow = this.injectWorkflowParams(workflow, params);
-
-      // 5. Upload reference image if using persona lock
+      // 4. Upload reference image BEFORE workflow injection (need the ComfyUI filename)
+      let uploadedRefName: string | undefined;
       if (input.personaLock?.referenceImagePath) {
-        await this.uploadReferenceImage(input.personaLock.referenceImagePath);
+        uploadedRefName = await this.uploadReferenceImage(input.personaLock.referenceImagePath);
+        // Override the reference path with the ComfyUI-side filename
+        params.referenceImagePath = uploadedRefName;
       }
 
-      // 6. Queue generation in ComfyUI
-      const clientId = crypto.randomUUID();
-      const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
+      // 5. Load and inject workflow template — try PuLID first, fallback to basic
+      let outputInfo: { filename: string; subfolder: string; type: string };
+      const usePulid = !!input.personaLock?.referenceImagePath;
 
-      // 7. Wait for completion
-      const outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+      if (usePulid) {
+        try {
+          const workflow = await this.loadWorkflow('character-portrait-pulid');
+          const preparedWorkflow = this.injectWorkflowParams(workflow, params);
+          const clientId = crypto.randomUUID();
+          const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
+          outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+          console.log('[ComfyUI] PuLID generation complete');
+        } catch (pulidErr) {
+          console.warn('[ComfyUI] PuLID failed, falling back to basic workflow:', pulidErr instanceof Error ? pulidErr.message : pulidErr);
+          const workflow = await this.loadWorkflow('character-portrait');
+          const preparedWorkflow = this.injectWorkflowParams(workflow, params);
+          const clientId = crypto.randomUUID();
+          const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
+          outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+          console.log('[ComfyUI] Basic generation complete (PuLID fallback)');
+        }
+      } else {
+        const workflow = await this.loadWorkflow('character-portrait');
+        const preparedWorkflow = this.injectWorkflowParams(workflow, params);
+        const clientId = crypto.randomUUID();
+        const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
+        outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+        console.log('[ComfyUI] Basic generation complete');
+      }
 
       // 8. Download generated image
       const imageData = await this.downloadImage(
@@ -238,13 +268,27 @@ export class LocalProvider implements ImageGenerationProvider {
       if (!promptHistory) continue;
 
       // Check for errors
+      // Log full status for debugging
+      console.log('[ComfyUI] History status:', JSON.stringify(promptHistory.status));
+
       if (promptHistory.status?.status_str === 'error') {
-        const errorMsg = promptHistory.status?.messages?.[0]?.[1] || 'Unknown ComfyUI error';
+        // Look for actual error in node outputs or status messages
+        const nodeErrors = Object.entries(promptHistory.outputs || {})
+          .filter(([, v]) => (v as Record<string, unknown>).errors)
+          .map(([k, v]) => `Node ${k}: ${JSON.stringify((v as Record<string, unknown>).errors)}`);
+
+        const statusMsg = promptHistory.status?.messages
+          ?.map((m: unknown[]) => typeof m[1] === 'string' ? m[1] : JSON.stringify(m[1]))
+          ?.join('; ') || '';
+
+        const errorMsg = nodeErrors.length > 0
+          ? nodeErrors.join(', ')
+          : statusMsg || 'Unknown ComfyUI error — check ComfyUI console';
         throw new Error(`ComfyUI generation failed: ${errorMsg}`);
       }
 
       // Check for completed outputs
-      if (promptHistory.outputs) {
+      if (promptHistory.status?.completed || promptHistory.outputs) {
         // Find the output node with images (usually the SaveImage node)
         for (const nodeId of Object.keys(promptHistory.outputs)) {
           const output = promptHistory.outputs[nodeId];
@@ -275,13 +319,12 @@ export class LocalProvider implements ImageGenerationProvider {
   }
 
   private async uploadReferenceImage(imagePath: string): Promise<string> {
-    const absolutePath = path.resolve('public', imagePath);
+    const absolutePath = path.join(process.cwd(), 'public', imagePath.replace(/^\//, ''));
     const imageBuffer = await fs.readFile(absolutePath);
     const filename = path.basename(imagePath);
 
     const formData = new FormData();
     formData.append('image', new Blob([imageBuffer]), filename);
-    formData.append('subfolder', 'portraits');
 
     const res = await fetch(`${COMFYUI_URL}/upload/image`, {
       method: 'POST',
@@ -387,7 +430,7 @@ export class LocalProvider implements ImageGenerationProvider {
         const meta = (n._meta as Record<string, unknown>);
         const title = meta?.title as string || '';
         if (title.toLowerCase().includes('reference') || title.toLowerCase().includes('pulid')) {
-          inputs.image = path.basename(params.referenceImagePath);
+          inputs.image = params.referenceImagePath; // Already a ComfyUI-side filename from upload
         }
       }
 
@@ -444,6 +487,80 @@ export class LocalProvider implements ImageGenerationProvider {
   }
 
   // ============================================================
+  // ComfyUI Lifecycle
+  // ============================================================
+
+  /**
+   * Ensure ComfyUI is running. If not, start it as a child process.
+   * The process persists across requests (singleton) and is cleaned up on app exit.
+   */
+  private async ensureRunning(): Promise<void> {
+    // Already running?
+    if (await this.isAvailable()) return;
+
+    // Another request is already starting it — wait
+    if (comfyStarting) {
+      return this.waitForStartup();
+    }
+
+    comfyStarting = true;
+    try {
+      // Verify ComfyUI directory exists
+      await fs.access(path.join(COMFYUI_PATH, 'main.py'));
+
+      console.log('[ComfyUI] Starting server...');
+      comfyProcess = spawn('python', ['main.py', '--normalvram', '--listen', '127.0.0.1', '--port', '8188'], {
+        cwd: COMFYUI_PATH,
+        stdio: 'ignore',
+        detached: false,
+        windowsHide: true,
+      });
+
+      comfyProcess.on('error', (err) => {
+        console.error('[ComfyUI] Process error:', err.message);
+        comfyProcess = null;
+      });
+
+      comfyProcess.on('exit', (code) => {
+        console.log(`[ComfyUI] Process exited with code ${code}`);
+        comfyProcess = null;
+      });
+
+      // Clean up on app exit
+      const cleanup = () => {
+        if (comfyProcess) {
+          console.log('[ComfyUI] Shutting down...');
+          comfyProcess.kill();
+          comfyProcess = null;
+        }
+      };
+      process.once('exit', cleanup);
+      process.once('SIGINT', cleanup);
+      process.once('SIGTERM', cleanup);
+
+      await this.waitForStartup();
+      console.log('[ComfyUI] Server ready.');
+    } catch (err) {
+      throw new Error(
+        `Failed to start ComfyUI at ${COMFYUI_PATH}: ${err instanceof Error ? err.message : String(err)}. ` +
+        'Ensure Python and ComfyUI are installed.'
+      );
+    } finally {
+      comfyStarting = false;
+    }
+  }
+
+  /** Poll until ComfyUI responds or timeout */
+  private async waitForStartup(): Promise<void> {
+    const deadline = Date.now() + STARTUP_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, STARTUP_POLL_INTERVAL_MS));
+      if (await this.isAvailable()) return;
+    }
+    throw new Error(`ComfyUI did not start within ${STARTUP_MAX_WAIT_MS / 1000}s`);
+  }
+
+  // ============================================================
   // VRAM Management
   // ============================================================
 
@@ -453,14 +570,20 @@ export class LocalProvider implements ImageGenerationProvider {
    */
   private async freeVram(): Promise<void> {
     try {
-      await fetch(`${OLLAMA_URL}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gemma2:9b', keep_alive: 0 }),
-        signal: AbortSignal.timeout(5000),
-      });
-      // Brief pause for VRAM to actually free
-      await new Promise(r => setTimeout(r, 1500));
+      // Unload ALL Ollama models
+      const modelsRes = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(3000) });
+      if (modelsRes.ok) {
+        const { models } = await modelsRes.json() as { models: Array<{ name: string }> };
+        for (const m of models) {
+          await fetch(`${OLLAMA_URL}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: m.name, keep_alive: 0 }),
+            signal: AbortSignal.timeout(5000),
+          }).catch(() => {});
+        }
+      }
+      await new Promise(r => setTimeout(r, 2000));
     } catch {
       // Ollama may not be running — that's fine
     }

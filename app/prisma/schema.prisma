@@ -55,6 +55,7 @@ model Campaign {
   campaignItems       CampaignItem[]
   encounters          Encounter[]
   goals               Goal[]
+  aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
   relationships       EntityRelationship[]
   createdAt           DateTime             @default(now())
 }

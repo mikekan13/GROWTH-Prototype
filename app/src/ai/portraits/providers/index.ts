@@ -29,19 +29,20 @@ export async function getPortraitProvider(
     // Fall back to local if cloud unavailable
   }
 
+  // Always return local provider — it will auto-start ComfyUI if needed
   const local = getLocalProvider();
   if (await local.isAvailable()) return local;
 
-  // If preferCloud was true and local also unavailable, try cloud as last resort
-  if (!preferCloud) {
-    const cloud = getCloudProvider();
-    if (await cloud.isAvailable()) return cloud;
-  }
+  // ComfyUI not running yet, but local provider will auto-start it on generate
+  // Return it anyway — ensureRunning() handles the startup
+  if (!preferCloud) return local;
 
-  throw new Error(
-    'No portrait generation provider available. ' +
-    'Ensure ComfyUI is running locally or configure a cloud provider.'
-  );
+  // Last resort: try cloud
+  const cloud = getCloudProvider();
+  if (await cloud.isAvailable()) return cloud;
+
+  // Return local as fallback — it will attempt auto-start and give a clear error if it fails
+  return local;
 }
 
 /** Check if any provider is available without throwing */

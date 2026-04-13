@@ -17,6 +17,7 @@ import type {
   CampaignStyleConfig,
   PortraitOverrides,
   PortraitCharacterData,
+  PersonaLockData,
 } from './types';
 
 // ============================================================
@@ -106,6 +107,44 @@ export async function generatePortrait(
   }
 
   return result;
+}
+
+/**
+ * Generate a portrait from inline description data (no DB character required).
+ * Used during character creation before a Character record exists.
+ */
+export async function generateFromDescription(
+  characterData: PortraitCharacterData,
+  options?: {
+    campaignStyle?: CampaignStyleConfig;
+    overrides?: PortraitOverrides;
+    preferCloud?: boolean;
+    referenceImagePath?: string;
+    creationMode?: boolean;
+  },
+): Promise<PortraitResult> {
+  const provider = await getPortraitProvider(options?.preferCloud);
+
+  // Build a persona lock stub if reference image is provided
+  const personaLock: PersonaLockData | null = options?.referenceImagePath ? {
+    referenceImagePath: options.referenceImagePath,
+    embeddingPath: '',
+    lockedPrompt: '',
+    lockedSeed: 0,
+    pulidWeight: 0.8,
+    bodyDescription: '',
+  } : null;
+
+  const input: PortraitInput = {
+    characterId: characterData.characterId || 'creation-preview',
+    characterData,
+    personaLock,
+    pipelineType: 'character_portrait',
+    campaignStyle: options?.campaignStyle,
+    overrides: options?.overrides,
+  };
+
+  return provider.generatePortrait(input);
 }
 
 // ============================================================

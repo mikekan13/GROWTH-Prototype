@@ -1,29 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { generatePortrait } from '@/ai/portraits/portrait-service';
+import { generatePortrait, generateFromDescription } from '@/ai/portraits/portrait-service';
+import type { PortraitCharacterData } from '@/ai/portraits/types';
 
 /**
  * POST /api/portraits/generate
  *
- * Queue a portrait generation for a character.
- * Body: { characterId, overrides?, campaignStyle?, preferCloud? }
+ * Generate a portrait. Supports two modes:
+ * 1. characterId — loads from DB (in-game generation)
+ * 2. characterData — inline data (character creation preview)
+ *
+ * Body: { characterId?, characterData?, overrides?, campaignStyle?, preferCloud?, referenceImagePath?, creationMode? }
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAuth();
+    await requireAuth();
     const body = await request.json();
-    const { characterId, overrides, campaignStyle, preferCloud } = body;
+    const { characterId, characterData, overrides, campaignStyle, preferCloud, referenceImagePath, creationMode } = body;
 
-    if (!characterId) {
-      return NextResponse.json({ error: 'characterId is required' }, { status: 400 });
+    if (!characterId && !characterData) {
+      return NextResponse.json({ error: 'characterId or characterData is required' }, { status: 400 });
     }
 
-    const result = await generatePortrait(characterId, {
-      campaignStyle,
-      overrides,
-      preferCloud,
-    });
+    let result;
+
+    if (characterData) {
+      // Creation mode — inline data, no DB record needed
+      result = await generateFromDescription(
+        characterData as PortraitCharacterData,
+        { campaignStyle, overrides, preferCloud, referenceImagePath, creationMode },
+      );
+    } else {
+      // In-game mode — load from DB
+      result = await generatePortrait(characterId, {
+        campaignStyle,
+        overrides,
+        preferCloud,
+      });
+    }
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 });

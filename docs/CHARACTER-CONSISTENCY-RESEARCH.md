@@ -1,384 +1,405 @@
-# Character Consistency in AI Image Generation — Research (March 2026)
+# Character Identity Consistency — Deep Research (April 2026)
 
-Research for GRO.WTH TTRPG portrait pipeline. Key constraint: painterly fantasy illustration (NOT photorealistic). Characters must be recognizable across hundreds of generations over years of play, with varying equipment, wounds, poses, and environments.
-
-Hardware target: NVIDIA RTX 4060 (8GB VRAM).
+Research for GRO.WTH TTRPG portrait pipeline. Key constraint: RTX 4060 (8GB VRAM), local generation, same character across hundreds of portraits over years of play with varying equipment, wounds, mood, age, and body changes.
 
 ---
 
-## 1. PuLID (Pure and Lightning ID Customization)
+## 1. PuLID vs IP-Adapter vs InstantID vs PhotoMaker for FLUX
 
-**Status:** NeurIPS 2024 paper. PuLID Flux II is the current version for Flux models.
+### PuLID-FLUX (RECOMMENDED)
 
-**How it works:** Uses contrastive alignment to inject facial identity into diffusion models without "model pollution" — the base model's style and composition capabilities remain intact. Extracts face embeddings via InsightFace + EVA-CLIP, then injects identity features through cross-attention layers.
+**Status**: Native FLUX.1 Dev support. Best option for this use case.
 
-**Strengths:**
-- Zero model pollution — preserves the base model's artistic style completely
-- Works from a single reference image (no training required)
-- Tunable weight (0.5-1.5) to balance identity vs. style freedom
-- 8GB VRAM compatible (with quantized Flux)
-- Fast: ~15-30s per generation on RTX 4060 with Nunchaku
-- Compatible with TeaCache and WaveSpeed for speed optimization
-- Native ComfyUI support via cubiq/PuLID_ComfyUI
+- **PuLID-FLUX v0.9.1** (released 2024-10-31) — ~5% improvement in facial similarity metrics over v0.9.0
+- Model file: `pulid_flux_v0.9.1.safetensors` from [guozinan/PuLID](https://huggingface.co/guozinan/PuLID)
+- Architecture: Transformer-based ID encoder, inserts cross-attention blocks into FLUX DIT blocks (Flamingo-inspired)
+- **Zero model pollution** — does not degrade base model style/composition
+- **Single reference image** sufficient
+- Tunable `id_weight` (identity strength) and `start_at` (insertion timing) parameters
 
-**Weaknesses:**
-- Most restrictive for expression/pose variation — tends to mirror reference image's hairstyle and face angle
-- Least effective at extreme head turns and unusual angles
-- Cannot change hairstyle easily (sticks rigidly to reference)
-- Requires InsightFace + EVA-CLIP models loaded alongside main model
+**Why it wins for TTRPG portraits:**
+- Tuning-free (no per-character LoRA training)
+- Excellent balance of identity fidelity vs editability (change clothing, expression, wounds without losing face)
+- Works with GGUF quantized FLUX models
+- Supports both realistic and stylized outputs via parameter presets
 
-**Compatibility:** Flux Dev/Pro (native), SDXL (original version). Flux II is the recommended version.
+### IP-Adapter (NOT recommended for identity)
 
-**For GRO.WTH:** CURRENT RECOMMENDATION in PORTRAIT-PIPELINE.md. Best balance of quality, VRAM, and zero-training workflow. The rigid pose/hairstyle issue is actually acceptable for a portrait pipeline where we control composition via prompts.
+- cubiq's ComfyUI_IPAdapter_plus is the reference implementation
+- **April 2025: cubiq set the repo to "maintenance only"** — no new active development
+- Designed for SD1.5/SDXL. FLUX support exists via community work but is less mature
+- IP-Adapter transfers style/composition, not strict face identity — better for "transfer the vibe" than "keep this exact face"
+- **Potential complementary use**: IP-Adapter for body/style alongside PuLID for face (future enhancement)
 
----
+### InstantID (NO FLUX support)
 
-## 2. InstantID
+- SDXL-only architecture (requires ControlNet + InsightFace pipeline)
+- No FLUX port exists or is planned
+- Higher VRAM usage than PuLID
+- **Dead end for this project.**
 
-**Status:** Mature, 11.9k GitHub stars. SDXL-based. No native Flux support.
+### PhotoMaker (NO FLUX support)
 
-**How it works:** Combines IP-Adapter with ControlNet facial keypoints. Uses InsightFace for face embedding + ControlNet for facial landmark guidance, giving both identity and structural control.
+- PhotoMaker V2 (July 2024) improved ID fidelity but is SDXL-only
+- Uses "stacked ID embedding" — needs 4+ reference images (impractical for TTRPG characters)
+- **Dead end for this project.**
 
-**Strengths:**
-- Highest face similarity scores in benchmarks (~82-86% facial recognition match)
-- Excellent at extreme angles and head turns
-- Good balance of identity preservation and creative flexibility
-- Well-established ComfyUI ecosystem
+### Verdict
 
-**Weaknesses:**
-- SDXL only — no official Flux support (major limitation in 2026)
-- Higher VRAM usage than PuLID (ControlNet + IP-Adapter combined)
-- Moderate complexity (more nodes in workflow than PuLID)
-- Sometimes shows original hair color "bleeding through" style changes
-
-**Compatibility:** SDXL only. Community Flux ports exist but are unofficial.
-
-**For GRO.WTH:** Not recommended as primary. SDXL-only locks us out of Flux's superior quality. Could be a fallback if SDXL is ever needed for specific stylized outputs.
+**PuLID-FLUX v0.9.1 is the only viable option.** InstantID, PhotoMaker, and IP-Adapter FaceID are all SDXL-only. PuLID is the sole identity preservation method with native, tested FLUX support.
 
 ---
 
-## 3. IP-Adapter / IP-Adapter FaceID
+## 2. FLUX.1 Dev Best Practices for Character Consistency
 
-**Status:** 6.5k GitHub stars. FaceID Plus V2 is the latest face-specific variant.
+### Model Selection
 
-**How it works:** Injects image prompt embeddings into cross-attention layers of diffusion models. FaceID variant uses InsightFace embeddings specifically for facial identity. Plus V2 adds CLIP image embeddings for better face structure.
+- **FLUX.1 Dev** (12B params) = correct choice. Guidance-distilled, needs 20-28 steps, good identity preservation with PuLID
+- **FLUX.1 Schnell** = distilled for speed (4 steps) but WORSE with PuLID — identity needs more diffusion steps. Not suitable.
+- **IMPORTANT CORRECTION**: "FLUX.2 Dev" referenced in PORTRAIT-PIPELINE.md does not exist. The model is FLUX.1 Dev (12B params, not 32B).
 
-**Strengths:**
-- Simplest workflow (3-4 nodes in ComfyUI)
-- Fastest generation (6-10 seconds)
-- Lowest VRAM (works on 6GB)
-- Most flexible for expression and pose changes
-- Widest model compatibility (SD 1.5, SDXL)
+### Quantization: Q4_0 GGUF vs Higher
 
-**Weaknesses:**
-- Lowest identity fidelity of the three main approaches
-- No official Flux support — SDXL/SD1.5 only
-- FaceID Plus V2 requires accompanying LoRA file
-- Less precise facial feature preservation than PuLID or InstantID
+From PuLID-Flux README (balazik):
+> "For better results I recommend the 16bit or 8bit GGUF model version of Flux1-dev (the 8e5m2 returns blurry backgrounds)"
 
-**Compatibility:** SD 1.5, SDXL. No Flux support.
+| Quant | Size | VRAM | Quality Notes |
+|-------|------|------|---------------|
+| F16 | 23.8 GB | ~22 GB | Best quality. Won't fit 8GB. |
+| Q8_0 | 12.7 GB | ~12 GB | Excellent. Won't fit 8GB alone. |
+| Q5_K_S | 8.29 GB | ~9-10 GB | Very good. Tight on 8GB with PuLID overhead. |
+| **Q4_K_S** | **6.81 GB** | **~8 GB** | **Good. Best option for 8GB VRAM.** |
+| Q4_0 | 6.79 GB | ~8 GB | Slightly worse than Q4_K_S (less precision in attention). |
 
-**For GRO.WTH:** Not recommended. Inferior identity preservation and no Flux support.
+**Q4_K_S is the recommendation** (not Q4_0). K-quants preserve more detail in attention layers. Face identity is primarily driven by PuLID's cross-attention injection, not the base model's weight precision — so Q4 quantization affects backgrounds and fine textures more than facial identity.
 
----
+**T5 text encoder**: Use `t5xxl_fp8_e4m3fn.safetensors` (not a GGUF T5). Simpler setup.
 
-## 4. PhotoMaker (V1 and V2)
+### Optimal Generation Settings
 
-**Status:** CVPR 2024 paper, 10.1k GitHub stars. V2 available.
+```
+Steps:      20-28 (more steps = better identity; diminishing returns past 28)
+Guidance:   3.5-4.0 (FLUX "fake CFG" — the guidance-distilled scale)
+True CFG:   1.0-2.0 (optional — real CFG doubles inference time but better fidelity)
+Sampler:    euler
+Scheduler:  simple
+Resolution: 768x1024 (portrait) or 1024x1024 (bust)
+```
 
-**How it works:** Stacks multiple ID embeddings from reference images into the generation process. V2 uses improved stacked ID embedding for better multi-image identity fusion.
+### PuLID-Specific Parameters (from official docs)
 
-**Strengths:**
-- Good at combining identity from multiple reference photos
-- Can handle style transfer while maintaining identity
-- Works with SDXL
+1. **`start_at` (timestep to start inserting ID)**:
+   - **Realistic portraits**: `0.15-0.2` (i.e., step 4 of 28). Lower = higher fidelity, less editability.
+   - **Stylized portraits**: `0.0-0.05` for maximum identity through style changes.
+   - If identity isn't strong enough, lower this value.
 
-**Weaknesses:**
-- SDXL only — no Flux support
-- Requires multiple reference images for best results
-- Less precise than InstantID or PuLID for single-reference scenarios
-- Community adoption has plateaued
+2. **`weight` (id_weight)**:
+   - **0.7-0.8**: Good balance — keeps identity while allowing equipment/expression variation
+   - **1.0+**: Maximum lock. Can reduce editability. PuLID docs suggest staying at or below 1.0.
+   - Start at 0.8, adjust based on results.
 
-**Compatibility:** SDXL only.
+3. **`end_at`**: Leave at 1.0 (full denoising path).
 
-**For GRO.WTH:** Not recommended. SDXL-only and no clear advantage over PuLID for our single-reference workflow.
-
----
-
-## 5. LoRA / DreamBooth Training Per Character
-
-**Status:** Mature technique. kohya-ss/sd-scripts is the gold standard. ai-toolkit is a newer alternative with Flux presets.
-
-**How it works:** Fine-tunes a small adapter network on 15-30 images of a specific character. The resulting LoRA file (50-150MB) captures deep identity features that generalize across poses, lighting, and styles.
-
-**Best Practices (Flux 2 Pro, 2026):**
-- Dataset: 15-20 well-curated images (diverse angles, lighting)
-- Training: 1500-2500 steps, learning rate 1e-4, cosine scheduler
-- Network dim: 32 (sweet spot for character LoRAs)
-- Resolution: 1024
-- VRAM: 12GB minimum (8GB possible with GGUF quantized base)
-- Training time: 1-3 hours
-- Cost: ~$5 in cloud GPU compute
-
-**Strengths:**
-- Highest identity consistency of any method — learns abstract identity concepts
-- Character holds up across extreme pose changes, lighting, style variations
-- Flux 2 LoRAs dramatically better than SDXL LoRAs at generalization
-- Supports up to 8 reference images per generation with multi-reference
-- One-time training cost, unlimited generations
-
-**Weaknesses:**
-- Requires training per character (impractical for player-generated characters at scale)
-- Needs 15-30 reference images (where do these come from for fictional characters?)
-- Risk of overfitting if dataset is poor
-- Cannot be done in real-time — requires offline GPU training
-- Larger storage per character (50-150MB per LoRA)
-
-**Compatibility:** Flux 2 Pro/Dev (best), SDXL (good), SD 1.5 (adequate).
-
-**For GRO.WTH:** NOT suitable as primary pipeline — we need on-demand generation from a single reference for player characters. However, could be excellent for RECURRING NPCs that a Watcher uses frequently. A Watcher could train a LoRA for their key NPCs after generating enough reference images via PuLID. This is a Phase D+ feature.
+4. **True CFG mode**: Uses actual classifier-free guidance (2x inference cost). Better identity in photorealistic scenarios. Worth enabling for "canonical" portrait generation; disable for rapid iteration.
 
 ---
 
-## 6. FLUX.1 Kontext
+## 3. Consistent Characters WITHOUT Reference Photos
 
-**Status:** Released June 2025 by Black Forest Labs. Dev (open-source, 12B params) and Pro/Max (API) versions. Native ComfyUI support from day one.
+For TTRPG characters created from text descriptions (no player selfie):
 
-**How it works:** A unified architecture that takes both text and image inputs via sequence concatenation. Understands existing images and modifies them through text instructions — no adapters, no ControlNet, no training needed. The model natively understands identity and can preserve it across edits.
+### Canonical Reference Workflow
 
-**Strengths:**
-- 98% identity retention across generations (claimed)
-- Native character preservation — no external adapters needed
-- Instruction-based: "change the background to a forest" preserves identity automatically
-- Supports iterative editing without degradation (unlike other models)
-- Context-aware lighting adaptation
-- Open-source Dev version runs locally
-- No training, no adapters, no complex workflows
+1. **Generate candidate references** from the character's physical description:
+   - Use species/seed, age, build, distinguishing marks as prompt
+   - Generate 4-8 candidates at full quality (28 steps, guidance 4.0, no PuLID)
+   - Neutral expression, clean background, no equipment
+   - Player selects their favorite as "their face"
 
-**Weaknesses:**
-- 12B parameters — heavier than adapter-based approaches
-- Best results require careful prompting (avoid pronouns, specify what to preserve)
-- Avoid multi-attribute changes in single request
-- Avoid simultaneous pose + background changes
-- Dev version is non-commercial license
-- Relatively new — ecosystem still maturing
+2. **Lock the identity** (Persona Lock):
+   - Store the chosen reference image (512x512+ face crop)
+   - Extract and store InsightFace embedding (backup/cache)
+   - Store the exact prompt used
+   - Store PuLID settings (weight, start_at, seed)
 
-**Compatibility:** Standalone model (Flux architecture). ComfyUI native support.
+3. **All subsequent generations**:
+   - Load stored reference image into PuLID node
+   - Modify only the prompt (equipment, wounds, expression, composition)
+   - PuLID maintains face identity from the reference
 
-**For GRO.WTH:** STRONG CONTENDER as a complement to PuLID. Kontext could handle portrait updates (equipment changes, injuries, scene changes) while PuLID handles initial identity establishment. The instruction-based editing ("add a scar across the left eye", "put them in plate armor") maps perfectly to our dynamic portrait update triggers. Worth investigating as the Phase C/D solution.
+### Prompt Template for Initial Generation
 
----
+```
+[SUBJECT] A [age]-year-old [species] [gender] with [distinctive features],
+[FACE] [face shape], [eye color] eyes, [nose type], [mouth], [facial hair],
+[HAIR] [color] [length] [style] hair,
+[BUILD] [body type], [height], [skin tone],
+[MARKS] [scars], [tattoos], [birthmarks],
+[STYLE] character portrait, neutral expression, soft lighting, clean background
+```
 
-## 7. ReActor / FaceSwap (Post-Processing)
-
-**Status:** ReActor's GitHub repository was TAKEN DOWN by GitHub for ToS violations. The approach is legally and ethically questionable.
-
-**How it works:** Generates an image first, then swaps the face using InsightFace face detection + replacement. Post-processing approach rather than generation-time identity injection.
-
-**Strengths:**
-- Can achieve very high face similarity (near 100%)
-- Works with any base model since it's post-processing
-- Fast face swap step
-
-**Weaknesses:**
-- Repository removed from GitHub (supply chain risk)
-- Ethical/legal concerns (deepfake technology)
-- Two-step process introduces artifacts at face boundaries
-- Style mismatch between swapped face and generated body
-- Poor results with non-photorealistic styles (painterly faces look wrong when swapped)
-
-**For GRO.WTH:** DO NOT USE. Ethically problematic, repository taken down, and fundamentally incompatible with painterly fantasy style (face swap produces uncanny results on illustrated faces).
+**Tips:**
+- Neutral expression + clean background for the canonical reference
+- No equipment/armor in the reference (pure face)
+- 1024x1024 minimum for face detail
+- Use a fixed seed and store it with the persona lock
 
 ---
 
-## 8. StoryDiffusion
+## 4. NSFW vs SFW Model Considerations
 
-**Status:** NeurIPS 2024 Spotlight. 6.4k GitHub stars.
+### FLUX.1 Dev Content Capabilities
 
-**How it works:** Uses "Consistent Self-Attention" — shares attention features across a batch of images being generated simultaneously, ensuring the same character looks consistent across all images in the batch. Requires 3+ text prompts (5-6 recommended) generated together.
+FLUX.1 Dev has a built-in safety filter in the model weights:
+- Generates mild artistic nudity but self-censors explicit content
+- Handles violence, wounds, gore well (critical for TTRPG injury portraits)
+- Battle damage showing skin/body works fine
 
-**Strengths:**
-- Designed specifically for multi-image character consistency
-- Hot-pluggable, compatible with SD 1.5 and SDXL models
-- Good for generating character reference sheets (multiple poses at once)
-- Also includes motion predictor for video generation
+**Vanilla FLUX.1 Dev is sufficient for GRO.WTH.** Character portraits with wounds, scars, exposed skin, diverse body types, and age changes all work without modification.
 
-**Weaknesses:**
-- Requires batch generation (3+ images at once) — not suitable for on-demand single portraits
-- SD 1.5 and SDXL only — no Flux support
-- Consistency degrades over very long sequences
-- Not designed for "generate one portrait that matches a previous one"
+### If Full Nudity is Needed Later (not MVP)
 
-**Compatibility:** SD 1.5, SDXL. No Flux support.
+- **Uncensored LoRAs**: Community LoRAs on CivitAI remove safety training. Loaded alongside base model as a separate file.
+- **Separate workflows**: SFW (default) vs mature (opt-in per campaign with uncensored LoRA)
+- **PuLID is unaffected**: Identity system operates on face embeddings independently of content filtering. Both SFW and NSFW use the same PuLID setup.
 
-**For GRO.WTH:** Not suitable for our primary pipeline (we need single on-demand portraits). However, could be useful for generating initial character reference sheets — batch-generate 5-6 poses of a new character to establish visual identity, then use those as PuLID references. Niche utility only.
+### Recommendation
 
----
-
-## 9. CharaConsist
-
-**Status:** Research paper (2025). Addresses fine-grained consistency under action variations.
-
-**How it works:** Uses point-tracking attention and adaptive token merge to maintain character identity even during significant pose/action changes. Addresses "locality bias" that causes other methods to lose identity when characters move.
-
-**Strengths:**
-- Fine-grained consistency under action variations
-- Controllable background preserving or switching
-- Addresses a real weakness of other methods (identity loss during action)
-
-**Weaknesses:**
-- Research-stage, limited practical tooling
-- No established ComfyUI integration
-- Unclear VRAM requirements and speed
-
-**For GRO.WTH:** Watch this space. If it matures into ComfyUI nodes, it could solve the "character in action poses" problem better than PuLID.
+Start with vanilla FLUX.1 Dev. Add uncensored LoRA later as opt-in campaign setting if needed.
 
 ---
 
-## 10. ACE++ (Alibaba)
+## 5. InsightFace Compatibility with PuLID-Flux
 
-**Status:** Released January 2025. Instruction-based editing built on Flux Fill.
+### The `providers` Error
 
-**How it works:** Context-aware content filling that can swap faces and reconstruct surrounding elements. Instruction-based approach similar to Kontext but from Alibaba's team.
+`FaceAnalysis.__init__() got an unexpected keyword argument 'providers'` means insightface is too OLD. The `providers` kwarg was added in version 0.7.
 
-**Strengths:**
-- High face similarity in front-facing shots (comparable to Hyper LoRA)
-- Can reconstruct occluding elements (flowers, jewelry around face)
-- Instruction-based editing
+- **insightface 0.2.x**: Old API, does NOT accept `providers`. This causes the error.
+- **insightface 0.7.3**: Current latest on PyPI (released 2023-04-02). DOES accept `providers`.
 
-**Weaknesses:**
-- Flux Fill training was suspended due to instability (heterogeneity between training data and Flux model)
-- Development appears stalled
-- Less robust than Kontext for iterative editing
+### Exact Fix
 
-**For GRO.WTH:** Not recommended. Development suspended, Kontext is the better instruction-based option.
+```bash
+# Uninstall any existing version
+pip uninstall insightface -y
 
----
+# Install onnxruntime-gpu FIRST (required backend)
+pip install onnxruntime-gpu
 
-## 11. ControlNet for Pose/Composition
+# Install correct version
+pip install insightface==0.7.3
 
-**Status:** Mature. InstantX Flux Union ControlNet supports Flux Dev.
+# Verify
+python -c "import insightface; print(insightface.__version__)"
+# Should print: 0.7.3
+```
 
-**How it works:** Conditions image generation on structural inputs — OpenPose skeletons, depth maps, canny edges, etc. Controls composition and pose without affecting identity.
+**Windows ComfyUI portable:**
+```bash
+.\python_embeded\python.exe -m pip uninstall insightface -y
+.\python_embeded\python.exe -m pip install onnxruntime-gpu
+.\python_embeded\python.exe -m pip install insightface==0.7.3
+```
 
-**Modes available for Flux:**
-- OpenPose (skeletal pose)
-- Depth (3D structure)
-- Canny (edge detection)
-- Soft Edge
-- Grayscale
+### Additional Required Models
 
-**Strengths:**
-- Precise pose and composition control
-- Works alongside identity methods (PuLID + ControlNet together)
-- Essential for "character in specific pose" scenarios
-- Flux Union ControlNet handles multiple modes simultaneously
+1. **AntelopeV2** face detection: Download from [MonsterMMORPG/tools](https://huggingface.co/MonsterMMORPG/tools/tree/main), unzip to `ComfyUI/models/insightface/models/antelopev2/`
+   - Files: `1k3d68.onnx`, `2d106det.onnx`, `genderage.onnx`, `glintr100.onnx`, `scrfd_10g_bnkps.onnx`
 
-**Weaknesses:**
-- Requires source pose image or skeleton
-- Additional VRAM overhead
-- Can conflict with identity adapters if both try to control facial structure
+2. **EVA-CLIP**: `EVA02_CLIP_L_336_psz14_s6B.pt` — auto-downloads on first run. If it fails (assertion error about `'detection' in self.models`), manually download from [QuanSun/EVA-CLIP](https://huggingface.co/QuanSun/EVA-CLIP) to `ComfyUI/models/clip/`
 
-**For GRO.WTH:** Useful for Phase C+ when we want specific poses (combat stance, sitting, etc.). Combine with PuLID: ControlNet handles pose, PuLID handles identity. Not needed for basic bust portraits (Phase A/B).
+3. **facexlib**: `pip install facexlib` (models download on first use)
 
----
+### Common Gotchas
 
-## 12. Hyper LoRA (Flux)
-
-**Status:** Emerging technique, competitive with established methods.
-
-**How it works:** A specialized LoRA approach that provides face identity preservation without per-character training. Functions more like an adapter than a traditional LoRA.
-
-**Strengths:**
-- Superior prompt adherence (better than InstantID or PuLID at following style instructions)
-- Most flexible with creative changes (hairstyle, color changes)
-- High face similarity in direct shots
-- Good at separating identity from style
-
-**Weaknesses:**
-- Less documented than PuLID/InstantID
-- Newer, smaller community
-- Performance at extreme angles less tested
-
-**For GRO.WTH:** Worth monitoring. If it proves to offer better style flexibility than PuLID while maintaining identity, it could be a better fit for painterly fantasy portraits where we need to change equipment/appearance while keeping the face.
+- **numpy incompatibility**: insightface 0.7.3 built against older numpy. Fix: `pip install numpy==1.26.4`
+- **Visual C++ Build Tools**: Required on Windows for insightface compilation. Install "Build Tools for Visual Studio" if pip fails.
+- **Python version**: insightface 0.7.3 has issues with Python 3.12+. Use **Python 3.10 or 3.11**.
 
 ---
 
-## Flux vs SDXL: Which Base Model?
+## 6. Face Embedding vs Reference Image Storage
 
-**Verdict for 2026: Flux wins for character consistency.**
+### Store Both, But Reference Image is Primary
 
-| Factor | Flux 2 | SDXL |
-|--------|--------|------|
-| Anatomy/hands | Much better | Frequent errors |
-| Prompt following | Superior | Good |
-| Identity preservation | Abstract concepts (better generalization) | Pixel patterns (less generalization) |
-| LoRA quality | Dramatically better | Good |
-| Ecosystem (adapters) | Growing fast (PuLID, Kontext, ControlNet Union) | Mature (InstantID, IP-Adapter, PhotoMaker) |
-| VRAM (quantized) | 8GB viable (GGUF Q4) | 8GB native |
-| Speed | Slower (more params) | Faster |
-| Stylized art | Good, improving | Superior ecosystem of fine-tunes |
-| Text in images | Excellent | Poor |
+| Storage Item | Purpose | Format |
+|-------------|---------|--------|
+| **Reference image** | PuLID input, visual record | PNG, 512x512+ face crop |
+| **Face embedding** | Cache/backup, similarity search | 512-dim float32 (2KB binary blob) |
+| **Generation prompt** | Reproducibility | Text |
+| **PuLID settings** | Reproducibility | JSON (weight, start_at, seed) |
 
-**For GRO.WTH:** Flux is the correct choice. Superior anatomy, better prompt following, and PuLID Flux II + Kontext give us a strong identity pipeline. SDXL's larger fine-tune ecosystem for stylized art is its main advantage, but Flux's native quality + style LoRAs are closing that gap rapidly.
+### Why the Image is Primary
 
----
+1. **PuLID re-processes the image each time** — it runs InsightFace internally AND uses EVA-CLIP for additional features. A pre-extracted embedding skips the CLIP features.
+2. **Portable across versions** — if PuLID upgrades, embedding format may change, but a face image always works.
+3. **Human-verifiable** — players and GMs can see what the reference looks like.
+4. **Multi-reference future** — can store 2-3 angle references (front, 3/4, profile).
 
-## Recommended Pipeline for GRO.WTH (Updated)
+### Embedding as Cache
 
-### Phase A-B: PuLID + Flux Dev (Current Plan — Validated)
-The existing PORTRAIT-PIPELINE.md plan is sound. PuLID Flux II on quantized Flux Dev is the right choice for:
-- Single reference image workflow
-- 8GB VRAM compatibility
-- Zero training required
-- Good identity preservation for bust portraits
-
-### Phase C: Add Kontext for Dynamic Updates
-When implementing dynamic portrait updates (equipment changes, injuries, aging):
-- Use Kontext Dev for instruction-based edits on existing portraits
-- "Add plate armor" / "add scar across left eye" / "make them look exhausted"
-- Preserves identity natively without re-running PuLID
-- Iterative edits don't degrade (unlike regenerating from scratch each time)
-
-### Phase D: Add ControlNet for Pose Variation
-When we need full-body or action poses:
-- ControlNet Union (OpenPose) for pose guidance
-- Combined with PuLID for identity
-- Enables combat scenes, group shots, action poses
-
-### Phase E (Future): LoRA Training for Key NPCs
-For Watchers who want maximum consistency on recurring NPCs:
-- Train character LoRA from PuLID-generated reference images
-- 15-20 images generated via PuLID, curated, then used as LoRA training set
-- Results in near-perfect identity consistency
-- Optional premium feature (requires GPU time)
-
-### Style Control Strategy
-For painterly fantasy (non-photorealistic):
-- Style LoRAs on top of Flux Dev for consistent art style
-- Watercolor, oil painting, fantasy illustration LoRAs available on CivitAI
-- Campaign-level style setting (each campaign could have its own art style LoRA)
-- PuLID identity weight tuned lower (0.6-0.8) to let style breathe while preserving face
+- Re-extract embeddings when upgrading InsightFace or PuLID
+- Reference images are the source of truth; embeddings are optimization
+- Embeddings useful for similarity search (finding similar-looking NPCs, lineage detection)
 
 ---
 
-## Sources
+## 7. Body Consistency Beyond Face
 
-- [PuLID GitHub](https://github.com/ToTheBeginning/PuLID) — NeurIPS 2024
-- [InstantID GitHub](https://github.com/instantX-research/InstantID) — 11.9k stars
-- [IP-Adapter GitHub](https://github.com/tencent-ailab/IP-Adapter) — 6.5k stars
-- [PhotoMaker GitHub](https://github.com/TencentARC/PhotoMaker) — CVPR 2024
-- [StoryDiffusion GitHub](https://github.com/HVision-NKU/StoryDiffusion) — NeurIPS 2024 Spotlight
-- [PuLID ComfyUI (cubiq)](https://github.com/cubiq/PuLID_ComfyUI) — Native implementation
-- [Flux 2 LoRA Training Guide 2026](https://apatero.com/blog/flux-2-pro-lora-training-character-consistency-2026)
-- [4-Way Face Swap Comparison](https://myaiforce.com/hyperlora-vs-instantid-vs-pulid-vs-ace-plus/)
-- [InstantID vs PuLID vs FaceID Comparison](https://apatero.com/blog/instantid-vs-pulid-vs-faceid-ultimate-face-swap-comparison-2025)
-- [Flux vs SDXL 2026](https://pxz.ai/blog/flux-vs-sdxl)
-- [Flux Kontext Character Consistency](https://comfyui.org/en/solving-character-consistency-with-flux1-kontext)
-- [FLUX.1 Kontext Dev (HuggingFace)](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
-- [FLUX.1 Kontext (Black Forest Labs)](https://bfl.ai/models/flux-kontext)
-- [ACE++ GitHub](https://github.com/ali-vilab/ACE_plus)
-- [CharaConsist Paper](https://arxiv.org/html/2507.11533v1)
-- [Few-shot DreamBooth with LoRA Paper](https://arxiv.org/abs/2510.09475)
-- [Best SDXL Model for DreamBooth](https://apatero.com/blog/best-sdxl-model-dreambooth-training-character-consistency-2025)
-- [Flux ControlNet Models Collection](https://comfyui-wiki.com/en/resource/controlnet-models/controlnet-flux-1)
+PuLID handles FACE only. Body consistency requires a separate approach.
+
+### Primary Method: Structured Prompt Template
+
+Store body description as structured data in PersonaLock:
+
+```json
+{
+  "build": "muscular, broad shoulders, 6'2\"",
+  "skinTone": "deep mahogany brown",
+  "scars": ["diagonal scar left forearm", "burn mark right shoulder"],
+  "tattoos": ["tribal sleeve left arm", "small rune right wrist"],
+  "hair": "long black dreadlocks past shoulders",
+  "distinguishingMarks": ["cleft chin", "heterochromia - left green, right brown"]
+}
+```
+
+This gets injected into EVERY generation prompt, providing body consistency through identical textual description.
+
+**Why this works:**
+- FLUX.1 Dev has excellent prompt adherence for body descriptions
+- Scars, tattoos, build, skin tone are well-understood concepts
+- Consistency improves when you use identical descriptive phrases each time
+- Body features don't need pixel-level precision the way faces do
+
+### Known Limitations
+
+- **Tattoo placement**: FLUX often confuses left/right. Use very specific descriptions + fixed seeds.
+- **Scar consistency**: Small scars may appear/disappear. Use prominent descriptions, accept minor variation.
+- **Build variation**: "Muscular" means different things. Use specific comparisons ("bodybuilder build" vs "swimmer's build").
+- **Skin tone**: Use specific descriptors ("deep mahogany brown" not just "dark").
+
+### Future Enhancements (Not MVP)
+
+1. **ControlNet Pose**: Lock body proportions via OpenPose/DWPose. FLUX ControlNet exists but is less mature.
+2. **IP-Adapter for body style**: Combine PuLID (face) + IP-Adapter (body reference) in same workflow.
+3. **Inpainting for marks**: Generate base portrait, inpaint specific scars/tattoos with masks.
+4. **Campaign LoRA**: For non-human species, a LoRA trained on that species' visual characteristics.
+
+---
+
+## 8. ComfyUI Workflow: FLUX + PuLID + GGUF
+
+### Required Custom Nodes
+
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/city96/ComfyUI-GGUF.git
+git clone https://github.com/balazik/ComfyUI-PuLID-Flux.git
+pip install -r ComfyUI-GGUF/requirements.txt
+pip install -r ComfyUI-PuLID-Flux/requirements.txt
+```
+
+Alternative PuLID node (cubiq, more mature):
+```bash
+git clone https://github.com/cubiq/PuLID_ComfyUI.git
+pip install -r PuLID_ComfyUI/requirements.txt
+```
+
+### Required Models
+
+| Model | Path | Source |
+|-------|------|--------|
+| FLUX.1 Dev Q4_K_S | `models/unet/flux1-dev-Q4_K_S.gguf` | [city96/FLUX.1-dev-gguf](https://huggingface.co/city96/FLUX.1-dev-gguf) |
+| T5 XXL FP8 | `models/clip/t5xxl_fp8_e4m3fn.safetensors` | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders) |
+| CLIP L | `models/clip/clip_l.safetensors` | [comfyanonymous/flux_text_encoders](https://huggingface.co/comfyanonymous/flux_text_encoders) |
+| FLUX VAE | `models/vae/ae.safetensors` | [FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) |
+| PuLID FLUX v0.9.1 | `models/pulid/pulid_flux_v0.9.1.safetensors` | [guozinan/PuLID](https://huggingface.co/guozinan/PuLID) |
+| AntelopeV2 | `models/insightface/models/antelopev2/*.onnx` | [MonsterMMORPG/tools](https://huggingface.co/MonsterMMORPG/tools) |
+| EVA-CLIP | `models/clip/EVA02_CLIP_L_336_psz14_s6B.pt` | [QuanSun/EVA-CLIP](https://huggingface.co/QuanSun/EVA-CLIP) |
+
+### Workflow Node Graph
+
+```
+[UnetLoaderGGUF] ──────────────────────────────────────┐
+  model: flux1-dev-Q4_K_S.gguf                         │
+                                                        ▼
+[DualCLIPLoader] ──────────► [CLIPTextEncode] ──► [KSampler]
+  clip1: clip_l.safetensors    (positive prompt)       │
+  clip2: t5xxl_fp8_e4m3fn     (negative: empty)       │
+                                                        │
+[PulidFluxModelLoader] ──┐                              │
+  pulid: v0.9.1          │                              │
+                         ▼                              │
+[PulidFluxInsightFaceLoader] ──► [ApplyPulidFlux] ──────┘
+  provider: CPU                    weight: 0.8
+                                   start_at: 0.15
+[LoadImage] ──────────────────►    end_at: 1.0
+  (reference face)
+
+[EmptyLatentImage] ────────────────────► [KSampler]
+  width: 768, height: 1024                    │
+                                              ▼
+                                        [VAEDecode] ──► [SaveImage]
+```
+
+### Known Issues
+
+1. **FP8 e5m2 = blurry backgrounds** — Use GGUF Q4_K_S or FP8 e4m3fn instead.
+2. **attn_mask not working** in balazik's PuLID-Flux — known limitation.
+3. **VRAM overflow**: PuLID loads InsightFace + EVA-CLIP alongside FLUX. On 8GB:
+   - Use `--lowvram` ComfyUI flag
+   - Set InsightFace provider to `CPU` (not CUDA)
+   - Consider `--cpu-text-encoder` to offload T5 to RAM
+4. **Speed**: Expect 30-60s per image on RTX 4060 with Q4_K_S + PuLID + lowvram.
+5. **First-run downloads**: EVA-CLIP auto-downloads. If it fails, manually download (see section 5).
+
+### ComfyUI API Integration (for GRO.WTH backend)
+
+```javascript
+// Queue a prompt
+const resp = await fetch('http://127.0.0.1:8188/prompt', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ prompt: workflowJson })
+});
+const { prompt_id } = await resp.json();
+
+// Poll for completion
+const history = await fetch(`http://127.0.0.1:8188/history/${prompt_id}`);
+
+// Retrieve generated image
+const image = await fetch(`http://127.0.0.1:8188/view?filename=${filename}`);
+```
+
+Store a template workflow JSON. Programmatically modify prompt text and reference image path before queuing.
+
+---
+
+## Corrections to PORTRAIT-PIPELINE.md
+
+| Current Text | Correction |
+|-------------|------------|
+| "FLUX.2 Dev" | FLUX.1 Dev (FLUX.2 does not exist) |
+| "32B parameter" | 12B parameters |
+| "PuLID Flux II" | PuLID-FLUX v0.9.1 (no "Flux II" product) |
+| "Supports up to 10 reference images" | Single reference image per PuLID call |
+| "Weight 1.0-1.5" | Weight 0.7-1.0 (above 1.0 over-constrains) |
+
+---
+
+## Final Recommended Stack
+
+```
+Base Model:      FLUX.1 Dev Q4_K_S GGUF (6.81 GB)
+Identity:        PuLID-FLUX v0.9.1
+Face Detection:  InsightFace 0.7.3 + AntelopeV2 models
+Face Features:   EVA02-CLIP-L-14-336
+Body Consistency: Structured prompt template (PersonaLock.bodyDescription)
+Orchestration:   ComfyUI with REST API (port 8188)
+Custom Nodes:    ComfyUI-GGUF + ComfyUI-PuLID-Flux
+Python:          3.10 or 3.11 (NOT 3.12+)
+VRAM Budget:     ~8 GB with --lowvram + CPU InsightFace
+Generation Time: ~30-60s per portrait on RTX 4060
+Content:         Vanilla FLUX.1 Dev (wounds/scars/bodies all work)
+```

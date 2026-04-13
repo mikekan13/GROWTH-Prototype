@@ -299,24 +299,32 @@ export interface GrowthHarvest {
   status: 'planned' | 'active' | 'completed';
 }
 
-// Physical Description — standardized fields for portrait generation
+// Physical Description — body-part-driven, shaped by seed's bodyStructure
 export interface PhysicalDescription {
-  // Body
-  height?: string;
+  // Overall body traits
+  gender?: string;              // Male, Female, Non-binary, or freetext
+  height?: number;              // Height in inches, constrained by seed min/max
   build?: string;
-  skinTone?: string;
-  // Face
+  skinTone?: string;            // Selected from seed-specific options
+  // Per-body-part descriptions keyed by part name (HEAD, TORSO, LEFT_UPPER_ARM, etc.)
+  bodyParts?: Record<string, BodyPartDescription>;
+}
+
+// Description for a single body part
+export interface BodyPartDescription {
+  description?: string;         // Free-text for this part ("muscular, scarred")
+  // HEAD-specific structured fields
   faceShape?: string;
   eyeShape?: string;
   eyeColor?: string;
   facialHair?: string;
-  // Hair
   hairColor?: string;
-  hairStyle?: string;
-  // Distinguishing features (permanent — not equipment/wounds)
-  distinguishingMarks?: string;  // Scars, tattoos, birthmarks
-  notableFeatures?: string;     // Horns, wings, unusual seed traits
-  // Removed: ageAppearance (determined by root/branches), clothingStyle (determined by equipment)
+  hairLength?: string;
+  hairTexture?: string;          // Natural texture: straight, wavy, curly, coily
+  hairStyle?: string;            // How it's worn: braided, ponytail, loose, pinned up
+  // Presentation (can change with story)
+  cosmetics?: string;            // Makeup style, war paint, face paint
+  hygiene?: string;              // General upkeep: pristine, well-kept, rugged, unkempt, feral
 }
 
 // Character Identity

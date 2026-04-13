@@ -24,11 +24,32 @@ import { getDefaultStyleConfig, applyCampaignStyle, getCompositionPreset } from 
 // Main Entry Point
 // ============================================================
 
+export interface PromptBuildOptions {
+  campaignStyle?: CampaignStyleConfig;
+  overrides?: PortraitOverrides;
+  /** Creation mode: pure physical identity, no equipment/wounds/conditions */
+  creationMode?: boolean;
+}
+
 export function buildPortraitPrompt(
   char: PortraitCharacterData,
-  campaignStyle?: CampaignStyleConfig,
-  overrides?: PortraitOverrides,
+  campaignStyleOrOptions?: CampaignStyleConfig | PromptBuildOptions,
+  overridesArg?: PortraitOverrides,
 ): PromptOutput {
+  // Support both old signature (campaignStyle, overrides) and new options object
+  let campaignStyle: CampaignStyleConfig | undefined;
+  let overrides: PortraitOverrides | undefined;
+  let creationMode = false;
+
+  if (campaignStyleOrOptions && 'creationMode' in campaignStyleOrOptions) {
+    campaignStyle = campaignStyleOrOptions.campaignStyle;
+    overrides = campaignStyleOrOptions.overrides;
+    creationMode = campaignStyleOrOptions.creationMode || false;
+  } else {
+    campaignStyle = campaignStyleOrOptions as CampaignStyleConfig | undefined;
+    overrides = overridesArg;
+  }
+
   const baseConfig = getDefaultStyleConfig();
   const config = applyCampaignStyle(baseConfig, campaignStyle);
 
@@ -45,13 +66,18 @@ export function buildPortraitPrompt(
   const bodyBlock = buildBodyDescriptionBlock(char);
   if (bodyBlock) blocks.push(bodyBlock);
 
-  // T2: EQUIPMENT BLOCK
-  const equipBlock = buildEquipmentBlock(char.visibleEquipment);
-  if (equipBlock) blocks.push(equipBlock);
+  if (creationMode) {
+    // Creation mode: pure physical identity, no equipment or state
+    blocks.push('bare skin, no clothing, no armor, no accessories');
+  } else {
+    // T2: EQUIPMENT BLOCK
+    const equipBlock = buildEquipmentBlock(char.visibleEquipment);
+    if (equipBlock) blocks.push(equipBlock);
 
-  // T3: STATUS BLOCK (wounds + conditions + depletion)
-  const statusBlock = buildStatusBlock(char.wounds, char.conditions, char.attributeDepletion);
-  if (statusBlock) blocks.push(statusBlock);
+    // T3: STATUS BLOCK (wounds + conditions + depletion)
+    const statusBlock = buildStatusBlock(char.wounds, char.conditions, char.attributeDepletion);
+    if (statusBlock) blocks.push(statusBlock);
+  }
 
   // T4: NARRATIVE BLOCK (subtle influence)
   const narrativeBlock = buildNarrativeBlock(char);
@@ -72,9 +98,13 @@ export function buildPortraitPrompt(
     : config.compositionSuffix;
   blocks.push(composition);
 
-  // T6: ENVIRONMENT BLOCK
-  const envBlock = buildEnvironmentBlock(char.environment);
-  if (envBlock) blocks.push(envBlock);
+  if (!creationMode) {
+    // T6: ENVIRONMENT BLOCK
+    const envBlock = buildEnvironmentBlock(char.environment);
+    if (envBlock) blocks.push(envBlock);
+  } else {
+    blocks.push('neutral grey studio background, soft even lighting');
+  }
 
   return {
     prompt: blocks.filter(Boolean).join(', '),
@@ -125,12 +155,16 @@ function buildBodyDescriptionBlock(char: PortraitCharacterData): string {
   const parts: string[] = [];
 
   if (identity.skinTone) parts.push(`${identity.skinTone} skin`);
-  if (identity.hairColor && identity.hairStyle) {
-    parts.push(`${identity.hairColor} ${identity.hairStyle} hair`);
-  } else if (identity.hairColor) {
-    parts.push(`${identity.hairColor} hair`);
-  } else if (identity.hairStyle) {
-    parts.push(`${identity.hairStyle} hair`);
+  const hairDesc = [identity.hairColor, identity.hairLength, identity.hairTexture].filter(Boolean);
+  if (hairDesc.length > 0) {
+    parts.push(`${hairDesc.join(' ')} hair`);
+  }
+  if (identity.hairStyle) {
+    parts.push(`worn ${identity.hairStyle}`);
+  }
+  if (identity.cosmetics) parts.push(identity.cosmetics);
+  if (identity.hygiene && identity.hygiene !== 'Average') {
+    parts.push(`${identity.hygiene.toLowerCase()} appearance`);
   }
   if (identity.eyeColor) parts.push(`${identity.eyeColor} eyes`);
   if (identity.bodyType) parts.push(`${identity.bodyType} build`);

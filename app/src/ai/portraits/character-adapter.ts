@@ -81,22 +81,41 @@ function extractIdentity(
   charData: GrowthCharacter,
   backstory?: { responses: string; narrative?: string | null } | null,
 ): PortraitCharacterData['identity'] {
-  // Parse physical description from backstory responses
+  const pd = charData.identity.physicalDescription;
+  const head = pd?.bodyParts?.HEAD;
+
+  // Build distinguishing features from all body part descriptions
+  const distinguishing: string[] = [];
+  if (pd?.bodyParts) {
+    for (const [part, data] of Object.entries(pd.bodyParts)) {
+      if (data.description && part !== 'HEAD') {
+        distinguishing.push(data.description);
+      }
+    }
+  }
+  // Head "Other Details" field
+  if (head?.description) {
+    distinguishing.push(head.description);
+  }
+
+  // Fallback to backstory-extracted description if no structured data
   const physicalDesc = extractPhysicalDescription(backstory);
 
   return {
     name: charData.identity.name,
     age: charData.identity.age,
-    physicalDescription: charData.identity.description || physicalDesc,
-    // These fields will be populated as the character sheet gains more structured fields.
-    // For now, they come from the free-text description or are undefined.
-    sex: undefined,
-    skinTone: undefined,
-    hairColor: undefined,
-    hairStyle: undefined,
-    eyeColor: undefined,
-    bodyType: undefined,
-    distinguishingFeatures: undefined,
+    sex: pd?.gender,
+    physicalDescription: physicalDesc,
+    skinTone: pd?.skinTone,
+    hairColor: head?.hairColor,
+    hairLength: head?.hairLength,
+    hairTexture: head?.hairTexture,
+    hairStyle: head?.hairStyle,
+    cosmetics: head?.cosmetics,
+    hygiene: head?.hygiene,
+    eyeColor: head?.eyeColor,
+    bodyType: pd?.build ? `${pd.build}${pd.height ? `, ${Math.floor(pd.height / 12)}'${pd.height % 12}"` : ''}` : undefined,
+    distinguishingFeatures: distinguishing.length > 0 ? distinguishing : undefined,
   };
 }
 

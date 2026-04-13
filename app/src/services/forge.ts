@@ -231,6 +231,7 @@ export async function listForgeItems(
 
   return items.map(item => ({
     ...item,
+    karmicValue: item.karmicValue != null ? Number(item.karmicValue) : null,
     data: JSON.parse(item.data),
   }));
 }
@@ -249,7 +250,7 @@ export async function getForgeItem(itemId: string, userId: string, _userRole: st
     throw new ForbiddenError('This item is not yet published');
   }
 
-  return { ...item, data: JSON.parse(item.data) };
+  return { ...item, karmicValue: item.karmicValue != null ? Number(item.karmicValue) : null, data: JSON.parse(item.data) };
 }
 
 export async function createForgeItem(
@@ -499,6 +500,7 @@ export async function listGlobalCatalog(
       data: true,
       useCount: true,
       authorUserId: true,
+      karmicValue: true,
     },
     orderBy: { useCount: 'desc' },
     take: 50,
@@ -506,6 +508,7 @@ export async function listGlobalCatalog(
 
   return items.map(item => ({
     ...item,
+    karmicValue: item.karmicValue != null ? Number(item.karmicValue) : null,
     data: JSON.parse(item.data),
   }));
 }
