@@ -375,7 +375,7 @@ export default function IdentityLockWizard({
   // ── Step 1: Front face generation (iterative grading) ───────
   // PuLID reference chains: player photo → first gen, then "Good" face → next gen
   const generateFrontFace = useCallback(async (pulidRef?: string) => {
-    if (abortRef.current) return;
+    abortRef.current = false;  // Reset abort flag on new generation
     dispatch({ type: 'FRONT_GENERATING' });
     try {
       // Use provided PuLID ref (from "Good" grade), or player's primary photo, or none
