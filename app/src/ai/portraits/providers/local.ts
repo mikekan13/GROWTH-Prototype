@@ -28,10 +28,11 @@ const COMFYUI_URL = process.env.COMFYUI_URL || 'http://127.0.0.1:8188';
 const COMFYUI_PATH = process.env.COMFYUI_PATH || 'C:/AI/ComfyUI';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
-// Default generation settings — tuned for 8GB VRAM + 16GB RAM
-const DEFAULT_STEPS = 12;
-const DEFAULT_CFG = 3.5;        // Flux uses lower CFG than SDXL
-const DEFAULT_WIDTH = 768;
+// Default generation settings — FLUX GGUF on RTX 4060 8GB
+// Requires Ollama stopped. ~40s at 1024/20 steps with enough RAM free.
+const DEFAULT_STEPS = 20;
+const DEFAULT_CFG = 1.0;        // FLUX uses CFG 1.0 — guidance is in the text encoder node (3.5)
+const DEFAULT_WIDTH = 768;      // 768 until RAM upgrade, then 1024
 const DEFAULT_HEIGHT = 768;
 const MODEL_NAME = 'flux1-dev-Q4_0';
 
@@ -483,7 +484,7 @@ export class LocalProvider implements ImageGenerationProvider {
     // Thumbnail generation deferred to Phase B (requires sharp)
     const thumbnailPath = pngPath.replace('.png', '_thumb.png');
 
-    return { imagePath: pngPath, thumbnailPath };
+    return { imagePath: `/${pngPath}`, thumbnailPath: `/${thumbnailPath}` };
   }
 
   // ============================================================
@@ -569,20 +570,11 @@ export class LocalProvider implements ImageGenerationProvider {
    * The RTX 4060 has 8GB VRAM shared between Ollama (gemma2:9b) and ComfyUI.
    */
   private async freeVram(): Promise<void> {
+    // Kill Ollama process entirely — it uses 4+ GB RAM even when idle
     try {
-      // Unload ALL Ollama models
-      const modelsRes = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(3000) });
-      if (modelsRes.ok) {
-        const { models } = await modelsRes.json() as { models: Array<{ name: string }> };
-        for (const m of models) {
-          await fetch(`${OLLAMA_URL}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: m.name, keep_alive: 0 }),
-            signal: AbortSignal.timeout(5000),
-          }).catch(() => {});
-        }
-      }
+      const { execSync } = require('child_process');
+      execSync('taskkill /F /IM ollama.exe 2>nul', { stdio: 'ignore' });
+      console.log('[ComfyUI] Killed Ollama to free RAM');
       await new Promise(r => setTimeout(r, 2000));
     } catch {
       // Ollama may not be running — that's fine

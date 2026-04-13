@@ -4,6 +4,9 @@ import { errorResponse } from '@/lib/api';
 import { generatePortrait, generateFromDescription } from '@/ai/portraits/portrait-service';
 import type { PortraitCharacterData } from '@/ai/portraits/types';
 
+// Allow up to 30 minutes for portrait generation (GGUF on low RAM is slow)
+export const maxDuration = 1800;
+
 /**
  * POST /api/portraits/generate
  *

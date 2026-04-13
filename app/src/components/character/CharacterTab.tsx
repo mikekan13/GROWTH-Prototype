@@ -24,6 +24,8 @@ interface CharacterDescData {
   desiredAge?: number;
   selectedSeed?: string;
   referencePhotos?: string[];
+  generatedBust?: string;
+  generatedFullBody?: string;
 }
 
 interface CampaignSeedItem {
@@ -98,6 +100,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         const parsed = JSON.parse(userCharacter.data);
         if (parsed.identity?.physicalDescription) setPhysicalDescription(parsed.identity.physicalDescription);
         if (parsed.identity?.referencePhotos) setReferencePhotos(parsed.identity.referencePhotos);
+        if (parsed.identity?.generatedBust) setGeneratedBust(parsed.identity.generatedBust);
+        if (parsed.identity?.generatedFullBody) setGeneratedFullBody(parsed.identity.generatedFullBody);
         if (parsed.backstory?.backstory) setBackstoryText(parsed.backstory.backstory);
         if (parsed.creation?.seed?.name) setSelectedSeedName(parsed.creation.seed.name);
         setCharacterName(parsed.identity?.name || userCharacter.name);
@@ -116,6 +120,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               if (desc.desiredAge) setDesiredAge(desc.desiredAge);
               if (desc.selectedSeed) setSelectedSeedName(desc.selectedSeed);
               if (desc.referencePhotos) setReferencePhotos(desc.referencePhotos);
+              if (desc.generatedBust) setGeneratedBust(desc.generatedBust);
+              if (desc.generatedFullBody) setGeneratedFullBody(desc.generatedFullBody);
             } catch { /* ignore */ }
           }
         })
@@ -286,6 +292,31 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
       }
       const bodyData = await bodyRes.json();
       setGeneratedFullBody(bodyData.imagePath);
+
+      // Persist portrait paths immediately
+      const portraitData = { generatedBust: bustData.imagePath, generatedFullBody: bodyData.imagePath };
+      if (userCharacter?.id) {
+        const charRes = await fetch(`/api/characters/${userCharacter.id}`);
+        if (charRes.ok) {
+          const { character } = await charRes.json();
+          const data = JSON.parse(character.data);
+          data.identity = { ...data.identity, ...portraitData };
+          await fetch(`/api/characters/${userCharacter.id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data }),
+          });
+        }
+      } else {
+        const memberRes = await fetch(`/api/campaigns/${campaignId}/members/me`);
+        if (memberRes.ok) {
+          const { member } = await memberRes.json();
+          const desc = member?.characterDesc ? JSON.parse(member.characterDesc) : {};
+          await fetch(`/api/campaigns/${campaignId}/members/me`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ characterDesc: { ...desc, ...portraitData } }),
+          });
+        }
+      }
     } catch (err) {
       setGenerationError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -301,7 +332,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         if (!res.ok) throw new Error('Failed to load');
         const { character } = await res.json();
         const data = JSON.parse(character.data);
-        data.identity = { ...data.identity, physicalDescription, referencePhotos };
+        data.identity = { ...data.identity, physicalDescription, referencePhotos, generatedBust, generatedFullBody };
         data.backstory = { ...data.backstory, backstory: backstoryText };
         const updateRes = await fetch(`/api/characters/${userCharacter.id}`, {
           method: 'PATCH',
@@ -314,7 +345,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            characterDesc: { physicalDescription, backstory: backstoryText, characterName, desiredAge, selectedSeed: selectedSeedName, referencePhotos },
+            characterDesc: { physicalDescription, backstory: backstoryText, characterName, desiredAge, selectedSeed: selectedSeedName, referencePhotos, generatedBust, generatedFullBody },
           }),
         });
         if (!res.ok) throw new Error('Failed to save');

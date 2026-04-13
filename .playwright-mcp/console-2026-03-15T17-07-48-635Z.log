@@ -1,0 +1,16 @@
+[  138311ms] [ERROR] ./src/components/DashboardShell.tsx:242:18
+Parsing ecmascript source code failed
+  240 |                     </div>
+  241 |                   </div>
+> 242 |                 )}
+      |                  ^
+  243 |               </div>
+  244 |             )}
+  245 |           </div>
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import trace:
+  Server Component:
+    ./src/components/DashboardShell.tsx
+    ./src/app/hub/page.tsx @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:3127
