@@ -115,10 +115,61 @@ export async function joinCampaign(userId: string, inviteCode: string) {
   if (existing) throw new ConflictError('You are already in this campaign');
 
   const member = await prisma.campaignMember.create({
-    data: { campaignId: campaign.id, userId },
+    data: { campaignId: campaign.id, userId, status: 'ACTIVE' },
   });
 
   return { campaign: { id: campaign.id, name: campaign.name }, member };
+}
+
+// Express interest in a campaign (from Hub listing)
+export async function expressInterest(userId: string, campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: { _count: { select: { members: true } } },
+  });
+
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (campaign.status !== 'ACTIVE') throw new ValidationError('Campaign is not active');
+  if (campaign.gmUserId === userId) throw new ValidationError('You are the GM of this campaign');
+
+  const existing = await prisma.campaignMember.findUnique({
+    where: { campaignId_userId: { campaignId, userId } },
+  });
+  if (existing) throw new ConflictError('You have already expressed interest');
+
+  const member = await prisma.campaignMember.create({
+    data: { campaignId, userId, status: 'INTERESTED' },
+  });
+
+  return { campaign: { id: campaign.id, name: campaign.name }, member };
+}
+
+// GM accepts or rejects an interested player
+export async function reviewInterest(
+  gmUserId: string,
+  gmRole: string,
+  memberId: string,
+  action: 'BACKSTORY' | 'REJECTED',
+) {
+  const member = await prisma.campaignMember.findUnique({
+    where: { id: memberId },
+    include: { campaign: true },
+  });
+
+  if (!member) throw new NotFoundError('Member not found');
+  if (!canManageCampaign(gmUserId, gmRole, member.campaign)) {
+    throw new ForbiddenError();
+  }
+  if (member.status !== 'INTERESTED') {
+    throw new ValidationError(`Cannot ${action.toLowerCase()} a member with status ${member.status}`);
+  }
+
+  const updated = await prisma.campaignMember.update({
+    where: { id: memberId },
+    data: { status: action },
+  });
+
+  return updated;
 }
 
 export async function updateCampaign(

@@ -37,8 +37,8 @@ if (typeof window !== 'undefined') {
 
 // ── Pages that use the Relations Canvas ─────────────────────────────
 function isCanvasPage(pathname: string): boolean {
-  // /campaign/[id] and /watcher/campaign/[id] have the canvas
-  return /^\/(campaign|watcher\/campaign)\/[^/]+$/.test(pathname);
+  // Only /campaign/[id] has the canvas — /watcher/campaign/[id] is a detail page
+  return /^\/campaign\/[^/]+$/.test(pathname);
 }
 
 // ── Component ───────────────────────────────────────────────────────

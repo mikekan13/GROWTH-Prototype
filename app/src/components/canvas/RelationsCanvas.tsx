@@ -1855,7 +1855,25 @@ export default function RelationsCanvas({
               case 'magic':
                 return <MagicCard magic={(charData.magic as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'backstory':
-                return <BackstoryCard backstory={(charData.backstory as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
+                return <BackstoryCard
+                  backstory={(charData.backstory as Record<string, unknown>) || {}}
+                  physicalDescription={((charData.identity as Record<string, unknown>)?.physicalDescription as Record<string, string>) || {}}
+                  onPhysicalDescriptionChange={onCharacterUpdate ? (field, value) => {
+                    const char = charData as unknown as GrowthCharacter;
+                    const updated: GrowthCharacter = {
+                      ...char,
+                      identity: {
+                        ...char.identity,
+                        physicalDescription: {
+                          ...char.identity.physicalDescription,
+                          [field]: value,
+                        },
+                      },
+                    };
+                    onCharacterUpdate(node.id, updated, [`physicalDescription.${field}`]);
+                  } : undefined}
+                  onClose={() => togglePanel(node.id, panelKey)}
+                />;
               case 'harvests':
                 return <HarvestCard harvests={(charData.harvests as Array<{ season: string; turn: number; description?: string; rewards?: string[]; consequences?: string[]; krmaChange?: number }>) || []} onClose={() => togglePanel(node.id, panelKey)} />;
               default:

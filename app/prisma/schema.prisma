@@ -60,13 +60,15 @@ model Campaign {
 }
 
 model CampaignMember {
-  id          String               @id @default(cuid())
-  campaign    Campaign             @relation(fields: [campaignId], references: [id])
-  campaignId  String
-  user        User                 @relation(fields: [userId], references: [id])
-  userId      String
-  application CampaignApplication?
-  joinedAt    DateTime             @default(now())
+  id              String               @id @default(cuid())
+  campaign        Campaign             @relation(fields: [campaignId], references: [id])
+  campaignId      String
+  user            User                 @relation(fields: [userId], references: [id])
+  userId          String
+  status          String               @default("INTERESTED") // INTERESTED, BACKSTORY, CHARACTER_CREATION, ACTIVE, REJECTED
+  application     CampaignApplication?
+  characterDesc   String?              // JSON: player's backstory + physical description before character exists
+  joinedAt        DateTime             @default(now())
 
   @@unique([campaignId, userId])
 }

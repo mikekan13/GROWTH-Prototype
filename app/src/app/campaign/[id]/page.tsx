@@ -23,11 +23,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
           userId: true,
         },
       },
-      members: {
-        include: {
-          user: { select: { id: true } },
-        },
-      },
+      members: true,
       locations: {
         select: {
           id: true,
@@ -56,7 +52,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   // Allow access if user is admin, GM, or a campaign member
   const isAdmin = session.user.role === 'GODHEAD' || session.user.role === 'ADMIN';
   const isGM = campaign.gmUserId === session.user.id;
-  const isMember = campaign.members.some(m => m.userId === session.user.id);
+  const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED'].includes(m.status));
 
   if (!isAdmin && !isGM && !isMember) redirect('/terminal');
 

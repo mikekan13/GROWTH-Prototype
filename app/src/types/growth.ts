@@ -110,6 +110,7 @@ export interface GrowthSeed {
   nectars: string[];           // Starting nectar names
   thorns: string[];            // Starting thorn names
   seedKV: number;              // Total Seed KRMA Value
+  bodyStructure: SeedBodyStructure;  // Physical body parts and vital areas
 }
 
 // Attribute names that can govern skills (all except Frequency)
@@ -206,8 +207,25 @@ export interface GROvine {
 }
 
 // Combat - Body Parts and Vitals
-export type BodyPart = 'HEAD' | 'NECK' | 'TORSO' | 'RIGHTARM' | 'LEFTARM'
-                     | 'RIGHTUPPERLEG' | 'LEFTUPPERLEG' | 'RIGHTLOWERLEG' | 'LEFTLOWERLEG';
+// Body parts are seed-defined — this is the human baseline
+// Other seeds may have different parts (e.g. TAIL, WINGS, extra limbs)
+export type BodyPart = string;
+
+// Human body parts as constants
+export const HUMAN_BODY_PARTS = [
+  'HEAD', 'TORSO',
+  'LEFT_UPPER_ARM', 'LEFT_LOWER_ARM',
+  'RIGHT_UPPER_ARM', 'RIGHT_LOWER_ARM',
+  'LEFT_UPPER_LEG', 'LEFT_LOWER_LEG',
+  'RIGHT_UPPER_LEG', 'RIGHT_LOWER_LEG',
+] as const;
+
+// Seed body structure — defines what physical parts a species has
+export interface SeedBodyStructure {
+  parts: string[];            // All body parts for this seed
+  vitals: string[];           // Parts that trigger death if destroyed
+  descriptors?: Record<string, string>;  // Optional per-part flavor (e.g. "HEAD": "elongated cranium")
+}
 
 // Equipment Layer System
 export type ArmorLayer = 'body' | 'clothing' | 'lightArmor' | 'heavyArmor';
@@ -281,6 +299,26 @@ export interface GrowthHarvest {
   status: 'planned' | 'active' | 'completed';
 }
 
+// Physical Description — standardized fields for portrait generation
+export interface PhysicalDescription {
+  // Body
+  height?: string;
+  build?: string;
+  skinTone?: string;
+  // Face
+  faceShape?: string;
+  eyeShape?: string;
+  eyeColor?: string;
+  facialHair?: string;
+  // Hair
+  hairColor?: string;
+  hairStyle?: string;
+  // Distinguishing features (permanent — not equipment/wounds)
+  distinguishingMarks?: string;  // Scars, tattoos, birthmarks
+  notableFeatures?: string;     // Horns, wings, unusual seed traits
+  // Removed: ageAppearance (determined by root/branches), clothingStyle (determined by equipment)
+}
+
 // Character Identity
 export interface GrowthIdentity {
   name: string;
@@ -289,6 +327,7 @@ export interface GrowthIdentity {
   background?: string;
   description?: string;
   image?: string;
+  physicalDescription?: PhysicalDescription;
 }
 
 // Backstory

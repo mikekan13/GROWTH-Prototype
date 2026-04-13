@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import EntitiesPanel from './EntitiesPanel';
+import ProfileSummary from '@/components/profile/ProfileSummary';
 
 interface CanvasNode {
   id: string;
@@ -16,275 +17,69 @@ interface TapestryTabProps {
   nodes: CanvasNode[];
 }
 
-// --- Application types ---
-interface ApplicationResponse {
-  promptId: string;
-  prompt: string;
-  response: string;
-  aiExpanded?: string;
-}
-
-interface Application {
+// --- Member types ---
+interface CampaignMemberData {
   id: string;
   status: string;
-  responses: string; // JSON
-  gmNotes: string | null;
-  profileSnapshot: string | null;
-  createdAt: string;
-  updatedAt: string;
-  member: {
-    user: { id: string; username: string };
+  joinedAt: string;
+  user: {
+    id: string;
+    username: string;
+    role: string;
+    profile: string | null;
   };
-}
-
-interface TemplatePrompt {
-  id: string;
-  prompt: string;
-  required: boolean;
-  category: string;
 }
 
 type SubTab = 'applications' | 'entities';
 
-const CATEGORIES = ['backstory', 'character', 'personality', 'mechanics', 'meta', 'interest', 'safety', 'other'];
-
-// --- Application Template Editor ---
-function TemplateEditor({ campaignId }: { campaignId: string }) {
-  const [prompts, setPrompts] = useState<TemplatePrompt[]>([]);
-  const [isDefault, setIsDefault] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [message, setMessage] = useState('');
-
-  const fetchTemplate = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/application/template`);
-      if (res.ok) {
-        const data = await res.json();
-        setPrompts(data.prompts || []);
-        setIsDefault(data.isDefault);
-      }
-    } catch { /* silent */ }
-    finally { setLoading(false); }
-  }, [campaignId]);
-
-  useEffect(() => { fetchTemplate(); }, [fetchTemplate]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage('');
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/application/template`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompts }),
-      });
-      if (res.ok) {
-        setMessage('Template saved');
-        setIsDefault(false);
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        const data = await res.json();
-        setMessage(data.error || 'Save failed');
-      }
-    } catch { setMessage('Network error'); }
-    finally { setSaving(false); }
-  };
-
-  const addPrompt = () => {
-    if (prompts.length >= 20) return;
-    setPrompts([...prompts, {
-      id: `custom-${Date.now()}`,
-      prompt: '',
-      required: false,
-      category: 'backstory',
-    }]);
-  };
-
-  const removePrompt = (index: number) => {
-    setPrompts(prompts.filter((_, i) => i !== index));
-  };
-
-  const updatePrompt = (index: number, field: keyof TemplatePrompt, value: string | boolean) => {
-    setPrompts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
-  };
-
-  const movePrompt = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= prompts.length) return;
-    const updated = [...prompts];
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setPrompts(updated);
-  };
-
-  if (loading) return null;
-
-  return (
-    <div className="mb-6 border border-white/10" style={{ background: 'rgba(0,0,0,0.2)' }}>
-      <button
-        className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <span className="text-[9px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[var(--accent-gold)]">
-          Application Questions
-        </span>
-        {isDefault && (
-          <span className="text-[8px] font-[family-name:var(--font-terminal)] text-white/20 uppercase tracking-wider">
-            (defaults)
-          </span>
-        )}
-        <span className="text-white/15 text-[9px] font-[family-name:var(--font-terminal)] ml-auto">
-          {prompts.length} question{prompts.length !== 1 ? 's' : ''}
-        </span>
-        <span className="text-white/20 text-[10px]">{expanded ? '▾' : '▸'}</span>
-      </button>
-
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-white/5 space-y-2 mt-0">
-          <div className="text-[8px] text-white/20 font-[family-name:var(--font-terminal)] tracking-wider mt-2">
-            These questions appear when players apply to your campaign.
-          </div>
-
-          {prompts.map((p, i) => (
-            <div key={p.id} className="flex gap-2 items-start p-2 border border-white/5" style={{ background: 'rgba(0,0,0,0.2)' }}>
-              {/* Reorder */}
-              <div className="flex flex-col gap-0.5 pt-1">
-                <button
-                  onClick={() => movePrompt(i, -1)}
-                  disabled={i === 0}
-                  className="text-white/20 hover:text-white/50 disabled:opacity-20 text-[9px] leading-none"
-                >▲</button>
-                <button
-                  onClick={() => movePrompt(i, 1)}
-                  disabled={i === prompts.length - 1}
-                  className="text-white/20 hover:text-white/50 disabled:opacity-20 text-[9px] leading-none"
-                >▼</button>
-              </div>
-
-              <div className="flex-1 space-y-1">
-                <textarea
-                  value={p.prompt}
-                  onChange={e => updatePrompt(i, 'prompt', e.target.value)}
-                  placeholder="Enter your question..."
-                  maxLength={500}
-                  rows={2}
-                  className="w-full bg-black/40 border border-white/10 p-1.5 text-[11px] text-white/70 font-[family-name:var(--font-terminal)] resize-none focus:border-[var(--accent-teal)]/40 focus:outline-none"
-                />
-                <div className="flex items-center gap-3">
-                  <select
-                    value={p.category}
-                    onChange={e => updatePrompt(i, 'category', e.target.value)}
-                    className="bg-black/40 border border-white/10 px-1.5 py-0.5 text-[9px] text-white/50 font-[family-name:var(--font-terminal)] focus:outline-none"
-                  >
-                    {CATEGORIES.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={p.required}
-                      onChange={e => updatePrompt(i, 'required', e.target.checked)}
-                      className="accent-[var(--accent-teal)]"
-                    />
-                    <span className="text-[9px] text-white/40 font-[family-name:var(--font-terminal)] uppercase tracking-wider">
-                      Required
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <button
-                onClick={() => removePrompt(i)}
-                className="text-white/15 hover:text-[#E8585A] text-[11px] px-1 pt-1 transition-colors"
-                title="Remove question"
-              >✕</button>
-            </div>
-          ))}
-
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={addPrompt}
-              disabled={prompts.length >= 20}
-              className="px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] border border-white/10 text-white/30 hover:border-[var(--accent-teal)]/40 hover:text-[var(--accent-teal)] disabled:opacity-30 transition-colors"
-            >
-              + Add Question
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] bg-[var(--accent-teal)] text-black hover:brightness-110 disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Saving...' : 'Save Template'}
-            </button>
-            {message && (
-              <span className="text-[9px] text-[var(--accent-teal)] font-[family-name:var(--font-terminal)]">
-                {message}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// --- Application Review Panel ---
-function ApplicationReviewPanel({ campaignId }: { campaignId: string }) {
-  const [applications, setApplications] = useState<Application[]>([]);
+// --- Applications Panel (Interested Players) ---
+function ApplicationsPanel({ campaignId }: { campaignId: string }) {
+  const [members, setMembers] = useState<CampaignMemberData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [gmNotes, setGmNotes] = useState<Record<string, string>>({});
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [viewingProfile, setViewingProfile] = useState<CampaignMemberData | null>(null);
 
-  const fetchApplications = useCallback(async () => {
+  const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/applications`);
+      const res = await fetch(`/api/campaigns/${campaignId}/members`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
-      setApplications(data.applications || []);
+      setMembers(data.members || []);
     } catch {
-      setError('Failed to load applications');
+      setError('Failed to load members');
     } finally {
       setLoading(false);
     }
   }, [campaignId]);
 
-  useEffect(() => { fetchApplications(); }, [fetchApplications]);
+  useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
-  const handleReview = async (appId: string, action: 'APPROVED' | 'REVISION' | 'DENIED') => {
-    setReviewingId(appId);
+  const handleAction = async (memberId: string, action: 'BACKSTORY' | 'REJECTED') => {
+    setActioningId(memberId);
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/applications/${appId}`, {
+      const res = await fetch(`/api/campaigns/${campaignId}/members/${memberId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, gmNotes: gmNotes[appId] || undefined }),
+        body: JSON.stringify({ action }),
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Review failed');
+        alert(data.error || 'Action failed');
         return;
       }
-      // Refresh list
-      await fetchApplications();
-      setExpandedId(null);
+      await fetchMembers();
     } catch {
       alert('Network error');
     } finally {
-      setReviewingId(null);
+      setActioningId(null);
     }
-  };
-
-  const parseResponses = (json: string): ApplicationResponse[] => {
-    try { return JSON.parse(json); } catch { return []; }
   };
 
   if (loading) {
     return (
       <div className="text-center py-12 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
-        Loading applications...
+        Loading...
       </div>
     );
   }
@@ -297,176 +92,185 @@ function ApplicationReviewPanel({ campaignId }: { campaignId: string }) {
     );
   }
 
-  // Group by status: SUBMITTED first, then REVISION, DRAFT, APPROVED, DENIED
-  const statusOrder: Record<string, number> = { SUBMITTED: 0, REVISION: 1, DRAFT: 2, APPROVED: 3, DENIED: 4 };
-  const sorted = [...applications].sort((a, b) => (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5));
-
-  const submitted = sorted.filter(a => a.status === 'SUBMITTED');
-  const revision = sorted.filter(a => a.status === 'REVISION');
-  const approved = sorted.filter(a => a.status === 'APPROVED');
-  const denied = sorted.filter(a => a.status === 'DENIED');
-  const drafts = sorted.filter(a => a.status === 'DRAFT');
-
-  if (applications.length === 0) {
-    return (
-      <div className="text-center py-12 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
-        No applications yet. List your campaign on the hub to receive applications.
-      </div>
-    );
-  }
+  const interested = members.filter(m => m.status === 'INTERESTED');
+  const currentPlayers = members.filter(m => ['BACKSTORY', 'CHARACTER_CREATION', 'ACTIVE'].includes(m.status));
+  const rejected = members.filter(m => m.status === 'REJECTED');
 
   const statusColor = (status: string) => {
     switch (status) {
-      case 'SUBMITTED': return 'var(--accent-gold)';
-      case 'APPROVED': return 'var(--accent-teal)';
-      case 'REVISION': return '#E8585A';
-      case 'DENIED': return '#888';
-      case 'DRAFT': return 'rgba(255,255,255,0.25)';
+      case 'INTERESTED': return 'var(--accent-gold)';
+      case 'BACKSTORY': return '#7050A8';
+      case 'CHARACTER_CREATION': return 'var(--accent-gold)';
+      case 'ACTIVE': return 'var(--accent-teal)';
+      case 'REJECTED': return '#888';
       default: return 'rgba(255,255,255,0.25)';
     }
   };
 
-  const renderGroup = (label: string, apps: Application[], color: string) => {
-    if (apps.length === 0) return null;
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'BACKSTORY': return 'Backstory';
+      case 'CHARACTER_CREATION': return 'Character Creation';
+      case 'ACTIVE': return 'Active';
+      default: return status;
+    }
+  };
+
+  const renderMemberRow = (member: CampaignMemberData) => {
+    const profile = member.user.profile ? (() => { try { return JSON.parse(member.user.profile!); } catch { return null; } })() : null;
+    const isInterested = member.status === 'INTERESTED';
+    const initial = member.user.username.charAt(0).toUpperCase();
     return (
-      <div className="mb-6">
-        <div
-          className="text-[9px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-2 pb-1 border-b"
-          style={{ color, borderColor: `${color}33` }}
-        >
-          {label} ({apps.length})
-        </div>
-        <div className="space-y-2">
-          {apps.map(app => {
-            const isExpanded = expandedId === app.id;
-            const responses = parseResponses(app.responses);
-            const isActionable = app.status === 'SUBMITTED' || app.status === 'REVISION';
-            return (
-              <div
-                key={app.id}
-                className="border"
-                style={{ borderColor: `${statusColor(app.status)}33`, background: 'rgba(0,0,0,0.3)' }}
+      <div
+        key={member.id}
+        className="border p-4"
+        style={{ borderColor: `${statusColor(member.status)}33`, background: 'rgba(0,0,0,0.3)' }}
+      >
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <button
+            onClick={() => setViewingProfile(member)}
+            className="shrink-0 w-14 h-14 flex items-center justify-center text-xl font-[family-name:var(--font-header)] border border-white/20 hover:border-[var(--accent-teal)] transition-colors"
+            style={{ background: 'rgba(112,80,168,0.2)', color: '#fff' }}
+          >
+            {initial}
+          </button>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-1">
+              <button
+                onClick={() => setViewingProfile(member)}
+                className="text-white text-sm font-bold font-[family-name:var(--font-header)] tracking-wider hover:text-[var(--accent-teal)] transition-colors"
               >
-                {/* Header row */}
-                <button
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/5 transition-colors"
-                  onClick={() => setExpandedId(isExpanded ? null : app.id)}
-                >
-                  <span className="text-white text-xs font-bold font-[family-name:var(--font-header)] tracking-wider">
-                    {app.member.user.username}
-                  </span>
-                  <span
-                    className="text-[8px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] px-1.5 py-0.5"
-                    style={{ background: `${statusColor(app.status)}20`, color: statusColor(app.status) }}
-                  >
-                    {app.status}
-                  </span>
-                  <span className="text-white/15 text-[9px] font-[family-name:var(--font-terminal)] ml-auto">
-                    {responses.length} response{responses.length !== 1 ? 's' : ''}
-                  </span>
-                  <span className="text-white/20 text-[10px]">
-                    {isExpanded ? '▾' : '▸'}
-                  </span>
-                </button>
-
-                {/* Expanded detail */}
-                {isExpanded && (
-                  <div className="px-3 pb-3 space-y-3 border-t border-white/5">
-                    {/* Responses */}
-                    {responses.map((r, i) => (
-                      <div key={r.promptId || i} className="mt-3">
-                        <div className="text-[9px] uppercase tracking-wider text-[var(--accent-teal)]/60 font-[family-name:var(--font-terminal)] mb-1">
-                          {r.prompt}
-                        </div>
-                        <div className="text-white/70 text-[11px] leading-relaxed whitespace-pre-wrap font-[family-name:var(--font-terminal)]">
-                          {r.response || <span className="text-white/15 italic">No response</span>}
-                        </div>
-                        {r.aiExpanded && (
-                          <div className="mt-1 pl-2 border-l border-[var(--accent-teal)]/20">
-                            <div className="text-[8px] text-[var(--accent-teal)]/40 font-[family-name:var(--font-terminal)] uppercase tracking-wider mb-0.5">
-                              AI Enhanced
-                            </div>
-                            <div className="text-white/50 text-[10px] leading-relaxed whitespace-pre-wrap font-[family-name:var(--font-terminal)]">
-                              {r.aiExpanded}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    {/* Existing GM notes */}
-                    {app.gmNotes && (
-                      <div className="p-2 border border-[var(--accent-gold)]/20" style={{ background: 'rgba(208,168,48,0.05)' }}>
-                        <div className="text-[8px] text-[var(--accent-gold)] font-[family-name:var(--font-terminal)] uppercase tracking-wider mb-1">
-                          Your Notes
-                        </div>
-                        <div className="text-white/60 text-[10px] whitespace-pre-wrap">{app.gmNotes}</div>
-                      </div>
-                    )}
-
-                    {/* Action area — only for actionable applications */}
-                    {isActionable && (
-                      <div className="pt-2 border-t border-white/5 space-y-2">
-                        <textarea
-                          value={gmNotes[app.id] || ''}
-                          onChange={e => setGmNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
-                          placeholder="Notes for the applicant (optional)..."
-                          className="w-full bg-black/40 border border-white/10 p-2 text-[11px] text-white/70 font-[family-name:var(--font-terminal)] resize-none focus:border-[var(--accent-teal)]/40 focus:outline-none"
-                          rows={2}
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleReview(app.id, 'APPROVED')}
-                            disabled={reviewingId === app.id}
-                            className="px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] bg-[var(--accent-teal)] text-black hover:brightness-110 disabled:opacity-50 transition-colors"
-                          >
-                            {reviewingId === app.id ? '...' : 'Approve'}
-                          </button>
-                          <button
-                            onClick={() => handleReview(app.id, 'REVISION')}
-                            disabled={reviewingId === app.id}
-                            className="px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] border border-[var(--accent-gold)]/40 text-[var(--accent-gold)] hover:bg-[var(--accent-gold)]/10 disabled:opacity-50 transition-colors"
-                          >
-                            {reviewingId === app.id ? '...' : 'Request Revision'}
-                          </button>
-                          <button
-                            onClick={() => handleReview(app.id, 'DENIED')}
-                            disabled={reviewingId === app.id}
-                            className="px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] border border-white/10 text-white/30 hover:border-[#E8585A]/40 hover:text-[#E8585A] disabled:opacity-50 transition-colors"
-                          >
-                            {reviewingId === app.id ? '...' : 'Deny'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {member.user.username}
+              </button>
+              {profile?.pronouns && (
+                <span className="text-white/30 text-[10px] font-[family-name:var(--font-terminal)]">{profile.pronouns}</span>
+              )}
+              <span
+                className="text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] px-2 py-0.5"
+                style={{ background: `${statusColor(member.status)}20`, color: statusColor(member.status) }}
+              >
+                {statusLabel(member.status)}
+              </span>
+            </div>
+            {profile?.bio && (
+              <div className="text-white/40 text-xs font-[family-name:var(--font-terminal)] leading-relaxed mb-2 line-clamp-2">
+                {profile.bio}
               </div>
-            );
-          })}
+            )}
+            {profile?.experienceLevel && (
+              <div className="text-white/25 text-[10px] font-[family-name:var(--font-terminal)]">
+                Experience: <span className="text-white/40">{profile.experienceLevel}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="shrink-0 flex items-center gap-2">
+            {isInterested && (
+              <>
+                <button
+                  onClick={() => handleAction(member.id, 'BACKSTORY')}
+                  disabled={actioningId === member.id}
+                  className="px-4 py-1.5 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] bg-[var(--accent-teal)] text-black hover:brightness-110 disabled:opacity-50 transition-colors"
+                >
+                  {actioningId === member.id ? '...' : 'Accept'}
+                </button>
+                <button
+                  onClick={() => handleAction(member.id, 'REJECTED')}
+                  disabled={actioningId === member.id}
+                  className="px-4 py-1.5 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] border border-white/10 text-white/30 hover:border-[#E8585A]/40 hover:text-[#E8585A] disabled:opacity-50 transition-colors"
+                >
+                  {actioningId === member.id ? '...' : 'Reject'}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
-  return (
-    <>
-      {renderGroup('Awaiting Review', submitted, 'var(--accent-gold)')}
-      {renderGroup('Revision Requested', revision, '#E8585A')}
-      {renderGroup('Drafts', drafts, 'rgba(255,255,255,0.25)')}
-      {renderGroup('Approved', approved, 'var(--accent-teal)')}
-      {renderGroup('Denied', denied, '#888')}
-    </>
-  );
-}
+  if (members.length === 0) {
+    return (
+      <div className="text-center py-12 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
+        No players yet. List your campaign on the Hub to receive interest.
+      </div>
+    );
+  }
 
-// --- Combined Applications + Template Panel ---
-function ApplicationsPanel({ campaignId }: { campaignId: string }) {
   return (
-    <>
-      <TemplateEditor campaignId={campaignId} />
-      <ApplicationReviewPanel campaignId={campaignId} />
-    </>
+    <div className="space-y-6">
+      {/* Profile popup */}
+      {viewingProfile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setViewingProfile(null)}>
+          <div className="bg-white p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto relative" style={{ borderRadius: '4px' }} onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setViewingProfile(null)}
+              className="absolute top-3 right-3 text-[var(--surface-dark)]/40 hover:text-[var(--surface-dark)] text-lg"
+            >
+              &#x2715;
+            </button>
+            <ProfileSummary
+              username={viewingProfile.user.username}
+              role={viewingProfile.user.role}
+              profile={viewingProfile.user.profile ? (() => { try { return JSON.parse(viewingProfile.user.profile!); } catch { return null; } })() : null}
+            />
+            {!viewingProfile.user.profile && (
+              <div className="text-sm text-[var(--surface-dark)]/40 italic mt-2">No profile set up yet.</div>
+            )}
+            {viewingProfile.status === 'INTERESTED' && (
+              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-[var(--surface-dark)]/10">
+                <button
+                  onClick={() => { handleAction(viewingProfile.id, 'BACKSTORY'); setViewingProfile(null); }}
+                  className="px-4 py-1.5 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] bg-[var(--accent-teal)] text-black hover:brightness-110 transition-colors"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => { handleAction(viewingProfile.id, 'REJECTED'); setViewingProfile(null); }}
+                  className="px-4 py-1.5 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] border border-[var(--surface-dark)]/20 text-[var(--surface-dark)]/40 hover:border-[#E8585A]/40 hover:text-[#E8585A] transition-colors"
+                >
+                  Reject
+                </button>
+                <button
+                  disabled
+                  className="px-4 py-1.5 text-[10px] uppercase tracking-[0.1em] font-[family-name:var(--font-terminal)] border border-[var(--surface-dark)]/10 text-[var(--surface-dark)]/20 cursor-not-allowed ml-auto"
+                >
+                  Message (coming soon)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {interested.length > 0 && (
+        <div>
+          <div className="text-[9px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-2 pb-1 border-b" style={{ color: 'var(--accent-gold)', borderColor: 'rgba(208,160,48,0.2)' }}>
+            Interested ({interested.length})
+          </div>
+          <div className="space-y-2">{interested.map(renderMemberRow)}</div>
+        </div>
+      )}
+      {currentPlayers.length > 0 && (
+        <div>
+          <div className="text-[9px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-2 pb-1 border-b" style={{ color: 'var(--accent-teal)', borderColor: 'rgba(34,171,148,0.2)' }}>
+            Current Players ({currentPlayers.length})
+          </div>
+          <div className="space-y-2">{currentPlayers.map(renderMemberRow)}</div>
+        </div>
+      )}
+      {rejected.length > 0 && (
+        <div>
+          <div className="text-[9px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase mb-2 pb-1 border-b" style={{ color: '#888', borderColor: 'rgba(136,136,136,0.2)' }}>
+            Rejected ({rejected.length})
+          </div>
+          <div className="space-y-2">{rejected.map(renderMemberRow)}</div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -530,7 +334,7 @@ export default function TapestryTab({ campaignId, isGM, nodes }: TapestryTabProp
   const [subTab, setSubTab] = useState<SubTab>(isGM ? 'applications' : 'entities');
 
   const subTabs: { key: SubTab; label: string; gmOnly?: boolean }[] = [
-    ...(isGM ? [{ key: 'applications' as SubTab, label: 'Applications', gmOnly: true }] : []),
+    ...(isGM ? [{ key: 'applications' as SubTab, label: 'Trailblazers', gmOnly: true }] : []),
     { key: 'entities', label: 'Entities' },
   ];
 

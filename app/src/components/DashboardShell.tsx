@@ -10,6 +10,7 @@ import EyetehrnetLogo from './EyetehrnetLogo';
 interface DashboardShellProps {
   username: string;
   role: string;
+  realRole?: string;
   children: React.ReactNode;
 }
 
@@ -24,7 +25,7 @@ const VIEW_ROLES = [
   { key: 'TRAILBLAZER', label: 'Trailblazer', color: 'var(--pillar-spirit)' },
 ] as const;
 
-export default function DashboardShell({ username, role, children }: DashboardShellProps) {
+export default function DashboardShell({ username, role, realRole, children }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = role === 'ADMIN';

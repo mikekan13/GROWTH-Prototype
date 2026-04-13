@@ -5,6 +5,7 @@ import { isWatcherOrAbove } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import ProfileSummary from '@/components/profile/ProfileSummary';
 import Link from 'next/link';
+import InterestButton from '@/components/hub/InterestButton';
 
 export default async function CampaignListingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -50,16 +51,20 @@ export default async function CampaignListingPage({ params }: { params: Promise<
 
   const session = await getSession();
 
-  // Check if user is already a member
   let isMember = false;
+
+  // Check if user has already expressed interest
+  let memberStatus: string | null = null;
   if (session) {
-    const membership = await prisma.campaignMember.findUnique({
+    const member = await prisma.campaignMember.findUnique({
       where: { campaignId_userId: { campaignId: id, userId: session.user.id } },
+      select: { status: true },
     });
-    isMember = !!membership;
+    memberStatus = member?.status || null;
+    isMember = !!member;
   }
 
-  const canApply = session
+  const canExpress = session
     && campaign.listingStatus === 'LISTED'
     && campaign.status === 'ACTIVE'
     && !isFull
@@ -123,19 +128,27 @@ export default async function CampaignListingPage({ params }: { params: Promise<
         </div>
       )}
 
-      {/* Apply button */}
+      {/* Interest / Status */}
       <div className="space-y-2">
-        {canApply && (
+        {canExpress && (
+          <InterestButton campaignId={campaign.id} />
+        )}
+        {memberStatus === 'INTERESTED' && (
+          <div className="text-xs text-[var(--accent-gold)] font-[family-name:var(--font-terminal)]">
+            You have expressed interest. Waiting for the GM to review.
+          </div>
+        )}
+        {memberStatus && !['INTERESTED', 'REJECTED'].includes(memberStatus) && (
           <Link
-            href={`/hub/${id}/apply`}
+            href={`/campaign/${campaign.id}`}
             className="inline-block px-8 py-2 bg-[var(--accent-teal)] text-white text-sm font-[family-name:var(--font-terminal)] tracking-wider uppercase hover:bg-[var(--accent-teal)]/80 transition-colors"
           >
-            Apply to Campaign
+            Enter Campaign
           </Link>
         )}
-        {isMember && (
-          <div className="text-xs text-[var(--accent-teal)] font-[family-name:var(--font-terminal)]">
-            You are already a member of this campaign
+        {memberStatus === 'REJECTED' && (
+          <div className="text-xs text-[var(--pillar-body)] font-[family-name:var(--font-terminal)]">
+            Your interest was not accepted for this campaign.
           </div>
         )}
         {isFull && !isMember && (
@@ -146,7 +159,7 @@ export default async function CampaignListingPage({ params }: { params: Promise<
         {!session && (
           <div className="p-3 bg-[var(--accent-teal)]/5 border border-[var(--accent-teal)]/20">
             <Link href="/" className="text-sm text-[var(--accent-teal)] hover:underline">
-              Log in to apply
+              Log in to join
             </Link>
           </div>
         )}

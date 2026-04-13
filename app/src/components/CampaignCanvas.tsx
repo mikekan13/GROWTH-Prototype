@@ -20,6 +20,7 @@ const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanva
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
 const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr: false });
 const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), { ssr: false });
+const CharacterTab = dynamic(() => import('@/components/character/CharacterTab'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -62,7 +63,7 @@ interface CampaignCanvasProps {
   userCharacter?: { id: string; name: string; data: string } | null;
 }
 
-type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry';
+type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry' | 'character';
 // Tab was renamed from 'relations' to 'canvas' (2026-03-11), 'essence' to 'tapestry' (2026-03-14)
 
 const MIN_TERMINAL_HEIGHT = 150;
@@ -569,6 +570,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     { key: 'forge', label: 'Forge' },
     { key: 'encounters', label: 'Encounters' },
     { key: 'tapestry', label: 'Tapestry' },
+    ...(!isGM ? [{ key: 'character' as Tab, label: 'Character' }] : []),
   ];
 
   return (
@@ -776,6 +778,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
         {activeTab === 'tapestry' && (
           <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} />
+        )}
+
+        {activeTab === 'character' && (
+          <CharacterTab
+            campaignId={campaign.id}
+            userId={userId}
+            userRole={userRole}
+            isGM={isGM}
+            userCharacter={userCharacter}
+          />
         )}
 
         {/* Campaign Terminal — resizable bottom overlay */}

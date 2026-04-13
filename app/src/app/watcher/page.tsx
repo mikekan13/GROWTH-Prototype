@@ -122,7 +122,7 @@ export default async function WatcherDashboard() {
               {campaigns.map(c => (
                 <Link
                   key={c.id}
-                  href={`/watcher/campaign/${c.id}`}
+                  href={`/campaign/${c.id}`}
                   className="flex items-center justify-between p-3 bg-white/40 border border-[var(--surface-dark)]/10 hover:bg-white/60 transition-colors no-underline"
                 >
                   <div>

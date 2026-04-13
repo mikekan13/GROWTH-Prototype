@@ -4,6 +4,7 @@ export function createDefaultCharacter(name: string): GrowthCharacter {
   return {
     identity: {
       name,
+      physicalDescription: {},
     },
     fatedAge: 80,  // Default human lifespan
     conditions: {
@@ -44,10 +45,11 @@ export function createDefaultCharacter(name: string): GrowthCharacter {
     fears: [],
     vitals: {
       bodyParts: {
-        HEAD: 0, NECK: 0, TORSO: 0,
-        RIGHTARM: 0, LEFTARM: 0,
-        RIGHTUPPERLEG: 0, LEFTUPPERLEG: 0,
-        RIGHTLOWERLEG: 0, LEFTLOWERLEG: 0,
+        HEAD: 0, TORSO: 0,
+        RIGHT_UPPER_ARM: 0, RIGHT_LOWER_ARM: 0,
+        LEFT_UPPER_ARM: 0, LEFT_LOWER_ARM: 0,
+        RIGHT_UPPER_LEG: 0, RIGHT_LOWER_LEG: 0,
+        LEFT_UPPER_LEG: 0, LEFT_LOWER_LEG: 0,
       },
       baseResist: 0,
       restRate: 1,

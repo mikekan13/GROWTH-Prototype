@@ -1,4 +1,4 @@
-import type { GrowthSeed, FateDie } from '@/types/growth';
+import type { GrowthSeed, FateDie, SeedBodyStructure } from '@/types/growth';
 
 /**
  * Canonical seed catalog — 48 seeds parsed from Character Creation Examples.csv
@@ -16,6 +16,18 @@ function parseList(s: string): string[] {
   return s.split(',').map(x => x.trim()).filter(Boolean);
 }
 
+// Default humanoid body structure — used for most seeds until species-specific ones are defined
+export const HUMANOID_BODY: SeedBodyStructure = {
+  parts: [
+    'HEAD', 'TORSO',
+    'LEFT_UPPER_ARM', 'LEFT_LOWER_ARM',
+    'RIGHT_UPPER_ARM', 'RIGHT_LOWER_ARM',
+    'LEFT_UPPER_LEG', 'LEFT_LOWER_LEG',
+    'RIGHT_UPPER_LEG', 'RIGHT_LOWER_LEG',
+  ],
+  vitals: ['HEAD', 'TORSO'],
+};
+
 export const SEED_CATALOG: GrowthSeed[] = [
   {
     name: 'Human',
@@ -28,7 +40,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Ambitious'),
     thorns: parseList('Bounded Potential'),
-    seedKV: 225,
+    seedKV: 225, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Altered Human',
@@ -41,7 +53,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('May purchase Nectars with starting frequency'),
     thorns: parseList('May choose Thorns to increase Frequency'),
-    seedKV: 350,
+    seedKV: 350, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Elven',
@@ -54,7 +66,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Dark Sight'),
     thorns: parseList('Long Lifespan Frailty'),
-    seedKV: 255,
+    seedKV: 255, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Dwarven',
@@ -67,7 +79,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Dark Sight'),
     thorns: parseList('Technological Dependency'),
-    seedKV: 580,
+    seedKV: 580, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Neo-Human',
@@ -80,7 +92,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Machine Interfacing, Strange Vibrations'),
     thorns: parseList('Tech Addiction'),
-    seedKV: 1640,
+    seedKV: 1640, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Cambion',
@@ -93,7 +105,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Demonic Heritage'),
     thorns: parseList('Dual Nature'),
-    seedKV: 280,
+    seedKV: 280, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Argentum Sanguis',
@@ -106,7 +118,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Make One Custom'),
     thorns: parseList('Ancient Bloodline Curse'),
-    seedKV: 1089,
+    seedKV: 1089, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Orcish',
@@ -119,7 +131,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Intimidation'),
     nectars: parseList('Berserker Rage'),
     thorns: parseList('Social Outcast'),
-    seedKV: 315,
+    seedKV: 315, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Halfling',
@@ -132,7 +144,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Stealth'),
     nectars: parseList('Lucky'),
     thorns: parseList('Small Stature'),
-    seedKV: 170,
+    seedKV: 170, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Goblinoid',
@@ -145,7 +157,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Scavenging'),
     nectars: parseList('Pack Mentality'),
     thorns: parseList('Compulsive Behavior'),
-    seedKV: 135,
+    seedKV: 135, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Tiefling',
@@ -158,7 +170,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Infernal Resilience'),
     thorns: parseList('Cursed Bloodline'),
-    seedKV: 220,
+    seedKV: 220, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Fey-Touched',
@@ -171,7 +183,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Otherworldly Grace'),
     thorns: parseList('Reality Disconnect'),
-    seedKV: 140,
+    seedKV: 140, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Astral Drifter',
@@ -184,7 +196,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Navigation'),
     nectars: parseList('Void Walking'),
     thorns: parseList('Temporal Displacement'),
-    seedKV: 935,
+    seedKV: 935, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Crystalline',
@@ -197,7 +209,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Energy Absorption'),
     thorns: parseList('Brittle Form'),
-    seedKV: 1060,
+    seedKV: 1060, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Shapeshifter',
@@ -210,7 +222,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Deception'),
     nectars: parseList('Perfect Mimicry'),
     thorns: parseList('Identity Crisis'),
-    seedKV: 215,
+    seedKV: 215, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Undying',
@@ -223,7 +235,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Deathless Vigor'),
     thorns: parseList('Unholy Aura'),
-    seedKV: 3280,
+    seedKV: 3280, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Synthetic',
@@ -236,7 +248,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Technical Skills'),
     nectars: parseList('Logical Processing'),
     thorns: parseList('Emotional Limitations'),
-    seedKV: 3530,
+    seedKV: 3530, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Void-Born',
@@ -249,7 +261,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Entropy Resistance'),
     thorns: parseList('Existential Dread'),
-    seedKV: 950,
+    seedKV: 950, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Elemental-Kin',
@@ -262,7 +274,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Elemental Affinity'),
     nectars: parseList('Primal Connection'),
     thorns: parseList('Environmental Dependency'),
-    seedKV: 295,
+    seedKV: 295, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Celestial',
@@ -275,7 +287,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Divine Favor'),
     thorns: parseList('Mortal Compassion'),
-    seedKV: 490,
+    seedKV: 490, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Abyssal-Spawn',
@@ -288,7 +300,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Intimidation'),
     nectars: parseList('Hellish Resilience'),
     thorns: parseList('Chaotic Impulses'),
-    seedKV: 540,
+    seedKV: 540, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Psionic',
@@ -301,7 +313,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Mental Powers'),
     nectars: parseList('Psychic Sensitivity'),
     thorns: parseList('Mental Overload'),
-    seedKV: 445,
+    seedKV: 445, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Construct',
@@ -314,7 +326,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Technical Knowledge'),
     nectars: parseList('Tireless Function'),
     thorns: parseList('Emotional Void'),
-    seedKV: 1670,
+    seedKV: 1670, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Time-Lost',
@@ -327,7 +339,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Temporal Lore'),
     nectars: parseList('Chrono-Perception'),
     thorns: parseList('Timeline Displacement'),
-    seedKV: 245,
+    seedKV: 245, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Dream-Walker',
@@ -340,7 +352,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Dream Lore'),
     nectars: parseList('Lucid Dreaming'),
     thorns: parseList('Reality Blur'),
-    seedKV: 150,
+    seedKV: 150, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Plague-Bearer',
@@ -353,7 +365,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Disease Resistance'),
     nectars: parseList('Viral Adaptation'),
     thorns: parseList('Carrier Status'),
-    seedKV: 535,
+    seedKV: 535, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Starborn',
@@ -366,7 +378,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Astral Navigation'),
     nectars: parseList('Cosmic Awareness'),
     thorns: parseList('Solar Dependency'),
-    seedKV: 1360,
+    seedKV: 1360, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Machine-Hybrid',
@@ -379,7 +391,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Technical Interface'),
     nectars: parseList('Cybernetic Enhancement'),
     thorns: parseList('System Vulnerability'),
-    seedKV: 3700,
+    seedKV: 3700, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Quantum-Phased',
@@ -392,7 +404,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Phase Shifting'),
     nectars: parseList('Quantum Entanglement'),
     thorns: parseList('Probability Cascade'),
-    seedKV: 1170,
+    seedKV: 1170, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Soul-Forged',
@@ -405,7 +417,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: [],
     nectars: parseList('Spirit Weapon'),
     thorns: parseList('Soul Fragments'),
-    seedKV: 960,
+    seedKV: 960, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Echo-Being',
@@ -418,7 +430,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Mimicry'),
     nectars: parseList('Perfect Balance'),
     thorns: parseList('Identity Echo'),
-    seedKV: 245,
+    seedKV: 245, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Void-Singer',
@@ -431,7 +443,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Void Songs'),
     nectars: parseList('Reality Harmonics'),
     thorns: parseList('Sanity Strain'),
-    seedKV: 495,
+    seedKV: 495, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Flame-Heart',
@@ -444,7 +456,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Fire Immunity'),
     nectars: parseList('Eternal Flame'),
     thorns: parseList('Heat Dependency'),
-    seedKV: 550,
+    seedKV: 550, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Phase-Spider',
@@ -457,7 +469,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Web-Spinning'),
     nectars: parseList('Multi-Dimensional'),
     thorns: parseList('Spatial Instability'),
-    seedKV: 550,
+    seedKV: 550, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Memory-Keeper',
@@ -470,7 +482,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Perfect Recall'),
     nectars: parseList('Ancestral Memories'),
     thorns: parseList('Information Overload'),
-    seedKV: 410,
+    seedKV: 410, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Storm-Child',
@@ -483,7 +495,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Weather Sense'),
     nectars: parseList('Lightning Affinity'),
     thorns: parseList('Static Discharge'),
-    seedKV: 175,
+    seedKV: 175, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Rust-Born',
@@ -496,7 +508,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Scrap Engineering'),
     nectars: parseList('Decay Immunity'),
     thorns: parseList('Corrosive Touch'),
-    seedKV: 700,
+    seedKV: 700, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Moon-Blessed',
@@ -509,7 +521,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Lunar Cycles'),
     nectars: parseList('Night Vision'),
     thorns: parseList('Lunar Dependency'),
-    seedKV: 165,
+    seedKV: 165, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Blood-Bound',
@@ -522,7 +534,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Blood Magic'),
     nectars: parseList('Regeneration'),
     thorns: parseList('Thirst Compulsion'),
-    seedKV: 550,
+    seedKV: 550, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Thought-Form',
@@ -535,7 +547,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Mental Projection'),
     nectars: parseList('Telepathic Network'),
     thorns: parseList('Physical Weakness'),
-    seedKV: 585,
+    seedKV: 585, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Gravity-Walker',
@@ -548,7 +560,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Zero-G Movement'),
     nectars: parseList('Gravitational Sense'),
     thorns: parseList('Density Fluctuation'),
-    seedKV: 510,
+    seedKV: 510, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Nano-Swarm',
@@ -561,7 +573,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Microscopic Control'),
     nectars: parseList('Collective Consciousness'),
     thorns: parseList('Cohesion Instability'),
-    seedKV: 3460,
+    seedKV: 3460, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Echo-Phantom',
@@ -574,7 +586,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Phase Walk'),
     nectars: parseList('Spectral Form'),
     thorns: parseList('Corporeal Weakness'),
-    seedKV: 170,
+    seedKV: 170, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Prism-Born',
@@ -587,7 +599,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Light Manipulation'),
     nectars: parseList('Spectrum Vision'),
     thorns: parseList('Chromatic Overload'),
-    seedKV: 405,
+    seedKV: 405, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Star-Scar',
@@ -600,7 +612,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Cosmic Resilience'),
     nectars: parseList('Stellar Navigation'),
     thorns: parseList('Radiation Burn'),
-    seedKV: 1165,
+    seedKV: 1165, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Hive-Mind',
@@ -613,7 +625,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Collective Thinking'),
     nectars: parseList('Shared Consciousness'),
     thorns: parseList('Individual Suppression'),
-    seedKV: 405,
+    seedKV: 405, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Warp-Touched',
@@ -626,7 +638,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Reality Sense'),
     nectars: parseList('Dimensional Shift'),
     thorns: parseList('Chaos Mutation'),
-    seedKV: 370,
+    seedKV: 370, bodyStructure: HUMANOID_BODY,
   },
   {
     name: 'Soul-Echo',
@@ -639,7 +651,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
     skills: parseList('Spirit Communication'),
     nectars: parseList('Ancestral Guidance'),
     thorns: parseList('Past Trauma'),
-    seedKV: 555,
+    seedKV: 555, bodyStructure: HUMANOID_BODY,
   },
 ];
 
