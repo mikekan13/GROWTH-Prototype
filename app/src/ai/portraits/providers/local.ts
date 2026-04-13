@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { spawn, type ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
+import sharp from 'sharp';
 import type {
   ImageGenerationProvider,
   PortraitInput,
@@ -127,43 +128,38 @@ export class LocalProvider implements ImageGenerationProvider {
         campaignLoraWeight: input.campaignStyle?.campaignLoraStrength,
       };
 
-      // 4. Upload reference image BEFORE workflow injection (need the ComfyUI filename)
-      let uploadedRefName: string | undefined;
+      // 4. Upload reference images BEFORE workflow injection (need ComfyUI filenames)
       if (input.personaLock?.referenceImagePath) {
-        uploadedRefName = await this.uploadReferenceImage(input.personaLock.referenceImagePath);
-        // Override the reference path with the ComfyUI-side filename
+        const uploadedRefName = await this.uploadReferenceImage(input.personaLock.referenceImagePath);
         params.referenceImagePath = uploadedRefName;
       }
 
-      // 5. Load and inject workflow template — try PuLID first, fallback to basic
-      let outputInfo: { filename: string; subfolder: string; type: string };
-      const usePulid = !!input.personaLock?.referenceImagePath;
-
-      if (usePulid) {
-        try {
-          const workflow = await this.loadWorkflow('character-portrait-pulid');
-          const preparedWorkflow = this.injectWorkflowParams(workflow, params);
-          const clientId = crypto.randomUUID();
-          const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
-          outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
-          console.log('[ComfyUI] PuLID generation complete');
-        } catch (pulidErr) {
-          console.warn('[ComfyUI] PuLID failed, falling back to basic workflow:', pulidErr instanceof Error ? pulidErr.message : pulidErr);
-          const workflow = await this.loadWorkflow('character-portrait');
-          const preparedWorkflow = this.injectWorkflowParams(workflow, params);
-          const clientId = crypto.randomUUID();
-          const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
-          outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
-          console.log('[ComfyUI] Basic generation complete (PuLID fallback)');
+      // 4b. Upload ControlNet angle reference if provided
+      const useControlnet = !!input.overrides?.anglePreset && await this.isControlNetAvailable();
+      if (useControlnet && input.overrides?.anglePreset) {
+        // Generate or load the angle reference image for ControlNet
+        const angleRefPath = await this.getAngleReferenceImage(input.overrides.anglePreset);
+        if (angleRefPath) {
+          const uploadedAngleRef = await this.uploadReferenceImage(angleRefPath);
+          params.controlnetImagePath = uploadedAngleRef;
+          params.controlnetStrength = 0.65;
         }
-      } else {
-        const workflow = await this.loadWorkflow('character-portrait');
-        const preparedWorkflow = this.injectWorkflowParams(workflow, params);
-        const clientId = crypto.randomUUID();
-        const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
-        outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
-        console.log('[ComfyUI] Basic generation complete');
       }
+
+      // 5. Select workflow: ControlNet+PuLID → PuLID → Basic (with fallbacks)
+      let outputInfo: { filename: string; subfolder: string; type: string };
+      const usePulid = !!params.referenceImagePath;
+      const workflowPriority: string[] = [];
+
+      if (useControlnet && usePulid) {
+        workflowPriority.push('character-face-controlnet');  // ControlNet + PuLID
+      }
+      if (usePulid) {
+        workflowPriority.push('character-portrait-pulid');   // PuLID only
+      }
+      workflowPriority.push('character-portrait');           // Basic (always fallback)
+
+      outputInfo = await this.tryWorkflows(workflowPriority, params);
 
       // 8. Download generated image
       const imageData = await this.downloadImage(
@@ -172,7 +168,7 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.type,
       );
 
-      // 9. Save to filesystem
+      // 9. Save to filesystem (full image + thumbnail)
       const { imagePath, thumbnailPath } = await this.savePortrait(
         input.characterId,
         imageData,
@@ -426,12 +422,31 @@ export class LocalProvider implements ImageGenerationProvider {
         }
       }
 
-      // Load Image node (for reference) — inject filename
-      if (classType === 'LoadImage' && params.referenceImagePath) {
+      // Load Image node — inject filenames based on title
+      if (classType === 'LoadImage') {
         const meta = (n._meta as Record<string, unknown>);
         const title = meta?.title as string || '';
-        if (title.toLowerCase().includes('reference') || title.toLowerCase().includes('pulid')) {
-          inputs.image = params.referenceImagePath; // Already a ComfyUI-side filename from upload
+        if ((title.toLowerCase().includes('reference') || title.toLowerCase().includes('pulid')) && params.referenceImagePath) {
+          inputs.image = params.referenceImagePath;
+        }
+        if (title.toLowerCase().includes('controlnet') || title.toLowerCase().includes('angle')) {
+          if (params.controlnetImagePath) {
+            inputs.image = params.controlnetImagePath;
+          }
+        }
+      }
+
+      // ApplyFluxControlNet — inject strength
+      if (classType === 'ApplyFluxControlNet' || classType === 'ApplyAdvancedFluxControlNet') {
+        if (params.controlnetStrength !== undefined && inputs.strength !== undefined) {
+          inputs.strength = params.controlnetStrength;
+        }
+      }
+
+      // Canny preprocessor — match resolution to generation size
+      if (classType === 'Canny_Edge_Preprocessor') {
+        if (inputs.resolution !== undefined) {
+          inputs.resolution = params.width;
         }
       }
 
@@ -471,20 +486,22 @@ export class LocalProvider implements ImageGenerationProvider {
     const dirPath = path.join('public', PORTRAIT_ROOT, characterId);
     await fs.mkdir(dirPath, { recursive: true });
 
-    // Save full portrait as WebP
-    const imagePath = path.join(PORTRAIT_ROOT, characterId, `${generationId}.webp`);
-    const fullPath = path.join('public', imagePath);
+    // Save full portrait as WebP (display) and PNG (PuLID reference, max quality)
+    const webpPath = path.join(PORTRAIT_ROOT, characterId, `${generationId}.webp`);
+    const pngPath = path.join(PORTRAIT_ROOT, characterId, `${generationId}.png`);
+    await Promise.all([
+      sharp(imageData).webp({ quality: 90 }).toFile(path.join('public', webpPath)),
+      fs.writeFile(path.join('public', pngPath), imageData),
+    ]);
 
-    // For Phase A, save the raw output (PNG from ComfyUI).
-    // WebP conversion would require sharp — defer to Phase B.
-    // Save as PNG for now, filename still uses .webp extension pattern.
-    const pngPath = imagePath.replace('.webp', '.png');
-    await fs.writeFile(path.join('public', pngPath), imageData);
+    // Generate thumbnail (256x256)
+    const thumbPath = path.join(PORTRAIT_ROOT, characterId, `${generationId}_thumb.webp`);
+    await sharp(imageData).resize(256, 256, { fit: 'cover' }).webp({ quality: 80 }).toFile(path.join('public', thumbPath));
 
-    // Thumbnail generation deferred to Phase B (requires sharp)
-    const thumbnailPath = pngPath.replace('.png', '_thumb.png');
-
-    return { imagePath: `/${pngPath}`, thumbnailPath: `/${thumbnailPath}` };
+    return {
+      imagePath: `/${webpPath}`,
+      thumbnailPath: `/${thumbPath}`,
+    };
   }
 
   // ============================================================
@@ -570,15 +587,26 @@ export class LocalProvider implements ImageGenerationProvider {
    * The RTX 4060 has 8GB VRAM shared between Ollama (gemma2:9b) and ComfyUI.
    */
   private async freeVram(): Promise<void> {
+    const { execSync } = require('child_process');
+
     // Kill Ollama process entirely — it uses 4+ GB RAM even when idle
     try {
-      const { execSync } = require('child_process');
       execSync('taskkill /F /IM ollama.exe 2>nul', { stdio: 'ignore' });
       console.log('[ComfyUI] Killed Ollama to free RAM');
-      await new Promise(r => setTimeout(r, 2000));
     } catch {
       // Ollama may not be running — that's fine
     }
+
+    // Shut down WSL — uses ~1.3GB RAM
+    try {
+      execSync('wsl --shutdown 2>nul', { stdio: 'ignore' });
+      console.log('[ComfyUI] Shut down WSL to free RAM');
+    } catch {
+      // WSL may not be running
+    }
+
+    // Give OS time to reclaim memory
+    await new Promise(r => setTimeout(r, 3000));
   }
 
   /** Tell ComfyUI to free VRAM after generation */
@@ -594,4 +622,77 @@ export class LocalProvider implements ImageGenerationProvider {
       // Non-critical
     }
   }
+
+  // ============================================================
+  // ControlNet Support
+  // ============================================================
+
+  /** Check if ControlNet model is available */
+  private async isControlNetAvailable(): Promise<boolean> {
+    try {
+      const controlnetPath = path.join(COMFYUI_PATH, 'models', 'xlabs', 'controlnets', 'flux-canny-controlnet-v3.safetensors');
+      await fs.access(controlnetPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get a bundled reference image for a specific angle. These are face-only
+   * photos at precise angles — ControlNet Canny extracts edges to force
+   * the generation composition. Identity comes from PuLID, not these refs.
+   */
+  private async getAngleReferenceImage(angle: string): Promise<string | null> {
+    // Map angle keys to bundled reference filenames
+    const ANGLE_REF_FILES: Record<string, string> = {
+      front: 'front.jpg',
+      three_quarter_left: 'three_quarter_left.jpg',
+      three_quarter_right: 'three_quarter_right.jpg',
+      profile_left: 'profile_left.jpg',
+      profile_right: 'profile_right.jpg',
+    };
+
+    const filename = ANGLE_REF_FILES[angle];
+    if (!filename) return null;
+
+    const refPath = `${PORTRAIT_ROOT}/angle-refs/${filename}`;
+    const fullRefPath = path.join('public', refPath);
+
+    try {
+      await fs.access(fullRefPath);
+      return `/${refPath}`;
+    } catch {
+      console.log(`[ControlNet] Angle reference not found: ${fullRefPath}`);
+      return null;
+    }
+  }
+
+  /**
+   * Try workflows in priority order with fallbacks.
+   * First success wins; failures cascade to next workflow.
+   */
+  private async tryWorkflows(
+    workflowNames: string[],
+    params: ComfyUIWorkflowParams,
+  ): Promise<{ filename: string; subfolder: string; type: string }> {
+    for (let i = 0; i < workflowNames.length; i++) {
+      const name = workflowNames[i];
+      try {
+        const workflow = await this.loadWorkflow(name);
+        const preparedWorkflow = this.injectWorkflowParams(workflow, params);
+        const clientId = crypto.randomUUID();
+        const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
+        const outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+        console.log(`[ComfyUI] Generation complete using workflow: ${name}`);
+        return outputInfo;
+      } catch (err) {
+        const isLast = i === workflowNames.length - 1;
+        if (isLast) throw err;  // No more fallbacks
+        console.warn(`[ComfyUI] Workflow "${name}" failed, trying next:`, err instanceof Error ? err.message : err);
+      }
+    }
+    throw new Error('All workflows failed');
+  }
+
 }

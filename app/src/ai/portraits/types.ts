@@ -56,6 +56,7 @@ export interface PortraitOverrides {
   steeringWords?: string[];                // "battle-worn", "smiling", "hooded"
   seed?: number;                           // For reproducibility
   composition?: 'bust' | 'half_body' | 'full_body' | 'action';
+  anglePreset?: 'front' | 'three_quarter_left' | 'three_quarter_right' | 'profile_left' | 'profile_right';  // Identity Lock angles
   environmentOverride?: string;            // Override environment description
 }
 
@@ -246,6 +247,8 @@ export interface ComfyUIWorkflowParams {
   height: number;
   referenceImagePath?: string;             // For PuLID
   pulidWeight?: number;
+  controlnetImagePath?: string;            // For ControlNet angle reference
+  controlnetStrength?: number;             // ControlNet influence (0.0-1.0)
   styleLora?: string;
   styleLoraWeight?: number;
   campaignLora?: string;

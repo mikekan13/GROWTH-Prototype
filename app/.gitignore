@@ -46,5 +46,8 @@ next-env.d.ts
 *.db
 *.db-journal
 
-# generated portraits (local, not committed)
-/public/portraits/
+# generated portraits (local, not committed) — except angle-refs (app assets)
+/public/portraits/*
+!/public/portraits/angle-refs
+/public/portraits/angle-refs/*
+!/public/portraits/angle-refs/*.jpg

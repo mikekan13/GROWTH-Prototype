@@ -18,7 +18,7 @@ import type {
   CampaignStyleConfig,
   PortraitOverrides,
 } from './types';
-import { getDefaultStyleConfig, applyCampaignStyle, getCompositionPreset } from './style-config';
+import { getDefaultStyleConfig, applyCampaignStyle, getCompositionPreset, getAnglePreset, getCreationModeNegative, getIdentityLockStyle, getFaceOnlyNegative } from './style-config';
 
 // ============================================================
 // Main Entry Point
@@ -53,22 +53,44 @@ export function buildPortraitPrompt(
   const baseConfig = getDefaultStyleConfig();
   const config = applyCampaignStyle(baseConfig, campaignStyle);
 
-  const blocks: string[] = [];
-
-  // STYLE BLOCK (constant)
-  blocks.push(config.stylePrefix);
-
   // T1: IDENTITY BLOCK (always included)
   const identityBlock = buildIdentityBlock(char);
-  blocks.push(identityBlock);
 
   // T1: BODY DESCRIPTION BLOCK
   const bodyBlock = buildBodyDescriptionBlock(char);
+
+  // ── IDENTITY LOCK FACE MODE ──
+  // When anglePreset is set, we're generating face-only images for identity lock.
+  // Completely different prompt strategy: realistic style, face-only framing,
+  // stripped of everything that isn't facial identity.
+  if (overrides?.anglePreset) {
+    const blocks: string[] = [];
+    blocks.push(getIdentityLockStyle());
+    blocks.push(identityBlock);
+    // Include hair/eye/skin from body block — these are facial features
+    if (bodyBlock) blocks.push(bodyBlock);
+    blocks.push(getAnglePreset(overrides.anglePreset));
+
+    return {
+      prompt: blocks.filter(Boolean).join(', '),
+      negativePrompt: getFaceOnlyNegative(),
+      identityBlock,
+      bodyDescriptionBlock: bodyBlock || '',
+    };
+  }
+
+  // ── STANDARD PORTRAIT MODE ──
+  const blocks: string[] = [];
+
+  // STYLE BLOCK
+  blocks.push(config.stylePrefix);
+
+  blocks.push(identityBlock);
   if (bodyBlock) blocks.push(bodyBlock);
 
   if (creationMode) {
     // Creation mode: pure physical identity, no equipment or state
-    blocks.push('bare skin, no clothing, no armor, no accessories');
+    blocks.push('nude, bare skin, no clothing, no armor, no accessories, no jewelry, no headwear, simple plain underwear only if needed');
   } else {
     // T2: EQUIPMENT BLOCK
     const equipBlock = buildEquipmentBlock(char.visibleEquipment);
@@ -106,9 +128,12 @@ export function buildPortraitPrompt(
     blocks.push('neutral grey studio background, soft even lighting');
   }
 
+  // Use stronger negative prompt in creation mode (anti-clothing/accessories)
+  const negativePrompt = creationMode ? getCreationModeNegative() : config.negativePrompt;
+
   return {
     prompt: blocks.filter(Boolean).join(', '),
-    negativePrompt: config.negativePrompt,
+    negativePrompt,
     identityBlock,
     bodyDescriptionBlock: bodyBlock || '',
   };

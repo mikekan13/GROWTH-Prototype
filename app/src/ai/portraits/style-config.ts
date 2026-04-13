@@ -55,6 +55,16 @@ const FULL_NEGATIVE_PROMPT = [
   NEGATIVE_STYLE_PURITY,
 ].join(', ');
 
+// Extra negatives for creation mode (no clothing, accessories, or embellishments)
+const NEGATIVE_CREATION_MODE = [
+  'clothing', 'clothes', 'armor', 'shirt', 'dress', 'robe', 'cloak', 'cape',
+  'jewelry', 'necklace', 'earrings', 'crown', 'tiara', 'headband', 'hat', 'helmet',
+  'weapon', 'sword', 'shield', 'staff',
+  'ornate', 'decorated', 'embellished', 'accessories',
+].join(', ');
+
+const CREATION_MODE_NEGATIVE = `${FULL_NEGATIVE_PROMPT}, ${NEGATIVE_CREATION_MODE}`;
+
 // ============================================================
 // Default Composition
 // ============================================================
@@ -64,7 +74,7 @@ const DEFAULT_COMPOSITION = 'bust portrait, three-quarter view, dark atmospheric
 const COMPOSITION_PRESETS: Record<string, string> = {
   bust: 'bust portrait, three-quarter view, dark atmospheric background, warm key light from upper left',
   half_body: 'half body portrait, three-quarter view, atmospheric background, dramatic side lighting',
-  full_body: 'full body portrait, standing pose, environment visible, balanced lighting',
+  full_body: 'full body portrait from head to feet, standing pose, entire body visible including feet, neutral grey background, balanced lighting',
   action: 'dynamic action pose, motion blur on periphery, dramatic lighting, environment interaction',
 };
 
@@ -86,6 +96,43 @@ const CAMPAIGN_THEME_MODIFIERS: Record<string, string> = {
 };
 
 // ============================================================
+// Identity Lock — Face-Only Style & Angles
+// ============================================================
+
+// Realistic style with subtle painterly touch — used ONLY during identity lock face generation
+// Replaces the full fantasy style prefix to prevent FLUX from adding crowns, jewelry, etc.
+const IDENTITY_LOCK_STYLE = [
+  'realistic portrait with subtle painterly quality',
+  'natural skin texture',
+  'detailed facial features',
+  'natural lighting',
+  'sharp focus on face',
+].join(', ');
+
+// Negative prompt specifically for face-only identity lock generation
+const NEGATIVE_FACE_ONLY = [
+  // Anti-body: we want ONLY the face
+  'shoulders', 'neck', 'body', 'torso', 'chest', 'arms', 'hands',
+  // Anti-clothing/accessories: nothing but the face
+  'clothing', 'clothes', 'armor', 'shirt', 'dress', 'robe', 'cloak',
+  'jewelry', 'necklace', 'earrings', 'crown', 'tiara', 'headband', 'hat', 'helmet',
+  'accessories', 'ornate', 'decorated', 'embellished',
+  // Anti-background distractions
+  'background details', 'scenery', 'landscape', 'room',
+  // Standard quality
+  'deformed', 'disfigured', 'bad anatomy', 'blurry', 'watermark', 'text', 'logo',
+  'anime', 'cartoon', 'CGI', '3d render',
+].join(', ');
+
+const ANGLE_PRESETS: Record<string, string> = {
+  front: 'tight face crop, passport photo framing, face fills the frame, straight-on frontal view, centered, eyes looking directly at camera, plain grey background, flat even studio lighting',
+  three_quarter_left: 'tight face crop, face fills the frame, three-quarter view turned slightly left, plain grey background, soft lighting from left',
+  three_quarter_right: 'tight face crop, face fills the frame, three-quarter view turned slightly right, plain grey background, soft lighting from right',
+  profile_left: 'tight face crop, face fills the frame, exact side profile facing left, plain grey background, soft side lighting',
+  profile_right: 'tight face crop, face fills the frame, exact side profile facing right, plain grey background, soft side lighting',
+};
+
+// ============================================================
 // Exports
 // ============================================================
 
@@ -104,6 +151,21 @@ export function getDefaultStyleConfig(): StyleConfig {
 /** Get composition preset by name */
 export function getCompositionPreset(preset: string): string {
   return COMPOSITION_PRESETS[preset] || DEFAULT_COMPOSITION;
+}
+
+/** Get angle-specific composition preset for identity lock discovery */
+export function getAnglePreset(angle: string): string {
+  return ANGLE_PRESETS[angle] || COMPOSITION_PRESETS.bust;
+}
+
+/** Get the identity lock style prefix (realistic, not fantasy) */
+export function getIdentityLockStyle(): string {
+  return IDENTITY_LOCK_STYLE;
+}
+
+/** Get the face-only negative prompt for identity lock */
+export function getFaceOnlyNegative(): string {
+  return NEGATIVE_FACE_ONLY;
 }
 
 /** Apply campaign theme modifiers to the style */
@@ -131,6 +193,11 @@ export function applyCampaignStyle(
 /** Look up built-in theme modifier string by genre name */
 export function getThemeModifier(genre: string): string | undefined {
   return CAMPAIGN_THEME_MODIFIERS[genre.toLowerCase()];
+}
+
+/** Get the creation-mode negative prompt (includes anti-clothing/accessories) */
+export function getCreationModeNegative(): string {
+  return CREATION_MODE_NEGATIVE;
 }
 
 /** Get the negative prompt layers individually (for debugging/tuning) */

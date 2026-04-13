@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { PhysicalDescription, BodyPartDescription } from '@/types/growth';
+import IdentityLockWizard from './IdentityLockWizard';
 
 const GENDER_OPTIONS = ['', 'Male', 'Female', 'Non-binary', 'Other'] as const;
 const BUILD_OPTIONS = ['', 'Slight', 'Slim', 'Lean', 'Average', 'Athletic', 'Stocky', 'Muscular', 'Heavy', 'Large'] as const;
@@ -65,10 +66,11 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
   const [uploading, setUploading] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [describeError, setDescribeError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [generating] = useState(false); // Kept for PortraitFrame loading; wizard handles its own state
   const [generatedBust, setGeneratedBust] = useState<string | null>(null);
   const [generatedFullBody, setGeneratedFullBody] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -223,13 +225,9 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
     finally { setDescribing(false); }
   }, [referencePhotos, selectedSeed]);
 
-  const handleGenerate = useCallback(async () => {
-    if (!selectedSeed) return;
-    setGenerating(true);
-    setGenerationError(null);
-
+  const buildCharacterData = useCallback(() => {
     const head = physicalDescription.bodyParts?.HEAD;
-    const characterData = {
+    return {
       characterId: userCharacter?.id || 'creation-preview',
       campaignId,
       identity: {
@@ -254,47 +252,16 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
       attributeDepletion: { overallDepletion: 'fresh' as const, bodyDepletion: 0, spiritDepletion: 0, soulDepletion: 0 },
       visualTraits: [],
     };
+  }, [physicalDescription, characterName, desiredAge, selectedSeed, campaignId, userCharacter?.id]);
 
+  const handleWizardComplete = useCallback(async (bust: string, fullBody: string) => {
+    setGeneratedBust(bust);
+    setGeneratedFullBody(fullBody);
+    setWizardOpen(false);
+
+    // Persist portrait paths
+    const portraitData = { generatedBust: bust, generatedFullBody: fullBody };
     try {
-      // Generate bust first
-      const bustRes = await fetch('/api/portraits/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          characterData,
-          creationMode: true,
-          referenceImagePath: referencePhotos[0] || undefined,
-          overrides: { composition: 'bust' },
-        }),
-      });
-      if (!bustRes.ok) {
-        const err = await bustRes.json();
-        throw new Error(err.error || 'Bust generation failed');
-      }
-      const bustData = await bustRes.json();
-      setGeneratedBust(bustData.imagePath);
-      const bustSeed = bustData.metadata.seed;
-
-      // Generate full body with SAME seed for consistency
-      const bodyRes = await fetch('/api/portraits/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          characterData,
-          creationMode: true,
-          referenceImagePath: referencePhotos[0] || undefined,
-          overrides: { composition: 'full_body', seed: bustSeed },
-        }),
-      });
-      if (!bodyRes.ok) {
-        const err = await bodyRes.json();
-        throw new Error(err.error || 'Full body generation failed');
-      }
-      const bodyData = await bodyRes.json();
-      setGeneratedFullBody(bodyData.imagePath);
-
-      // Persist portrait paths immediately
-      const portraitData = { generatedBust: bustData.imagePath, generatedFullBody: bodyData.imagePath };
       if (userCharacter?.id) {
         const charRes = await fetch(`/api/characters/${userCharacter.id}`);
         if (charRes.ok) {
@@ -318,11 +285,9 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         }
       }
     } catch (err) {
-      setGenerationError(err instanceof Error ? err.message : 'Generation failed');
-    } finally {
-      setGenerating(false);
+      console.error('Failed to persist portraits:', err);
     }
-  }, [selectedSeed, physicalDescription, characterName, desiredAge, referencePhotos, campaignId, userCharacter?.id]);
+  }, [userCharacter?.id, campaignId]);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -551,11 +516,24 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
             )}
           </div>
 
-          {/* Generated portraits row — separate from reference photos */}
-          <div className="flex gap-4 justify-center mt-3 pt-3" style={{ borderTop: '1px solid #582a7230' }}>
-            <PortraitFrame label="Bust" initial={characterName ? characterName.charAt(0).toUpperCase() : '?'} portrait={generatedBust} loading={generating} />
-            <PortraitFrame label="Full Body" initial={characterName ? characterName.charAt(0).toUpperCase() : '?'} portrait={generatedFullBody} loading={generating && !!generatedBust} />
-          </div>
+          {/* Generated portraits row — or Identity Lock Wizard */}
+          {wizardOpen ? (
+            <div className="mt-3 pt-3" style={{ borderTop: '1px solid #582a7230' }}>
+              <IdentityLockWizard
+                characterData={buildCharacterData()}
+                campaignId={campaignId}
+                referencePhotos={referencePhotos}
+                characterId={userCharacter?.id}
+                onComplete={handleWizardComplete}
+                onCancel={() => setWizardOpen(false)}
+              />
+            </div>
+          ) : (
+            <div className="flex gap-4 justify-center mt-3 pt-3" style={{ borderTop: '1px solid #582a7230' }}>
+              <PortraitFrame label="Bust" initial={characterName ? characterName.charAt(0).toUpperCase() : '?'} portrait={generatedBust} loading={generating} />
+              <PortraitFrame label="Full Body" initial={characterName ? characterName.charAt(0).toUpperCase() : '?'} portrait={generatedFullBody} loading={generating && !!generatedBust} />
+            </div>
+          )}
         </div>
 
         {/* Age + Generate row */}
@@ -580,20 +558,22 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
             </div>
           </div>
           <div className="flex flex-col gap-1 items-end">
-            <button
-              onClick={handleGenerate}
-              disabled={generating || !selectedSeed}
-              className="px-6 py-3 text-xs uppercase tracking-[0.15em] h-fit transition-colors"
-              style={{
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                backgroundColor: generating ? '#333' : selectedSeed ? '#7050A8' : '#333',
-                color: generating ? '#666' : selectedSeed ? '#fff' : '#555',
-                border: '1px solid #582a72', borderRadius: '2px',
-                cursor: generating || !selectedSeed ? 'default' : 'pointer',
-              }}
-            >
-              {generating ? 'Generating...' : 'Generate Portrait'}
-            </button>
+            {!wizardOpen && (
+              <button
+                onClick={() => setWizardOpen(true)}
+                disabled={!selectedSeed}
+                className="px-6 py-3 text-xs uppercase tracking-[0.15em] h-fit transition-colors"
+                style={{
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  backgroundColor: selectedSeed ? '#7050A8' : '#333',
+                  color: selectedSeed ? '#fff' : '#555',
+                  border: '1px solid #582a72', borderRadius: '2px',
+                  cursor: !selectedSeed ? 'default' : 'pointer',
+                }}
+              >
+                {generatedBust ? 'Redo Identity Lock' : 'Identity Lock'}
+              </button>
+            )}
             {generationError && (
               <div className="text-xs" style={{ color: '#E8585A', fontFamily: 'var(--font-terminal), Consolas, monospace', maxWidth: '200px' }}>
                 {generationError}
