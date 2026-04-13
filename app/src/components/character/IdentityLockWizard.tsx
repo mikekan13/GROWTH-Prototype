@@ -140,7 +140,7 @@ type Action =
   | { type: 'FRONT_CANDIDATE_ERROR'; error: string }
   | { type: 'FRONT_GRADE_BAD' }        // Retry with new seed
   | { type: 'FRONT_GRADE_GOOD' }       // Use this as PuLID ref, generate again to converge
-  | { type: 'FRONT_GRADE_PERFECT' }    // Lock this face, proceed to angles
+  | { type: 'FRONT_GRADE_PERFECT'; index?: number }    // Lock this face, proceed to angles
   // Angles
   | { type: 'START_ANGLES' }
   | { type: 'ANGLE_GENERATING'; angle: AngleKey }
@@ -194,8 +194,9 @@ function reducer(state: WizardState, action: Action): WizardState {
       // Good = use this face as PuLID reference for next generation (converge)
       return state;
     case 'FRONT_GRADE_PERFECT': {
-      // Perfect = lock this face, proceed to angles
-      const latest = state.frontCandidates[state.frontCandidates.length - 1];
+      // Perfect = lock selected face, proceed to angles
+      const idx = action.index ?? state.frontCandidates.length - 1;
+      const latest = state.frontCandidates[idx];
       return {
         ...state,
         lockedFace: latest.imagePath,
@@ -336,6 +337,30 @@ export default function IdentityLockWizard({
   // Primary reference photo (for PuLID on front face generation)
   const primaryRef = referencePhotos[0] || undefined;
 
+  // Which candidate is currently displayed (defaults to latest)
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
+  const displayIndex = viewingIndex ?? (state.frontCandidates.length - 1);
+  const displayCandidate = state.frontCandidates[displayIndex] || null;
+
+  // Load existing generated images on mount
+  const [existingLoaded, setExistingLoaded] = useState(false);
+  useEffect(() => {
+    if (existingLoaded) return;
+    setExistingLoaded(true);
+    const charId = (characterData as Record<string, unknown>).characterId as string || 'creation-preview';
+    fetch(`/api/portraits/existing?characterId=${charId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.images?.length > 0) {
+          for (const imgPath of data.images) {
+            dispatch({ type: 'FRONT_CANDIDATE_DONE', imagePath: imgPath, seed: 0 });
+          }
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Core generation helper ─────────────────────────────────
   // Debug info from last generation
   const [debugInfo, setDebugInfo] = useState<{ prompt: string; negativePrompt: string; seed: number; timeMs: number; workflow: string; failures: string[]; refs: string } | null>(null);
@@ -360,6 +385,7 @@ export default function IdentityLockWizard({
       throw new Error(err.error || 'Generation failed');
     }
     const data = await res.json();
+    setViewingIndex(null);  // Reset to show latest
     setDebugInfo({
       prompt: data.metadata.prompt || '',
       negativePrompt: data.metadata.negativePrompt || '',
@@ -407,18 +433,12 @@ export default function IdentityLockWizard({
   }, [generateFrontFace, state.frontCandidates]);
 
   const handleFrontPerfect = useCallback(() => {
-    dispatch({ type: 'FRONT_GRADE_PERFECT' });
-  }, []);
+    dispatch({ type: 'FRONT_GRADE_PERFECT', index: displayIndex >= 0 ? displayIndex : undefined });
+  }, [displayIndex]);
 
-  // Auto-start first generation on mount
-  const started = useRef(false);
+  // Don't auto-generate — existing images load on mount, player can pick or generate new
   useEffect(() => {
-    if (!started.current) {
-      started.current = true;
-      generateFrontFace();
-    }
     return () => { abortRef.current = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Step 2: Multi-angle generation (uses locked front as PuLID ref) ──
@@ -449,22 +469,17 @@ export default function IdentityLockWizard({
   }, [state.lockedFace, state.angles, generate]);
 
   // Trigger angle generation when entering angle_generation step
-  const angleGenTriggered = useRef(false);
+  // Trigger angle generation when entering angle_generation step
+  const prevStepRef = useRef<string>('');
   useEffect(() => {
-    if (state.step === 'angle_generation' && state.lockedFace) {
-      // Check if there are angles to generate
-      const needsGen = ANGLE_KEYS.some(k => !state.angles[k].imagePath);
-      if (needsGen) {
-        const isRegen = ANGLE_KEYS.some(k => state.angles[k].grade === 'bad' || (!state.angles[k].imagePath && !state.angles[k].generating));
-        if (!angleGenTriggered.current || isRegen) {
-          angleGenTriggered.current = true;
-          const hasBad = ANGLE_KEYS.some(k => state.angles[k].grade === 'bad');
-          runAngleGeneration(hasBad);
-        }
-      }
+    if (state.step === 'angle_generation' && state.lockedFace && prevStepRef.current !== 'angle_generation') {
+      abortRef.current = false;  // Reset abort flag
+      const hasBad = ANGLE_KEYS.some(k => state.angles[k].grade === 'bad');
+      runAngleGeneration(hasBad);
     }
+    prevStepRef.current = state.step;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step, state.lockedFace]);
+  }, [state.step]);
 
   // ── Step 3: Body generation ─────────────────────────────────
   const generateBody = useCallback(async () => {
@@ -628,12 +643,19 @@ export default function IdentityLockWizard({
             {state.frontCandidates.length > 1 && (
               <div className="flex flex-col items-center">
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '8px' }}>
-                  Previous ({state.frontCandidates.length - 1})
+                  All Attempts ({state.frontCandidates.length})
                 </div>
-                <div className="flex gap-1 flex-wrap" style={{ maxWidth: '180px' }}>
-                  {state.frontCandidates.slice(0, -1).map((c, i) => (
-                    <div key={i} className="border overflow-hidden" style={{ borderColor: '#2a2a3e', width: '40px', height: '53px', backgroundColor: '#111' }}>
-                      <img src={c.imagePath} alt={`Attempt ${i + 1}`} className="w-full h-full object-cover opacity-50" />
+                <div className="flex gap-1 flex-wrap" style={{ maxWidth: '200px' }}>
+                  {state.frontCandidates.map((c, i) => (
+                    <div key={i} onClick={() => setViewingIndex(i)} className="border overflow-hidden cursor-pointer transition-all"
+                      style={{
+                        borderColor: i === displayIndex ? '#D0A030' : '#2a2a3e',
+                        borderWidth: i === displayIndex ? '2px' : '1px',
+                        width: '48px', height: '48px', backgroundColor: '#111',
+                      }}>
+                      <img src={c.imagePath} alt={`Attempt ${i + 1}`}
+                        className="w-full h-full object-cover"
+                        style={{ opacity: i === displayIndex ? 1 : 0.5 }} />
                     </div>
                   ))}
                 </div>
@@ -643,7 +665,7 @@ export default function IdentityLockWizard({
             {/* Current face (large) */}
             <div className="flex flex-col items-center">
               <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                {state.frontGenerating ? 'Generating...' : `Attempt ${state.frontCandidates.length || 1}`}
+                {state.frontGenerating ? 'Generating...' : `Attempt ${displayIndex + 1} of ${state.frontCandidates.length}`}
               </div>
               <div className="relative border overflow-hidden" style={{
                 borderColor: state.frontGenerating ? '#2a2a3e' : '#D0A030',
@@ -652,9 +674,9 @@ export default function IdentityLockWizard({
                 width: '220px',
                 aspectRatio: '1/1',
               }}>
-                {!state.frontGenerating && state.frontCandidates.length > 0 ? (
+                {!state.frontGenerating && displayCandidate ? (
                   <FaceCropImage
-                    src={state.frontCandidates[state.frontCandidates.length - 1].imagePath}
+                    src={displayCandidate.imagePath}
                     alt="Current face"
                     faceCrop
                   />
@@ -671,40 +693,53 @@ export default function IdentityLockWizard({
                   </div>
                 )}
               </div>
-              {!state.frontGenerating && state.frontCandidates.length > 0 && (
+              {!state.frontGenerating && displayCandidate && (
                 <div className="text-xs mt-1" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                  Seed: {state.frontCandidates[state.frontCandidates.length - 1].seed}
+                  Seed: {displayCandidate.seed}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Grade buttons — only show when a face is ready */}
-          {!state.frontGenerating && state.frontCandidates.length > 0 && (
+          {/* Actions */}
+          {!state.frontGenerating && (
             <div className="space-y-2">
-              <div className="text-xs text-center mb-2" style={{ color: '#888', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                Is this your character&apos;s face?
-              </div>
-              <div className="flex gap-3 justify-center">
-                <button onClick={handleFrontBad}
-                  className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors"
-                  style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#E8585A', border: '1px solid #E8585A60', borderRadius: '2px' }}>
-                  Bad — Try Again
+              {displayCandidate && (
+                <>
+                  <div className="text-xs text-center mb-2" style={{ color: '#888', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                    Is this your character&apos;s face?
+                  </div>
+                  <div className="flex gap-3 justify-center">
+                    <button onClick={handleFrontBad}
+                      className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors"
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#E8585A', border: '1px solid #E8585A60', borderRadius: '2px' }}>
+                      Bad — Try Again
+                    </button>
+                    <button onClick={handleFrontGood}
+                      className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors"
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#22ab94', border: '1px solid #22ab9460', borderRadius: '2px' }}>
+                      Good — Get Closer
+                    </button>
+                    <button onClick={handleFrontPerfect}
+                      className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors font-bold"
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#D0A030', color: '#000', border: '1px solid #D0A030', borderRadius: '2px' }}>
+                      Perfect — Lock It
+                    </button>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-center mt-2">
+                <button onClick={() => generateFrontFace()}
+                  className="px-4 py-2 text-xs uppercase tracking-wider transition-colors"
+                  style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#582a72', color: '#fff', border: '1px solid #582a72', borderRadius: '2px' }}>
+                  Generate New Face
                 </button>
-                <button onClick={handleFrontGood}
-                  className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors"
-                  style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#22ab94', border: '1px solid #22ab9460', borderRadius: '2px' }}>
-                  Good — Get Closer
-                </button>
-                <button onClick={handleFrontPerfect}
-                  className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors font-bold"
-                  style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#D0A030', color: '#000', border: '1px solid #D0A030', borderRadius: '2px' }}>
-                  Perfect — Lock It
-                </button>
               </div>
-              <div className="text-xs text-center mt-1" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                Bad = new random face &nbsp;|&nbsp; Good = refine this face &nbsp;|&nbsp; Perfect = lock &amp; continue
-              </div>
+              {displayCandidate && (
+                <div className="text-xs text-center mt-1" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                  Bad = new random face &nbsp;|&nbsp; Good = refine this face &nbsp;|&nbsp; Perfect = lock &amp; continue
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -792,9 +827,9 @@ export default function IdentityLockWizard({
           {state.step === 'angle_grading' && (
             <div className="flex flex-wrap gap-2 justify-center">
               {hasBadAngles && (
-                <WizardButton onClick={() => { angleGenTriggered.current = false; dispatch({ type: 'REGEN_BAD_ANGLES' }); }} color="#7050A8" label="Regenerate Bad" />
+                <WizardButton onClick={() => dispatch({ type: 'REGEN_BAD_ANGLES' })} color="#7050A8" label="Regenerate Bad" />
               )}
-              <WizardButton onClick={() => { angleGenTriggered.current = false; dispatch({ type: 'REGEN_ALL_ANGLES' }); }} color="#582a72" label="Redo All Angles" />
+              <WizardButton onClick={() => dispatch({ type: 'REGEN_ALL_ANGLES' })} color="#582a72" label="Redo All Angles" />
               {allGraded && hasAnyGood && (
                 <>
                   <WizardButton onClick={() => generateBody()} color="#22ab94" label="See Full Body" />
