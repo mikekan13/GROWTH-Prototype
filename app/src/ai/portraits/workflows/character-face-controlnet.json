@@ -54,7 +54,7 @@
     "class_type": "LoraLoader",
     "inputs": {
       "model": ["1", 0],
-      "clip": ["16", 1],
+      "clip": ["2", 0],
       "lora_name": "painterly-fantasy-ckpf.safetensors",
       "strength_model": 0.6,
       "strength_clip": 0.6

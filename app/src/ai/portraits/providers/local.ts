@@ -146,10 +146,12 @@ export class LocalProvider implements ImageGenerationProvider {
       // XLabs nodes try to load their own FLUX copy (won't fit in 8GB VRAM alongside GGUF).
       // Need InstantX FLUX ControlNet Union (~6.6GB) for standard pipeline compatibility.
       // Disabled until proper model is downloaded. Falling back to prompt-only + PuLID.
-      // ControlNet for angle control — front face uses PuLID-only (stronger face match)
-      // ControlNet only for 3/4 and profile angles where pose control is needed
+      // ControlNet DISABLED — XLabs pipeline incompatible with LoRA style control.
+      // XlabsSampler's denoise_controlnet bypasses LoRA patches, pulling output to photorealism.
+      // Need InstantX ControlNet Union (6.6GB) which uses standard KSampler pipeline.
+      // TODO: Enable when InstantX model is downloaded.
       const anglePreset = input.overrides?.anglePreset;
-      const useControlnet = !!anglePreset && anglePreset !== 'front' && await this.isControlNetAvailable();
+      const useControlnet = false; // !!anglePreset && await this.isControlNetAvailable();
       if (useControlnet && input.overrides?.anglePreset) {
         const angleRefPath = await this.getAngleReferenceImage(input.overrides.anglePreset);
         console.log('[ComfyUI] ControlNet angle ref path:', angleRefPath);
