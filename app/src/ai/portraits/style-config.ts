@@ -102,34 +102,45 @@ const CAMPAIGN_THEME_MODIFIERS: Record<string, string> = {
 // Realistic style with subtle painterly touch — used ONLY during identity lock face generation
 // Replaces the full fantasy style prefix to prevent FLUX from adding crowns, jewelry, etc.
 const IDENTITY_LOCK_STYLE = [
-  'realistic portrait with subtle painterly quality',
-  'natural skin texture',
-  'detailed facial features',
-  'natural lighting',
-  'sharp focus on face',
+  'face portrait',
+  'natural skin with pores and fine detail',
+  'highly detailed facial features',
+  'crisp sharp focus',
+  'soft lighting',
+  'high resolution',
+  'hair slicked back in tight bun, all hair pulled away from face',
+  'ears fully visible',
+  'no clothing visible',
+  'bare skin only',
 ].join(', ');
 
 // Negative prompt specifically for face-only identity lock generation
 const NEGATIVE_FACE_ONLY = [
   // Anti-body: we want ONLY the face
-  'shoulders', 'neck', 'body', 'torso', 'chest', 'arms', 'hands',
-  // Anti-clothing/accessories: nothing but the face
-  'clothing', 'clothes', 'armor', 'shirt', 'dress', 'robe', 'cloak',
+  'shoulders', 'neck', 'body', 'torso', 'chest', 'arms', 'hands', 'fingers',
+  'full body', 'half body', 'upper body',
+  // Anti-clothing/accessories: nothing but the bare face
+  'clothing', 'clothes', 'armor', 'shirt', 'dress', 'robe', 'cloak', 'cape',
   'jewelry', 'necklace', 'earrings', 'crown', 'tiara', 'headband', 'hat', 'helmet',
-  'accessories', 'ornate', 'decorated', 'embellished',
+  'accessories', 'ornate', 'decorated', 'embellished', 'feathers', 'ornaments',
+  'loose hair', 'hair covering face', 'bangs over eyes', 'bangs', 'hair over ears', 'wig',
+  // Anti-style: prevent extreme cartoon/illustration but allow subtle artistry
+  'anime', 'cartoon', 'comic', 'manga',
+  'CGI', '3d render', 'oil painting', 'watercolor', 'sketch',
+  'heavy brushstrokes', 'flat color',
   // Anti-background distractions
-  'background details', 'scenery', 'landscape', 'room',
+  'background details', 'scenery', 'landscape', 'room', 'outdoors',
   // Standard quality
   'deformed', 'disfigured', 'bad anatomy', 'blurry', 'watermark', 'text', 'logo',
-  'anime', 'cartoon', 'CGI', '3d render',
+  'low quality', 'worst quality',
 ].join(', ');
 
 const ANGLE_PRESETS: Record<string, string> = {
-  front: 'tight face crop, passport photo framing, face fills the frame, straight-on frontal view, centered, eyes looking directly at camera, plain grey background, flat even studio lighting',
-  three_quarter_left: 'tight face crop, face fills the frame, three-quarter view turned slightly left, plain grey background, soft lighting from left',
-  three_quarter_right: 'tight face crop, face fills the frame, three-quarter view turned slightly right, plain grey background, soft lighting from right',
-  profile_left: 'tight face crop, face fills the frame, exact side profile facing left, plain grey background, soft side lighting',
-  profile_right: 'tight face crop, face fills the frame, exact side profile facing right, plain grey background, soft side lighting',
+  front: 'plain grey background, even lighting',
+  three_quarter_left: 'plain grey background, soft lighting',
+  three_quarter_right: 'plain grey background, soft lighting',
+  profile_left: 'plain grey background, soft lighting',
+  profile_right: 'plain grey background, soft lighting',
 };
 
 // ============================================================

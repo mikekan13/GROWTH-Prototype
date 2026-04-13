@@ -337,6 +337,9 @@ export default function IdentityLockWizard({
   const primaryRef = referencePhotos[0] || undefined;
 
   // ── Core generation helper ─────────────────────────────────
+  // Debug info from last generation
+  const [debugInfo, setDebugInfo] = useState<{ prompt: string; negativePrompt: string; seed: number; timeMs: number; workflow: string; failures: string[]; refs: string } | null>(null);
+
   const generate = useCallback(async (opts: {
     referenceImagePath?: string;
     overrides?: Record<string, unknown>;
@@ -357,6 +360,15 @@ export default function IdentityLockWizard({
       throw new Error(err.error || 'Generation failed');
     }
     const data = await res.json();
+    setDebugInfo({
+      prompt: data.metadata.prompt || '',
+      negativePrompt: data.metadata.negativePrompt || '',
+      seed: data.metadata.seed,
+      timeMs: data.metadata.generationTimeMs,
+      workflow: data.metadata.workflowUsed || 'unknown',
+      failures: data.metadata.failedWorkflows || [],
+      refs: data.metadata.debugRefs || '',
+    });
     return { imagePath: data.imagePath, seed: data.metadata.seed };
   }, [characterData]);
 
@@ -919,6 +931,9 @@ export default function IdentityLockWizard({
           {state.error}
         </div>
       )}
+
+      {/* Debug Panel */}
+      {debugInfo && <DebugPanel info={debugInfo} />}
     </div>
   );
 }
@@ -1155,6 +1170,45 @@ function FaceCropImage({ src, alt, faceCrop }: { src: string; alt: string; faceC
         </div>
       )}
     </>
+  );
+}
+
+function DebugPanel({ info }: { info: { prompt: string; negativePrompt: string; seed: number; timeMs: number; workflow: string; failures: string[]; refs: string } }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3 border" style={{ borderColor: '#333', borderRadius: '3px', backgroundColor: '#0a0a15' }}>
+      <button onClick={() => setOpen(!open)} className="w-full text-left px-2 py-1 flex justify-between items-center"
+        style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px', color: '#555' }}>
+        <span>Debug — Workflow: <span style={{ color: info.workflow.includes('controlnet') ? '#22ab94' : info.workflow.includes('pulid') ? '#D0A030' : '#E8585A' }}>{info.workflow}</span> | Seed: {info.seed} | {(info.timeMs / 1000).toFixed(1)}s</span>
+        <span>{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-2" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+          <div>
+            <div style={{ color: '#22ab94' }}>PROMPT:</div>
+            <div style={{ color: '#888', wordBreak: 'break-all' }}>{info.prompt}</div>
+          </div>
+          <div>
+            <div style={{ color: '#E8585A' }}>NEGATIVE:</div>
+            <div style={{ color: '#666', wordBreak: 'break-all' }}>{info.negativePrompt}</div>
+          </div>
+          {info.refs && (
+            <div>
+              <div style={{ color: '#8e7cc3' }}>REFS:</div>
+              <div style={{ color: '#888', wordBreak: 'break-all' }}>{info.refs}</div>
+            </div>
+          )}
+          {info.failures.length > 0 && (
+            <div>
+              <div style={{ color: '#D0A030' }}>FAILED WORKFLOWS:</div>
+              {info.failures.map((f, i) => (
+                <div key={i} style={{ color: '#E8585A', wordBreak: 'break-all' }}>{f}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

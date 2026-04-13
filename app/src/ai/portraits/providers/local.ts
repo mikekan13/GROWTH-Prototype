@@ -110,6 +110,11 @@ export class LocalProvider implements ImageGenerationProvider {
       const config = applyCampaignStyle(styleConfig, input.campaignStyle);
       const promptOutput = buildPortraitPrompt(input.characterData, input.campaignStyle, input.overrides);
 
+      // Debug: log the prompt and mode
+      console.log('[ComfyUI] anglePreset:', input.overrides?.anglePreset || 'none');
+      console.log('[ComfyUI] Prompt:', promptOutput.prompt.substring(0, 200) + '...');
+      console.log('[ComfyUI] Negative (first 100):', promptOutput.negativePrompt.substring(0, 100) + '...');
+
       // 3. Prepare workflow parameters
       const seed = input.overrides?.seed ?? Math.floor(Math.random() * 2147483647);
       const params: ComfyUIWorkflowParams = {
@@ -130,28 +135,42 @@ export class LocalProvider implements ImageGenerationProvider {
 
       // 4. Upload reference images BEFORE workflow injection (need ComfyUI filenames)
       if (input.personaLock?.referenceImagePath) {
+        console.log('[ComfyUI] Uploading PuLID reference:', input.personaLock.referenceImagePath);
         const uploadedRefName = await this.uploadReferenceImage(input.personaLock.referenceImagePath);
         params.referenceImagePath = uploadedRefName;
+        console.log('[ComfyUI] PuLID ref uploaded as:', uploadedRefName);
       }
 
       // 4b. Upload ControlNet angle reference if provided
-      const useControlnet = !!input.overrides?.anglePreset && await this.isControlNetAvailable();
+      // NOTE: XLabs Canny v3 model is incompatible with standard ComfyUI ControlNet loader.
+      // XLabs nodes try to load their own FLUX copy (won't fit in 8GB VRAM alongside GGUF).
+      // Need InstantX FLUX ControlNet Union (~6.6GB) for standard pipeline compatibility.
+      // Disabled until proper model is downloaded. Falling back to prompt-only + PuLID.
+      // ControlNet for angle control — front face uses PuLID-only (stronger face match)
+      // ControlNet only for 3/4 and profile angles where pose control is needed
+      const anglePreset = input.overrides?.anglePreset;
+      const useControlnet = !!anglePreset && anglePreset !== 'front' && await this.isControlNetAvailable();
       if (useControlnet && input.overrides?.anglePreset) {
-        // Generate or load the angle reference image for ControlNet
         const angleRefPath = await this.getAngleReferenceImage(input.overrides.anglePreset);
+        console.log('[ComfyUI] ControlNet angle ref path:', angleRefPath);
         if (angleRefPath) {
           const uploadedAngleRef = await this.uploadReferenceImage(angleRefPath);
           params.controlnetImagePath = uploadedAngleRef;
-          params.controlnetStrength = 0.65;
+          params.controlnetStrength = 0.2;  // Minimal — just guide head angle/position, not style or geometry
+          console.log('[ComfyUI] ControlNet ref uploaded as:', uploadedAngleRef);
+        } else {
+          console.log('[ComfyUI] No angle reference found — ControlNet will be skipped');
         }
       }
+
+      console.log('[ComfyUI] Params — PuLID ref:', params.referenceImagePath || 'NONE', '| CN ref:', params.controlnetImagePath || 'NONE');
 
       // 5. Select workflow: ControlNet+PuLID → PuLID → Basic (with fallbacks)
       let outputInfo: { filename: string; subfolder: string; type: string };
       const usePulid = !!params.referenceImagePath;
       const workflowPriority: string[] = [];
 
-      if (useControlnet && usePulid) {
+      if (useControlnet && usePulid && params.controlnetImagePath) {
         workflowPriority.push('character-face-controlnet');  // ControlNet + PuLID
       }
       if (usePulid) {
@@ -159,7 +178,10 @@ export class LocalProvider implements ImageGenerationProvider {
       }
       workflowPriority.push('character-portrait');           // Basic (always fallback)
 
-      outputInfo = await this.tryWorkflows(workflowPriority, params);
+      const workflowResult = await this.tryWorkflows(workflowPriority, params);
+      outputInfo = workflowResult.output;
+      const workflowUsed = workflowResult.workflowName;
+      const failedWorkflows = workflowResult.failedWorkflows;
 
       // 8. Download generated image
       const imageData = await this.downloadImage(
@@ -191,7 +213,10 @@ export class LocalProvider implements ImageGenerationProvider {
         styleLoraWeight: params.styleLoraWeight,
         campaignLoraName: params.campaignLora,
         campaignLoraWeight: params.campaignLoraWeight,
-      };
+        workflowUsed,
+        failedWorkflows,
+        debugRefs: `PuLID: ${params.referenceImagePath || 'NONE'} | CN: ${params.controlnetImagePath || 'NONE'}`,
+      } as PortraitMetadata & { workflowUsed: string; failedWorkflows: string[]; debugRefs: string };
 
       return {
         success: true,
@@ -369,6 +394,11 @@ export class LocalProvider implements ImageGenerationProvider {
   ): Record<string, unknown> {
     const w = JSON.parse(JSON.stringify(workflow)); // Deep clone
 
+    // Strip comment keys (e.g. _comment_pulid) — ComfyUI crashes on non-node keys
+    for (const key of Object.keys(w)) {
+      if (key.startsWith('_')) delete w[key];
+    }
+
     for (const [nodeId, node] of Object.entries(w)) {
       const n = node as Record<string, unknown>;
       const classType = n.class_type as string;
@@ -409,6 +439,12 @@ export class LocalProvider implements ImageGenerationProvider {
         if (inputs.cfg !== undefined) inputs.cfg = params.cfg;
       }
 
+      // XlabsSampler — inject seed, steps (different field names)
+      if (classType === 'XlabsSampler') {
+        if (inputs.noise_seed !== undefined) inputs.noise_seed = params.seed;
+        if (inputs.steps !== undefined) inputs.steps = params.steps;
+      }
+
       // Empty Latent Image — inject dimensions
       if (classType === 'EmptyLatentImage') {
         inputs.width = params.width;
@@ -436,15 +472,15 @@ export class LocalProvider implements ImageGenerationProvider {
         }
       }
 
-      // ApplyFluxControlNet — inject strength
-      if (classType === 'ApplyFluxControlNet' || classType === 'ApplyAdvancedFluxControlNet') {
+      // ControlNet Apply — inject strength (supports both XLabs and standard nodes)
+      if (classType === 'ApplyFluxControlNet' || classType === 'ApplyAdvancedFluxControlNet' || classType === 'ControlNetApplyAdvanced') {
         if (params.controlnetStrength !== undefined && inputs.strength !== undefined) {
           inputs.strength = params.controlnetStrength;
         }
       }
 
       // Canny preprocessor — match resolution to generation size
-      if (classType === 'Canny_Edge_Preprocessor') {
+      if (classType === 'CannyEdgePreprocessor' || classType === 'Canny_Edge_Preprocessor') {
         if (inputs.resolution !== undefined) {
           inputs.resolution = params.width;
         }
@@ -657,25 +693,36 @@ export class LocalProvider implements ImageGenerationProvider {
     if (!filename) return null;
 
     const refPath = `${PORTRAIT_ROOT}/angle-refs/${filename}`;
-    const fullRefPath = path.join('public', refPath);
+    // Try both relative and absolute paths (process.cwd() may vary)
+    const candidates = [
+      path.join('public', refPath),
+      path.join(process.cwd(), 'public', refPath),
+    ];
 
-    try {
-      await fs.access(fullRefPath);
-      return `/${refPath}`;
-    } catch {
-      console.log(`[ControlNet] Angle reference not found: ${fullRefPath}`);
-      return null;
+    for (const fullRefPath of candidates) {
+      try {
+        await fs.access(fullRefPath);
+        console.log(`[ControlNet] Found angle ref: ${fullRefPath}`);
+        return `/${refPath}`;
+      } catch {
+        // try next
+      }
     }
+    console.log(`[ControlNet] Angle reference not found for "${angle}". Tried:`, candidates);
+    return null;
   }
 
   /**
    * Try workflows in priority order with fallbacks.
    * First success wins; failures cascade to next workflow.
    */
+  private failedWorkflows: string[] = [];
+
   private async tryWorkflows(
     workflowNames: string[],
     params: ComfyUIWorkflowParams,
-  ): Promise<{ filename: string; subfolder: string; type: string }> {
+  ): Promise<{ output: { filename: string; subfolder: string; type: string }; workflowName: string; failedWorkflows: string[] }> {
+    this.failedWorkflows = [];
     for (let i = 0; i < workflowNames.length; i++) {
       const name = workflowNames[i];
       try {
@@ -683,13 +730,15 @@ export class LocalProvider implements ImageGenerationProvider {
         const preparedWorkflow = this.injectWorkflowParams(workflow, params);
         const clientId = crypto.randomUUID();
         const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
-        const outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+        const output = await this.waitForCompletion(queueResponse.prompt_id);
         console.log(`[ComfyUI] Generation complete using workflow: ${name}`);
-        return outputInfo;
+        return { output, workflowName: name, failedWorkflows: this.failedWorkflows };
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.failedWorkflows.push(`${name}: ${errMsg}`);
         const isLast = i === workflowNames.length - 1;
-        if (isLast) throw err;  // No more fallbacks
-        console.warn(`[ComfyUI] Workflow "${name}" failed, trying next:`, err instanceof Error ? err.message : err);
+        if (isLast) throw err;
+        console.warn(`[ComfyUI] Workflow "${name}" failed, trying next:`, errMsg);
       }
     }
     throw new Error('All workflows failed');

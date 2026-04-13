@@ -55,6 +55,11 @@ export async function POST(request: NextRequest) {
         seed: result.metadata.seed,
         generationTimeMs: result.metadata.generationTimeMs,
         model: result.metadata.model,
+        prompt: result.metadata.prompt,
+        negativePrompt: result.metadata.negativePrompt,
+        workflowUsed: (result.metadata as unknown as Record<string, unknown>).workflowUsed || 'unknown',
+        failedWorkflows: (result.metadata as unknown as Record<string, unknown>).failedWorkflows || [],
+        debugRefs: (result.metadata as unknown as Record<string, unknown>).debugRefs || '',
       },
     });
   } catch (error) {

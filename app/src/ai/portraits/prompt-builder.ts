@@ -61,14 +61,12 @@ export function buildPortraitPrompt(
 
   // ── IDENTITY LOCK FACE MODE ──
   // When anglePreset is set, we're generating face-only images for identity lock.
-  // Completely different prompt strategy: realistic style, face-only framing,
-  // stripped of everything that isn't facial identity.
+  // ONLY facial features — no body, no limbs, no accessories, no clothing.
   if (overrides?.anglePreset) {
+    const faceBlock = buildFaceOnlyBlock(char);
     const blocks: string[] = [];
     blocks.push(getIdentityLockStyle());
-    blocks.push(identityBlock);
-    // Include hair/eye/skin from body block — these are facial features
-    if (bodyBlock) blocks.push(bodyBlock);
+    blocks.push(faceBlock);
     blocks.push(getAnglePreset(overrides.anglePreset));
 
     return {
@@ -200,6 +198,39 @@ function buildBodyDescriptionBlock(char: PortraitCharacterData): string {
   }
 
   return parts.join(', ');
+}
+
+// ============================================================
+// Face-Only Description (for identity lock — no body, no accessories)
+// ============================================================
+
+function buildFaceOnlyBlock(char: PortraitCharacterData): string {
+  const { identity, seed } = char;
+  const parts: string[] = [];
+
+  // Age + sex + species (core identity)
+  const agePart = identity.age ? `${identity.age}-year-old` : '';
+  const sexPart = identity.sex || '';
+  const seedPart = seed?.name || '';
+  const coreParts = [agePart, sexPart, seedPart].filter(Boolean);
+  if (coreParts.length > 0) {
+    parts.push(`a ${coreParts.join(' ')}`);
+  }
+
+  // Skin tone
+  if (identity.skinTone) parts.push(`${identity.skinTone} skin`);
+
+  // Eye color
+  if (identity.eyeColor) parts.push(`${identity.eyeColor} eyes`);
+
+  // NO hair in face lock — hair is pulled back to expose pure face geometry.
+  // Hair gets added back from character description in regular portrait generation.
+  // NO cosmetics — we want the bare face
+  // NO bodyType, height, build, distinguishingFeatures, hairStyle
+  // NO physicalDescription (free text may contain body descriptions)
+  // NO seed.description (species lore, not visual)
+
+  return parts.filter(Boolean).join(', ');
 }
 
 // ============================================================

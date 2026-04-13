@@ -103,11 +103,11 @@
     "_meta": { "title": "Angle Reference Image (ControlNet)" }
   },
   "21": {
-    "class_type": "Canny_Edge_Preprocessor",
+    "class_type": "CannyEdgePreprocessor",
     "inputs": {
       "image": ["20", 0],
-      "low_threshold": 100,
-      "high_threshold": 200,
+      "low_threshold": 150,
+      "high_threshold": 250,
       "resolution": 768
     },
     "_meta": { "title": "Canny Edge Detection" }
@@ -125,29 +125,29 @@
     "inputs": {
       "controlnet": ["22", 0],
       "image": ["21", 0],
-      "strength": 0.65,
-      "model": ["13", 0]
+      "strength": 0.65
     },
     "_meta": { "title": "Apply ControlNet (Canny)" }
   },
 
-  "_comment_sampler": "── Generation ──",
+  "_comment_sampler": "── Generation (XLabs Sampler for ControlNet support) ──",
 
   "7": {
-    "class_type": "KSampler",
+    "class_type": "XlabsSampler",
     "inputs": {
-      "model": ["23", 0],
-      "seed": 42,
+      "model": ["13", 0],
+      "conditioning": ["4", 0],
+      "neg_conditioning": ["5", 0],
+      "noise_seed": 42,
       "steps": 20,
-      "cfg": 1.0,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "positive": ["4", 0],
-      "negative": ["5", 0],
+      "timestep_to_start_cfg": 20,
+      "true_gs": 3.5,
+      "image_to_image_strength": 0.0,
+      "denoise_strength": 1.0,
       "latent_image": ["6", 0],
-      "denoise": 1.0
+      "controlnet_condition": ["23", 0]
     },
-    "_meta": { "title": "KSampler" }
+    "_meta": { "title": "XLabs Sampler" }
   },
   "8": {
     "class_type": "VAEDecode",
