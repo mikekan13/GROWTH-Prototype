@@ -51,10 +51,6 @@
     "class_type": "ApplyIPAdapterFlux",
     "inputs": { "model": ["25", 0], "ipadapter_flux": ["30", 0], "image": ["31", 0], "weight": 0.75, "start_percent": 0.0, "end_percent": 1.0 }
   },
-  "33": {
-    "class_type": "ApplyFBCacheOnModel",
-    "inputs": { "model": ["32", 0], "object_to_patch": "diffusion_model", "residual_diff_threshold": 0.12, "start": 0.0, "end": 1.0, "max_consecutive_cache_hits": -1 }
-  },
   "4": {
     "class_type": "CLIPTextEncodeFlux",
     "inputs": { "clip": ["25", 1], "clip_l": "", "t5xxl": "", "guidance": 3.5 }
@@ -70,7 +66,7 @@
   "7": {
     "class_type": "KSampler",
     "inputs": {
-      "model": ["33", 0],
+      "model": ["32", 0],
       "seed": 42,
       "steps": 8,
       "cfg": 1.0,
