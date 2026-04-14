@@ -136,7 +136,7 @@ Return a JSON object with these exact keys:
   "hairColor": natural base color,
   "hairLength": one of ["Bald", "Buzzed", "Short", "Ear-length", "Chin-length", "Shoulder-length", "Mid-back", "Waist-length", "Hip-length", "Knee-length", "Floor-length"],
   "hairTexture": the NATURAL texture of the hair itself — one of ["Straight", "Wavy", "Curly", "Coily", "Kinky", "Wiry", "Fine", "Thick"]. Look at loose strands or the wave pattern, not how it's styled. Braided hair can still be wavy or curly underneath.
-  "hairStyle": how the hair is actually worn/styled in the photos — be specific about styling details. Include braids, ponytails, updos, accessories (feathers, beads, clips, ribbons), partings, bangs. Example: "loose braids with feather ornament" or "half-up with side braids". Look at ALL provided photos for the most complete picture.
+  "hairStyle": how the hair is naturally worn/styled — describe the HAIR ITSELF only, NOT accessories. Include braids, ponytails, updos, partings, bangs, loose, pinned. Example: "loose with side-swept bangs" or "half-up with side braids". Do NOT mention feathers, beads, clips, ribbons, ornaments, or any hair accessories — those are equipment, not hairstyle.
   "cosmetics": any visible makeup, war paint, face paint, or "None",
   "hygiene": one of ["Pristine", "Well-kept", "Average", "Rugged", "Rough", "Unkempt", "Feral"],
   "description": other notable features (scars, moles, piercings, bone structure — NOT clothing/accessories)
@@ -152,7 +152,15 @@ SYMMETRY RULE — VERY IMPORTANT:
 
 If a body part is hidden by clothing, infer from overall build. Never mention what they are wearing.
 
-Return ONLY valid JSON, no markdown. Keys: UPPERCASE body part names (HEAD, TORSO, LEFT_UPPER_ARM, etc.) plus "overall".`;
+STYLE PREFERENCES — infer from the photos:
+"style": {
+  "primaryColor": the dominant color this person gravitates toward (from clothing, accessories, or overall vibe in the photos) as a hex color code,
+  "secondaryColor": a secondary/accent color visible in their look, as hex,
+  "tertiaryColor": a third color if visible, or a complementary choice, as hex,
+  "aesthetics": an array of exactly 2 aesthetic descriptors from this list that best match how this person presents themselves: ["Ornate", "Practical", "Rugged", "Elegant", "Minimal", "Wild", "Military", "Scholarly", "Noble", "Street", "Ceremonial", "Artisan", "Nomadic", "Mystic", "Mercenary", "Courtly", "Tribal", "Anarchic", "Maritime", "Monastic", "Gothic", "Theatrical", "Pastoral", "Ascetic", "Industrial", "Diplomatic", "Predatory", "Festive", "Ancient", "Biomantic"]
+}
+
+Return ONLY valid JSON, no markdown. Keys: UPPERCASE body part names (HEAD, TORSO, LEFT_UPPER_ARM, etc.) plus "overall" plus "style".`;
 }
 
 // ── Claude (Cloud) ───────────────────────────────────────────────────────

@@ -255,13 +255,27 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         // Body part fields
         const newBodyParts = { ...prev.bodyParts };
         for (const [part, data] of Object.entries(descriptions)) {
-          if (part === 'overall') continue;
+          if (part === 'overall' || part === 'style') continue;
           const partData = data as Record<string, string>;
           newBodyParts[part] = { ...newBodyParts[part], ...partData };
         }
         updated.bodyParts = newBodyParts;
         return updated;
       });
+      // Apply style preferences
+      if (descriptions.style) {
+        const s = descriptions.style as Record<string, unknown>;
+        if (s.primaryColor || s.secondaryColor || s.tertiaryColor) {
+          setStyleColors(prev => ({
+            primary: (s.primaryColor as string) || prev.primary,
+            secondary: (s.secondaryColor as string) || prev.secondary,
+            tertiary: (s.tertiaryColor as string) || prev.tertiary,
+          }));
+        }
+        if (Array.isArray(s.aesthetics) && s.aesthetics.length > 0) {
+          setStyleAesthetics(s.aesthetics.slice(0, 2) as string[]);
+        }
+      }
       setDirty(true);
     } catch (e) { setDescribeError(e instanceof Error ? e.message : 'Description generation failed'); }
     finally { setDescribing(false); }
@@ -691,22 +705,43 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                     {isExpanded && (
                       <div className="pl-4 pb-2">
                         {isHead ? (
-                          <div className="space-y-2 mt-1">
-                            <div className="grid grid-cols-2 gap-2">
-                              <FieldSelect label="Face Shape" value={bpData.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'faceShape', v)} />
-                              <FieldSelect label="Eye Shape" value={bpData.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'eyeShape', v)} />
-                              <FieldInput label="Eye Color" value={bpData.eyeColor} placeholder="green, hazel, amber" editable={isEditable} onChange={v => updateBodyPart(part, 'eyeColor', v)} />
-                              <FieldInput label="Facial Hair" value={bpData.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart(part, 'facialHair', v)} />
-                              <FieldInput label="Hair Color" value={bpData.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart(part, 'hairColor', v)} />
-                              <FieldSelect label="Hair Length" value={bpData.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairLength', v)} />
-                              <FieldSelect label="Hair Texture" value={bpData.hairTexture} options={HAIR_TEXTURE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
-                              <FieldInput label="Usual Style" value={bpData.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart(part, 'hairStyle', v)} />
+                          <div className="space-y-3 mt-1">
+                            {/* Face */}
+                            <div>
+                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Face</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <FieldSelect label="Shape" value={bpData.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'faceShape', v)} />
+                                <FieldInput label="Facial Hair" value={bpData.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart(part, 'facialHair', v)} />
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <FieldInput label="Cosmetics" value={bpData.cosmetics} placeholder="kohl eyeliner, war paint, none" editable={isEditable} onChange={v => updateBodyPart(part, 'cosmetics', v)} />
-                              <FieldSelect label="Hygiene" value={bpData.hygiene} options={HYGIENE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hygiene', v)} />
+                            {/* Eyes */}
+                            <div>
+                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Eyes</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <FieldSelect label="Shape" value={bpData.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'eyeShape', v)} />
+                                <FieldInput label="Color" value={bpData.eyeColor} placeholder="green, hazel, amber" editable={isEditable} onChange={v => updateBodyPart(part, 'eyeColor', v)} />
+                              </div>
                             </div>
-                            <FieldTextarea label="Other Details" value={bpData.description} placeholder="Scars on cheek, pointed ears, glowing runes on forehead..." editable={isEditable} onChange={v => updateBodyPart(part, 'description', v)} />
+                            {/* Hair */}
+                            <div>
+                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Hair</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <FieldInput label="Color" value={bpData.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart(part, 'hairColor', v)} />
+                                <FieldSelect label="Length" value={bpData.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairLength', v)} />
+                                <FieldSelect label="Texture" value={bpData.hairTexture} options={HAIR_TEXTURE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
+                                <FieldInput label="Style" value={bpData.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart(part, 'hairStyle', v)} />
+                              </div>
+                            </div>
+                            {/* Grooming */}
+                            <div>
+                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Grooming</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <FieldInput label="Cosmetics" value={bpData.cosmetics} placeholder="kohl eyeliner, war paint, none" editable={isEditable} onChange={v => updateBodyPart(part, 'cosmetics', v)} />
+                                <FieldSelect label="Hygiene" value={bpData.hygiene} options={HYGIENE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hygiene', v)} />
+                              </div>
+                            </div>
+                            {/* Distinguishing Features */}
+                            <FieldTextarea label="Distinguishing Features" value={bpData.description} placeholder="Scars, pointed ears, piercings, birthmarks, glowing runes..." editable={isEditable} onChange={v => updateBodyPart(part, 'description', v)} />
                           </div>
                         ) : (
                           <div className="mt-1">
