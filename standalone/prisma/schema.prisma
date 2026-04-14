@@ -1,0 +1,555 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id             String     @id @default(cuid())
+  username       String     @unique
+  email          String     @unique
+  passwordHash   String
+  role           String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
+  profile        String?    // JSON<TrailblazerProfile>
+  watcherProfile String?    // JSON<WatcherProfile> (GM-specific, only for WATCHER/ADMIN roles)
+  campaigns      Campaign[]       @relation("GMCampaigns")
+  characters     Character[]
+  memberships    CampaignMember[]
+  wallet         Wallet?
+  sessions       Session[]
+  accessCodes    AccessCode[]
+  createdAt      DateTime   @default(now())
+}
+
+model Campaign {
+  id                  String               @id @default(cuid())
+  name                String
+  genre               String?
+  themes              String?              // JSON array
+  description         String?
+  worldContext        String?              // World description for AI context
+  customPrompts       String?              // JSON array of GM-defined backstory prompts (legacy)
+  applicationTemplate String?              // JSON: [{ id, prompt, required, category }]
+  listingStatus       String               @default("UNLISTED") // UNLISTED | LISTED | CLOSED
+  listingDescription  String?              // Public-facing campaign pitch
+  listingTags         String?              // JSON string[]
+  requiredFields      String?              // JSON string[] — profile fields GM requires from applicants
+  gmUser              User                 @relation("GMCampaigns", fields: [gmUserId], references: [id])
+  gmUserId            String
+  inviteCode          String?              @unique
+  status              String               @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  maxTrailblazers     Int                  @default(5)
+  characters          Character[]
+  members             CampaignMember[]
+  applications        CampaignApplication[]
+  copilotMessages     CopilotMessage[]
+  changeLogs          ChangeLog[]
+  sessions            GameSession[]
+  events              CampaignEvent[]
+  forgeItems          ForgeItem[]
+  playerRequests      PlayerRequest[]
+  locations           Location[]
+  campaignItems       CampaignItem[]
+  encounters          Encounter[]
+  goals               Goal[]
+  aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
+  relationships       EntityRelationship[]
+  createdAt           DateTime             @default(now())
+}
+
+model CampaignMember {
+  id              String               @id @default(cuid())
+  campaign        Campaign             @relation(fields: [campaignId], references: [id])
+  campaignId      String
+  user            User                 @relation(fields: [userId], references: [id])
+  userId          String
+  status          String               @default("INTERESTED") // INTERESTED, BACKSTORY, CHARACTER_CREATION, ACTIVE, REJECTED
+  application     CampaignApplication?
+  characterDesc   String?              // JSON: player's backstory + physical description before character exists
+  joinedAt        DateTime             @default(now())
+
+  @@unique([campaignId, userId])
+}
+
+model CampaignApplication {
+  id          String         @id @default(cuid())
+  campaign    Campaign       @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  member      CampaignMember @relation(fields: [memberId], references: [id])
+  memberId    String         @unique
+  responses       String         // JSON: [{ promptId, prompt, response, aiExpanded? }]
+  profileSnapshot String?        // JSON: snapshot of profile at application time
+  status          String         @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REVISION | DENIED
+  gmNotes         String?
+  characterId     String?        // linked after GM builds character
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([campaignId, status])
+}
+
+model Character {
+  id         String              @id @default(cuid())
+  name       String
+  entityType String              @default("PLAYER_CHARACTER") // PLAYER_CHARACTER, NPC, CREATURE, GODHEAD
+  user       User                @relation(fields: [userId], references: [id])
+  userId     String
+  campaign   Campaign?           @relation(fields: [campaignId], references: [id])
+  campaignId String?             // Nullable: God-heads + global NPCs have no campaign
+  data       String              // JSON<GrowthCharacter>
+  portrait   String?
+  status     String              @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, ACTIVE, DEAD, RETIRED
+  backstory  CharacterBackstory?
+  changeLogs ChangeLog[]
+  portraitGenerations PortraitGeneration[]
+  personaLock PersonaLock?
+  godHead    GodHead?
+  goals      Goal[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([entityType])
+}
+
+model CharacterBackstory {
+  id          String    @id @default(cuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String    @unique
+  responses   String    // JSON: array of { prompt: string, response: string }
+  narrative   String?   // Combined/compiled narrative (generated from responses)
+  gmNotes     String?
+  status      String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REVISION
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Wallet {
+  id           String  @id @default(cuid())
+  owner        User?   @relation(fields: [ownerId], references: [id])
+  ownerId      String? @unique
+  walletType   String  @default("USER")   // USER, RESERVE, CAMPAIGN, CHARACTER, BURN, LADY_DEATH
+  ownerType    String  @default("USER")   // Kept for backwards compat; walletType is canonical
+  label        String?                    // Reserve: "Terminal","Mercy","Balance","Severity"; System: "Burn Sink","Lady Death"
+  balance      BigInt  @default(0)
+  campaignId   String?                    // For CAMPAIGN wallets
+  characterId  String?                    // For CHARACTER wallets
+  frozen       Boolean @default(false)
+
+  @@index([walletType])
+  @@index([campaignId])
+  @@index([characterId])
+}
+
+model KrmaTransaction {
+  id              String   @id @default(cuid())
+  sequenceNumber  BigInt   @unique
+  fromWalletId    String
+  toWalletId      String
+  amount          BigInt
+  state           String                  // FLUID, LOCK, UNLOCK, BURN
+  reason          String                  // Transaction type code (e.g. CAMPAIGN_FUND)
+  description     String   @default("")   // Human-readable explanation
+  metadata        String   @default("{}") // JSON: TransactionMetadata
+  campaignId      String?                 // Campaign context if applicable
+  actorId         String                  // Who initiated
+  actorType       String   @default("SYSTEM") // USER, SYSTEM, GM, EVALUATOR, GODHEAD
+  checksum        String                  // SHA-256 chain link
+  idempotencyKey  String?  @unique        // Prevents duplicate transactions
+  createdAt       DateTime @default(now())
+
+  @@index([fromWalletId])
+  @@index([toWalletId])
+  @@index([campaignId, createdAt])
+  @@index([createdAt])
+  @@index([reason])
+}
+
+model LedgerSequence {
+  id      String @id @default("singleton")
+  current BigInt @default(0)
+}
+
+model BurnLedger {
+  id          String @id @default("singleton")
+  totalBurned BigInt @default(0)
+  cap         BigInt @default(5000000000)
+}
+
+model AuditEntry {
+  id         String   @id @default(cuid())
+  timestamp  DateTime @default(now())
+  actorId    String
+  actorType  String
+  action     String
+  targetType String
+  targetId   String
+  outcome    String   // SUCCESS, DENIED, FAILED, ERROR
+  reason     String   @default("")
+  metadata   String   @default("{}")
+
+  @@index([actorId])
+  @@index([targetId])
+  @@index([timestamp])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model ChangeLog {
+  id             String    @id @default(cuid())
+  campaign       Campaign  @relation(fields: [campaignId], references: [id])
+  campaignId     String
+  character      Character @relation(fields: [characterId], references: [id])
+  characterId    String
+  characterName  String    @default("")
+  groupId        String?
+
+  actor          String    // player | gm | ai_copilot | system
+  actorUserId    String
+
+  category       String    // attribute | condition | inventory | etc.
+  description    String
+  changes        String    // JSON: FieldChange[]
+  source         String?
+
+  revertible     Boolean   @default(true)
+  revertedAt     DateTime?
+  revertedBy     String?
+
+  snapshotBefore String?   // Full character JSON snapshot (nullable)
+
+  createdAt      DateTime  @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([characterId, createdAt])
+  @@index([groupId])
+}
+
+model GameSession {
+  id         String          @id @default(cuid())
+  campaign   Campaign        @relation(fields: [campaignId], references: [id])
+  campaignId String
+  number     Int             // Session 1, 2, 3...
+  name       String?
+  startedAt  DateTime        @default(now())
+  endedAt    DateTime?
+  events     CampaignEvent[]
+
+  @@unique([campaignId, number])
+  @@index([campaignId])
+}
+
+model CampaignEvent {
+  id            String       @id @default(cuid())
+  campaign      Campaign     @relation(fields: [campaignId], references: [id])
+  campaignId    String
+  session       GameSession? @relation(fields: [sessionId], references: [id])
+  sessionId     String?
+  type          String       // dice_roll | chat | command | ai_message | game_event
+  actor         String       // player | gm | ai_copilot | system
+  actorUserId   String
+  actorName     String
+  characterId   String?
+  characterName String?
+  payload       String       // JSON: type-specific payload
+  createdAt     DateTime     @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([campaignId, type])
+  @@index([sessionId])
+}
+
+model ForgeItem {
+  id         String          @id @default(cuid())
+  campaign   Campaign?       @relation(fields: [campaignId], references: [id])
+  campaignId String?         // Nullable: global catalog items have no campaign
+  type       String          // skill | item | nectar | blossom | thorn
+  name       String
+  status     String          @default("draft") // draft | published | global
+  data       String          // JSON: type-specific details (governors, description, etc.)
+  createdBy  String          // userId of creator (GM)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  requests   PlayerRequest[]
+
+  // Global catalog
+  isGlobal       Boolean     @default(false)   // True = lives in global catalog
+  sourceGlobalId String?     // If this is a campaign instance of a global blueprint
+  authorUserId   String?     // Original author (for royalty tracking, may differ from createdBy)
+
+  // Authorship economy
+  useCount       Int         @default(0)        // Times instantiated across campaigns
+  royaltyRate    Float       @default(0.01)     // KRMA fraction paid to author on use
+
+  // Blueprint decay (Lady Death)
+  lastUsedAt     DateTime?                      // Last time this blueprint was instantiated
+  decayStatus    String      @default("ACTIVE") // ACTIVE, FLAGGED, DISSOLVING, DISSOLVED
+  flaggedAt      DateTime?
+
+  // Karmic evaluation (Kai)
+  relationshipTags String?   // JSON: [{ blueprintId, interactionType, synergyRisk }]
+  karmicValue    BigInt?     // Locked value assigned by Kai
+  evaluatedAt    DateTime?   // When Kai last scored this
+
+  @@unique([campaignId, name, type])
+  @@index([campaignId, type])
+  @@index([campaignId, status])
+  @@index([isGlobal, type])
+  @@index([authorUserId])
+  @@index([decayStatus])
+}
+
+model PlayerRequest {
+  id          String     @id @default(cuid())
+  campaign    Campaign   @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  requesterId String     // userId of the requesting player
+  type        String     // skill | item | nectar | blossom | thorn
+  name        String     // Requested name
+  status      String     @default("pending") // pending | approved | denied | modified
+  data        String     // JSON: what the player wants (governors, description, etc.)
+  gmNotes     String?    // GM feedback
+  forgeItem   ForgeItem? @relation(fields: [forgeItemId], references: [id])
+  forgeItemId String?    // Linked ForgeItem once approved/modified
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([campaignId, status])
+  @@index([requesterId])
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  name        String
+  type        String   @default("point_of_interest") // settlement | wilderness | dungeon | building | point_of_interest | region
+  data        String   // JSON<GrowthLocation>
+  status      String   @default("ACTIVE") // ACTIVE, HIDDEN, DESTROYED
+  createdBy   String   // userId of creator (GM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, type])
+}
+
+model CampaignItem {
+  id          String   @id @default(cuid())
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  name        String
+  type        String   @default("misc") // weapon | armor | accessory | consumable | tool | artifact | prima_materia | misc
+  data        String   // JSON<GrowthWorldItem>
+  holderId    String?  // characterId of current holder (null = unowned/world item)
+  locationId  String?  // locationId where item resides (null = carried/unknown)
+  status      String   @default("ACTIVE") // ACTIVE, DESTROYED, CONSUMED, LOST
+  createdBy   String   // userId of creator (GM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, type])
+  @@index([holderId])
+  @@index([locationId])
+}
+
+model Encounter {
+  id          String   @id @default(cuid())
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  campaignId  String
+  name        String
+  type        String   @default("combat") // combat | social | exploration | puzzle | event
+  status      String   @default("PLANNED") // PLANNED, ACTIVE, PAUSED, RESOLVED
+  round       Int      @default(0)
+  phase       String   @default("intention") // intention | resolution | impact
+  data        String   // JSON<GrowthEncounter>
+  locationId  String?  // Where this encounter takes place
+  sessionId   String?  // Which game session
+  createdBy   String   // userId of creator (GM)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, status])
+}
+
+model CopilotMessage {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  role       String   // user | assistant
+  content    String
+  userId     String?
+  username   String?
+  actions    String?  // JSON: CopilotAction[] — proposed actions
+  metadata   String?  // JSON: retrieval context, tokens used, etc.
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+}
+
+model PortraitGeneration {
+  id              String    @id @default(cuid())
+  characterId     String
+  character       Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // Image storage
+  imagePath       String              // Relative path: portraits/{characterId}/{id}.png
+  thumbnailPath   String?             // Smaller version for lists/tokens
+
+  // Generation metadata
+  prompt          String              // Full prompt used
+  negativePrompt  String              // Full negative prompt used
+  seed            Int
+  model           String              // e.g. "flux1-dev-Q4_0"
+  steps           Int
+  pulidWeight     Float?
+  styleLoraName   String?
+  styleLoraWeight Float?
+  generationTimeMs Int
+
+  // State snapshot (character visual state at generation time)
+  stateSnapshot   String              // JSON: PortraitCharacterData
+
+  // Status
+  status          String   @default("completed")  // pending, completed, failed, accepted, archived
+  isCurrentPortrait Boolean @default(false)
+
+  // Campaign context
+  campaignId      String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([characterId])
+  @@index([characterId, isCurrentPortrait])
+}
+
+model PersonaLock {
+  id              String   @id @default(cuid())
+  characterId     String   @unique
+  character       Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // Identity anchors
+  referenceImagePath  String          // Path to the locked reference portrait
+  embeddingPath       String          // Path to face embedding file (Phase B)
+  lockedPrompt        String          // The exact prompt that generated the accepted portrait
+  lockedSeed          Int             // Seed of the accepted generation
+  bodyDescription     String @default("") // Full body description for non-facial consistency
+
+  // Style config at lock time
+  styleLora       String?
+  loraStrength    Float    @default(0.6)
+  pulidWeight     Float    @default(0.8)
+
+  // Lock history
+  lockVersion     Int      @default(1)     // Increments on re-lock
+  previousLockId  String?                  // Points to archived lock ID
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ── God-Head Architecture ─────────────────────────────────────────────────
+
+model Goal {
+  id              String    @id @default(cuid())
+  character       Character @relation(fields: [characterId], references: [id])
+  characterId     String    // The entity that owns this goal (PC, NPC, God-head)
+  campaign        Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId      String?   // Nullable: God-head meta-goals may be campaign-independent
+
+  description     String    // Plain language ("Find my father's killer")
+  status          String    @default("ACTIVE") // ACTIVE, COMPLETED, FAILED, ABANDONED
+  priority        Int       @default(1) // 1-5, entity sets priority
+
+  // God-head custodianship — which God-head "picked up" this GRO.vine
+  custodianId     String?   // GodHead.id that adopted this goal
+  custodianName   String?   // Cached display name
+  pillar          String?   // MERCY, BALANCE, SEVERITY — inherited from custodian
+
+  // Resistance (GM side)
+  resistancePrompt String?  // Auto-generated prompt to GM
+  resistancePlan   String?  // GM's plan/response
+
+  // Progress tracking
+  milestones      String?   // JSON: [{ id, description, completed, nectarAwarded?, completedAt? }]
+  nectarsEarned   Int       @default(0)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+
+  @@index([characterId, status])
+  @@index([campaignId, status])
+  @@index([custodianId])
+}
+
+model EntityRelationship {
+  id               String   @id @default(cuid())
+  campaign         Campaign? @relation(fields: [campaignId], references: [id])
+  campaignId       String?  // Nullable: some relationships are cross-campaign (God-head networks)
+
+  // Source node
+  sourceId         String   // Any entity ID (character, location, item, goal, god-head)
+  sourceType       String   // CHARACTER, NPC, LOCATION, ITEM, GODHEAD, GOAL
+
+  // Target node
+  targetId         String
+  targetType       String
+
+  // Edge properties
+  relationshipType String   // ally, rival, parent, guardian, custodian, located_at, owns, created_by, etc.
+  strength         Int      @default(5) // 1-10
+  bidirectional    Boolean  @default(false)
+  data             String?  // JSON: relationship-specific metadata (e.g. shared history, tension points)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([sourceId, targetId, relationshipType])
+  @@index([campaignId])
+  @@index([sourceId, sourceType])
+  @@index([targetId, targetType])
+}
+
+model GodHead {
+  id            String    @id @default(cuid())
+  name          String    @unique // "Lady Death", "Kai", "Eth'erling"
+  domain        String    // "Death, decay, karmic recycling, blueprint maintenance"
+  pillar        String    // MERCY, BALANCE, SEVERITY
+  character     Character @relation(fields: [characterId], references: [id])
+  characterId   String    @unique // Links to Character record (universal sheet)
+
+  // AI behavior
+  systemPrompt  String    // Core personality + domain authority instructions
+  temperature   Float     @default(0.7)
+  active        Boolean   @default(true)
+
+  // Economy
+  walletId      String?   // God-head's KRMA wallet ID
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model AccessCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  role        String    @default("WATCHER") // Role granted on redemption
+  label       String?   // "Kickstarter Backer", "Alpha Tester", etc.
+  redeemedBy  User?     @relation(fields: [redeemedById], references: [id])
+  redeemedById String?
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime? // Optional expiration
+}
