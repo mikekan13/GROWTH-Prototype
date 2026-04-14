@@ -399,12 +399,50 @@ export class LocalProvider implements ImageGenerationProvider {
       if (key.startsWith('_')) delete w[key];
     }
 
+    // Auto-detect available models — fall back to old versions if new ones not downloaded yet
+    const modelFallbacks: Record<string, string> = {};
+    let useGgufClipLoader = true;  // Switch to standard DualCLIPLoader when using fp8 safetensors
+    try {
+      const { existsSync } = require('fs');
+      const q4ksPath = path.join(COMFYUI_PATH, 'models', 'unet', 'flux1-dev-Q4_K_S.gguf');
+      if (!existsSync(q4ksPath) || require('fs').statSync(q4ksPath).size < 6_500_000_000) {
+        modelFallbacks['flux1-dev-Q4_K_S.gguf'] = 'flux1-dev-Q4_0.gguf';
+      }
+      const t5fp8Path = path.join(COMFYUI_PATH, 'models', 'clip', 't5xxl_fp8_e4m3fn.safetensors');
+      const t5fp8Ready = existsSync(t5fp8Path) && require('fs').statSync(t5fp8Path).size > 4_800_000_000;  // ~4.89GB expected
+      if (!t5fp8Ready) {
+        modelFallbacks['t5xxl_fp8_e4m3fn.safetensors'] = 't5-v1_1-xxl-encoder-Q4_K_M.gguf';
+      } else {
+        useGgufClipLoader = false;  // fp8 safetensors complete — use standard loader
+      }
+      const cnUnionPath = path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union.safetensors');
+      if (!existsSync(cnUnionPath) || require('fs').statSync(cnUnionPath).size < 6_000_000_000) {
+        modelFallbacks['flux-controlnet-union.safetensors'] = 'flux-canny-controlnet-v3.safetensors';
+      }
+    } catch { /* ignore */ }
+
     for (const [nodeId, node] of Object.entries(w)) {
       const n = node as Record<string, unknown>;
       const classType = n.class_type as string;
       const inputs = n.inputs as Record<string, unknown>;
 
       if (!classType || !inputs) continue;
+
+      // Apply model fallbacks — swap new model names for old if not yet downloaded
+      for (const [newName, oldName] of Object.entries(modelFallbacks)) {
+        for (const key of Object.keys(inputs)) {
+          if (inputs[key] === newName) {
+            inputs[key] = oldName;
+            console.log(`[ComfyUI] Model fallback: ${newName} → ${oldName}`);
+          }
+        }
+      }
+
+      // Swap DualCLIPLoaderGGUF → DualCLIPLoader when using fp8 safetensors clip
+      if (!useGgufClipLoader && classType === 'DualCLIPLoaderGGUF') {
+        n.class_type = 'DualCLIPLoader';
+        console.log('[ComfyUI] Swapped DualCLIPLoaderGGUF → DualCLIPLoader (fp8 clip)');
+      }
 
       // CLIPTextEncodeFlux — FLUX-specific encoder with separate clip_l and t5xxl inputs
       // The guidance value is embedded in conditioning (not KSampler cfg)

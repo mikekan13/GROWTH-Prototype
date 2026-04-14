@@ -645,9 +645,9 @@ export default function IdentityLockWizard({
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '8px' }}>
                   All Attempts ({state.frontCandidates.length})
                 </div>
-                <div className="flex gap-1 flex-wrap" style={{ maxWidth: '200px' }}>
+                <div className="overflow-y-auto flex flex-col gap-1 pr-1" style={{ maxHeight: '220px', width: '56px' }}>
                   {state.frontCandidates.map((c, i) => (
-                    <div key={i} onClick={() => setViewingIndex(i)} className="border overflow-hidden cursor-pointer transition-all"
+                    <div key={i} onClick={() => setViewingIndex(i)} className="flex-shrink-0 border overflow-hidden cursor-pointer transition-all"
                       style={{
                         borderColor: i === displayIndex ? '#D0A030' : '#2a2a3e',
                         borderWidth: i === displayIndex ? '2px' : '1px',
