@@ -71,9 +71,9 @@
     "inputs": {
       "ipadapter": "ip-adapter.bin",
       "clip_vision": "google/siglip-so400m-patch14-384",
-      "provider": "cuda"
+      "provider": "cpu"
     },
-    "_meta": { "title": "IP-Adapter-Flux Loader" }
+    "_meta": { "title": "IP-Adapter-Flux Loader (CPU offload for 8GB VRAM)" }
   },
   "31": {
     "class_type": "LoadImage",
@@ -107,7 +107,7 @@
   },
   "6": {
     "class_type": "EmptyLatentImage",
-    "inputs": { "width": 1024, "height": 1024, "batch_size": 1 }
+    "inputs": { "width": 768, "height": 768, "batch_size": 1 }
   },
   "7": {
     "class_type": "KSampler",
