@@ -12,6 +12,39 @@ const HYGIENE_OPTIONS = ['', 'Pristine', 'Well-kept', 'Average', 'Rugged', 'Roug
 const FACE_SHAPE_OPTIONS = ['', 'Oval', 'Round', 'Square', 'Heart', 'Long', 'Diamond', 'Angular'] as const;
 const EYE_SHAPE_OPTIONS = ['', 'Almond', 'Round', 'Hooded', 'Downturned', 'Upturned', 'Wide-set', 'Deep-set', 'Narrow'] as const;
 
+const AESTHETIC_OPTIONS = [
+  'Ornate',       // detailed embroidery, filigree, layered, decorative
+  'Practical',    // clean lines, functional, well-maintained
+  'Rugged',       // worn, patched, weathered, lived-in
+  'Elegant',      // flowing, tailored, refined silhouettes
+  'Minimal',      // simple, understated, unadorned
+  'Wild',         // furs, bones, trophies, natural materials
+  'Military',     // structured, uniform, insignias, sharp edges
+  'Scholarly',    // robes, pouches, ink-stained, bookish
+  'Noble',        // rich fabrics, crests, draped, regal
+  'Street',       // layered, mismatched, improvised, urban
+  'Ceremonial',   // ritual markings, symbolic, formal
+  'Artisan',      // tools, aprons, craft materials, handmade
+  'Nomadic',      // travel-worn, layered for weather, practical packs
+  'Mystic',       // flowing, symbolic, ethereal, otherworldly
+  'Mercenary',    // mixed armor, trophies, utilitarian
+  'Courtly',      // refined, political, subtle displays of wealth
+  'Tribal',       // cultural markings, natural dyes, clan symbols
+  'Anarchic',     // defiant, punk, modified, unconventional
+  'Maritime',     // seafaring, weathered leather, rope, naval
+  'Monastic',     // austere, simple wraps, humble, disciplined
+  'Gothic',       // dark, dramatic, angular, heavy fabrics
+  'Theatrical',   // bold, expressive, costume-like, attention-seeking
+  'Pastoral',     // earthy, homespun, agricultural, warm
+  'Ascetic',      // bare minimum, self-denial, spiritual
+  'Industrial',   // metal, rivets, soot-stained, mechanical
+  'Diplomatic',   // neutral tones, non-threatening, polished
+  'Predatory',    // sleek, dark, form-fitting, intimidating
+  'Festive',      // colorful, celebratory, adorned, joyful
+  'Ancient',      // archaic, wrapped linens, bronze, classical
+  'Biomantic',    // living materials, grown not made, organic
+] as const;
+
 function inchesToDisplay(inches: number): string {
   const ft = Math.floor(inches / 12);
   const rem = inches % 12;
@@ -27,6 +60,8 @@ interface CharacterDescData {
   referencePhotos?: string[];
   generatedBust?: string;
   generatedFullBody?: string;
+  styleColors?: { primary: string; secondary: string; tertiary: string };
+  styleAesthetics?: string[];
 }
 
 interface CampaignSeedItem {
@@ -60,6 +95,9 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
   const [backstoryText, setBackstoryText] = useState('');
   const [characterName, setCharacterName] = useState('');
   const [desiredAge, setDesiredAge] = useState<number>(25);
+  const [styleColors, setStyleColors] = useState<{ primary: string; secondary: string; tertiary: string }>({ primary: '#582a72', secondary: '#D0A030', tertiary: '#22ab94' });
+  const [styleAesthetics, setStyleAesthetics] = useState<string[]>([]);
+  const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set(['HEAD']));
   const [selectedSeedName, setSelectedSeedName] = useState<string>('');
   const [campaignSeeds, setCampaignSeeds] = useState<CampaignSeedItem[]>([]);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
@@ -104,6 +142,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         if (parsed.identity?.referencePhotos) setReferencePhotos(parsed.identity.referencePhotos);
         if (parsed.identity?.generatedBust) setGeneratedBust(parsed.identity.generatedBust);
         if (parsed.identity?.generatedFullBody) setGeneratedFullBody(parsed.identity.generatedFullBody);
+        if (parsed.identity?.styleColors) setStyleColors(parsed.identity.styleColors);
+        if (parsed.identity?.styleAesthetics) setStyleAesthetics(parsed.identity.styleAesthetics);
         if (parsed.backstory?.backstory) setBackstoryText(parsed.backstory.backstory);
         if (parsed.creation?.seed?.name) setSelectedSeedName(parsed.creation.seed.name);
         setCharacterName(parsed.identity?.name || userCharacter.name);
@@ -124,6 +164,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               if (desc.referencePhotos) setReferencePhotos(desc.referencePhotos);
               if (desc.generatedBust) setGeneratedBust(desc.generatedBust);
               if (desc.generatedFullBody) setGeneratedFullBody(desc.generatedFullBody);
+              if (desc.styleColors) setStyleColors(desc.styleColors);
+              if (desc.styleAesthetics) setStyleAesthetics(desc.styleAesthetics);
             } catch { /* ignore */ }
           }
         })
@@ -297,7 +339,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         if (!res.ok) throw new Error('Failed to load');
         const { character } = await res.json();
         const data = JSON.parse(character.data);
-        data.identity = { ...data.identity, physicalDescription, referencePhotos, generatedBust, generatedFullBody };
+        data.identity = { ...data.identity, physicalDescription, referencePhotos, generatedBust, generatedFullBody, styleColors, styleAesthetics };
         data.backstory = { ...data.backstory, backstory: backstoryText };
         const updateRes = await fetch(`/api/characters/${userCharacter.id}`, {
           method: 'PATCH',
@@ -310,7 +352,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            characterDesc: { physicalDescription, backstory: backstoryText, characterName, desiredAge, selectedSeed: selectedSeedName, referencePhotos, generatedBust, generatedFullBody },
+            characterDesc: { physicalDescription, backstory: backstoryText, characterName, desiredAge, selectedSeed: selectedSeedName, referencePhotos, generatedBust, generatedFullBody, styleColors, styleAesthetics },
           }),
         });
         if (!res.ok) throw new Error('Failed to save');
@@ -392,7 +434,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               </select>
               {campaignSeeds.length === 0 && (
                 <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                  No seeds published in this campaign yet. Ask your GM to add seeds via the Forge.
+                  No seeds published in this campaign yet. Ask your Watcher to add seeds via the Forge.
                 </div>
               )}
               {selectedSeed && (
@@ -429,7 +471,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           )}
         </div>
 
-        {/* REFERENCE PHOTOS + PORTRAITS */}
+        {/* ── SECTION: Reference Photos ── */}
         <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -437,7 +479,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                 Reference Photos
               </div>
               <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                Upload photos to define your character's look. Used for auto-description and portrait identity.
+                Upload photos of your character inspiration. Used for face identity and auto-description.
               </div>
             </div>
             {isEditable && (
@@ -481,17 +523,16 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
             </div>
           )}
 
-          {/* Reference photos row */}
           <div className="flex gap-3 flex-wrap">
             {referencePhotos.map((photo, i) => (
               <div key={photo} className="relative group">
-                <div className="border overflow-hidden" style={{ borderColor: i === 0 ? '#D0A030' : '#582a72', borderWidth: i === 0 ? '2px' : '1px', borderRadius: '3px', width: '120px', height: '150px' }}>
+                <div className="border overflow-hidden" style={{ borderColor: i === 0 ? '#D0A030' : '#582a72', borderWidth: i === 0 ? '2px' : '1px', borderRadius: '3px', width: '100px', height: '125px' }}>
                   <img src={photo} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" />
                 </div>
                 {i === 0 && (
-                  <div className="absolute top-1 left-1 px-1.5 py-0.5" style={{
+                  <div className="absolute top-1 left-1 px-1 py-0.5" style={{
                     backgroundColor: '#D0A030', color: '#000', borderRadius: '2px',
-                    fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '8px',
                   }}>PRIMARY</div>
                 )}
                 {isEditable && (
@@ -505,8 +546,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                 )}
               </div>
             ))}
-            {isEditable && (
-              <label className="border border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '120px', height: '150px', backgroundColor: '#111' }}>
+            {isEditable && referencePhotos.length === 0 && (
+              <label className="border border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '100px', height: '125px', backgroundColor: '#111' }}>
                 <div className="text-2xl" style={{ color: '#582a72', opacity: 0.4 }}>+</div>
                 <div className="text-xs mt-1" style={{ color: '#582a72', opacity: 0.4, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                   Add Photo
@@ -514,70 +555,11 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
               </label>
             )}
-          </div>
-
-          {/* Generated portraits row — or Identity Lock Wizard */}
-          {wizardOpen ? (
-            <div className="mt-3 pt-3" style={{ borderTop: '1px solid #582a7230' }}>
-              <IdentityLockWizard
-                characterData={buildCharacterData()}
-                campaignId={campaignId}
-                referencePhotos={referencePhotos}
-                characterId={userCharacter?.id}
-                onComplete={handleWizardComplete}
-                onCancel={() => setWizardOpen(false)}
-              />
-            </div>
-          ) : (
-            <div className="flex gap-4 justify-center mt-3 pt-3" style={{ borderTop: '1px solid #582a7230' }}>
-              <PortraitFrame label="Bust" initial={characterName ? characterName.charAt(0).toUpperCase() : '?'} portrait={generatedBust} loading={generating} />
-              <PortraitFrame label="Full Body" initial={characterName ? characterName.charAt(0).toUpperCase() : '?'} portrait={generatedFullBody} loading={generating && !!generatedBust} />
-            </div>
-          )}
-        </div>
-
-        {/* Age + Generate row */}
-        <div className="flex justify-center gap-4 items-end">
-          <div className="border p-3 flex-1 max-w-xs" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs uppercase tracking-wider" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                Desired Age at Campaign Start
-              </span>
-              <span className="text-lg" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
-                {desiredAge}
-              </span>
-            </div>
-            {isEditable && (
-              <input type="range" min={10} max={selectedSeed?.data.fatedAge || 200} value={desiredAge}
-                onChange={e => { setDesiredAge(Number(e.target.value)); setDirty(true); }}
-                className="w-full" style={{ accentColor: '#582a72' }} />
-            )}
-            <div className="flex justify-between text-xs mt-1" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-              <span>10</span>
-              <span>Fated Age: {selectedSeed?.data.fatedAge || '—'}</span>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1 items-end">
-            {!wizardOpen && (
-              <button
-                onClick={() => setWizardOpen(true)}
-                disabled={!selectedSeed}
-                className="px-6 py-3 text-xs uppercase tracking-[0.15em] h-fit transition-colors"
-                style={{
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  backgroundColor: selectedSeed ? '#7050A8' : '#333',
-                  color: selectedSeed ? '#fff' : '#555',
-                  border: '1px solid #582a72', borderRadius: '2px',
-                  cursor: !selectedSeed ? 'default' : 'pointer',
-                }}
-              >
-                {generatedBust ? 'Redo Identity Lock' : 'Identity Lock'}
-              </button>
-            )}
-            {generationError && (
-              <div className="text-xs" style={{ color: '#E8585A', fontFamily: 'var(--font-terminal), Consolas, monospace', maxWidth: '200px' }}>
-                {generationError}
-              </div>
+            {isEditable && referencePhotos.length > 0 && (
+              <label className="border border-dashed flex items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '50px', height: '125px', backgroundColor: '#111' }}>
+                <div className="text-xl" style={{ color: '#582a72', opacity: 0.4 }}>+</div>
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
+              </label>
             )}
           </div>
         </div>
@@ -594,9 +576,31 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
 
             {/* Overall body traits */}
             <SectionLabel text="Overall" />
-            <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-5 gap-2 mb-4">
               {/* Gender */}
               <FieldSelect label="Gender" value={pd.gender} options={GENDER_OPTIONS} editable={isEditable} onChange={v => updateField('gender', v)} />
+              {/* Age */}
+              <div>
+                <label className="text-xs uppercase block mb-0.5" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                  Age
+                </label>
+                {isEditable ? (
+                  <div>
+                    <div className="text-sm mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+                      {desiredAge}
+                    </div>
+                    <input type="range" min={10} max={selectedSeed?.data.fatedAge || 200} value={desiredAge}
+                      onChange={e => { setDesiredAge(Number(e.target.value)); setDirty(true); }}
+                      className="w-full" style={{ accentColor: '#582a72' }} />
+                    <div className="flex justify-between text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>
+                      <span>10</span>
+                      <span>Fated: {selectedSeed?.data.fatedAge || '—'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm p-1" style={{ color: '#ccc' }}>{desiredAge}</div>
+                )}
+              </div>
               {/* Height — seed-constrained slider */}
               <div>
                 <label className="text-xs uppercase block mb-0.5" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -651,42 +655,70 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               </div>
             </div>
 
-            {/* Body part sections from seed */}
-            <div className="space-y-4">
+            {/* Body part sections from seed — collapsible */}
+            <div className="space-y-1">
               {(selectedSeed.data.bodyStructure?.parts || []).map(part => {
                 const bpData = pd.bodyParts?.[part] || {};
                 const isHead = part === 'HEAD';
                 const isVital = selectedSeed.data.bodyStructure?.vitals?.includes(part);
+                const isExpanded = expandedParts.has(part);
+                const hasContent = isHead ? !!(bpData.eyeColor || bpData.hairColor || bpData.description) : !!bpData.description;
+                const togglePart = () => setExpandedParts(prev => {
+                  const next = new Set(prev);
+                  if (next.has(part)) next.delete(part); else next.add(part);
+                  return next;
+                });
+
                 return (
                   <div key={part}>
-                    <SectionLabel text={formatPartName(part)} vital={isVital} />
-                    {isHead ? (
-                      <div className="space-y-2 mt-1">
-                        <div className="grid grid-cols-2 gap-2">
-                          <FieldSelect label="Face Shape" value={bpData.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'faceShape', v)} />
-                          <FieldSelect label="Eye Shape" value={bpData.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'eyeShape', v)} />
-                          <FieldInput label="Eye Color" value={bpData.eyeColor} placeholder="green, hazel, amber" editable={isEditable} onChange={v => updateBodyPart(part, 'eyeColor', v)} />
-                          <FieldInput label="Facial Hair" value={bpData.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart(part, 'facialHair', v)} />
-                          <FieldInput label="Hair Color" value={bpData.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart(part, 'hairColor', v)} />
-                          <FieldSelect label="Hair Length" value={bpData.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairLength', v)} />
-                          <FieldSelect label="Hair Texture" value={bpData.hairTexture} options={HAIR_TEXTURE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
-                          <FieldInput label="Usual Style" value={bpData.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart(part, 'hairStyle', v)} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <FieldInput label="Cosmetics" value={bpData.cosmetics} placeholder="kohl eyeliner, war paint, none" editable={isEditable} onChange={v => updateBodyPart(part, 'cosmetics', v)} />
-                          <FieldSelect label="Hygiene" value={bpData.hygiene} options={HYGIENE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hygiene', v)} />
-                        </div>
-                        <FieldTextarea label="Other Details" value={bpData.description} placeholder="Scars on cheek, pointed ears, glowing runes on forehead..." editable={isEditable} onChange={v => updateBodyPart(part, 'description', v)} />
+                    <button onClick={togglePart} className="w-full flex items-center justify-between py-1.5 px-2 transition-colors"
+                      style={{ backgroundColor: isExpanded ? '#1a1a2e' : 'transparent', borderRadius: '2px' }}>
+                      <div className="flex items-center gap-2">
+                        <span style={{ color: '#582a72', fontSize: '10px' }}>{isExpanded ? '▾' : '▸'}</span>
+                        <span className="text-xs uppercase tracking-wider" style={{
+                          color: isVital ? '#E8585A' : '#8e7cc3',
+                          fontFamily: 'var(--font-terminal), Consolas, monospace',
+                        }}>
+                          {formatPartName(part)}{isVital ? ' ●' : ''}
+                        </span>
                       </div>
-                    ) : (
-                      <div className="mt-1">
-                        <FieldTextarea
-                          label="Description"
-                          value={bpData.description}
-                          placeholder={getPartPlaceholder(part)}
-                          editable={isEditable}
-                          onChange={v => updateBodyPart(part, 'description', v)}
-                        />
+                      {!isExpanded && hasContent && (
+                        <span className="text-xs truncate max-w-[200px]" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                          {isHead ? [bpData.eyeColor, bpData.hairColor, bpData.faceShape].filter(Boolean).join(', ') : (bpData.description || '').substring(0, 40)}
+                        </span>
+                      )}
+                    </button>
+                    {isExpanded && (
+                      <div className="pl-4 pb-2">
+                        {isHead ? (
+                          <div className="space-y-2 mt-1">
+                            <div className="grid grid-cols-2 gap-2">
+                              <FieldSelect label="Face Shape" value={bpData.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'faceShape', v)} />
+                              <FieldSelect label="Eye Shape" value={bpData.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'eyeShape', v)} />
+                              <FieldInput label="Eye Color" value={bpData.eyeColor} placeholder="green, hazel, amber" editable={isEditable} onChange={v => updateBodyPart(part, 'eyeColor', v)} />
+                              <FieldInput label="Facial Hair" value={bpData.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart(part, 'facialHair', v)} />
+                              <FieldInput label="Hair Color" value={bpData.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart(part, 'hairColor', v)} />
+                              <FieldSelect label="Hair Length" value={bpData.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairLength', v)} />
+                              <FieldSelect label="Hair Texture" value={bpData.hairTexture} options={HAIR_TEXTURE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
+                              <FieldInput label="Usual Style" value={bpData.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart(part, 'hairStyle', v)} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <FieldInput label="Cosmetics" value={bpData.cosmetics} placeholder="kohl eyeliner, war paint, none" editable={isEditable} onChange={v => updateBodyPart(part, 'cosmetics', v)} />
+                              <FieldSelect label="Hygiene" value={bpData.hygiene} options={HYGIENE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hygiene', v)} />
+                            </div>
+                            <FieldTextarea label="Other Details" value={bpData.description} placeholder="Scars on cheek, pointed ears, glowing runes on forehead..." editable={isEditable} onChange={v => updateBodyPart(part, 'description', v)} />
+                          </div>
+                        ) : (
+                          <div className="mt-1">
+                            <FieldTextarea
+                              label="Description"
+                              value={bpData.description}
+                              placeholder={getPartPlaceholder(part)}
+                              editable={isEditable}
+                              onChange={v => updateBodyPart(part, 'description', v)}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -703,6 +735,152 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           </div>
         )}
 
+        {/* ── SECTION: Style Preferences ── */}
+        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+          <div className="text-base uppercase mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+            Style Preferences
+          </div>
+          <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+            Your character&apos;s visual style. Colors and aesthetic shape how equipment and clothing appear.
+          </div>
+
+          {/* Colors */}
+          <div className="flex gap-4 mb-4 items-end">
+            {(['primary', 'secondary', 'tertiary'] as const).map(key => (
+              <div key={key} className="flex flex-col items-center">
+                <label className="text-xs uppercase mb-1" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                  {key}
+                </label>
+                {isEditable ? (
+                  <input
+                    type="color"
+                    value={styleColors[key]}
+                    onChange={e => { setStyleColors(prev => ({ ...prev, [key]: e.target.value })); setDirty(true); }}
+                    className="w-10 h-10 cursor-pointer border-0 p-0"
+                    style={{ backgroundColor: 'transparent' }}
+                  />
+                ) : (
+                  <div className="w-10 h-10 border" style={{ backgroundColor: styleColors[key], borderColor: '#582a72', borderRadius: '2px' }} />
+                )}
+                <div className="text-xs mt-0.5" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>
+                  {styleColors[key]}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Aesthetics — pick up to 2 */}
+          <div>
+            <label className="text-xs uppercase block mb-1" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              Aesthetic (choose up to 2)
+            </label>
+            <div className="flex flex-wrap gap-1">
+              {AESTHETIC_OPTIONS.map(a => {
+                const selected = styleAesthetics.includes(a);
+                return (
+                  <button
+                    key={a}
+                    onClick={() => {
+                      if (!isEditable) return;
+                      if (selected) {
+                        setStyleAesthetics(prev => prev.filter(x => x !== a));
+                      } else if (styleAesthetics.length < 2) {
+                        setStyleAesthetics(prev => [...prev, a]);
+                      }
+                      setDirty(true);
+                    }}
+                    className="px-2 py-1 text-xs transition-colors"
+                    style={{
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      backgroundColor: selected ? '#582a72' : '#111',
+                      color: selected ? '#ffcc78' : '#666',
+                      border: `1px solid ${selected ? '#7050A8' : '#2a2a3e'}`,
+                      borderRadius: '2px',
+                      cursor: isEditable ? 'pointer' : 'default',
+                      opacity: !selected && styleAesthetics.length >= 2 ? 0.3 : 1,
+                    }}
+                  >
+                    {a}
+                  </button>
+                );
+              })}
+            </div>
+            {styleAesthetics.length > 0 && (
+              <div className="text-xs mt-2" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                Style: <span style={{ color: '#ffcc78' }}>{styleAesthetics.join(' + ')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── SECTION: Visual Identity ── */}
+        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-base uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+                Visual Identity
+              </div>
+              <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                Lock your character&apos;s appearance. This defines how they look across all portraits, tokens, and 3D renders.
+              </div>
+            </div>
+            {!wizardOpen && isEditable && (
+              <button
+                onClick={() => setWizardOpen(true)}
+                disabled={!selectedSeed}
+                className="px-5 py-2 text-xs uppercase tracking-[0.12em] transition-colors"
+                style={{
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  backgroundColor: selectedSeed ? '#7050A8' : '#333',
+                  color: selectedSeed ? '#fff' : '#555',
+                  border: '1px solid #582a72', borderRadius: '2px',
+                  cursor: !selectedSeed ? 'default' : 'pointer',
+                }}
+              >
+                {generatedBust ? 'Relock Identity' : 'Lock Identity'}
+              </button>
+            )}
+          </div>
+
+          {wizardOpen ? (
+            <IdentityLockWizard
+              characterData={buildCharacterData()}
+              campaignId={campaignId}
+              referencePhotos={referencePhotos}
+              characterId={userCharacter?.id}
+              onComplete={handleWizardComplete}
+              onCancel={() => setWizardOpen(false)}
+            />
+          ) : (
+            <div className="flex gap-4 justify-center">
+              {/* Dynamic Portrait — changes with equipment, wounds, mood */}
+              <PortraitFrame label="Portrait" portrait={generatedBust} loading={generating} />
+              {/* Battle Token — for maps and combat */}
+              <PortraitFrame label="Token" portrait={generatedFullBody} loading={generating && !!generatedBust} />
+              {/* 3D View — future: rotatable 3D model */}
+              <div className="flex flex-col items-center">
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                  3D View
+                </div>
+                <div className="relative border overflow-hidden flex items-center justify-center" style={{ borderColor: '#2a2a3e', backgroundColor: '#111', width: '200px', height: '275px' }}>
+                  <div className="text-center">
+                    <div className="text-3xl mb-2" style={{ color: '#582a72', opacity: 0.2 }}>&#9649;</div>
+                    <div className="text-xs uppercase tracking-widest" style={{ color: '#582a72', opacity: 0.25, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                      Coming Soon
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {generationError && (
+            <div className="text-xs mt-2" style={{ color: '#E8585A', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              {generationError}
+            </div>
+          )}
+        </div>
+
         {/* BACKSTORY */}
         <div className="border p-4 flex flex-col" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="text-base uppercase mb-2" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
@@ -710,8 +888,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           </div>
           <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
             {isGM
-              ? 'Player-submitted backstory. Use to inform seed, root, and branch creation.'
-              : 'Your history, personality, motivations, fears. Your GM builds your mechanical character from this.'}
+              ? 'Trailblazer-submitted backstory. Use to inform seed, root, and branch creation.'
+              : 'Your history, personality, motivations, fears. Your Watcher builds your mechanical character from this.'}
           </div>
           {isEditable ? (
             <textarea
@@ -752,7 +930,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               {saving ? 'Saving...' : dirty ? 'Save Draft' : 'Saved'}
             </button>
             <button
-              onClick={() => { /* TODO: submit to GM */ }}
+              onClick={() => { /* TODO: submit to Watcher */ }}
               disabled={!characterName || !backstoryText}
               className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
               style={{
@@ -763,7 +941,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                 borderRadius: '2px', cursor: characterName && backstoryText ? 'pointer' : 'default',
               }}
             >
-              Submit to GM
+              Submit to Watcher
             </button>
             {lastSaved && !dirty && (
               <span className="text-xs" style={{ color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -779,7 +957,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
 
 // --- Sub-components ---
 
-function PortraitFrame({ label, initial, portrait, loading }: { label: string; initial: string; portrait: string | null; loading?: boolean }) {
+function PortraitFrame({ label, portrait, loading }: { label: string; portrait: string | null; loading?: boolean }) {
   return (
     <div className="flex flex-col items-center">
       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -787,7 +965,8 @@ function PortraitFrame({ label, initial, portrait, loading }: { label: string; i
       </div>
       <div className="relative border overflow-hidden" style={{ borderColor: portrait ? '#D0A030' : '#582a72', backgroundColor: '#111', width: '200px', height: '275px' }}>
         {portrait ? (
-          <img src={portrait} alt={label} className="w-full h-full object-cover" />
+          <img src={portrait} alt={label} className="w-full h-full object-cover"
+            onError={e => { (e.target as HTMLImageElement).src = '/EmptyPortrait.png'; (e.target as HTMLImageElement).className = 'w-full h-full object-contain'; }} />
         ) : loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-sm animate-pulse" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -798,12 +977,7 @@ function PortraitFrame({ label, initial, portrait, loading }: { label: string; i
             </div>
           </div>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-5xl" style={{ color: '#582a72', opacity: 0.2 }}>{initial}</div>
-            <div className="text-xs uppercase tracking-widest mt-2" style={{ color: '#582a72', opacity: 0.25, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-              Pending
-            </div>
-          </div>
+          <img src="/EmptyPortrait.png" alt={`${label} — not yet generated`} className="w-full h-full object-contain" />
         )}
       </div>
     </div>

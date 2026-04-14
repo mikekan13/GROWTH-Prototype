@@ -143,7 +143,12 @@ Return a JSON object with these exact keys:
 }
 
 For each body part (${bodyPartsList.join(', ')}):
-{ "description": physical body description only — musculature, skin texture, scars, tattoos, birthmarks, body hair. NO clothing. 1-2 sentences. }
+{ "description": clinical physical description — be specific and measurable. State: muscle tone (none/light/moderate/defined/heavy), proportions (slim/proportional/broad/thick), skin condition, and ONLY note markings that are actually visible (scars, tattoos, birthmarks, moles). Do NOT embellish or use flowery language. 1 concise sentence max. }
+
+SYMMETRY RULE — VERY IMPORTANT:
+- For paired body parts (left arm/right arm, left leg/right leg), use the SAME description for both sides UNLESS you can see a visible difference (scar, tattoo, birthmark, prosthetic, injury, asymmetric feature).
+- If both sides look the same, give them IDENTICAL descriptions. Do NOT use different adjectives or phrasings for matching pairs.
+- Only describe a difference on one side if you can actually SEE it in the photo.
 
 If a body part is hidden by clothing, infer from overall build. Never mention what they are wearing.
 

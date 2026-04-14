@@ -146,12 +146,9 @@ export class LocalProvider implements ImageGenerationProvider {
       // XLabs nodes try to load their own FLUX copy (won't fit in 8GB VRAM alongside GGUF).
       // Need InstantX FLUX ControlNet Union (~6.6GB) for standard pipeline compatibility.
       // Disabled until proper model is downloaded. Falling back to prompt-only + PuLID.
-      // ControlNet DISABLED — XLabs pipeline incompatible with LoRA style control.
-      // XlabsSampler's denoise_controlnet bypasses LoRA patches, pulling output to photorealism.
-      // Need InstantX ControlNet Union (6.6GB) which uses standard KSampler pipeline.
-      // TODO: Enable when InstantX model is downloaded.
+      // ControlNet via InstantX Union — standard pipeline, compatible with LoRAs + KSampler
       const anglePreset = input.overrides?.anglePreset;
-      const useControlnet = false; // !!anglePreset && await this.isControlNetAvailable();
+      const useControlnet = !!anglePreset && await this.isControlNetAvailable();
       if (useControlnet && input.overrides?.anglePreset) {
         const angleRefPath = await this.getAngleReferenceImage(input.overrides.anglePreset);
         console.log('[ComfyUI] ControlNet angle ref path:', angleRefPath);
@@ -173,7 +170,8 @@ export class LocalProvider implements ImageGenerationProvider {
       const workflowPriority: string[] = [];
 
       if (useControlnet && usePulid && params.controlnetImagePath) {
-        workflowPriority.push('character-face-controlnet');  // ControlNet + PuLID
+        workflowPriority.push('character-face-controlnet-instantx');  // InstantX ControlNet + PuLID + LoRAs (standard pipeline)
+        workflowPriority.push('character-face-controlnet');            // XLabs fallback
       }
       if (usePulid) {
         workflowPriority.push('character-portrait-pulid');   // PuLID only
@@ -667,13 +665,15 @@ export class LocalProvider implements ImageGenerationProvider {
 
   /** Check if ControlNet model is available */
   private async isControlNetAvailable(): Promise<boolean> {
-    try {
-      const controlnetPath = path.join(COMFYUI_PATH, 'models', 'xlabs', 'controlnets', 'flux-canny-controlnet-v3.safetensors');
-      await fs.access(controlnetPath);
-      return true;
-    } catch {
-      return false;
+    // Check for InstantX Union (preferred) or XLabs Canny (fallback)
+    const candidates = [
+      path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union.safetensors'),
+      path.join(COMFYUI_PATH, 'models', 'xlabs', 'controlnets', 'flux-canny-controlnet-v3.safetensors'),
+    ];
+    for (const p of candidates) {
+      try { await fs.access(p); return true; } catch { /* next */ }
     }
+    return false;
   }
 
   /**

@@ -22,33 +22,6 @@
     },
     "_meta": { "title": "VAE Loader" }
   },
-  "4": {
-    "class_type": "CLIPTextEncodeFlux",
-    "inputs": {
-      "clip": ["16", 1],
-      "clip_l": "",
-      "t5xxl": "",
-      "guidance": 3.5
-    },
-    "_meta": { "title": "Positive" }
-  },
-  "5": {
-    "class_type": "CLIPTextEncode",
-    "inputs": {
-      "clip": ["16", 1],
-      "text": ""
-    },
-    "_meta": { "title": "Negative" }
-  },
-  "6": {
-    "class_type": "EmptyLatentImage",
-    "inputs": {
-      "width": 1024,
-      "height": 1024,
-      "batch_size": 1
-    },
-    "_meta": { "title": "Empty Latent" }
-  },
   "15": {
     "class_type": "LoraLoader",
     "inputs": {
@@ -71,6 +44,34 @@
     },
     "_meta": { "title": "Detail LoRA (Extreme Detailer)" }
   },
+  "4": {
+    "class_type": "CLIPTextEncodeFlux",
+    "inputs": {
+      "clip": ["16", 1],
+      "clip_l": "",
+      "t5xxl": "",
+      "guidance": 3.5
+    },
+    "_meta": { "title": "Positive" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["16", 1],
+      "text": ""
+    },
+    "_meta": { "title": "Negative" }
+  },
+  "6": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 768,
+      "height": 768,
+      "batch_size": 1
+    },
+    "_meta": { "title": "Empty Latent" }
+  },
+
   "10": {
     "class_type": "PulidFluxModelLoader",
     "inputs": {
@@ -111,6 +112,45 @@
     },
     "_meta": { "title": "Apply PuLID Flux" }
   },
+
+  "20": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "angle_reference.png"
+    },
+    "_meta": { "title": "Angle Reference Image (ControlNet)" }
+  },
+  "21": {
+    "class_type": "CannyEdgePreprocessor",
+    "inputs": {
+      "image": ["20", 0],
+      "low_threshold": 150,
+      "high_threshold": 250,
+      "resolution": 768
+    },
+    "_meta": { "title": "Canny Edge Detection" }
+  },
+  "22": {
+    "class_type": "ControlNetLoader",
+    "inputs": {
+      "control_net_name": "flux-controlnet-union.safetensors"
+    },
+    "_meta": { "title": "Load InstantX ControlNet Union" }
+  },
+  "23": {
+    "class_type": "ControlNetApplyAdvanced",
+    "inputs": {
+      "control_net": ["22", 0],
+      "image": ["21", 0],
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "strength": 0.4,
+      "start_percent": 0.0,
+      "end_percent": 0.8
+    },
+    "_meta": { "title": "Apply ControlNet (Canny)" }
+  },
+
   "7": {
     "class_type": "KSampler",
     "inputs": {
@@ -120,8 +160,8 @@
       "cfg": 1.0,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "positive": ["4", 0],
-      "negative": ["5", 0],
+      "positive": ["23", 0],
+      "negative": ["23", 1],
       "latent_image": ["6", 0],
       "denoise": 1.0
     },
@@ -139,7 +179,7 @@
     "class_type": "SaveImage",
     "inputs": {
       "images": ["8", 0],
-      "filename_prefix": "GROWTH_portrait_pulid"
+      "filename_prefix": "GROWTH_face_controlnet"
     },
     "_meta": { "title": "Save Image" }
   }
