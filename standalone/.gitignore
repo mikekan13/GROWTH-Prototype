@@ -1,0 +1,20 @@
+# Next
+.next/
+out/
+
+# Node
+node_modules/
+
+# Runtime
+tmp/
+.venv/
+
+# Env
+.env*.local
+
+# Generated
+src/generated/
+
+# Logs
+*.log
+!src/**/*.log
