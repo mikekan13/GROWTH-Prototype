@@ -139,8 +139,11 @@ export class LocalProvider implements ImageGenerationProvider {
         cfg: DEFAULT_CFG,
         // Full-body generation needs vertical room — square 768×768 biases FLUX toward
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
-        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
+        // Body canvas bumped 768x1152 → 896x1344 so the face gets enough pixels.
+        // At 768x1152 the head occupies ~200px square, not enough for PuLID detail.
+        // At 896x1344 it's ~230px square — ~1.5x the detail area. Same 2:3 aspect.
+        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 896 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1344 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
