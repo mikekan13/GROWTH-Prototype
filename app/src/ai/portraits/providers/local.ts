@@ -139,11 +139,9 @@ export class LocalProvider implements ImageGenerationProvider {
         cfg: DEFAULT_CFG,
         // Full-body generation needs vertical room — square 768×768 biases FLUX toward
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
-        // Body canvas bumped 768x1152 → 896x1344 so the face gets enough pixels.
-        // At 768x1152 the head occupies ~200px square, not enough for PuLID detail.
-        // At 896x1344 it's ~230px square — ~1.5x the detail area. Same 2:3 aspect.
-        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 896 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1344 : DEFAULT_HEIGHT),
+        // Canvas matches Tara test script: 768x1152 (2:3 tall).
+        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
@@ -166,21 +164,13 @@ export class LocalProvider implements ImageGenerationProvider {
         // Face-lock weights:
         //   Step 1 (draft):  painterly 0.6, detail 0.5, dark 0.15 — safe discovery.
         //   Step 2 (final):  painterly 0.75, detail 0.7, dark 0.3 — more fantasy/mood.
-        // Body reference: keep the painterly LoRA at half strength (brings
-        // Tara's painterly realism without the illustrated-fantasy dominance).
-        // 0 was too cartoony; 0.5 summoned gowns. 0.25 is the middle ground.
-        styleLoraWeight: isSketch ? 0.6
-          : isFaceLock ? (isFinal ? 0.75 : 0.6)
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.4
-          : config.loraStrength,
+        // Tara-test weight: 0.5 (config.loraStrength default).
+        styleLoraWeight: isSketch ? 0.6 : isFaceLock ? (isFinal ? 0.75 : 0.6) : config.loraStrength,
         // Detail LoRA: match Tara-test weight (0.55) so hands/feet get the
         // same crisp detail the Tara reference gens had.
         detailLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.7 : 0.5) : 0.55,
         campaignLora: isSketch ? undefined : 'dark-fantasy-v2-flux.safetensors',
-        campaignLoraWeight: isSketch ? 0
-          : isFaceLock ? (isFinal ? 0.3 : 0.15)
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
-          : 0.4,
+        campaignLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.3 : 0.15) : 0.4,
         // Hand detail LoRA only for face-lock final (close-up where hands might appear).
         // Body gen at full-body framing = hands are tiny, not worth the LoRA compute.
         handDetailLoraWeight: isFinal && input.overrides?.composition !== 'full_body' ? 0.6 : 0,

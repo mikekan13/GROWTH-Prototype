@@ -66,13 +66,13 @@ const STYLE_PREFIX = STYLE_TAGS;
 // known failures: long hair tokens get interpreted as robes/cloaks/capes. So
 // CREATION_MODE_NEGATIVE explicitly lists garment shapes to avoid.
 const FULL_NEGATIVE_PROMPT = '';
-// Shared negative for any creation-mode gen: garments, accessories, ornate
-// decoration, and illustrated/stylized art styles (we want photo-real output).
-const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, crown, tiara, headband, headdress, hood, veil, hat, helmet, jewelry, necklace, earrings, armor, ornate, decorated, embellished, feathers, ornaments, accessories, frame, border, art nouveau frame, decorative frame, ornate background, anime, cartoon, illustration, digital painting, stylized art, fantasy art, painterly, brush strokes, oil painting, watercolor, mutated hands, extra fingers, missing fingers, fused fingers, six fingers, malformed hands, deformed hands, mutated feet, extra toes, missing toes, deformed feet, twisted limbs, bad anatomy';
+// Short negative exactly matching the Tara test script that produced
+// the hair-WORKING-knee-length output. Extra terms diluted the core signal.
+const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
 
-// Nude-mode extras: block default underwear/bodysuit fallbacks that FLUX
-// inserts when asked for "nude" (especially with PuLID anchoring a clothed ref).
-const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, underwear, bra, panties, lingerie, bikini`;
+// Nude-mode extras: only bodysuit/leotard/swimsuit (covers FLUX's default
+// "nude-with-clothing" failure modes without overloading the negative).
+const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, bikini`;
 
 // Kept for backward-compat; defaults to the underwear-allowed (SFW) variant.
 const CREATION_MODE_NEGATIVE = CREATION_MODE_NEGATIVE_BASE;
@@ -225,21 +225,16 @@ export function getStyleTags(creationMode = false): string {
   // weights (0) for body reference so including their triggers just pollutes.
   // Target output is photo-real anatomical reference, not illustrated art.
   if (creationMode) {
-    // Photo-realistic model photograph vocabulary — NOT "reference sheet" or
-    // "anatomy reference" (FLUX reads those as illustrated artist study sheets,
-    // produces cartoon/digital-art output). Painterly LoRA trigger kept for
-    // the Tara-test realism. Fantasy/art-nouveau triggers stay out.
+    // Exact match for the Tara test script style prefix — the only body gen
+    // recipe we know works.
     return [
       `in the style of ${TRIGGER_PAINTERLY}`,
       TRIGGER_DETAIL,
-      'professional photography',
-      'studio portrait photograph',
-      '85mm lens',
-      'soft studio lighting',
-      'photorealistic',
-      'hyperrealistic',
+      TRIGGER_DARK_FANTASY,
+      'hyperrealistic fantasy portrait',
+      'art nouveau influence',
       'extremely detailed',
-      'sharp focus',
+      'subtle painterly quality',
     ].join(', ');
   }
   return STYLE_TAGS;
@@ -248,10 +243,10 @@ export function getStyleTags(creationMode = false): string {
 /** Get style sentences for t5xxl encoder */
 export function getStyleSentences(creationMode = false): string {
   if (creationMode) {
+    // Match Tara test script t5xxl preamble exactly.
     return [
-      `A photorealistic professional studio portrait photograph in the style of ${TRIGGER_PAINTERLY} (${TRIGGER_DETAIL} detail).`,
-      'Shot on 85mm lens with soft studio lighting against a neutral grey seamless backdrop.',
-      'Full figure photograph, standing subject framed from head to feet, sharp focus, hyperrealistic detail.',
+      `A hyperrealistic fantasy portrait in the style of ${TRIGGER_PAINTERLY} and ${TRIGGER_DARK_FANTASY}.`,
+      'Extremely detailed rendering that borders on photorealistic with a subtle art nouveau elegance.',
     ].join(' ');
   }
   return STYLE_SENTENCES;
