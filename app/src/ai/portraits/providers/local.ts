@@ -366,25 +366,6 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.type,
       );
 
-      // 8b. Two-stage face refinement for creationMode body gen.
-      // Body canvas is 768x1152 so the face is only ~200px square — too few
-      // pixels for crisp PuLID detail. Crop the face region, regen it at
-      // 768x768 (native face-lock res) with low denoise to preserve composition,
-      // then composite back. This is the "head and body separate then compose"
-      // approach the Tara session used.
-      const doFaceRefine = input.creationMode === true
-        && input.overrides?.composition === 'full_body'
-        && !!params.referenceImagePath;
-      if (doFaceRefine) {
-        try {
-          console.log('[ComfyUI] Running face-refine composite pass...');
-          imageData = await this.refineBodyFace(imageData, params);
-          console.log('[ComfyUI] Face-refine composite done.');
-        } catch (err) {
-          console.warn('[ComfyUI] Face-refine failed — keeping original body gen:', err instanceof Error ? err.message : err);
-        }
-      }
-
       // 9. Save to filesystem under a step subfolder:
       //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
       //   'refined'  — Step 2 front-lock (final, ControlNet, angle=front)
