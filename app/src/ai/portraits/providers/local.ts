@@ -163,11 +163,22 @@ export class LocalProvider implements ImageGenerationProvider {
         // Face-lock weights:
         //   Step 1 (draft):  painterly 0.6, detail 0.5, dark 0.15 — safe discovery.
         //   Step 2 (final):  painterly 0.75, detail 0.7, dark 0.3 — more fantasy/mood.
-        // Match Tara's winning body-test recipe: style 0.5, detail 0.55.
-        styleLoraWeight: isSketch ? 0.6 : isFaceLock ? (isFinal ? 0.75 : 0.6) : config.loraStrength,
-        detailLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.7 : 0.5) : 0.55,
+        // Body reference needs PHOTOREAL output, not illustrated fantasy art.
+        // creationMode + full_body → kill painterly style LoRA, dial down detail
+        // slightly. Detail LoRA stays for skin texture; NSFW handles anatomy.
+        styleLoraWeight: isSketch ? 0.6
+          : isFaceLock ? (isFinal ? 0.75 : 0.6)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
+          : config.loraStrength,
+        detailLoraWeight: isSketch ? 0
+          : isFaceLock ? (isFinal ? 0.7 : 0.5)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.4
+          : 0.55,
         campaignLora: isSketch ? undefined : 'dark-fantasy-v2-flux.safetensors',
-        campaignLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.3 : 0.15) : 0.4,
+        campaignLoraWeight: isSketch ? 0
+          : isFaceLock ? (isFinal ? 0.3 : 0.15)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
+          : 0.4,
         // Hand detail LoRA only for face-lock final (close-up where hands might appear).
         // Body gen at full-body framing = hands are tiny, not worth the LoRA compute.
         handDetailLoraWeight: isFinal && input.overrides?.composition !== 'full_body' ? 0.6 : 0,

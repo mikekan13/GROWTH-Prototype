@@ -186,7 +186,9 @@ export function buildPortraitPrompt(
     sentences.push('Neutral grey studio background with soft even lighting.');
   }
 
-  const negativePrompt = creationMode ? getCreationModeNegative() : config.negativePrompt;
+  const negativePrompt = creationMode
+    ? getCreationModeNegative(campaignStyle?.allowNudity === true)
+    : config.negativePrompt;
 
   return {
     clipL: tags.filter(Boolean).join(', '),
@@ -240,20 +242,24 @@ function buildBodyDescriptionBlock(char: PortraitCharacterData, creationMode = f
   const { identity } = char;
   const parts: string[] = [];
 
-  // Hair FIRST + STRAND-LEVEL emphasis. FLUX interprets "long hair" as flowing fabric
-  // (robes/cloaks) without strand-texture tokens. Stacking "individual strands" +
-  // "hair texture" prevents the robe-confusion seen in early body gen tests.
-  // (See CREATION_MODE_NEGATIVE for the matching no-robe negative tokens.)
+  // Hair. In creationMode (body reference) keep it MINIMAL — just color, tied
+  // back out of the way. Elaborate hair descriptions ("flowing silken strands
+  // down the back") confuse FLUX in A-pose reference context and push toward
+  // decorated/clothed fantasy output. Final portrait gets the full hair treatment.
   const hairDesc = [identity.hairColor, identity.hairLength, identity.hairTexture].filter(Boolean);
   if (hairDesc.length > 0) {
-    const hairCore = hairDesc.join(' ');
-    if (identity.hairStyle) {
-      parts.push(`${hairCore} hair worn ${identity.hairStyle}`);
+    if (creationMode) {
+      parts.push(`${identity.hairColor || 'plain'} hair tied back simply out of the way`);
     } else {
-      parts.push(`${hairCore} hair`);
+      const hairCore = hairDesc.join(' ');
+      if (identity.hairStyle) {
+        parts.push(`${hairCore} hair worn ${identity.hairStyle}`);
+      } else {
+        parts.push(`${hairCore} hair`);
+      }
+      parts.push(`hair made of individual strands, hair texture clearly visible`);
+      parts.push(`glossy ${identity.hairColor || hairCore} silken hair flowing freely behind shoulders and down the back`);
     }
-    parts.push(`hair made of individual strands, hair texture clearly visible`);
-    parts.push(`glossy ${identity.hairColor || hairCore} silken hair flowing freely behind shoulders and down the back`);
   }
 
   if (identity.skinTone) parts.push(`${identity.skinTone} skin`);

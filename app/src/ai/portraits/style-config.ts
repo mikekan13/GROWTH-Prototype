@@ -66,7 +66,16 @@ const STYLE_PREFIX = STYLE_TAGS;
 // known failures: long hair tokens get interpreted as robes/cloaks/capes. So
 // CREATION_MODE_NEGATIVE explicitly lists garment shapes to avoid.
 const FULL_NEGATIVE_PROMPT = '';
-const CREATION_MODE_NEGATIVE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, crown, tiara, headband, headdress, hat, helmet, jewelry, necklace, earrings, armor, ornate, decorated, embellished, feathers, ornaments, accessories, frame, border, art nouveau frame, decorative frame, ornate background';
+// Shared negative for any creation-mode gen: garments, accessories, ornate
+// decoration, and illustrated/stylized art styles (we want photo-real output).
+const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, crown, tiara, headband, headdress, hood, veil, hat, helmet, jewelry, necklace, earrings, armor, ornate, decorated, embellished, feathers, ornaments, accessories, frame, border, art nouveau frame, decorative frame, ornate background, anime, cartoon, illustration, digital painting, stylized art, fantasy art, painterly, brush strokes, oil painting, watercolor';
+
+// Nude-mode extras: block default underwear/bodysuit fallbacks that FLUX
+// inserts when asked for "nude" (especially with PuLID anchoring a clothed ref).
+const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, underwear, bra, panties, lingerie, bikini`;
+
+// Kept for backward-compat; defaults to the underwear-allowed (SFW) variant.
+const CREATION_MODE_NEGATIVE = CREATION_MODE_NEGATIVE_BASE;
 
 // ============================================================
 // Default Composition
@@ -211,19 +220,18 @@ export function getDefaultStyleConfig(): StyleConfig {
 
 /** Get style tags for clip_l encoder */
 export function getStyleTags(creationMode = false): string {
-  // In creationMode (A-pose body reference) we strip atmospheric lighting tags —
-  // "dramatic chiaroscuro", "rich deep colors", "luminous detailed eyes" all push
-  // FLUX toward moody theatrical portraits, which fights the neutral grey
-  // studio background and A-pose framing. Winning hand-tuned test used the
-  // shorter style prefix.
+  // creationMode = A-pose nude body reference. Strip all fantasy/painterly
+  // style signal — the painterly + dark-fantasy LoRAs are disabled at their
+  // weights (0) for body reference so including their triggers just pollutes.
+  // Target output is photo-real anatomical reference, not illustrated art.
   if (creationMode) {
     return [
-      `in the style of ${TRIGGER_PAINTERLY}`,
-      TRIGGER_DETAIL,
-      TRIGGER_DARK_FANTASY,
-      'hyperrealistic fantasy portrait',
-      'extremely detailed',
-      'subtle painterly quality',
+      TRIGGER_DETAIL,  // only detail LoRA still active; its trigger word stays
+      'photograph',
+      'photo-realistic',
+      'body anatomy reference',
+      'character reference sheet',
+      'clean studio photography',
     ].join(', ');
   }
   return STYLE_TAGS;
@@ -233,9 +241,9 @@ export function getStyleTags(creationMode = false): string {
 export function getStyleSentences(creationMode = false): string {
   if (creationMode) {
     return [
-      `A hyperrealistic fantasy portrait in the style of ${TRIGGER_PAINTERLY} and ${TRIGGER_DARK_FANTASY}.`,
-      'Extremely detailed rendering that borders on photorealistic.',
-      'Clean even studio lighting with neutral neutral grey background.',
+      `A photo-realistic body anatomy reference photograph, high resolution (${TRIGGER_DETAIL} style).`,
+      'Clean studio photography with even soft lighting, neutral grey background.',
+      'Character reference sheet format, standing figure, full figure visible from head to feet.',
     ].join(' ');
   }
   return STYLE_SENTENCES;
@@ -304,8 +312,8 @@ export function getThemeModifier(genre: string): string | undefined {
 }
 
 /** Get the creation-mode negative prompt (includes anti-clothing/accessories) */
-export function getCreationModeNegative(): string {
-  return CREATION_MODE_NEGATIVE;
+export function getCreationModeNegative(allowNude = false): string {
+  return allowNude ? CREATION_MODE_NEGATIVE_NUDE : CREATION_MODE_NEGATIVE_BASE;
 }
 
 /** Get the negative prompt (minimal — FLUX ignores most negatives at CFG 1.0) */
