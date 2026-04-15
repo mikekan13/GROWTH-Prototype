@@ -622,14 +622,15 @@ export default function IdentityLockWizard({
   const generateBody = useCallback(async () => {
     if (!state.lockedFace) return;
     dispatch({ type: 'BODY_GENERATING' });
-    // Body gen uses SINGLE PuLID ref (just locked face). PuLID only embeds the face
-    // region per image — stacking 9 refs (face + 4 angles + 4 player photos) all
-    // encode the same face box and cost 9× BiSeNet parses for marginal identity gain.
-    // Hair, skin, body-level detail come from prompt (character.identity fields),
-    // not from PuLID. Keeping body gen to 1 ref cuts ~60% off gen time.
+    // Primary PuLID = locked face (face identity, weight 0.7).
+    // Secondary PuLID chain = up to 4 player photos (hair identity, weight 0.4).
+    // Needs PULID_KEEP_HAIR=1 on ComfyUI so secondaries pass hair through
+    // instead of masking it — without it, prompt alone can't produce knee-length
+    // flowing hair reliably, and body gens end up in robe/cape territory.
     try {
       const result = await generate({
         referenceImagePath: state.lockedFace,
+        referenceImagePaths: referencePhotos.slice(0, 4),
         creationMode: true,
         overrides: { composition: 'full_body', quality: 'final' },
       });
@@ -639,7 +640,7 @@ export default function IdentityLockWizard({
     } catch (e) {
       dispatch({ type: 'BODY_ERROR', error: e instanceof Error ? e.message : 'Body generation failed' });
     }
-  }, [state.lockedFace, generate]);
+  }, [state.lockedFace, referencePhotos, generate]);
 
   // ── Step 4: Test generation ─────────────────────────────────
   const generateTest = useCallback(async (steeringWords: string, composition: string) => {

@@ -182,10 +182,12 @@ export class LocalProvider implements ImageGenerationProvider {
 
       // 4. Upload reference images and split into primary + secondary PuLID refs.
       // Primary (first entry) = referenceImagePath → own ApplyPulidFlux at pulidWeight (0.8).
-      // Secondaries (remaining entries) = chained in a SECOND ApplyPulidFlux at secondaryPulidWeight (0.3).
-      // HARD CAP at 3 total refs — 5-ref chains OOM on 8GB VRAM (BiSeNet + EVA-CLIP
-      // transient spikes push past budget). Confirmed by CUDA crash in autonomous tests.
-      const MAX_PULID_REFS = 3;
+      // Secondaries (remaining entries) = chained in a SECOND ApplyPulidFlux at secondaryPulidWeight.
+      // Face gens cap at 3 refs (5+ OOMs on 8GB). Body gens bump to 5 —
+      // hair identity needs multiple angles, and the body workflow skips ControlNet
+      // so the VRAM saved goes into PuLID chain length.
+      const isFullBodyGen = input.overrides?.composition === 'full_body';
+      const MAX_PULID_REFS = isFullBodyGen ? 5 : 3;
       const primaryIn = input.personaLock?.referenceImagePath;
       const batchIn = input.personaLock?.referenceImagePaths || [];
       const primaryOnly = primaryIn ? [primaryIn] : [];
@@ -209,8 +211,10 @@ export class LocalProvider implements ImageGenerationProvider {
         }
         params.referenceImagePath = uploaded[0];
         params.referenceImagePaths = uploaded.slice(1);  // secondaries only
-        params.secondaryPulidWeight = 0.15;  // lowered from 0.3 — was causing head-cap contamination
-        console.log(`[ComfyUI] PuLID primary: ${uploaded[0]} | ${uploaded.length - 1} secondaries`);
+        // Body gen: 0.4 — strong enough for hair transfer from player photos.
+        // Face gen: 0.15 — anything higher contaminated the head-cap with ref hair.
+        params.secondaryPulidWeight = isFullBodyGen ? 0.4 : 0.15;
+        console.log(`[ComfyUI] PuLID primary: ${uploaded[0]} | ${uploaded.length - 1} secondaries @ weight ${params.secondaryPulidWeight}`);
       }
 
       // 4b. Upload ControlNet angle reference if provided.
@@ -251,16 +255,18 @@ export class LocalProvider implements ImageGenerationProvider {
       console.log('[ComfyUI] Params — PuLID ref:', params.referenceImagePath || 'NONE', '| CN ref:', params.controlnetImagePath || 'NONE', '| Base:', params.baseImagePath || 'NONE');
 
       // 5. Select workflow: ControlNet+PuLID → PuLID → Basic (with fallbacks)
+      //    Body gen skips InstantX — ControlNet fights the secondary-PuLID hair chain,
+      //    and A-pose doesn't need pose steering.
       let outputInfo: { filename: string; subfolder: string; type: string };
       const usePulid = !!params.referenceImagePath;
       const workflowPriority: string[] = [];
 
-      if (useControlnet && usePulid && params.controlnetImagePath) {
+      if (!isFullBodyGen && useControlnet && usePulid && params.controlnetImagePath) {
         workflowPriority.push('character-face-controlnet-instantx');  // InstantX ControlNet + PuLID + LoRAs (standard pipeline)
         workflowPriority.push('character-face-controlnet');            // XLabs fallback
       }
       if (usePulid) {
-        workflowPriority.push('character-portrait-pulid');   // PuLID only
+        workflowPriority.push('character-portrait-pulid');   // PuLID only (primary path for body)
       }
       workflowPriority.push('character-portrait');           // Basic (always fallback)
 
