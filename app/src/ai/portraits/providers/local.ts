@@ -60,14 +60,13 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
-  // PASS 1 prompt — describes a TORSO crop (shoulders to thighs), NOT a full body.
-  // Canvas is 768x768 square; asking for "full body head to feet" here makes FLUX
-  // draw a squished mini-person. Instead frame as "torso shot" so shoulders and
-  // thighs fall at top/bottom of the square naturally (see autotest3 image #6).
-  // Pass 2 extends the canvas to 1152 and inpaints the head + feet strips.
+  // PASS 1 prompt — describes a body crop from SHOULDERS TO KNEES (not full body,
+  // not just torso). Pass 2 then needs only ~192px top strip for head+neck and
+  // ~192px bottom strip for calves+feet. Asking pass 1 for shoulders-to-thighs
+  // leaves too much leg anatomy for the bottom 192px strip in pass 2.
   const clipL = [
     'in the style of ckpf, aidmafluxpro1.1',
-    'hyperrealistic torso photograph',
+    'hyperrealistic body photograph',
     'extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
     hairPhrase,
@@ -76,19 +75,19 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `${build} build`,
     clothing,
     'standing upright arms relaxed at sides',
-    'torso shot, mid-body framing from shoulders to thighs',
-    'shoulders at top of frame, thighs at bottom of frame',
+    'mid-body framing from shoulders to knees',
+    'shoulders at top of frame, knees at bottom of frame',
     'head and face not visible, face cropped above frame',
-    'feet and knees not visible, legs cropped below frame',
+    'calves and feet not visible, lower legs cropped below frame',
     'neutral grey background, balanced even lighting',
   ].join(', ');
 
   const t5xxl = [
-    `A hyperrealistic torso photograph in the style of ckpf with aidmafluxpro1.1 detail.`,
+    `A hyperrealistic body photograph in the style of ckpf with aidmafluxpro1.1 detail.`,
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
-    'Torso framing shot — the body is cropped from the shoulders at the top of the frame down to the mid-thighs at the bottom.',
-    'The head and face are above the frame (not visible). The knees and feet are below the frame (not visible).',
+    'Body framing shot — the figure is cropped from the shoulders at the top of the frame down to the knees at the bottom.',
+    'The head and face are above the frame (not visible). The calves and feet are below the frame (not visible).',
     'Standing upright with arms relaxed at the sides. Neutral grey background with soft even lighting.',
   ].join(' ');
 
@@ -1460,12 +1459,11 @@ export class LocalProvider implements ImageGenerationProvider {
     // Pass 2 prompt: emphasize head (top) + feet (bottom) context. Torso is preserved
     // from pass 1 so we don't need to re-describe it — we just need FLUX to paint
     // head + feet coherently onto the standing torso.
-    // Pass 2 prompt — the existing torso is LOCKED by mask; we only regen the top
-    // 192px (head + neck connecting to existing shoulders) and bottom 192px
-    // (knees + calves + feet connecting to existing mid-thighs). FLUX must see
-    // this as EXTENDING the torso, not drawing a new figure in the strips.
-    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic photograph, extremely detailed, a standing nude figure continues upward with a head attached to the existing shoulders, face visible, head attached to neck to shoulders, and continues downward with legs attached to the existing thighs, knees, calves, feet standing on the ground, proportional anatomy, realistic human proportions, A-pose standing, neutral grey background, subtle painterly quality';
-    const p2T5xxl = 'Outpainting extension of a torso photograph. The existing torso in the middle of the frame continues upward with a proportionally sized head attached via neck to the existing shoulders, face visible and centered horizontally. Below the existing thighs, the legs continue downward with knees, calves, and bare feet planted on the ground at the bottom of the frame. Realistic adult human proportions, not oversized head, not floating disconnected head, head smoothly attached to neck. Neutral grey background with even lighting matching the existing torso.';
+    // Pass 2 prompt — middle is LOCKED (shoulders-to-knees torso from pass 1).
+    // Top 192px: head + neck connecting to existing shoulders.
+    // Bottom 192px: calves + feet connecting to existing knees.
+    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic photograph, extremely detailed, a standing nude figure continues upward with a proportional head attached to the existing shoulders by the neck, face visible and centered, and continues downward with calves and bare feet attached below the existing knees, feet planted on the ground at the bottom of the frame, realistic human proportions, A-pose standing, neutral grey background, subtle painterly quality';
+    const p2T5xxl = 'Outpainting extension of a cropped body photograph. The existing body in the middle of the frame (shoulders to knees) continues upward with a proportionally sized head attached via neck to the existing shoulders, face visible and centered horizontally. Below the existing knees, the lower legs continue downward with calves and bare feet planted on the ground at the bottom of the frame. Realistic adult human proportions, not oversized head, not floating disconnected head, head smoothly attached to neck, feet clearly visible on the ground. Neutral grey background with even lighting matching the existing body.';
     const p2Neg = 'floating head, disconnected head, head not attached to body, two bodies, mini body, tiny person, squished body, bobblehead, big head, oversized head, chibi, portrait framing, bust shot, close-up, duplicate body, extra figure, robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet';
 
     // Find key nodes
