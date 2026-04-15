@@ -21,9 +21,74 @@ import type {
   ProviderStatus,
   ComfyUIQueueResponse,
   ComfyUIWorkflowParams,
+  PortraitCharacterData,
 } from '../types';
 import { buildPortraitPrompt, type PromptBuildOptions } from '../prompt-builder';
 import { getDefaultStyleConfig, applyCampaignStyle, TRIGGER_NSFW } from '../style-config';
+
+/**
+ * Hardcoded body-reference prompt template, literal port of the test-body-gen.js
+ * recipe that produced the Tara reference outputs. Bypasses prompt-builder to
+ * eliminate drift — character data is filled into a fixed template, nothing else.
+ */
+function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolean): {
+  clipL: string;
+  t5xxl: string;
+  negativePrompt: string;
+} {
+  const identity = char.identity;
+  const seed = char.seed;
+  const age = identity.age || 25;
+  const sex = identity.sex || 'Female';
+  const seedName = seed?.name || 'Human';
+  const skin = identity.skinTone || 'Fair';
+  const eyes = identity.eyeColor || 'brown';
+  const build = identity.bodyType || 'average';
+  const hairColor = identity.hairColor || 'dark';
+  const hairLength = identity.hairLength || '';
+  const hairTexture = identity.hairTexture || 'straight';
+
+  const hairPhrase = hairLength
+    ? `${hairLength} ${hairTexture} ${hairColor} hair, hair made of individual strands, hair texture clearly visible`
+    : `${hairTexture} ${hairColor} hair tied back simply`;
+
+  const clothing = allowNude
+    ? 'nude, completely bare, no clothing, no accessories'
+    : 'wearing plain neutral grey bra and panties, simple modest underwear only';
+
+  const clothingSentence = allowNude
+    ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
+    : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
+
+  const clipL = [
+    'in the style of ckpf, aidmafluxpro1.1, drkfnts style',
+    'hyperrealistic fantasy portrait, art nouveau influence',
+    'extremely detailed, subtle painterly quality',
+    `a ${age}-year-old ${sex} ${seedName}`,
+    hairPhrase,
+    `${skin} skin`,
+    `${eyes} eyes`,
+    `${build} build`,
+    clothing,
+    'A-pose standing arms slightly away from body',
+    'full body from head to feet, entire body visible feet on ground',
+    'full body reference shot standing figure centered in frame head at top feet at bottom',
+    'long shot framing, wide angle, neutral grey background',
+  ].join(', ');
+
+  const t5xxl = [
+    `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}.`,
+    `${skin} skin. ${eyes} eyes. ${build} build.`,
+    clothingSentence,
+    'She stands in an A-pose with arms held slightly away from the body.',
+    'The entire body is visible from head to feet including the full figure and both feet on the ground.',
+    'Full body reference shot, standing figure centered in frame, head at top of frame and feet at bottom, long shot framing, wide angle, neutral grey background with balanced even lighting.',
+  ].join(' ');
+
+  const negativePrompt = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
+
+  return { clipL, t5xxl, negativePrompt };
+}
 
 const COMFYUI_URL = process.env.COMFYUI_URL || 'http://127.0.0.1:8188';
 const COMFYUI_PATH = process.env.COMFYUI_PATH || 'C:/AI/ComfyUI';
@@ -108,11 +173,13 @@ export class LocalProvider implements ImageGenerationProvider {
       // 2. Build prompt from character data
       const styleConfig = getDefaultStyleConfig();
       const config = applyCampaignStyle(styleConfig, input.campaignStyle);
-      const promptOutput = buildPortraitPrompt(input.characterData, {
-        campaignStyle: input.campaignStyle,
-        overrides: input.overrides,
-        creationMode: input.creationMode === true,
-      });
+      const promptOutput = (input.creationMode === true && input.overrides?.composition === 'full_body')
+        ? buildBodyReferencePrompt(input.characterData, input.campaignStyle?.allowNudity === true)
+        : buildPortraitPrompt(input.characterData, {
+            campaignStyle: input.campaignStyle,
+            overrides: input.overrides,
+            creationMode: input.creationMode === true,
+          });
 
       // Debug: log the prompt and mode
       console.log('[ComfyUI] anglePreset:', input.overrides?.anglePreset || 'none');
