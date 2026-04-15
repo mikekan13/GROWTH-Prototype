@@ -4,7 +4,9 @@
     "inputs": {
       "unet_name": "flux1-dev-Q4_K_S.gguf"
     },
-    "_meta": { "title": "FLUX.1 Dev GGUF" }
+    "_meta": {
+      "title": "FLUX.1 Dev GGUF"
+    }
   },
   "2": {
     "class_type": "DualCLIPLoaderGGUF",
@@ -13,110 +15,46 @@
       "clip_name2": "clip_l.safetensors",
       "type": "flux"
     },
-    "_meta": { "title": "Dual CLIP Loader" }
+    "_meta": {
+      "title": "Dual CLIP Loader"
+    }
   },
   "3": {
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "ae.safetensors"
     },
-    "_meta": { "title": "VAE Loader" }
-  },
-  "15": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["1", 0],
-      "clip": ["2", 0],
-      "lora_name": "extreme-detailer-flux.safetensors",
-      "strength_model": 0.55,
-      "strength_clip": 0.55
-    },
-    "_meta": { "title": "Detail LoRA (Extreme Detailer)" }
-  },
-  "16": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["15", 0],
-      "clip": ["15", 1],
-      "lora_name": "painterly-fantasy-ckpf.safetensors",
-      "strength_model": 0.5,
-      "strength_clip": 0.5
-    },
-    "_meta": { "title": "Style LoRA (Painterly Fantasy)" }
-  },
-  "17": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["16", 0],
-      "clip": ["16", 1],
-      "lora_name": "hand-detail-flux.safetensors",
-      "strength_model": 0.6,
-      "strength_clip": 0.6
-    },
-    "_meta": { "title": "Hand Detail LoRA" }
-  },
-  "18": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["17", 0],
-      "clip": ["17", 1],
-      "lora_name": "flux-nsfw-unlock.safetensors",
-      "strength_model": 0.0,
-      "strength_clip": 0.0
-    },
-    "_meta": { "title": "NSFW Unlock LoRA" }
-  },
-  "19": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["18", 0],
-      "clip": ["18", 1],
-      "lora_name": "dark-fantasy-v2-flux.safetensors",
-      "strength_model": 0.4,
-      "strength_clip": 0.4
-    },
-    "_meta": { "title": "Campaign LoRA (Dark Fantasy)" }
-  },
-  "20": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["19", 0],
-      "clip": ["19", 1],
-      "lora_name": "Hyper-FLUX.1-dev-8steps-lora.safetensors",
-      "strength_model": 0.125,
-      "strength_clip": 1.0
-    },
-    "_meta": { "title": "Hyper-FLUX 8-step Speed LoRA" }
-  },
-  "21": {
-    "class_type": "ApplyFBCacheOnModel",
-    "inputs": {
-      "model": ["20", 0],
-      "object_to_patch": "diffusion_model",
-      "residual_diff_threshold": 0.12,
-      "start": 0,
-      "end": 1,
-      "max_consecutive_cache_hits": -1
-    },
-    "_meta": { "title": "WaveSpeed FBCache" }
+    "_meta": {
+      "title": "VAE Loader"
+    }
   },
   "4": {
     "class_type": "CLIPTextEncodeFlux",
     "inputs": {
-      "clip": ["20", 1],
+      "clip": [
+        "20",
+        1
+      ],
       "clip_l": "",
       "t5xxl": "",
       "guidance": 3.5
     },
-    "_meta": { "title": "Positive" }
+    "_meta": {
+      "title": "Positive"
+    }
   },
   "5": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["20", 1],
+      "clip": [
+        "20",
+        1
+      ],
       "text": ""
     },
-    "_meta": { "title": "Negative" }
+    "_meta": {
+      "title": "Negative"
+    }
   },
   "6": {
     "class_type": "EmptyLatentImage",
@@ -125,38 +63,202 @@
       "height": 1024,
       "batch_size": 1
     },
-    "_meta": { "title": "Empty Latent" }
+    "_meta": {
+      "title": "Empty Latent"
+    }
   },
   "7": {
     "class_type": "KSampler",
     "inputs": {
-      "model": ["21", 0],
+      "model": [
+        "21",
+        0
+      ],
       "seed": 42,
       "steps": 8,
-      "cfg": 1.0,
+      "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "positive": ["4", 0],
-      "negative": ["5", 0],
-      "latent_image": ["6", 0],
-      "denoise": 1.0
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "6",
+        0
+      ],
+      "denoise": 1
     },
-    "_meta": { "title": "KSampler (8-step Hyper-FLUX + FBCache)" }
+    "_meta": {
+      "title": "KSampler (8-step Hyper-FLUX + FBCache)"
+    }
   },
   "8": {
-    "class_type": "VAEDecode",
+    "class_type": "VAEDecodeTiled",
     "inputs": {
-      "samples": ["7", 0],
-      "vae": ["3", 0]
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
     },
-    "_meta": { "title": "VAE Decode" }
+    "_meta": {
+      "title": "VAE Decode (Tiled — 8GB safe)"
+    }
   },
   "9": {
     "class_type": "SaveImage",
     "inputs": {
-      "images": ["8", 0],
+      "images": [
+        "8",
+        0
+      ],
       "filename_prefix": "GROWTH_fast"
     },
-    "_meta": { "title": "Save Image" }
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "15": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "clip": [
+        "2",
+        0
+      ],
+      "lora_name": "extreme-detailer-flux.safetensors",
+      "strength_model": 0.55,
+      "strength_clip": 0.55
+    },
+    "_meta": {
+      "title": "Detail LoRA (Extreme Detailer)"
+    }
+  },
+  "16": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "15",
+        0
+      ],
+      "clip": [
+        "15",
+        1
+      ],
+      "lora_name": "painterly-fantasy-ckpf.safetensors",
+      "strength_model": 0.5,
+      "strength_clip": 0.5
+    },
+    "_meta": {
+      "title": "Style LoRA (Painterly Fantasy)"
+    }
+  },
+  "17": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "16",
+        0
+      ],
+      "clip": [
+        "16",
+        1
+      ],
+      "lora_name": "hand-detail-flux.safetensors",
+      "strength_model": 0.6,
+      "strength_clip": 0.6
+    },
+    "_meta": {
+      "title": "Hand Detail LoRA"
+    }
+  },
+  "18": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "17",
+        0
+      ],
+      "clip": [
+        "17",
+        1
+      ],
+      "lora_name": "flux-nsfw-unlock.safetensors",
+      "strength_model": 0,
+      "strength_clip": 0
+    },
+    "_meta": {
+      "title": "NSFW Unlock LoRA"
+    }
+  },
+  "19": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "18",
+        0
+      ],
+      "clip": [
+        "18",
+        1
+      ],
+      "lora_name": "dark-fantasy-v2-flux.safetensors",
+      "strength_model": 0.4,
+      "strength_clip": 0.4
+    },
+    "_meta": {
+      "title": "Campaign LoRA (Dark Fantasy)"
+    }
+  },
+  "20": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "19",
+        0
+      ],
+      "clip": [
+        "19",
+        1
+      ],
+      "lora_name": "Hyper-FLUX.1-dev-8steps-lora.safetensors",
+      "strength_model": 0.125,
+      "strength_clip": 1
+    },
+    "_meta": {
+      "title": "Hyper-FLUX 8-step Speed LoRA"
+    }
+  },
+  "21": {
+    "class_type": "ApplyFBCacheOnModel",
+    "inputs": {
+      "model": [
+        "20",
+        0
+      ],
+      "object_to_patch": "diffusion_model",
+      "residual_diff_threshold": 0.12,
+      "start": 0,
+      "end": 1,
+      "max_consecutive_cache_hits": -1
+    },
+    "_meta": {
+      "title": "WaveSpeed FBCache"
+    }
   }
 }

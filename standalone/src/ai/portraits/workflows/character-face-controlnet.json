@@ -4,7 +4,9 @@
     "inputs": {
       "unet_name": "flux1-dev-Q4_K_S.gguf"
     },
-    "_meta": { "title": "FLUX.1 Dev GGUF" }
+    "_meta": {
+      "title": "FLUX.1 Dev GGUF"
+    }
   },
   "2": {
     "class_type": "DualCLIPLoaderGGUF",
@@ -13,32 +15,46 @@
       "clip_name2": "clip_l.safetensors",
       "type": "flux"
     },
-    "_meta": { "title": "Dual CLIP Loader" }
+    "_meta": {
+      "title": "Dual CLIP Loader"
+    }
   },
   "3": {
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "ae.safetensors"
     },
-    "_meta": { "title": "VAE Loader" }
+    "_meta": {
+      "title": "VAE Loader"
+    }
   },
   "4": {
     "class_type": "CLIPTextEncodeFlux",
     "inputs": {
-      "clip": ["19", 1],
+      "clip": [
+        "19",
+        1
+      ],
       "clip_l": "",
       "t5xxl": "",
       "guidance": 3.5
     },
-    "_meta": { "title": "Positive" }
+    "_meta": {
+      "title": "Positive"
+    }
   },
   "5": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["19", 1],
+      "clip": [
+        "19",
+        1
+      ],
       "text": ""
     },
-    "_meta": { "title": "Negative" }
+    "_meta": {
+      "title": "Negative"
+    }
   },
   "6": {
     "class_type": "EmptyLatentImage",
@@ -47,126 +63,260 @@
       "height": 768,
       "batch_size": 1
     },
-    "_meta": { "title": "Empty Latent" }
+    "_meta": {
+      "title": "Empty Latent"
+    }
   },
-
-  "15": {
-    "class_type": "LoraLoader",
+  "7": {
+    "class_type": "XlabsSampler",
     "inputs": {
-      "model": ["1", 0],
-      "clip": ["2", 0],
-      "lora_name": "extreme-detailer-flux.safetensors",
-      "strength_model": 0.55,
-      "strength_clip": 0.55
+      "model": [
+        "13",
+        0
+      ],
+      "conditioning": [
+        "4",
+        0
+      ],
+      "neg_conditioning": [
+        "5",
+        0
+      ],
+      "noise_seed": 42,
+      "steps": 20,
+      "timestep_to_start_cfg": 20,
+      "true_gs": 3.5,
+      "image_to_image_strength": 0,
+      "denoise_strength": 1,
+      "latent_image": [
+        "6",
+        0
+      ],
+      "controlnet_condition": [
+        "23",
+        0
+      ]
     },
-    "_meta": { "title": "Detail LoRA (Extreme Detailer)" }
+    "_meta": {
+      "title": "XLabs Sampler"
+    }
   },
-  "16": {
-    "class_type": "LoraLoader",
+  "8": {
+    "class_type": "VAEDecodeTiled",
     "inputs": {
-      "model": ["15", 0],
-      "clip": ["15", 1],
-      "lora_name": "painterly-fantasy-ckpf.safetensors",
-      "strength_model": 0.5,
-      "strength_clip": 0.5
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
     },
-    "_meta": { "title": "Style LoRA (Painterly Fantasy)" }
+    "_meta": {
+      "title": "VAE Decode (Tiled — 8GB safe)"
+    }
   },
-  "17": {
-    "class_type": "LoraLoader",
+  "9": {
+    "class_type": "SaveImage",
     "inputs": {
-      "model": ["16", 0],
-      "clip": ["16", 1],
-      "lora_name": "hand-detail-flux.safetensors",
-      "strength_model": 0.6,
-      "strength_clip": 0.6
+      "images": [
+        "8",
+        0
+      ],
+      "filename_prefix": "GROWTH_face_controlnet"
     },
-    "_meta": { "title": "Hand Detail LoRA" }
+    "_meta": {
+      "title": "Save Image"
+    }
   },
-  "18": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["17", 0],
-      "clip": ["17", 1],
-      "lora_name": "flux-nsfw-unlock.safetensors",
-      "strength_model": 0.0,
-      "strength_clip": 0.0
-    },
-    "_meta": { "title": "NSFW Unlock LoRA" }
-  },
-  "19": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["18", 0],
-      "clip": ["18", 1],
-      "lora_name": "dark-fantasy-v2-flux.safetensors",
-      "strength_model": 0.4,
-      "strength_clip": 0.4
-    },
-    "_meta": { "title": "Campaign LoRA (Dark Fantasy)" }
-  },
-
-  "_comment_pulid": "── PuLID: Face Identity Lock ──",
-
   "10": {
     "class_type": "PulidFluxModelLoader",
     "inputs": {
       "pulid_file": "pulid_flux_v0.9.1.safetensors"
     },
-    "_meta": { "title": "Load PuLID Flux Model" }
+    "_meta": {
+      "title": "Load PuLID Flux Model"
+    }
   },
   "11": {
     "class_type": "PulidFluxInsightFaceLoader",
     "inputs": {
       "provider": "CPU"
     },
-    "_meta": { "title": "Load InsightFace" }
-  },
-  "14": {
-    "class_type": "PulidFluxEvaClipLoader",
-    "inputs": {},
-    "_meta": { "title": "Load Eva Clip" }
+    "_meta": {
+      "title": "Load InsightFace"
+    }
   },
   "12": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "reference.png"
     },
-    "_meta": { "title": "Reference Image (PuLID)" }
+    "_meta": {
+      "title": "Reference Image (PuLID)"
+    }
   },
   "13": {
     "class_type": "ApplyPulidFlux",
     "inputs": {
-      "model": ["19", 0],
-      "pulid_flux": ["10", 0],
-      "eva_clip": ["14", 0],
-      "face_analysis": ["11", 0],
-      "image": ["12", 0],
+      "model": [
+        "19",
+        0
+      ],
+      "pulid_flux": [
+        "10",
+        0
+      ],
+      "eva_clip": [
+        "14",
+        0
+      ],
+      "face_analysis": [
+        "11",
+        0
+      ],
+      "image": [
+        "12",
+        0
+      ],
       "weight": 0.8,
-      "start_at": 0.0,
-      "end_at": 1.0
+      "start_at": 0,
+      "end_at": 1
     },
-    "_meta": { "title": "Apply PuLID Flux" }
+    "_meta": {
+      "title": "Apply PuLID Flux"
+    }
   },
-
-  "_comment_controlnet": "── ControlNet: Pose/Angle Control ──",
-
+  "14": {
+    "class_type": "PulidFluxEvaClipLoader",
+    "inputs": {},
+    "_meta": {
+      "title": "Load Eva Clip"
+    }
+  },
+  "15": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "clip": [
+        "2",
+        0
+      ],
+      "lora_name": "extreme-detailer-flux.safetensors",
+      "strength_model": 0.55,
+      "strength_clip": 0.55
+    },
+    "_meta": {
+      "title": "Detail LoRA (Extreme Detailer)"
+    }
+  },
+  "16": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "15",
+        0
+      ],
+      "clip": [
+        "15",
+        1
+      ],
+      "lora_name": "painterly-fantasy-ckpf.safetensors",
+      "strength_model": 0.5,
+      "strength_clip": 0.5
+    },
+    "_meta": {
+      "title": "Style LoRA (Painterly Fantasy)"
+    }
+  },
+  "17": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "16",
+        0
+      ],
+      "clip": [
+        "16",
+        1
+      ],
+      "lora_name": "hand-detail-flux.safetensors",
+      "strength_model": 0.6,
+      "strength_clip": 0.6
+    },
+    "_meta": {
+      "title": "Hand Detail LoRA"
+    }
+  },
+  "18": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "17",
+        0
+      ],
+      "clip": [
+        "17",
+        1
+      ],
+      "lora_name": "flux-nsfw-unlock.safetensors",
+      "strength_model": 0,
+      "strength_clip": 0
+    },
+    "_meta": {
+      "title": "NSFW Unlock LoRA"
+    }
+  },
+  "19": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "18",
+        0
+      ],
+      "clip": [
+        "18",
+        1
+      ],
+      "lora_name": "dark-fantasy-v2-flux.safetensors",
+      "strength_model": 0.4,
+      "strength_clip": 0.4
+    },
+    "_meta": {
+      "title": "Campaign LoRA (Dark Fantasy)"
+    }
+  },
   "20": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "angle_reference.png"
     },
-    "_meta": { "title": "Angle Reference Image (ControlNet)" }
+    "_meta": {
+      "title": "Angle Reference Image (ControlNet)"
+    }
   },
   "21": {
     "class_type": "CannyEdgePreprocessor",
     "inputs": {
-      "image": ["20", 0],
+      "image": [
+        "20",
+        0
+      ],
       "low_threshold": 150,
       "high_threshold": 250,
       "resolution": 768
     },
-    "_meta": { "title": "Canny Edge Detection" }
+    "_meta": {
+      "title": "Canny Edge Detection"
+    }
   },
   "22": {
     "class_type": "LoadFluxControlNet",
@@ -174,51 +324,28 @@
       "model_name": "flux-dev",
       "controlnet_path": "flux-canny-controlnet-v3.safetensors"
     },
-    "_meta": { "title": "Load XLabs ControlNet" }
+    "_meta": {
+      "title": "Load XLabs ControlNet"
+    }
   },
   "23": {
     "class_type": "ApplyFluxControlNet",
     "inputs": {
-      "controlnet": ["22", 0],
-      "image": ["21", 0],
+      "controlnet": [
+        "22",
+        0
+      ],
+      "image": [
+        "21",
+        0
+      ],
       "strength": 0.65
     },
-    "_meta": { "title": "Apply ControlNet (Canny)" }
+    "_meta": {
+      "title": "Apply ControlNet (Canny)"
+    }
   },
-
-  "_comment_sampler": "── Generation (XLabs Sampler for ControlNet support) ──",
-
-  "7": {
-    "class_type": "XlabsSampler",
-    "inputs": {
-      "model": ["13", 0],
-      "conditioning": ["4", 0],
-      "neg_conditioning": ["5", 0],
-      "noise_seed": 42,
-      "steps": 20,
-      "timestep_to_start_cfg": 20,
-      "true_gs": 3.5,
-      "image_to_image_strength": 0.0,
-      "denoise_strength": 1.0,
-      "latent_image": ["6", 0],
-      "controlnet_condition": ["23", 0]
-    },
-    "_meta": { "title": "XLabs Sampler" }
-  },
-  "8": {
-    "class_type": "VAEDecode",
-    "inputs": {
-      "samples": ["7", 0],
-      "vae": ["3", 0]
-    },
-    "_meta": { "title": "VAE Decode" }
-  },
-  "9": {
-    "class_type": "SaveImage",
-    "inputs": {
-      "images": ["8", 0],
-      "filename_prefix": "GROWTH_face_controlnet"
-    },
-    "_meta": { "title": "Save Image" }
-  }
+  "_comment_pulid": "── PuLID: Face Identity Lock ──",
+  "_comment_controlnet": "── ControlNet: Pose/Angle Control ──",
+  "_comment_sampler": "── Generation (XLabs Sampler for ControlNet support) ──"
 }
