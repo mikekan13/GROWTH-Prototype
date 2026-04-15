@@ -76,6 +76,7 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `${build} build`,
     clothing,
     'plain undecorated bare skin, no body paint, no markings, no jewelry',
+    'anatomically accurate adult anatomy, natural nipples and areolas, natural navel, natural pubic mound and labia, realistic body details, natural skin texture',
     'full body reference shot, standing figure centered in frame, long shot framing, wide angle',
     'neutral grey background, balanced even lighting',
   ].join(', ');
@@ -86,6 +87,7 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
     'Plain undecorated bare skin — no body paint, no tattoos, no markings, no jewelry, no gold, no accessories.',
+    'Anatomically accurate adult body: natural nipples and areolas on the breasts, defined navel, natural pubic mound and labia, natural skin texture with subtle pore detail. Not doll-like, not Barbie-smooth, not censored or featureless.',
     'The figure stands in an A-pose with arms held slightly away from the body in a symmetric stance.',
     `In the style of ckpf with aidmafluxpro1.1 detail. Hyperrealistic, extremely detailed.`,
     'Full body reference shot, long shot framing, wide angle, neutral grey background, balanced even lighting.',

@@ -70,7 +70,7 @@ const FULL_NEGATIVE_PROMPT = '';
 // keeps wanting to dress the figure in gold/jewelry/decorative elements.
 const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, gold, gold trim, gold paint, body paint, tattoo, markings, jewelry, necklace, choker, bracelet, ring, earring, crown, tiara, headdress, ornate, decorated, embellished, side view, profile view, three quarter view, turned to side, contrapposto, leg crossed, leaning, tilted hip, cropped feet, cut off feet, no feet';
 
-const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, bikini, lingerie`;
+const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, bikini, lingerie, doll, doll body, plastic body, Barbie, Barbie smooth, mannequin, featureless crotch, smooth crotch, no nipples, no pubic, censored, blurred genitals, mosaic, pixelated`;
 
 // Kept for backward-compat; defaults to the underwear-allowed (SFW) variant.
 const CREATION_MODE_NEGATIVE = CREATION_MODE_NEGATIVE_BASE;
