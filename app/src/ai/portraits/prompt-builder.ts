@@ -58,8 +58,8 @@ export function buildPortraitPrompt(
   const baseConfig = getDefaultStyleConfig();
   const config = applyCampaignStyle(baseConfig, campaignStyle);
 
-  // T1: IDENTITY BLOCK (always included)
-  const identityBlock = buildIdentityBlock(char);
+  // T1: IDENTITY BLOCK (always included). creationMode trims narrative lore.
+  const identityBlock = buildIdentityBlock(char, creationMode);
 
   // T1: BODY DESCRIPTION BLOCK
   const bodyBlock = buildBodyDescriptionBlock(char);
@@ -96,12 +96,12 @@ export function buildPortraitPrompt(
   const sentences: string[] = [];
 
   // STYLE — all 3 LoRA triggers (ckpf, aidmafluxpro1.1, drkfnts style) are in the global style
-  tags.push(getStyleTags());
-  sentences.push(getStyleSentences());
+  tags.push(getStyleTags(creationMode));
+  sentences.push(getStyleSentences(creationMode));
 
   // IDENTITY (tags = keywords, sentences = natural language)
   tags.push(identityBlock);
-  sentences.push(buildIdentitySentence(char));
+  sentences.push(buildIdentitySentence(char, creationMode));
 
   // BODY DESCRIPTION
   if (bodyBlock) {
@@ -201,7 +201,7 @@ export function buildPortraitPrompt(
 // T1: Core Identity
 // ============================================================
 
-function buildIdentityBlock(char: PortraitCharacterData): string {
+function buildIdentityBlock(char: PortraitCharacterData, creationMode = false): string {
   const parts: string[] = [];
 
   // Age and sex/presentation
@@ -216,13 +216,16 @@ function buildIdentityBlock(char: PortraitCharacterData): string {
     parts.push(`a ${coreParts.join(' ')}`);
   }
 
-  // Seed-specific physical traits
-  if (seed?.description) {
+  // Seed-specific physical traits — skipped in creationMode because seed
+  // descriptions are species lore (e.g. "Humans are diverse… fantasy and sci-fi
+  // civilizations") that pushes FLUX toward decorative fantasy flavor.
+  if (seed?.description && !creationMode) {
     parts.push(seed.description);
   }
 
-  // Physical description (free-text from character sheet)
-  if (identity.physicalDescription) {
+  // Physical description (free-text from character sheet) — also skipped in
+  // creationMode; reference body should be pure visual identity, not narrative.
+  if (identity.physicalDescription && !creationMode) {
     parts.push(identity.physicalDescription);
   }
 
@@ -508,7 +511,7 @@ function buildFaceSentence(char: PortraitCharacterData): string {
 }
 
 /** Build a natural language sentence describing the character's identity */
-function buildIdentitySentence(char: PortraitCharacterData): string {
+function buildIdentitySentence(char: PortraitCharacterData, creationMode = false): string {
   const { identity, seed } = char;
   const parts: string[] = [];
 
@@ -520,8 +523,9 @@ function buildIdentitySentence(char: PortraitCharacterData): string {
     parts.push(`A ${coreParts.join(' ')}.`);
   }
 
-  if (seed?.description) parts.push(seed.description + '.');
-  if (identity.physicalDescription) parts.push(identity.physicalDescription + '.');
+  // Skip seed description + physical description in creationMode (see buildIdentityBlock).
+  if (seed?.description && !creationMode) parts.push(seed.description + '.');
+  if (identity.physicalDescription && !creationMode) parts.push(identity.physicalDescription + '.');
 
   return parts.join(' ');
 }

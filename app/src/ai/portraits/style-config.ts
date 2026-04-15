@@ -210,12 +210,34 @@ export function getDefaultStyleConfig(): StyleConfig {
 }
 
 /** Get style tags for clip_l encoder */
-export function getStyleTags(): string {
+export function getStyleTags(creationMode = false): string {
+  // In creationMode (A-pose body reference) we strip atmospheric lighting tags —
+  // "dramatic chiaroscuro", "rich deep colors", "luminous detailed eyes" all push
+  // FLUX toward moody theatrical portraits, which fights the neutral grey
+  // studio background and A-pose framing. Winning hand-tuned test used the
+  // shorter style prefix.
+  if (creationMode) {
+    return [
+      `in the style of ${TRIGGER_PAINTERLY}`,
+      TRIGGER_DETAIL,
+      TRIGGER_DARK_FANTASY,
+      'hyperrealistic fantasy portrait',
+      'extremely detailed',
+      'subtle painterly quality',
+    ].join(', ');
+  }
   return STYLE_TAGS;
 }
 
 /** Get style sentences for t5xxl encoder */
-export function getStyleSentences(): string {
+export function getStyleSentences(creationMode = false): string {
+  if (creationMode) {
+    return [
+      `A hyperrealistic fantasy portrait in the style of ${TRIGGER_PAINTERLY} and ${TRIGGER_DARK_FANTASY}.`,
+      'Extremely detailed rendering that borders on photorealistic.',
+      'Clean even studio lighting with neutral neutral grey background.',
+    ].join(' ');
+  }
   return STYLE_SENTENCES;
 }
 
