@@ -210,8 +210,17 @@ export class LocalProvider implements ImageGenerationProvider {
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
         // Body canvas: Tara test 768x1152. Face detail comes from a second-pass
         // face-refine composite (refineBodyFace), not from bigger canvas.
-        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
+        // creationMode body is TWO-PASS:
+        //   Pass 1: 768x768 square — FLUX crops to torso (head + feet out of frame — see autotest3 img #6).
+        //   Pass 2 (inpaintHeadAndFeet): pad to 768x1152, inpaint top 192 + bottom 192 with PuLID head + feet.
+        // This is how autotest3 got its sharp face — head gets 192x768 native resolution, not a tiny
+        // ~200px region squeezed into a 1-shot full body. Non-creationMode body gens stay single-pass.
+        width: isSketch ? 384 : isDraft ? 640
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 768
+          : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 768
+          : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
@@ -365,6 +374,22 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.subfolder,
         outputInfo.type,
       );
+
+      // 8b. PASS 2 for creationMode body: take the 768x768 torso, pad to 768x1152,
+      // inpaint the top 192px (head + PuLID face) and bottom 192px (feet + ground).
+      // This is the autotest3 recipe that Mike confirmed produced the reference output.
+      const doTwoPassBody = input.creationMode === true
+        && input.overrides?.composition === 'full_body'
+        && !!params.referenceImagePath;
+      if (doTwoPassBody) {
+        try {
+          console.log('[ComfyUI] Body pass 2: pad + inpaint head/feet on torso...');
+          imageData = await this.inpaintHeadAndFeet(imageData, params);
+          console.log('[ComfyUI] Body pass 2 done.');
+        } catch (err) {
+          console.warn('[ComfyUI] Body pass 2 failed — keeping pass 1 torso:', err instanceof Error ? err.message : err);
+        }
+      }
 
       // 9. Save to filesystem under a step subfolder:
       //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
@@ -1357,6 +1382,169 @@ export class LocalProvider implements ImageGenerationProvider {
     const outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
 
     // 5. Download inpainted result
+    return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+  }
+
+  /**
+   * AUTOTEST3 RECIPE — Body pass 2.
+   *
+   * Pass 1 (already done by caller) produced a 768x768 torso (head + feet
+   * cropped out by square-framing bias). This method pads it to 768x1152
+   * with neutral grey above + below, then inpaints the top 192px (head) and
+   * bottom 192px (feet) using PuLID + the same LoRA stack.
+   *
+   * Face gets native 192x768 resolution — sharp, not the 200px postage stamp
+   * a one-shot 768x1152 body gen produces.
+   */
+  private async inpaintHeadAndFeet(
+    torsoImage: Buffer,
+    params: ComfyUIWorkflowParams,
+  ): Promise<Buffer> {
+    const TOP_BAND = 192;
+    const BOT_BAND = 192;
+    const TORSO_SIZE = 768;
+    const OUT_W = 768;
+    const OUT_H = TOP_BAND + TORSO_SIZE + BOT_BAND; // 1152
+
+    // 1. Pad torso image vertically with neutral grey (matches "neutral grey background" in prompt).
+    const padded = await sharp(torsoImage)
+      .resize(TORSO_SIZE, TORSO_SIZE, { fit: 'fill' })
+      .extend({
+        top: TOP_BAND,
+        bottom: BOT_BAND,
+        left: 0,
+        right: 0,
+        background: { r: 180, g: 180, b: 180 },
+      })
+      .png()
+      .toBuffer();
+
+    // 2. Build inpaint mask: white where we INPAINT (top + bottom), black where we PRESERVE (middle torso).
+    const maskSvg = `<svg width="${OUT_W}" height="${OUT_H}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${OUT_W}" height="${OUT_H}" fill="black"/>
+      <rect x="0" y="0" width="${OUT_W}" height="${TOP_BAND}" fill="white"/>
+      <rect x="0" y="${TOP_BAND + TORSO_SIZE}" width="${OUT_W}" height="${BOT_BAND}" fill="white"/>
+    </svg>`;
+    const maskBuf = await sharp(Buffer.from(maskSvg)).png().toBuffer();
+
+    // 3. Upload padded + mask to ComfyUI
+    const stamp = Date.now();
+    const paddedName = await this.uploadBuffer(padded, `body_pass2_padded_${stamp}.png`);
+    const maskName = await this.uploadBuffer(maskBuf, `body_pass2_mask_${stamp}.png`);
+
+    // 4. Load the PuLID workflow and mutate it for inpaint
+    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
+    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
+
+    // GGUF → fp8 swap (same as main pipeline)
+    for (const node of Object.values(w) as Record<string, unknown>[]) {
+      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
+        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
+      }
+    }
+
+    // Pass 2 prompt: emphasize head (top) + feet (bottom) context. Torso is preserved
+    // from pass 1 so we don't need to re-describe it — we just need FLUX to paint
+    // head + feet coherently onto the standing torso.
+    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic portrait, extremely detailed, full body from head to feet, head and face at top of frame, feet and ground at bottom of frame, A-pose standing figure, neutral grey background, subtle painterly quality';
+    const p2T5xxl = 'A hyperrealistic full body photograph in the style of ckpf with aidmafluxpro1.1 detail. Full body standing in A-pose from head to feet, head and face visible at the top of the frame, feet standing on the ground at the bottom of the frame. Neutral grey background with balanced even lighting.';
+    const p2Neg = 'robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet, floating, cropped, cut off';
+
+    // Find key nodes
+    let emptyLatentId: string | null = null;
+    let vaeNodeId: string | null = null;
+    let ksamplerId: string | null = null;
+    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      const ct = node.class_type as string;
+      if (ct === 'EmptyLatentImage') emptyLatentId = id;
+      if (ct === 'VAELoader') vaeNodeId = id;
+      if (ct === 'KSampler') ksamplerId = id;
+    }
+    if (!emptyLatentId || !vaeNodeId || !ksamplerId) {
+      throw new Error(`inpaintHeadAndFeet: missing nodes — empty=${emptyLatentId} vae=${vaeNodeId} ksampler=${ksamplerId}`);
+    }
+
+    // Inject inpaint chain:
+    //   LoadImage(padded) → VAEEncode → SetLatentNoiseMask(mask) → KSampler
+    const loadPaddedId = `p2_load_padded_${stamp}`;
+    const loadMaskId = `p2_load_mask_${stamp}`;
+    const imgToMaskId = `p2_img_to_mask_${stamp}`;
+    const growMaskId = `p2_grow_mask_${stamp}`;
+    const vaeEncodeId = `p2_vae_enc_${stamp}`;
+    const setMaskId = `p2_set_mask_${stamp}`;
+
+    w[loadPaddedId] = { class_type: 'LoadImage', inputs: { image: paddedName }, _meta: { title: 'Pass2 Padded Body' } };
+    w[loadMaskId] = { class_type: 'LoadImage', inputs: { image: maskName }, _meta: { title: 'Pass2 Mask' } };
+    w[imgToMaskId] = { class_type: 'ImageToMask', inputs: { image: [loadMaskId, 0], channel: 'red' }, _meta: { title: 'Pass2 Mask→Mask' } };
+    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 16, tapered_corners: true }, _meta: { title: 'Pass2 Feather' } };
+    w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadPaddedId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'Pass2 Encode' } };
+    w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'Pass2 Noise Mask' } };
+
+    // Rewire KSampler.latent_image FROM [emptyLatentId, 0] TO [setMaskId, 0]
+    const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
+    ksamplerInputs.latent_image = [setMaskId, 0];
+    ksamplerInputs.denoise = 1.0; // full generation in masked regions
+    ksamplerInputs.steps = 20;
+    ksamplerInputs.cfg = 1.0;
+    ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
+
+    // Remove the unused EmptyLatentImage
+    delete w[emptyLatentId];
+
+    // Inject prompts + canvas dims + LoRA weights (match pass 1)
+    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      const cls = node.class_type as string;
+      const inputs = node.inputs as Record<string, unknown>;
+      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
+      if (!inputs) continue;
+
+      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
+        inputs.clip_l = p2ClipL;
+        inputs.t5xxl = p2T5xxl;
+      }
+      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
+        inputs.text = p2Neg;
+      }
+      if (cls === 'ApplyPulidFlux') {
+        inputs.weight = 0.8;  // strong face lock at head region
+      }
+      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
+        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
+      }
+      if (cls === 'LoraLoader') {
+        if (title.includes('style')) { inputs.strength_model = 0.5; inputs.strength_clip = 0.5; }
+        else if (title.includes('campaign')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
+        else if (title.includes('hand detail')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
+        else if (title.includes('nsfw')) { inputs.strength_model = 0.8; inputs.strength_clip = 0.8; }
+        else if (title.includes('detail')) { inputs.strength_model = 0.55; inputs.strength_clip = 0.55; }
+      }
+    }
+
+    // Strip 0-weight LoRAs from the chain (keeps stack clean)
+    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      if ((node.class_type as string) !== 'LoraLoader') continue;
+      const inputs = node.inputs as Record<string, unknown>;
+      if (inputs.strength_model === 0 && inputs.strength_clip === 0) {
+        const modelIn = inputs.model;
+        const clipIn = inputs.clip;
+        for (const other of Object.values(w) as Record<string, unknown>[]) {
+          const oi = other.inputs as Record<string, unknown> | undefined;
+          if (!oi) continue;
+          for (const [k, v] of Object.entries(oi)) {
+            if (Array.isArray(v) && v[0] === id) {
+              if (v[1] === 0) oi[k] = modelIn;
+              if (v[1] === 1) oi[k] = clipIn;
+            }
+          }
+        }
+        delete w[id];
+      }
+    }
+
+    // Queue + wait + download
+    const clientId = crypto.randomUUID();
+    const queueRes = await this.queuePrompt(w, clientId);
+    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
     return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
   }
 
