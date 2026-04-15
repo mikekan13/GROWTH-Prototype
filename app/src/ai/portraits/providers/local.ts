@@ -61,8 +61,9 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
   const clipL = [
-    'in the style of ckpf, aidmafluxpro1.1, drkfnts style',
-    'hyperrealistic fantasy portrait, art nouveau influence',
+    // Autotest3-era style: only painterly + detail LoRA triggers. No dark-fantasy.
+    'in the style of ckpf, aidmafluxpro1.1',
+    'hyperrealistic fantasy portrait',
     'extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
     hairPhrase,
@@ -77,6 +78,7 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
   ].join(', ');
 
   const t5xxl = [
+    `A hyperrealistic portrait in the style of ckpf with aidmafluxpro1.1 detail.`,
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}.`,
     `${skin} skin. ${eyes} eyes. ${build} build.`,
     clothingSentence,
@@ -238,7 +240,14 @@ export class LocalProvider implements ImageGenerationProvider {
         // same crisp detail the Tara reference gens had.
         detailLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.7 : 0.5) : 0.55,
         campaignLora: isSketch ? undefined : 'dark-fantasy-v2-flux.safetensors',
-        campaignLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.3 : 0.15) : 0.4,
+        // Campaign (dark-fantasy) LoRA OFF for creationMode body. The autotest3
+        // reference image was generated before this LoRA entered the workflow
+        // (commit 7701b7e6 added it). Stacking it on top of painterly+detail+NSFW
+        // compromises face detail.
+        campaignLoraWeight: isSketch ? 0
+          : isFaceLock ? (isFinal ? 0.3 : 0.15)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
+          : 0.4,
         // Hand detail LoRA only for face-lock final (close-up where hands might appear).
         // Body gen at full-body framing = hands are tiny, not worth the LoRA compute.
         handDetailLoraWeight: isFinal && input.overrides?.composition !== 'full_body' ? 0.6 : 0,
