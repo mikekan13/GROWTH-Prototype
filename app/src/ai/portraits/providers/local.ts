@@ -383,12 +383,9 @@ export class LocalProvider implements ImageGenerationProvider {
         && !!params.referenceImagePath;
       if (doTwoPassBody) {
         try {
-          // Free VRAM before pass 2. Pass 1 leaves UNet + CLIP + PuLID + EVA-CLIP +
-          // InsightFace + 3 LoRAs + VAE resident — pass 2 adds the padded base + mask
-          // tensors on top. 8GB cards OOM (CUDA invalid argument) without a reset.
-          console.log('[ComfyUI] Freeing VRAM before pass 2...');
-          await this.releaseVram().catch(() => {});
-          await new Promise(r => setTimeout(r, 3000));
+          // Pass 2 keeps the already-loaded pass 1 models (UNet/CLIP/VAE/PuLID)
+          // to avoid a 60s+ reload. VRAM pressure mitigated by trimming LoRAs
+          // inside inpaintHeadAndFeet.
           console.log('[ComfyUI] Body pass 2: pad + inpaint head/feet on torso...');
           imageData = await this.inpaintHeadAndFeet(imageData, params);
           console.log('[ComfyUI] Body pass 2 done.');
@@ -1489,11 +1486,14 @@ export class LocalProvider implements ImageGenerationProvider {
     w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadPaddedId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'Pass2 Encode' } };
     w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'Pass2 Noise Mask' } };
 
-    // Rewire KSampler.latent_image FROM [emptyLatentId, 0] TO [setMaskId, 0]
+    // Rewire KSampler.latent_image FROM [emptyLatentId, 0] TO [setMaskId, 0].
+    // Pass 2 at 15 steps, denoise 0.9 — enough detail for head/feet while keeping
+    // pass 2 wall time to ~2 min. 20 steps at full denoise took 29 min under VRAM
+    // pressure; 15 is the sweet spot.
     const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
     ksamplerInputs.latent_image = [setMaskId, 0];
-    ksamplerInputs.denoise = 1.0; // full generation in masked regions
-    ksamplerInputs.steps = 20;
+    ksamplerInputs.denoise = 0.9;
+    ksamplerInputs.steps = 15;
     ksamplerInputs.cfg = 1.0;
     ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
 
