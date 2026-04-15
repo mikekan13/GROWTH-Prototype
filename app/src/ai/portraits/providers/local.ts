@@ -207,8 +207,10 @@ export class LocalProvider implements ImageGenerationProvider {
       const MAX_PULID_REFS = isFullBodyGen ? 5 : 3;
       const primaryIn = input.personaLock?.referenceImagePath;
       const batchIn = input.personaLock?.referenceImagePaths || [];
-      const primaryOnly = primaryIn ? [primaryIn] : [];
-      const allInRaw = batchIn.length ? batchIn : primaryOnly;
+      // Merge primary + secondaries so the locked face stays at index 0.
+      // Dedupe in case primaryIn is also in batchIn.
+      const merged = [primaryIn, ...batchIn].filter((p): p is string => !!p);
+      const allInRaw = Array.from(new Set(merged));
       const allIn = allInRaw.slice(0, MAX_PULID_REFS);
       if (allInRaw.length > MAX_PULID_REFS) {
         console.warn(`[ComfyUI] PuLID refs capped from ${allInRaw.length} to ${MAX_PULID_REFS} — 8GB VRAM budget`);
