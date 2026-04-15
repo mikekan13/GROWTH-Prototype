@@ -142,18 +142,24 @@ export function buildPortraitPrompt(
     }
   }
 
-  // T4: NARRATIVE (subtle)
-  const narrativeBlock = buildNarrativeBlock(char);
-  if (narrativeBlock) {
-    tags.push(narrativeBlock);
-    sentences.push(narrativeBlock + '.');
+  // T4: NARRATIVE (subtle) — skipped in creationMode; reference body should be
+  // clean and un-narrativized (no "royal", "warrior", "cursed" flavor pushing
+  // toward crowns/armor/atmospheric props).
+  if (!creationMode) {
+    const narrativeBlock = buildNarrativeBlock(char);
+    if (narrativeBlock) {
+      tags.push(narrativeBlock);
+      sentences.push(narrativeBlock + '.');
+    }
   }
 
-  // T5: VISUAL TRAITS
-  const traitBlock = buildTraitBlock(char.visualTraits);
-  if (traitBlock) {
-    tags.push(traitBlock);
-    sentences.push(traitBlock + '.');
+  // T5: VISUAL TRAITS — also skipped in creationMode for the same reason.
+  if (!creationMode) {
+    const traitBlock = buildTraitBlock(char.visualTraits);
+    if (traitBlock) {
+      tags.push(traitBlock);
+      sentences.push(traitBlock + '.');
+    }
   }
 
   // STEERING WORDS

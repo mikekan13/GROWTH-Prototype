@@ -66,7 +66,7 @@ const STYLE_PREFIX = STYLE_TAGS;
 // known failures: long hair tokens get interpreted as robes/cloaks/capes. So
 // CREATION_MODE_NEGATIVE explicitly lists garment shapes to avoid.
 const FULL_NEGATIVE_PROMPT = '';
-const CREATION_MODE_NEGATIVE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
+const CREATION_MODE_NEGATIVE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, crown, tiara, headband, headdress, hat, helmet, jewelry, necklace, earrings, armor, ornate, decorated, embellished, feathers, ornaments, accessories, frame, border, art nouveau frame, decorative frame, ornate background';
 
 // ============================================================
 // Default Composition
