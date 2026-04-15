@@ -163,12 +163,12 @@ export class LocalProvider implements ImageGenerationProvider {
         // Face-lock weights:
         //   Step 1 (draft):  painterly 0.6, detail 0.5, dark 0.15 — safe discovery.
         //   Step 2 (final):  painterly 0.75, detail 0.7, dark 0.3 — more fantasy/mood.
-        // Body reference needs PHOTOREAL output, not illustrated fantasy art.
-        // creationMode + full_body → kill painterly style LoRA, dial down detail
-        // slightly. Detail LoRA stays for skin texture; NSFW handles anatomy.
+        // Body reference: keep the painterly LoRA at half strength (brings
+        // Tara's painterly realism without the illustrated-fantasy dominance).
+        // 0 was too cartoony; 0.5 summoned gowns. 0.25 is the middle ground.
         styleLoraWeight: isSketch ? 0.6
           : isFaceLock ? (isFinal ? 0.75 : 0.6)
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.25
           : config.loraStrength,
         detailLoraWeight: isSketch ? 0
           : isFaceLock ? (isFinal ? 0.7 : 0.5)

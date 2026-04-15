@@ -225,13 +225,19 @@ export function getStyleTags(creationMode = false): string {
   // weights (0) for body reference so including their triggers just pollutes.
   // Target output is photo-real anatomical reference, not illustrated art.
   if (creationMode) {
+    // Painterly LoRA trigger returns (brings Tara-style painterly realism).
+    // Dark-fantasy trigger stays OUT (its aesthetic = ornate outfits/crowns).
+    // "hyperrealistic" stays for photo-quality; "fantasy portrait" + "art nouveau"
+    // are dropped (they summon gowns/frames).
     return [
-      TRIGGER_DETAIL,  // only detail LoRA still active; its trigger word stays
-      'photograph',
-      'photo-realistic',
+      `in the style of ${TRIGGER_PAINTERLY}`,
+      TRIGGER_DETAIL,
+      'hyperrealistic',
+      'subtle painterly quality',
       'body anatomy reference',
       'character reference sheet',
       'clean studio photography',
+      'extremely detailed',
     ].join(', ');
   }
   return STYLE_TAGS;
@@ -241,8 +247,8 @@ export function getStyleTags(creationMode = false): string {
 export function getStyleSentences(creationMode = false): string {
   if (creationMode) {
     return [
-      `A photo-realistic body anatomy reference photograph, high resolution (${TRIGGER_DETAIL} style).`,
-      'Clean studio photography with even soft lighting, neutral grey background.',
+      `A hyperrealistic body anatomy reference in the style of ${TRIGGER_PAINTERLY} (${TRIGGER_DETAIL} detail).`,
+      'Subtle painterly realism, photo-like quality, clean studio lighting, neutral grey background.',
       'Character reference sheet format, standing figure, full figure visible from head to feet.',
     ].join(' ');
   }
