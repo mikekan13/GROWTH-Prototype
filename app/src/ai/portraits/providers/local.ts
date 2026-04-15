@@ -368,6 +368,22 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.type,
       );
 
+      // 8b. Face-detailer pass for creationMode body. BiSeNet (face_no_hair
+      // mask) → inpaint just the face oval with PuLID at higher PuLID weight.
+      // Body/torso/legs untouched. Adds ~90s.
+      const doFaceDetailer = input.creationMode === true
+        && input.overrides?.composition === 'full_body'
+        && !!params.referenceImagePath;
+      if (doFaceDetailer) {
+        try {
+          console.log('[ComfyUI] Face-detailer: BiSeNet mask + PuLID inpaint...');
+          imageData = await this.refineFaceWithBiSeNet(imageData, params);
+          console.log('[ComfyUI] Face-detailer done.');
+        } catch (err) {
+          console.warn('[ComfyUI] Face-detailer failed — keeping single-pass body:', err instanceof Error ? err.message : err);
+        }
+      }
+
       // 9. Save to filesystem under a step subfolder:
       //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
       //   'refined'  — Step 2 front-lock (final, ControlNet, angle=front)
@@ -1507,6 +1523,174 @@ export class LocalProvider implements ImageGenerationProvider {
     const queueRes = await this.queuePrompt(w, clientId);
     const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
     return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+  }
+
+  /**
+   * FACE-DETAILER for body gens.
+   *
+   * Run BiSeNet (Segformer-B5) face-parsing on the body image to extract a
+   * tight face oval mask (face_no_hair = skin/eyes/brows/nose/mouth, EXCLUDES
+   * hair/neck/torso). Inpaint that masked region with PuLID at high weight
+   * to sharpen the face. Body/torso/legs/hair are never touched.
+   *
+   * Adds ~10s mask + ~75s inpaint = ~90s on 8GB.
+   */
+  private async refineFaceWithBiSeNet(
+    bodyImage: Buffer,
+    params: ComfyUIWorkflowParams,
+  ): Promise<Buffer> {
+    const stamp = Date.now();
+    const tmpRoot = path.join(process.cwd(), 'tmp', `face-refine-${stamp}`);
+    await fs.mkdir(tmpRoot, { recursive: true });
+    const bodyPath = path.join(tmpRoot, 'body.png');
+    await fs.writeFile(bodyPath, bodyImage);
+
+    // 1. Run face_parse.py via standalone's venv
+    const repoRoot = path.resolve(process.cwd(), '..');
+    const pythonExe = path.join(repoRoot, 'standalone', '.venv', 'Scripts', 'python.exe');
+    const scriptPath = path.join(repoRoot, 'standalone', 'scripts', 'face_parse.py');
+    const maskOutDir = path.join(tmpRoot, 'masks');
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(pythonExe, [
+        scriptPath,
+        bodyPath,
+        '--out-dir', maskOutDir,
+        '--region', 'face_no_hair',
+        '--feather', '12',
+      ], { stdio: 'pipe', windowsHide: true });
+      let stderr = '';
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`face_parse.py exited ${code}: ${stderr.slice(0, 400)}`));
+      });
+      proc.on('error', reject);
+    });
+
+    const maskPath = path.join(maskOutDir, 'mask_face_no_hair.png');
+    const maskBuffer = await fs.readFile(maskPath);
+
+    // Sanity check: if mask is mostly black (BiSeNet didn't find a face) skip.
+    const maskStats = await sharp(maskBuffer).stats();
+    const meanWhite = maskStats.channels[0].mean;
+    if (meanWhite < 5) {
+      throw new Error(`face_no_hair mask is empty (mean=${meanWhite.toFixed(1)}) — face not detected`);
+    }
+    console.log(`[ComfyUI] Face mask: ${meanWhite.toFixed(1)} avg coverage`);
+
+    // 2. Upload body + mask to ComfyUI
+    const bodyName = await this.uploadBuffer(bodyImage, `face_refine_body_${stamp}.png`);
+    const maskName = await this.uploadBuffer(maskBuffer, `face_refine_mask_${stamp}.png`);
+
+    // 3. Build inpaint workflow
+    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
+    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
+    for (const node of Object.values(w) as Record<string, unknown>[]) {
+      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
+        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
+      }
+    }
+
+    // Face-focused prompt: tight on facial features. Body context preserved by mask.
+    const fdClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic close-up face, extremely detailed face, sharp focused eyes, fine pore skin texture, detailed lips, realistic facial features, soft natural lighting';
+    const fdT5xxl = 'A hyperrealistic close-up face with extremely detailed skin showing fine pore texture, sharp focused eyes with detailed iris, realistic lips, detailed eyebrows. Crisp focus on facial features.';
+    const fdNeg = 'blurry, soft focus, low detail, deformed face, distorted features, doll face, plastic skin, big head, oversized head';
+
+    let emptyLatentId: string | null = null;
+    let vaeNodeId: string | null = null;
+    let ksamplerId: string | null = null;
+    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      const ct = node.class_type as string;
+      if (ct === 'EmptyLatentImage') emptyLatentId = id;
+      if (ct === 'VAELoader') vaeNodeId = id;
+      if (ct === 'KSampler') ksamplerId = id;
+    }
+    if (!emptyLatentId || !vaeNodeId || !ksamplerId) {
+      throw new Error('refineFaceWithBiSeNet: missing nodes');
+    }
+
+    const loadBodyId = `fd_load_${stamp}`;
+    const loadMaskId = `fd_mask_${stamp}`;
+    const imgToMaskId = `fd_i2m_${stamp}`;
+    const growMaskId = `fd_grow_${stamp}`;
+    const vaeEncodeId = `fd_enc_${stamp}`;
+    const setMaskId = `fd_setmask_${stamp}`;
+
+    w[loadBodyId] = { class_type: 'LoadImage', inputs: { image: bodyName }, _meta: { title: 'FD Body' } };
+    w[loadMaskId] = { class_type: 'LoadImage', inputs: { image: maskName }, _meta: { title: 'FD Mask' } };
+    w[imgToMaskId] = { class_type: 'ImageToMask', inputs: { image: [loadMaskId, 0], channel: 'red' }, _meta: { title: 'FD Mask→Mask' } };
+    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 8, tapered_corners: true }, _meta: { title: 'FD Feather' } };
+    w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadBodyId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'FD Encode' } };
+    w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'FD Noise Mask' } };
+
+    const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
+    ksamplerInputs.latent_image = [setMaskId, 0];
+    ksamplerInputs.denoise = 0.55;  // moderate — preserve face composition, sharpen detail
+    ksamplerInputs.steps = 15;
+    ksamplerInputs.cfg = 1.0;
+    ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
+
+    delete w[emptyLatentId];
+
+    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      const cls = node.class_type as string;
+      const inputs = node.inputs as Record<string, unknown>;
+      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
+      if (!inputs) continue;
+
+      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
+        inputs.clip_l = fdClipL;
+        inputs.t5xxl = fdT5xxl;
+      }
+      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
+        inputs.text = fdNeg;
+      }
+      if (cls === 'ApplyPulidFlux') {
+        inputs.weight = 0.9;  // strong face lock — this is THE face refinement
+      }
+      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
+        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
+      }
+      if (cls === 'LoraLoader') {
+        if (title.includes('detail') && !title.includes('hand')) {
+          inputs.strength_model = 0.6; inputs.strength_clip = 0.6;
+        } else {
+          inputs.strength_model = 0; inputs.strength_clip = 0;
+        }
+      }
+    }
+
+    // Strip 0-weight LoRAs
+    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      if ((node.class_type as string) !== 'LoraLoader') continue;
+      const inputs = node.inputs as Record<string, unknown>;
+      if (inputs.strength_model === 0 && inputs.strength_clip === 0) {
+        const modelIn = inputs.model;
+        const clipIn = inputs.clip;
+        for (const other of Object.values(w) as Record<string, unknown>[]) {
+          const oi = other.inputs as Record<string, unknown> | undefined;
+          if (!oi) continue;
+          for (const [k, v] of Object.entries(oi)) {
+            if (Array.isArray(v) && v[0] === id) {
+              if (v[1] === 0) oi[k] = modelIn;
+              if (v[1] === 1) oi[k] = clipIn;
+            }
+          }
+        }
+        delete w[id];
+      }
+    }
+
+    const clientId = crypto.randomUUID();
+    const queueRes = await this.queuePrompt(w, clientId);
+    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
+    const refined = await this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+
+    // Cleanup tmp dir (best effort)
+    fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
+
+    return refined;
   }
 
   /**
