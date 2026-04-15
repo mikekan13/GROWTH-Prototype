@@ -324,6 +324,8 @@ interface IdentityLockWizardProps {
   campaignId: string;
   referencePhotos: string[];         // ALL player-uploaded reference photos
   characterId?: string;
+  characterName?: string;            // Editable inline at wizard top
+  onNameChange?: (name: string) => void;
   onComplete: (bust: string, fullBody: string) => void;
   onCancel: () => void;
 }
@@ -337,6 +339,8 @@ export default function IdentityLockWizard({
   campaignId,
   referencePhotos,
   characterId,
+  characterName,
+  onNameChange,
   onComplete,
   onCancel,
 }: IdentityLockWizardProps) {
@@ -733,13 +737,29 @@ export default function IdentityLockWizard({
   return (
     <div className="border p-4" style={{ borderColor: '#D0A030', borderRadius: '3px', backgroundColor: '#0d0d1f' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-base uppercase" style={{ color: '#D0A030', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.12em' }}>
+      <div className="flex items-center justify-between mb-4 gap-4">
+        <div className="text-base uppercase whitespace-nowrap" style={{ color: '#D0A030', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.12em' }}>
           Identity Lock
         </div>
+        {onNameChange && (
+          <input
+            type="text"
+            value={characterName || ''}
+            onChange={e => onNameChange(e.target.value)}
+            placeholder="Character name"
+            className="flex-1 px-3 py-1 text-sm bg-transparent border outline-none"
+            style={{
+              borderColor: '#582a72',
+              color: '#e8d9ff',
+              fontFamily: 'var(--font-terminal), Consolas, monospace',
+              borderRadius: '3px',
+              maxWidth: '360px',
+            }}
+          />
+        )}
         <button
           onClick={onCancel}
-          className="text-xs px-2 py-1 transition-colors"
+          className="text-xs px-2 py-1 transition-colors whitespace-nowrap"
           style={{ color: '#666', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
           onMouseEnter={e => (e.currentTarget.style.color = '#E8585A')}
           onMouseLeave={e => (e.currentTarget.style.color = '#666')}
@@ -1151,15 +1171,16 @@ export default function IdentityLockWizard({
               <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 Full Body
               </div>
-              <div className="relative border overflow-hidden" style={{ borderColor: state.bodyImage ? '#22ab94' : '#2a2a3e', width: '140px', aspectRatio: '3/4', backgroundColor: '#111' }}>
-                {state.bodyImage ? (
-                  <img src={state.bodyImage} alt="Full body" className="w-full h-full object-cover" />
-                ) : state.bodyGenerating ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="relative border overflow-hidden" style={{ borderColor: state.bodyGenerating ? '#7050A8' : state.bodyImage ? '#22ab94' : '#2a2a3e', width: '140px', aspectRatio: '3/4', backgroundColor: '#111' }}>
+                {state.bodyImage && (
+                  <img src={state.bodyImage} alt="Full body" className="w-full h-full object-cover" style={{ opacity: state.bodyGenerating ? 0.25 : 1 }} />
+                )}
+                {state.bodyGenerating && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: state.bodyImage ? 'rgba(17,17,17,0.5)' : 'transparent' }}>
                     <div className="animate-pulse text-sm" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Generating...</div>
                     <ElapsedTimer startTime={state.generationStartTime} />
                   </div>
-                ) : null}
+                )}
               </div>
             </div>
           </div>

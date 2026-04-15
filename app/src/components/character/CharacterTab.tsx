@@ -894,6 +894,8 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               campaignId={campaignId}
               referencePhotos={referencePhotos}
               characterId={userCharacter?.id}
+              characterName={characterName}
+              onNameChange={isEditable ? (n) => { setCharacterName(n); setDirty(true); } : undefined}
               onComplete={handleWizardComplete}
               onCancel={() => setWizardOpen(false)}
             />
