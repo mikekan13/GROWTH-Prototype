@@ -61,12 +61,14 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
   // Single-pass full body 768x1152.
-  // Composition tokens FIRST (FLUX honors front-loaded structural prompts more
-  // strongly). Pose anchors with anti-decoration negatives carry the framing.
+  // Art-school / anatomy-study framing — FLUX learned anatomical accuracy from
+  // life-drawing reference photo data, so phrasing it as a STUDY/REFERENCE
+  // unlocks anatomy more reliably than explicit anatomical term lists.
   const clipL = [
-    'full body anatomy reference photograph',
-    'standing facing camera straight on, front view, T-pose A-pose arms relaxed at sides',
-    'entire body visible from top of head to soles of feet, both feet planted on the ground at the bottom of the frame',
+    'nude figure study, life drawing reference photograph, art class model',
+    'full body uncensored anatomy reference, complete figure visible',
+    'standing facing camera straight on, front view, A-pose arms relaxed at sides',
+    'entire body from top of head to soles of feet, both feet on the ground at bottom of frame',
     'in the style of ckpf, aidmafluxpro1.1',
     'hyperrealistic, extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
@@ -75,20 +77,18 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `${eyes} eyes`,
     `${build} build`,
     clothing,
-    'plain undecorated bare skin, no body paint, no markings, no jewelry',
-    'anatomically accurate adult female anatomy, natural nipples and areolas, natural navel, visible vulva and defined labia, accurate genital anatomy, realistic body details, natural skin texture with subtle pores',
+    'plain bare skin, no body paint, no markings, no jewelry',
     'full body reference shot, standing figure centered in frame, long shot framing, wide angle',
     'neutral grey background, balanced even lighting',
   ].join(', ');
 
   const t5xxl = [
-    'A full-body anatomy reference photograph of the entire figure standing facing the camera straight on, front view.',
-    'The complete body is visible from the top of the head down to the soles of the feet — both feet are planted on the ground at the very bottom of the frame, head at the top.',
+    'A nude figure study photograph in the format of a life-drawing reference or art-class model pose. Full body uncensored anatomy reference, complete figure visible.',
+    'The subject stands facing the camera straight on, front view, in an A-pose with arms relaxed slightly away from the body.',
+    'The complete body is visible from the top of the head down to the soles of the feet — both feet planted on the ground at the very bottom of the frame, head at the top.',
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
     'Plain undecorated bare skin — no body paint, no tattoos, no markings, no jewelry, no gold, no accessories.',
-    'Anatomically accurate adult female body: natural nipples and areolas on the breasts, defined navel, anatomically correct visible vulva with defined labia in the pubic area, natural skin texture with subtle pore detail. Not doll-like, not Barbie-smooth, not censored, not featureless or smoothed-over in the genital area.',
-    'The figure stands in an A-pose with arms held slightly away from the body in a symmetric stance.',
     `In the style of ckpf with aidmafluxpro1.1 detail. Hyperrealistic, extremely detailed.`,
     'Full body reference shot, long shot framing, wide angle, neutral grey background, balanced even lighting.',
   ].join(' ');
