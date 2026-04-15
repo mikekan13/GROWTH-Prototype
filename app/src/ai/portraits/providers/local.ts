@@ -1563,8 +1563,8 @@ export class LocalProvider implements ImageGenerationProvider {
         scriptPath,
         bodyPath,
         '--out-dir', maskOutDir,
-        '--region', 'face_no_hair',
-        '--feather', '12',
+        '--region', 'head_with_hair',  // larger area = more pixels to refine
+        '--feather', '6',                // tighter blend so the refinement isn't washed out
       ], { stdio: 'pipe', windowsHide: true });
       let stderr = '';
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -1575,7 +1575,7 @@ export class LocalProvider implements ImageGenerationProvider {
       proc.on('error', reject);
     });
 
-    const maskPath = path.join(maskOutDir, 'mask_face_no_hair.png');
+    const maskPath = path.join(maskOutDir, 'mask_head_with_hair.png');
     const maskBuffer = await fs.readFile(maskPath);
 
     // Sanity check: if mask is mostly black (BiSeNet didn't find a face) skip.
@@ -1627,14 +1627,14 @@ export class LocalProvider implements ImageGenerationProvider {
     w[loadBodyId] = { class_type: 'LoadImage', inputs: { image: bodyName }, _meta: { title: 'FD Body' } };
     w[loadMaskId] = { class_type: 'LoadImage', inputs: { image: maskName }, _meta: { title: 'FD Mask' } };
     w[imgToMaskId] = { class_type: 'ImageToMask', inputs: { image: [loadMaskId, 0], channel: 'red' }, _meta: { title: 'FD Mask→Mask' } };
-    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 8, tapered_corners: true }, _meta: { title: 'FD Feather' } };
+    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 4, tapered_corners: true }, _meta: { title: 'FD Feather' } };
     w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadBodyId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'FD Encode' } };
     w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'FD Noise Mask' } };
 
     const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
     ksamplerInputs.latent_image = [setMaskId, 0];
-    ksamplerInputs.denoise = 0.55;  // moderate — preserve face composition, sharpen detail
-    ksamplerInputs.steps = 15;
+    ksamplerInputs.denoise = 0.7;   // higher — actually rebuild the head with PuLID precision
+    ksamplerInputs.steps = 18;       // a few more steps so the refine resolves cleanly
     ksamplerInputs.cfg = 1.0;
     ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
 
@@ -1654,7 +1654,7 @@ export class LocalProvider implements ImageGenerationProvider {
         inputs.text = fdNeg;
       }
       if (cls === 'ApplyPulidFlux') {
-        inputs.weight = 0.9;  // strong face lock — this is THE face refinement
+        inputs.weight = 0.95;  // near-max face lock — this is THE face refinement
       }
       if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
         if (params.referenceImagePath) inputs.image = params.referenceImagePath;
