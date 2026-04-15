@@ -985,12 +985,17 @@ export class LocalProvider implements ImageGenerationProvider {
       // Verify ComfyUI directory exists
       await fs.access(path.join(COMFYUI_PATH, 'main.py'));
 
-      console.log('[ComfyUI] Starting server...');
+      console.log('[ComfyUI] Starting server (PULID_KEEP_HAIR=1 for secondary PuLID hair transfer)...');
       comfyProcess = spawn('python', ['main.py', '--normalvram', '--listen', '127.0.0.1', '--port', '8188'], {
         cwd: COMFYUI_PATH,
         stdio: 'ignore',
         detached: false,
         windowsHide: true,
+        // PULID_KEEP_HAIR=1 flips pulidflux.py's bg_label from default
+        // (masks hair) to the alternate (preserves hair). Required for the
+        // secondary PuLID chain in body gen — without it, secondaries only
+        // transfer face, not hair.
+        env: { ...process.env, PULID_KEEP_HAIR: '1' },
       });
 
       comfyProcess.on('error', (err) => {
