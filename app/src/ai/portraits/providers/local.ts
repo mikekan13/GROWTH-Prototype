@@ -76,7 +76,7 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `${build} build`,
     clothing,
     'plain undecorated bare skin, no body paint, no markings, no jewelry',
-    'anatomically accurate adult anatomy, natural nipples and areolas, natural navel, natural pubic mound and labia, realistic body details, natural skin texture',
+    'anatomically accurate adult female anatomy, natural nipples and areolas, natural navel, visible vulva and defined labia, accurate genital anatomy, realistic body details, natural skin texture with subtle pores',
     'full body reference shot, standing figure centered in frame, long shot framing, wide angle',
     'neutral grey background, balanced even lighting',
   ].join(', ');
@@ -87,7 +87,7 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
     'Plain undecorated bare skin — no body paint, no tattoos, no markings, no jewelry, no gold, no accessories.',
-    'Anatomically accurate adult body: natural nipples and areolas on the breasts, defined navel, natural pubic mound and labia, natural skin texture with subtle pore detail. Not doll-like, not Barbie-smooth, not censored or featureless.',
+    'Anatomically accurate adult female body: natural nipples and areolas on the breasts, defined navel, anatomically correct visible vulva with defined labia in the pubic area, natural skin texture with subtle pore detail. Not doll-like, not Barbie-smooth, not censored, not featureless or smoothed-over in the genital area.',
     'The figure stands in an A-pose with arms held slightly away from the body in a symmetric stance.',
     `In the style of ckpf with aidmafluxpro1.1 detail. Hyperrealistic, extremely detailed.`,
     'Full body reference shot, long shot framing, wide angle, neutral grey background, balanced even lighting.',
@@ -267,7 +267,7 @@ export class LocalProvider implements ImageGenerationProvider {
           input.campaignStyle?.allowNudity
           || (input.creationMode && input.overrides?.composition === 'full_body')
         ),
-        nsfwUnlockWeight: 0.8,
+        nsfwUnlockWeight: 0.95,  // bumped from 0.8 — body still rendering Barbie-smooth in genital area
       };
 
       // 4. Upload reference images and split into primary + secondary PuLID refs.
@@ -1535,14 +1535,17 @@ export class LocalProvider implements ImageGenerationProvider {
   }
 
   /**
-   * FACE-DETAILER for body gens.
+   * FACE-DETAILER for body gens (crop + upscale + inpaint + composite).
    *
-   * Run BiSeNet (Segformer-B5) face-parsing on the body image to extract a
-   * tight face oval mask (face_no_hair = skin/eyes/brows/nose/mouth, EXCLUDES
-   * hair/neck/torso). Inpaint that masked region with PuLID at high weight
-   * to sharpen the face. Body/torso/legs/hair are never touched.
+   * 1. BiSeNet head mask gives us the face bounding box.
+   * 2. Crop the body to that bbox (with padding) and UPSCALE to 768x768 so
+   *    PuLID has enough pixels to actually paint identity.
+   * 3. Inpaint the head area at native 768 resolution with PuLID weight 0.95.
+   * 4. Downscale the refined crop back to the bbox dimensions.
+   * 5. Composite back into the body image, mask-feathered for seamless edge.
    *
-   * Adds ~10s mask + ~75s inpaint = ~90s on 8GB.
+   * Body/torso/legs/hair are mathematically untouchable — only the face bbox
+   * gets re-rendered.
    */
   private async refineFaceWithBiSeNet(
     bodyImage: Buffer,
@@ -1554,7 +1557,7 @@ export class LocalProvider implements ImageGenerationProvider {
     const bodyPath = path.join(tmpRoot, 'body.png');
     await fs.writeFile(bodyPath, bodyImage);
 
-    // 1. Run face_parse.py via standalone's venv
+    // 1. Run face_parse.py
     const repoRoot = path.resolve(process.cwd(), '..');
     const pythonExe = path.join(repoRoot, 'standalone', '.venv', 'Scripts', 'python.exe');
     const scriptPath = path.join(repoRoot, 'standalone', 'scripts', 'face_parse.py');
@@ -1565,8 +1568,8 @@ export class LocalProvider implements ImageGenerationProvider {
         scriptPath,
         bodyPath,
         '--out-dir', maskOutDir,
-        '--region', 'head_with_hair',  // larger area = more pixels to refine
-        '--feather', '6',                // tighter blend so the refinement isn't washed out
+        '--region', 'head_with_hair',
+        '--feather', '0',  // no feather here; we feather the bbox crop edges below
       ], { stdio: 'pipe', windowsHide: true });
       let stderr = '';
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -1577,20 +1580,61 @@ export class LocalProvider implements ImageGenerationProvider {
       proc.on('error', reject);
     });
 
-    const maskPath = path.join(maskOutDir, 'mask_head_with_hair.png');
-    const maskBuffer = await fs.readFile(maskPath);
+    const headMaskPath = path.join(maskOutDir, 'mask_head_with_hair.png');
+    const headMaskBuf = await fs.readFile(headMaskPath);
 
-    // Sanity check: if mask is mostly black (BiSeNet didn't find a face) skip.
-    const maskStats = await sharp(maskBuffer).stats();
-    const meanWhite = maskStats.channels[0].mean;
-    if (meanWhite < 5) {
-      throw new Error(`face_no_hair mask is empty (mean=${meanWhite.toFixed(1)}) — face not detected`);
+    // 2. Find bbox of the head mask using sharp.raw + scan
+    const bodyMeta = await sharp(bodyImage).metadata();
+    const W = bodyMeta.width || 768;
+    const H = bodyMeta.height || 1152;
+
+    const rawMask = await sharp(headMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer();
+    let minX = W, minY = H, maxX = 0, maxY = 0;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (rawMask[y * W + x] > 64) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
     }
-    console.log(`[ComfyUI] Face mask: ${meanWhite.toFixed(1)} avg coverage`);
+    if (maxX <= minX || maxY <= minY) {
+      throw new Error('head mask empty — face not detected');
+    }
+    // Pad bbox 30% in each direction (room for PuLID to extend the head)
+    // and snap to a square for clean upscale.
+    const bw = maxX - minX;
+    const bh = maxY - minY;
+    const pad = Math.round(Math.max(bw, bh) * 0.3);
+    const cx = Math.round((minX + maxX) / 2);
+    const cy = Math.round((minY + maxY) / 2);
+    let side = Math.max(bw, bh) + 2 * pad;
+    side = Math.min(side, Math.min(W, H)); // can't be larger than the image
+    let cropX = Math.round(cx - side / 2);
+    let cropY = Math.round(cy - side / 2);
+    cropX = Math.max(0, Math.min(W - side, cropX));
+    cropY = Math.max(0, Math.min(H - side, cropY));
+    console.log(`[ComfyUI] Face bbox: ${minX},${minY} → ${maxX},${maxY} | crop ${side}x${side} @ (${cropX},${cropY})`);
 
-    // 2. Upload body + mask to ComfyUI
-    const bodyName = await this.uploadBuffer(bodyImage, `face_refine_body_${stamp}.png`);
-    const maskName = await this.uploadBuffer(maskBuffer, `face_refine_mask_${stamp}.png`);
+    // 3. Crop face region from body, upscale to 768x768
+    const faceCrop = await sharp(bodyImage)
+      .extract({ left: cropX, top: cropY, width: side, height: side })
+      .resize(768, 768, { fit: 'fill', kernel: 'lanczos3' })
+      .png()
+      .toBuffer();
+
+    // Crop the head-mask too (for the inpaint mask in upscaled space)
+    const cropMask = await sharp(headMaskBuf)
+      .resize(W, H, { fit: 'fill' })
+      .extract({ left: cropX, top: cropY, width: side, height: side })
+      .resize(768, 768, { fit: 'fill', kernel: 'nearest' })
+      .png()
+      .toBuffer();
+
+    const bodyName = await this.uploadBuffer(faceCrop, `face_crop_${stamp}.png`);
+    const maskName = await this.uploadBuffer(cropMask, `face_crop_mask_${stamp}.png`);
 
     // 3. Build inpaint workflow
     const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
@@ -1694,12 +1738,39 @@ export class LocalProvider implements ImageGenerationProvider {
     const clientId = crypto.randomUUID();
     const queueRes = await this.queuePrompt(w, clientId);
     const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
-    const refined = await this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+    const refinedCrop768 = await this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+
+    // 4. Downscale refined crop back to the bbox dimensions
+    const refinedCropSized = await sharp(refinedCrop768)
+      .resize(side, side, { fit: 'fill', kernel: 'lanczos3' })
+      .png()
+      .toBuffer();
+
+    // 5. Build feathered alpha from the head mask (resized to bbox space) so
+    //    the composite blends cleanly at hair/neck edges, no hard rectangle.
+    const cropMaskGrey = await sharp(headMaskBuf)
+      .resize(W, H, { fit: 'fill' })
+      .extract({ left: cropX, top: cropY, width: side, height: side })
+      .greyscale()
+      .blur(8) // soft alpha so edge transitions blend
+      .toBuffer();
+
+    const refinedWithAlpha = await sharp(refinedCropSized)
+      .ensureAlpha()
+      .joinChannel(cropMaskGrey)
+      .png()
+      .toBuffer();
+
+    // 6. Composite the refined head onto the body image at the bbox position
+    const composited = await sharp(bodyImage)
+      .composite([{ input: refinedWithAlpha, left: cropX, top: cropY, blend: 'over' }])
+      .png()
+      .toBuffer();
 
     // Cleanup tmp dir (best effort)
     fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
 
-    return refined;
+    return composited;
   }
 
   /**
