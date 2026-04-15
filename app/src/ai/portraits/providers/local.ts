@@ -206,12 +206,10 @@ export class LocalProvider implements ImageGenerationProvider {
         cfg: DEFAULT_CFG,
         // Full-body generation needs vertical room — square 768×768 biases FLUX toward
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
-        // Body canvas 1024x1536 (2:3). Proven Tara recipe stays; canvas grows
-        // so the face — only ~20% of the frame height in a full body shot —
-        // gets enough pixels for PuLID detail. At 768x1152 the head was 200px
-        // square; at 1024x1536 it's ~270px square, 78% more detail area.
-        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1024 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1536 : DEFAULT_HEIGHT),
+        // Body canvas: Tara test 768x1152. Face detail comes from a second-pass
+        // face-refine composite (refineBodyFace), not from bigger canvas.
+        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
@@ -358,6 +356,25 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.subfolder,
         outputInfo.type,
       );
+
+      // 8b. Two-stage face refinement for creationMode body gen.
+      // Body canvas is 768x1152 so the face is only ~200px square — too few
+      // pixels for crisp PuLID detail. Crop the face region, regen it at
+      // 768x768 (native face-lock res) with low denoise to preserve composition,
+      // then composite back. This is the "head and body separate then compose"
+      // approach the Tara session used.
+      const doFaceRefine = input.creationMode === true
+        && input.overrides?.composition === 'full_body'
+        && !!params.referenceImagePath;
+      if (doFaceRefine) {
+        try {
+          console.log('[ComfyUI] Running face-refine composite pass...');
+          imageData = await this.refineBodyFace(imageData, params);
+          console.log('[ComfyUI] Face-refine composite done.');
+        } catch (err) {
+          console.warn('[ComfyUI] Face-refine failed — keeping original body gen:', err instanceof Error ? err.message : err);
+        }
+      }
 
       // 9. Save to filesystem under a step subfolder:
       //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
@@ -1351,6 +1368,159 @@ export class LocalProvider implements ImageGenerationProvider {
 
     // 5. Download inpainted result
     return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+  }
+
+  /**
+   * Two-stage face refine for full-body gens. Crops the head region, regens
+   * it at native face-lock resolution (768x768) with low denoise so PuLID
+   * can paint crisp facial detail, then composites back onto the body.
+   *
+   * This is the "head rendered separately at higher resolution then pasted
+   * onto the body" technique from the Tara sessions.
+   */
+  private async refineBodyFace(
+    bodyImage: Buffer,
+    params: ComfyUIWorkflowParams,
+  ): Promise<Buffer> {
+    const meta = await sharp(bodyImage).metadata();
+    const W = meta.width || 768;
+    const H = meta.height || 1152;
+
+    // Face crop: center-horizontal square covering head + some neck/shoulder.
+    // Head in a full body gen sits roughly in the top 0-30% of the frame.
+    // Square crop of size ~W (face typically ~W/3 wide, so W-sized crop leaves
+    // headroom above and includes shoulders below — good blend context).
+    const cropSize = W;                     // 768
+    const cropX = 0;                         // full width
+    const cropY = 0;                         // from top
+    const cropBuf = await sharp(bodyImage)
+      .extract({ left: cropX, top: cropY, width: cropSize, height: cropSize })
+      .png()
+      .toBuffer();
+
+    // Upload crop as img2img base
+    const baseName = await this.uploadBuffer(cropBuf, `body_face_crop_${Date.now()}.png`);
+
+    // Load the PuLID workflow and configure for face refine
+    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
+    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
+
+    // GGUF → fp8 swap (same as main pipeline)
+    for (const node of Object.values(w) as Record<string, unknown>[]) {
+      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
+        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
+      }
+    }
+
+    // Face-focused prompt: style-consistent, detail-focused, no body-composition talk
+    const faceClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic fantasy portrait, extremely detailed, sharp focus, luminous detailed eyes, fine pore texture skin, close-up face portrait, face centered in frame, neutral grey background';
+    const faceT5xxl = 'A hyperrealistic close-up face portrait with extremely detailed skin showing fine pore texture, luminous detailed eyes, crisp sharp focus. Face centered in the frame with a neutral grey background.';
+    const faceNeg = 'blurry, low quality, deformed, disfigured, bad anatomy';
+
+    // Face-refine params: low denoise (preserve composition), higher PuLID
+    const refineSeed = Math.floor(Math.random() * 2147483647);
+
+    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      const cls = node.class_type as string;
+      const inputs = node.inputs as Record<string, unknown>;
+      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
+      if (!inputs) continue;
+
+      if (cls === 'EmptyLatentImage') { inputs.width = 768; inputs.height = 768; }
+      if (cls === 'KSampler') {
+        inputs.seed = refineSeed;
+        inputs.steps = 15;
+        inputs.cfg = 1.0;
+        inputs.denoise = 0.45;
+      }
+      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
+        inputs.clip_l = faceClipL;
+        inputs.t5xxl = faceT5xxl;
+      }
+      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
+        inputs.text = faceNeg;
+      }
+      if (cls === 'ApplyPulidFlux') {
+        inputs.weight = 0.85;  // stronger for face-only refine
+      }
+      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
+        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
+      }
+      // LoRA weights match face-lock (detail for sharpness; skip hand-detail)
+      if (cls === 'LoraLoader') {
+        if (title.includes('style')) { inputs.strength_model = 0.5; inputs.strength_clip = 0.5; }
+        else if (title.includes('campaign')) { inputs.strength_model = 0.3; inputs.strength_clip = 0.3; }
+        else if (title.includes('hand detail')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
+        else if (title.includes('nsfw')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
+        else if (title.includes('detail')) { inputs.strength_model = 0.7; inputs.strength_clip = 0.7; }
+      }
+    }
+
+    // Inject img2img: convert EmptyLatentImage to VAEEncode(base) → SetLatentNoiseMask-less img2img.
+    // Find the EmptyLatentImage node, replace with VAEEncode of the uploaded base.
+    let emptyLatentId: string | null = null;
+    let vaeNodeId: string | null = null;
+    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
+      if ((node.class_type as string) === 'EmptyLatentImage') emptyLatentId = id;
+      if ((node.class_type as string) === 'VAELoader' || (node.class_type as string) === 'VAELoaderFlux') vaeNodeId = id;
+    }
+    if (emptyLatentId && vaeNodeId) {
+      const loadId = `face_base_load_${Date.now()}`;
+      w[loadId] = { class_type: 'LoadImage', inputs: { image: baseName }, _meta: { title: 'Face Base' } };
+      const encId = `face_base_enc_${Date.now()}`;
+      w[encId] = {
+        class_type: 'VAEEncode',
+        inputs: { pixels: [loadId, 0], vae: [vaeNodeId, 0] },
+        _meta: { title: 'Face Base Encode' },
+      };
+      // Rewire any consumer of [emptyLatentId, 0] → [encId, 0]
+      for (const [otherId, otherNode] of Object.entries(w) as [string, Record<string, unknown>][]) {
+        if (otherId === loadId || otherId === encId) continue;
+        const inputs = otherNode.inputs as Record<string, unknown>;
+        if (!inputs) continue;
+        for (const [k, v] of Object.entries(inputs)) {
+          if (Array.isArray(v) && v[0] === emptyLatentId) inputs[k] = [encId, 0];
+        }
+      }
+      delete w[emptyLatentId];
+    }
+
+    // Queue + wait
+    const clientId = crypto.randomUUID();
+    const queueRes = await this.queuePrompt(w, clientId);
+    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
+    const refinedBuf = await this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+
+    // Resize refined back to the crop size and composite onto body.
+    // Feather the bottom edge so the face-to-body transition doesn't show a seam.
+    const refinedSized = await sharp(refinedBuf)
+      .resize(cropSize, cropSize, { fit: 'fill' })
+      .png()
+      .toBuffer();
+
+    // Build a vertical alpha gradient: opaque at top, feathered at bottom 15%.
+    const featherPx = Math.round(cropSize * 0.15);
+    const alphaSvg = `<svg width="${cropSize}" height="${cropSize}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="${((cropSize - featherPx) / cropSize).toFixed(3)}" stop-color="white" stop-opacity="1"/>
+          <stop offset="1" stop-color="white" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <rect width="${cropSize}" height="${cropSize}" fill="url(#g)"/>
+    </svg>`;
+    const alphaBuf = await sharp(Buffer.from(alphaSvg)).extractChannel(0).toBuffer();
+
+    const refinedWithAlpha = await sharp(refinedSized)
+      .ensureAlpha()
+      .joinChannel(alphaBuf)
+      .png()
+      .toBuffer();
+
+    return sharp(bodyImage)
+      .composite([{ input: refinedWithAlpha, left: cropX, top: cropY, blend: 'over' }])
+      .png()
+      .toBuffer();
   }
 
   /**
