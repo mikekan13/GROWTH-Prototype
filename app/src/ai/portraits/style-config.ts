@@ -66,13 +66,11 @@ const STYLE_PREFIX = STYLE_TAGS;
 // known failures: long hair tokens get interpreted as robes/cloaks/capes. So
 // CREATION_MODE_NEGATIVE explicitly lists garment shapes to avoid.
 const FULL_NEGATIVE_PROMPT = '';
-// Short negative exactly matching the Tara test script that produced
-// the hair-WORKING-knee-length output. Extra terms diluted the core signal.
-const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
+// Block fantasy garments + body decoration + non-front poses. Painterly LoRA
+// keeps wanting to dress the figure in gold/jewelry/decorative elements.
+const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, gold, gold trim, gold paint, body paint, tattoo, markings, jewelry, necklace, choker, bracelet, ring, earring, crown, tiara, headdress, ornate, decorated, embellished, side view, profile view, three quarter view, turned to side, contrapposto, leg crossed, leaning, tilted hip, cropped feet, cut off feet, no feet';
 
-// Nude-mode extras: only bodysuit/leotard/swimsuit (covers FLUX's default
-// "nude-with-clothing" failure modes without overloading the negative).
-const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, bikini`;
+const CREATION_MODE_NEGATIVE_NUDE = `${CREATION_MODE_NEGATIVE_BASE}, bodysuit, leotard, swimsuit, bikini, lingerie`;
 
 // Kept for backward-compat; defaults to the underwear-allowed (SFW) variant.
 const CREATION_MODE_NEGATIVE = CREATION_MODE_NEGATIVE_BASE;

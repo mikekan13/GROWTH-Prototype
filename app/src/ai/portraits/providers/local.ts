@@ -60,30 +60,35 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
-  // Single-pass full body 768x1152 — Tara test recipe.
+  // Single-pass full body 768x1152.
+  // Composition tokens FIRST (FLUX honors front-loaded structural prompts more
+  // strongly). Pose anchors with anti-decoration negatives carry the framing.
   const clipL = [
+    'full body anatomy reference photograph',
+    'standing facing camera straight on, front view, T-pose A-pose arms relaxed at sides',
+    'entire body visible from top of head to soles of feet, both feet planted on the ground at the bottom of the frame',
     'in the style of ckpf, aidmafluxpro1.1',
-    'hyperrealistic fantasy portrait',
-    'extremely detailed, subtle painterly quality',
+    'hyperrealistic, extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
     hairPhrase,
     `${skin} skin`,
     `${eyes} eyes`,
     `${build} build`,
     clothing,
-    'A-pose standing arms slightly away from body',
-    'full body from head to feet, entire body visible feet on ground',
-    'full body reference shot standing figure centered in frame head at top feet at bottom',
-    'long shot framing, wide angle, neutral grey background',
+    'plain undecorated bare skin, no body paint, no markings, no jewelry',
+    'full body reference shot, standing figure centered in frame, long shot framing, wide angle',
+    'neutral grey background, balanced even lighting',
   ].join(', ');
 
   const t5xxl = [
-    `A hyperrealistic portrait in the style of ckpf with aidmafluxpro1.1 detail.`,
+    'A full-body anatomy reference photograph of the entire figure standing facing the camera straight on, front view.',
+    'The complete body is visible from the top of the head down to the soles of the feet — both feet are planted on the ground at the very bottom of the frame, head at the top.',
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
-    'She stands in an A-pose with arms held slightly away from the body.',
-    'The entire body is visible from head to feet including the full figure and both feet on the ground.',
-    'Full body reference shot, standing figure centered in frame, head at top of frame and feet at bottom, long shot framing, wide angle, neutral grey background with balanced even lighting.',
+    'Plain undecorated bare skin — no body paint, no tattoos, no markings, no jewelry, no gold, no accessories.',
+    'The figure stands in an A-pose with arms held slightly away from the body in a symmetric stance.',
+    `In the style of ckpf with aidmafluxpro1.1 detail. Hyperrealistic, extremely detailed.`,
+    'Full body reference shot, long shot framing, wide angle, neutral grey background, balanced even lighting.',
   ].join(' ');
 
   const negativePrompt = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
@@ -270,11 +275,13 @@ export class LocalProvider implements ImageGenerationProvider {
       // hair identity needs multiple angles, and the body workflow skips ControlNet
       // so the VRAM saved goes into PuLID chain length.
       const isFullBodyGen = input.overrides?.composition === 'full_body';
-      const MAX_PULID_REFS = isFullBodyGen ? 5 : 3;
+      // For creationMode body: ONLY use the locked bald face as PuLID primary.
+      // Player photos as secondary refs were biasing pose/styling toward
+      // whatever the source photos showed (3/4 turn, decorations, etc.).
+      const isCreationBody = isFullBodyGen && input.creationMode === true;
+      const MAX_PULID_REFS = isCreationBody ? 1 : (isFullBodyGen ? 5 : 3);
       const primaryIn = input.personaLock?.referenceImagePath;
-      const batchIn = input.personaLock?.referenceImagePaths || [];
-      // Merge primary + secondaries so the locked face stays at index 0.
-      // Dedupe in case primaryIn is also in batchIn.
+      const batchIn = isCreationBody ? [] : (input.personaLock?.referenceImagePaths || []);
       const merged = [primaryIn, ...batchIn].filter((p): p is string => !!p);
       const allInRaw = Array.from(new Set(merged));
       const allIn = allInRaw.slice(0, MAX_PULID_REFS);
