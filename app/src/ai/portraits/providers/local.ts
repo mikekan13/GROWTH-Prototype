@@ -835,13 +835,9 @@ export class LocalProvider implements ImageGenerationProvider {
         } else if (title.toLowerCase().includes('nsfw unlock')) {
           // NSFW LoRA: strength 0 (disabled) unless campaign allows nudity
           if (params.nsfwUnlock) {
-            // KNOWN ISSUE: the "flux-nsfw-unlock.safetensors" file is mislabeled —
-            // its actual safetensors metadata says it's "Helluva_Hotel_Style"
-            // (trigger: "hhstyle"), a cartoon style LoRA, NOT an NSFW unlocker.
-            // Force-disable until a real NSFW unlock LoRA is installed.
-            inputs.strength_model = 0;
-            inputs.strength_clip = 0;
-            console.warn('[ComfyUI] NSFW Unlock LoRA file is mislabeled (actually Helluva_Hotel_Style) — DISABLED. Install real LoRA from https://civitai.com/models/674027/flux-nsfw-unlock');
+            inputs.strength_model = params.nsfwUnlockWeight ?? 0.95;
+            inputs.strength_clip = params.nsfwUnlockWeight ?? 0.95;
+            console.log('[ComfyUI] NSFW Unlock LoRA enabled (aidmaNSFWunlockV2), strength:', params.nsfwUnlockWeight ?? 0.95);
           } else {
             inputs.strength_model = 0.0;
             inputs.strength_clip = 0.0;

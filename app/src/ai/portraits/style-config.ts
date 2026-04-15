@@ -20,8 +20,10 @@ export const TRIGGER_DETAIL = 'aidmafluxpro1.1';
 /** SXZ Dark Fantasy campaign LoRA — active when campaign uses dark fantasy theme */
 export const TRIGGER_DARK_FANTASY = 'drkfnts style';
 
-/** NSFW Unlock LoRA — active when mature content enabled */
-export const TRIGGER_NSFW = 'aidmaNSFWunlock';
+/** NSFW Unlock LoRA — active when mature content enabled.
+ *  Trigger is lowercase per the LoRA's training tag frequency
+ *  (verified by reading aidmaNSFWunlock-FLUX-V0.2.safetensors metadata). */
+export const TRIGGER_NSFW = 'aidmansfwunlock';
 
 // ============================================================
 // Global Style Bible — Split for Dual CLIP Encoding
