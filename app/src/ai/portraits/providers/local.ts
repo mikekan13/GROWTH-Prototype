@@ -1452,9 +1452,12 @@ export class LocalProvider implements ImageGenerationProvider {
     // Pass 2 prompt: emphasize head (top) + feet (bottom) context. Torso is preserved
     // from pass 1 so we don't need to re-describe it — we just need FLUX to paint
     // head + feet coherently onto the standing torso.
-    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic portrait, extremely detailed, full body from head to feet, head and face at top of frame, feet and ground at bottom of frame, A-pose standing figure, neutral grey background, subtle painterly quality';
-    const p2T5xxl = 'A hyperrealistic full body photograph in the style of ckpf with aidmafluxpro1.1 detail. Full body standing in A-pose from head to feet, head and face visible at the top of the frame, feet standing on the ground at the bottom of the frame. Neutral grey background with balanced even lighting.';
-    const p2Neg = 'robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet, floating, cropped, cut off';
+    // Pass 2 prompt: emphasize SMALL PROPORTIONAL HEAD — FLUX defaults to oversized
+    // heads when inpainting a head region; explicit "tiny head" / "small proportional"
+    // tokens plus negative anti-bobblehead language fix it.
+    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic full body photograph, extremely detailed, full body from head to feet, small proportional head, tiny head, realistic human proportions, adult anatomy 7 heads tall, head and face at top of frame, feet and ground at bottom of frame, A-pose standing figure, neutral grey background, subtle painterly quality';
+    const p2T5xxl = 'A hyperrealistic full body photograph in the style of ckpf with aidmafluxpro1.1 detail. A full body standing figure with a small proportional head — realistic adult human proportions where the head is roughly one seventh of total body height, not oversized. Head and face are visible at the top of the frame; feet are standing on the ground at the bottom of the frame. Neutral grey background with balanced even lighting.';
+    const p2Neg = 'big head, large head, oversized head, giant head, bobblehead, chibi, chibi proportions, disproportionate head, zoomed head, portrait framing, bust shot, close-up, robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet, floating, cropped, cut off';
 
     // Find key nodes
     let emptyLatentId: string | null = null;
