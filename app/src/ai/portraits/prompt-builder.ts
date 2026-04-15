@@ -62,7 +62,7 @@ export function buildPortraitPrompt(
   const identityBlock = buildIdentityBlock(char, creationMode);
 
   // T1: BODY DESCRIPTION BLOCK
-  const bodyBlock = buildBodyDescriptionBlock(char);
+  const bodyBlock = buildBodyDescriptionBlock(char, creationMode);
 
   // ── IDENTITY LOCK FACE MODE ──
   // When anglePreset is set, we're generating face-only images for identity lock.
@@ -106,7 +106,7 @@ export function buildPortraitPrompt(
   // BODY DESCRIPTION
   if (bodyBlock) {
     tags.push(bodyBlock);
-    sentences.push(buildBodySentence(char));
+    sentences.push(buildBodySentence(char, creationMode));
   }
 
   if (creationMode) {
@@ -236,7 +236,7 @@ function buildIdentityBlock(char: PortraitCharacterData, creationMode = false): 
 // T1: Body Description (for full-body consistency)
 // ============================================================
 
-function buildBodyDescriptionBlock(char: PortraitCharacterData): string {
+function buildBodyDescriptionBlock(char: PortraitCharacterData, creationMode = false): string {
   const { identity } = char;
   const parts: string[] = [];
 
@@ -264,11 +264,11 @@ function buildBodyDescriptionBlock(char: PortraitCharacterData): string {
   if (identity.eyeColor) parts.push(`${identity.eyeColor} eyes`);
   if (identity.bodyType) parts.push(`${identity.bodyType} build`);
 
-  // Distinguishing features (tattoos, birthmarks, piercings, scars) — dedupe
-  // because character.identity.distinguishingFeatures has been observed to contain
-  // the same string repeated 9x (autosave bug). Duplicates bloat the prompt and
-  // exhaust the token window.
-  if (identity.distinguishingFeatures?.length) {
+  // Distinguishing features: skipped in creationMode because they contain
+  // free-text body-part descriptions ("Slim build with light muscle tone,
+  // proportional shoulders, fair skin with no visible markings.") that
+  // duplicate bodyType and fight A-pose composition. Dedupe otherwise.
+  if (identity.distinguishingFeatures?.length && !creationMode) {
     parts.push(...Array.from(new Set(identity.distinguishingFeatures)));
   }
 
@@ -531,7 +531,7 @@ function buildIdentitySentence(char: PortraitCharacterData, creationMode = false
 }
 
 /** Build a natural language sentence describing the character's body */
-function buildBodySentence(char: PortraitCharacterData): string {
+function buildBodySentence(char: PortraitCharacterData, creationMode = false): string {
   const { identity } = char;
   const parts: string[] = [];
 
@@ -547,7 +547,7 @@ function buildBodySentence(char: PortraitCharacterData): string {
   if (identity.eyeColor) parts.push(`${identity.eyeColor} eyes`);
   if (identity.bodyType) parts.push(`a ${identity.bodyType} build`);
 
-  if (identity.distinguishingFeatures?.length) {
+  if (identity.distinguishingFeatures?.length && !creationMode) {
     parts.push(Array.from(new Set(identity.distinguishingFeatures)).join(', '));
   }
 
