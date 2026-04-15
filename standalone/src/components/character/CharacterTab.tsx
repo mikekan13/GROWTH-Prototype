@@ -125,6 +125,10 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
 
   // Fetch seeds available in this campaign
   useEffect(() => {
+    if (!campaignId) {
+      setCampaignSeeds([]);
+      return;
+    }
     fetch(`/api/campaigns/${campaignId}/forge?type=seed&status=published`)
       .then(r => r.json())
       .then(res => {
@@ -448,18 +452,20 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                   setDirty(true);
                 }}
                 className="w-full text-sm p-2"
-                style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px' }}
+                style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px', colorScheme: 'dark' }}
               >
-                <option value="">— Select a Seed —</option>
+                <option value="" style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>— Select a Seed —</option>
                 {campaignSeeds.map(s => (
-                  <option key={s.id} value={s.name}>
+                  <option key={s.id} value={s.name} style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>
                     {s.name}{s.data.baseFateDie ? ` — ${s.data.baseFateDie}` : ''}{s.data.seedKV ? ` · KV ${s.data.seedKV}` : ''}
                   </option>
                 ))}
               </select>
               {campaignSeeds.length === 0 && (
                 <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                  No seeds published in this campaign yet. Ask your Watcher to add seeds via the Forge.
+                  {campaignId
+                    ? 'No seeds published in this campaign yet. Ask your Watcher to add seeds via the Forge.'
+                    : 'This entity is not scoped to a campaign — seeds are campaign-scoped, so none are available here.'}
                 </div>
               )}
               {selectedSeed && (
