@@ -267,7 +267,7 @@ export class LocalProvider implements ImageGenerationProvider {
           input.campaignStyle?.allowNudity
           || (input.creationMode && input.overrides?.composition === 'full_body')
         ),
-        nsfwUnlockWeight: 0.95,  // bumped from 0.8 — body still rendering Barbie-smooth in genital area
+        nsfwUnlockWeight: 0.8,
       };
 
       // 4. Upload reference images and split into primary + secondary PuLID refs.
@@ -835,9 +835,9 @@ export class LocalProvider implements ImageGenerationProvider {
         } else if (title.toLowerCase().includes('nsfw unlock')) {
           // NSFW LoRA: strength 0 (disabled) unless campaign allows nudity
           if (params.nsfwUnlock) {
-            inputs.strength_model = params.nsfwUnlockWeight ?? 0.95;
-            inputs.strength_clip = params.nsfwUnlockWeight ?? 0.95;
-            console.log('[ComfyUI] NSFW Unlock LoRA enabled (aidmaNSFWunlockV2), strength:', params.nsfwUnlockWeight ?? 0.95);
+            inputs.strength_model = params.nsfwUnlockWeight ?? 0.8;
+            inputs.strength_clip = params.nsfwUnlockWeight ?? 0.8;
+            console.log('[ComfyUI] NSFW Unlock LoRA enabled, strength:', params.nsfwUnlockWeight ?? 0.8);
           } else {
             inputs.strength_model = 0.0;
             inputs.strength_clip = 0.0;
