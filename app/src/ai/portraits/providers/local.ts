@@ -60,10 +60,14 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
+  // PASS 1 prompt — describes a TORSO crop (shoulders to thighs), NOT a full body.
+  // Canvas is 768x768 square; asking for "full body head to feet" here makes FLUX
+  // draw a squished mini-person. Instead frame as "torso shot" so shoulders and
+  // thighs fall at top/bottom of the square naturally (see autotest3 image #6).
+  // Pass 2 extends the canvas to 1152 and inpaints the head + feet strips.
   const clipL = [
-    // Autotest3-era style: only painterly + detail LoRA triggers. No dark-fantasy.
     'in the style of ckpf, aidmafluxpro1.1',
-    'hyperrealistic fantasy portrait',
+    'hyperrealistic torso photograph',
     'extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
     hairPhrase,
@@ -71,20 +75,21 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `${eyes} eyes`,
     `${build} build`,
     clothing,
-    'A-pose standing arms slightly away from body',
-    'full body from head to feet, entire body visible feet on ground',
-    'full body reference shot standing figure centered in frame head at top feet at bottom',
-    'long shot framing, wide angle, neutral grey background',
+    'standing upright arms relaxed at sides',
+    'torso shot, mid-body framing from shoulders to thighs',
+    'shoulders at top of frame, thighs at bottom of frame',
+    'head and face not visible, face cropped above frame',
+    'feet and knees not visible, legs cropped below frame',
+    'neutral grey background, balanced even lighting',
   ].join(', ');
 
   const t5xxl = [
-    `A hyperrealistic portrait in the style of ckpf with aidmafluxpro1.1 detail.`,
-    `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}.`,
-    `${skin} skin. ${eyes} eyes. ${build} build.`,
+    `A hyperrealistic torso photograph in the style of ckpf with aidmafluxpro1.1 detail.`,
+    `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
-    'She stands in an A-pose with arms held slightly away from the body.',
-    'The entire body is visible from head to feet including the full figure and both feet on the ground.',
-    'Full body reference shot, standing figure centered in frame, head at top of frame and feet at bottom, long shot framing, wide angle, neutral grey background with balanced even lighting.',
+    'Torso framing shot — the body is cropped from the shoulders at the top of the frame down to the mid-thighs at the bottom.',
+    'The head and face are above the frame (not visible). The knees and feet are below the frame (not visible).',
+    'Standing upright with arms relaxed at the sides. Neutral grey background with soft even lighting.',
   ].join(' ');
 
   const negativePrompt = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
@@ -350,18 +355,24 @@ export class LocalProvider implements ImageGenerationProvider {
       // 5. Select workflow: ControlNet+PuLID → PuLID → Basic (with fallbacks)
       //    Body gen skips InstantX — ControlNet fights the secondary-PuLID hair chain,
       //    and A-pose doesn't need pose steering.
+      //
+      //    creationMode + full_body (pass 1 torso): skip PuLID entirely. Face isn't
+      //    in frame at this stage; PuLID injects a face signal that FLUX then tries
+      //    to render somewhere in the torso shot (squished mini-person + egg head).
+      //    Pass 2 is where PuLID belongs — at the head inpaint.
       let outputInfo: { filename: string; subfolder: string; type: string };
       const usePulid = !!params.referenceImagePath;
+      const isCreationBodyPass1 = isFullBodyGen && input.creationMode === true;
       const workflowPriority: string[] = [];
 
       if (!isFullBodyGen && useControlnet && usePulid && params.controlnetImagePath) {
         workflowPriority.push('character-face-controlnet-instantx');  // InstantX ControlNet + PuLID + LoRAs (standard pipeline)
         workflowPriority.push('character-face-controlnet');            // XLabs fallback
       }
-      if (usePulid) {
+      if (usePulid && !isCreationBodyPass1) {
         workflowPriority.push('character-portrait-pulid');   // PuLID only (primary path for body)
       }
-      workflowPriority.push('character-portrait');           // Basic (always fallback)
+      workflowPriority.push('character-portrait');           // Basic (always fallback; primary path for pass 1 torso)
 
       const workflowResult = await this.tryWorkflows(workflowPriority, params);
       outputInfo = workflowResult.output;
@@ -1449,12 +1460,13 @@ export class LocalProvider implements ImageGenerationProvider {
     // Pass 2 prompt: emphasize head (top) + feet (bottom) context. Torso is preserved
     // from pass 1 so we don't need to re-describe it — we just need FLUX to paint
     // head + feet coherently onto the standing torso.
-    // Pass 2 prompt: emphasize SMALL PROPORTIONAL HEAD — FLUX defaults to oversized
-    // heads when inpainting a head region; explicit "tiny head" / "small proportional"
-    // tokens plus negative anti-bobblehead language fix it.
-    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic full body photograph, extremely detailed, full body from head to feet, small proportional head, tiny head, realistic human proportions, adult anatomy 7 heads tall, head and face at top of frame, feet and ground at bottom of frame, A-pose standing figure, neutral grey background, subtle painterly quality';
-    const p2T5xxl = 'A hyperrealistic full body photograph in the style of ckpf with aidmafluxpro1.1 detail. A full body standing figure with a small proportional head — realistic adult human proportions where the head is roughly one seventh of total body height, not oversized. Head and face are visible at the top of the frame; feet are standing on the ground at the bottom of the frame. Neutral grey background with balanced even lighting.';
-    const p2Neg = 'big head, large head, oversized head, giant head, bobblehead, chibi, chibi proportions, disproportionate head, zoomed head, portrait framing, bust shot, close-up, robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet, floating, cropped, cut off';
+    // Pass 2 prompt — the existing torso is LOCKED by mask; we only regen the top
+    // 192px (head + neck connecting to existing shoulders) and bottom 192px
+    // (knees + calves + feet connecting to existing mid-thighs). FLUX must see
+    // this as EXTENDING the torso, not drawing a new figure in the strips.
+    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic photograph, extremely detailed, a standing nude figure continues upward with a head attached to the existing shoulders, face visible, head attached to neck to shoulders, and continues downward with legs attached to the existing thighs, knees, calves, feet standing on the ground, proportional anatomy, realistic human proportions, A-pose standing, neutral grey background, subtle painterly quality';
+    const p2T5xxl = 'Outpainting extension of a torso photograph. The existing torso in the middle of the frame continues upward with a proportionally sized head attached via neck to the existing shoulders, face visible and centered horizontally. Below the existing thighs, the legs continue downward with knees, calves, and bare feet planted on the ground at the bottom of the frame. Realistic adult human proportions, not oversized head, not floating disconnected head, head smoothly attached to neck. Neutral grey background with even lighting matching the existing torso.';
+    const p2Neg = 'floating head, disconnected head, head not attached to body, two bodies, mini body, tiny person, squished body, bobblehead, big head, oversized head, chibi, portrait framing, bust shot, close-up, duplicate body, extra figure, robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet';
 
     // Find key nodes
     let emptyLatentId: string | null = null;
