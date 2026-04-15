@@ -120,14 +120,18 @@ export async function generateFromDescription(
     overrides?: PortraitOverrides;
     preferCloud?: boolean;
     referenceImagePath?: string;
+    referenceImagePaths?: string[];
     creationMode?: boolean;
   },
 ): Promise<PortraitResult> {
   const provider = await getPortraitProvider(options?.preferCloud);
 
-  // Build a persona lock stub if reference image is provided
-  const personaLock: PersonaLockData | null = options?.referenceImagePath ? {
-    referenceImagePath: options.referenceImagePath,
+  // Build a persona lock stub if reference image(s) provided.
+  // Multiple refs (when available) get batched into PuLID for stronger identity lock.
+  const primaryRef = options?.referenceImagePath || options?.referenceImagePaths?.[0];
+  const personaLock: PersonaLockData | null = primaryRef ? {
+    referenceImagePath: primaryRef,
+    referenceImagePaths: options?.referenceImagePaths,
     embeddingPath: '',
     lockedPrompt: '',
     lockedSeed: 0,
@@ -142,6 +146,7 @@ export async function generateFromDescription(
     pipelineType: 'character_portrait',
     campaignStyle: options?.campaignStyle,
     overrides: options?.overrides,
+    creationMode: options?.creationMode,  // previously dropped here — caused body gen to render clothed despite creationMode=true
   };
 
   return provider.generatePortrait(input);

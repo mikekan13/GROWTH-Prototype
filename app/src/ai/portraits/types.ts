@@ -50,6 +50,7 @@ export interface PortraitInput {
   pipelineType: PipelineType;
   campaignStyle?: CampaignStyleConfig;
   overrides?: PortraitOverrides;
+  creationMode?: boolean;                   // true = nude/bare character for identity baseline (used for Step 1 face + body gen)
 }
 
 export interface PortraitOverrides {
@@ -58,6 +59,10 @@ export interface PortraitOverrides {
   composition?: 'bust' | 'half_body' | 'full_body' | 'action';
   anglePreset?: 'front' | 'three_quarter_left' | 'three_quarter_right' | 'profile_left' | 'profile_right';  // Identity Lock angles
   environmentOverride?: string;            // Override environment description
+  quality?: 'sketch' | 'draft' | 'final';  // sketch=512/6steps/style only, draft=640/15/style+detail, final=768/20/all
+  baseImagePath?: string;                  // img2img: use as starting latent instead of empty (for refine pass)
+  denoise?: number;                        // img2img denoise strength (0.0-1.0, default 1.0 = full txt2img)
+  skipControlNet?: boolean;                // Disable ControlNet injection even if anglePreset is set. Used for Step 1 face discovery — ControlNet adds contour bleed we don't want until Step 2 refine.
 }
 
 export interface PortraitResult {
@@ -70,7 +75,8 @@ export interface PortraitResult {
 }
 
 export interface PortraitMetadata {
-  prompt: string;
+  prompt: string;                          // T5-XXL prompt (human-readable, for logs/debug)
+  clipL?: string;                          // CLIP-L tags (for reproduction)
   negativePrompt: string;
   seed: number;
   model: string;
@@ -189,7 +195,8 @@ export interface EnvironmentContext {
 // ============================================================
 
 export interface PersonaLockData {
-  referenceImagePath: string;              // Full portrait used as reference
+  referenceImagePath: string;              // Primary reference (first photo, for backward compat)
+  referenceImagePaths?: string[];          // All uploaded reference photos — batched into PuLID for stronger identity
   embeddingPath: string;                   // PuLID face embedding file
   lockedPrompt: string;                    // Identity portion of prompt at lock time
   lockedSeed: number;
@@ -220,6 +227,7 @@ export interface CampaignStyleConfig {
   campaignLoraStrength?: number;
   themeModifiers?: string;                 // Additional style words for this campaign
   compositionOverride?: string;            // Campaign-specific framing
+  allowNudity?: boolean;                   // Enable NSFW unlock LoRA for nude base body (Watcher toggle)
 }
 
 // ============================================================
@@ -227,8 +235,9 @@ export interface CampaignStyleConfig {
 // ============================================================
 
 export interface PromptOutput {
-  prompt: string;
-  negativePrompt: string;
+  clipL: string;                           // Tags/keywords for CLIP-L encoder (≤77 tokens)
+  t5xxl: string;                           // Natural language sentences for T5-XXL encoder
+  negativePrompt: string;                  // Minimal — FLUX ignores negatives at CFG 1.0
   identityBlock: string;                   // Stored separately for persona lock
   bodyDescriptionBlock: string;            // Stored separately for consistency
 }
@@ -238,21 +247,32 @@ export interface PromptOutput {
 // ============================================================
 
 export interface ComfyUIWorkflowParams {
-  prompt: string;
+  clipL: string;                           // Tags for CLIP-L encoder
+  t5xxl: string;                           // Sentences for T5-XXL encoder
   negativePrompt: string;
   seed: number;
   steps: number;
   cfg: number;
   width: number;
   height: number;
-  referenceImagePath?: string;             // For PuLID
-  pulidWeight?: number;
+  referenceImagePath?: string;             // Primary PuLID reference (high weight)
+  referenceImagePaths?: string[];          // Secondary PuLID refs — chained in a SECOND ApplyPulidFlux at low weight for "fine details from other photos" without dominating identity
+  pulidWeight?: number;                    // Primary weight (default 0.8)
+  secondaryPulidWeight?: number;           // Secondary weight (default 0.3) — low so fine details pull in without overpowering the primary
+  pulidStartAt?: number;                   // Delay PuLID start (0.0-1.0) — lets prompt establish composition first
+  pulidEndAt?: number;                     // Cut off PuLID early (0.0-1.0) — lets prompt clean up final steps
   controlnetImagePath?: string;            // For ControlNet angle reference
   controlnetStrength?: number;             // ControlNet influence (0.0-1.0)
   styleLora?: string;
   styleLoraWeight?: number;
   campaignLora?: string;
   campaignLoraWeight?: number;
+  detailLoraWeight?: number;               // Extreme detailer LoRA strength (default 0.5)
+  handDetailLoraWeight?: number;           // Hand detail LoRA strength (default 0.6)
+  nsfwUnlock?: boolean;                    // Enable NSFW unlock LoRA + trigger word
+  nsfwUnlockWeight?: number;              // NSFW unlock LoRA strength (default 0.8)
+  baseImagePath?: string;                  // img2img: uploaded base image filename
+  denoise?: number;                        // img2img denoise (0.0-1.0, 1.0 = txt2img)
 }
 
 export interface ComfyUIQueueResponse {

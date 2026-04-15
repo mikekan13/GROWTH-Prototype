@@ -19,8 +19,21 @@ export const maxDuration = 1800;
 export async function POST(request: NextRequest) {
   try {
     await requireAuth();
-    const body = await request.json();
-    const { characterId, characterData, overrides, campaignStyle, preferCloud, referenceImagePath, creationMode } = body;
+    // Defensive: read as text first so empty/malformed bodies produce a clear 400
+    // instead of an Unhandled error at JSON.parse. Was throwing SyntaxError at line 22
+    // when something (stale fetch, race, duplicate dispatch) sent an empty body.
+    const raw = await request.text();
+    if (!raw || !raw.trim()) {
+      return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(raw);
+    } catch (parseErr) {
+      console.warn('[portraits/generate] Malformed JSON body:', raw.slice(0, 200));
+      return NextResponse.json({ error: 'Malformed JSON body', detail: parseErr instanceof Error ? parseErr.message : String(parseErr) }, { status: 400 });
+    }
+    const { characterId, characterData, overrides, campaignStyle, preferCloud, referenceImagePath, referenceImagePaths, creationMode } = body;
 
     if (!characterId && !characterData) {
       return NextResponse.json({ error: 'characterId or characterData is required' }, { status: 400 });
@@ -32,7 +45,7 @@ export async function POST(request: NextRequest) {
       // Creation mode — inline data, no DB record needed
       result = await generateFromDescription(
         characterData as PortraitCharacterData,
-        { campaignStyle, overrides, preferCloud, referenceImagePath, creationMode },
+        { campaignStyle, overrides, preferCloud, referenceImagePath, referenceImagePaths, creationMode },
       );
     } else {
       // In-game mode — load from DB

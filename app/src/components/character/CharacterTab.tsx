@@ -87,10 +87,14 @@ interface CharacterTabProps {
   userId?: string;
   userRole?: string;
   isGM: boolean;
-  userCharacter?: { id: string; name: string; data: string } | null;
+  userCharacter?: { id: string; name: string; data: string; entityType?: string } | null;
+  // Explicit override for edit permissions. When set to true, forces editable mode
+  // regardless of isGM/entityType gating. Used by Tapestry where GM always owns the
+  // entity they're editing — bypasses the entityType round-trip from the API.
+  canEdit?: boolean;
 }
 
-export default function CharacterTab({ campaignId, userId, userRole, isGM, userCharacter }: CharacterTabProps) {
+export default function CharacterTab({ campaignId, userId, userRole, isGM, userCharacter, canEdit }: CharacterTabProps) {
   const [physicalDescription, setPhysicalDescription] = useState<PhysicalDescription>({});
   const [backstoryText, setBackstoryText] = useState('');
   const [characterName, setCharacterName] = useState('');
@@ -352,13 +356,15 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         const res = await fetch(`/api/characters/${userCharacter.id}`);
         if (!res.ok) throw new Error('Failed to load');
         const { character } = await res.json();
-        const data = JSON.parse(character.data);
-        data.identity = { ...data.identity, physicalDescription, referencePhotos, generatedBust, generatedFullBody, styleColors, styleAesthetics };
+        const data = typeof character.data === 'string' ? JSON.parse(character.data) : character.data;
+        data.identity = { ...data.identity, name: characterName, physicalDescription, referencePhotos, generatedBust, generatedFullBody, styleColors, styleAesthetics };
         data.backstory = { ...data.backstory, backstory: backstoryText };
+        // Include top-level `name` so the Character row's name field updates too
+        // (shown in entity list, used for display in canvas nodes, etc.).
         const updateRes = await fetch(`/api/characters/${userCharacter.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data }),
+          body: JSON.stringify({ data, name: characterName || data.identity?.name || 'Unnamed' }),
         });
         if (!updateRes.ok) throw new Error('Failed to save');
       } else {
@@ -381,7 +387,12 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
   }, [userCharacter?.id, campaignId, physicalDescription, backstoryText, characterName, desiredAge, selectedSeedName, referencePhotos]);
 
   const pd = physicalDescription;
-  const isEditable = !isGM;
+  // canEdit prop = explicit override (Tapestry GM-editor path passes true).
+  // Otherwise: player editing own PC editable; GM viewing player's PC read-only;
+  // GM editing non-PC entity editable.
+  const isEditable = canEdit === true
+    || !isGM
+    || (userCharacter?.entityType != null && userCharacter.entityType !== 'PLAYER_CHARACTER');
 
   if (loading) {
     return (
