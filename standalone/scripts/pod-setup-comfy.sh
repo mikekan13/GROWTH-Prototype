@@ -79,6 +79,18 @@ if '    **kwargs,\n) -> Tensor:' not in s:
     print('patched IPA utils.py')
 else:
     print('IPA utils.py already patched')
+
+# PuLID-Flux pulidflux.py forward_orig kwargs (ComfyUI 0.19+ timestep_zero_index compat)
+f = Path('/workspace/ComfyUI/custom_nodes/ComfyUI-PuLID-Flux/pulidflux.py')
+s = f.read_text()
+old = "    guidance: Tensor = None,\n    control=None,\n) -> Tensor:"
+new = "    guidance: Tensor = None,\n    control=None,\n    **kwargs,\n) -> Tensor:"
+if '**kwargs,\n) -> Tensor:' not in s:
+    s = s.replace(old, new, 1)
+    f.write_text(s)
+    print('patched PuLID pulidflux.py')
+else:
+    print('PuLID already patched')
 PY
 
 echo 'ComfyUI setup complete.'

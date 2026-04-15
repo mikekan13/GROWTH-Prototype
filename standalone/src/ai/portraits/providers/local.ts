@@ -27,6 +27,11 @@ import { getDefaultStyleConfig, applyCampaignStyle, TRIGGER_NSFW } from '../styl
 
 const COMFYUI_URL = process.env.COMFYUI_URL || 'http://127.0.0.1:8188';
 const COMFYUI_PATH = process.env.COMFYUI_PATH || 'C:/AI/ComfyUI';
+// Remote ComfyUI (e.g. RunPod) — we can't fs.access models from this process, so
+// trust the remote instance and skip local filesystem pre-checks. Any model
+// mismatch surfaces as a ComfyUI /prompt 400 at submit time, which is the right
+// failure point anyway.
+const COMFYUI_REMOTE = !/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(COMFYUI_URL);
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
 // Default generation settings — FLUX GGUF on RTX 4060 8GB
@@ -512,7 +517,11 @@ export class LocalProvider implements ImageGenerationProvider {
     // Auto-detect available models — fall back to old versions if new ones not downloaded yet
     const modelFallbacks: Record<string, string> = {};
     let useGgufClipLoader = true;  // Switch to standard DualCLIPLoader when using fp8 safetensors
-    try {
+    if (COMFYUI_REMOTE) {
+      // Remote pod — we provisioned a known model set. Trust workflow as-is,
+      // use standard DualCLIPLoader (we downloaded the fp8 safetensors).
+      useGgufClipLoader = false;
+    } else try {
       const { existsSync } = require('fs');
       const q4ksPath = path.join(COMFYUI_PATH, 'models', 'unet', 'flux1-dev-Q4_K_S.gguf');
       if (!existsSync(q4ksPath) || require('fs').statSync(q4ksPath).size < 6_800_000_000) {
@@ -539,6 +548,16 @@ export class LocalProvider implements ImageGenerationProvider {
       }
     } catch { /* ignore */ }
 
+    // Detect Hyper-FLUX LoRA — if present, workflow's step count is distilled
+    // (usually 8) and must NOT be overridden by the provider's DEFAULT_STEPS.
+    let hasHyperFlux = false;
+    for (const node of Object.values(w)) {
+      const n = node as Record<string, unknown>;
+      const inputs = n.inputs as Record<string, unknown> | undefined;
+      const loraName = inputs?.lora_name as string | undefined;
+      if (loraName && /Hyper-FLUX/i.test(loraName)) { hasHyperFlux = true; break; }
+    }
+
     for (const [nodeId, node] of Object.entries(w)) {
       const n = node as Record<string, unknown>;
       const classType = n.class_type as string;
@@ -560,6 +579,30 @@ export class LocalProvider implements ImageGenerationProvider {
       if (!useGgufClipLoader && classType === 'DualCLIPLoaderGGUF') {
         n.class_type = 'DualCLIPLoader';
         console.log('[ComfyUI] Swapped DualCLIPLoaderGGUF → DualCLIPLoader (fp8 clip)');
+      }
+
+      // ── CLOUD STACK TRANSFORMATIONS ──
+      // Cloud 4090 24GB should run FP8 native, plain VAEDecode, CUDA InsightFace.
+      // Same workflow JSON drives both envs — transform here per-env.
+      if (COMFYUI_REMOTE) {
+        // UnetLoaderGGUF → UNETLoader with FP8 safetensors
+        if (classType === 'UnetLoaderGGUF' && inputs.unet_name === 'flux1-dev-Q4_K_S.gguf') {
+          n.class_type = 'UNETLoader';
+          inputs.unet_name = 'flux1-dev-fp8.safetensors';
+          inputs.weight_dtype = 'fp8_e4m3fn';
+          console.log('[ComfyUI] Cloud: UnetLoaderGGUF → UNETLoader (flux1-dev-fp8.safetensors)');
+        }
+        // VAEDecodeTiled → VAEDecode (no VRAM pressure on 24GB)
+        if (classType === 'VAEDecodeTiled') {
+          n.class_type = 'VAEDecode';
+          n.inputs = { samples: inputs.samples, vae: inputs.vae };
+          console.log('[ComfyUI] Cloud: VAEDecodeTiled → VAEDecode');
+        }
+        // InsightFace CPU → CUDA (face detection via GPU)
+        if (classType === 'PulidFluxInsightFaceLoader' && inputs.provider === 'CPU') {
+          inputs.provider = 'CUDA';
+          console.log('[ComfyUI] Cloud: InsightFace CPU → CUDA');
+        }
       }
 
       // CLIPTextEncodeFlux — FLUX dual encoder with separate clip_l (tags) and t5xxl (sentences)
@@ -601,11 +644,12 @@ export class LocalProvider implements ImageGenerationProvider {
         }
       }
 
-      // KSampler — inject seed, steps, cfg, and img2img denoise
+      // KSampler — inject seed, steps, cfg, and img2img denoise.
+      // Hyper-FLUX LoRA workflows have distilled step counts baked in — do NOT override.
       if (classType === 'KSampler' || classType === 'KSamplerAdvanced') {
         if (inputs.seed !== undefined) inputs.seed = params.seed;
         if (inputs.noise_seed !== undefined) inputs.noise_seed = params.seed;
-        if (inputs.steps !== undefined) inputs.steps = params.steps;
+        if (inputs.steps !== undefined && !hasHyperFlux) inputs.steps = params.steps;
         if (inputs.cfg !== undefined) inputs.cfg = params.cfg;
         // img2img: set denoise < 1.0 to preserve base image composition
         if (params.baseImagePath && params.denoise !== undefined) {
@@ -613,10 +657,11 @@ export class LocalProvider implements ImageGenerationProvider {
         }
       }
 
-      // XlabsSampler — inject seed, steps (different field names)
+      // XlabsSampler — inject seed, steps (different field names).
+      // Hyper-FLUX LoRA workflows keep their distilled step count.
       if (classType === 'XlabsSampler') {
         if (inputs.noise_seed !== undefined) inputs.noise_seed = params.seed;
-        if (inputs.steps !== undefined) inputs.steps = params.steps;
+        if (inputs.steps !== undefined && !hasHyperFlux) inputs.steps = params.steps;
       }
 
       // Empty Latent Image — inject dimensions
@@ -950,6 +995,15 @@ export class LocalProvider implements ImageGenerationProvider {
     // Already running?
     if (await this.isAvailable()) return;
 
+    // Remote ComfyUI (cloud pod) — we can't spawn it from here. If it's down,
+    // surface a clear error so the user knows to `node scripts/cloud-up.mjs`.
+    if (COMFYUI_REMOTE) {
+      throw new Error(
+        `Remote ComfyUI at ${COMFYUI_URL} is not responding. ` +
+        `Run: node scripts/cloud-up.mjs (or set COMFYUI_URL to a local instance).`
+      );
+    }
+
     // Another request is already starting it — wait
     if (comfyStarting) {
       return this.waitForStartup();
@@ -1063,6 +1117,8 @@ export class LocalProvider implements ImageGenerationProvider {
 
   /** Check if ControlNet model is available */
   private async isControlNetAvailable(): Promise<boolean> {
+    // Cloud pod — trust that we provisioned the ControlNet when setting up.
+    if (COMFYUI_REMOTE) return true;
     // Check for InstantX Union (preferred) or XLabs Canny (fallback)
     const candidates = [
       path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union-pro2-fp8.safetensors'),

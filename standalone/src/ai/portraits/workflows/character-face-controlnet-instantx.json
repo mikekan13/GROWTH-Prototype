@@ -4,7 +4,9 @@
     "inputs": {
       "unet_name": "flux1-dev-Q4_K_S.gguf"
     },
-    "_meta": { "title": "FLUX.1 Dev GGUF" }
+    "_meta": {
+      "title": "FLUX.1 Dev GGUF"
+    }
   },
   "2": {
     "class_type": "DualCLIPLoaderGGUF",
@@ -13,87 +15,46 @@
       "clip_name2": "clip_l.safetensors",
       "type": "flux"
     },
-    "_meta": { "title": "Dual CLIP Loader" }
+    "_meta": {
+      "title": "Dual CLIP Loader"
+    }
   },
   "3": {
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "ae.safetensors"
     },
-    "_meta": { "title": "VAE Loader" }
-  },
-  "15": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["1", 0],
-      "clip": ["2", 0],
-      "lora_name": "extreme-detailer-flux.safetensors",
-      "strength_model": 0.55,
-      "strength_clip": 0.55
-    },
-    "_meta": { "title": "Detail LoRA (Extreme Detailer)" }
-  },
-  "16": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["15", 0],
-      "clip": ["15", 1],
-      "lora_name": "painterly-fantasy-ckpf.safetensors",
-      "strength_model": 0.5,
-      "strength_clip": 0.5
-    },
-    "_meta": { "title": "Style LoRA (Painterly Fantasy)" }
-  },
-  "17": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["16", 0],
-      "clip": ["16", 1],
-      "lora_name": "hand-detail-flux.safetensors",
-      "strength_model": 0.6,
-      "strength_clip": 0.6
-    },
-    "_meta": { "title": "Hand Detail LoRA" }
-  },
-  "18": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["17", 0],
-      "clip": ["17", 1],
-      "lora_name": "flux-nsfw-unlock.safetensors",
-      "strength_model": 0.0,
-      "strength_clip": 0.0
-    },
-    "_meta": { "title": "NSFW Unlock LoRA" }
-  },
-  "19": {
-    "class_type": "LoraLoader",
-    "inputs": {
-      "model": ["18", 0],
-      "clip": ["18", 1],
-      "lora_name": "dark-fantasy-v2-flux.safetensors",
-      "strength_model": 0.4,
-      "strength_clip": 0.4
-    },
-    "_meta": { "title": "Campaign LoRA (Dark Fantasy)" }
+    "_meta": {
+      "title": "VAE Loader"
+    }
   },
   "4": {
     "class_type": "CLIPTextEncodeFlux",
     "inputs": {
-      "clip": ["19", 1],
+      "clip": [
+        "25",
+        1
+      ],
       "clip_l": "",
       "t5xxl": "",
       "guidance": 3.5
     },
-    "_meta": { "title": "Positive" }
+    "_meta": {
+      "title": "Positive"
+    }
   },
   "5": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["19", 1],
+      "clip": [
+        "25",
+        1
+      ],
       "text": ""
     },
-    "_meta": { "title": "Negative" }
+    "_meta": {
+      "title": "Negative"
+    }
   },
   "6": {
     "class_type": "EmptyLatentImage",
@@ -102,61 +63,249 @@
       "height": 768,
       "batch_size": 1
     },
-    "_meta": { "title": "Empty Latent" }
+    "_meta": {
+      "title": "Empty Latent"
+    }
   },
-
+  "7": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "13",
+        0
+      ],
+      "seed": 42,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "23",
+        0
+      ],
+      "negative": [
+        "23",
+        1
+      ],
+      "latent_image": [
+        "6",
+        0
+      ],
+      "denoise": 1
+    },
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "8": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
+    },
+    "_meta": {
+      "title": "VAE Decode (Tiled — 8GB VRAM safe)"
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "8",
+        0
+      ],
+      "filename_prefix": "GROWTH_face_controlnet"
+    },
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
   "10": {
     "class_type": "PulidFluxModelLoader",
     "inputs": {
       "pulid_file": "pulid_flux_v0.9.1.safetensors"
     },
-    "_meta": { "title": "Load PuLID Flux Model" }
+    "_meta": {
+      "title": "Load PuLID Flux Model"
+    }
   },
   "11": {
     "class_type": "PulidFluxInsightFaceLoader",
     "inputs": {
       "provider": "CPU"
     },
-    "_meta": { "title": "Load InsightFace" }
-  },
-  "14": {
-    "class_type": "PulidFluxEvaClipLoader",
-    "inputs": {},
-    "_meta": { "title": "Load Eva Clip" }
+    "_meta": {
+      "title": "Load InsightFace"
+    }
   },
   "12": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "reference.png"
     },
-    "_meta": { "title": "Reference Image (PuLID)" }
+    "_meta": {
+      "title": "Reference Image (PuLID)"
+    }
   },
   "13": {
     "class_type": "ApplyPulidFlux",
     "inputs": {
-      "model": ["19", 0],
-      "pulid_flux": ["10", 0],
-      "eva_clip": ["14", 0],
-      "face_analysis": ["11", 0],
-      "image": ["12", 0],
+      "model": [
+        "25",
+        0
+      ],
+      "pulid_flux": [
+        "10",
+        0
+      ],
+      "eva_clip": [
+        "14",
+        0
+      ],
+      "face_analysis": [
+        "11",
+        0
+      ],
+      "image": [
+        "12",
+        0
+      ],
       "weight": 0.8,
-      "start_at": 0.0,
-      "end_at": 1.0
+      "start_at": 0,
+      "end_at": 1
     },
-    "_meta": { "title": "Apply PuLID Flux" }
+    "_meta": {
+      "title": "Apply PuLID Flux"
+    }
   },
-
+  "14": {
+    "class_type": "PulidFluxEvaClipLoader",
+    "inputs": {},
+    "_meta": {
+      "title": "Load Eva Clip"
+    }
+  },
+  "15": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "clip": [
+        "2",
+        0
+      ],
+      "lora_name": "extreme-detailer-flux.safetensors",
+      "strength_model": 0.55,
+      "strength_clip": 0.55
+    },
+    "_meta": {
+      "title": "Detail LoRA (Extreme Detailer)"
+    }
+  },
+  "16": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "15",
+        0
+      ],
+      "clip": [
+        "15",
+        1
+      ],
+      "lora_name": "painterly-fantasy-ckpf.safetensors",
+      "strength_model": 0.5,
+      "strength_clip": 0.5
+    },
+    "_meta": {
+      "title": "Style LoRA (Painterly Fantasy)"
+    }
+  },
+  "17": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "16",
+        0
+      ],
+      "clip": [
+        "16",
+        1
+      ],
+      "lora_name": "hand-detail-flux.safetensors",
+      "strength_model": 0.6,
+      "strength_clip": 0.6
+    },
+    "_meta": {
+      "title": "Hand Detail LoRA"
+    }
+  },
+  "18": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "17",
+        0
+      ],
+      "clip": [
+        "17",
+        1
+      ],
+      "lora_name": "flux-nsfw-unlock.safetensors",
+      "strength_model": 0,
+      "strength_clip": 0
+    },
+    "_meta": {
+      "title": "NSFW Unlock LoRA"
+    }
+  },
+  "19": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "model": [
+        "18",
+        0
+      ],
+      "clip": [
+        "18",
+        1
+      ],
+      "lora_name": "dark-fantasy-v2-flux.safetensors",
+      "strength_model": 0.4,
+      "strength_clip": 0.4
+    },
+    "_meta": {
+      "title": "Campaign LoRA (Dark Fantasy)"
+    }
+  },
   "20": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "angle_reference.png"
     },
-    "_meta": { "title": "Angle Reference Image (ControlNet)" }
+    "_meta": {
+      "title": "Angle Reference Image (ControlNet)"
+    }
   },
   "21": {
     "class_type": "DWPreprocessor",
     "inputs": {
-      "image": ["20", 0],
+      "image": [
+        "20",
+        0
+      ],
       "detect_hand": "disable",
       "detect_body": "enable",
       "detect_face": "enable",
@@ -164,72 +313,80 @@
       "bbox_detector": "yolox_l.onnx",
       "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt"
     },
-    "_meta": { "title": "DWPose Skeleton Detection" }
+    "_meta": {
+      "title": "DWPose Skeleton Detection"
+    }
   },
   "22": {
     "class_type": "ControlNetLoader",
     "inputs": {
       "control_net_name": "flux-controlnet-union-pro2-fp8.safetensors"
     },
-    "_meta": { "title": "Load InstantX ControlNet Union" }
-  },
-  "24": {
-    "class_type": "SetUnionControlNetType",
-    "inputs": {
-      "control_net": ["22", 0],
-      "type": "openpose"
-    },
-    "_meta": { "title": "Set Union Type (OpenPose)" }
+    "_meta": {
+      "title": "Load InstantX ControlNet Union"
+    }
   },
   "23": {
     "class_type": "ControlNetApplyAdvanced",
     "inputs": {
-      "control_net": ["24", 0],
-      "image": ["21", 0],
-      "positive": ["4", 0],
-      "negative": ["5", 0],
-      "vae": ["3", 0],
+      "control_net": [
+        "24",
+        0
+      ],
+      "image": [
+        "21",
+        0
+      ],
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
       "strength": 0.7,
-      "start_percent": 0.0,
+      "start_percent": 0,
       "end_percent": 0.8
     },
-    "_meta": { "title": "Apply ControlNet (OpenPose)" }
+    "_meta": {
+      "title": "Apply ControlNet (OpenPose)"
+    }
   },
-
-  "7": {
-    "class_type": "KSampler",
+  "24": {
+    "class_type": "SetUnionControlNetType",
     "inputs": {
-      "model": ["13", 0],
-      "seed": 42,
-      "steps": 20,
-      "cfg": 1.0,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "positive": ["23", 0],
-      "negative": ["23", 1],
-      "latent_image": ["6", 0],
-      "denoise": 1.0
+      "control_net": [
+        "22",
+        0
+      ],
+      "type": "openpose"
     },
-    "_meta": { "title": "KSampler" }
+    "_meta": {
+      "title": "Set Union Type (OpenPose)"
+    }
   },
-  "8": {
-    "class_type": "VAEDecodeTiled",
+  "25": {
+    "class_type": "LoraLoader",
     "inputs": {
-      "samples": ["7", 0],
-      "vae": ["3", 0],
-      "tile_size": 512,
-      "overlap": 64,
-      "temporal_size": 64,
-      "temporal_overlap": 8
+      "model": [
+        "19",
+        0
+      ],
+      "clip": [
+        "19",
+        1
+      ],
+      "lora_name": "Hyper-FLUX.1-dev-8steps-lora.safetensors",
+      "strength_model": 0.125,
+      "strength_clip": 1
     },
-    "_meta": { "title": "VAE Decode (Tiled — 8GB VRAM safe)" }
-  },
-  "9": {
-    "class_type": "SaveImage",
-    "inputs": {
-      "images": ["8", 0],
-      "filename_prefix": "GROWTH_face_controlnet"
-    },
-    "_meta": { "title": "Save Image" }
+    "_meta": {
+      "title": "Hyper-FLUX 8-step Speed LoRA"
+    }
   }
 }
