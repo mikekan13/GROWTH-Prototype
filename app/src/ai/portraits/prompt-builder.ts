@@ -123,8 +123,10 @@ export function buildPortraitPrompt(
     }
     tags.push('A-pose standing, arms slightly away from body, symmetric stance');
     tags.push('full body from head to feet, entire body visible, feet on ground');
+    tags.push('detailed hands, five fingers per hand, accurate anatomy, detailed feet, five toes per foot');
     sentences.push('They stand in an A-pose with arms held slightly away from the body in a symmetric stance.');
     sentences.push('The entire body is visible from head to feet including the full figure and both feet on the ground.');
+    sentences.push('Hands and feet are rendered in detail with anatomically correct fingers and toes.');
   } else {
     // T2: EQUIPMENT
     const equipBlock = buildEquipmentBlock(char.visibleEquipment);

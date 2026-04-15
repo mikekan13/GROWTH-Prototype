@@ -173,10 +173,9 @@ export class LocalProvider implements ImageGenerationProvider {
           : isFaceLock ? (isFinal ? 0.75 : 0.6)
           : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.4
           : config.loraStrength,
-        detailLoraWeight: isSketch ? 0
-          : isFaceLock ? (isFinal ? 0.7 : 0.5)
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.4
-          : 0.55,
+        // Detail LoRA: match Tara-test weight (0.55) so hands/feet get the
+        // same crisp detail the Tara reference gens had.
+        detailLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.7 : 0.5) : 0.55,
         campaignLora: isSketch ? undefined : 'dark-fantasy-v2-flux.safetensors',
         campaignLoraWeight: isSketch ? 0
           : isFaceLock ? (isFinal ? 0.3 : 0.15)

@@ -68,7 +68,7 @@ const STYLE_PREFIX = STYLE_TAGS;
 const FULL_NEGATIVE_PROMPT = '';
 // Shared negative for any creation-mode gen: garments, accessories, ornate
 // decoration, and illustrated/stylized art styles (we want photo-real output).
-const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, crown, tiara, headband, headdress, hood, veil, hat, helmet, jewelry, necklace, earrings, armor, ornate, decorated, embellished, feathers, ornaments, accessories, frame, border, art nouveau frame, decorative frame, ornate background, anime, cartoon, illustration, digital painting, stylized art, fantasy art, painterly, brush strokes, oil painting, watercolor';
+const CREATION_MODE_NEGATIVE_BASE = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind, crown, tiara, headband, headdress, hood, veil, hat, helmet, jewelry, necklace, earrings, armor, ornate, decorated, embellished, feathers, ornaments, accessories, frame, border, art nouveau frame, decorative frame, ornate background, anime, cartoon, illustration, digital painting, stylized art, fantasy art, painterly, brush strokes, oil painting, watercolor, mutated hands, extra fingers, missing fingers, fused fingers, six fingers, malformed hands, deformed hands, mutated feet, extra toes, missing toes, deformed feet, twisted limbs, bad anatomy';
 
 // Nude-mode extras: block default underwear/bodysuit fallbacks that FLUX
 // inserts when asked for "nude" (especially with PuLID anchoring a clothed ref).
