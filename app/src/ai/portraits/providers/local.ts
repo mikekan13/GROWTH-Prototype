@@ -206,9 +206,12 @@ export class LocalProvider implements ImageGenerationProvider {
         cfg: DEFAULT_CFG,
         // Full-body generation needs vertical room — square 768×768 biases FLUX toward
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
-        // Canvas matches Tara test script: 768x1152 (2:3 tall).
-        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
+        // Body canvas 1024x1536 (2:3). Proven Tara recipe stays; canvas grows
+        // so the face — only ~20% of the frame height in a full body shot —
+        // gets enough pixels for PuLID detail. At 768x1152 the head was 200px
+        // square; at 1024x1536 it's ~270px square, 78% more detail area.
+        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1024 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1536 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
