@@ -60,30 +60,30 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
-  // PASS 1 prompt — body with FEET visible at the bottom, head cropped ABOVE
-  // the frame. 768x768 square. Pass 2 extends the canvas up and adds the head.
+  // Single-pass full body 768x1152 — Tara test recipe.
   const clipL = [
     'in the style of ckpf, aidmafluxpro1.1',
-    'hyperrealistic body photograph',
+    'hyperrealistic fantasy portrait',
     'extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
     hairPhrase,
     `${skin} skin`,
+    `${eyes} eyes`,
     `${build} build`,
     clothing,
     'A-pose standing arms slightly away from body',
-    'body from neck down to feet, feet planted on the ground at bottom of frame',
-    'head and face cropped above frame, neck at top of frame, only the body visible',
-    'neutral grey background, balanced even lighting',
+    'full body from head to feet, entire body visible feet on ground',
+    'full body reference shot standing figure centered in frame head at top feet at bottom',
+    'long shot framing, wide angle, neutral grey background',
   ].join(', ');
 
   const t5xxl = [
-    `A hyperrealistic body photograph in the style of ckpf with aidmafluxpro1.1 detail.`,
-    `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${build} build.`,
+    `A hyperrealistic portrait in the style of ckpf with aidmafluxpro1.1 detail.`,
+    `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
     'She stands in an A-pose with arms held slightly away from the body.',
-    'The body is shown from the neck downward — head and face are cropped above the frame, not visible. Feet are planted on the ground at the bottom of the frame.',
-    'Neutral grey background with balanced even lighting.',
+    'The entire body is visible from head to feet including the full figure and both feet on the ground.',
+    'Full body reference shot, standing figure centered in frame, head at top of frame and feet at bottom, long shot framing, wide angle, neutral grey background with balanced even lighting.',
   ].join(' ');
 
   const negativePrompt = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
@@ -209,16 +209,10 @@ export class LocalProvider implements ImageGenerationProvider {
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
         // Body canvas: Tara test 768x1152. Face detail comes from a second-pass
         // face-refine composite (refineBodyFace), not from bigger canvas.
-        // creationMode body is two-pass:
-        //   Pass 1: 768x768 — body with FEET visible at bottom, head cropped above frame.
-        //   Pass 2 (outpaintHeadAbove): extend up to 768x1152, inpaint top 384 with head + neck.
-        // Only extends UP (not down) — feet are already in pass 1.
-        width: isSketch ? 384 : isDraft ? 640
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 768
-          : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 768
-          : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
+        // Single-pass body 768x1152 (Tara test recipe). Face-detailer pass to be
+        // added separately so the body comes out clean while we wire that up.
+        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
@@ -351,15 +345,13 @@ export class LocalProvider implements ImageGenerationProvider {
       //
       let outputInfo: { filename: string; subfolder: string; type: string };
       const usePulid = !!params.referenceImagePath;
-      const isCreationBodyPass1 = isFullBodyGen && input.creationMode === true;
       const workflowPriority: string[] = [];
 
       if (!isFullBodyGen && useControlnet && usePulid && params.controlnetImagePath) {
         workflowPriority.push('character-face-controlnet-instantx');
         workflowPriority.push('character-face-controlnet');
       }
-      // Pass 1 of creation body skips PuLID — head not in frame.
-      if (usePulid && !isCreationBodyPass1) {
+      if (usePulid) {
         workflowPriority.push('character-portrait-pulid');
       }
       workflowPriority.push('character-portrait');
@@ -375,22 +367,6 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.subfolder,
         outputInfo.type,
       );
-
-      // 8b. PASS 2 for creationMode body: extend the 768x768 body upward (add
-      // 384px above), inpaint the new top strip with head + neck connecting to
-      // the existing shoulders. Only extends UP — feet are already in pass 1.
-      const doExtendUp = input.creationMode === true
-        && input.overrides?.composition === 'full_body'
-        && !!params.referenceImagePath;
-      if (doExtendUp) {
-        try {
-          console.log('[ComfyUI] Body pass 2: extend up, inpaint head above shoulders...');
-          imageData = await this.outpaintHeadAbove(imageData, params);
-          console.log('[ComfyUI] Body pass 2 done.');
-        } catch (err) {
-          console.warn('[ComfyUI] Body pass 2 failed — keeping pass 1 (no head):', err instanceof Error ? err.message : err);
-        }
-      }
 
       // 9. Save to filesystem under a step subfolder:
       //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
