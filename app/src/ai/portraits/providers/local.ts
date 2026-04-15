@@ -168,7 +168,7 @@ export class LocalProvider implements ImageGenerationProvider {
         // 0 was too cartoony; 0.5 summoned gowns. 0.25 is the middle ground.
         styleLoraWeight: isSketch ? 0.6
           : isFaceLock ? (isFinal ? 0.75 : 0.6)
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.25
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.4
           : config.loraStrength,
         detailLoraWeight: isSketch ? 0
           : isFaceLock ? (isFinal ? 0.7 : 0.5)

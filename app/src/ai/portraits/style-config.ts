@@ -225,19 +225,21 @@ export function getStyleTags(creationMode = false): string {
   // weights (0) for body reference so including their triggers just pollutes.
   // Target output is photo-real anatomical reference, not illustrated art.
   if (creationMode) {
-    // Painterly LoRA trigger returns (brings Tara-style painterly realism).
-    // Dark-fantasy trigger stays OUT (its aesthetic = ornate outfits/crowns).
-    // "hyperrealistic" stays for photo-quality; "fantasy portrait" + "art nouveau"
-    // are dropped (they summon gowns/frames).
+    // Photo-realistic model photograph vocabulary — NOT "reference sheet" or
+    // "anatomy reference" (FLUX reads those as illustrated artist study sheets,
+    // produces cartoon/digital-art output). Painterly LoRA trigger kept for
+    // the Tara-test realism. Fantasy/art-nouveau triggers stay out.
     return [
       `in the style of ${TRIGGER_PAINTERLY}`,
       TRIGGER_DETAIL,
+      'professional photography',
+      'studio portrait photograph',
+      '85mm lens',
+      'soft studio lighting',
+      'photorealistic',
       'hyperrealistic',
-      'subtle painterly quality',
-      'body anatomy reference',
-      'character reference sheet',
-      'clean studio photography',
       'extremely detailed',
+      'sharp focus',
     ].join(', ');
   }
   return STYLE_TAGS;
@@ -247,9 +249,9 @@ export function getStyleTags(creationMode = false): string {
 export function getStyleSentences(creationMode = false): string {
   if (creationMode) {
     return [
-      `A hyperrealistic body anatomy reference in the style of ${TRIGGER_PAINTERLY} (${TRIGGER_DETAIL} detail).`,
-      'Subtle painterly realism, photo-like quality, clean studio lighting, neutral grey background.',
-      'Character reference sheet format, standing figure, full figure visible from head to feet.',
+      `A photorealistic professional studio portrait photograph in the style of ${TRIGGER_PAINTERLY} (${TRIGGER_DETAIL} detail).`,
+      'Shot on 85mm lens with soft studio lighting against a neutral grey seamless backdrop.',
+      'Full figure photograph, standing subject framed from head to feet, sharp focus, hyperrealistic detail.',
     ].join(' ');
   }
   return STYLE_SENTENCES;
