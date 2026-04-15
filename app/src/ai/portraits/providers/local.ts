@@ -116,8 +116,9 @@ export class LocalProvider implements ImageGenerationProvider {
 
       // Debug: log the prompt and mode
       console.log('[ComfyUI] anglePreset:', input.overrides?.anglePreset || 'none');
-      console.log('[ComfyUI] clip_l:', promptOutput.clipL.substring(0, 200) + '...');
-      console.log('[ComfyUI] t5xxl:', promptOutput.t5xxl.substring(0, 200) + '...');
+      console.log('[ComfyUI] creationMode:', input.creationMode, '→ passed to builder:', input.creationMode === true, '| allowNudity:', input.campaignStyle?.allowNudity, '| composition:', input.overrides?.composition);
+      console.log('[ComfyUI] clip_l (FULL):', promptOutput.clipL);
+      console.log('[ComfyUI] t5xxl (FULL):', promptOutput.t5xxl);
       console.log('[ComfyUI] Negative:', promptOutput.negativePrompt);
 
       // 3. Prepare workflow parameters
@@ -162,10 +163,26 @@ export class LocalProvider implements ImageGenerationProvider {
         // Face-lock weights:
         //   Step 1 (draft):  painterly 0.6, detail 0.5, dark 0.15 — safe discovery.
         //   Step 2 (final):  painterly 0.75, detail 0.7, dark 0.3 — more fantasy/mood.
-        styleLoraWeight: isSketch ? 0.6 : isFaceLock ? (isFinal ? 0.75 : 0.6) : config.loraStrength,
-        detailLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.7 : 0.5) : 0.55,
+        // creationMode body gen uses MUCH lower style LoRA pull. At regular
+        // weights the painterly+fantasy LoRAs override the A-pose/nude prompt
+        // and render "fantasy princess in a gown." Reference body needs clean
+        // anatomy, not decorated fantasy art.
+        styleLoraWeight: isSketch ? 0.6
+          : isFaceLock ? (isFinal ? 0.75 : 0.6)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.3
+          : config.loraStrength,
+        detailLoraWeight: isSketch ? 0
+          : isFaceLock ? (isFinal ? 0.7 : 0.5)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0.4
+          : 0.55,
         campaignLora: isSketch ? undefined : 'dark-fantasy-v2-flux.safetensors',
-        campaignLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.3 : 0.15) : 0.4,  // Higher for Step 2 mood; Step 1 stays low (helmet risk in discovery)
+        // Campaign LoRA = dark fantasy styler. For creationMode body reference,
+        // disable entirely — it's the strongest pull toward ornate fantasy
+        // outfits/atmospheres that contaminate A-pose anatomy references.
+        campaignLoraWeight: isSketch ? 0
+          : isFaceLock ? (isFinal ? 0.3 : 0.15)
+          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
+          : 0.4,
         // Hand detail LoRA only for face-lock final (close-up where hands might appear).
         // Body gen at full-body framing = hands are tiny, not worth the LoRA compute.
         handDetailLoraWeight: isFinal && input.overrides?.composition !== 'full_body' ? 0.6 : 0,
