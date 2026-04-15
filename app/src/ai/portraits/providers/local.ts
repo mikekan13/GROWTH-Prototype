@@ -383,6 +383,12 @@ export class LocalProvider implements ImageGenerationProvider {
         && !!params.referenceImagePath;
       if (doTwoPassBody) {
         try {
+          // Free VRAM before pass 2. Pass 1 leaves UNet + CLIP + PuLID + EVA-CLIP +
+          // InsightFace + 3 LoRAs + VAE resident — pass 2 adds the padded base + mask
+          // tensors on top. 8GB cards OOM (CUDA invalid argument) without a reset.
+          console.log('[ComfyUI] Freeing VRAM before pass 2...');
+          await this.releaseVram().catch(() => {});
+          await new Promise(r => setTimeout(r, 3000));
           console.log('[ComfyUI] Body pass 2: pad + inpaint head/feet on torso...');
           imageData = await this.inpaintHeadAndFeet(imageData, params);
           console.log('[ComfyUI] Body pass 2 done.');
@@ -1511,12 +1517,15 @@ export class LocalProvider implements ImageGenerationProvider {
       if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
         if (params.referenceImagePath) inputs.image = params.referenceImagePath;
       }
+      // Pass 2 LoRAs: trim to just detail (for face sharpness). Style is already
+      // baked into the pass 1 torso; NSFW isn't needed at head/feet. This cuts
+      // ~1.5GB VRAM pressure so pass 2 fits on 8GB alongside PuLID + base + mask.
       if (cls === 'LoraLoader') {
-        if (title.includes('style')) { inputs.strength_model = 0.5; inputs.strength_clip = 0.5; }
-        else if (title.includes('campaign')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
-        else if (title.includes('hand detail')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
-        else if (title.includes('nsfw')) { inputs.strength_model = 0.8; inputs.strength_clip = 0.8; }
-        else if (title.includes('detail')) { inputs.strength_model = 0.55; inputs.strength_clip = 0.55; }
+        if (title.includes('detail') && !title.includes('hand')) {
+          inputs.strength_model = 0.55; inputs.strength_clip = 0.55;
+        } else {
+          inputs.strength_model = 0; inputs.strength_clip = 0;
+        }
       }
     }
 
