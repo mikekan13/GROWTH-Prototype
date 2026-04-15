@@ -1568,8 +1568,12 @@ export class LocalProvider implements ImageGenerationProvider {
         scriptPath,
         bodyPath,
         '--out-dir', maskOutDir,
-        '--region', 'head_with_hair',
-        '--feather', '0',  // no feather here; we feather the bbox crop edges below
+        // eyes_brows = just eyes + brows. Most reliable detection on body shots
+        // — BiSeNet was trained on face close-ups and over-segments "skin" /
+        // "hair" labels on full-body images. Use the unambiguous eye/brow region
+        // to find the FACE CENTER, then we expand to a head-sized bbox around it.
+        '--region', 'eyes_brows',
+        '--feather', '0',
       ], { stdio: 'pipe', windowsHide: true });
       let stderr = '';
       proc.stderr.on('data', (d) => { stderr += d.toString(); });
@@ -1580,15 +1584,15 @@ export class LocalProvider implements ImageGenerationProvider {
       proc.on('error', reject);
     });
 
-    const headMaskPath = path.join(maskOutDir, 'mask_head_with_hair.png');
-    const headMaskBuf = await fs.readFile(headMaskPath);
+    const eyesMaskPath = path.join(maskOutDir, 'mask_eyes_brows.png');
+    const eyesMaskBuf = await fs.readFile(eyesMaskPath);
 
-    // 2. Find bbox of the head mask using sharp.raw + scan
+    // 2. Find bbox of the EYES region — that's the most reliable face anchor.
     const bodyMeta = await sharp(bodyImage).metadata();
     const W = bodyMeta.width || 768;
     const H = bodyMeta.height || 1152;
 
-    const rawMask = await sharp(headMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer();
+    const rawMask = await sharp(eyesMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer();
     let minX = W, minY = H, maxX = 0, maxY = 0;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -1601,22 +1605,27 @@ export class LocalProvider implements ImageGenerationProvider {
       }
     }
     if (maxX <= minX || maxY <= minY) {
-      throw new Error('head mask empty — face not detected');
+      throw new Error('eyes mask empty — face not detected');
     }
-    // Pad bbox 30% in each direction (room for PuLID to extend the head)
-    // and snap to a square for clean upscale.
-    const bw = maxX - minX;
-    const bh = maxY - minY;
-    const pad = Math.round(Math.max(bw, bh) * 0.3);
+
+    // Eye width is typically ~25% of head width. Expand to head bbox by scaling
+    // the eyes bbox up by ~5x (eyes are roughly 1/3 of head height, 1/2 of head width).
+    // Then snap to a square ~1.5x the head height (gives generous PuLID context).
+    const eyesW = maxX - minX;
+    const eyesH = maxY - minY;
     const cx = Math.round((minX + maxX) / 2);
-    const cy = Math.round((minY + maxY) / 2);
-    let side = Math.max(bw, bh) + 2 * pad;
-    side = Math.min(side, Math.min(W, H)); // can't be larger than the image
+    const cy = Math.round(maxY + eyesH * 0.6);  // shift down — eyes are ~upper-third of face
+    const headWidth = Math.max(Math.round(eyesW * 2.2), 200);   // head width from eye width
+    const headHeight = Math.max(Math.round(eyesH * 5.0), 240);  // head height from eye height
+    let side = Math.max(headWidth, headHeight);
+    side = Math.min(side, Math.min(W, H));  // never exceed image dims
+    // Snap to multiples of 8 for clean VAE encode
+    side = Math.floor(side / 8) * 8;
     let cropX = Math.round(cx - side / 2);
     let cropY = Math.round(cy - side / 2);
     cropX = Math.max(0, Math.min(W - side, cropX));
     cropY = Math.max(0, Math.min(H - side, cropY));
-    console.log(`[ComfyUI] Face bbox: ${minX},${minY} → ${maxX},${maxY} | crop ${side}x${side} @ (${cropX},${cropY})`);
+    console.log(`[ComfyUI] Eyes bbox: (${minX},${minY})-(${maxX},${maxY}) → head crop ${side}x${side} @ (${cropX},${cropY})`);
 
     // 3. Crop face region from body, upscale to 768x768
     const faceCrop = await sharp(bodyImage)
@@ -1625,13 +1634,15 @@ export class LocalProvider implements ImageGenerationProvider {
       .png()
       .toBuffer();
 
-    // Crop the head-mask too (for the inpaint mask in upscaled space)
-    const cropMask = await sharp(headMaskBuf)
-      .resize(W, H, { fit: 'fill' })
-      .extract({ left: cropX, top: cropY, width: side, height: side })
-      .resize(768, 768, { fit: 'fill', kernel: 'nearest' })
-      .png()
-      .toBuffer();
+    // Inpaint mask for the upscaled crop: full white = regen the whole crop
+    // (it's all "head area" already since we sized the bbox to the head).
+    // Tiny black border so SetLatentNoiseMask doesn't pull from outside the
+    // edge — but the composite mask below feathers everything visible.
+    const cropMaskSvg = `<svg width="768" height="768" xmlns="http://www.w3.org/2000/svg">
+      <rect width="768" height="768" fill="black"/>
+      <rect x="32" y="32" width="704" height="704" fill="white"/>
+    </svg>`;
+    const cropMask = await sharp(Buffer.from(cropMaskSvg)).png().toBuffer();
 
     const bodyName = await this.uploadBuffer(faceCrop, `face_crop_${stamp}.png`);
     const maskName = await this.uploadBuffer(cropMask, `face_crop_mask_${stamp}.png`);
@@ -1746,13 +1757,30 @@ export class LocalProvider implements ImageGenerationProvider {
       .png()
       .toBuffer();
 
-    // 5. Build feathered alpha from the head mask (resized to bbox space) so
-    //    the composite blends cleanly at hair/neck edges, no hard rectangle.
-    const cropMaskGrey = await sharp(headMaskBuf)
-      .resize(W, H, { fit: 'fill' })
-      .extract({ left: cropX, top: cropY, width: side, height: side })
+    // 5. Build feathered alpha — a soft RECTANGULAR mask that feathers ~12%
+    //    of the side from the edges. Avoids hard rectangle seam without needing
+    //    BiSeNet to give us a perfect head silhouette.
+    const featherPx = Math.round(side * 0.12);
+    const alphaSvg = `<svg width="${side}" height="${side}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="lr" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="black"/>
+          <stop offset="${(featherPx / side).toFixed(3)}" stop-color="white"/>
+          <stop offset="${(1 - featherPx / side).toFixed(3)}" stop-color="white"/>
+          <stop offset="1" stop-color="black"/>
+        </linearGradient>
+        <linearGradient id="td" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="black"/>
+          <stop offset="${(featherPx / side).toFixed(3)}" stop-color="white"/>
+          <stop offset="${(1 - featherPx / side).toFixed(3)}" stop-color="white"/>
+          <stop offset="1" stop-color="black"/>
+        </linearGradient>
+        <mask id="m"><rect width="${side}" height="${side}" fill="url(#td)"/></mask>
+      </defs>
+      <rect width="${side}" height="${side}" fill="url(#lr)" mask="url(#m)"/>
+    </svg>`;
+    const cropMaskGrey = await sharp(Buffer.from(alphaSvg))
       .greyscale()
-      .blur(8) // soft alpha so edge transitions blend
       .toBuffer();
 
     const refinedWithAlpha = await sharp(refinedCropSized)
