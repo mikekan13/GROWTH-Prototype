@@ -60,13 +60,10 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
     : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
 
-  // PASS 1 prompt — describes a body crop from SHOULDERS TO KNEES (not full body,
-  // not just torso). Pass 2 then needs only ~192px top strip for head+neck and
-  // ~192px bottom strip for calves+feet. Asking pass 1 for shoulders-to-thighs
-  // leaves too much leg anatomy for the bottom 192px strip in pass 2.
+  // Single-pass full body at 768x1152 — matches the Tara test-body-gen.js recipe.
   const clipL = [
     'in the style of ckpf, aidmafluxpro1.1',
-    'hyperrealistic body photograph',
+    'hyperrealistic fantasy portrait',
     'extremely detailed, subtle painterly quality',
     `a ${age}-year-old ${sex} ${seedName}`,
     hairPhrase,
@@ -74,21 +71,19 @@ function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolea
     `${eyes} eyes`,
     `${build} build`,
     clothing,
-    'standing upright arms relaxed at sides',
-    'mid-body framing from shoulders to knees',
-    'shoulders at top of frame, knees at bottom of frame',
-    'head and face not visible, face cropped above frame',
-    'calves and feet not visible, lower legs cropped below frame',
-    'neutral grey background, balanced even lighting',
+    'A-pose standing arms slightly away from body',
+    'full body from head to feet, entire body visible feet on ground',
+    'full body reference shot standing figure centered in frame head at top feet at bottom',
+    'long shot framing, wide angle, neutral grey background',
   ].join(', ');
 
   const t5xxl = [
-    `A hyperrealistic body photograph in the style of ckpf with aidmafluxpro1.1 detail.`,
+    `A hyperrealistic portrait in the style of ckpf with aidmafluxpro1.1 detail.`,
     `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
     clothingSentence,
-    'Body framing shot — the figure is cropped from the shoulders at the top of the frame down to the knees at the bottom.',
-    'The head and face are above the frame (not visible). The calves and feet are below the frame (not visible).',
-    'Standing upright with arms relaxed at the sides. Neutral grey background with soft even lighting.',
+    'She stands in an A-pose with arms held slightly away from the body.',
+    'The entire body is visible from head to feet including the full figure and both feet on the ground.',
+    'Full body reference shot, standing figure centered in frame, head at top of frame and feet at bottom, long shot framing, wide angle, neutral grey background with balanced even lighting.',
   ].join(' ');
 
   const negativePrompt = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
@@ -214,17 +209,9 @@ export class LocalProvider implements ImageGenerationProvider {
         // bust/half-body composition. Tall canvas is the only reliable enforcement.
         // Body canvas: Tara test 768x1152. Face detail comes from a second-pass
         // face-refine composite (refineBodyFace), not from bigger canvas.
-        // creationMode body is TWO-PASS:
-        //   Pass 1: 768x768 square — FLUX crops to torso (head + feet out of frame — see autotest3 img #6).
-        //   Pass 2 (inpaintHeadAndFeet): pad to 768x1152, inpaint top 192 + bottom 192 with PuLID head + feet.
-        // This is how autotest3 got its sharp face — head gets 192x768 native resolution, not a tiny
-        // ~200px region squeezed into a 1-shot full body. Non-creationMode body gens stay single-pass.
-        width: isSketch ? 384 : isDraft ? 640
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 768
-          : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 768
-          : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
+        // Single-pass body gen at 768x1152 (Tara test script exact).
+        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
+        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
         referenceImagePath: input.personaLock?.referenceImagePath,
         // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
         // to face-centric framing (PuLID's attention injection runs across all sampling
@@ -355,23 +342,18 @@ export class LocalProvider implements ImageGenerationProvider {
       //    Body gen skips InstantX — ControlNet fights the secondary-PuLID hair chain,
       //    and A-pose doesn't need pose steering.
       //
-      //    creationMode + full_body (pass 1 torso): skip PuLID entirely. Face isn't
-      //    in frame at this stage; PuLID injects a face signal that FLUX then tries
-      //    to render somewhere in the torso shot (squished mini-person + egg head).
-      //    Pass 2 is where PuLID belongs — at the head inpaint.
       let outputInfo: { filename: string; subfolder: string; type: string };
       const usePulid = !!params.referenceImagePath;
-      const isCreationBodyPass1 = isFullBodyGen && input.creationMode === true;
       const workflowPriority: string[] = [];
 
       if (!isFullBodyGen && useControlnet && usePulid && params.controlnetImagePath) {
-        workflowPriority.push('character-face-controlnet-instantx');  // InstantX ControlNet + PuLID + LoRAs (standard pipeline)
-        workflowPriority.push('character-face-controlnet');            // XLabs fallback
+        workflowPriority.push('character-face-controlnet-instantx');
+        workflowPriority.push('character-face-controlnet');
       }
-      if (usePulid && !isCreationBodyPass1) {
-        workflowPriority.push('character-portrait-pulid');   // PuLID only (primary path for body)
+      if (usePulid) {
+        workflowPriority.push('character-portrait-pulid');
       }
-      workflowPriority.push('character-portrait');           // Basic (always fallback; primary path for pass 1 torso)
+      workflowPriority.push('character-portrait');
 
       const workflowResult = await this.tryWorkflows(workflowPriority, params);
       outputInfo = workflowResult.output;
@@ -384,25 +366,6 @@ export class LocalProvider implements ImageGenerationProvider {
         outputInfo.subfolder,
         outputInfo.type,
       );
-
-      // 8b. PASS 2 for creationMode body: take the 768x768 torso, pad to 768x1152,
-      // inpaint the top 192px (head + PuLID face) and bottom 192px (feet + ground).
-      // This is the autotest3 recipe that Mike confirmed produced the reference output.
-      const doTwoPassBody = input.creationMode === true
-        && input.overrides?.composition === 'full_body'
-        && !!params.referenceImagePath;
-      if (doTwoPassBody) {
-        try {
-          // Pass 2 keeps the already-loaded pass 1 models (UNet/CLIP/VAE/PuLID)
-          // to avoid a 60s+ reload. VRAM pressure mitigated by trimming LoRAs
-          // inside inpaintHeadAndFeet.
-          console.log('[ComfyUI] Body pass 2: pad + inpaint head/feet on torso...');
-          imageData = await this.inpaintHeadAndFeet(imageData, params);
-          console.log('[ComfyUI] Body pass 2 done.');
-        } catch (err) {
-          console.warn('[ComfyUI] Body pass 2 failed — keeping pass 1 torso:', err instanceof Error ? err.message : err);
-        }
-      }
 
       // 9. Save to filesystem under a step subfolder:
       //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
