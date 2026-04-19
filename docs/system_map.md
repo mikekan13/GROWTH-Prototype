@@ -21,9 +21,21 @@ Types               →  types/growth.ts (GrowthCharacter, game mechanics)
 Client Component → API Route → Service Function → Prisma → SQLite
 Server Component → Service Function (direct) → Prisma → SQLite
 Server Component → Prisma (direct, simple queries)
+Real-time:  Client ←SSE← /api/campaigns/[id]/stream (server pushes events)
+            Client →POST→ API Route → Service → broadcast via SSE to all clients
 ```
 
 API routes are thin wrappers: parse input → Zod validate → call service → catch errors → return HTTP response.
+
+### Real-Time System (SSE)
+- Server-Sent Events for real-time campaign communication (replaces polling)
+- Connection manager: `lib/campaign-stream.ts` — per-campaign rooms, broadcast, heartbeat
+- SSE endpoint: `/api/campaigns/[id]/stream` — auth via cookie, state sync on connect
+- Client hook: `hooks/useCampaignStream.ts` — typed event subscriptions, auto-reconnect
+- Event types: `types/campaign-events.ts` — skill checks, connections, state changes, terminal relay
+- Events POST broadcasts: creating a campaign event also pushes it via SSE to all connected clients
+- Pending checks: `lib/pending-checks.ts` — in-memory store for multi-step skill check flow
+- Skill check flow: initiate (rolls SD) → effort wager prompt (SSE to player) → wager submit (rolls FD) → result broadcast
 
 ## Key Systems
 

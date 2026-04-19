@@ -317,35 +317,6 @@ export class DiceService {
   }
 
   /**
-   * Fear check: FD + relevant attribute vs Resistance Level × 2.
-   */
-  static fearCheck(params: {
-    characterId: string;
-    fearName: string;
-    fateDie: FateDie;
-    attributeValue: number;
-    resistanceLevel: number;
-  }): RollResult {
-    const fdSides = parseDie(params.fateDie);
-
-    const request: RollRequest = {
-      id: generateRollId(),
-      source: { type: 'fear_check', fearName: params.fearName, characterId: params.characterId },
-      dice: [{
-        die: params.fateDie,
-        label: 'Fate Die',
-        sides: fdSides,
-        color: 'purple',
-      }],
-      dr: params.resistanceLevel * 2,
-      flatModifiers: params.attributeValue,
-      metadata: { fearName: params.fearName, resistanceLevel: params.resistanceLevel },
-    };
-
-    return executeRoll(request);
-  }
-
-  /**
    * Contested roll: attacker and defender each roll, attacker wins if their total >= defender's total.
    */
   static contestedRoll(params: {

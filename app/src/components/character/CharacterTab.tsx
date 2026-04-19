@@ -937,7 +937,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
             {isGM
               ? 'Trailblazer-submitted backstory. Use to inform seed, root, and branch creation.'
-              : 'Your history, personality, motivations, fears. Your Watcher builds your mechanical character from this.'}
+              : 'Your history, personality, motivations. Your Watcher builds your mechanical character from this.'}
           </div>
           {isEditable ? (
             <textarea

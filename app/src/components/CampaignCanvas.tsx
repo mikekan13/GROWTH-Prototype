@@ -11,6 +11,9 @@ import type { GrowthWorldItem } from '@/types/item';
 import { calculateCharacterTKV, calculateItemKV, calculateLocationKV } from '@/lib/kv-calculator';
 import { recomputeAugments } from '@/lib/character-actions';
 import type { CanvasFolder } from '@/types/canvas';
+import { useCampaignStream } from '@/hooks/useCampaignStream';
+import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
+import type { TerminalEvent } from '@/types/terminal';
 
 function formatKrma(value: string): string {
   return Number(value).toLocaleString();
@@ -21,6 +24,7 @@ const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTer
 const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr: false });
 const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), { ssr: false });
 const CharacterTab = dynamic(() => import('@/components/character/CharacterTab'), { ssr: false });
+const EffortWagerModal = dynamic(() => import('@/components/campaign/EffortWagerModal'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -81,7 +85,168 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const [isDeleting, setIsDeleting] = useState(false);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [pendingWager, setPendingWager] = useState<EffortWagerPromptEvent | null>(null);
+  // Stores check result data until the die settles, then posts to terminal
+  const pendingCheckResultRef = useRef<Record<string, unknown> | null>(null);
+
+  // ── Contested check state machine ──
+  interface ContestedState {
+    phase: 'selecting_defender' | 'attacker_wagering' | 'defender_wagering' | 'complete';
+    attackerId: string;
+    attackerName: string;
+    attackerSkill: string;
+    attackerGovernors: string[];
+    revealDR: boolean;
+    defenderId?: string;
+    defenderName?: string;
+    defenderSkill?: string;
+    defenderGovernors?: string[];
+    attackerTotal?: number;
+    attackerResult?: Record<string, unknown>;
+    defenderResult?: Record<string, unknown>;
+  }
+  const [contestedState, setContestedState] = useState<ContestedState | null>(null);
+
   const router = useRouter();
+
+  // ── Real-time SSE stream ──
+  const streamEventsRef = useRef<TerminalEvent[]>([]);
+  const [streamEventsTick, setStreamEventsTick] = useState(0);
+
+  const { connected, connectedUsers } = useCampaignStream({
+    campaignId: campaign.id,
+    onEvent: useCallback((event: CampaignStreamEvent) => {
+      const { data } = event;
+
+      // Handle terminal events — accumulate for the terminal to consume
+      if (data.kind === 'terminal_event') {
+        const te = data.event;
+        // Avoid duplicates by ID
+        if (!streamEventsRef.current.some(e => e.id === te.id)) {
+          streamEventsRef.current = [...streamEventsRef.current, te];
+          setStreamEventsTick(n => n + 1);
+        }
+      }
+
+      // Handle effort wager prompts — show modal to the player
+      if (data.kind === 'effort_wager_prompt') {
+        setPendingWager(data);
+      }
+
+      // Clear contested state when checks resolve
+      if (data.kind === 'check_result') {
+        // For contested: the defender's result clears the line
+        // Simple heuristic: if we're in contested mode and get a result, clear after a short delay
+        if (contestedState) {
+          setTimeout(() => setContestedState(null), 2000);
+        }
+      }
+
+      // Handle character updates — refresh the page data
+      if (data.kind === 'character_update') {
+        router.refresh();
+      }
+    }, [router]),
+  });
+
+  // ── Post skill check result to terminal after die settles ──
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { source?: string };
+      if (detail?.source !== 'service') return;
+      const result = pendingCheckResultRef.current;
+      if (!result) return;
+      pendingCheckResultRef.current = null;
+
+      // Normal skill check — post to terminal (contested checks are handled server-side)
+      const showDR = result.revealDR;
+      await fetch(`/api/campaigns/${campaign.id}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'dice_roll',
+          characterId: result.characterId,
+          characterName: result.characterName,
+          payload: {
+            kind: 'dice_roll',
+            context: showDR
+              ? `${result.skillName || 'Unskilled'} check vs DR ${result.dr}`
+              : `${result.skillName || 'Unskilled'} check`,
+            skillName: result.skillName,
+            skillLevel: result.isSkilled ? result.skillLevel : undefined,
+            skillDie: { die: result.sdDie, value: result.sdResult, isFlat: String(result.sdDie).startsWith('flat') },
+            fateDie: { die: result.fdDie, value: result.fdResult },
+            effort: result.effort,
+            effortAttribute: result.effortAttribute,
+            total: result.total,
+            dr: showDR ? result.dr : undefined,
+            success: result.success,
+            margin: showDR ? result.margin : undefined,
+            isSkilled: result.isSkilled,
+          },
+        }),
+      }).catch(() => {});
+    };
+
+    window.addEventListener('growth:dice-settled', handler);
+    return () => window.removeEventListener('growth:dice-settled', handler);
+  }, [campaign.id, contestedState]);
+
+  // ── Contested check line (ref-based for smooth animation) ──
+  const [defenderPickerTarget, setDefenderPickerTarget] = useState<{ id: string; name: string } | null>(null);
+  const contestedLineRef = useRef<SVGLineElement>(null);
+  const contestedDot1Ref = useRef<SVGCircleElement>(null);
+  const contestedDot2Ref = useRef<SVGCircleElement>(null);
+  const contestedMouseRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (!contestedState) return;
+
+    const onMouseMove = (e: MouseEvent) => { contestedMouseRef.current = { x: e.clientX, y: e.clientY }; };
+    if (contestedState.phase === 'selecting_defender') {
+      window.addEventListener('mousemove', onMouseMove);
+    }
+
+    let rafId: number;
+    const update = () => {
+      const line = contestedLineRef.current;
+      const d1 = contestedDot1Ref.current;
+      const d2 = contestedDot2Ref.current;
+      if (line && d1 && d2) {
+        const aEl = document.querySelector(`[data-node-id="${contestedState.attackerId}"]`);
+        if (aEl) {
+          const r = aEl.getBoundingClientRect();
+          const ax = String(r.left + r.width / 2), ay = String(r.top + r.height / 2);
+          line.setAttribute('x1', ax); line.setAttribute('y1', ay);
+          d1.setAttribute('cx', ax); d1.setAttribute('cy', ay);
+        }
+        const dId = contestedState.defenderId;
+        if (dId) {
+          const dEl = document.querySelector(`[data-node-id="${dId}"]`);
+          if (dEl) {
+            const r = dEl.getBoundingClientRect();
+            const dx = String(r.left + r.width / 2), dy = String(r.top + r.height / 2);
+            line.setAttribute('x2', dx); line.setAttribute('y2', dy);
+            d2.setAttribute('cx', dx); d2.setAttribute('cy', dy);
+            d2.setAttribute('r', '5'); d2.setAttribute('opacity', '0.9');
+            line.setAttribute('stroke-dasharray', 'none');
+            line.setAttribute('stroke-width', '2.5'); line.setAttribute('opacity', '0.9');
+          }
+        } else {
+          const m = contestedMouseRef.current;
+          line.setAttribute('x2', String(m.x)); line.setAttribute('y2', String(m.y));
+          d2.setAttribute('cx', String(m.x)); d2.setAttribute('cy', String(m.y));
+          d2.setAttribute('r', '3'); d2.setAttribute('opacity', '0.4');
+          line.setAttribute('stroke-dasharray', '8 4');
+          line.setAttribute('stroke-width', '1.5'); line.setAttribute('opacity', '0.6');
+        }
+      }
+      rafId = requestAnimationFrame(update);
+    };
+    rafId = requestAnimationFrame(update);
+
+    return () => { cancelAnimationFrame(rafId); window.removeEventListener('mousemove', onMouseMove); };
+  }, [contestedState]);
 
   // ── Folder state (persisted to localStorage) ──
   const folderStorageKey = `canvas-${campaign.id}-folders`;
@@ -695,6 +860,27 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
       {/* Canvas content area — fills remaining space */}
       <main ref={mainRef} className="flex-1 relative overflow-hidden">
+        {/* Contested mode banner */}
+        {contestedState?.phase === 'selecting_defender' && (
+          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center gap-4 py-2 px-4" style={{
+            backgroundColor: 'rgba(208, 160, 48, 0.15)',
+            borderBottom: '1px solid #D0A03060',
+          }}>
+            <span className="text-xs uppercase tracking-[0.2em]" style={{
+              fontFamily: 'var(--font-terminal), Consolas, monospace',
+              color: '#D0A030',
+            }}>
+              CONTESTED: {contestedState.attackerName} ({contestedState.attackerSkill}) — RIGHT-CLICK DEFENDER
+            </span>
+            <button
+              onClick={() => setContestedState(null)}
+              className="text-[10px] uppercase px-2 py-0.5 border hover:bg-white/10"
+              style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ff6666', borderColor: '#ff666640' }}
+            >
+              CANCEL
+            </button>
+          </div>
+        )}
         {activeTab === 'canvas' && (
           <RelationsCanvas
             nodes={nodes}
@@ -716,6 +902,40 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             folders={folders}
             onFoldersChange={handleFoldersChange}
             onRestComplete={() => router.refresh()}
+            isGM={isGM}
+            contestedAttackerId={contestedState?.phase === 'selecting_defender' ? contestedState.attackerId : undefined}
+            onContestedCheck={isGM ? (characterId, characterName, skillName, governors, revealDR) => {
+              // Store attacker governors on window so defender card can read them
+              (window as unknown as Record<string, unknown>).__contestedAttackerGovernors = governors;
+              setContestedState({
+                phase: 'selecting_defender',
+                attackerId: characterId,
+                attackerName: characterName,
+                attackerSkill: skillName,
+                attackerGovernors: governors,
+                revealDR,
+              });
+            } : undefined}
+            onContestedDefenderSelect={contestedState?.phase === 'selecting_defender' ? (defenderId, defenderName) => {
+              // Set defender on contested state so line anchors, then open picker modal
+              setContestedState(prev => prev ? { ...prev, defenderId, defenderName } : null);
+              setDefenderPickerTarget({ id: defenderId, name: defenderName });
+            } : undefined}
+            onSkillCheck={isGM ? async (characterId, skillName, attributeName, dr, revealDR) => {
+              try {
+                const res = await fetch(`/api/campaigns/${campaign.id}/skill-check`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ characterId, skillName, attributeName, dr, revealDR }),
+                });
+                if (!res.ok) {
+                  const err = await res.json();
+                  console.error('[SkillCheck]', err.error);
+                }
+              } catch (err) {
+                console.error('[SkillCheck] Connection failed', err);
+              }
+            } : undefined}
           />
         )}
 
@@ -852,10 +1072,182 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               userId={userId}
               username={username}
               userRole={userRole}
+              streamEvents={streamEventsRef.current}
+              streamEventsTick={streamEventsTick}
+              connected={connected}
+              connectedUsers={connectedUsers}
+              campaignCharacters={nodes.filter(n => n.type === 'character' || n.type === 'npc').map(n => ({ id: n.id, name: n.name }))}
             />
           </div>
         </div>
       </main>
+
+      {/* Effort Wager Modal */}
+      {pendingWager && (
+        <EffortWagerModal
+          prompt={pendingWager}
+          campaignId={campaign.id}
+          onComplete={async (wagers, sdDie, screenX, screenY) => {
+            const checkId = pendingWager.checkId;
+            setPendingWager(null);
+
+            // Submit wager to server
+            try {
+              const res = await fetch(`/api/campaigns/${campaign.id}/skill-check/wager`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checkId, wagers }),
+              });
+
+              if (res.ok) {
+                const data = await res.json();
+                // Store result — will be posted to terminal after die settles
+                pendingCheckResultRef.current = data;
+                // Spawn the Fate Die in the player's hand at cursor position
+                const fateDie = pendingWager.fateDie;
+                if (fateDie) {
+                  window.dispatchEvent(new CustomEvent('growth:spawn-die-in-hand', {
+                    detail: {
+                      dieType: fateDie,
+                      screenX,
+                      screenY,
+                      serverValue: data.fdResult,
+                    },
+                  }));
+                }
+              } else {
+                const err = await res.json();
+                console.error('[Wager]', err.error);
+              }
+            } catch (err) {
+              console.error('[Wager] Connection failed', err);
+            }
+          }}
+          onError={(err) => { console.error('[Wager]', err); setPendingWager(null); }}
+        />
+      )}
+
+      {/* Contested check line overlay — ref-based, updated via RAF */}
+      {contestedState && (
+        <svg className="fixed inset-0 z-40 pointer-events-none" style={{ width: '100vw', height: '100vh' }}>
+          <line ref={contestedLineRef} x1="0" y1="0" x2="0" y2="0" stroke="#D0A030" strokeWidth="1.5" strokeDasharray="8 4" opacity="0.6" />
+          <circle ref={contestedDot1Ref} cx="0" cy="0" r="5" fill="#D0A030" opacity="0.9" />
+          <circle ref={contestedDot2Ref} cx="0" cy="0" r="3" fill="#D0A030" opacity="0.4" />
+        </svg>
+      )}
+
+      {/* Defender skill picker modal */}
+      {defenderPickerTarget && contestedState && (() => {
+        const defenderNode = nodes.find(n => n.id === defenderPickerTarget.id);
+        const defenderData = defenderNode?.characterData;
+        const defenderSkills = (Array.isArray(defenderData?.skills) ? defenderData.skills : []) as Array<{ name: string; level: number; governors?: string[] }>;
+        const attackerGovs = contestedState.attackerGovernors;
+        const overlappingSkills = defenderSkills.filter(s =>
+          (s.governors || []).some(g => attackerGovs.includes(g))
+        );
+
+        const startContested = async (defenderSkill: string, defenderGovernors: string[]) => {
+          const cs = contestedState;
+          setDefenderPickerTarget(null);
+          setContestedState({ ...cs, phase: 'attacker_wagering', defenderId: defenderPickerTarget.id, defenderName: defenderPickerTarget.name, defenderSkill, defenderGovernors });
+
+          try {
+            const isRawAttacker = cs.attackerSkill.startsWith('raw:');
+            const isRawDefender = defenderSkill.startsWith('raw:');
+            const res = await fetch(`/api/campaigns/${campaign.id}/contested-check`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                attackerCharacterId: cs.attackerId,
+                attackerSkillName: isRawAttacker ? undefined : cs.attackerSkill,
+                attackerAttributeName: isRawAttacker ? cs.attackerSkill.slice(4) : undefined,
+                defenderCharacterId: defenderPickerTarget.id,
+                defenderSkillName: isRawDefender ? undefined : defenderSkill,
+                defenderAttributeName: isRawDefender ? defenderSkill.slice(4) : undefined,
+                defenderGovernors,
+                revealDR: cs.revealDR,
+              }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              console.error('[Contested]', err.error);
+              setContestedState(null);
+            }
+          } catch {
+            console.error('[Contested] Connection failed');
+            setContestedState(null);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="border-2 p-0 overflow-hidden" style={{
+              backgroundColor: '#0a0a1a',
+              borderColor: '#D0A030',
+              boxShadow: '0 0 30px #D0A03040',
+              width: '280px',
+            }}>
+              {/* Header */}
+              <div className="px-4 py-2" style={{ backgroundColor: '#D0A03015', borderBottom: '1px solid #D0A03030' }}>
+                <div className="text-xs tracking-[0.2em] uppercase" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#D0A030' }}>
+                  DEFENDER: {defenderPickerTarget.name}
+                </div>
+                <div className="text-[10px] mt-0.5" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#D0A03080' }}>
+                  vs {contestedState.attackerName} ({contestedState.attackerSkill.startsWith('raw:') ? contestedState.attackerSkill.slice(4).toUpperCase() : contestedState.attackerSkill})
+                </div>
+              </div>
+              {/* Matching skills */}
+              <div className="px-4 py-3 space-y-1">
+                {overlappingSkills.length === 0 && (
+                  <div className="text-[10px] text-white/40 font-[Consolas,monospace] py-1">No matching skills</div>
+                )}
+                {overlappingSkills.map(s => {
+                  const overlap = (s.governors || []).filter(g => attackerGovs.includes(g));
+                  return (
+                    <button
+                      key={s.name}
+                      onClick={() => startContested(s.name, overlap)}
+                      className="w-full px-2 py-1 text-left text-sm hover:bg-[#D0A030]/20 font-[Consolas,monospace] flex items-center justify-between"
+                      style={{ color: '#fff' }}
+                    >
+                      <span>{s.name}</span>
+                      <span className="text-[9px]" style={{ color: '#D0A03080' }}>
+                        Lv{s.level} — {overlap.join('/')}
+                      </span>
+                    </button>
+                  );
+                })}
+                {/* Unskilled — raw attribute from attacker's governors */}
+                <div className="border-t border-white/10 pt-2 mt-2">
+                  <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-1">UNSKILLED (FD ONLY)</div>
+                  <div className="flex gap-2">
+                    {attackerGovs.map(gov => (
+                      <button
+                        key={gov}
+                        onClick={() => startContested(`raw:${gov}`, [gov])}
+                        className="px-2 py-0.5 text-[10px] hover:bg-white/10 font-[Consolas,monospace] border border-white/10"
+                        style={{ color: '#aaa' }}
+                      >
+                        {gov.slice(0, 3).toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Cancel */}
+              <div className="px-4 py-2 flex justify-end" style={{ backgroundColor: '#111' }}>
+                <button
+                  onClick={() => setDefenderPickerTarget(null)}
+                  className="text-[10px] uppercase px-3 py-1 border hover:bg-white/10"
+                  style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#888', borderColor: '#444' }}
+                >
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog

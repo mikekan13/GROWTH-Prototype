@@ -29,8 +29,6 @@ export function DiceResultBar({ result, visible }: DiceResultBarProps) {
     contextLabel = 'Unskilled Check';
   } else if (source.type === 'death_save') {
     contextLabel = 'Death Save';
-  } else if (source.type === 'fear_check') {
-    contextLabel = `Fear: ${source.fearName}`;
   } else if (source.type === 'quick_roll') {
     contextLabel = source.context;
   } else if (source.type === 'contested') {

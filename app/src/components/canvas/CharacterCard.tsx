@@ -6,6 +6,7 @@ import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { CtxMenuPanel, CtxMenuStreamLabel } from '@/components/ui/ContextMenu';
 import type { HeldItemData } from '@/types/item';
 import { updateAttribute, type AttributeName } from '@/lib/character-actions';
+import { parseDie } from '@/lib/dice-utils';
 import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
 
@@ -61,6 +62,16 @@ interface CharacterCardProps {
   onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
   folderId?: string | null;
   onRemoveFromFolder?: (folderId: string, nodeId: string) => void;
+  /** GM-only: initiate a skill check against this character */
+  onSkillCheck?: (characterId: string, skillName: string | undefined, attributeName: string | undefined, dr: number, revealDR: boolean) => void;
+  /** GM-only: initiate a contested check with this character as attacker */
+  onContestedCheck?: (characterId: string, characterName: string, skillName: string, governors: string[], revealDR: boolean) => void;
+  /** When set, this card is a potential defender target — show defender skill picker on right-click */
+  contestedAttackerId?: string;
+  /** Callback when this card is selected as defender */
+  onContestedDefenderSelect?: (characterId: string, characterName: string, skillName: string, governors: string[]) => void;
+  /** Whether the current viewer is a GM */
+  isGM?: boolean;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -277,10 +288,20 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   onCharacterUpdate,
   folderId,
   onRemoveFromFolder,
+  onSkillCheck,
+  onContestedCheck,
+  contestedAttackerId,
+  onContestedDefenderSelect,
+  isGM,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isBarDragging, setIsBarDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [showSkillCheckMenu, setShowSkillCheckMenu] = useState(false);
+  const [showContestedMenu, setShowContestedMenu] = useState(false);
+  const [showDefenderMenu, setShowDefenderMenu] = useState(false);
+  const [skillCheckDR, setSkillCheckDR] = useState(10);
+  const [skillCheckRevealDR, setSkillCheckRevealDR] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [isInViewport, setIsInViewport] = useState(true);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -338,16 +359,38 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const tkv = data?.tkv || 0;
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    if (!onDelete) return;
+    if (!onDelete && !onSkillCheck && !onContestedCheck) return;
+    // Don't open context menu in defender selection mode
+    if (contestedAttackerId) return;
     e.preventDefault();
     e.stopPropagation();
     setContextMenuPos({ x: e.pageX, y: e.pageY });
     setShowContextMenu(true);
+    setShowSkillCheckMenu(false);
+    setShowContestedMenu(false);
+    setShowDefenderMenu(false);
+  };
+
+  // In contested mode, left-click selects this card as defender
+  const handleContestedClick = (e: React.MouseEvent) => {
+    if (!contestedAttackerId || contestedAttackerId === node.id || !onContestedDefenderSelect) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Fire callback with character info — parent opens the defender picker modal
+    onContestedDefenderSelect(node.id, node.name, '', []);
   };
 
   // Drag handler — updates parent with SVG coordinate offsets
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    // In contested mode, left-click selects defender instead of dragging
+    if (contestedAttackerId && onContestedDefenderSelect) {
+      if (contestedAttackerId !== node.id) {
+        handleContestedClick(e);
+      }
+      // Block dragging for all cards in contested mode
+      return;
+    }
     if (!onPositionChange || !onDragOffsetChange) return;
 
     e.preventDefault();
@@ -393,6 +436,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
   // ── Context Menu Portal ───────────────────────────────────────────────────
 
+  const skills = (Array.isArray(data?.skills) ? data.skills : []) as Array<{ name: string; level: number; governors?: string[] }>;
+
   const contextMenu = showContextMenu && typeof window !== 'undefined' && createPortal(
     <div
       ref={contextMenuRef}
@@ -401,7 +446,186 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     >
       <CtxMenuStreamLabel />
       <CtxMenuPanel>
-        {folderId && onRemoveFromFolder && (
+        {/* Main menu buttons — hidden when a sub-picker is open */}
+        {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && (
+          <>
+            {onSkillCheck && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowSkillCheckMenu(true); }}
+                className="w-full px-3 py-1.5 text-left text-sm text-[#22ab94] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                sKILL cHECK
+              </button>
+            )}
+            {onContestedCheck && skills.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowContestedMenu(true); }}
+                className="w-full px-3 py-1.5 text-left text-sm text-[#D0A030] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                cONTESTED
+              </button>
+            )}
+          </>
+        )}
+        {/* Contested skill picker — attacker picks skill, no DR */}
+        {isGM && onContestedCheck && showContestedMenu && (
+          <div className="px-3 py-2 space-y-1" style={{ width: '220px' }} onClick={e => e.stopPropagation()}>
+            <div className="text-[10px] tracking-[0.15em] uppercase text-[#D0A030] font-[Consolas,monospace] mb-1">
+              CONTEST AS — {node.name}
+            </div>
+            <label className="flex items-center gap-1 cursor-pointer mb-1" onClick={e => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={skillCheckRevealDR}
+                onChange={e => setSkillCheckRevealDR(e.target.checked)}
+                className="w-3 h-3 accent-[#D0A030]"
+              />
+              <span className="text-[9px] text-white/40 font-[Consolas,monospace]">REVEAL TOTALS</span>
+            </label>
+            {skills.map(s => (
+              <button
+                key={s.name}
+                onClick={() => {
+                  setShowContextMenu(false);
+                  setShowContestedMenu(false);
+                  onContestedCheck(node.id, node.name, s.name, s.governors || [], skillCheckRevealDR);
+                }}
+                className="w-full px-1.5 py-0.5 text-left text-xs hover:bg-[#D0A030]/20 font-[Consolas,monospace] flex items-center justify-between"
+                style={{ color: '#D0A030' }}
+              >
+                <span>{s.name}</span>
+                <span className="text-[9px]" style={{ color: '#D0A03080' }}>
+                  {(s.governors || []).join('/')}
+                </span>
+              </button>
+            ))}
+            {/* Unskilled contest — raw attribute */}
+            <div className="border-t border-white/10 pt-1 mt-1">
+              <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">UNSKILLED</div>
+              <div className="grid grid-cols-3 gap-x-1">
+                {[
+                  { label: 'BODY', color: '#E8585A', attrs: ['clout', 'celerity', 'constitution'] },
+                  { label: 'SPIRIT', color: '#7050A8', attrs: ['flow', 'focus'] },
+                  { label: 'SOUL', color: '#4080D0', attrs: ['willpower', 'wisdom', 'wit'] },
+                ].map(p => (
+                  <div key={p.label} className="flex flex-col">
+                    {p.attrs.map(attr => (
+                      <button
+                        key={attr}
+                        onClick={() => {
+                          setShowContextMenu(false);
+                          setShowContestedMenu(false);
+                          onContestedCheck(node.id, node.name, `raw:${attr}`, [attr], skillCheckRevealDR);
+                        }}
+                        className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace]"
+                        style={{ color: p.color }}
+                      >
+                        {attr.slice(0, 3).toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Skill Check Picker (replaces menu items when open) */}
+        {isGM && onSkillCheck && showSkillCheckMenu && (() => {
+          const fateDie = data?.creation?.seed?.baseFateDie as string || 'd6';
+          const fdMax = parseDie(fateDie);
+          return (
+          <div className="px-3 py-2 space-y-1" style={{ width: '220px' }} onClick={e => e.stopPropagation()}>
+            <div className="text-[10px] tracking-[0.15em] uppercase text-[#22ab94] font-[Consolas,monospace] mb-1">
+              {node.name} — {fateDie.toUpperCase()}
+            </div>
+            {/* DR input + reveal toggle — compact single row */}
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] text-white/50 font-[Consolas,monospace]">DR</span>
+              <input
+                type="number"
+                min={1}
+                max={40}
+                value={skillCheckDR}
+                onChange={e => setSkillCheckDR(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-12 text-xs px-1 py-0.5 text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/60 rounded-none outline-none focus:border-[#22ab94]"
+              />
+              <label className="flex items-center gap-1 cursor-pointer" onClick={e => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={skillCheckRevealDR}
+                  onChange={e => setSkillCheckRevealDR(e.target.checked)}
+                  className="w-3 h-3 accent-[#22ab94]"
+                />
+                <span className="text-[9px] text-white/40 font-[Consolas,monospace]">SHOW</span>
+              </label>
+            </div>
+            {/* Skill buttons with max possible */}
+            {skills.map((s: { name: string; level: number; governors?: string[] }) => {
+              const maxPossible = fdMax + s.level;
+              const impossible = skillCheckDR > maxPossible;
+              return (
+                <button
+                  key={s.name}
+                  onClick={() => {
+                    setShowContextMenu(false);
+                    setShowSkillCheckMenu(false);
+                    onSkillCheck(node.id, s.name, undefined, skillCheckDR, skillCheckRevealDR);
+                  }}
+                  className="w-full px-1.5 py-0.5 text-left text-xs hover:bg-[#22ab94]/20 font-[Consolas,monospace] flex items-center justify-between"
+                  style={{ color: impossible ? '#ff6666' : 'rgba(255,255,255,0.8)' }}
+                >
+                  <span>{s.name}</span>
+                  <span className="text-[9px]" style={{ color: impossible ? '#ff666680' : 'rgba(255,255,255,0.4)' }}>
+                    {s.level} /{maxPossible}{impossible ? ' ✗' : ''}
+                  </span>
+                </button>
+              );
+            })}
+            {/* Unskilled divider + raw attribute options */}
+            <div className="border-t border-white/10 pt-1 mt-1">
+              <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">UNSKILLED (MAX:{fdMax})</div>
+              {(() => {
+                const impossible = skillCheckDR > fdMax;
+                const pillars = [
+                  { label: 'BODY', color: '#E8585A', attrs: [{ key: 'clout', label: 'CLO' }, { key: 'celerity', label: 'CEL' }, { key: 'constitution', label: 'CON' }] },
+                  { label: 'SPIRIT', color: '#7050A8', attrs: [{ key: 'flow', label: 'FLO' }, { key: 'focus', label: 'FOC' }] },
+                  { label: 'SOUL', color: '#4080D0', attrs: [{ key: 'willpower', label: 'WIL' }, { key: 'wisdom', label: 'WIS' }, { key: 'wit', label: 'WIT' }] },
+                ];
+                return (
+                  <div className="grid grid-cols-3 gap-x-1">
+                    {pillars.map(p => (
+                      <div key={p.label} className="flex flex-col">
+                        {p.attrs.map(a => (
+                          <button
+                            key={a.key}
+                            onClick={() => {
+                              setShowContextMenu(false);
+                              setShowSkillCheckMenu(false);
+                              onSkillCheck(node.id, undefined, a.key, skillCheckDR, skillCheckRevealDR);
+                            }}
+                            className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace]"
+                            style={{ color: p.color, opacity: impossible ? 0.5 : 1, textDecoration: impossible ? 'line-through' : 'none' }}
+                          >
+                            {a.label}{impossible ? '✗' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+          );
+        })()}
+        {/* Existing menu items (hidden when sub-pickers are open) */}
+        {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && folderId && onRemoveFromFolder && (
           <button
             onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onRemoveFromFolder(folderId, node.id); }}
             className="w-full px-3 py-1.5 text-left text-sm text-amber-400 hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
@@ -413,15 +637,17 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             rEMOVE FROM fOLDER
           </button>
         )}
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete?.(node.id); }}
-          className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete?.(node.id); }}
+            className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          dELETE cHARACTER
-        </button>
+            dELETE cHARACTER
+          </button>
+        )}
       </CtxMenuPanel>
     </div>,
     document.body

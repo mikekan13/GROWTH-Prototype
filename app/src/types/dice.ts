@@ -23,7 +23,6 @@ export type RollSource =
   | { type: 'skill_check'; skillName: string; skillLevel: number; characterId: string }
   | { type: 'unskilled_check'; characterId: string }
   | { type: 'death_save'; characterId: string }
-  | { type: 'fear_check'; fearName: string; characterId: string }
   | { type: 'magic_resistance'; characterId: string }
   | { type: 'item_use'; itemId: string; characterId: string }
   | { type: 'encounter'; encounterId: string }

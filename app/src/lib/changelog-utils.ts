@@ -73,7 +73,6 @@ export function inferCategory(changes: FieldChange[]): ChangeCategory {
   if (firstPath.startsWith('grovines')) return 'grovine';
   if (firstPath.startsWith('identity.')) return 'identity';
   if (firstPath.startsWith('levels.')) return 'levels';
-  if (firstPath.startsWith('fears')) return 'fear';
   if (firstPath.startsWith('harvests')) return 'harvest';
   if (firstPath.startsWith('backstory.')) return 'backstory';
 

@@ -35,7 +35,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   vitals: '\u2695',
   identity: '\u263A',
   levels: '\u2191',
-  fear: '\u2620',
   harvest: '\u2618',
   backstory: '\u270E',
   campaign: '\u2302',

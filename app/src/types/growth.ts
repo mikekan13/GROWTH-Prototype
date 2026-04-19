@@ -272,18 +272,6 @@ export interface GrowthInventory {
   items: GrowthItem[];
 }
 
-// Fear System
-export interface GrowthFear {
-  name: string;
-  description: string;
-  resistanceLevel: number;  // 1-10
-  status: 'active' | 'aligned' | 'removed';
-  hiddenPower?: string;     // Discovered through confrontation
-  // Fears assigned by GM, never fully go away
-  // Can be "aligned" (integrated, granting paradoxical powers)
-  // Can be "removed" (extremely rare, represents reprogramming)
-}
-
 // Harvest System (Seasonal Turns)
 export interface GrowthHarvest {
   id: string;
@@ -343,8 +331,6 @@ export interface GrowthBackstory {
   description?: string;     // Physical/visual description
   backstory?: string;       // Narrative backstory
   personalityTraits?: string[];
-  values?: string[];        // Positive character drives (discovered, not pre-selected)
-  addictions?: string[];    // Shadow side of values
   notes?: string;           // GM/player session notes
 }
 
@@ -360,7 +346,6 @@ export interface GrowthCharacter {
   magic: GrowthMagic;
   traits: GrowthTrait[];       // Nectars + Blossoms + Thorns combined
   grovines: GROvine[];         // Active narrative threads
-  fears: GrowthFear[];
   vitals: GrowthVitals;
   inventory: GrowthInventory;
   backstory: GrowthBackstory;

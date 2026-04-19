@@ -215,6 +215,8 @@ export class DiceAnimator {
   private impactFlashes: ImpactFlash[] = [];
 
   private grabbedDice: GrabbedDie[] = [];
+  /** When true, the current grab is from a skill check — use 'service' source and skip onThrow */
+  private skillCheckGrab = false;
   private mousePos = new THREE.Vector2();
   private raycaster = new THREE.Raycaster();
   private velocitySamples: VelocitySample[] = [];
@@ -662,38 +664,40 @@ export class DiceAnimator {
       color: g.ad.color,
     }));
 
-    // Build the throw batch — only these dice will be reported on settle
+    // Build the throw batch — skill check dice use 'service' to prevent duplicate terminal events
+    const isSkillCheck = this.skillCheckGrab;
     this.throwBatches.push({
       dice: new Set(this.grabbedDice.map(g => g.ad)),
-      source: 'physical',
+      source: isSkillCheck ? 'service' : 'physical',
       reported: false,
     });
 
-    // Assign throw ID to this batch
-    const throwId = this.nextThrowId++;
-
-    // Mark thrown dice as unrevealed — server will provide authoritative values
-    for (const g of this.grabbedDice) {
-      g.ad.revealed = false;
-      g.ad.serverValue = null;
-      g.ad.throwId = throwId;
-      this.hideNumbers(g.ad);
-      // Remove any existing glow
-      if (g.ad.glowMesh) {
-        g.ad.meshResult.group.remove(g.ad.glowMesh);
-        g.ad.glowMesh = null;
+    // Assign throw ID to this batch (skill check dice already have throwId + serverValue)
+    if (!isSkillCheck) {
+      const throwId = this.nextThrowId++;
+      for (const g of this.grabbedDice) {
+        g.ad.revealed = false;
+        g.ad.serverValue = null;
+        g.ad.throwId = throwId;
+        this.hideNumbers(g.ad);
+        if (g.ad.glowMesh) {
+          g.ad.meshResult.group.remove(g.ad.glowMesh);
+          g.ad.glowMesh = null;
+        }
       }
     }
 
     this.grabbedDice = [];
     this.velocitySamples = [];
+    this.skillCheckGrab = false;
     document.body.style.cursor = '';
 
     window.removeEventListener('mousemove', this.boundOnMouseMove);
     window.removeEventListener('mouseup', this.boundOnMouseUp);
 
-    // Fire throw callback — DiceOverlay calls the server for authoritative values
-    if (thrownDice.length > 0) {
+    // Fire throw callback — skip for skill check dice (server values already set)
+    if (!isSkillCheck && thrownDice.length > 0) {
+      const throwId = this.nextThrowId - 1;
       this.callbacks.onThrow(thrownDice, throwId);
     }
   }
@@ -1066,6 +1070,74 @@ export class DiceAnimator {
 
     // Fire throw callback — DiceOverlay calls the server for authoritative values
     this.callbacks.onThrow([{ dieType, color }], throwId);
+  }
+
+  /**
+   * Spawn a die and immediately enter grab state — die follows the cursor
+   * until the player releases (mouseup), then flings with physics.
+   * Used by the skill check flow: player "grabs" their Skill Die from the
+   * wager modal and throws it on the canvas.
+   *
+   * Returns the throwId so the caller can set server values later.
+   */
+  spawnDieInHand(dieType: DieType, color: DieColor, screenX: number, screenY: number): number {
+    const meshResult = createDieMesh(dieType, color, true);
+    this.scene.add(meshResult.group);
+
+    const body = this.physics.addDie(meshResult.group, meshResult.geometry, dieType);
+
+    // Position at grab height above the cursor
+    const rect = this.canvasEl.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((screenX - rect.left) / rect.width) * 2 - 1,
+      -((screenY - rect.top) / rect.height) * 2 + 1,
+    );
+
+    // Position at origin, grab orbit will move it to cursor on next frame
+    body.body.position.set(0, DRAG_Y_BASE, 0);
+    body.body.velocity.set(0, 0, 0);
+    body.body.angularVelocity.set(0, 0, 0);
+
+    const throwId = this.nextThrowId++;
+
+    const ad: AnimatedDie = {
+      body,
+      meshResult,
+      dieType,
+      color,
+      label: dieType.toUpperCase(),
+      targetValue: this.randomValue(dieType),
+      serverValue: null,
+      throwId,
+      glowMesh: null,
+      revealed: false,
+      revealTime: 0,
+    };
+
+    this.animatedDice.push(ad);
+
+    // Set up grab state — reuse the existing grab mechanics
+    this.mousePos.copy(ndc);
+    this.velocitySamples = [{ pos: ndc.clone(), time: performance.now() }];
+    this.dragY = DRAG_Y_BASE + (Math.random() - 0.5) * DRAG_Y_RANDOM;
+    this.orbitStartTime = performance.now();
+    this.physics.resetFrameCounter();
+    this.preGlitchActive = false;
+
+    // Enter grab state with this die — mark as skill check so onMouseUp uses 'service' source
+    this.skillCheckGrab = true;
+    this.grabbedDice = [];
+    this.scoopDie(ad);
+
+    document.body.style.cursor = 'grabbing';
+
+    // Attach mouse listeners for the fling
+    window.addEventListener('mousemove', this.boundOnMouseMove);
+    window.addEventListener('mouseup', this.boundOnMouseUp);
+
+    this.ensureLoopRunning();
+
+    return throwId;
   }
 
   /**

@@ -145,15 +145,6 @@ export async function buildEntityContext(entityId: string): Promise<string> {
     }
   }
 
-  // ── Fears ──
-  const activeFears = data.fears.filter(f => f.status === 'active');
-  if (activeFears.length > 0) {
-    lines.push(`\n--- Fears ---`);
-    for (const f of activeFears) {
-      lines.push(`${f.name} (resist: ${f.resistanceLevel}) — ${f.description}`);
-    }
-  }
-
   // ── Inventory (summary) ──
   if (data.inventory.items.length > 0) {
     lines.push(`\n--- Inventory (${data.inventory.items.length} items, weight: ${data.inventory.weight}) ---`);

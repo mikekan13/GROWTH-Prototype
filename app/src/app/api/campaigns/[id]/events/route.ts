@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
-import type { TerminalEventType, TerminalActor, TerminalPayload } from '@/types/terminal';
+import { broadcastEvent } from '@/lib/campaign-stream';
+import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,22 @@ export async function POST(
       characterName,
       payload,
     });
+
+    // Broadcast to all SSE-connected clients in this campaign
+    const terminalEvent: TerminalEvent = {
+      id: `ev-${event.id}`,
+      type: event.type as TerminalEventType,
+      timestamp: event.createdAt instanceof Date ? event.createdAt.toISOString() : String(event.createdAt),
+      campaignId,
+      actor,
+      actorUserId: session.user.id,
+      actorName: session.user.username,
+      characterId: characterId || undefined,
+      characterName: characterName || undefined,
+      sessionId: event.sessionId || undefined,
+      payload,
+    };
+    broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
 
     return NextResponse.json({ event }, { status: 201 });
   } catch (error) {

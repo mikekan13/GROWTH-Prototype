@@ -91,6 +91,12 @@ interface RelationsCanvasProps {
   folders?: CanvasFolder[];
   onFoldersChange?: (folders: CanvasFolder[]) => void;
   onRestComplete?: () => void;
+  onSkillCheck?: (characterId: string, skillName: string | undefined, attributeName: string | undefined, dr: number, revealDR: boolean) => void;
+  onContestedCheck?: (characterId: string, characterName: string, skillName: string, governors: string[], revealDR: boolean) => void;
+  /** When set, canvas is in contested check mode — waiting for defender click */
+  contestedAttackerId?: string;
+  onContestedDefenderSelect?: (characterId: string, characterName: string, skillName: string, governors: string[]) => void;
+  isGM?: boolean;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -118,6 +124,11 @@ export default function RelationsCanvas({
   folders = [],
   onFoldersChange,
   onRestComplete,
+  onSkillCheck,
+  onContestedCheck,
+  contestedAttackerId,
+  onContestedDefenderSelect,
+  isGM,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1540,7 +1551,7 @@ export default function RelationsCanvas({
           style={{ overflow: "visible", pointerEvents: "none" }}
         >
           <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-          <div data-card-wrapper style={{ pointerEvents: "auto" }}>
+          <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto" }}>
           <CharacterCard
             node={charNode}
             isExpanded={isNodeExpanded}
@@ -1637,6 +1648,11 @@ export default function RelationsCanvas({
               checkFolderDropTarget(nodeId, offsetX, clampedY);
             }}
             onCharacterUpdate={onCharacterUpdate}
+            onSkillCheck={onSkillCheck}
+            onContestedCheck={onContestedCheck}
+            contestedAttackerId={contestedAttackerId}
+            onContestedDefenderSelect={onContestedDefenderSelect}
+            isGM={isGM}
           />
           </div>
           </div>

@@ -8,7 +8,6 @@ export interface BackstoryData {
   personality?: string;
   background?: string;
   motivations?: string;
-  fears?: string;
   notes?: string;
   prompts?: Array<{ question: string; answer: string }>;
 }
@@ -25,7 +24,6 @@ const SECTION_ORDER: { key: keyof BackstoryData; label: string; icon: string }[]
   { key: 'personality', label: 'PERSONALITY', icon: '\u263A' },
   { key: 'background', label: 'BACKGROUND', icon: '\u2302' },
   { key: 'motivations', label: 'MOTIVATIONS', icon: '\u2191' },
-  { key: 'fears', label: 'FEARS', icon: '\u2620' },
   { key: 'notes', label: 'NOTES', icon: '\u270E' },
 ];
 

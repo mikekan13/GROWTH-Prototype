@@ -26,7 +26,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | KRMA Death Split | `services/krma/death-split.ts` | Orchestrates multi-transaction death process: Body→GM, Soul→50/50, Spirit→player, Frequency→Lady Death. Atomic batch. | ledger, wallet, evaluator |
 | KRMA Reconciliation | `services/krma/reconciliation.ts` | Balance reconciliation, global supply invariant check, checksum chain verification, full audit | Prisma, ledger |
 | KRMA Crystallization | `services/krma/crystallization.ts` | Crystallize/dissolve entities across KRMA line. Ledger stored as campaign events. Prevents double-crystallization. Pool tracking | Prisma, permissions |
-| DiceService | `services/dice.ts` | Single entry point for all dice rolling. Skilled/unskilled checks, death saves, fear checks, contested rolls, quick rolls, custom rolls. Integrates crypto RNG, Godhead injection, event bus | dice lib, dice-events, dice-injection |
+| DiceService | `services/dice.ts` | Single entry point for all dice rolling. Skilled/unskilled checks, death saves, contested rolls, quick rolls, custom rolls. Integrates crypto RNG, Godhead injection, event bus | dice lib, dice-events, dice-injection |
 | DiceInjectionRegistry | `services/dice-injection.ts` | Godhead override system. Register/remove/apply injections that silently modify die results. Filter by character/source/skill/next-roll. Override types: set values, ensure success/failure, clamp, hidden modifier. Audit-logged | dice types |
 | ProfileService | `services/profile.ts` | Get/update trailblazer profile, get/update watcher profile (WATCHER+ only), public profile view (strips topicsToAvoid) | Prisma, permissions |
 | HubService | `services/hub.ts` | List LISTED campaigns (public, filterable), campaign listing detail (public), update listing (GM-only), apply to campaign (auth, creates member+application atomically with profile snapshot) | Prisma, permissions |
@@ -113,6 +113,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 |------|------|---------|
 | useDiceEvents | `hooks/useDiceEvents.ts` | Subscribe to dice roll events from DiceService event bus |
 | useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
+| useCampaignStream | `hooks/useCampaignStream.ts` | SSE connection to campaign stream. Provides: connection status, connected users, typed event subscriptions via `on()` |
 
 ## AI — Portrait Pipeline
 
@@ -145,7 +146,10 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | /api/access-codes/redeem | POST | AccessCodeService |
 | /api/changelog | GET | ChangeLogService (query with filters: campaignId, characterId, actor, category, pagination) |
 | /api/changelog/[id]/revert | POST | ChangeLogService (revert entry with conflict detection) |
-| /api/campaigns/[id]/events | GET, POST | CampaignEventService (create + query campaign events with type/session filters) |
+| /api/campaigns/[id]/events | GET, POST | CampaignEventService (create + query campaign events with type/session filters). POST now broadcasts via SSE |
+| /api/campaigns/[id]/stream | GET (SSE) | Campaign real-time stream. SSE endpoint for live events (dice, checks, state changes, chat, connections) |
+| /api/campaigns/[id]/skill-check | POST | Initiate multi-step skill check. Rolls SD, stores pending check, broadcasts wager prompt to player via SSE |
+| /api/campaigns/[id]/skill-check/wager | POST | Submit effort wager for pending check. Rolls FD, computes result, deducts effort, broadcasts result |
 | /api/campaigns/[id]/rest | POST | Rest system (short/long rest for selected characters, GM-only, creates changelog + game event) |
 | /api/campaigns/[id]/sessions | GET, POST | CampaignEventService (list sessions, start/end session) |
 | /api/campaigns/[id]/forge | GET, POST | ForgeService (list + create forge items, GM-only create, players see published only) |

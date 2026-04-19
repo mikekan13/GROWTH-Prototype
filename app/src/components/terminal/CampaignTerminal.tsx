@@ -31,6 +31,16 @@ interface CampaignTerminalProps {
   userId?: string;
   username?: string;
   userRole?: string;
+  /** Real-time SSE events from the campaign stream */
+  streamEvents?: TerminalEvent[];
+  /** Tick counter to detect new stream events without reference comparison */
+  streamEventsTick?: number;
+  /** Whether the SSE stream is connected */
+  connected?: boolean;
+  /** Users currently connected via SSE */
+  connectedUsers?: Array<{ userId: string; username: string; role: string }>;
+  /** All characters in this campaign (for GM skill check targeting) */
+  campaignCharacters?: Array<{ id: string; name: string }>;
 }
 
 // ── Filter Config ──────────────────────────────────────────────────────────
@@ -68,6 +78,11 @@ export default function CampaignTerminal({
   userId: _userId,
   username: _username,
   userRole: _userRole,
+  streamEvents,
+  streamEventsTick,
+  connected,
+  connectedUsers,
+  campaignCharacters,
 }: CampaignTerminalProps) {
   const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
@@ -184,13 +199,26 @@ export default function CampaignTerminal({
     }
   }, [visible, fetchEvents, fetchSessions]);
 
-  // Auto-poll every 5s when visible
+  // Merge stream events into the event list (replaces 5s polling)
+  useEffect(() => {
+    if (!streamEvents || streamEvents.length === 0) return;
+    setEvents(prev => {
+      const existingIds = new Set(prev.map(e => e.id));
+      const newEvents = streamEvents.filter(e => !existingIds.has(e.id));
+      if (newEvents.length === 0) return prev;
+      const merged = [...prev, ...newEvents];
+      merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      return merged;
+    });
+  }, [streamEventsTick, streamEvents]);
+
+  // Fallback poll every 30s (in case SSE reconnects and misses events)
   useEffect(() => {
     if (!visible) return;
     const interval = setInterval(() => {
       fetchEvents();
       fetchSessions();
-    }, 5000);
+    }, 30_000);
     return () => clearInterval(interval);
   }, [visible, fetchEvents, fetchSessions]);
 
@@ -511,6 +539,119 @@ export default function CampaignTerminal({
       }
     }
 
+    // Handle /skillcheck — GM initiates multi-step skill check
+    // Usage: /skillcheck <characterName> <skillName> dr:<n>
+    // Usage: /skillcheck <characterName> attr:<attribute> dr:<n>
+    if (trimmed.startsWith('/skillcheck')) {
+      const parts = trimmed.split(/\s+/);
+      const charName = parts[1];
+      if (!charName) {
+        await fetch(`/api/campaigns/${campaignId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'command',
+            payload: { kind: 'command', input: trimmed, result: 'Usage: /skillcheck <character> <skill> dr:<n>\n       /skillcheck <character> attr:<attribute> dr:<n>', success: false },
+          }),
+        });
+        fetchEvents();
+        return;
+      }
+
+      // Parse remaining args
+      const remaining = parts.slice(2);
+      let skillName: string | undefined;
+      let attrName: string | undefined;
+      let dr: number | undefined;
+      for (const arg of remaining) {
+        if (arg.startsWith('dr:')) dr = parseInt(arg.slice(3));
+        else if (arg.startsWith('attr:')) attrName = arg.slice(5);
+        else if (!skillName) skillName = arg;
+      }
+
+      if (!dr) {
+        await fetch(`/api/campaigns/${campaignId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'command',
+            payload: { kind: 'command', input: trimmed, result: 'Missing dr:<number>', success: false },
+          }),
+        });
+        fetchEvents();
+        return;
+      }
+
+      // Look up character by name from campaign characters
+      try {
+        const target = (campaignCharacters || []).find(c =>
+          c.name.toLowerCase() === charName.toLowerCase()
+        );
+
+        if (!target) {
+          await fetch(`/api/campaigns/${campaignId}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'command',
+              payload: { kind: 'command', input: trimmed, result: `Character "${charName}" not found in this campaign`, success: false },
+            }),
+          });
+          fetchEvents();
+          return;
+        }
+
+        // Initiate the skill check
+        const checkRes = await fetch(`/api/campaigns/${campaignId}/skill-check`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            characterId: target.id,
+            skillName: skillName || undefined,
+            attributeName: attrName || (skillName ? undefined : 'willpower'),
+            dr,
+          }),
+        });
+
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          await fetch(`/api/campaigns/${campaignId}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'game_event',
+              payload: {
+                kind: 'game_event',
+                eventType: 'skill_check',
+                description: `Skill check initiated for ${checkData.characterName}: ${checkData.skillName || 'unskilled'} vs DR ${dr} — SD: ${checkData.sdDie.toUpperCase()} → ${checkData.sdResult} [${checkData.difficultyHint.toUpperCase()}]`,
+              },
+            }),
+          });
+        } else {
+          const err = await checkRes.json();
+          await fetch(`/api/campaigns/${campaignId}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'command',
+              payload: { kind: 'command', input: trimmed, result: err.error || 'Skill check failed', success: false },
+            }),
+          });
+        }
+        fetchEvents();
+      } catch {
+        await fetch(`/api/campaigns/${campaignId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'command',
+            payload: { kind: 'command', input: trimmed, result: 'Connection failed', success: false },
+          }),
+        }).catch(() => {});
+      }
+      return;
+    }
+
     // Parse and execute command
     const result = executeCommand(trimmed, character?.data || null);
 
@@ -636,12 +777,23 @@ export default function CampaignTerminal({
       <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span style={{ color: '#22ab94', fontSize: '14px' }}>{'\u25C8'}</span>
+            <span style={{ color: connected ? '#22ab94' : '#666', fontSize: '14px' }} title={connected ? 'Connected (live)' : 'Disconnected (polling)'}>
+              {connected ? '\u25C8' : '\u25CB'}
+            </span>
             <h2 className="text-sm uppercase tracking-widest" style={{
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
               color: '#22ab94',
               fontSize: '18px',
             }}>CAMPAIGN TERMINAL</h2>
+            {connectedUsers && connectedUsers.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5" style={{
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                color: '#22ab9480',
+                border: '1px solid rgba(34,171,148,0.2)',
+              }} title={connectedUsers.map(u => u.username).join(', ')}>
+                {connectedUsers.length} online
+              </span>
+            )}
             {activeSession && (
               <span className="text-[13px] px-2 py-0.5" style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',

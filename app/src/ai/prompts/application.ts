@@ -19,7 +19,7 @@ ${campaign.worldContext ? `- World Context: ${campaign.worldContext}` : ''}
 Generate 5 creative, open-ended backstory prompts tailored to this campaign's setting and themes. Each prompt should:
 - Encourage rich character development
 - Be specific enough to inspire but open enough for creative freedom
-- Cover different aspects: origin, motivation, relationships, fears, goals
+- Cover different aspects: origin, motivation, relationships, goals
 
 Return ONLY a JSON array of objects with "prompt" and "category" fields.
 Categories: "origin", "motivation", "relationships", "personality", "goals"

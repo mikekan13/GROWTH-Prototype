@@ -417,6 +417,39 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
     return () => observer.disconnect();
   }, [active]);
 
+  // ── Skill Check: Spawn die in hand ────────────────────────────────────
+  // Listens for 'growth:spawn-die-in-hand' — spawns a die at the cursor
+  // in grabbed state. Player moves mouse and releases to fling it.
+  // After fling settles, the server value is applied.
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        dieType: string;
+        screenX: number;
+        screenY: number;
+        serverValue: number;
+      };
+      if (!detail?.dieType) return;
+
+      if (!ensureInitialized()) return;
+      const animator = animatorRef.current!;
+
+      const dieType = detail.dieType as DieType;
+      const opt = DIE_OPTIONS.find(d => d.type === dieType);
+      const color = opt?.color ?? 'white';
+
+      const throwId = animator.spawnDieInHand(dieType, color, detail.screenX, detail.screenY);
+      syncHasDice();
+
+      // Set server value so die settles to the correct face after fling
+      animator.setServerValues(throwId, [{ dieType, value: detail.serverValue }]);
+    };
+
+    window.addEventListener('growth:spawn-die-in-hand', handler);
+    return () => window.removeEventListener('growth:spawn-die-in-hand', handler);
+  }, [ensureInitialized, syncHasDice]);
+
   // ── Cleanup ───────────────────────────────────────────────────────────
 
   useEffect(() => {

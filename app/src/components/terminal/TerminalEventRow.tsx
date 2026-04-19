@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   attribute: '\u25C8', condition: '\u26A0', inventory: '\uD83C\uDF92',
   equipment: '\u2694', skill: '\u2605', magic: '\u2728', trait: '\u2736',
   grovine: '\u2618', vitals: '\u2695', identity: '\u263A', levels: '\u2191',
-  fear: '\u2620', harvest: '\u2618', backstory: '\u270E', campaign: '\u2302', status: '\u25CF',
+  harvest: '\u2618', backstory: '\u270E', campaign: '\u2302', status: '\u25CF',
 };
 
 // ── Time Formatter ─────────────────────────────────────────────────────────
