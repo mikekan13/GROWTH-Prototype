@@ -21,7 +21,7 @@ function formatKrma(value: string): string {
 
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
-const ForgePanel = dynamic(() => import('@/components/forge/ForgePanel'), { ssr: false });
+const ForgeWorkshop = dynamic(() => import('@/components/forge/ForgeWorkshop'), { ssr: false });
 const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), { ssr: false });
 const CharacterTab = dynamic(() => import('@/components/character/CharacterTab'), { ssr: false });
 const EffortWagerModal = dynamic(() => import('@/components/campaign/EffortWagerModal'), { ssr: false });
@@ -940,11 +940,10 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         )}
 
         {activeTab === 'forge' && (
-          <ForgePanel
+          <ForgeWorkshop
             campaignId={campaign.id}
             isGM={userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD'}
             userId={userId || ''}
-            onPlaceItem={handleCreateItemFromForge}
           />
         )}
 

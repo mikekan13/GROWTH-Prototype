@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { listForgeItems, createForgeItem, createForgeItemSchema } from '@/services/forge';
+import { listForgeItems, listGlobalCatalog, createForgeItem, createForgeItemSchema } from '@/services/forge';
 
 export async function GET(
   request: NextRequest,
@@ -11,6 +11,15 @@ export async function GET(
     const session = await requireAuth();
     const { id: campaignId } = await params;
     const sp = request.nextUrl.searchParams;
+
+    // Global catalog mode
+    if (sp.get('global') === 'true') {
+      const items = await listGlobalCatalog(
+        sp.get('type') || undefined,
+        sp.get('search') || undefined,
+      );
+      return NextResponse.json({ items });
+    }
 
     const items = await listForgeItems(campaignId, session.user.id, session.user.role, {
       type: sp.get('type') || undefined,
