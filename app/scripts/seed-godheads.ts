@@ -219,7 +219,6 @@ async function seedGodheads() {
         characterId: character.id,
         systemPrompt: seed.systemPrompt,
         temperature: seed.temperature,
-        active: true,
         walletId: wallet.id,
       },
     });

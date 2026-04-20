@@ -168,10 +168,9 @@ export async function authorForgeItem(
   if (!campaign) throw new NotFoundError('Campaign');
   if (campaign.gmUserId !== userId) throw new ForbiddenError('Only the campaign GM can author forge items');
 
-  // Get an active God-head for authoring (domain routing TODO — for now use any active God-head)
+  // Get a God-head for authoring (domain routing TODO — for now use any God-head)
   // Future: Eth'erling routes to domain-aligned God-head, then Kai evaluates KV balance
   const godhead = await prisma.godHead.findFirst({
-    where: { active: true },
     orderBy: { name: 'asc' },
   });
 

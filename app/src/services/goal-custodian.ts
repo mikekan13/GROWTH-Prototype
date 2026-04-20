@@ -49,14 +49,11 @@ export async function assignGoalCustodian(goalId: string): Promise<{
     fullContext: false,
   });
 
-  // Get active God-heads
-  const godheads = await prisma.godHead.findMany({
-    where: { active: true },
-  });
+  // Get all God-heads (god-heads never sleep)
+  const godheads = await prisma.godHead.findMany();
 
   if (godheads.length === 0) {
-    // No God-heads seeded yet — skip assignment
-    return { godheadName: '', pillar: '', reason: 'No active God-heads available' };
+    return { godheadName: '', pillar: '', reason: 'No God-heads seeded yet' };
   }
 
   const provider = getGodheadProvider();

@@ -530,16 +530,88 @@ model GodHead {
   character     Character @relation(fields: [characterId], references: [id])
   characterId   String    @unique // Links to Character record (universal sheet)
 
-  // AI behavior
+  // AI behavior — god-heads never sleep, no active flag
   systemPrompt  String    // Core personality + domain authority instructions
   temperature   Float     @default(0.7)
-  active        Boolean   @default(true)
 
   // Economy
   walletId      String?   // God-head's KRMA wallet ID
 
+  // Relations
+  memory        GodHeadMemory[]
+  invocations   GodHeadInvocation[]
+  actionLogs    GodHeadActionLog[]
+  tokenUsage    GodHeadTokenUsage[]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// ── God-Head Agent Infrastructure ─────────────────────────────────────────
+
+model GodHeadMemory {
+  id          String   @id @default(cuid())
+  godHead     GodHead  @relation(fields: [godHeadId], references: [id])
+  godHeadId   String
+  key         String   // Agent-managed key (e.g. "observations.kai.blueprint_preferences")
+  value       String   // JSON — agent writes whatever it needs
+  updatedAt   DateTime @updatedAt
+
+  @@unique([godHeadId, key])
+  @@index([godHeadId])
+}
+
+model GodHeadInvocation {
+  id           String   @id @default(cuid())
+  godHead      GodHead  @relation(fields: [godHeadId], references: [id])
+  godHeadId    String
+  triggerType  String   // goal.created, blueprint.created, gm.requested_council, manual, etc.
+  triggerData  String   // JSON — context for the trigger
+  status       String   @default("PENDING") // PENDING, RUNNING, DONE, FAILED
+  result       String?  // JSON — final output/summary
+  error        String?  // Error message if FAILED
+  stepCount    Int      @default(0) // Number of tool calls in this invocation
+  actionLogs   GodHeadActionLog[]
+  tokenUsage   GodHeadTokenUsage[]
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([godHeadId, status])
+  @@index([status, createdAt])
+}
+
+model GodHeadActionLog {
+  id            String           @id @default(cuid())
+  invocation    GodHeadInvocation @relation(fields: [invocationId], references: [id])
+  invocationId  String
+  godHead       GodHead          @relation(fields: [godHeadId], references: [id])
+  godHeadId     String
+  toolName      String           // read_entity, draft_blueprint, transfer_krma, etc.
+  input         String           // JSON — tool input parameters
+  output        String?          // JSON — tool return value
+  error         String?          // Error if tool call failed
+  durationMs    Int?
+  createdAt     DateTime         @default(now())
+
+  @@index([invocationId])
+  @@index([godHeadId, createdAt])
+}
+
+model GodHeadTokenUsage {
+  id            String            @id @default(cuid())
+  godHead       GodHead           @relation(fields: [godHeadId], references: [id])
+  godHeadId     String
+  invocation    GodHeadInvocation? @relation(fields: [invocationId], references: [id])
+  invocationId  String?
+  model         String            // claude-opus-4-6, claude-sonnet-4-6, etc.
+  inputTokens   Int
+  outputTokens  Int
+  costEstimate  Float             @default(0) // USD estimate
+  createdAt     DateTime          @default(now())
+
+  @@index([godHeadId])
+  @@index([invocationId])
 }
 
 model AccessCode {
