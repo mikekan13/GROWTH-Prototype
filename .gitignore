@@ -5,6 +5,9 @@ Thumbs.db
 # Obsidian
 .obsidian/
 
+# Dependencies
+node_modules/
+
 # Large files
 *.pdf
 *.png
