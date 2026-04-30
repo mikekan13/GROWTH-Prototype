@@ -7,34 +7,52 @@ import { GodHeadAgent } from '@/godhead/agent';
 import { executeTransaction } from '@/services/krma/ledger';
 import type { ForgeItemType } from './forge';
 
-// Flat fee charged to the campaign for one authoring request.
-// Paid from the campaign wallet to Kai's wallet on every call (success or
-// fail — Kai still spent the cycles). Future tiers can scale by KV or type.
-const AUTHORING_FEE = BigInt(10);
+// ── Chain economics ─────────────────────────────────────────────────────
+// GM→Creator funds the chain; Creator pays Kai; Kai pays Et'herling.
+// Whatever's left after handoffs stays with each god-head as their fee.
+const CHAIN_FUND = BigInt(30);                  // GM → Creator
+const CREATOR_TO_KAI = BigInt(10);              // Creator → Kai (balance check)
+const KAI_TO_ETHERLING = BigInt(10);            // Kai → Et'herling (KV grade)
+// Net retained per stage: Creator 10, Kai 0, Et'herling 10. Adjust later.
 
 // ── Input Schema ─────────────────────────────────────────────────────────
 
 export const forgeAuthorInputSchema = z.object({
   type: z.enum(['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn']),
   name: z.string().min(1, 'Name required').max(100),
-  description: z.string().min(10, 'Describe what you want Kai to build (at least 10 characters)').max(2000),
+  description: z.string().min(10, 'Describe what you want the chain to build (at least 10 characters)').max(2000),
   campaignContext: z.string().max(500).optional(),
 });
 
 export type ForgeAuthorInput = z.infer<typeof forgeAuthorInputSchema>;
 
-// ── Result type ──────────────────────────────────────────────────────────
+// ── Result types ─────────────────────────────────────────────────────────
+
+export interface ChainStageRecord {
+  godhead: string;
+  reasoning: string;
+  invocationId: string;
+  inputTokens: number;
+  outputTokens: number;
+}
 
 export interface ForgeAuthorResult {
   type: ForgeItemType;
   name: string;
   canonicalName: string;
   data: Record<string, unknown>;
-  godheadReasoning: string;
+  godheadReasoning: string;     // Combined narrative for legacy UI
   suggestedKV: number;
+  // Per-stage breakdown for the new GM review surface.
+  chainStages: {
+    router: { godhead: string; chosenCreator: string; reasoning: string };
+    creator: ChainStageRecord;
+    balance: ChainStageRecord;
+    kvGrade: ChainStageRecord;
+  };
 }
 
-// ── Schema guidance for each type (tells Kai what fields to generate) ────
+// ── Schema guidance for each type ────────────────────────────────────────
 
 const TYPE_SCHEMAS: Record<string, string> = {
   seed: `Generate a JSON object with these fields:
@@ -151,12 +169,6 @@ ROOT COSTING (age-scaled break-even, rulings r-2026-04-22-10 + -11):
 - Frequency cost = max(0, Root KV - break-even). Below break-even = player gets Freq refund.
 - Max Root age = 25 (hard cap — past that belongs to Branches).
 - Anchor: Plain 18-year-old Human Root = 100 KV. With Seed (225) = TKV 325 reference.
-- Max affordable Root KV = Seed Frequency + break-even(age). Human at age 18 ceiling = 140 KV.
-
-YEAR OF LIFE AS WEIGHT:
-- Average year produces about 5 KRMA of content KV. This is descriptive, not prescriptive.
-- Intense years (training montage, major life events) can produce 20-30+ KV.
-- Coasting years produce 1-2 KV. Per-year ratios outside ~3-15 should be flagged.
 
 SKILL LEVEL SCALE (ruling r-2026-04-22-02):
 - 1-3: Flat bonus (+1/+2/+3 to Fate Die)
@@ -165,33 +177,197 @@ SKILL LEVEL SCALE (ruling r-2026-04-22-02):
 - 8-11: d8 (professional)
 - 12-19: d12 (master)
 - 20: d20 (godlike / hard cap)
-- Character-creation soft cap: ~10 per skill. Up to 12 only with extreme tuning (old character + stacked Root/Branches on same skill). 20 is lifetime only.
 
 NECTARS, THORNS & BLOSSOMS (rulings r-2026-04-22-05 + -06):
-- Nectar = permanent positive trait. Thorn = permanent negative. Blossom = temporary (Godhead-granted during play, doesn't count against N+T limit).
+- Nectar = permanent positive trait. Thorn = permanent negative. Blossom = temporary.
 - Total Nectars + Thorns ≤ Fate Die max value (d6 = max 6 total, d20 = max 20).
-- Acquisition: mostly from GRO.vines (complete → Nectar; fail → Thorn). Also Harvests, character creation (Seed/Root/Branch bake-ins), GM-assigned events, Terminal injections, death events.
-- "Fears and anxieties" trigger is RETIRED — Fears system is cut.
 - Each N/T graded case-by-case. No formula.
-- Most Roots/Branches have ZERO nectars/thorns. Only add if character-defining.
 
 SEED REFERENCE:
-- Human is the ONLY verified canonical Seed: attrs_augs=50, freq=40, fatedAge=80, baseResist=15, fateDie=d6, N="Ambitious", T="Bounded Potential", KV=225.
-  Breakdown: 50 + 40 + 30(resist ×2) + 10(d6) + 80(fatedAge) + 15(N/T net) = 225.
-- Other pre-existing seeds (Elven, Dwarven, Cambion, etc.) are UNVERIFIED design proposals, not canon.
-
-RETIRED SYSTEMS (don't use):
-- Tech Level (entirely retired 2026-04-22 — not a character stat, not a material property, not a campaign descriptor). Skill-gating replaces it where relevant.
-- Per-character Wealth/Health Levels (retired earlier; only narrative descriptors remain).
-- Old age formula "-2 KV per year frequency reduction" — SUPERSEDED by the break-even model above.
+- Human is the ONLY verified canonical Seed: KV 225 (50 augs + 40 freq + 30 resist×2 + 10 d6 + 80 fatedAge + 15 N/T net).
 
 BALANCE PHILOSOPHY:
 - Every power has a cost. Every advantage creates a vulnerability.
-- Frequency is the universal currency — it's what gets spent to create things.
-- If something feels too powerful, raise its frequency cost or add a thorn.
-- KV should feel EARNED — a character with 500 KV should feel meaningfully different from one with 200 KV.`;
+- Frequency is the universal currency.
+- KV should feel EARNED — a 500 KV character should feel meaningfully different from a 200 KV one.`;
 
-// ── Core authoring function ──────────────────────────────────────────────
+// ── Selva: deterministic router (LLM Selva is post-MVP) ──────────────────
+
+interface RouterDecision {
+  godhead: string;        // Always "Selva" for now
+  chosenCreator: string;  // Name of the Creator god-head
+  reasoning: string;
+}
+
+function routeWithSelva(input: ForgeAuthorInput): RouterDecision {
+  // Barebones: Lady Death is the default Creator. She is the only MVP god-head
+  // not already locked into a downstream chain role (Kai = Balance, Et'herling
+  // = KV grader). Future iterations route by type/domain across a wider council.
+  return {
+    godhead: 'Selva',
+    chosenCreator: 'Tara Almswood',
+    reasoning: `Routed ${input.type} request to Lady Death (default Creator while the council is small). Kai will balance; Et'herling will grade KV.`,
+  };
+}
+
+// ── Stage instruction builders ───────────────────────────────────────────
+
+function creatorInstructions(type: string, schemaGuide: string): string {
+  return `You are the Creator god-head in the GRO.WTH blueprint authoring chain. Your job: turn the GM's narrative description into structured mechanical stats per the schema below. Do NOT grade KV — Et'herling will do that downstream. Do NOT exhaustively second-guess balance — Kai will adjust if needed.
+
+Use your read tools when helpful: search_blueprints to check for similar existing entries, read_my_memory for past rulings, query_relationships for context. Use write_my_memory to record any new pattern.
+
+${schemaGuide}
+
+NAME STANDARDIZATION:
+Approved designs go to the global catalog. Standardize the name:
+- Gender-neutral, setting-agnostic, reusable.
+- Keep the GM's described essence.
+- Return the standardized name in "canonicalName".
+
+FINAL OUTPUT FORMAT (must match exactly):
+\`\`\`json
+{
+  "canonicalName": "...",
+  "data": { ... matches schema ... },
+  "reasoning": "Why you authored these stats. Note any liberties taken from the literal description."
+}
+\`\`\`
+Only the fenced JSON. No prose around it.`;
+}
+
+function balanceInstructions(): string {
+  return `You are Kai, the Balance reviewer in the blueprint authoring chain. The Creator god-head has drafted stats. Your job: check for balance issues and ALTER the draft if needed. Use your tools to compare against existing blueprints.
+
+Possible alterations:
+- Stat adjustments (raise or lower numbers)
+- Add/remove nectars or thorns to even out a clearly skewed result
+- Flag (but do NOT fix) major scope issues — those go back to the Creator
+
+You SHOULD use search_blueprints to find precedents and read_my_memory for past balance rulings.
+
+${KV_GUIDANCE}
+
+FINAL OUTPUT FORMAT (must match exactly):
+\`\`\`json
+{
+  "canonicalName": "(unchanged or revised)",
+  "data": { ... possibly adjusted from the Creator's draft ... },
+  "reasoning": "What you changed and why. If nothing changed, say so explicitly.",
+  "altered": true
+}
+\`\`\`
+Only the fenced JSON.`;
+}
+
+function kvGradeInstructions(): string {
+  return `You are Et'herling, the KV grader in the blueprint authoring chain. The Creator drafted, Kai balanced. Your job: assign the final KRMA Value (KV) using the canonical costing rules. This is the number that will be stamped on the blueprint.
+
+${KV_GUIDANCE}
+
+Show your math in "reasoning". Sum each component (attributes, skills, frequency, resist, fated age, fate die, net N/T) and total it.
+
+FINAL OUTPUT FORMAT (must match exactly):
+\`\`\`json
+{
+  "suggestedKV": 0,
+  "reasoning": "KV math: <component breakdown> = <total>. Notes on any judgment calls."
+}
+\`\`\`
+Only the fenced JSON.`;
+}
+
+// ── Response parsing ─────────────────────────────────────────────────────
+
+function extractJson<T = Record<string, unknown>>(response: string, label: string): T {
+  const match = response.match(/```json\s*([\s\S]*?)```/) || response.match(/\{[\s\S]*\}/);
+  if (!match) throw new ValidationError(`${label} returned an unparseable response.`);
+  try {
+    return JSON.parse(match[1] || match[0]);
+  } catch {
+    throw new ValidationError(`${label} returned invalid JSON.`);
+  }
+}
+
+// ── Stage runners ────────────────────────────────────────────────────────
+
+interface CreatorOutput {
+  canonicalName: string;
+  data: Record<string, unknown>;
+  reasoning: string;
+}
+interface BalanceOutput {
+  canonicalName: string;
+  data: Record<string, unknown>;
+  reasoning: string;
+  altered: boolean;
+}
+interface KVGradeOutput {
+  suggestedKV: number;
+  reasoning: string;
+}
+
+async function runStage<T>(
+  godheadName: string,
+  triggerType: string,
+  triggerData: Record<string, unknown>,
+  parser: (final: string) => T,
+): Promise<{ parsed: T; record: ChainStageRecord }> {
+  const agent = await GodHeadAgent.load(godheadName);
+  const result = await agent.invoke(triggerType, triggerData);
+
+  if (result.status === 'FAILED' || !result.result) {
+    throw new ValidationError(
+      `${godheadName} stage failed: ${result.error || 'no response'}`,
+    );
+  }
+  const parsed = parser(result.result);
+  return {
+    parsed,
+    record: {
+      godhead: godheadName,
+      reasoning: '', // filled by caller from parsed output
+      invocationId: result.invocationId,
+      inputTokens: result.totalInputTokens,
+      outputTokens: result.totalOutputTokens,
+    },
+  };
+}
+
+// ── Inter-stage KRMA helpers ─────────────────────────────────────────────
+
+async function transferBetweenGodheads(params: {
+  fromGodheadName: string;
+  toGodheadName: string;
+  amount: bigint;
+  description: string;
+  campaignId: string;
+  metadata: Record<string, unknown>;
+  idempotencyKey: string;
+}): Promise<void> {
+  const [from, to] = await Promise.all([
+    prisma.godHead.findUnique({ where: { name: params.fromGodheadName } }),
+    prisma.godHead.findUnique({ where: { name: params.toGodheadName } }),
+  ]);
+  if (!from?.walletId) throw new ValidationError(`${params.fromGodheadName} has no wallet`);
+  if (!to?.walletId) throw new ValidationError(`${params.toGodheadName} has no wallet`);
+
+  await executeTransaction({
+    fromWalletId: from.walletId,
+    toWalletId: to.walletId,
+    amount: params.amount,
+    state: 'FLUID',
+    reason: 'BLUEPRINT_CHAIN_HANDOFF',
+    description: params.description,
+    metadata: params.metadata,
+    campaignId: params.campaignId,
+    actorId: from.id,
+    actorType: 'GODHEAD',
+    idempotencyKey: params.idempotencyKey,
+  });
+}
+
+// ── Core orchestrator ────────────────────────────────────────────────────
 
 export async function authorForgeItem(
   campaignId: string,
@@ -199,7 +375,7 @@ export async function authorForgeItem(
   userRole: string,
   input: ForgeAuthorInput,
 ): Promise<ForgeAuthorResult> {
-  // Permission check — GM only
+  // Permission + campaign load
   if (!isWatcherOrAbove(userRole)) throw new ForbiddenError();
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
@@ -208,15 +384,23 @@ export async function authorForgeItem(
   if (!campaign) throw new NotFoundError('Campaign');
   if (campaign.gmUserId !== userId) throw new ForbiddenError('Only the campaign GM can author forge items');
 
-  // Future: Eth'erling routes to domain-aligned God-head. For barebones, Kai
-  // both authors and evaluates. Fail loud if Kai isn't seeded.
-  const godhead = await prisma.godHead.findUnique({
-    where: { name: 'Kai' },
-  });
-  if (!godhead) throw new NotFoundError("God-head 'Kai' (run scripts/seed-godheads.ts)");
-  if (!godhead.walletId) throw new ValidationError("Kai has no wallet — cannot accept authoring fee");
+  const schemaGuide = TYPE_SCHEMAS[input.type];
+  if (!schemaGuide) throw new ValidationError(`Unsupported forge type: ${input.type}`);
 
-  // Charge the campaign wallet — the GM's KRMA pool funds authoring.
+  // ── Selva: route the request (deterministic for now) ─────────────────
+  const router = routeWithSelva(input);
+
+  // Resolve all chain participants up front so we fail fast if any are missing.
+  const [creator, kai, etherling] = await Promise.all([
+    prisma.godHead.findUnique({ where: { name: router.chosenCreator } }),
+    prisma.godHead.findUnique({ where: { name: 'Kai' } }),
+    prisma.godHead.findUnique({ where: { name: "Eth'erling" } }),
+  ]);
+  if (!creator?.walletId) throw new NotFoundError(`Creator god-head '${router.chosenCreator}' missing or has no wallet`);
+  if (!kai?.walletId) throw new NotFoundError("God-head 'Kai' missing or has no wallet");
+  if (!etherling?.walletId) throw new NotFoundError("God-head 'Eth'erling' missing or has no wallet");
+
+  // Charge the campaign — funds the whole chain in one shot.
   const campaignWallet = await prisma.wallet.findFirst({
     where: { campaignId, ownerType: 'CAMPAIGN' },
     select: { id: true },
@@ -224,124 +408,121 @@ export async function authorForgeItem(
   if (!campaignWallet) {
     throw new ValidationError('Campaign has no wallet — fund it before authoring');
   }
+  const fundIdem = `forge.chain.fund:${campaignId}:${userId}:${input.type}:${input.name}:${Date.now()}`;
   await executeTransaction({
     fromWalletId: campaignWallet.id,
-    toWalletId: godhead.walletId,
-    amount: AUTHORING_FEE,
+    toWalletId: creator.walletId,
+    amount: CHAIN_FUND,
     state: 'FLUID',
     reason: 'BLUEPRINT_AUTHOR',
-    description: `Authoring fee for ${input.type}: "${input.name}"`,
-    metadata: { type: input.type, requestedName: input.name },
+    description: `Chain fund — ${input.type} "${input.name}" (Creator: ${creator.name})`,
+    metadata: { type: input.type, requestedName: input.name, chosenCreator: creator.name },
     campaignId,
     actorId: userId,
     actorType: 'GM',
-    idempotencyKey: `forge.author:${campaignId}:${userId}:${input.type}:${input.name}:${Date.now()}`,
+    idempotencyKey: fundIdem,
   });
 
-  const schemaGuide = TYPE_SCHEMAS[input.type];
-  if (!schemaGuide) throw new ValidationError(`Unsupported forge type: ${input.type}`);
+  const campaignContext = {
+    id: campaignId,
+    name: campaign.name,
+    genre: campaign.genre,
+    worldContext: campaign.worldContext,
+  };
 
-  // Invoke Kai via the god-head agent runtime. She gets read tools
-  // (search_blueprints, query_relationships, read_my_memory, etc.) and
-  // can persist reasoning to memory across calls — meaning she stays
-  // consistent with her own past rulings. Final text response must be
-  // a fenced JSON block per the format we describe in the trigger.
-  const agent = await GodHeadAgent.load('Kai');
-  const invocationResult = await agent.invoke('forge.author_request', {
-    instructions: buildAuthoringInstructions(input.type, schemaGuide),
-    request: {
+  // ── Stage 1: Creator drafts ──────────────────────────────────────────
+  const creatorStage = await runStage<CreatorOutput>(
+    creator.name,
+    'forge.author.creator',
+    {
+      instructions: creatorInstructions(input.type, schemaGuide),
+      request: {
+        type: input.type,
+        requestedName: input.name,
+        description: input.description,
+        campaignContext: input.campaignContext ?? null,
+      },
+      campaign: campaignContext,
+    },
+    (text) => extractJson<CreatorOutput>(text, creator.name),
+  );
+  creatorStage.record.reasoning = creatorStage.parsed.reasoning;
+
+  // Creator pays Kai for the balance check.
+  await transferBetweenGodheads({
+    fromGodheadName: creator.name,
+    toGodheadName: 'Kai',
+    amount: CREATOR_TO_KAI,
+    description: `Balance handoff for ${input.type} "${input.name}"`,
+    campaignId,
+    metadata: { fundIdem, stage: 'creator->kai' },
+    idempotencyKey: `${fundIdem}:creator->kai`,
+  });
+
+  // ── Stage 2: Kai balance-checks ──────────────────────────────────────
+  const balanceStage = await runStage<BalanceOutput>(
+    'Kai',
+    'forge.author.balance',
+    {
+      instructions: balanceInstructions(),
+      creatorOutput: creatorStage.parsed,
       type: input.type,
-      requestedName: input.name,
-      description: input.description,
-      campaignContext: input.campaignContext ?? null,
+      schema: schemaGuide,
+      campaign: campaignContext,
     },
-    campaign: {
-      id: campaignId,
-      name: campaign.name,
-      genre: campaign.genre,
-      worldContext: campaign.worldContext,
-    },
+    (text) => extractJson<BalanceOutput>(text, 'Kai'),
+  );
+  balanceStage.record.reasoning = balanceStage.parsed.reasoning;
+
+  // Kai pays Et'herling for the KV grading stage.
+  await transferBetweenGodheads({
+    fromGodheadName: 'Kai',
+    toGodheadName: "Eth'erling",
+    amount: KAI_TO_ETHERLING,
+    description: `KV grading handoff for ${input.type} "${input.name}"`,
+    campaignId,
+    metadata: { fundIdem, stage: 'kai->etherling' },
+    idempotencyKey: `${fundIdem}:kai->etherling`,
   });
 
-  if (invocationResult.status === 'FAILED' || !invocationResult.result) {
-    throw new ValidationError(
-      `Kai's authoring invocation failed: ${invocationResult.error || 'no response'}`,
-    );
-  }
+  // ── Stage 3: Et'herling grades KV ────────────────────────────────────
+  const kvStage = await runStage<KVGradeOutput>(
+    "Eth'erling",
+    'forge.author.kv_grade',
+    {
+      instructions: kvGradeInstructions(),
+      finalDraft: {
+        canonicalName: balanceStage.parsed.canonicalName,
+        data: balanceStage.parsed.data,
+      },
+      type: input.type,
+      campaign: campaignContext,
+    },
+    (text) => extractJson<KVGradeOutput>(text, "Eth'erling"),
+  );
+  kvStage.record.reasoning = kvStage.parsed.reasoning;
 
-  return parseAuthorResponse(invocationResult.result, input.type, input.name);
-}
-
-// ── Authoring instructions (consumed by Kai via the trigger context) ─────
-
-function buildAuthoringInstructions(type: string, schemaGuide: string): string {
-  return `You are authoring AND grading a ${type} blueprint for a GM. This is a single-pass author+evaluate task.
-
-You may use your read tools (search_blueprints to check for similar existing entries, read_my_memory to recall past rulings, query_relationships if context matters). You do NOT need to call draft_blueprint — the GM still reviews before any persistence happens. Your job is to return a structured proposal.
-
-You SHOULD use write_my_memory to record any new ruling or pattern you establish — future authoring calls benefit from your consistency.
-
-${schemaGuide}
-
-${KV_GUIDANCE}
-
-NAME STANDARDIZATION:
-Approved designs go to the global catalog for ALL campaigns. Standardize the name:
-- Gender-neutral: "Miller's Daughter" → "Miller's Child"
-- Setting-agnostic: "Elven Longbow of the Northern Reach" → "Elven Longbow"
-- Reusable and catalog-worthy — no campaign-specific proper nouns
-- Keep the essence the GM described
-Return the standardized name in "canonicalName".
-
-KV GRADING (your evaluation duty):
-- Compute "suggestedKV" using the costing rules above. Show your math in "reasoning".
-- Flag if the GM's request implies stats outside expected balance ranges.
-- If you adjust stats from a literal reading of the description for balance, say so in "reasoning".
-
-FINAL OUTPUT FORMAT:
-After any tool calls, your final assistant message MUST be exactly one fenced JSON block, no surrounding prose:
-\`\`\`json
-{
-  "canonicalName": "...",
-  "data": { ... matches the schema above ... },
-  "reasoning": "Balance decisions, name changes, and KV math.",
-  "suggestedKV": 000
-}
-\`\`\`
-
-Do not include fields outside the schema. Do not wrap in extra prose. Only the fenced JSON.`;
-}
-
-// ── Response parser ──────────────────────────────────────────────────────
-
-function parseAuthorResponse(response: string, type: ForgeItemType, name: string): ForgeAuthorResult {
-  // Extract JSON from response (may be wrapped in ```json ... ```)
-  const jsonMatch = response.match(/```json\s*([\s\S]*?)```/) || response.match(/\{[\s\S]*\}/);
-
-  if (!jsonMatch) {
-    throw new ValidationError('God-head returned an unparseable response. Try rephrasing your description.');
-  }
-
-  const jsonStr = jsonMatch[1] || jsonMatch[0];
-  let parsed: { canonicalName?: string; data: Record<string, unknown>; reasoning: string; suggestedKV: number };
-
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch {
-    throw new ValidationError('God-head returned invalid JSON. Try again with a clearer description.');
-  }
-
-  if (!parsed.data || typeof parsed.data !== 'object') {
-    throw new ValidationError('God-head response missing "data" field.');
-  }
+  // ── Combine for return ───────────────────────────────────────────────
+  const combinedReasoning = [
+    `🔀 ${router.godhead} → ${router.chosenCreator}: ${router.reasoning}`,
+    `📜 ${creator.name} (Creator): ${creatorStage.parsed.reasoning}`,
+    `⚖️  Kai (Balance${balanceStage.parsed.altered ? ' — altered' : ' — no change'}): ${balanceStage.parsed.reasoning}`,
+    `💎 Eth'erling (KV): ${kvStage.parsed.reasoning}`,
+  ].join('\n\n');
 
   return {
-    type,
-    name,
-    canonicalName: parsed.canonicalName || name,
-    data: parsed.data,
-    godheadReasoning: parsed.reasoning || 'No reasoning provided.',
-    suggestedKV: parsed.suggestedKV || 0,
+    type: input.type,
+    name: input.name,
+    canonicalName: balanceStage.parsed.canonicalName,
+    data: balanceStage.parsed.data,
+    godheadReasoning: combinedReasoning,
+    suggestedKV: kvStage.parsed.suggestedKV,
+    chainStages: {
+      router,
+      creator: creatorStage.record,
+      balance: balanceStage.record,
+      kvGrade: kvStage.record,
+    },
   };
 }
 
@@ -366,7 +547,6 @@ export async function confirmForgeAuthoring(
   if (!campaign) throw new NotFoundError('Campaign');
   if (campaign.gmUserId !== userId) throw new ForbiddenError('Only the campaign GM can confirm forge items');
 
-  // Create the forge item as draft
   const item = await prisma.forgeItem.create({
     data: {
       campaignId,

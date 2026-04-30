@@ -28,7 +28,8 @@ export type TransactionReason =
   | 'CHARACTER_INVEST'
   | 'CHARACTER_ADJUST'
   // Forge / Blueprint Authoring
-  | 'BLUEPRINT_AUTHOR'
+  | 'BLUEPRINT_AUTHOR'        // GM funds the Creator god-head for the chain (entry payment)
+  | 'BLUEPRINT_CHAIN_HANDOFF' // Inter-godhead payment between chain stages (Creator→Kai→Et'herling)
   // Session Play
   | 'SESSION_REWARD'
   | 'REROLL_COST'
