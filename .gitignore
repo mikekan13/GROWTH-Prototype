@@ -15,3 +15,11 @@ node_modules/
 
 # Beta codebase (reference only, not part of the build)
 GRO.WTH Beta/
+
+# Secrets — never commit env files at any depth
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example

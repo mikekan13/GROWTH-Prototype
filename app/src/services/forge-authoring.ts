@@ -4,7 +4,13 @@ import { prisma } from '@/lib/db';
 import { ValidationError, NotFoundError, ForbiddenError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { getGodheadProvider } from '@/ai/providers';
+import { executeTransaction } from '@/services/krma/ledger';
 import type { ForgeItemType } from './forge';
+
+// Flat fee charged to the campaign for one authoring request.
+// Paid from the campaign wallet to Kai's wallet on every call (success or
+// fail — Kai still spent the cycles). Future tiers can scale by KV or type.
+const AUTHORING_FEE = BigInt(10);
 
 // ── Input Schema ─────────────────────────────────────────────────────────
 
@@ -42,8 +48,10 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - nectars: string[] (up to 10 positive traits — racial/species advantages)
   - thorns: string[] (up to 10 negative traits — racial/species disadvantages)
 
-  Balance guidelines: Human baseline has total attributes=50, frequency=40, fatedAge=80, baseResist=15, KV=225.
-  Elven: attrs=69, freq=30, fatedAge=500, resist=13, KV=255. Dwarven: attrs=63, freq=30, fatedAge=350, resist=18, KV=580.
+  Human (ONLY verified reference Seed — ruling 2026-04-22):
+    attrs_augs total=50, frequency=40, fatedAge=80, baseResist=15, fateDie=d6,
+    Nectar="Ambitious", Thorn="Bounded Potential", KV=225.
+  Other pre-existing seeds (Elven/Dwarven/Cambion/etc.) are UNVERIFIED — treat them as design proposals, not canonical reference.
   More powerful seeds cost more frequency. Most seeds have 0-1 nectars and 0-1 thorns. Many have none.
   Only add nectars/thorns if they are truly character-defining species traits.`,
 
@@ -57,9 +65,14 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - thorns: string[] (disadvantages or obligations)
   - seedRequirement: string (which seed type this root requires, or "" for any)
 
-  Balance: A typical root has 3-6 skills at levels 2-8 (NEVER above 12), total attribute points 10-25.
-  Frequency = (total attribute points) + (total skill levels) - (ageAdded × 2).
-  Age is usually 16-21 for a root (childhood).
+  Balance: A typical root has 3-6 skills at levels 2-8, total attribute points 10-25.
+  Root age can be 0-25 (hard cap at 25 per ruling r-2026-04-22-11; past 25 is Branches territory). Most roots are 15-22.
+  Character-creation skill soft cap: ~10 per skill, up to 12 with extreme tuning (ruling r-2026-04-22-02).
+  New Root-costing model (rulings r-2026-04-22-10 + -11):
+    Root KV = (sum attribute levels) + (sum skill levels) + net nectar/thorn KV.
+    Break-even at age Y = 100 + (Y - 18) × 5.
+    Frequency field = max(0, Root KV - break-even). 0 = free; positive = player pays; conceptual refund if KV is below break-even.
+    Anchor: Plain 18-year-old Human Root = 100 KV (with Seed 225 => TKV 325).
   Most roots have NO nectars or thorns unless the GM specifically describes something character-defining.`,
 
   branch: `Generate a JSON object with these fields:
@@ -72,8 +85,13 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - thorns: string[] (specialization costs/drawbacks)
   - requirements: string (prerequisites like "Root: Soldier" or "")
 
-  Balance: Branches are narrower than roots — 2-4 skills at levels 3-10 (specialist, NEVER above 12), total attributes 5-15.
-  Frequency = (total attribute points) + (total skill levels) - (ageAdded × 2).
+  Balance: Branches are narrower than roots — 2-4 skills at levels 3-10, total attributes 5-15.
+  Branch costing uses the same break-even model as Roots (rulings r-2026-04-22-10 + -11):
+    Branch KV = (sum attribute levels added) + (sum skill levels added) + net nectar/thorn KV.
+    Break-even for a Branch with ageAdded Y = Y × 5 (each year a Branch adds contributes 5 KV of baseline).
+    Frequency field = max(0, Branch KV - break-even). 0 = free; positive = player pays Frequency.
+    Note: Branches are not yet fully specified in the rulebook — the above is a working model pending final ruling.
+  Character-creation skill soft cap: ~10 per skill, up to 12 with extreme tuning.
   Branches represent focused training AFTER a root. Most have NO nectars/thorns.`,
 
   skill: `Generate a JSON object with these fields:
@@ -87,7 +105,7 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - itemType: "weapon"|"armor"|"accessory"|"consumable"|"tool"|"artifact"|"prima_materia"|"misc"
   - material: string (e.g. "Steel", "Ironwood", "Dragonbone")
   - weightLevel: integer 0-10
-  - condition: integer 1-4 (4=pristine, 1=broken)
+  - condition: integer 0-4 (ruling r-2026-04-22-12: 4=Indestructible super-rare, 3=Undamaged/normal max, 2=Worn, 1=Broken, 0=Destroyed/nonexistent). Default new items to 3.
   - rarity: "common"|"uncommon"|"rare"|"very_rare"|"legendary"|"artifact"
   - value: number (in standard currency units)
   - notes: string (special properties or lore)
@@ -113,37 +131,59 @@ const TYPE_SCHEMAS: Record<string, string> = {
 
 // ── KV estimation guidance ───────────────────────────────────────────────
 
-const KV_GUIDANCE = `KRMA VALUE (KV) CALCULATION — use these concrete rules:
+const KV_GUIDANCE = `KRMA VALUE (KV) CALCULATION — canonical rules as of 2026-04-22.
+See rulebook/rulebook.md §3 (attributes), §6 (character creation), §9 (items) for full detail.
 
-COSTING RULES:
-- 1 attribute point = 1 KV
-- 1 skill level = 1 KV (regular skills)
+COSTING RULES (per-unit):
+- 1 attribute augment point = 1 KV (Seed grants augs)
+- 1 attribute level = 1 KV (Root/Branch grants levels)
+- 1 skill level = 1 KV (mundane skills)
 - 2 KV per magic/supernatural skill level
-- Age on roots: every year of age = -2 KV (frequency reduction). Root age represents childhood (usually 16-21 years).
-- Root frequency = sum of all costs (attributes + skills) minus age reduction
-- Body Resist: 1 KV per point of base resist
+- 1 KV per point of Frequency
+- 2 KV per point of Base Resist
+- 1 KV per year of Fated Age (provisional — long-lived Seeds like Elf/Dragon may use a curve later)
+- Fate Die KV: d4=5, d6=10, d8=20, d12=40, d20=80
+- Nectar/Thorn: graded individually by mechanical and narrative impact (no formula). Net can be positive or negative.
 
-SKILL LEVEL SCALE:
-- 1-5: Novice to competent (basic training)
-- 6-9: Professional (years of practice)
-- 10-12: Expert (top of normal human capability)
-- 13-15: Exceptional (Michael Jordan = Basketball 13)
-- 16-19: Superhuman mastery
-- 20: God-level
-Roots should have skills mostly in the 2-8 range. Nothing above 12 on a root.
+ROOT COSTING (age-scaled break-even, rulings r-2026-04-22-10 + -11):
+- Root KV = attribute_levels + skill_levels + net_nectar_thorn_KV (no direct age term)
+- Break-even KV at age Y = 100 + (Y - 18) × 5
+- Frequency cost = max(0, Root KV - break-even). Below break-even = player gets Freq refund.
+- Max Root age = 25 (hard cap — past that belongs to Branches).
+- Anchor: Plain 18-year-old Human Root = 100 KV. With Seed (225) = TKV 325 reference.
+- Max affordable Root KV = Seed Frequency + break-even(age). Human at age 18 ceiling = 140 KV.
 
-NECTARS & THORNS — EXTREMELY RARE:
-- These are character-defining abilities that fundamentally change how a character plays
-- Most seeds, roots, and branches have ZERO nectars and ZERO thorns
-- Only add them if the GM's description explicitly calls for something character-defining
-- If you suggest nectars/thorns, note they must be separately authored and reviewed
-- Examples: "Dark Sight" (see in darkness), "Long Lifespan Frailty" (age penalty)
+YEAR OF LIFE AS WEIGHT:
+- Average year produces about 5 KRMA of content KV. This is descriptive, not prescriptive.
+- Intense years (training montage, major life events) can produce 20-30+ KV.
+- Coasting years produce 1-2 KV. Per-year ratios outside ~3-15 should be flagged.
 
-REFERENCE SEEDS (from canonical catalog):
-- Human: attrs total=50, freq=40, fatedAge=80, resist=15, KV=225
-- Elven: attrs total=69, freq=30, fatedAge=500, resist=13, KV=255
-- Dwarven: attrs total=63, freq=30, fatedAge=350, resist=18, KV=580
-- Seeds with higher total attributes or better stats cost more frequency
+SKILL LEVEL SCALE (ruling r-2026-04-22-02):
+- 1-3: Flat bonus (+1/+2/+3 to Fate Die)
+- 4-5: d4 skill die (basic competency)
+- 6-7: d6
+- 8-11: d8 (professional)
+- 12-19: d12 (master)
+- 20: d20 (godlike / hard cap)
+- Character-creation soft cap: ~10 per skill. Up to 12 only with extreme tuning (old character + stacked Root/Branches on same skill). 20 is lifetime only.
+
+NECTARS, THORNS & BLOSSOMS (rulings r-2026-04-22-05 + -06):
+- Nectar = permanent positive trait. Thorn = permanent negative. Blossom = temporary (Godhead-granted during play, doesn't count against N+T limit).
+- Total Nectars + Thorns ≤ Fate Die max value (d6 = max 6 total, d20 = max 20).
+- Acquisition: mostly from GRO.vines (complete → Nectar; fail → Thorn). Also Harvests, character creation (Seed/Root/Branch bake-ins), GM-assigned events, Terminal injections, death events.
+- "Fears and anxieties" trigger is RETIRED — Fears system is cut.
+- Each N/T graded case-by-case. No formula.
+- Most Roots/Branches have ZERO nectars/thorns. Only add if character-defining.
+
+SEED REFERENCE:
+- Human is the ONLY verified canonical Seed: attrs_augs=50, freq=40, fatedAge=80, baseResist=15, fateDie=d6, N="Ambitious", T="Bounded Potential", KV=225.
+  Breakdown: 50 + 40 + 30(resist ×2) + 10(d6) + 80(fatedAge) + 15(N/T net) = 225.
+- Other pre-existing seeds (Elven, Dwarven, Cambion, etc.) are UNVERIFIED design proposals, not canon.
+
+RETIRED SYSTEMS (don't use):
+- Tech Level (entirely retired 2026-04-22 — not a character stat, not a material property, not a campaign descriptor). Skill-gating replaces it where relevant.
+- Per-character Wealth/Health Levels (retired earlier; only narrative descriptors remain).
+- Old age formula "-2 KV per year frequency reduction" — SUPERSEDED by the break-even model above.
 
 BALANCE PHILOSOPHY:
 - Every power has a cost. Every advantage creates a vulnerability.
@@ -168,10 +208,34 @@ export async function authorForgeItem(
   if (!campaign) throw new NotFoundError('Campaign');
   if (campaign.gmUserId !== userId) throw new ForbiddenError('Only the campaign GM can author forge items');
 
-  // Get a God-head for authoring (domain routing TODO — for now use any God-head)
-  // Future: Eth'erling routes to domain-aligned God-head, then Kai evaluates KV balance
-  const godhead = await prisma.godHead.findFirst({
-    orderBy: { name: 'asc' },
+  // Future: Eth'erling routes to domain-aligned God-head. For barebones, Kai
+  // both authors and evaluates. Fail loud if Kai isn't seeded.
+  const godhead = await prisma.godHead.findUnique({
+    where: { name: 'Kai' },
+  });
+  if (!godhead) throw new NotFoundError("God-head 'Kai' (run scripts/seed-godheads.ts)");
+  if (!godhead.walletId) throw new ValidationError("Kai has no wallet — cannot accept authoring fee");
+
+  // Charge the campaign wallet — the GM's KRMA pool funds authoring.
+  const campaignWallet = await prisma.wallet.findFirst({
+    where: { campaignId, ownerType: 'CAMPAIGN' },
+    select: { id: true },
+  });
+  if (!campaignWallet) {
+    throw new ValidationError('Campaign has no wallet — fund it before authoring');
+  }
+  await executeTransaction({
+    fromWalletId: campaignWallet.id,
+    toWalletId: godhead.walletId,
+    amount: AUTHORING_FEE,
+    state: 'FLUID',
+    reason: 'BLUEPRINT_AUTHOR',
+    description: `Authoring fee for ${input.type}: "${input.name}"`,
+    metadata: { type: input.type, requestedName: input.name },
+    campaignId,
+    actorId: userId,
+    actorType: 'GM',
+    idempotencyKey: `forge.author:${campaignId}:${userId}:${input.type}:${input.name}:${Date.now()}`,
   });
 
   const schemaGuide = TYPE_SCHEMAS[input.type];

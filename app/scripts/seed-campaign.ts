@@ -6,13 +6,15 @@ import { prisma } from '../src/lib/db';
 import crypto from 'crypto';
 
 async function main() {
-  const godhead = await prisma.user.findFirst({ where: { role: 'GODHEAD' } });
-  if (!godhead) {
-    console.error('No GODHEAD user found. Run seed-admin.ts first.');
+  const admin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  if (!admin) {
+    console.error('No ADMIN user found. Run seed-admin.ts first.');
     return;
   }
 
-  const existing = await prisma.campaign.findFirst({ where: { gmUserId: godhead.id } });
+  const existing = await prisma.campaign.findFirst({
+    where: { name: 'The Prime Campaign' },
+  });
   if (existing) {
     console.log(`Campaign "${existing.name}" already exists (id: ${existing.id}). Skipping.`);
     return;
@@ -26,18 +28,29 @@ async function main() {
       genre: 'Cosmic Fantasy',
       description: 'The original campaign — where the patterns were first recognized.',
       worldContext: 'A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness.',
-      gmUserId: godhead.id,
+      gmUserId: admin.id,
       inviteCode,
       maxTrailblazers: 5,
     },
   });
 
-  // Also add the godhead as a campaign member
   await prisma.campaignMember.create({
-    data: { campaignId: campaign.id, userId: godhead.id },
+    data: { campaignId: campaign.id, userId: admin.id },
+  });
+
+  // Also create the campaign's KRMA wallet so authoring/economy can target it.
+  await prisma.wallet.create({
+    data: {
+      ownerType: 'CAMPAIGN',
+      walletType: 'CAMPAIGN',
+      campaignId: campaign.id,
+      label: campaign.name,
+      balance: 0n,
+    },
   });
 
   console.log(`Created campaign: "${campaign.name}" (id: ${campaign.id})`);
+  console.log(`GM: ${admin.username || admin.email} (${admin.id})`);
   console.log(`Invite code: ${inviteCode}`);
 }
 

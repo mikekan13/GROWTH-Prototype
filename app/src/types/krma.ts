@@ -27,6 +27,8 @@ export type TransactionReason =
   // Character Creation
   | 'CHARACTER_INVEST'
   | 'CHARACTER_ADJUST'
+  // Forge / Blueprint Authoring
+  | 'BLUEPRINT_AUTHOR'
   // Session Play
   | 'SESSION_REWARD'
   | 'REROLL_COST'
