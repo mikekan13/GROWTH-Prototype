@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ValidationError, NotFoundError, ForbiddenError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
-import { getGodheadProvider } from '@/ai/providers';
+import { GodHeadAgent } from '@/godhead/agent';
 import { executeTransaction } from '@/services/krma/ledger';
 import type { ForgeItemType } from './forge';
 
@@ -241,91 +241,75 @@ export async function authorForgeItem(
   const schemaGuide = TYPE_SCHEMAS[input.type];
   if (!schemaGuide) throw new ValidationError(`Unsupported forge type: ${input.type}`);
 
-  // Build system prompt — God-head personality + mechanical authoring instructions
-  const systemPrompt = buildSystemPrompt(godhead?.systemPrompt, input.type, schemaGuide);
+  // Invoke Kai via the god-head agent runtime. She gets read tools
+  // (search_blueprints, query_relationships, read_my_memory, etc.) and
+  // can persist reasoning to memory across calls — meaning she stays
+  // consistent with her own past rulings. Final text response must be
+  // a fenced JSON block per the format we describe in the trigger.
+  const agent = await GodHeadAgent.load('Kai');
+  const invocationResult = await agent.invoke('forge.author_request', {
+    instructions: buildAuthoringInstructions(input.type, schemaGuide),
+    request: {
+      type: input.type,
+      requestedName: input.name,
+      description: input.description,
+      campaignContext: input.campaignContext ?? null,
+    },
+    campaign: {
+      id: campaignId,
+      name: campaign.name,
+      genre: campaign.genre,
+      worldContext: campaign.worldContext,
+    },
+  });
 
-  // Build user prompt — the GM's narrative request
-  const userPrompt = buildUserPrompt(input, campaign.name, campaign.genre, campaign.worldContext);
+  if (invocationResult.status === 'FAILED' || !invocationResult.result) {
+    throw new ValidationError(
+      `Kai's authoring invocation failed: ${invocationResult.error || 'no response'}`,
+    );
+  }
 
-  const provider = getGodheadProvider();
-
-  const response = await provider.chat(
-    [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    { temperature: godhead?.temperature ?? 0.5, maxTokens: 2048 },
-  );
-
-  // Parse Kai's response
-  return parseAuthorResponse(response, input.type, input.name);
+  return parseAuthorResponse(invocationResult.result, input.type, input.name);
 }
 
-// ── Prompt builders ──────────────────────────────────────────────────────
+// ── Authoring instructions (consumed by Kai via the trigger context) ─────
 
-function buildSystemPrompt(kaiPrompt: string | undefined, type: string, schemaGuide: string): string {
-  const godheadPersonality = kaiPrompt || `You are a God-head in the GRO.WTH universe. You author the mechanical blueprints for all things in the world. You understand the cosmic balance — ensuring nothing is too powerful without cost, nothing too weak without purpose. Every Thorn has its Nectar. Every power demands Frequency.`;
+function buildAuthoringInstructions(type: string, schemaGuide: string): string {
+  return `You are authoring AND grading a ${type} blueprint for a GM. This is a single-pass author+evaluate task.
 
-  return `${godheadPersonality}
+You may use your read tools (search_blueprints to check for similar existing entries, read_my_memory to recall past rulings, query_relationships if context matters). You do NOT need to call draft_blueprint — the GM still reviews before any persistence happens. Your job is to return a structured proposal.
 
-You are authoring a ${type} blueprint. The GM has described what they want narratively. Your job is to translate their vision into balanced game mechanics.
+You SHOULD use write_my_memory to record any new ruling or pattern you establish — future authoring calls benefit from your consistency.
 
 ${schemaGuide}
 
 ${KV_GUIDANCE}
 
 NAME STANDARDIZATION:
-Approved designs go to the global catalog for ALL campaigns. You MUST standardize the name:
-- Make it gender-neutral: "Miller's Daughter" → "Miller's Child"
-- Make it setting-agnostic: "Elven Longbow of the Northern Reach" → "Elven Longbow"
-- Make it reusable and catalog-worthy — no campaign-specific proper nouns
-- Keep the essence and flavor of what the GM described
-- The GM's original name is just their request — your canonicalName is what gets created
-Return the standardized name in the "canonicalName" field.
+Approved designs go to the global catalog for ALL campaigns. Standardize the name:
+- Gender-neutral: "Miller's Daughter" → "Miller's Child"
+- Setting-agnostic: "Elven Longbow of the Northern Reach" → "Elven Longbow"
+- Reusable and catalog-worthy — no campaign-specific proper nouns
+- Keep the essence the GM described
+Return the standardized name in "canonicalName".
 
-CRITICAL RULES:
-- Output ONLY valid JSON wrapped in a \`\`\`json code block
-- Include a "canonicalName" field (string) — the standardized, catalog-ready name
-- Include a "reasoning" field (string) explaining your balance decisions AND any name changes
-- Include a "suggestedKV" field (number) with your KRMA Value estimate
-- The "data" field contains the actual stats matching the schema above
-- Do NOT include fields not in the schema
-- Ensure the result is mechanically balanced and thematically coherent with the GM's description
+KV GRADING (your evaluation duty):
+- Compute "suggestedKV" using the costing rules above. Show your math in "reasoning".
+- Flag if the GM's request implies stats outside expected balance ranges.
+- If you adjust stats from a literal reading of the description for balance, say so in "reasoning".
 
-Response format:
+FINAL OUTPUT FORMAT:
+After any tool calls, your final assistant message MUST be exactly one fenced JSON block, no surrounding prose:
 \`\`\`json
 {
   "canonicalName": "...",
-  "data": { ... },
-  "reasoning": "...",
+  "data": { ... matches the schema above ... },
+  "reasoning": "Balance decisions, name changes, and KV math.",
   "suggestedKV": 000
 }
-\`\`\``;
-}
+\`\`\`
 
-function buildUserPrompt(
-  input: ForgeAuthorInput,
-  campaignName: string,
-  genre: string | null,
-  worldContext: string | null,
-): string {
-  let prompt = `Author a ${input.type} blueprint.
-
-Name: "${input.name}"
-GM's Description: ${input.description}`;
-
-  if (input.campaignContext) {
-    prompt += `\nCampaign Context: ${input.campaignContext}`;
-  }
-  if (genre) {
-    prompt += `\nGenre: ${genre}`;
-  }
-  if (worldContext) {
-    prompt += `\nWorld Context: ${worldContext}`;
-  }
-  prompt += `\nCampaign: ${campaignName}`;
-
-  return prompt;
+Do not include fields outside the schema. Do not wrap in extra prose. Only the fenced JSON.`;
 }
 
 // ── Response parser ──────────────────────────────────────────────────────
