@@ -21,6 +21,21 @@ import type { ToolContext } from './tools/registry';
 
 // Import tools so they self-register
 import './tools/read-entity';
+import './tools/read-wallet';
+import './tools/read-my-wallet';
+import './tools/query-relationships';
+import './tools/list-goals';
+import './tools/read-goal';
+import './tools/search-blueprints';
+import './tools/read-blueprint';
+import './tools/read-my-memory';
+import './tools/write-my-memory';
+import './tools/adopt-goal';
+import './tools/release-goal';
+import './tools/propose-resistance';
+import './tools/draft-blueprint';
+import './tools/send-message-to-gm';
+import './tools/transfer-krma';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 

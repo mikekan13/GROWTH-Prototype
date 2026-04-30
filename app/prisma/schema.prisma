@@ -57,6 +57,7 @@ model Campaign {
   goals               Goal[]
   aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
   relationships       EntityRelationship[]
+  godHeadMessages     GodHeadMessage[]
   createdAt           DateTime             @default(now())
 }
 
@@ -542,6 +543,7 @@ model GodHead {
   invocations   GodHeadInvocation[]
   actionLogs    GodHeadActionLog[]
   tokenUsage    GodHeadTokenUsage[]
+  messages      GodHeadMessage[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -573,6 +575,7 @@ model GodHeadInvocation {
   stepCount    Int      @default(0) // Number of tool calls in this invocation
   actionLogs   GodHeadActionLog[]
   tokenUsage   GodHeadTokenUsage[]
+  messages     GodHeadMessage[]
   startedAt    DateTime?
   finishedAt   DateTime?
   createdAt    DateTime @default(now())
@@ -611,6 +614,24 @@ model GodHeadTokenUsage {
   createdAt     DateTime          @default(now())
 
   @@index([godHeadId])
+  @@index([invocationId])
+}
+
+model GodHeadMessage {
+  id            String             @id @default(cuid())
+  godHead       GodHead            @relation(fields: [godHeadId], references: [id])
+  godHeadId     String
+  campaign      Campaign           @relation(fields: [campaignId], references: [id])
+  campaignId    String
+  direction     String             // GODHEAD_TO_GM | GM_TO_GODHEAD
+  content       String             // Message body (plain text or JSON for structured payloads)
+  invocation    GodHeadInvocation? @relation(fields: [invocationId], references: [id])
+  invocationId  String?
+  readAt        DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@index([campaignId, godHeadId, createdAt])
+  @@index([godHeadId, readAt])
   @@index([invocationId])
 }
 
