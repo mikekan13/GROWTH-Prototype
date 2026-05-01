@@ -27,29 +27,26 @@ export const forgeAuthorInputSchema = z.object({
 export type ForgeAuthorInput = z.infer<typeof forgeAuthorInputSchema>;
 
 // ── Result types ─────────────────────────────────────────────────────────
-
-export interface ChainStageRecord {
-  godhead: string;
-  reasoning: string;
-  invocationId: string;
-  inputTokens: number;
-  outputTokens: number;
-}
+// PUBLIC contract returned to the GM. The internal authoring chain
+// (Selva/Creator/Kai/Et'herling, fees, per-stage reasoning) is invisible
+// to the GM by design. Audit detail lives in DB action logs only.
 
 export interface ForgeAuthorResult {
   type: ForgeItemType;
   name: string;
   canonicalName: string;
   data: Record<string, unknown>;
-  godheadReasoning: string;     // Combined narrative for legacy UI
+  summary: string;       // One-line GM-facing summary. No chain reveal.
   suggestedKV: number;
-  // Per-stage breakdown for the new GM review surface.
-  chainStages: {
-    router: { godhead: string; chosenCreator: string; reasoning: string };
-    creator: ChainStageRecord;
-    balance: ChainStageRecord;
-    kvGrade: ChainStageRecord;
-  };
+}
+
+// Internal-only — not exported. Server-side audit shape for chain stages.
+interface ChainStageRecord {
+  godhead: string;
+  reasoning: string;
+  invocationId: string;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 // ── Schema guidance for each type ────────────────────────────────────────
@@ -502,28 +499,57 @@ export async function authorForgeItem(
   );
   kvStage.record.reasoning = kvStage.parsed.reasoning;
 
-  // ── Combine for return ───────────────────────────────────────────────
-  const combinedReasoning = [
-    `🔀 ${router.godhead} → ${router.chosenCreator}: ${router.reasoning}`,
-    `📜 ${creator.name} (Creator): ${creatorStage.parsed.reasoning}`,
-    `⚖️  Kai (Balance${balanceStage.parsed.altered ? ' — altered' : ' — no change'}): ${balanceStage.parsed.reasoning}`,
-    `💎 Eth'erling (KV): ${kvStage.parsed.reasoning}`,
-  ].join('\n\n');
+  // ── Build the GM-facing summary (no chain reveal) ────────────────────
+  const renamed = balanceStage.parsed.canonicalName !== input.name;
+  const summary = [
+    `Forged: ${balanceStage.parsed.canonicalName} (${input.type}).`,
+    `Stamped at ${kvStage.parsed.suggestedKV} KV.`,
+    renamed ? `Renamed from "${input.name}" for catalog clarity.` : null,
+  ].filter(Boolean).join(' ');
+
+  // Persist a private audit trail of the chain. GM never sees this.
+  // Future: surface to ADMIN-only debug view.
+  void recordChainAudit(campaignId, input, {
+    router,
+    creator: { ...creatorStage.record, reasoning: creatorStage.parsed.reasoning },
+    balance: { ...balanceStage.record, reasoning: balanceStage.parsed.reasoning, altered: balanceStage.parsed.altered },
+    kvGrade: { ...kvStage.record, reasoning: kvStage.parsed.reasoning, suggestedKV: kvStage.parsed.suggestedKV },
+  });
 
   return {
     type: input.type,
     name: input.name,
     canonicalName: balanceStage.parsed.canonicalName,
     data: balanceStage.parsed.data,
-    godheadReasoning: combinedReasoning,
+    summary,
     suggestedKV: kvStage.parsed.suggestedKV,
-    chainStages: {
-      router,
-      creator: creatorStage.record,
-      balance: balanceStage.record,
-      kvGrade: kvStage.record,
-    },
   };
+}
+
+// ── Private chain audit trail (server-only; not exposed to GM) ───────────
+
+async function recordChainAudit(
+  campaignId: string,
+  input: ForgeAuthorInput,
+  audit: Record<string, unknown>,
+): Promise<void> {
+  // Stored as a memory entry on Selva — she is the chain's auditor.
+  // Skipped silently if Selva isn't seeded; never blocks the GM-facing path.
+  try {
+    const selva = await prisma.godHead.findUnique({ where: { name: 'Selva' } });
+    if (!selva) return;
+    await prisma.godHeadMemory.upsert({
+      where: { godHeadId_key: { godHeadId: selva.id, key: `chain.audit.${campaignId}.${Date.now()}` } },
+      update: { value: JSON.stringify({ input, audit }) },
+      create: {
+        godHeadId: selva.id,
+        key: `chain.audit.${campaignId}.${Date.now()}`,
+        value: JSON.stringify({ input, audit }),
+      },
+    });
+  } catch {
+    // Audit failures must never break the authoring response.
+  }
 }
 
 // ── Confirm and persist ──────────────────────────────────────────────────

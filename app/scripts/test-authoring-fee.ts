@@ -54,7 +54,7 @@ async function main() {
   console.log(`\nchain ran in ${ms}ms`);
   console.log(`canonicalName: ${result.canonicalName}`);
   console.log(`final KV:      ${result.suggestedKV}`);
-  console.log(`\n--- Combined reasoning ---\n${result.godheadReasoning}\n--------------------------`);
+  console.log(`GM-facing summary: ${result.summary}`);
 
   const post = {
     campaign: await balance(campaignWallet.id),
@@ -78,14 +78,23 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\nper-stage tokens:`);
-  console.log(`  Creator   ${result.chainStages.creator.godhead}: in=${result.chainStages.creator.inputTokens} out=${result.chainStages.creator.outputTokens}`);
-  console.log(`  Balance   ${result.chainStages.balance.godhead}: in=${result.chainStages.balance.inputTokens} out=${result.chainStages.balance.outputTokens}`);
-  console.log(`  KV grade  ${result.chainStages.kvGrade.godhead}: in=${result.chainStages.kvGrade.inputTokens} out=${result.chainStages.kvGrade.outputTokens}`);
-  const totalIn = result.chainStages.creator.inputTokens + result.chainStages.balance.inputTokens + result.chainStages.kvGrade.inputTokens;
-  const totalOut = result.chainStages.creator.outputTokens + result.chainStages.balance.outputTokens + result.chainStages.kvGrade.outputTokens;
+  // Per-stage token usage now lives in the DB (public response is sanitized).
+  // Pull it from GodHeadTokenUsage for the most recent invocations.
+  const tokenRows = await prisma.godHeadTokenUsage.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+    include: { godHead: { select: { name: true } } },
+  });
+  console.log(`\nper-stage tokens (from DB, most recent 3 invocations):`);
+  let totalIn = 0;
+  let totalOut = 0;
+  for (const row of tokenRows.reverse()) {
+    console.log(`  ${row.godHead.name.padEnd(15)}: in=${row.inputTokens} out=${row.outputTokens}`);
+    totalIn += row.inputTokens;
+    totalOut += row.outputTokens;
+  }
   const cost = (totalIn / 1_000_000) * 3 + (totalOut / 1_000_000) * 15;
-  console.log(`  TOTAL     in=${totalIn} out=${totalOut}  ~$${cost.toFixed(4)}`);
+  console.log(`  TOTAL          : in=${totalIn} out=${totalOut}  ~$${cost.toFixed(4)}`);
 }
 
 main()

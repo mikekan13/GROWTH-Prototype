@@ -108,7 +108,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
   const [authoring, setAuthoring] = useState(false);
   const [authorResult, setAuthorResult] = useState<{
     type: string; name: string; canonicalName: string; data: Record<string, unknown>;
-    godheadReasoning: string; suggestedKV: number;
+    summary: string; suggestedKV: number;
   } | null>(null);
   const [authorError, setAuthorError] = useState('');
   // Global catalog suggestion state (checked before authoring)
@@ -963,10 +963,10 @@ function RequestRow({ request, isGM, onResolve, onRefresh: _onRefresh }: {
   );
 }
 
-// ── Kai Review Panel ─────────────────────────────────────────────────────
+// ── Blueprint Review Panel ───────────────────────────────────────────────
 
 function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
-  result: { type: string; name: string; canonicalName: string; data: Record<string, unknown>; godheadReasoning: string; suggestedKV: number };
+  result: { type: string; name: string; canonicalName: string; data: Record<string, unknown>; summary: string; suggestedKV: number };
   onConfirm: () => void;
   onReject: () => void;
   onRetry: () => void;
@@ -1176,16 +1176,15 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
         </div>
       )}
 
-      {/* Kai's reasoning */}
+      {/* GM-facing summary — chain internals are intentionally hidden */}
       <div className="text-[12px] px-2 py-1.5" style={{
-        color: 'rgba(255,255,255,0.5)',
+        color: 'rgba(255,255,255,0.7)',
         backgroundColor: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: '2px',
         fontFamily: 'var(--font-terminal), Consolas, monospace',
-        fontStyle: 'italic',
       }}>
-        <span style={{ color: '#7050A8' }}>God-head:</span> {result.godheadReasoning}
+        {result.summary}
       </div>
 
       {/* Action buttons */}
