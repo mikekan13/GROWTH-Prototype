@@ -61,6 +61,7 @@ interface GodHeadIdentity {
   pillar: string;
   systemPrompt: string;
   temperature: number;
+  defaultModel: string | null;
   walletId: string | null;
   characterId: string;
 }
@@ -75,7 +76,8 @@ export class GodHeadAgent {
   constructor(identity: GodHeadIdentity, model?: string) {
     this.client = new Anthropic();
     this.identity = identity;
-    this.model = model || DEFAULT_MODEL;
+    // Resolution order: explicit override → god-head's stored default → runtime default.
+    this.model = model || identity.defaultModel || DEFAULT_MODEL;
   }
 
   /**
@@ -97,6 +99,7 @@ export class GodHeadAgent {
       pillar: godHead.pillar,
       systemPrompt: godHead.systemPrompt,
       temperature: godHead.temperature,
+      defaultModel: godHead.defaultModel,
       walletId: godHead.walletId,
       characterId: godHead.characterId,
     }, model);

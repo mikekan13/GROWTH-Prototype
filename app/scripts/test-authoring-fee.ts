@@ -70,11 +70,47 @@ async function main() {
   const dEth = post.etherling - pre.etherling;
   console.log(`\ndelta: campaign=-${dCampaign} tara=+${dTara} kai=+${dKai} etherling=+${dEth}`);
 
-  // Expectations: campaign -30, tara +20 (30 in, 10 out), kai 0 (10 in, 10 out), etherling +10
+  // First-pass expectations: campaign -30, tara +20, kai 0, etherling +10
   if (dCampaign === BigInt(30) && dTara === BigInt(20) && dKai === BigInt(0) && dEth === BigInt(10)) {
-    console.log('\n✔ Chain economics correct: GM(-30) → Tara(+20) → Kai(0) → Et\'herling(+10)');
+    console.log('\n✔ First-pass economics: GM(-30) → Tara(+20) → Kai(0) → Et\'herling(+10)');
   } else {
-    console.error('\n✗ Chain economics off — expected -30/+20/0/+10');
+    console.error('\n✗ First-pass economics off — expected -30/+20/0/+10');
+    process.exit(1);
+  }
+
+  // ── Reforge pass: half cost ──────────────────────────────────────────
+  console.log(`\n→ Reforging (should cost half)...\n`);
+  const t1 = Date.now();
+  const reforgeResult = await authorForgeItem(campaign.id, admin.id, admin.role, {
+    type: 'skill',
+    name: 'Lazy Cartography',
+    description: 'Mapping the surrounding terrain very slowly while reclining and intermittently napping. The maps come out usable but full of decorative loops where the cartographer drifted off.',
+    reforge: true,
+  });
+  const ms1 = Date.now() - t1;
+  console.log(`reforge ran in ${ms1}ms`);
+  console.log(`canonicalName: ${reforgeResult.canonicalName}`);
+  console.log(`KV: ${reforgeResult.suggestedKV}`);
+
+  const post2 = {
+    campaign: await balance(campaignWallet.id),
+    tara: await balance(tara.walletId),
+    kai: await balance(kai.walletId),
+    etherling: await balance(etherling.walletId),
+  };
+  const r = {
+    campaign: post.campaign - post2.campaign,
+    tara: post2.tara - post.tara,
+    kai: post2.kai - post.kai,
+    etherling: post2.etherling - post.etherling,
+  };
+  console.log(`reforge delta: campaign=-${r.campaign} tara=+${r.tara} kai=+${r.kai} etherling=+${r.etherling}`);
+
+  // Expected reforge: campaign -15, tara +10, kai 0, etherling +5
+  if (r.campaign === BigInt(15) && r.tara === BigInt(10) && r.kai === BigInt(0) && r.etherling === BigInt(5)) {
+    console.log('✔ Reforge economics correct: GM(-15) → Tara(+10) → Kai(0) → Et\'herling(+5)');
+  } else {
+    console.error('✗ Reforge economics off — expected -15/+10/0/+5');
     process.exit(1);
   }
 

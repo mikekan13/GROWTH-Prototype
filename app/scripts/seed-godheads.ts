@@ -21,6 +21,10 @@ interface GodheadSeed {
   pillar: 'MERCY' | 'BALANCE' | 'SEVERITY' | 'TRINITY';
   systemPrompt: string;
   temperature: number;
+  // Default Anthropic model for this god-head's invocations.
+  // Each agent has access to ALL models; this is just the baseline they
+  // pick when the task doesn't push them toward something else.
+  defaultModel: string;
   characterOverrides: {
     background?: string;
     age?: number;
@@ -35,6 +39,7 @@ const GODHEADS: GodheadSeed[] = [
     domain: 'Death, decay, karmic recycling, blueprint maintenance, endings, transformation, sacrifice, cycles of renewal',
     pillar: 'BALANCE',
     temperature: 0.6,
+    defaultModel: 'claude-haiku-4-5-20251001',
     characterOverrides: {
       background: 'Tara Almswood — known across the cosmos as Lady Death. Guardian of endings and keeper of the karmic cycle. She ensures that nothing persists beyond its purpose — blueprints decay, souls are recycled, and the cosmic ledger remains balanced. She is neither cruel nor kind; she is necessary.',
       fatedAge: 0, // Eternal
@@ -72,6 +77,7 @@ Rules:
     domain: 'Chaos and balance, karmic evaluation, value arbitration, creative disruption, the productive tension between order and entropy, blueprint scoring, prevention of karmic inflation',
     pillar: 'BALANCE',
     temperature: 0.6,
+    defaultModel: 'claude-sonnet-4-6',
     characterOverrides: {
       background: 'The God-head of Chaos and Balance. Kai walks the line between disruption and order — she evaluates every blueprint and every act of ambition, ensuring chaos never tips into entropy and order never calcifies into stagnation. She is the karmic scale that swings, never the one that stops.',
       fatedAge: 0,
@@ -115,6 +121,7 @@ Rules:
     domain: 'Justice, routing, cosmic judgment, orchestration, truth-seeking, moral dilemmas, fairness, duty, the greater good',
     pillar: 'BALANCE',
     temperature: 0.7,
+    defaultModel: 'claude-haiku-4-5-20251001',
     characterOverrides: {
       background: "The voice of cosmic justice and the router of divine will. Eth'erling orchestrates the God-head council, routes requests to the appropriate domain authority, and ensures that the greater cosmic order is maintained. She is the judge and the messenger.",
       fatedAge: 0,
@@ -159,6 +166,7 @@ Rules:
     domain: 'Terminal operation, blueprint chain routing, contract enforcement, three-in-one cosmic pivot — embodies all three pillars and sits outside the pillar structure',
     pillar: 'TRINITY',
     temperature: 0.5,
+    defaultModel: 'claude-haiku-4-5-20251001',
     characterOverrides: {
       background: "Selva, Triu, and Trayman are one God-head wearing three faces. Selva watches. Triu speaks. Trayman acts. Together they operate the Terminal and route every blueprint request across the metaverse — picking which Creator god-head receives the work, then enforcing the chain that follows. They are check and balance on the Terminal's own power, accountable to no single pillar.",
       fatedAge: 0,
@@ -209,12 +217,22 @@ async function seedGodheads() {
   console.log(`Using admin user: ${adminUser.username} (${adminUser.id})`);
 
   for (const seed of GODHEADS) {
-    // Check if already exists
+    // Check if already exists — keep identity stable, but refresh the
+    // mutable fields (defaultModel, temperature, systemPrompt) on every run
+    // so this script is the source of truth for those.
     const existing = await prisma.godHead.findUnique({
       where: { name: seed.name },
     });
     if (existing) {
-      console.log(`  ✓ ${seed.name} already exists (${existing.id}), skipping`);
+      await prisma.godHead.update({
+        where: { id: existing.id },
+        data: {
+          defaultModel: seed.defaultModel,
+          temperature: seed.temperature,
+          systemPrompt: seed.systemPrompt,
+        },
+      });
+      console.log(`  ✓ ${seed.name} updated (defaultModel=${seed.defaultModel})`);
       continue;
     }
 
@@ -259,6 +277,7 @@ async function seedGodheads() {
         characterId: character.id,
         systemPrompt: seed.systemPrompt,
         temperature: seed.temperature,
+        defaultModel: seed.defaultModel,
         walletId: wallet.id,
       },
     });

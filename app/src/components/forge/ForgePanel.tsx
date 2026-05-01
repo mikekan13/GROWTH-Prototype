@@ -256,15 +256,16 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
     await doAuthor();
   };
 
-  // Step 2: Actually call God-head authoring (after global check or GM rejects suggestions)
-  const doAuthor = async () => {
+  // Step 2: Actually call God-head authoring (after global check or GM rejects suggestions).
+  // `reforge=true` signals an iteration on a previously rejected attempt — server discounts the fee.
+  const doAuthor = async (reforge: boolean = false) => {
     setAuthoring(true);
     setAuthorError('');
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/forge/author`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: newType, name: newName.trim(), description: newDesc.trim() }),
+        body: JSON.stringify({ type: newType, name: newName.trim(), description: newDesc.trim(), reforge }),
       });
       if (res.ok) {
         const { result } = await res.json();
@@ -572,7 +573,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                       result={authorResult}
                       onConfirm={handleConfirmAuthor}
                       onReject={() => setAuthorResult(null)}
-                      onRetry={doAuthor}
+                      onRetry={() => doAuthor(true)}
                     />
                   )}
                 </div>

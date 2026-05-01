@@ -8,12 +8,15 @@ import { executeTransaction } from '@/services/krma/ledger';
 import type { ForgeItemType } from './forge';
 
 // ── Chain economics ─────────────────────────────────────────────────────
-// GM→Creator funds the chain; Creator pays Kai; Kai pays Et'herling.
-// Whatever's left after handoffs stays with each god-head as their fee.
-const CHAIN_FUND = BigInt(30);                  // GM → Creator
-const CREATOR_TO_KAI = BigInt(10);              // Creator → Kai (balance check)
-const KAI_TO_ETHERLING = BigInt(10);            // Kai → Et'herling (KV grade)
-// Net retained per stage: Creator 10, Kai 0, Et'herling 10. Adjust later.
+// First-pass: GM→Creator funds the chain; Creator pays Kai; Kai pays Et'herling.
+// Reforge: half cost across the board. The compute is the same, but the GM
+// is iterating on their own request — this discount keeps reforging viable.
+const CHAIN_FUND_FIRST = BigInt(30);              // GM → Creator (initial author)
+const CHAIN_FUND_REFORGE = BigInt(15);            // GM → Creator (re-attempt)
+const CREATOR_TO_KAI_FIRST = BigInt(10);
+const CREATOR_TO_KAI_REFORGE = BigInt(5);
+const KAI_TO_ETHERLING_FIRST = BigInt(10);
+const KAI_TO_ETHERLING_REFORGE = BigInt(5);
 
 // ── Input Schema ─────────────────────────────────────────────────────────
 
@@ -22,6 +25,7 @@ export const forgeAuthorInputSchema = z.object({
   name: z.string().min(1, 'Name required').max(100),
   description: z.string().min(10, 'Describe what you want the chain to build (at least 10 characters)').max(2000),
   campaignContext: z.string().max(500).optional(),
+  reforge: z.boolean().optional(),  // True when the GM is re-running after a previous discard.
 });
 
 export type ForgeAuthorInput = z.infer<typeof forgeAuthorInputSchema>;
@@ -384,6 +388,11 @@ export async function authorForgeItem(
   const schemaGuide = TYPE_SCHEMAS[input.type];
   if (!schemaGuide) throw new ValidationError(`Unsupported forge type: ${input.type}`);
 
+  const isReforge = input.reforge === true;
+  const chainFund = isReforge ? CHAIN_FUND_REFORGE : CHAIN_FUND_FIRST;
+  const creatorToKai = isReforge ? CREATOR_TO_KAI_REFORGE : CREATOR_TO_KAI_FIRST;
+  const kaiToEtherling = isReforge ? KAI_TO_ETHERLING_REFORGE : KAI_TO_ETHERLING_FIRST;
+
   // ── Selva: route the request (deterministic for now) ─────────────────
   const router = routeWithSelva(input);
 
@@ -409,11 +418,11 @@ export async function authorForgeItem(
   await executeTransaction({
     fromWalletId: campaignWallet.id,
     toWalletId: creator.walletId,
-    amount: CHAIN_FUND,
+    amount: chainFund,
     state: 'FLUID',
     reason: 'BLUEPRINT_AUTHOR',
-    description: `Chain fund — ${input.type} "${input.name}" (Creator: ${creator.name})`,
-    metadata: { type: input.type, requestedName: input.name, chosenCreator: creator.name },
+    description: `${isReforge ? 'Reforge' : 'Chain'} fund — ${input.type} "${input.name}" (Creator: ${creator.name})`,
+    metadata: { type: input.type, requestedName: input.name, chosenCreator: creator.name, reforge: isReforge },
     campaignId,
     actorId: userId,
     actorType: 'GM',
@@ -449,10 +458,10 @@ export async function authorForgeItem(
   await transferBetweenGodheads({
     fromGodheadName: creator.name,
     toGodheadName: 'Kai',
-    amount: CREATOR_TO_KAI,
+    amount: creatorToKai,
     description: `Balance handoff for ${input.type} "${input.name}"`,
     campaignId,
-    metadata: { fundIdem, stage: 'creator->kai' },
+    metadata: { fundIdem, stage: 'creator->kai', reforge: isReforge },
     idempotencyKey: `${fundIdem}:creator->kai`,
   });
 
@@ -475,10 +484,10 @@ export async function authorForgeItem(
   await transferBetweenGodheads({
     fromGodheadName: 'Kai',
     toGodheadName: "Eth'erling",
-    amount: KAI_TO_ETHERLING,
+    amount: kaiToEtherling,
     description: `KV grading handoff for ${input.type} "${input.name}"`,
     campaignId,
-    metadata: { fundIdem, stage: 'kai->etherling' },
+    metadata: { fundIdem, stage: 'kai->etherling', reforge: isReforge },
     idempotencyKey: `${fundIdem}:kai->etherling`,
   });
 

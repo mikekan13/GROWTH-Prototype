@@ -534,6 +534,7 @@ model GodHead {
   // AI behavior — god-heads never sleep, no active flag
   systemPrompt  String    // Core personality + domain authority instructions
   temperature   Float     @default(0.7)
+  defaultModel  String?   // Anthropic model id this god-head prefers (claude-sonnet-4-6, claude-haiku-4-5-20251001, claude-opus-4-7). NULL = runtime default.
 
   // Economy
   walletId      String?   // God-head's KRMA wallet ID
