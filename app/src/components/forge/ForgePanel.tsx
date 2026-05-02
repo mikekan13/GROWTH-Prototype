@@ -1,13 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import type { SkillGovernor } from '@/types/growth';
-import { SKILL_GOVERNORS } from '@/types/growth';
-import type { WorldItemType, ItemRarity } from '@/types/item';
-import { ITEM_TYPE_ICONS, WEAPON_PROPERTIES, BODY_PARTS } from '@/types/item';
+import { useState, useEffect, useCallback } from 'react';
 import type { Material, MaterialMod, ResistType } from '@/types/material';
-import { ARMOR_LAYER_RULES } from '@/types/material';
-import { getMaterialNames, getMaterial, combineMaterials, MATERIAL_CATALOG } from '@/lib/materials';
+import { MATERIAL_CATALOG } from '@/lib/materials';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -57,10 +52,6 @@ const TYPE_COLORS: Record<string, string> = {
   thorn: '#E8585A',
 };
 
-// ALL forge types use the God-head authoring pipeline (narrative → AI stats → confirm)
-// GMs describe, God-heads author mechanics. No direct stat forms.
-const AI_AUTHORED_TYPES = new Set(['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn']);
-
 const STATUS_COLORS: Record<string, string> = {
   draft: '#888',
   published: '#22ab94',
@@ -91,20 +82,12 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
   const [activeType, setActiveType] = useState<string>('seed');
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  // Create form state
+  // Create form state — minimal: every blueprint is authored by the chain
+  // from name + Vision text. No more direct stat fields in the UI.
   const [newType, setNewType] = useState<string>('skill');
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newGovs, setNewGovs] = useState<Set<SkillGovernor>>(new Set());
-  // Item-specific create state
-  const [itemSubType, setItemSubType] = useState<WorldItemType>('weapon');
-  const [itemMaterial, setItemMaterial] = useState('');
-  const [itemRarity, setItemRarity] = useState<ItemRarity>('common');
-  const [itemWeightLevel, setItemWeightLevel] = useState(1);
-  const [itemValue, setItemValue] = useState(0);
-  const [itemSecondaryMaterial, setItemSecondaryMaterial] = useState('');
-  const [itemNotes, setItemNotes] = useState('');
-  // AI authoring state
+  // Chain authoring state
   const [authoring, setAuthoring] = useState(false);
   const [authorResult, setAuthorResult] = useState<{
     type: string; name: string; canonicalName: string; data: Record<string, unknown>;
@@ -116,21 +99,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
     id: string; name: string; type: string; data: Record<string, unknown>; useCount: number;
   }>>([]);
   const [checkingGlobal, setCheckingGlobal] = useState(false);
-  const [globalChecked, setGlobalChecked] = useState(false);
-  // Weapon fields
-  const [weaponDamage, setWeaponDamage] = useState({ piercing: 0, slashing: 0, heat: 0, decay: 0, cold: 0, bashing: 0, energy: 0 });
-  const [weaponRange, setWeaponRange] = useState('melee');
-  const [weaponTarget, setWeaponTarget] = useState('');
-  const [weaponProps, setWeaponProps] = useState<Set<string>>(new Set());
-  // Armor fields
-  const [armorLayer, setArmorLayer] = useState<'clothing' | 'lightArmor' | 'heavyArmor'>('lightArmor');
-  const [armorResistance, setArmorResistance] = useState(0);
-  const [armorCoveredParts, setArmorCoveredParts] = useState<Set<string>>(new Set());
-  // Prima Materia fields
-  const [pmSchool, setPmSchool] = useState('');
-  const [pmLevel, setPmLevel] = useState(1);
-  const [pmStable, setPmStable] = useState(true);
-  const [pmCharges, setPmCharges] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -161,7 +129,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
     setAuthorError('');
     setAuthorResult(null);
     setGlobalSuggestions([]);
-    setGlobalChecked(false);
     try {
       const searchParam = encodeURIComponent(newName.trim());
       const res = await fetch(`/api/forge/global?type=${newType}&search=${searchParam}`);
@@ -170,14 +137,12 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
         const suggestions = data.items || [];
         if (suggestions.length > 0) {
           setGlobalSuggestions(suggestions);
-          setGlobalChecked(true);
           setCheckingGlobal(false);
           return; // Show suggestions, don't author yet
         }
       }
     } catch { /* silent — proceed to authoring */ }
     setCheckingGlobal(false);
-    setGlobalChecked(true);
     // No suggestions found — go straight to God-head authoring
     await doAuthor();
   };
@@ -225,8 +190,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
         setNewName('');
         setNewDesc('');
         setShowCreateForm(false);
-        setGlobalChecked(false);
-        fetchData();
+            fetchData();
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to pull item');
@@ -292,16 +256,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
       fetchData();
     } catch { /* silent */ }
   };
-
-  const toggleGov = (gov: SkillGovernor) => {
-    setNewGovs(prev => {
-      const next = new Set(prev);
-      if (next.has(gov)) next.delete(gov); else next.add(gov);
-      return next;
-    });
-  };
-
-  const canSubmit = newName.trim() && newDesc.trim();
 
   const types = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'];
   const pendingRequests = requests.filter(r => r.status === 'pending');
@@ -404,9 +358,8 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 />
               </div>
-              {/* Forge authoring flow: global check → suggestions → God-head authoring */}
-              {AI_AUTHORED_TYPES.has(newType) && (
-                <div className="space-y-3">
+              {/* Forge authoring flow: global check → suggestions → chain → review */}
+              <div className="space-y-3">
                   <div className="text-[12px] px-2 py-1.5" style={{
                     color: 'rgba(255,204,120,0.7)',
                     backgroundColor: 'rgba(255,204,120,0.05)',
@@ -492,7 +445,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                     />
                   )}
                 </div>
-              )}
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleAuthor}
@@ -508,7 +460,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   {checkingGlobal ? '⟳ Checking catalog...' : authoring ? '⟳ Forging...' : '⚡ Send to Forge'}
                 </button>
                 <button
-                  onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); setItemNotes(''); setItemSecondaryMaterial(''); setWeaponProps(new Set()); setArmorCoveredParts(new Set()); setPmSchool(''); setAuthorResult(null); setAuthorError(''); setGlobalSuggestions([]); setGlobalChecked(false); }}
+                  onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setAuthorResult(null); setAuthorError(''); setGlobalSuggestions([]); }}
                   className="text-[14px] px-3 py-1 uppercase tracking-wider text-gray-500"
                   style={{ border: '1px solid #3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
@@ -1096,364 +1048,6 @@ function StatBadge({ label, value, color }: { label: string; value: string; colo
   );
 }
 
-// ── Item Create Fields ───────────────────────────────────────────────────
-
-const ITEM_SUBTYPES: WorldItemType[] = ['weapon', 'armor', 'accessory', 'consumable', 'tool', 'artifact', 'prima_materia', 'misc'];
-const RARITY_OPTIONS: ItemRarity[] = ['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact'];
-const DAMAGE_KEYS = ['piercing', 'slashing', 'heat', 'decay', 'cold', 'bashing', 'energy'] as const;
-const DAMAGE_ABBREV: Record<string, string> = { piercing: 'P', slashing: 'S', heat: 'H', decay: 'D', cold: 'C', bashing: 'B', energy: 'E' };
-
-function ItemCreateFields({
-  itemSubType, setItemSubType,
-  itemMaterial, setItemMaterial,
-  itemSecondaryMaterial, setItemSecondaryMaterial,
-  itemRarity, setItemRarity,
-  itemWeightLevel, setItemWeightLevel,
-  itemValue, setItemValue,
-  itemNotes, setItemNotes,
-  weaponDamage, setWeaponDamage,
-  weaponRange, setWeaponRange,
-  weaponTarget, setWeaponTarget,
-  weaponProps, setWeaponProps,
-  armorLayer, setArmorLayer,
-  armorResistance, setArmorResistance,
-  armorCoveredParts, setArmorCoveredParts,
-  pmSchool, setPmSchool,
-  pmLevel, setPmLevel,
-  pmStable, setPmStable,
-  pmCharges, setPmCharges,
-}: {
-  itemSubType: WorldItemType; setItemSubType: (v: WorldItemType) => void;
-  itemMaterial: string; setItemMaterial: (v: string) => void;
-  itemSecondaryMaterial: string; setItemSecondaryMaterial: (v: string) => void;
-  itemRarity: ItemRarity; setItemRarity: (v: ItemRarity) => void;
-  itemWeightLevel: number; setItemWeightLevel: (v: number) => void;
-  itemValue: number; setItemValue: (v: number) => void;
-  itemNotes: string; setItemNotes: (v: string) => void;
-  weaponDamage: Record<string, number>; setWeaponDamage: (v: Record<string, number>) => void;
-  weaponRange: string; setWeaponRange: (v: string) => void;
-  weaponTarget: string; setWeaponTarget: (v: string) => void;
-  weaponProps: Set<string>; setWeaponProps: (v: Set<string>) => void;
-  armorLayer: 'clothing' | 'lightArmor' | 'heavyArmor'; setArmorLayer: (v: 'clothing' | 'lightArmor' | 'heavyArmor') => void;
-  armorResistance: number; setArmorResistance: (v: number) => void;
-  armorCoveredParts: Set<string>; setArmorCoveredParts: (v: Set<string>) => void;
-  pmSchool: string; setPmSchool: (v: string) => void;
-  pmLevel: number; setPmLevel: (v: number) => void;
-  pmStable: boolean; setPmStable: (v: boolean) => void;
-  pmCharges: number; setPmCharges: (v: number) => void;
-}) {
-  const materialNames = getMaterialNames();
-  const primaryMat = itemMaterial ? getMaterial(itemMaterial) : null;
-  const secondaryMat = itemSecondaryMaterial ? getMaterial(itemSecondaryMaterial) : null;
-
-  // Compute combined material stats when both materials are selected
-  const effectiveMat = primaryMat && secondaryMat
-    ? combineMaterials(primaryMat, secondaryMat)
-    : primaryMat || null;
-
-  // Auto-fill from material selection
-  const handleMaterialChange = (name: string, isSecondary = false) => {
-    if (isSecondary) {
-      setItemSecondaryMaterial(name);
-    } else {
-      setItemMaterial(name);
-    }
-
-    // Recalculate stats from materials
-    const pMat = isSecondary ? primaryMat : getMaterial(name);
-    const sMat = isSecondary ? getMaterial(name) : secondaryMat;
-
-    if (pMat && sMat) {
-      const combined = combineMaterials(pMat, sMat);
-      setItemWeightLevel(combined.baseWeight);
-      if (itemSubType === 'armor') {
-        const mult = ARMOR_LAYER_RULES[armorLayer].resistMultiplier;
-        setArmorResistance(Math.round(combined.baseResist * mult));
-      }
-    } else if (pMat) {
-      setItemWeightLevel(pMat.baseWeight);
-      if (itemSubType === 'armor') {
-        const mult = ARMOR_LAYER_RULES[armorLayer].resistMultiplier;
-        setArmorResistance(Math.round(pMat.baseResist * mult));
-      }
-    }
-  };
-
-  // Recalc armor resistance when layer changes
-  const handleArmorLayerChange = (layer: 'clothing' | 'lightArmor' | 'heavyArmor') => {
-    setArmorLayer(layer);
-    if (effectiveMat) {
-      const mult = ARMOR_LAYER_RULES[layer].resistMultiplier;
-      setArmorResistance(Math.round(effectiveMat.baseResist * mult));
-    }
-  };
-
-  const toggleWeaponProp = (prop: string) => {
-    const next = new Set(weaponProps);
-    if (next.has(prop)) next.delete(prop); else next.add(prop);
-    setWeaponProps(next);
-  };
-
-  const toggleCoveredPart = (part: string) => {
-    const next = new Set(armorCoveredParts);
-    if (next.has(part)) next.delete(part); else next.add(part);
-    setArmorCoveredParts(next);
-  };
-
-  const inputStyle = {
-    borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace',
-    background: 'transparent', outline: 'none', color: 'white',
-  };
-
-  return (
-    <div className="space-y-2 border-t pt-2" style={{ borderColor: '#3a3a4e' }}>
-      {/* Item Sub-type */}
-      <div className="flex gap-2 items-center">
-        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Sub-type:</label>
-        <div className="flex flex-wrap gap-1">
-          {ITEM_SUBTYPES.map(t => (
-            <button key={t} type="button" onClick={() => setItemSubType(t)}
-              className="text-[14px] px-1.5 py-0.5 uppercase"
-              style={{
-                borderRadius: '2px',
-                fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                backgroundColor: itemSubType === t ? '#22ab94' : '#2a2a3e',
-                color: itemSubType === t ? 'white' : '#666',
-                border: `1px solid ${itemSubType === t ? '#22ab94' : '#3a3a4e'}`,
-              }}
-            >
-              {ITEM_TYPE_ICONS[t] || ''} {t.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Primary Material Selection */}
-      <div className="flex gap-2 items-center">
-        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Primary:</label>
-        <select value={itemMaterial} onChange={e => handleMaterialChange(e.target.value)}
-          className="flex-1 text-[14px] px-2 py-1 border" style={inputStyle}
-        >
-          <option value="" style={{ backgroundColor: '#1a1a2e' }}>None (custom)</option>
-          {materialNames.map(name => (
-            <option key={name} value={name} style={{ backgroundColor: '#1a1a2e' }}>{name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Secondary Material Selection */}
-      <div className="flex gap-2 items-center">
-        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0">Second:</label>
-        <select value={itemSecondaryMaterial} onChange={e => handleMaterialChange(e.target.value, true)}
-          className="flex-1 text-[14px] px-2 py-1 border" style={inputStyle}
-        >
-          <option value="" style={{ backgroundColor: '#1a1a2e' }}>None</option>
-          {materialNames.filter(n => n !== itemMaterial).map(name => (
-            <option key={name} value={name} style={{ backgroundColor: '#1a1a2e' }}>{name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Material Summary */}
-      {effectiveMat && (
-        <div className="flex flex-wrap gap-1 ml-16">
-          <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#22ab94' }}>
-            {effectiveMat.resistType} R{effectiveMat.baseResist}
-          </span>
-          <span className="text-[14px] px-1 py-0.5" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#c0c0c0' }}>
-            W{effectiveMat.baseWeight}
-          </span>
-          {effectiveMat.mods.map(mod => (
-            <span key={mod} className="text-[14px] px-1 py-0.5" style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '2px', color: 'rgba(255,255,255,0.5)' }}>
-              {mod}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-2">
-        <div>
-          <label className="text-[14px] text-gray-500 block">Weight (0-10)</label>
-          <input type="number" min={0} max={10} value={itemWeightLevel} onChange={e => setItemWeightLevel(Number(e.target.value))}
-            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
-        </div>
-        <div>
-          <label className="text-[14px] text-gray-500 block">KV Value</label>
-          <input type="number" min={0} value={itemValue} onChange={e => setItemValue(Number(e.target.value))}
-            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
-        </div>
-        <div>
-          <label className="text-[14px] text-gray-500 block">Rarity</label>
-          <select value={itemRarity} onChange={e => setItemRarity(e.target.value as ItemRarity)}
-            className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
-            {RARITY_OPTIONS.map(r => (
-              <option key={r} value={r} style={{ backgroundColor: '#1a1a2e' }}>{r.replace('_', ' ')}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Weapon Fields */}
-      {itemSubType === 'weapon' && (
-        <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(232,88,90,0.2)' }}>
-          <div className="text-[15px] uppercase tracking-wider" style={{ color: '#E8585A', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
-            Weapon — Damage (P:S:H/D\C:B:E)
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {DAMAGE_KEYS.map(key => (
-              <div key={key}>
-                <label className="text-[14px] text-gray-500 block text-center">{DAMAGE_ABBREV[key]}</label>
-                <input type="number" min={0} value={weaponDamage[key] || 0}
-                  onChange={e => setWeaponDamage({ ...weaponDamage, [key]: Number(e.target.value) })}
-                  className="w-full text-[14px] px-1 py-0.5 border text-center" style={inputStyle} />
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[14px] text-gray-500 block">Range</label>
-              <select value={weaponRange} onChange={e => setWeaponRange(e.target.value)}
-                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
-                {['melee', 'short', 'medium', 'long'].map(r => (
-                  <option key={r} value={r} style={{ backgroundColor: '#1a1a2e' }}>{r}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="text-[14px] text-gray-500 block">Target Attr</label>
-              <select value={weaponTarget} onChange={e => setWeaponTarget(e.target.value)}
-                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
-                <option value="" style={{ backgroundColor: '#1a1a2e' }}>—</option>
-                {['clout', 'celerity', 'constitution'].map(a => (
-                  <option key={a} value={a} style={{ backgroundColor: '#1a1a2e' }}>{a}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {/* Weapon Properties */}
-          <div>
-            <label className="text-[14px] text-gray-500 block mb-1">Properties</label>
-            <div className="flex flex-wrap gap-1">
-              {WEAPON_PROPERTIES.map(prop => (
-                <button key={prop} type="button" onClick={() => toggleWeaponProp(prop)}
-                  className="text-[13px] px-2 py-1 uppercase"
-                  style={{
-                    borderRadius: '2px',
-                    fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    backgroundColor: weaponProps.has(prop) ? 'rgba(232,88,90,0.25)' : '#2a2a3e',
-                    color: weaponProps.has(prop) ? '#E8585A' : '#666',
-                    border: `1px solid ${weaponProps.has(prop) ? 'rgba(232,88,90,0.4)' : '#3a3a4e'}`,
-                  }}
-                >{prop}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Armor Fields */}
-      {itemSubType === 'armor' && (
-        <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(62,120,192,0.2)' }}>
-          <div className="text-[15px] uppercase tracking-wider" style={{ color: '#3E78C0', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
-            Armor
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[14px] text-gray-500 block">Layer</label>
-              <select value={armorLayer} onChange={e => handleArmorLayerChange(e.target.value as typeof armorLayer)}
-                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle}>
-                <option value="clothing" style={{ backgroundColor: '#1a1a2e' }}>Clothing (0.5x, 3 layers)</option>
-                <option value="lightArmor" style={{ backgroundColor: '#1a1a2e' }}>Light Armor (1x, 1 layer)</option>
-                <option value="heavyArmor" style={{ backgroundColor: '#1a1a2e' }}>Heavy Armor (1.5x, -1 Cel)</option>
-              </select>
-            </div>
-            <div style={{ width: 80 }}>
-              <label className="text-[14px] text-gray-500 block">Resistance</label>
-              <input type="number" min={0} value={armorResistance}
-                onChange={e => setArmorResistance(Number(e.target.value))}
-                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
-            </div>
-          </div>
-          {/* Covered Parts */}
-          <div>
-            <label className="text-[14px] text-gray-500 block mb-1">Coverage</label>
-            <div className="flex flex-wrap gap-1">
-              {BODY_PARTS.map(part => (
-                <button key={part} type="button" onClick={() => toggleCoveredPart(part)}
-                  className="text-[13px] px-2 py-1"
-                  style={{
-                    borderRadius: '2px',
-                    fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    backgroundColor: armorCoveredParts.has(part) ? 'rgba(62,120,192,0.25)' : '#2a2a3e',
-                    color: armorCoveredParts.has(part) ? '#3E78C0' : '#666',
-                    border: `1px solid ${armorCoveredParts.has(part) ? 'rgba(62,120,192,0.4)' : '#3a3a4e'}`,
-                  }}
-                >{part}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Prima Materia Fields */}
-      {itemSubType === 'prima_materia' && (
-        <div className="border-t pt-2 space-y-2" style={{ borderColor: 'rgba(112,80,168,0.2)' }}>
-          <div className="text-[15px] uppercase tracking-wider" style={{ color: '#7050A8', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
-            Prima Materia
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[14px] text-gray-500 block">School</label>
-              <input type="text" value={pmSchool} onChange={e => setPmSchool(e.target.value)}
-                placeholder="Alteration, Restoration..."
-                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
-            </div>
-            <div style={{ width: 60 }}>
-              <label className="text-[14px] text-gray-500 block">Level</label>
-              <input type="number" min={1} max={10} value={pmLevel} onChange={e => setPmLevel(Number(e.target.value))}
-                className="w-full text-[14px] px-1 py-0.5 border" style={inputStyle} />
-            </div>
-          </div>
-          <div className="flex gap-3 items-center">
-            <button type="button" onClick={() => setPmStable(!pmStable)}
-              className="text-[14px] px-2 py-0.5"
-              style={{
-                borderRadius: '2px',
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                backgroundColor: pmStable ? 'rgba(74,222,128,0.15)' : 'rgba(245,158,11,0.15)',
-                color: pmStable ? '#4ade80' : '#f59e0b',
-                border: `1px solid ${pmStable ? 'rgba(74,222,128,0.3)' : 'rgba(245,158,11,0.3)'}`,
-              }}
-            >
-              {pmStable ? 'Stable' : 'Unstable'}
-            </button>
-            {pmStable && (
-              <div className="flex items-center gap-1">
-                <label className="text-[14px] text-gray-500">Charges:</label>
-                <input type="number" min={0} value={pmCharges} onChange={e => setPmCharges(Number(e.target.value))}
-                  className="text-[14px] px-1 py-0.5 border" style={{ ...inputStyle, width: 50 }} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* GM Notes */}
-      <div className="flex gap-2 items-start">
-        <label className="text-[14px] text-gray-400 w-16 flex-shrink-0 pt-1">Notes:</label>
-        <input
-          type="text"
-          value={itemNotes}
-          onChange={e => setItemNotes(e.target.value)}
-          placeholder="GM notes (hidden from players)..."
-          className="flex-1 bg-transparent outline-none text-[14px] text-gray-400 px-2 py-1 border"
-          style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-        />
-      </div>
-    </div>
-  );
-}
 
 // ── Material Designer ────────────────────────────────────────────────────
 
