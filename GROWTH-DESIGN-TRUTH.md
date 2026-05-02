@@ -1,11 +1,10 @@
 # GRO.WTH — Canonical Design Truth
 
-Last updated: 2026-03-06
-Status: DRAFT — needs Mike's review and correction
+Last updated: 2026-05-02
 
 This document captures the CURRENT state of GROWTH's design as synthesized from the repository (70+ files), the beta codebase, and 512 source cards from Mike's Claude/ChatGPT conversation history. Where the repository and conversations disagree, the conversations (especially 2025-2026) take precedence as they reflect Mike's latest thinking.
 
-IMPORTANT: Mike is the Godhead. This document is my best understanding. He WILL need to correct things here. Items marked [QUESTION] need his input.
+IMPORTANT: Mike is ADMIN (top human authority, outside the game). GODHEAD is the in-system AI agent role. Mike's verbal corrections override this document.
 
 ---
 
@@ -29,6 +28,8 @@ The name: GRO<n>WTH — where G/R/O = Body (red), <n> = bridge (gold, nearly inv
 
 The 3x3 attribute matrix. **CRITICAL: Soul and Spirit labels were swapped in Jan 2026 after 9 years of mislabeling.** The correction aligns with Orthodox anthropology (soma/psyche/pneuma).
 
+> **⚠ DECISION-NEEDED (raised 2026-05-02):** Mike's canonical color palette (`memory/growth-color-palette.md`) maps Spirit→Purple and Soul→Blue. The pillar headers below currently show Spirit=BLUE / Soul=PURPLE — that pre-dates the palette. Either the colors flip on the existing attribute groupings, OR the alchemical/sephirot mapping needs a deeper reshuffle. Mike to resolve before this section is treated as authoritative.
+
 ### Body Pillar (Salt) — Physical/Manifestation — RED
 - **Clout** — Strength and power
 - **Celerity** — Speed and agility
@@ -50,20 +51,24 @@ The 3x3 attribute matrix. **CRITICAL: Soul and Spirit labels were swapped in Jan
 
 ### Attribute Mechanics
 - Each attribute has: level, current pool, augment positive, augment negative
-- Pool Max = level + augPos - augNeg
-- When current reaches 0: character gets a depletion condition + overflow to Frequency
+- **Pool Max formula:** `level + augPos - augNeg`
+- **Frequency exception:** only `level + current` (no augments)
+- **Overflow rule:** when any attribute hits 0, remaining damage overflows to Frequency
 - Frequency at 0 = Death's Door (Lady Death comes)
 
-### Depletion Conditions (when attribute hits 0)
-- Clout 0 = Weak
-- Celerity 0 = Clumsy
-- Constitution 0 = Exhausted
-- Focus 0 = Muted
-- Frequency 0 = Death's Door
-- Flow 0 = Deafened
-- Willpower 0 = Overwhelmed
-- Wisdom 0 = Confused
-- Wit 0 = Incoherent
+### Depletion Conditions (all 9 — confirmed by Mike 2026-03-13)
+
+| Attribute at 0 | Condition | Effect |
+|---|---|---|
+| Clout | Weak | Carry Level becomes 1 |
+| Celerity | Clumsy | DR 5 Fate Die only check before ANY action; failure = action hesitates + GM negative outcome |
+| Constitution | Exhausted | All ability point costs doubled |
+| Flow | Deafened | Cannot roll dice for any checks |
+| Frequency | Death's Door | FD + Health Level vs Lady Death |
+| Focus | Muted | Cannot add Effort to rolls |
+| Willpower | Overwhelmed | Cannot Short Rest; recovery effects restore half (round down, min 1) |
+| Wisdom | Confused | No color-code hints, no Oracle assistance; must wager Effort upfront |
+| Wit | Incoherent | Must use Unskilled checks only |
 
 ---
 
@@ -96,6 +101,7 @@ These three elements define each GRO.vine (a narrative thread/storyline for a ch
 - Humans: 4 (baseline 3 + "Ambitious" nectar = +1)
 - Determined by Seed
 - Completable goals end and free slots; incompletable goals become eternal tensions
+- Nectar/Thorn cap = Fate Die value. Decline option: convert Nectar to raw KRMA with tax (rate TBD per Mike).
 
 ### GRO.vine Rewards
 - Completing a GRO.vine earns a **Nectar** (permanent positive ability) bestowed by the Godheads
@@ -124,6 +130,16 @@ Custom-created by GM based on backstory. Cost Frequency (reducible by adding age
 4. GM creates custom Branches from life events
 5. Budget management (minimum 1 Frequency remaining)
 6. Age trade-offs reduce costs
+
+### Crystallization Flow (Q5.14 canon)
+1. Tutorial.
+2. Structured backstory prompts.
+3. GM assigns Seed / Roots / Branches.
+4. System generates initial sheet from those.
+5. Player + GM discussion phase.
+6. **GM "crystallizes"** the sheet → locks it active in the campaign.
+
+AI portrait generation is available throughout.
 
 ### Nectars and Thorns
 Limited by Fate Die value (d4=4 max, d20=20 max).
@@ -161,6 +177,50 @@ Limited by Fate Die value (d4=4 max, d20=20 max).
 
 ---
 
+## 6.5 SKILL SYSTEM
+
+### Skill Die Progression
+
+| Level | Die/Bonus |
+|---|---|
+| 0 (unskilled) | No skill die — FD + Effort only |
+| 1 | Flat +1 |
+| 2 | Flat +2 |
+| 3 | Flat +3 |
+| 4-5 | d4 |
+| 6-7 | d6 |
+| 8-11 | d8 |
+| 12-19 | d12 |
+| 20 | d20 |
+
+Die upgrades at levels 4, 6, 8, 12, 20.
+
+- **Skilled check formula:** FD + Skill Die + flat mods + Effort.
+- **Total Max Potential:** Fate Die Max + Skill Level (cap on total roll).
+- **Skilled resolution order (drives UI):** roll SD openly → Terminal color hint → player wagers Effort → roll FD → total vs DR. Meet or exceed = success.
+- **Unskilled resolution:** wager Effort blind → roll FD → total vs DR.
+- **Effort:** ALWAYS spent regardless of success/failure. Comes from governor attributes of the skill matching the action's pillar (body action → body governors). Player chooses distribution across 1-3 eligible governors.
+- **Effort cap:** Max effort on roll = Fate Die Max + Skill Level (skilled); Fate Die Max only (unskilled). Cap is on the *total added to the roll*, not on the amount spent from pools.
+- **Contested checks:** ties → defensive side wins. Both offensive → initiative decides.
+
+---
+
+## 6.7 TERMINAL DIFFICULTY COLOR SYSTEM
+
+DR expressed as percentage of character's Total Max Potential (FD max + Skill Level), color-coded:
+
+- **BLUE** — easy (threshold TBD — see notes)
+- **GREEN** — moderate (threshold TBD)
+- **YELLOW** — hard (threshold TBD)
+- **ORANGE** — very hard (threshold TBD)
+- **RED** — beyond Total Max Potential (requires Frequency Burning)
+
+Threshold percentages bands exist in killed docs but are flagged uncertain — confirm with Mike before locking exact values.
+
+**Skill relevance modifier:** highly relevant -3, moderately -1/-2, slightly +1/+2/+3, irrelevant = impossible without Frequency Burning.
+
+---
+
 ## 7. MAGIC SYSTEM
 
 ### Three Pillars of Magic
@@ -179,6 +239,28 @@ Magic is being reframed AWAY from occultism toward three compatible models:
 ### Casting Methods
 - **Weaving** — Skilled, controlled casting using Skill Die
 - **Wild Casting** — Raw, dangerous, attribute-dependent
+
+---
+
+## 7.5 COMBAT ACTION ECONOMY
+
+- **Grid:** standard 5ft squares (canvas-rendered encounter cards).
+- **ActionMod base = 0.** Modified only by items and traits.
+- **Cross-pillar actions:** generally not transferable. Any action CAN be used as movement.
+- **Multi-pillar skills:** usable, but Effort can only come from governors of the matching action type within a single roll.
+
+### Death — TWO systems
+- **Combat Death:** triggered when Frequency hits 0 in combat. Roll = FD + Health Level vs Lady Death. 3-strike rule.
+- **Fated Age Death:** triggered at Fated Age. Roll = Health Level + mods vs Lady Death (no FD). 3-strike rule, independent of combat strikes.
+
+Spirit Package: on death, KRMA splits per the death-split service; mechanical inheritance rules govern what passes to next character. (Detailed propagation rules TBD per Mike.)
+
+---
+
+## 7.7 REST SYSTEM
+
+- **Short Rest (current canon):** Deplete 1 Frequency (current pool only — NOT spending Max) → heal every other attribute by 1 point.
+- May change to a per-pillar rest model later; build the simple version swappable.
 
 ---
 
@@ -204,10 +286,14 @@ Magic is being reframed AWAY from occultism toward three compatible models:
 - Burns create permanent "scars" in the meta-campaign ledger
 
 ### Reserve Pools
-- Terminal: 50,000,000
-- Mercy: 20,000,000
-- Balance: 20,000,000
-- Severity: 10,000,000
+- **Total supply:** 100 Billion KRMA, hard cap, only shrinks via burn.
+- **Terminal:** 75B (75%) — one-way drain
+- **Balance:** 12.5B
+- **Mercy:** 6.25B
+- **Severity:** 6.25B
+- (Last three can recirculate among God-heads.)
+- **Burn cap:** 5B globally; once reached, burning is permanently disabled.
+- May change before public release — keep reserve system re-seedable.
 
 ### KV (Karma Value) System
 - System-controlled and deterministic (AlphaEvolve evaluator)
@@ -233,6 +319,17 @@ Magic is being reframed AWAY from occultism toward three compatible models:
 - Community must discover how to "kill" Lady Death
 - Killer inherits entire platform ownership
 - Founder (Mike) exits
+
+---
+
+## 8.5 FREQUENCY OPERATIONS
+
+Three distinct operations on Frequency (confirmed):
+- **Spend** — costs from Max pool (advancement currency). Permanent reduction of Max.
+- **Deplete** — costs from Current pool only (does not reduce Max). Recovered via rest.
+- **Burn** — converts Frequency directly to a temporary stat boost or impossible-action enabler. Distinct from Spend.
+
+> Burn mechanics specifics TBD — Mike to define.
 
 ---
 
@@ -345,6 +442,23 @@ Persistent entities carrying character identity, history, and KRMA fingerprint.
 
 ---
 
+## 13.5 INVENTORY
+
+Three-tier system:
+- **Equipped slots** (body regions)
+- **Inventory** (carried)
+- **Possessions** (owned, not carried — houses, vehicles, etc.)
+
+**Equipped + Inventory** use the **Weight system, levels 1-10**.
+
+**Equipped slot regions are per-Seed (not hardcoded).** GM defines paperdoll regions during Seed creation.
+
+**Default humanoid (10 regions):** Head, Body, Upper Left Arm, Lower Left Arm, Upper Right Arm, Lower Right Arm, Upper Left Leg, Lower Left Leg, Upper Right Leg, Lower Right Leg.
+
+Non-humanoid Seeds may add tails, wings, extra limbs, etc.
+
+---
+
 ## 14. DESIGN PRINCIPLES
 
 These are recurring themes Mike has stated across many conversations:
@@ -413,15 +527,17 @@ Achieved 100/100 cross-LLM transfer (GPT-4o, DeepSeek, Claude). Can compress the
 
 ---
 
-## 18. VALUES, ADDICTIONS, AND FEARS
+## 18. FEARS
 
-These three systems are interconnected:
+> Values and Addictions were CUT from the design 2026-04-19. Fears remain.
 
-- **Values**: Positive character drives (discovered through play, not pre-selected)
-- **Addictions**: The shadow side of values — two sides of the same coin
-- **Fears**: GM-assigned (see section 5), with hidden paradoxical powers
-
-Characters' values/addictions are RECOGNIZED rather than CREATED — connecting to the "discovered, not created" principle.
+- GM-assigned, NOT chosen by player.
+- Fears never fully go away.
+- Can be "aligned" (integrated into identity, granting paradoxical conditional powers).
+- Can be "removed" (extremely rare, represents reprogramming).
+- Hidden powers tied to fears — discovered through confrontation over time.
+- Resistance Levels 1-10.
+- Fear Checks: FD + attribute vs Resistance × 2.
 
 ---
 
@@ -436,7 +552,7 @@ Characters' values/addictions are RECOGNIZED rather than CREATED — connecting 
 
 ---
 
-## 20. WHAT'S NOT DECIDED YET
+## 20. RESOLVED DESIGN DECISIONS (formerly Open Questions)
 
 All original questions resolved. Answers recorded below:
 
@@ -459,9 +575,21 @@ Previously resolved:
 - ~~Soul/Spirit swap applied to repo~~ — No, repository still uses pre-swap labels (noted in CLAUDE.md)
 - ~~Database choice~~ — Prisma + SQLite (beta) → PostgreSQL (production)
 
+### Codified data conflict resolutions (2026-03-13)
+
+These are already obeyed by the codebase but called out so future readers don't relitigate:
+
+1. Skill levels 1-3 = flat +1/+2/+3 (no Skill Die).
+2. Death = TWO systems (Combat vs Fated Age), 3-strike each, independent.
+3. Soul/Spirit Jan 2026 NAME swap is canonical: Spirit pillar holds Flow/Frequency/Focus (formerly labeled "Soul"), Soul pillar holds Willpower/Wisdom/Wit (formerly labeled "Spirit").
+4. Pillar colors and full Sephirot tone mapping: see `VISUAL-DESIGN-SPEC.md` §"Pillar Colors" and `~/.claude/projects/C--Projects-GRO-WTH/memory/growth-color-palette.md` (canonical palette 2026-05-02). The pillar→color mapping in §2 of this document is under review (see DECISION-NEEDED note at top of §2).
+5. Effort is ALWAYS spent regardless of success/failure.
+6. Skilled = FD + Skill Die (FD is base).
+7. Thread facet model is DISCARDED.
+
 ---
 
-## 15. SOURCES
+## 21. SOURCES
 
 ### Primary (Most Current)
 - SC-0381: Orthodox reconciliation and pillar swap (Jan 2026)
