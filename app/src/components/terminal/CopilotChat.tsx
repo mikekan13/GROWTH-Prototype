@@ -144,13 +144,73 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
 
       switch (action.type) {
         case 'create_forge_item':
-          endpoint = `/api/campaigns/${campaignId}/forge`;
-          body = {
-            type: action.params.type || 'skill',
-            name: action.params.name,
-            data: action.params.data || {},
-          };
-          break;
+          // Forge blueprints MUST go through the chain (Selva → Creator →
+          // Kai → Et'herling). Author + confirm in two calls. Description
+          // is taken from action.params.data.description, falling back to
+          // a stringified data blob if the copilot only provided structured
+          // hints.
+          {
+            const data = (action.params.data ?? {}) as Record<string, unknown>;
+            const description =
+              typeof data.description === 'string' && data.description.trim()
+                ? data.description
+                : JSON.stringify(data) || `${action.params.name} (auto-described)`;
+            const authorRes = await fetch(`/api/campaigns/${campaignId}/forge/author`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: action.params.type || 'skill',
+                name: action.params.name,
+                description,
+              }),
+            });
+            if (!authorRes.ok) {
+              const err = await authorRes.json().catch(() => ({}));
+              setMessages(prev => [...prev, {
+                id: `act-err-${Date.now()}`,
+                role: 'assistant',
+                content: `Forge chain rejected the request: ${err.error || 'unknown error'}`,
+                actions: [],
+                createdAt: new Date().toISOString(),
+              }]);
+              return;
+            }
+            const { result } = await authorRes.json();
+            endpoint = `/api/campaigns/${campaignId}/forge/author`;
+            body = {
+              type: result.type,
+              name: result.canonicalName,
+              data: result.data,
+              karmicValue: result.suggestedKV,
+            };
+            // PUT to confirm (handled by the shared fetch below — note the
+            // METHOD override via _method for clarity, but we'll just call
+            // PUT explicitly).
+            const confirmRes = await fetch(endpoint, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            if (!confirmRes.ok) {
+              const err = await confirmRes.json().catch(() => ({}));
+              setMessages(prev => [...prev, {
+                id: `act-err-${Date.now()}`,
+                role: 'assistant',
+                content: `Failed to persist forged blueprint: ${err.error || 'unknown error'}`,
+                actions: [],
+                createdAt: new Date().toISOString(),
+              }]);
+            } else {
+              setMessages(prev => [...prev, {
+                id: `act-ok-${Date.now()}`,
+                role: 'assistant',
+                content: `Forged "${result.canonicalName}" (${result.type}). KV ${result.suggestedKV}. Awaiting publish from the forge.`,
+                actions: [],
+                createdAt: new Date().toISOString(),
+              }]);
+            }
+            return; // Skip the generic POST below — both calls handled inline.
+          }
         case 'create_location':
           endpoint = `/api/campaigns/${campaignId}/locations`;
           body = {

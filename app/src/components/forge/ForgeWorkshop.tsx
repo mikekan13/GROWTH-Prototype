@@ -275,25 +275,48 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
   // ── Create new blueprint ────────────────────────────────────────────────
 
   const handleCreate = async () => {
-    if (!createName.trim()) return;
+    if (!createName.trim() || !createDesc.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/forge`, {
+      // Submit to the authoring chain — every blueprint must be graded
+      // by Selva → Creator → Kai → Et'herling. Direct creation is disabled.
+      const authorRes = await fetch(`/api/campaigns/${campaignId}/forge/author`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: activeType,
           name: createName.trim(),
-          data: { description: createDesc.trim() },
+          description: createDesc.trim(),
         }),
       });
-      if (res.ok) {
+      if (!authorRes.ok) {
+        const err = await authorRes.json();
+        alert(err.error || 'Forge chain failed.');
+        return;
+      }
+      const { result } = await authorRes.json();
+
+      // Confirm — persist as draft for GM to publish later from the workshop list.
+      const confirmRes = await fetch(`/api/campaigns/${campaignId}/forge/author`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: result.type,
+          name: result.canonicalName,
+          data: result.data,
+          karmicValue: result.suggestedKV,
+        }),
+      });
+      if (confirmRes.ok) {
         setCreateName('');
         setCreateDesc('');
         setShowCreate(false);
         fetchCampaignItems();
+      } else {
+        const err = await confirmRes.json();
+        alert(err.error || 'Failed to persist forged blueprint.');
       }
-    } catch { /* silent */ }
+    } catch { alert('Connection failed.'); }
     finally { setCreating(false); }
   };
 

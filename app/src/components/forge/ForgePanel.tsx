@@ -152,80 +152,6 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
 
   useEffect(() => { fetchData(); }, [fetchData]); // eslint-disable-line react-hooks/set-state-in-effect
 
-  const handleCreate = async () => {
-    if (!newName.trim()) return;
-
-    const data: Record<string, unknown> = {};
-    if (newType === 'skill') {
-      if (newGovs.size === 0) return;
-      data.governors = Array.from(newGovs);
-      if (newDesc.trim()) data.description = newDesc.trim();
-    } else if (newType === 'item') {
-      data.description = newDesc.trim() || '';
-      data.itemType = itemSubType;
-      data.rarity = itemRarity;
-      data.weightLevel = itemWeightLevel;
-      data.condition = 4; // Undamaged by default
-      if (itemMaterial) data.material = itemMaterial;
-      if (itemSecondaryMaterial) data.material = `${itemMaterial}/${itemSecondaryMaterial}`;
-      if (itemValue > 0) data.value = itemValue;
-      if (itemNotes.trim()) data.notes = itemNotes.trim();
-      // Auto-apply material modifiers (combined if secondary)
-      if (itemMaterial) {
-        const primaryMat = getMaterial(itemMaterial);
-        const secondaryMat = itemSecondaryMaterial ? getMaterial(itemSecondaryMaterial) : null;
-        if (primaryMat && secondaryMat) {
-          const combined = combineMaterials(primaryMat, secondaryMat);
-          data.materialModifiers = combined.mods;
-        } else if (primaryMat) {
-          data.materialModifiers = primaryMat.mods;
-        }
-      }
-      // Weapon-specific
-      if (itemSubType === 'weapon') {
-        const hasAnyDamage = Object.values(weaponDamage).some(v => v > 0);
-        if (hasAnyDamage) data.damage = weaponDamage;
-        if (weaponRange) data.range = weaponRange;
-        if (weaponTarget) data.targetAttribute = weaponTarget;
-        if (weaponProps.size > 0) data.weaponProperties = Array.from(weaponProps);
-      }
-      // Armor-specific
-      if (itemSubType === 'armor') {
-        data.armorLayer = armorLayer;
-        if (armorResistance > 0) data.resistance = armorResistance;
-        if (armorCoveredParts.size > 0) data.coveredParts = Array.from(armorCoveredParts);
-      }
-      // Prima Materia-specific
-      if (itemSubType === 'prima_materia' && pmSchool.trim()) {
-        data.primaMateria = {
-          school: pmSchool.trim(),
-          level: pmLevel,
-          stable: pmStable,
-          ...(pmStable && pmCharges > 0 ? { charges: pmCharges } : {}),
-        };
-      }
-    } else {
-      data.description = newDesc.trim() || 'No description';
-    }
-
-    try {
-      const res = await fetch(`/api/campaigns/${campaignId}/forge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: newType, name: newName.trim(), data }),
-      });
-      if (res.ok) {
-        setNewName('');
-        setNewDesc('');
-        setNewGovs(new Set());
-        setShowCreateForm(false);
-        fetchData();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Failed to create');
-      }
-    } catch { alert('Connection failed'); }
-  };
 
   // ── Forge Flow: check global catalog first, then God-head authoring ──
   const handleAuthor = async () => {
@@ -468,26 +394,15 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                 />
               </div>
               <div className="flex gap-2 items-start">
-                <label className="text-[14px] text-gray-400 w-10 pt-1">{AI_AUTHORED_TYPES.has(newType) ? 'Vision:' : 'Desc:'}</label>
-                {AI_AUTHORED_TYPES.has(newType) ? (
-                  <textarea
-                    value={newDesc}
-                    onChange={e => setNewDesc(e.target.value)}
-                    placeholder="Describe what you envision — theme, flavor, role in the world, power level..."
-                    rows={3}
-                    className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border resize-y"
-                    style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={newDesc}
-                    onChange={e => setNewDesc(e.target.value)}
-                    placeholder="Description..."
-                    className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border"
-                    style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
-                  />
-                )}
+                <label className="text-[14px] text-gray-400 w-10 pt-1">Vision:</label>
+                <textarea
+                  value={newDesc}
+                  onChange={e => setNewDesc(e.target.value)}
+                  placeholder="Describe what you envision — theme, flavor, role in the world, power level..."
+                  rows={3}
+                  className="flex-1 bg-transparent outline-none text-[14px] text-gray-300 px-2 py-1 border resize-y"
+                  style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                />
               </div>
               {/* Forge authoring flow: global check → suggestions → God-head authoring */}
               {AI_AUTHORED_TYPES.has(newType) && (
@@ -578,84 +493,20 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   )}
                 </div>
               )}
-              {/* Manual types: direct stat fields */}
-              {newType === 'skill' && (
-                <div>
-                  <label className="text-[14px] text-gray-400 block mb-1">Governors (at least one):</label>
-                  <div className="flex flex-wrap gap-1">
-                    {SKILL_GOVERNORS.map(gov => (
-                      <button
-                        key={gov}
-                        type="button"
-                        onClick={() => toggleGov(gov)}
-                        className="text-[14px] px-1.5 py-0.5 transition-colors uppercase"
-                        style={{
-                          borderRadius: '2px',
-                          fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                          letterSpacing: '0.05em',
-                          backgroundColor: newGovs.has(gov) ? GOV_COLOR[gov] : '#2a2a3e',
-                          color: newGovs.has(gov) ? 'white' : '#666',
-                          border: `1px solid ${newGovs.has(gov) ? GOV_COLOR[gov] : '#3a3a4e'}`,
-                        }}
-                      >
-                        {GOV_ABBREV[gov]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {newType === 'item' && (
-                <ItemCreateFields
-                  itemSubType={itemSubType} setItemSubType={setItemSubType}
-                  itemMaterial={itemMaterial} setItemMaterial={setItemMaterial}
-                  itemSecondaryMaterial={itemSecondaryMaterial} setItemSecondaryMaterial={setItemSecondaryMaterial}
-                  itemRarity={itemRarity} setItemRarity={setItemRarity}
-                  itemWeightLevel={itemWeightLevel} setItemWeightLevel={setItemWeightLevel}
-                  itemValue={itemValue} setItemValue={setItemValue}
-                  itemNotes={itemNotes} setItemNotes={setItemNotes}
-                  weaponDamage={weaponDamage} setWeaponDamage={(v) => setWeaponDamage(v as typeof weaponDamage)}
-                  weaponRange={weaponRange} setWeaponRange={setWeaponRange}
-                  weaponTarget={weaponTarget} setWeaponTarget={setWeaponTarget}
-                  weaponProps={weaponProps} setWeaponProps={setWeaponProps}
-                  armorLayer={armorLayer} setArmorLayer={setArmorLayer}
-                  armorResistance={armorResistance} setArmorResistance={setArmorResistance}
-                  armorCoveredParts={armorCoveredParts} setArmorCoveredParts={setArmorCoveredParts}
-                  pmSchool={pmSchool} setPmSchool={setPmSchool}
-                  pmLevel={pmLevel} setPmLevel={setPmLevel}
-                  pmStable={pmStable} setPmStable={setPmStable}
-                  pmCharges={pmCharges} setPmCharges={setPmCharges}
-                />
-              )}
               <div className="flex gap-2 pt-1">
-                {AI_AUTHORED_TYPES.has(newType) ? (
-                  <button
-                    onClick={handleAuthor}
-                    disabled={!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0}
-                    className="text-[14px] px-3 py-1 uppercase tracking-wider"
-                    style={{
-                      color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : '#7050A8',
-                      border: `1px solid ${(!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#3a3a4e' : 'rgba(112,80,168,0.5)'}`,
-                      borderRadius: '2px',
-                      fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    }}
-                  >
-                    {checkingGlobal ? '⟳ Checking catalog...' : authoring ? '⟳ God-heads forging...' : '⚡ Send to Forge'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleCreate}
-                    disabled={!canSubmit}
-                    className="text-[14px] px-3 py-1 uppercase tracking-wider"
-                    style={{
-                      color: canSubmit ? '#ffcc78' : '#666',
-                      border: `1px solid ${canSubmit ? 'rgba(255,204,120,0.4)' : '#3a3a4e'}`,
-                      borderRadius: '2px',
-                      fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    }}
-                  >
-                    Create
-                  </button>
-                )}
+                <button
+                  onClick={handleAuthor}
+                  disabled={!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0}
+                  className="text-[14px] px-3 py-1 uppercase tracking-wider"
+                  style={{
+                    color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : '#7050A8',
+                    border: `1px solid ${(!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#3a3a4e' : 'rgba(112,80,168,0.5)'}`,
+                    borderRadius: '2px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  }}
+                >
+                  {checkingGlobal ? '⟳ Checking catalog...' : authoring ? '⟳ Forging...' : '⚡ Send to Forge'}
+                </button>
                 <button
                   onClick={() => { setShowCreateForm(false); setNewName(''); setNewDesc(''); setNewGovs(new Set()); setItemNotes(''); setItemSecondaryMaterial(''); setWeaponProps(new Set()); setArmorCoveredParts(new Set()); setPmSchool(''); setAuthorResult(null); setAuthorError(''); setGlobalSuggestions([]); setGlobalChecked(false); }}
                   className="text-[14px] px-3 py-1 uppercase tracking-wider text-gray-500"

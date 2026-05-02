@@ -45,7 +45,7 @@ async function main() {
       walletType: 'CAMPAIGN',
       campaignId: campaign.id,
       label: campaign.name,
-      balance: 0n,
+      balance: BigInt(0),
     },
   });
 
