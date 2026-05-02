@@ -1,9 +1,8 @@
 # GRO.WTH Visual Design Specification
 
-Extracted from Core Rulebook v0.4.5 (369 pages, 117 content pages)
-Last updated: 2026-03-06
+Last updated: 2026-05-02
 
-This document defines the visual language for the GRO.WTH app, derived directly from the rulebook's aesthetic. The rulebook IS the visual truth — the app should feel like a digital manifestation of this book.
+This document defines the visual language for the GRO.WTH app. Aesthetic mood, typography, layout patterns, and visual modes are derived from Core Rulebook v0.4.5 (369 pages). **Pillar colors and palette tokens follow the canonical palette in `~/.claude/projects/C--Projects-GRO-WTH/memory/growth-color-palette.md`** — the rulebook PDF is pre-Jan-2026-swap and uses outdated pillar colors; ignore its pillar colors and use the canonical palette below.
 
 ---
 
@@ -31,57 +30,90 @@ Key principles from the book:
 | `--surface-void` | `#000000` | Combat, body/material, consequence. Black void |
 | `--surface-dark` | `#1E2D40` | Header backgrounds, section badge fills |
 
-### Pillar Colors
-| Token | Hex | Pillar | Usage |
-|-------|-----|--------|-------|
-| `--pillar-body` | `#E8585A` | Body (Salt/Red) | CLO badge, d4 die, Gevurah/Binah nodes, Body sections |
-| `--pillar-spirit` | `#3EB89A` | Spirit (Sulfur/Teal) | CEL badge, d6 die, page numbers, accent throughout |
-| `--pillar-soul` | `#7050A8` | Soul (Mercury/Purple) | FOC badge, d12 die, Daath/Tiphereth nodes, Soul sections |
+### Pillar Colors (Canonical 2026-05-02 — Sephirot mapped)
 
-NOTE: In the rulebook (pre-swap), these are labeled Soul=Focus/Flow and Spirit=Will/Wis/Wit. The colors remain the same after the Jan 2026 swap — only the labels change.
+Each pillar has 3 tones. Primary token = "1" (deepest/most saturated).
+
+#### Body (Red — physical, Salt)
+| Token | Hex | Sephirah |
+|-------|-----|----------|
+| `--pillar-body-1` | `#f7525f` | Binah (PRIMARY) |
+| `--pillar-body-2` | `#ea9999` | Geburah |
+| `--pillar-body-3` | `#f4cccc` | Hod |
+
+#### Spirit (Purple — Sulfur, Flow/Frequency/Focus)
+| Token | Hex | Sephirah |
+|-------|-----|----------|
+| `--pillar-spirit-1` | `#582a72` | Daath (PRIMARY) |
+| `--pillar-spirit-2` | `#8e7cc3` | Tiphareth |
+| `--pillar-spirit-3` | `#b4a7d6` | Yesod |
+
+#### Soul (Blue — Mercury, Will/Wisdom/Wit)
+| Token | Hex | Sephirah |
+|-------|-----|----------|
+| `--pillar-soul-1` | `#002f6c` | Chokmah (PRIMARY) |
+| `--pillar-soul-2` | `#6fa8dc` | Chesed |
+| `--pillar-soul-3` | `#9fc5e8` | Netzach |
+
+> **Jan 2026 label swap:** Pre-swap rulebook labels Soul=Focus/Flow/Frequency and Spirit=Will/Wis/Wit. Post-swap (current canon) is the OPPOSITE: Spirit=Flow/Freq/Focus (purple), Soul=Will/Wis/Wit (blue). The pre-swap rulebook diagrams must be remade in current colors before they ship in-app.
+
+### Terminal Tiers (Canonical)
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--terminal-prime` | `#22ab94` | Terminal Prime Frame, Pathways (replaces old `--accent-teal`) |
+| `--terminal-base` | `#000000` | Terminal Base, Malkuth |
+| `--terminal-mid` | `#222222` | Terminal Mid |
+| `--terminal-low` | `#393937` | Terminal Low |
+| `--terminal-bg` | `#cfe2f3` | Terminal Graphical Protocol, light backgrounds |
+
+### Whites
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--white-true` | `#ffffff` | Kether. Text color = purest Terminal Logic. |
+| `--white-default` | `#F5F4EF` | Default font color when "white but not elevated knowledge" — filtered terminal logic. |
 
 ### Accent Colors
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `--accent-teal` | `#2DB8A0` | Page numbers, system highlights, ouroboros, Spirit general |
-| `--accent-gold` | `#D0A030` | Section header text, KRMA, golden connections |
+| `--krma-gold` | `#ffcc78` | KRMA, Completion, Growth, Karma, Frequency, flaming sword pathway |
 | `--accent-amber` | `#D07818` | Terminal speak sections, amber CRT mode |
 | `--accent-coral` | `#E84040` | Glitch/error/anti-pattern, warnings |
 | `--terminal-green` | `#40E070` | Terminal ERROR messages, critical system text |
-| `--krma-gold` | `#FFCC78` | KRMA values, "+1 KRMA" badges |
 
 ### Difficulty Colors (Terminal DR Color Coding)
+Maps to pillar primary colors post-swap:
 | Color | Hex | Meaning |
 |-------|-----|---------|
-| BLUE | `#3EB89A` | Natural flow (easy) |
-| PURPLE | `#7050A8` | Some resistance (moderate) |
-| RED | `#E8585A` | Active opposition (hard) |
+| BLUE (Soul) | `#002f6c` | Natural flow (easy) |
+| PURPLE (Spirit) | `#582a72` | Some resistance (moderate) |
+| RED (Body) | `#f7525f` | Active opposition (hard) |
 
-### Tree of Life Node Colors
-| Sephirah | Hex | Notes |
-|----------|-----|-------|
-| Kether | `#FFFFFF` | White, dark outline |
-| Chokmah | `#142844` | Deep navy |
-| Binah | `#E8555A` | Coral red (Body) |
-| Daath | `#4A2870` | Deep purple (Soul) |
-| Chesed | `#7A9AB8` | Steel blue |
-| Gevurah | `#E06868` | Lighter coral |
-| Tiphereth | `#8878B8` | Medium lavender (Soul center) |
-| Netzach | `#B8D4E4` | Ice blue |
-| Hod | `#F0C8C0` | Pale pink |
-| Yesod | `#C8B8D8` | Light lavender |
-| Malkuth | `#000000` | Black |
-| Teal paths | `#3EB89A` | Connecting lines |
-| Gold paths | `#D0A030` | Connecting lines |
+### Tree of Life Node Colors (Canonical 2026-05-02)
+Each sephirah maps directly to a pillar tone or terminal tier:
+| Sephirah | Hex | Maps to |
+|----------|-----|---------|
+| Kether | `#ffffff` | White (true), all pillars |
+| Chokmah | `#002f6c` | Soul 1 (Blue 1) |
+| Binah | `#f7525f` | Body 1 (Red 1) |
+| Daath | `#582a72` | Spirit 1 (Purple 1) |
+| Chesed | `#6fa8dc` | Soul 2 (Blue 2) |
+| Geburah | `#ea9999` | Body 2 (Red 2) |
+| Tiphareth | `#8e7cc3` | Spirit 2 (Purple 2) |
+| Netzach | `#9fc5e8` | Soul 3 (Blue 3) |
+| Hod | `#f4cccc` | Body 3 (Red 3) |
+| Yesod | `#b4a7d6` | Spirit 3 (Purple 3) |
+| Malkuth | `#000000` | Terminal Base |
+| Teal paths | `#22ab94` | Terminal Prime Frame, Pathways |
+| Gold paths | `#ffcc78` | KRMA, flaming sword pathway |
 
-### Dice Colors
+### Dice Colors (Canonical 2026-05-02 — pillar-aligned)
 | Die | Shape | Hex | Pillar Association |
 |-----|-------|-----|-------------------|
-| d4 | Triangle | `#F06070` | Body |
-| d6 | Square | `#3BB8A0` | Spirit |
-| d8 | Diamond | `#1B3A5C` | Void/Depth |
-| d12 | Pentagon | `#7050A8` | Soul |
-| d20 | Hexagon | `#B0C0D8` | Transcendence |
+| d4 | Triangle | `#f7525f` | Body (Red 1) |
+| d6 | Square | `#582a72` | Spirit (Purple 1) — CHANGED from teal post-swap |
+| d8 | Diamond | `#222222` | Void/Depth (Terminal Mid) |
+| d12 | Pentagon | `#002f6c` | Soul (Blue 1) — CHANGED from purple post-swap |
+| d20 | Hexagon | `#cfe2f3` | Transcendence (Terminal Bg light) |
 
 ---
 
@@ -349,18 +381,42 @@ These quotes from the rulebook should inform the app's tone:
   --surface-void: #000000;
   --surface-dark: #1E2D40;
 
-  /* Pillars */
-  --pillar-body: #E8585A;
-  --pillar-spirit: #3EB89A;
-  --pillar-soul: #7050A8;
+  /* Pillars — Body (Red, Salt) */
+  --pillar-body-1: #f7525f;  /* Binah, PRIMARY */
+  --pillar-body-2: #ea9999;  /* Geburah */
+  --pillar-body-3: #f4cccc;  /* Hod */
+
+  /* Pillars — Spirit (Purple, Sulfur, Flow/Freq/Focus) */
+  --pillar-spirit-1: #582a72; /* Daath, PRIMARY */
+  --pillar-spirit-2: #8e7cc3; /* Tiphareth */
+  --pillar-spirit-3: #b4a7d6; /* Yesod */
+
+  /* Pillars — Soul (Blue, Mercury, Will/Wis/Wit) */
+  --pillar-soul-1: #002f6c;   /* Chokmah, PRIMARY */
+  --pillar-soul-2: #6fa8dc;   /* Chesed */
+  --pillar-soul-3: #9fc5e8;   /* Netzach */
+
+  /* Pillar primary aliases (default to tone 1) */
+  --pillar-body: var(--pillar-body-1);
+  --pillar-spirit: var(--pillar-spirit-1);
+  --pillar-soul: var(--pillar-soul-1);
+
+  /* Terminal */
+  --terminal-prime: #22ab94;
+  --terminal-base:  #000000;
+  --terminal-mid:   #222222;
+  --terminal-low:   #393937;
+  --terminal-bg:    #cfe2f3;
+
+  /* Whites */
+  --white-true:    #ffffff; /* Kether — purest terminal logic */
+  --white-default: #F5F4EF; /* Filtered terminal logic, default font white */
 
   /* Accents */
-  --accent-teal: #2DB8A0;
-  --accent-gold: #D0A030;
-  --accent-amber: #D07818;
-  --accent-coral: #E84040;
+  --krma-gold:      #ffcc78;
+  --accent-amber:   #D07818;
+  --accent-coral:   #E84040;
   --terminal-green: #40E070;
-  --krma-gold: #FFCC78;
 
   /* Typography */
   --font-terminal: 'Consolas', 'Source Code Pro', monospace;
