@@ -1,11 +1,11 @@
 # GRO.WTH Project — Claude Code Instructions
 
 ## What This Is
-GRO.WTH is a digital-first TTRPG platform being rebuilt as a clean Next.js app. The game has been in design for 9+ years. Mike (the Godhead) is the sole developer, using AI exclusively for all coding. Session continuity is critical.
+GRO.WTH is a digital-first TTRPG platform being rebuilt as a clean Next.js app. The game has been in design for 9+ years. Mike (ADMIN — the top human authority, outside the game) is the sole developer, using AI exclusively for all coding. Session continuity is critical.
 
 ## Authority Hierarchy
 **For game rules/mechanics:**
-1. **Mike (Godhead)** — Ultimate authority. His verbal corrections override ALL documents.
+1. **Mike (ADMIN)** — Ultimate authority. His verbal corrections override ALL documents. Note: GODHEAD is an in-system AI agent role, NOT Mike. Mike sits above the game.
 2. **GROWTH-DESIGN-TRUTH.md** — Canonical design reference (in this folder). When in doubt, check here.
 3. **GRO.WTH Repository/** — 70+ markdown files of game rules. NOTE: These do NOT reflect the Jan 2026 Soul/Spirit label swap or the Aug 2025 Thread system redesign.
 
@@ -19,10 +19,11 @@ GRO.WTH is a digital-first TTRPG platform being rebuilt as a clean Next.js app. 
 
 ## Critical Design Facts (Do Not Get Wrong)
 - **Soul/Spirit SWAPPED (Jan 2026)**: What the repository calls "Soul" (Flow/Frequency/Focus) is actually **Spirit** (Sulfur/Blue). What it calls "Spirit" (Willpower/Wisdom/Wit) is actually **Soul** (Mercury/Purple). This aligns with Orthodox anthropology (soma/psyche/pneuma).
-- **Pillar Colors**: Body=Red, Spirit=Blue, Soul=Purple, Terminal=Teal, KRMA=Gold
-- **Three Interfaces**: Trailblazer Portal (player), Watcher Console (GM), Terminal Admin (godhead/admin)
+- **Pillar Colors (canonical, per palette 2026-05-02)**: Body=Red `#f7525f`, Spirit=Purple `#582a72`, Soul=Blue `#002f6c`, Terminal=Teal `#22ab94`, KRMA=Gold `#ffcc78`. Each pillar has 3 tones (see `memory/growth-color-palette.md` for full Sephirot mapping).
+- **Three Interfaces**: Trailblazer Portal (player), Watcher Console (GM), Terminal Admin (ADMIN-only — Mike). GODHEAD AI agents do NOT get the Terminal.
+- **Role hierarchy**: ADMIN (Mike) > GODHEAD (AI agent, plays/manages within the system) > WATCHER (GM, KRMA-constrained) > TRAILBLAZER (player, default on registration).
 - **Google Sheets is DEAD** — Killed entirely. No googleapis, no Sheets integration, no fallback.
-- **No MCP servers** — The old MCP integration is dead weight. Don't use it.
+- **No legacy Beta MCP integration** — but Playwright, SQLite, and context-mode MCP servers ARE installed for dev tooling (see `~/.claude.json` and `memory/mcp-servers-setup.md`). Use them.
 - **No OAuth/Google Auth** — Using bcrypt + session tokens. Simple auth that works.
 - **Relations Canvas IS the vision** — Spatial web of floating/dockable panels for the GM interface.
 - **Only Watchers create campaigns** — Trailblazers are invited. Subscription model: 5 seats per Watcher.
@@ -58,22 +59,25 @@ Types              →  types/growth.ts (GrowthCharacter, game mechanics)
 - Zod 4 quirks: use `error.issues` (not `.errors`), `z.record()` requires 2 args
 
 ## Project Structure
+
+> **Active codebase = `app/`.** A temporary fork at `C:\Projects\GROWTH Character Creator\` (port 3001) exists for in-progress character creation work and will be merged back into `app/` after the current cleanup pass. Do NOT start new work in the fork.
+
 ```
 C:\Projects\GRO.WTH\
   CLAUDE.md               <- You are here
+  CLEANUP-AUDIT.md        <- Active cleanup pass (May 2026); see _cleanup_audit/ for details
   GROWTH-DESIGN-TRUTH.md  <- Canonical game design document
   VISUAL-DESIGN-SPEC.md   <- Visual identity (colors, fonts, modes, CSS)
-  PORTRAIT-PIPELINE.md    <- AI portrait pipeline research + design
-  PLAN.md                 <- Build plan with phases
-  Core Rulebook v0.4.5.pdf <- The "Bible" (369 pages, visual+rules reference)
-  GRO.WTH Repository/    <- Game rules reference (70+ md files, some outdated)
+  ROADMAP.md              <- Single source of truth for build phases (replaces old PLAN.md and sub-plans)
+  Core Rulebook v0.4.5.pdf <- The "Bible" (369 pages, visual+rules reference; PRE-Jan-2026-swap labels)
+  GRO.WTH Repository/    <- Game rules reference (70+ md files; rules audit in progress, see CLEANUP-AUDIT.md)
   GRO.WTH Beta/          <- Legacy codebase (reference only)
   docs/                   <- System documentation (kept in sync with code)
     system_map.md         <- Architecture overview, data flow, key systems
     module_registry.md    <- All services, components, API routes with purposes
     database_schema.md    <- Models, fields, JSON schemas
     ai_systems.md         <- AI system designs and status
-  app/                    <- The app (Next.js 16)
+  app/                    <- The app (Next.js 16) — ACTIVE
     src/
       app/                <- Pages + API routes (interface layer)
       components/         <- React components
@@ -89,7 +93,7 @@ C:\Projects\GRO.WTH\
 
 ### Before Starting Work
 1. **Read `docs/system_map.md`** to understand current architecture and key systems
-2. **Read PLAN.md** to understand what phase we're in and what to build next
+2. **Read ROADMAP.md** to understand what phase we're in and what to build next
 3. **Check `docs/module_registry.md`** if you need to find where code lives
 4. **Read GROWTH-DESIGN-TRUTH.md** if working on game mechanics
 
@@ -101,7 +105,7 @@ C:\Projects\GRO.WTH\
 9. **Follow the architecture** — services for logic, thin API routes, typed errors, Zod validation.
 
 ### After Completing Work
-10. **Update PLAN.md** with what was completed and what's next.
+10. **Update ROADMAP.md** with what was completed and what's next.
 11. **Update `docs/` files** if you added/changed services, routes, models, or AI systems.
 12. **Commit all code changes** to git.
 13. **Push to GitHub** — `git push origin master` from `C:\Projects\GRO.WTH\app`.
@@ -112,14 +116,15 @@ C:\Projects\GRO.WTH\
 - **Repository** (`C:\Projects\GRO.WTH\GRO.WTH Repository\`): `origin` → `https://github.com/mikekan13/GROWTH_Repository.git`
 - Push app changes every session. Push repository changes only when rules files are modified.
 
-## Visual Identity (from Core Rulebook v0.4.5)
-- **NOT dark-theme-only.** See VISUAL-DESIGN-SPEC.md for full details.
+## Visual Identity (canonical palette — see VISUAL-DESIGN-SPEC.md and `memory/growth-color-palette.md` for full Sephirot mapping)
+- **NOT dark-theme-only.**
 - Primary surface: Powder blue (#CBD9E8) for rules/calm state
 - Black void for combat/consequence sections
 - Amber (#D07818) for Terminal speak sections
 - Chaotic cosmic-glitch for consciousness breaks
-- Pillar colors: Body=#E8585A (coral), Spirit=#3EB89A (teal), Soul=#7050A8 (purple)
-- Terminal=#2DB8A0 (teal), KRMA=#D0A030 (gold)
+- **Pillar primary colors (post-Jan-2026 swap)**: Body=`#f7525f` (Red 1, Binah), Spirit=`#582a72` (Purple 1, Daath), Soul=`#002f6c` (Blue 1, Chokmah)
+- Terminal=`#22ab94` (Teal, Prime Frame), KRMA=`#ffcc78` (Gold)
+- Each pillar has 3 tones tied to Sephirot — see palette memory.
 - Fonts: Consolas (Terminal/primary), Bebas Neue (headers), Inknut Antiqua (soul/creator), Roboto (sub-terminal), Comfortaa (mechanics/body)
 - Black highlight bars behind text = signature UI pattern
 - Centered, meditative layout with generous whitespace
