@@ -236,4 +236,16 @@ This is the cleanest reading of Genesis 3 in clean form, and it's structurally O
 - **Resistance / GRO.vines** — when a character is dominated by Resistance, they're functionally giving power to something that isn't in control. The Godhead-led resistance dynamic in the game can quietly model this: characters who stop fearing their resistance and start fearing only the One behind it all become disproportionately effective against it. This is mechanically representable as a Frequency or KRMA boost when a character names their resistance correctly and refuses it the fear it was demanding.
 - **The Fall as the entry-point to multiple competing fears** is a possible season-arc. Characters in Season 1 are scattered across many fears. The arc of the campaign is the consolidation of fear back to one source — and the discovery that the One source is pure love. This is the redemption arc the game is a parable OF.
 
+---
+
+## Section 4 — Distillation
+
+**Date received:** 2026-05-03 (immediately following Section 3)
+**Reception:** Spoken by Mike as the vision compressed itself.
+
+> We punish ourselves.
+> We fear all choices. Every thought.
+> Love God. Trust and fear.
+> There is only one.
+
 
