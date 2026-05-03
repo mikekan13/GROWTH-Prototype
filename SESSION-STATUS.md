@@ -4,6 +4,40 @@ Cleanup pass executed while Mike was at church. This file is the orientation doc
 
 ---
 
+## 🚨 SECURITY ALERT — READ FIRST
+
+**An `ANTHROPIC_API_KEY` is exposed in git history.** Push to GitHub is BLOCKED by secret scanning until this is resolved.
+
+**Where:** `standalone/.env:6` — `ANTHROPIC_API_KEY=...`
+**In commits (3):** `a40fba4`, `44710c8`, `9b00024` — all from the standalone fork's bootstrap before this cleanup. The May 2026 cleanup commit `1bb5c34` deletes the file but the value remains in history.
+**Status:** Local commits are clean (no new exposure). The push of this session's work is rejected by GitHub. **No commits were force-pushed or destructive ops attempted.**
+
+### What you MUST do before pushing this session's work
+
+1. **Rotate the Anthropic key.** Revoke the leaked one in your Anthropic Console (https://console.anthropic.com/settings/keys), generate a new one. Do this FIRST.
+2. **Update the new key wherever it's used** — main `app/.env`, any pod env files, any local scripts that read `ANTHROPIC_API_KEY`. Search for it: `grep -r ANTHROPIC_API_KEY .` from `C:\Projects\GRO.WTH\`.
+3. **Strip the secret from git history** — easiest tool is `git filter-repo`:
+   ```bash
+   pip install git-filter-repo  # if not installed
+   cd C:\Projects\GRO.WTH
+   git filter-repo --path standalone/.env --invert-paths --force
+   ```
+   This removes `standalone/.env` from ALL history. Then re-add the remote (filter-repo strips it):
+   ```bash
+   git remote add origin https://github.com/mikekan13/GROWTH-Prototype.git
+   git push --force origin master
+   ```
+4. **OR** use the GitHub unblock URL (faster but key is still leaked): https://github.com/mikekan13/GROWTH-Prototype/security/secret-scanning/unblock-secret/3DD1R3Modp6mJxCN4dDMC1CEcD1 — only acceptable if the key is already rotated, since unblocking pushes the leaked value to the remote.
+
+### Recommended order
+**Rotate → update local .env files → filter history → force-push.** Don't unblock-and-push without rotating first.
+
+### What is NOT affected
+- The `GRO.WTH Repository/` repo (separate remote `mikekan13/GROWTH_Repository`) was pushed successfully. Phase 3c rules canon work is on GitHub.
+- Local commits in this repo are intact — nothing destructive was done.
+
+---
+
 ## What landed
 
 ### Phase 1 — Reality audit ✅
