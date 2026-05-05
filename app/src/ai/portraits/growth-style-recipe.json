@@ -1,0 +1,51 @@
+{
+  "_description": "GROWTH Body Generation — Golden Style Recipe (locked 2026-04-20)",
+  "_notes": "This is the canonical style config for GROWTH character body generation. Back this up before changing anything.",
+
+  "promptTemplate": {
+    "format": "Hyper Realistic Sci-fi fantasy 3d rendering of a {build} {subject} with high detailed {skinTone} skin. She has {hairTexture} hair {hairStyle}. wearing {secondaryColor} underwear. sharp focus. completely grey background, soft Rembrandt lighting.",
+    "loraTriggers": ["aidmafluxpro1.1", "drkfnts style", "SharpL1nes", "7udicrousy"]
+  },
+
+  "pass1_fill": {
+    "model": "flux1-fill-dev.safetensors",
+    "steps": 15,
+    "cfg": 1,
+    "guidance": 30,
+    "denoise": 1.0,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "canvas": {
+      "width": 1024,
+      "height": 2048,
+      "faceSize": 350,
+      "headY": 32,
+      "background": [180, 180, 180]
+    }
+  },
+
+  "pass2_sharpen": {
+    "model": "flux1-dev-fp8.safetensors",
+    "steps": 30,
+    "denoise": 0.60,
+    "sampler": "euler",
+    "scheduler": "beta",
+    "identityLock": false
+  },
+
+  "loraChain": [
+    { "key": "realism",    "file": "infiniteyou-realism.safetensors",         "weight": 1.00, "trigger": null },
+    { "key": "detail",     "file": "extreme-detailer-flux.safetensors",       "weight": 0.40, "trigger": "aidmafluxpro1.1" },
+    { "key": "handDetail", "file": "detailed-perfection-flux.safetensors",    "weight": 0.60, "trigger": null },
+    { "key": "campaign",   "file": "dark-fantasy-v2-flux.safetensors",        "weight": 0.50, "trigger": "drkfnts style" },
+    { "key": "mythSharpLines", "file": "FluxMythSharpL1nes.safetensors",      "weight": 0.40, "trigger": "SharpL1nes" },
+    { "key": "growthStyle","file": "growth-style-1.safetensors",              "weight": 0.60, "trigger": "7udicrousy" },
+    { "key": "artiSketchy","file": "artisketchyfs-v02.safetensors",           "weight": 0.30, "trigger": null }
+  ],
+
+  "defaults": {
+    "fillModel": "standard",
+    "draftMode": false,
+    "idLockP2": false
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "_comment": "FLUX.2 Dev face workflow — mirrors the cloud ComfyUI 'Image Edit (Flux.2 Dev)' subgraph verified working by user 2026-04-23. Key differences from our legacy flux2-face-multiref.json: (1) includes LoraLoaderModelOnly with Flux2-dev-Turbo LoRA baked into the model chain like the cloud template does, (2) uses GetImageSize to drive output size from the primary reference image rather than hardcoding, (3) no Sage/Torch/EasyCache perf patches (clean model path, matches cloud). N reference slots (REF1..REF5) like our legacy workflow so provider can populate variable identity/style/pose refs. ReferenceLatent chain: GUIDANCE → REFLAT_5 → REFLAT_4 → ... → REFLAT_1 → GUIDER. Image 1 in prompt = REFLAT_1 (last in chain = primary subject per prepend rule).",
+
+  "UNET": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "flux2_dev_fp8mixed.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Load FLUX.2 UNET" }
+  },
+  "LORA_TURBO": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["UNET", 0], "lora_name": "Flux2TurboComfyv2.safetensors", "strength_model": 0 },
+    "_meta": { "title": "Flux2 Turbo LoRA (strength 0 = normal 20-step mode)" }
+  },
+  "CLIP": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "mistral_3_small_flux2_fp8.safetensors", "type": "flux2", "device": "default" },
+    "_meta": { "title": "Load Mistral-3 CLIP" }
+  },
+  "VAE": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "flux2-vae.safetensors" },
+    "_meta": { "title": "Load VAE" }
+  },
+
+  "LOAD_REF1": { "class_type": "LoadImage", "inputs": { "image": "ref1.png" }, "_meta": { "title": "REF1" } },
+  "SCALE_REF1": { "class_type": "ImageScaleToTotalPixels", "inputs": { "image": ["LOAD_REF1", 0], "upscale_method": "area", "megapixels": 1, "resolution_steps": 1 }, "_meta": { "title": "Scale REF1 to 1 MP" } },
+  "ENCODE_REF1": { "class_type": "VAEEncode", "inputs": { "pixels": ["SCALE_REF1", 0], "vae": ["VAE", 0] }, "_meta": { "title": "Encode REF1" } },
+
+  "LOAD_REF2": { "class_type": "LoadImage", "inputs": { "image": "ref2.png" }, "_meta": { "title": "REF2" } },
+  "SCALE_REF2": { "class_type": "ImageScaleToTotalPixels", "inputs": { "image": ["LOAD_REF2", 0], "upscale_method": "area", "megapixels": 1, "resolution_steps": 1 }, "_meta": { "title": "Scale REF2 to 1 MP" } },
+  "ENCODE_REF2": { "class_type": "VAEEncode", "inputs": { "pixels": ["SCALE_REF2", 0], "vae": ["VAE", 0] }, "_meta": { "title": "Encode REF2" } },
+
+  "LOAD_REF3": { "class_type": "LoadImage", "inputs": { "image": "ref3.png" }, "_meta": { "title": "REF3" } },
+  "SCALE_REF3": { "class_type": "ImageScaleToTotalPixels", "inputs": { "image": ["LOAD_REF3", 0], "upscale_method": "area", "megapixels": 1, "resolution_steps": 1 }, "_meta": { "title": "Scale REF3 to 1 MP" } },
+  "ENCODE_REF3": { "class_type": "VAEEncode", "inputs": { "pixels": ["SCALE_REF3", 0], "vae": ["VAE", 0] }, "_meta": { "title": "Encode REF3" } },
+
+  "LOAD_REF4": { "class_type": "LoadImage", "inputs": { "image": "ref4.png" }, "_meta": { "title": "REF4" } },
+  "SCALE_REF4": { "class_type": "ImageScaleToTotalPixels", "inputs": { "image": ["LOAD_REF4", 0], "upscale_method": "area", "megapixels": 1, "resolution_steps": 1 }, "_meta": { "title": "Scale REF4 to 1 MP" } },
+  "ENCODE_REF4": { "class_type": "VAEEncode", "inputs": { "pixels": ["SCALE_REF4", 0], "vae": ["VAE", 0] }, "_meta": { "title": "Encode REF4" } },
+
+  "LOAD_REF5": { "class_type": "LoadImage", "inputs": { "image": "ref5.png" }, "_meta": { "title": "REF5" } },
+  "SCALE_REF5": { "class_type": "ImageScaleToTotalPixels", "inputs": { "image": ["LOAD_REF5", 0], "upscale_method": "area", "megapixels": 1, "resolution_steps": 1 }, "_meta": { "title": "Scale REF5 to 1 MP" } },
+  "ENCODE_REF5": { "class_type": "VAEEncode", "inputs": { "pixels": ["SCALE_REF5", 0], "vae": ["VAE", 0] }, "_meta": { "title": "Encode REF5" } },
+
+  "CLIP_ENCODE": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["CLIP", 0] },
+    "_meta": { "title": "Prompt" }
+  },
+  "GUIDANCE": {
+    "class_type": "FluxGuidance",
+    "inputs": { "conditioning": ["CLIP_ENCODE", 0], "guidance": 4.0 },
+    "_meta": { "title": "Flux Guidance" }
+  },
+
+  "REFLAT_5": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["GUIDANCE", 0],  "latent": ["ENCODE_REF5", 0] }, "_meta": { "title": "RefLatent REF5" } },
+  "REFLAT_4": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["REFLAT_5", 0],  "latent": ["ENCODE_REF4", 0] }, "_meta": { "title": "RefLatent REF4" } },
+  "REFLAT_3": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["REFLAT_4", 0],  "latent": ["ENCODE_REF3", 0] }, "_meta": { "title": "RefLatent REF3" } },
+  "REFLAT_2": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["REFLAT_3", 0],  "latent": ["ENCODE_REF2", 0] }, "_meta": { "title": "RefLatent REF2" } },
+  "REFLAT_1": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["REFLAT_2", 0],  "latent": ["ENCODE_REF1", 0] }, "_meta": { "title": "RefLatent REF1" } },
+
+  "GETSIZE": {
+    "class_type": "GetImageSize",
+    "inputs": { "image": ["SCALE_REF1", 0] },
+    "_meta": { "title": "Get size from REF1" }
+  },
+  "EMPTY_LATENT": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": { "width": ["GETSIZE", 0], "height": ["GETSIZE", 1], "batch_size": 1 },
+    "_meta": { "title": "Empty Latent (matches REF1 size)" }
+  },
+  "SCHEDULER": {
+    "class_type": "Flux2Scheduler",
+    "inputs": { "steps": 20, "width": ["GETSIZE", 0], "height": ["GETSIZE", 1] },
+    "_meta": { "title": "Flux2 Scheduler" }
+  },
+  "SAMPLER": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" },
+    "_meta": { "title": "Sampler" }
+  },
+  "NOISE": {
+    "class_type": "RandomNoise",
+    "inputs": { "noise_seed": 0 },
+    "_meta": { "title": "Noise" }
+  },
+  "GUIDER": {
+    "class_type": "BasicGuider",
+    "inputs": { "model": ["LORA_TURBO", 0], "conditioning": ["REFLAT_1", 0] },
+    "_meta": { "title": "Guider" }
+  },
+  "SAMPLE": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["NOISE", 0],
+      "guider": ["GUIDER", 0],
+      "sampler": ["SAMPLER", 0],
+      "sigmas": ["SCHEDULER", 0],
+      "latent_image": ["EMPTY_LATENT", 0]
+    },
+    "_meta": { "title": "Sample" }
+  },
+  "DECODE": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["SAMPLE", 0], "vae": ["VAE", 0] },
+    "_meta": { "title": "Decode" }
+  },
+  "SAVE": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["DECODE", 0], "filename_prefix": "flux2_face_cloud" },
+    "_meta": { "title": "Save" }
+  }
+}

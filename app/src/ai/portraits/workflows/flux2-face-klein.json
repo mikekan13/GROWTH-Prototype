@@ -1,0 +1,272 @@
+{
+  "_comment": "FLUX.2 Klein 9B distilled — fastest path for face identity gen. 4-step sampling, multi-reference via chained ReferenceLatent. Klein is BFL's step-distilled variant; do not stack Turbo LoRA (klein is already distilled and would break the DMD trajectory). Text encoder is Qwen3 8B, NOT Mistral-3. VAE is flux2-vae-klein (BFL's repo). Target: sub-5s warm on H100.",
+
+  "12": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-9b.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    },
+    "_meta": { "title": "Load FLUX.2 Klein 9B UNET (fp8 compute)" }
+  },
+
+  "38": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_8b.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": { "title": "Load Qwen3 8B text encoder" }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae-klein.safetensors"
+    },
+    "_meta": { "title": "Load Klein VAE" }
+  },
+
+  "LOAD_REF1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref1.png" },
+    "_meta": { "title": "REF1" }
+  },
+  "SCALE_REF1": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF1", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF1 to 1 MP" }
+  },
+  "ENCODE_REF1": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE_REF1", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode REF1" }
+  },
+
+  "LOAD_REF2": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref2.png" },
+    "_meta": { "title": "REF2" }
+  },
+  "SCALE_REF2": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF2", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF2 to 1 MP" }
+  },
+  "ENCODE_REF2": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE_REF2", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode REF2" }
+  },
+
+  "LOAD_REF3": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref3.png" },
+    "_meta": { "title": "REF3" }
+  },
+  "SCALE_REF3": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF3", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF3 to 1 MP" }
+  },
+  "ENCODE_REF3": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE_REF3", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode REF3" }
+  },
+
+  "LOAD_REF4": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref4.png" },
+    "_meta": { "title": "REF4" }
+  },
+  "SCALE_REF4": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF4", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF4 to 1 MP" }
+  },
+  "ENCODE_REF4": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE_REF4", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode REF4" }
+  },
+
+  "LOAD_REF5": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref5.png" },
+    "_meta": { "title": "REF5" }
+  },
+  "SCALE_REF5": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF5", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF5 to 1 MP" }
+  },
+  "ENCODE_REF5": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE_REF5", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode REF5" }
+  },
+
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": ["38", 0]
+    },
+    "_meta": { "title": "Positive Prompt" }
+  },
+  "26": {
+    "class_type": "FluxGuidance",
+    "inputs": {
+      "conditioning": ["6", 0],
+      "guidance": 4.5
+    },
+    "_meta": { "title": "Guidance (klein CFG)" }
+  },
+
+  "REFLAT_1": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["26", 0],
+      "latent": ["ENCODE_REF1", 0]
+    },
+    "_meta": { "title": "ReferenceLatent 1" }
+  },
+  "REFLAT_2": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_1", 0],
+      "latent": ["ENCODE_REF2", 0]
+    },
+    "_meta": { "title": "ReferenceLatent 2" }
+  },
+  "REFLAT_3": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_2", 0],
+      "latent": ["ENCODE_REF3", 0]
+    },
+    "_meta": { "title": "ReferenceLatent 3" }
+  },
+  "REFLAT_4": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_3", 0],
+      "latent": ["ENCODE_REF4", 0]
+    },
+    "_meta": { "title": "ReferenceLatent 4" }
+  },
+  "REFLAT_5": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_4", 0],
+      "latent": ["ENCODE_REF5", 0]
+    },
+    "_meta": { "title": "ReferenceLatent 5" }
+  },
+
+  "48": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 4,
+      "width": 1024,
+      "height": 1024
+    },
+    "_meta": { "title": "Flux2 Scheduler (klein 4-step)" }
+  },
+  "16": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" },
+    "_meta": { "title": "Sampler" }
+  },
+  "25": {
+    "class_type": "RandomNoise",
+    "inputs": { "noise_seed": 0 },
+    "_meta": { "title": "Noise" }
+  },
+  "22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": ["12", 0],
+      "conditioning": ["REFLAT_5", 0]
+    },
+    "_meta": { "title": "Guider" }
+  },
+  "47": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "_meta": { "title": "Empty Latent" }
+  },
+
+  "13": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["25", 0],
+      "guider": ["22", 0],
+      "sampler": ["16", 0],
+      "sigmas": ["48", 0],
+      "latent_image": ["47", 0]
+    },
+    "_meta": { "title": "Sample" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Decode" }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["8", 0],
+      "filename_prefix": "flux2_face_klein"
+    },
+    "_meta": { "title": "Save" }
+  }
+}

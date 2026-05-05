@@ -1,0 +1,170 @@
+{
+  "_comment": "FLUX.2 Dev — single-reference edit workflow. Source image as reference via ReferenceLatent. No mask; entire image can change per prompt. Golden LoRAs inject via LORA_CHAIN_START/END placeholders in provider.",
+
+  "12": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux2_dev_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": { "title": "Load FLUX.2 UNET" }
+  },
+  "PERF_SAGE": {
+    "class_type": "PathchSageAttentionKJ",
+    "inputs": { "model": ["12", 0], "sage_attention": "auto", "allow_compile": false },
+    "_meta": { "title": "Sage attention patch" }
+  },
+  "PERF_TORCH": {
+    "class_type": "ModelPatchTorchSettings",
+    "inputs": { "model": ["PERF_SAGE", 0], "enable_fp16_accumulation": true },
+    "_meta": { "title": "Torch fp16 accumulation" }
+  },
+  "PERF_EASYCACHE": {
+    "class_type": "EasyCache",
+    "inputs": { "model": ["PERF_TORCH", 0], "reuse_threshold": 0.10, "start_percent": 0.25, "end_percent": 0.85, "verbose": true },
+    "_meta": { "title": "EasyCache speed patch" }
+  },
+  "38": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "mistral_3_small_flux2_fp8.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": { "title": "Load Mistral-3 CLIP" }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "full_encoder_small_decoder.safetensors"
+    },
+    "_meta": { "title": "Load VAE" }
+  },
+
+  "LOAD": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "source.png"
+    },
+    "_meta": { "title": "Source Image" }
+  },
+  "SCALE": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale to 1 MP" }
+  },
+  "GETSIZE": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": ["SCALE", 0]
+    },
+    "_meta": { "title": "Get Scaled Size" }
+  },
+  "ENCODE": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode Source" }
+  },
+
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": ["38", 0]
+    },
+    "_meta": { "title": "Edit Prompt" }
+  },
+  "26": {
+    "class_type": "FluxGuidance",
+    "inputs": {
+      "conditioning": ["6", 0],
+      "guidance": 4.0
+    },
+    "_meta": { "title": "Guidance" }
+  },
+  "43": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["26", 0],
+      "latent": ["ENCODE", 0]
+    },
+    "_meta": { "title": "Reference Latent" }
+  },
+
+  "48": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 20,
+      "width": ["GETSIZE", 0],
+      "height": ["GETSIZE", 1]
+    },
+    "_meta": { "title": "Flux2 Scheduler" }
+  },
+  "16": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": { "title": "Sampler" }
+  },
+  "25": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 0
+    },
+    "_meta": { "title": "Noise" }
+  },
+  "22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": ["PERF_EASYCACHE", 0],
+      "conditioning": ["43", 0]
+    },
+    "_meta": { "title": "Guider" }
+  },
+  "47": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": ["GETSIZE", 0],
+      "height": ["GETSIZE", 1],
+      "batch_size": 1
+    },
+    "_meta": { "title": "Empty Latent" }
+  },
+
+  "13": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["25", 0],
+      "guider": ["22", 0],
+      "sampler": ["16", 0],
+      "sigmas": ["48", 0],
+      "latent_image": ["47", 0]
+    },
+    "_meta": { "title": "Sample" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Decode" }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["8", 0],
+      "filename_prefix": "flux2_edit"
+    },
+    "_meta": { "title": "Save" }
+  }
+}

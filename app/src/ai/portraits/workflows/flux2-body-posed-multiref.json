@@ -1,0 +1,292 @@
+{
+  "_comment": "FLUX.2 Dev — posed + multi-reference BODY workflow. POSE slot takes the canonical full-body stand (FrontBodyPose.png). Canny strips identity so only silhouette/pose edges reach ReferenceLatent. IDENTITY refs (LOAD_REF1..REF5) carry the character identity — slot 1 is typically the locked face from the prior step, slots 2-5 are user uploads. Render size defaults 1024x1536 (portrait aspect). Provider strips unused REF slots and rewires BasicGuider.conditioning to whatever REFLAT_N is last.",
+
+  "12": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux2_dev_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": { "title": "Load FLUX.2 UNET" }
+  },
+  "PERF_SAGE": {
+    "class_type": "PathchSageAttentionKJ",
+    "inputs": { "model": ["12", 0], "sage_attention": "auto", "allow_compile": false },
+    "_meta": { "title": "Sage attention patch" }
+  },
+  "PERF_TORCH": {
+    "class_type": "ModelPatchTorchSettings",
+    "inputs": { "model": ["PERF_SAGE", 0], "enable_fp16_accumulation": true },
+    "_meta": { "title": "Torch fp16 accumulation" }
+  },
+  "PERF_EASYCACHE": {
+    "class_type": "EasyCache",
+    "inputs": { "model": ["PERF_TORCH", 0], "reuse_threshold": 0.10, "start_percent": 0.25, "end_percent": 0.85, "verbose": true },
+    "_meta": { "title": "EasyCache speed patch" }
+  },
+  "38": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "mistral_3_small_flux2_fp8.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": { "title": "Load Mistral-3 CLIP" }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "full_encoder_small_decoder.safetensors"
+    },
+    "_meta": { "title": "Load VAE" }
+  },
+
+  "LOAD_POSE": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "FrontBodyPose.png" },
+    "_meta": { "title": "POSE_TEMPLATE" }
+  },
+  "POSE_SCALE": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_POSE", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale Pose to 1 MP" }
+  },
+  "POSE_CANNY": {
+    "class_type": "Canny",
+    "inputs": {
+      "image": ["POSE_SCALE", 0],
+      "low_threshold": 0.15,
+      "high_threshold": 0.45
+    },
+    "_meta": { "title": "Canny Edges (identity stripped)" }
+  },
+  "POSE_ENCODE": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["POSE_CANNY", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode Pose Edges" }
+  },
+
+  "LOAD_REF1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref1.png" },
+    "_meta": { "title": "REF1" }
+  },
+  "SCALE_REF1": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF1", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF1" }
+  },
+  "ENCODE_REF1": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["SCALE_REF1", 0], "vae": ["10", 0] },
+    "_meta": { "title": "Encode REF1" }
+  },
+
+  "LOAD_REF2": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref2.png" },
+    "_meta": { "title": "REF2" }
+  },
+  "SCALE_REF2": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF2", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF2" }
+  },
+  "ENCODE_REF2": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["SCALE_REF2", 0], "vae": ["10", 0] },
+    "_meta": { "title": "Encode REF2" }
+  },
+
+  "LOAD_REF3": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref3.png" },
+    "_meta": { "title": "REF3" }
+  },
+  "SCALE_REF3": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF3", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF3" }
+  },
+  "ENCODE_REF3": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["SCALE_REF3", 0], "vae": ["10", 0] },
+    "_meta": { "title": "Encode REF3" }
+  },
+
+  "LOAD_REF4": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref4.png" },
+    "_meta": { "title": "REF4" }
+  },
+  "SCALE_REF4": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF4", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF4" }
+  },
+  "ENCODE_REF4": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["SCALE_REF4", 0], "vae": ["10", 0] },
+    "_meta": { "title": "Encode REF4" }
+  },
+
+  "LOAD_REF5": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "ref5.png" },
+    "_meta": { "title": "REF5" }
+  },
+  "SCALE_REF5": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD_REF5", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale REF5" }
+  },
+  "ENCODE_REF5": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["SCALE_REF5", 0], "vae": ["10", 0] },
+    "_meta": { "title": "Encode REF5" }
+  },
+
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["38", 0] },
+    "_meta": { "title": "Positive Prompt" }
+  },
+  "26": {
+    "class_type": "FluxGuidance",
+    "inputs": { "conditioning": ["6", 0], "guidance": 4.0 },
+    "_meta": { "title": "Guidance" }
+  },
+
+  "REFLAT_POSE": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["26", 0],
+      "latent": ["POSE_ENCODE", 0]
+    },
+    "_meta": { "title": "ReferenceLatent POSE" }
+  },
+  "REFLAT_1": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_POSE", 0],
+      "latent": ["ENCODE_REF1", 0]
+    },
+    "_meta": { "title": "ReferenceLatent ID1" }
+  },
+  "REFLAT_2": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_1", 0],
+      "latent": ["ENCODE_REF2", 0]
+    },
+    "_meta": { "title": "ReferenceLatent ID2" }
+  },
+  "REFLAT_3": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_2", 0],
+      "latent": ["ENCODE_REF3", 0]
+    },
+    "_meta": { "title": "ReferenceLatent ID3" }
+  },
+  "REFLAT_4": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_3", 0],
+      "latent": ["ENCODE_REF4", 0]
+    },
+    "_meta": { "title": "ReferenceLatent ID4" }
+  },
+  "REFLAT_5": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["REFLAT_4", 0],
+      "latent": ["ENCODE_REF5", 0]
+    },
+    "_meta": { "title": "ReferenceLatent ID5" }
+  },
+
+  "48": {
+    "class_type": "Flux2Scheduler",
+    "inputs": { "steps": 20, "width": 1024, "height": 1536 },
+    "_meta": { "title": "Flux2 Scheduler" }
+  },
+  "16": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" },
+    "_meta": { "title": "Sampler" }
+  },
+  "25": {
+    "class_type": "RandomNoise",
+    "inputs": { "noise_seed": 0 },
+    "_meta": { "title": "Noise" }
+  },
+  "22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": ["PERF_EASYCACHE", 0],
+      "conditioning": ["REFLAT_5", 0]
+    },
+    "_meta": { "title": "Guider" }
+  },
+  "47": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": { "width": 1024, "height": 1536, "batch_size": 1 },
+    "_meta": { "title": "Empty Latent" }
+  },
+
+  "13": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["25", 0],
+      "guider": ["22", 0],
+      "sampler": ["16", 0],
+      "sigmas": ["48", 0],
+      "latent_image": ["47", 0]
+    },
+    "_meta": { "title": "Sample" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["13", 0], "vae": ["10", 0] },
+    "_meta": { "title": "Decode" }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["8", 0], "filename_prefix": "flux2_body_posed" },
+    "_meta": { "title": "Save" }
+  }
+}

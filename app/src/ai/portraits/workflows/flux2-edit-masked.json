@@ -1,0 +1,176 @@
+{
+  "_comment": "FLUX.2 Dev — masked edit. Source image is VAE-encoded, a binary mask is attached via SetLatentNoiseMask so only masked pixels resample. The same latent also flows through ReferenceLatent so the unmasked region's identity/composition stays locked. FLUX.2 Dev has no native mask-aware conditioning (that's Klein); SetLatentNoiseMask is the Dev-compatible path. Provider wires mask by matching LoadImage nodes by _meta.title ('Source Image' / 'Mask Image'). Mask must be single-channel (L), white = edit, black = keep. Known bug: ComfyUI MaskEditor bakes red paint into FLUX output — always supply a clean pre-built mask from the caller, never via MaskEditor UI.",
+
+  "12": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux2_dev_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": { "title": "Load FLUX.2 UNET" }
+  },
+  "PERF_DIFFDIFF": {
+    "class_type": "DifferentialDiffusion",
+    "inputs": { "model": ["12", 0], "strength": 1.0 },
+    "_meta": { "title": "Differential Diffusion (soft mask edges)" }
+  },
+  "PERF_SAGE": {
+    "class_type": "PathchSageAttentionKJ",
+    "inputs": { "model": ["PERF_DIFFDIFF", 0], "sage_attention": "auto", "allow_compile": false },
+    "_meta": { "title": "Sage attention patch" }
+  },
+  "PERF_TORCH": {
+    "class_type": "ModelPatchTorchSettings",
+    "inputs": { "model": ["PERF_SAGE", 0], "enable_fp16_accumulation": true },
+    "_meta": { "title": "Torch fp16 accumulation" }
+  },
+  "PERF_EASYCACHE": {
+    "class_type": "EasyCache",
+    "inputs": { "model": ["PERF_TORCH", 0], "reuse_threshold": 0.10, "start_percent": 0.25, "end_percent": 0.85, "verbose": true },
+    "_meta": { "title": "EasyCache speed patch" }
+  },
+  "38": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "mistral_3_small_flux2_fp8.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": { "title": "Load Mistral-3 CLIP" }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "full_encoder_small_decoder.safetensors"
+    },
+    "_meta": { "title": "Load VAE" }
+  },
+
+  "LOAD": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "source.png" },
+    "_meta": { "title": "Source Image" }
+  },
+  "LOAD_MASK": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "mask.png" },
+    "_meta": { "title": "Mask Image" }
+  },
+  "MASK_TO_MASK": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": ["LOAD_MASK", 0],
+      "channel": "red"
+    },
+    "_meta": { "title": "Mask → Single Channel" }
+  },
+  "SCALE": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": ["LOAD", 0],
+      "upscale_method": "lanczos",
+      "megapixels": 1,
+      "resolution_steps": 1
+    },
+    "_meta": { "title": "Scale Source to 1 MP" }
+  },
+  "GETSIZE": {
+    "class_type": "GetImageSize",
+    "inputs": { "image": ["SCALE", 0] },
+    "_meta": { "title": "Get Scaled Size" }
+  },
+  "ENCODE": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["SCALE", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Encode Source" }
+  },
+  "MASKED_LATENT": {
+    "class_type": "SetLatentNoiseMask",
+    "inputs": {
+      "samples": ["ENCODE", 0],
+      "mask": ["MASK_TO_MASK", 0]
+    },
+    "_meta": { "title": "Attach Noise Mask" }
+  },
+
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["38", 0] },
+    "_meta": { "title": "Edit Prompt" }
+  },
+  "26": {
+    "class_type": "FluxGuidance",
+    "inputs": {
+      "conditioning": ["6", 0],
+      "guidance": 4.0
+    },
+    "_meta": { "title": "Guidance" }
+  },
+  "43": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["26", 0],
+      "latent": ["ENCODE", 0]
+    },
+    "_meta": { "title": "Reference Latent (identity lock)" }
+  },
+
+  "48": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 20,
+      "width": ["GETSIZE", 0],
+      "height": ["GETSIZE", 1]
+    },
+    "_meta": { "title": "Flux2 Scheduler" }
+  },
+  "16": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" },
+    "_meta": { "title": "Sampler" }
+  },
+  "25": {
+    "class_type": "RandomNoise",
+    "inputs": { "noise_seed": 0 },
+    "_meta": { "title": "Noise" }
+  },
+  "22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": ["PERF_EASYCACHE", 0],
+      "conditioning": ["43", 0]
+    },
+    "_meta": { "title": "Guider" }
+  },
+
+  "13": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["25", 0],
+      "guider": ["22", 0],
+      "sampler": ["16", 0],
+      "sigmas": ["48", 0],
+      "latent_image": ["MASKED_LATENT", 0]
+    },
+    "_meta": { "title": "Sample (masked latent)" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": { "title": "Decode" }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["8", 0],
+      "filename_prefix": "flux2_edit_masked"
+    },
+    "_meta": { "title": "Save" }
+  }
+}
