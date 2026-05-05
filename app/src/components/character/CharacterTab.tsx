@@ -98,9 +98,15 @@ interface CharacterTabProps {
   // regardless of isGM/entityType gating. Used by Tapestry where GM always owns the
   // entity they're editing — bypasses the entityType round-trip from the API.
   canEdit?: boolean;
+  // When set, this CharacterTab loads the specified character INSTEAD of userCharacter.
+  // Used by in-canvas selection: clicking an entity in Tapestry > Entities switches
+  // the active tab to 'character' and passes the entity id here so we never have to
+  // navigate away to /character/[id]. Falls back to userCharacter if fetch fails.
+  selectedCharacterId?: string | null;
 }
 
-export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit }: CharacterTabProps) {
+export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit, selectedCharacterId }: CharacterTabProps) {
+  const [overrideCharacter, setOverrideCharacter] = useState<{ id: string; name: string; data: string; entityType?: string } | null>(null);
   const [physicalDescription, setPhysicalDescription] = useState<PhysicalDescription>({});
   const [backstoryText, setBackstoryText] = useState('');
   const [characterName, setCharacterName] = useState('');
@@ -129,6 +135,44 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
     [selectedSeedName, campaignSeeds],
   );
 
+  // The character we actually render — selectedCharacterId override beats the
+  // user's own PC. Lets the GM (or any user) view an arbitrary character in this
+  // tab without navigating away.
+  const effectiveCharacter = overrideCharacter ?? userCharacter ?? null;
+
+  // Fetch the override character whenever selectedCharacterId changes.
+  // On failure, leave overrideCharacter null and fall back to userCharacter.
+  useEffect(() => {
+    if (!selectedCharacterId) {
+      setOverrideCharacter(null);
+      return;
+    }
+    if (overrideCharacter?.id === selectedCharacterId) return;
+    let cancelled = false;
+    fetch(`/api/characters/${selectedCharacterId}`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(({ character }) => {
+        if (cancelled || !character) return;
+        // Normalize: API returns `data` either as object or string. CharacterTab's
+        // hydration code expects a string (it JSON.parses).
+        const dataStr = typeof character.data === 'string' ? character.data : JSON.stringify(character.data ?? {});
+        setOverrideCharacter({
+          id: character.id,
+          name: character.name,
+          data: dataStr,
+          entityType: character.entityType,
+        });
+        // Force re-hydration of local state by clearing the hydrated marker.
+        hydratedIdRef.current = null;
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('[CharacterTab] failed to load selected character', selectedCharacterId, err);
+        setOverrideCharacter(null);
+      });
+    return () => { cancelled = true; };
+  }, [selectedCharacterId, overrideCharacter?.id]);
+
   // Fetch seeds available in this campaign
   useEffect(() => {
     if (!campaignId) {
@@ -154,13 +198,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
   // identical content — wiped in-flight local edits like just-uploaded reference photos.
   const hydratedIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const charId = userCharacter?.id ?? null;
+    const charId = effectiveCharacter?.id ?? null;
     if (hydratedIdRef.current === charId) return; // already hydrated for this character
     hydratedIdRef.current = charId;
 
-    if (userCharacter?.data) {
+    if (effectiveCharacter?.data) {
       try {
-        const parsed = JSON.parse(userCharacter.data);
+        const parsed = JSON.parse(effectiveCharacter.data);
         if (parsed.identity?.physicalDescription) setPhysicalDescription(parsed.identity.physicalDescription);
         if (parsed.identity?.referencePhotos) setReferencePhotos(parsed.identity.referencePhotos);
         if (parsed.identity?.generatedBust) setGeneratedBust(parsed.identity.generatedBust);
@@ -169,7 +213,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
         if (parsed.identity?.styleAesthetics) setStyleAesthetics(parsed.identity.styleAesthetics);
         if (parsed.backstory?.backstory) setBackstoryText(parsed.backstory.backstory);
         if (parsed.creation?.seed?.name) setSelectedSeedName(parsed.creation.seed.name);
-        setCharacterName(parsed.identity?.name || userCharacter.name);
+        setCharacterName(parsed.identity?.name || effectiveCharacter.name);
       } catch { /* ignore */ }
       setLoading(false);
     } else {
@@ -195,7 +239,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
         .catch(() => {})
         .finally(() => setLoading(false));
     }
-  }, [userCharacter, campaignId]);
+  }, [effectiveCharacter, campaignId]);
 
   const updateField = useCallback((field: 'build' | 'skinTone' | 'gender', value: string) => {
     setPhysicalDescription(prev => ({ ...prev, [field]: value }));
@@ -315,7 +359,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
   const buildCharacterData = useCallback(() => {
     const head = physicalDescription.bodyParts?.HEAD;
     return {
-      characterId: userCharacter?.id || 'creation-preview',
+      characterId: effectiveCharacter?.id || 'creation-preview',
       campaignId,
       identity: {
         name: characterName || 'Unnamed',
@@ -344,7 +388,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
       attributeDepletion: { overallDepletion: 'fresh' as const, bodyDepletion: 0, spiritDepletion: 0, soulDepletion: 0 },
       visualTraits: [],
     };
-  }, [physicalDescription, characterName, desiredAge, selectedSeed, campaignId, userCharacter?.id]);
+  }, [physicalDescription, characterName, desiredAge, selectedSeed, campaignId, effectiveCharacter?.id]);
 
   const handleWizardComplete = useCallback(async (bust: string, fullBody: string) => {
     setGeneratedBust(bust);
@@ -354,13 +398,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
     // Persist portrait paths
     const portraitData = { generatedBust: bust, generatedFullBody: fullBody };
     try {
-      if (userCharacter?.id) {
-        const charRes = await fetch(`/api/characters/${userCharacter.id}`);
+      if (effectiveCharacter?.id) {
+        const charRes = await fetch(`/api/characters/${effectiveCharacter.id}`);
         if (charRes.ok) {
           const { character } = await charRes.json();
           const data = JSON.parse(character.data);
           data.identity = { ...data.identity, ...portraitData };
-          await fetch(`/api/characters/${userCharacter.id}`, {
+          await fetch(`/api/characters/${effectiveCharacter.id}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ data }),
           });
@@ -379,13 +423,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
     } catch (err) {
       console.error('Failed to persist portraits:', err);
     }
-  }, [userCharacter?.id, campaignId]);
+  }, [effectiveCharacter?.id, campaignId]);
 
   const save = useCallback(async () => {
     setSaving(true);
     try {
-      if (userCharacter?.id) {
-        const res = await fetch(`/api/characters/${userCharacter.id}`);
+      if (effectiveCharacter?.id) {
+        const res = await fetch(`/api/characters/${effectiveCharacter.id}`);
         if (!res.ok) throw new Error('Failed to load');
         const { character } = await res.json();
         const data = typeof character.data === 'string' ? JSON.parse(character.data) : character.data;
@@ -394,7 +438,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
         data.creation = { ...data.creation, seed: selectedSeed ? { name: selectedSeed.name } : data.creation?.seed };
         // Include top-level `name` so the Character row's name field updates too
         // (shown in entity list, used for display in canvas nodes, etc.).
-        const updateRes = await fetch(`/api/characters/${userCharacter.id}`, {
+        const updateRes = await fetch(`/api/characters/${effectiveCharacter.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data, name: characterName || data.identity?.name || 'Unnamed' }),
@@ -417,7 +461,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
     } finally {
       setSaving(false);
     }
-  }, [userCharacter?.id, campaignId, physicalDescription, backstoryText, characterName, desiredAge, selectedSeedName, selectedSeed, referencePhotos, styleColors, styleAesthetics, generatedBust, generatedFullBody]);
+  }, [effectiveCharacter?.id, campaignId, physicalDescription, backstoryText, characterName, desiredAge, selectedSeedName, selectedSeed, referencePhotos, styleColors, styleAesthetics, generatedBust, generatedFullBody]);
 
   const pd = physicalDescription;
   // canEdit prop = explicit override (Tapestry GM-editor path passes true).
@@ -425,7 +469,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
   // GM editing non-PC entity editable.
   const isEditable = canEdit === true
     || !isGM
-    || (userCharacter?.entityType != null && userCharacter.entityType !== 'PLAYER_CHARACTER');
+    || (effectiveCharacter?.entityType != null && effectiveCharacter.entityType !== 'PLAYER_CHARACTER');
 
   if (loading) {
     return (
@@ -928,7 +972,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit 
               characterData={buildCharacterData()}
               campaignId={campaignId}
               referencePhotos={referencePhotos}
-              characterId={userCharacter?.id}
+              characterId={effectiveCharacter?.id}
               onComplete={handleWizardComplete}
               onCancel={() => setWizardOpen(false)}
             />

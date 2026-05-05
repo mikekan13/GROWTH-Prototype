@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 
 interface Entity {
   id: string;
@@ -20,6 +19,11 @@ interface Entity {
 interface EntitiesPanelProps {
   campaignId: string;
   isGM: boolean;
+  // In-canvas selection: when present, clicking a row (or finishing creation)
+  // notifies the parent instead of navigating to /character/[id]. The parent
+  // (CampaignCanvas) switches the active tab to 'character' and passes the id
+  // to CharacterTab so the same dashboard context is preserved.
+  onSelectCharacter?: (characterId: string) => void;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -35,8 +39,7 @@ function formatKrma(n: number): string {
   return n.toLocaleString();
 }
 
-export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) {
-  const router = useRouter();
+export default function EntitiesPanel({ campaignId, isGM, onSelectCharacter }: EntitiesPanelProps) {
   const [creating, setCreating] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +66,9 @@ export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) 
       const res = await fetch(`/api/campaigns/${campaignId}/entities`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to create');
       const data = await res.json();
-      router.push(`/character/${data.id}`);
+      // Refresh the list first so the new entity appears when the user comes back.
+      await fetchEntities();
+      onSelectCharacter?.(data.id);
     } catch {
       setError('Failed to create entity');
     } finally {
@@ -72,7 +77,7 @@ export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) 
   };
 
   const handleEntityClick = (entity: Entity) => {
-    router.push(`/character/${entity.id}`);
+    onSelectCharacter?.(entity.id);
   };
 
   if (loading) {

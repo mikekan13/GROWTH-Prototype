@@ -81,6 +81,19 @@ interface CampaignEconomyData {
 
 export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
+  // In-canvas character selection: when set, the Character tab loads THIS character
+  // instead of the user's own PC. Cleared when navigating to a non-character tab so
+  // the user's own PC shows next time the Character tab is opened without a selection.
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const handleSelectCharacter = useCallback((id: string) => {
+    setSelectedCharacterId(id);
+    setActiveTab('character');
+  }, []);
+  useEffect(() => {
+    if (activeTab !== 'character') {
+      setSelectedCharacterId(null);
+    }
+  }, [activeTab]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [nodes, setNodes] = useState(initialNodes);
@@ -996,7 +1009,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         )}
 
         {activeTab === 'tapestry' && (
-          <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} />
+          <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} onSelectCharacter={handleSelectCharacter} />
         )}
 
         {activeTab === 'character' && (
@@ -1006,6 +1019,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             userRole={userRole}
             isGM={isGM}
             userCharacter={userCharacter}
+            selectedCharacterId={selectedCharacterId}
           />
         )}
 
