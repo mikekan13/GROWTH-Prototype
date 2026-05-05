@@ -272,6 +272,18 @@ export interface GrowthInventory {
   items: GrowthItem[];
 }
 
+// Fear System
+// Per DESIGN-TRUTH §18: Fears are alive (Values + Addictions were cut Apr 2026).
+// Fears are GM-assigned, never fully go away. Can be "aligned" (integrated,
+// granting paradoxical powers) or "removed" (extremely rare; reprogramming).
+export interface GrowthFear {
+  name: string;
+  description: string;
+  resistanceLevel: number;        // 1-10
+  status: 'active' | 'aligned' | 'removed';
+  hiddenPower?: string;           // Discovered through confrontation
+}
+
 // Harvest System (Seasonal Turns)
 export interface GrowthHarvest {
   id: string;
@@ -324,6 +336,9 @@ export interface GrowthIdentity {
   description?: string;
   image?: string;
   physicalDescription?: PhysicalDescription;
+  // Style fields (portrait pipeline / character creator)
+  styleColors?: { primary: string; secondary: string; tertiary: string }; // hex codes — secondary drives underwear color
+  styleAesthetics?: string[];     // up to 2 aesthetic descriptors — drives underwear style
 }
 
 // Backstory
@@ -346,6 +361,7 @@ export interface GrowthCharacter {
   magic: GrowthMagic;
   traits: GrowthTrait[];       // Nectars + Blossoms + Thorns combined
   grovines: GROvine[];         // Active narrative threads
+  fears?: GrowthFear[];        // GM-assigned fears (optional for legacy chars without fears)
   vitals: GrowthVitals;
   inventory: GrowthInventory;
   backstory: GrowthBackstory;
