@@ -146,15 +146,6 @@ Limited by Fate Die value (d4=4 max, d20=20 max).
 - Nectars = permanent positive abilities (from completing GRO.vines)
 - Thorns = permanent negative effects (from failed GRO.vines, death, etc.)
 
-### Fears System
-- Assigned by GM, NOT chosen by player
-- Fears never fully go away
-- Can be "aligned" (integrated into identity, granting paradoxical conditional powers)
-- Can be "removed" (extremely rare, represents reprogramming)
-- Hidden powers tied to fears — discovered through confrontation over time
-- Fears have Resistance Levels (1-10)
-- Fear Checks: Fate Die + attribute vs Resistance x 2
-
 ---
 
 ## 6. RESOLUTION SYSTEM
