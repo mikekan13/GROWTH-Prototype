@@ -3,9 +3,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { canViewCharacter } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
-import CharacterSheet from '@/components/character/CharacterSheet';
-import PortraitPanel from '@/components/character/PortraitPanel';
-import type { GrowthCharacter } from '@/types/growth';
+import CharacterPageClient from './CharacterPageClient';
 
 export default async function CharacterPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -15,7 +13,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
 
   const character = await prisma.character.findUnique({
     where: { id },
-    include: { campaign: { select: { name: true, gmUserId: true } } },
+    include: { campaign: { select: { id: true, name: true, gmUserId: true } } },
   });
 
   if (!character) {
@@ -26,15 +24,30 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
     redirect('/trailblazer');
   }
 
-  const data = JSON.parse(character.data) as GrowthCharacter;
+  const isGM =
+    session.user.role === 'ADMIN' ||
+    (character.campaign?.gmUserId === session.user.id);
+  const isOwner = character.userId === session.user.id;
+  const canEdit = isGM || isOwner;
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
       <div className="mb-4 text-xs text-[var(--surface-dark)]/40 uppercase tracking-wider">
         {character.campaign?.name ?? 'No Campaign'} | {character.status}
       </div>
-      <PortraitPanel characterId={character.id} currentPortrait={character.portrait} />
-      <CharacterSheet character={data} />
+      <CharacterPageClient
+        campaignId={character.campaign?.id ?? ''}
+        isGM={isGM}
+        userId={session.user.id}
+        userRole={session.user.role}
+        characterData={{
+          id: character.id,
+          name: character.name,
+          data: character.data,
+          entityType: character.entityType,
+        }}
+        canEdit={canEdit}
+      />
     </DashboardShell>
   );
 }
