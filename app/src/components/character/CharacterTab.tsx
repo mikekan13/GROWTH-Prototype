@@ -1,11 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { PhysicalDescription, BodyPartDescription } from '@/types/growth';
 import IdentityLockWizard from './IdentityLockWizard';
 
 const GENDER_OPTIONS = ['', 'Male', 'Female', 'Non-binary', 'Other'] as const;
-const BUILD_OPTIONS = ['', 'Slight', 'Slim', 'Lean', 'Average', 'Athletic', 'Stocky', 'Muscular', 'Heavy', 'Large'] as const;
+const BUILD_OPTIONS = [
+  '', 'Petite', 'Slight', 'Slim', 'Slender', 'Lean', 'Wiry', 'Lithe',
+  'Toned', 'Average', 'Athletic', 'Fit', 'Compact',
+  'Curvy', 'Voluptuous', 'Full-figured', 'Shapely',
+  'Broad', 'Stocky', 'Muscular', 'Brawny', 'Built',
+  'Heavy', 'Large', 'Lanky', 'Willowy',
+] as const;
 const HAIR_LENGTH_OPTIONS = ['', 'Bald', 'Buzzed', 'Short', 'Ear-length', 'Chin-length', 'Shoulder-length', 'Mid-back', 'Waist-length', 'Hip-length', 'Knee-length', 'Floor-length'] as const;
 const HAIR_TEXTURE_OPTIONS = ['', 'Straight', 'Wavy', 'Curly', 'Coily', 'Kinky', 'Wiry', 'Fine', 'Thick'] as const;
 const HYGIENE_OPTIONS = ['', 'Pristine', 'Well-kept', 'Average', 'Rugged', 'Rough', 'Unkempt', 'Feral'] as const;
@@ -94,7 +100,7 @@ interface CharacterTabProps {
   canEdit?: boolean;
 }
 
-export default function CharacterTab({ campaignId, userId, userRole, isGM, userCharacter, canEdit }: CharacterTabProps) {
+export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit }: CharacterTabProps) {
   const [physicalDescription, setPhysicalDescription] = useState<PhysicalDescription>({});
   const [backstoryText, setBackstoryText] = useState('');
   const [characterName, setCharacterName] = useState('');
@@ -111,7 +117,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
   const [generating] = useState(false); // Kept for PortraitFrame loading; wizard handles its own state
   const [generatedBust, setGeneratedBust] = useState<string | null>(null);
   const [generatedFullBody, setGeneratedFullBody] = useState<string | null>(null);
-  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [generationError, _setGenerationError] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -125,6 +131,10 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
 
   // Fetch seeds available in this campaign
   useEffect(() => {
+    if (!campaignId) {
+      setCampaignSeeds([]);
+      return;
+    }
     fetch(`/api/campaigns/${campaignId}/forge?type=seed&status=published`)
       .then(r => r.json())
       .then(res => {
@@ -138,7 +148,16 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
       .catch(() => {});
   }, [campaignId]);
 
+  // Hydrate local state from persisted character data ONCE per character id.
+  // Previously this ran on every parent re-render (deps were [userCharacter, campaignId]),
+  // so any parent update that gave us a new userCharacter object reference — even with
+  // identical content — wiped in-flight local edits like just-uploaded reference photos.
+  const hydratedIdRef = useRef<string | null>(null);
   useEffect(() => {
+    const charId = userCharacter?.id ?? null;
+    if (hydratedIdRef.current === charId) return; // already hydrated for this character
+    hydratedIdRef.current = charId;
+
     if (userCharacter?.data) {
       try {
         const parsed = JSON.parse(userCharacter.data);
@@ -202,20 +221,28 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
   const handlePhotoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    console.log('[refUpload] picked', { name: file.name, type: file.type, size: file.size });
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
       const res = await fetch('/api/references', { method: 'POST', body: formData });
+      const bodyText = await res.text();
       if (!res.ok) {
-        const err = await res.json();
-        alert(err.error || 'Upload failed');
+        console.error('[refUpload] server rejected', res.status, bodyText);
+        let parsed: Record<string, unknown> | null = null;
+        try { parsed = JSON.parse(bodyText); } catch { /* leave as null */ }
+        alert(`Upload failed (HTTP ${res.status})\n${parsed?.error || bodyText.slice(0, 400)}`);
         return;
       }
-      const { path: photoPath } = await res.json();
+      const { path: photoPath } = JSON.parse(bodyText) as { path: string };
+      console.log('[refUpload] stored at', photoPath);
       setReferencePhotos(prev => [...prev, photoPath]);
       setDirty(true);
-    } catch { alert('Upload failed'); }
+    } catch (err) {
+      console.error('[refUpload] network/client error', err);
+      alert(`Upload failed (client error): ${err instanceof Error ? err.message : String(err)}`);
+    }
     finally { setUploading(false); e.target.value = ''; }
   }, []);
 
@@ -296,8 +323,13 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         sex: physicalDescription.gender,
         skinTone: physicalDescription.skinTone,
         hairColor: head?.hairColor,
+        hairLength: head?.hairLength,
+        hairTexture: head?.hairTexture,
         hairStyle: head?.hairStyle,
         eyeColor: head?.eyeColor,
+        facialHair: head?.facialHair,
+        styleColors,
+        styleAesthetics,
         bodyType: physicalDescription.build
           ? `${physicalDescription.build}${physicalDescription.height ? `, ${Math.floor(physicalDescription.height / 12)}'${physicalDescription.height % 12}"` : ''}`
           : undefined,
@@ -359,6 +391,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
         const data = typeof character.data === 'string' ? JSON.parse(character.data) : character.data;
         data.identity = { ...data.identity, name: characterName, physicalDescription, referencePhotos, generatedBust, generatedFullBody, styleColors, styleAesthetics };
         data.backstory = { ...data.backstory, backstory: backstoryText };
+        data.creation = { ...data.creation, seed: selectedSeed ? { name: selectedSeed.name } : data.creation?.seed };
         // Include top-level `name` so the Character row's name field updates too
         // (shown in entity list, used for display in canvas nodes, etc.).
         const updateRes = await fetch(`/api/characters/${userCharacter.id}`, {
@@ -384,7 +417,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
     } finally {
       setSaving(false);
     }
-  }, [userCharacter?.id, campaignId, physicalDescription, backstoryText, characterName, desiredAge, selectedSeedName, referencePhotos]);
+  }, [userCharacter?.id, campaignId, physicalDescription, backstoryText, characterName, desiredAge, selectedSeedName, selectedSeed, referencePhotos, styleColors, styleAesthetics, generatedBust, generatedFullBody]);
 
   const pd = physicalDescription;
   // canEdit prop = explicit override (Tapestry GM-editor path passes true).
@@ -448,18 +481,20 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                   setDirty(true);
                 }}
                 className="w-full text-sm p-2"
-                style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px' }}
+                style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px', colorScheme: 'dark' }}
               >
-                <option value="">— Select a Seed —</option>
+                <option value="" style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>— Select a Seed —</option>
                 {campaignSeeds.map(s => (
-                  <option key={s.id} value={s.name}>
+                  <option key={s.id} value={s.name} style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>
                     {s.name}{s.data.baseFateDie ? ` — ${s.data.baseFateDie}` : ''}{s.data.seedKV ? ` · KV ${s.data.seedKV}` : ''}
                   </option>
                 ))}
               </select>
               {campaignSeeds.length === 0 && (
                 <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                  No seeds published in this campaign yet. Ask your Watcher to add seeds via the Forge.
+                  {campaignId
+                    ? 'No seeds published in this campaign yet. Ask your Watcher to add seeds via the Forge.'
+                    : 'This entity is not scoped to a campaign — seeds are campaign-scoped, so none are available here.'}
                 </div>
               )}
               {selectedSeed && (
@@ -739,7 +774,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
                               <div className="grid grid-cols-2 gap-2">
                                 <FieldInput label="Color" value={bpData.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart(part, 'hairColor', v)} />
                                 <FieldSelect label="Length" value={bpData.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairLength', v)} />
-                                <FieldSelect label="Texture" value={bpData.hairTexture} options={HAIR_TEXTURE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
+                                <FieldInput label="Texture" value={bpData.hairTexture} placeholder="thick wavy, fine straight, curly" editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
                                 <FieldInput label="Style" value={bpData.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart(part, 'hairStyle', v)} />
                               </div>
                             </div>
@@ -894,8 +929,6 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
               campaignId={campaignId}
               referencePhotos={referencePhotos}
               characterId={userCharacter?.id}
-              characterName={characterName}
-              onNameChange={isEditable ? (n) => { setCharacterName(n); setDirty(true); } : undefined}
               onComplete={handleWizardComplete}
               onCancel={() => setWizardOpen(false)}
             />
@@ -937,7 +970,7 @@ export default function CharacterTab({ campaignId, userId, userRole, isGM, userC
           <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
             {isGM
               ? 'Trailblazer-submitted backstory. Use to inform seed, root, and branch creation.'
-              : 'Your history, personality, motivations. Your Watcher builds your mechanical character from this.'}
+              : 'Your history, personality, motivations, fears. Your Watcher builds your mechanical character from this.'}
           </div>
           {isEditable ? (
             <textarea
