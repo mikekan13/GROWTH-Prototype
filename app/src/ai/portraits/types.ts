@@ -54,15 +54,44 @@ export interface PortraitInput {
 }
 
 export interface PortraitOverrides {
-  steeringWords?: string[];                // "battle-worn", "smiling", "hooded"
-  seed?: number;                           // For reproducibility
+  // ── Active on the FLUX.2 path ───────────────────────────────
+  steeringWords?: string[];                 // Extra descriptors ("hooded", "smiling")
+  seed?: number;                            // Reproducibility
   composition?: 'bust' | 'half_body' | 'full_body' | 'action';
-  anglePreset?: 'front' | 'three_quarter_left' | 'three_quarter_right' | 'profile_left' | 'profile_right';  // Identity Lock angles
-  environmentOverride?: string;            // Override environment description
-  quality?: 'sketch' | 'draft' | 'final';  // sketch=512/6steps/style only, draft=640/15/style+detail, final=768/20/all
-  baseImagePath?: string;                  // img2img: use as starting latent instead of empty (for refine pass)
-  denoise?: number;                        // img2img denoise strength (0.0-1.0, default 1.0 = full txt2img)
-  skipControlNet?: boolean;                // Disable ControlNet injection even if anglePreset is set. Used for Step 1 face discovery — ControlNet adds contour bleed we don't want until Step 2 refine.
+  anglePreset?: 'front' | 'three_quarter_left' | 'three_quarter_right' | 'profile_left' | 'profile_right';
+  environmentOverride?: string;
+  quality?: 'sketch' | 'draft' | 'final';
+  customPrompt?: string;                    // Overrides the dynamic prompt entirely
+  customPass2Prompt?: string;               // Pass-2 edit prompt (only used when runPass2)
+  bodyLoraWeights?: Record<string, number>; // UI slider values; no-op on FLUX.2 (no retrained LoRAs yet)
+
+  // ── Face-gen levers (wizard experimentation knobs) ─────────
+  pass1Refs?: string[];                     // Refs to use in Pass 1; undefined = all uploaded refs
+  pass2Refs?: string[];                     // Refs to use in Pass 2; undefined = all uploaded refs
+  runPass2?: boolean;                       // Run Pass 2 edit on Pass 1 output (default false)
+  useTurbo?: boolean;                       // Enable 8-step Flux2Turbo LoRA on Pass 1 (default false)
+  useTurboPass2?: boolean;                  // Enable 8-step Flux2Turbo LoRA on Pass 2 (default false)
+  pass1Guidance?: number;                   // FluxGuidance value for Pass 1 (default 4.0)
+  pass2Guidance?: number;                   // FluxGuidance value for Pass 2 (default 4.0)
+
+  // ── Wizard-legacy, provider no-op ──────────────────────────
+  // Still set by the Identity Lock wizard for backwards compatibility, but
+  // ignored by the FLUX.2 provider. Kept on the type so the UI compiles
+  // unchanged; a future wizard simplification can drop these UI controls
+  // and the fields can then be removed.
+  neutralizeExpression?: boolean;
+  bodyLoraOrder?: string[];
+  bodyDraftMode?: boolean;
+  bodyPoseImagePath?: string;
+  pass2Seed?: number;
+  pass2Denoise?: number;
+  pass2IdLock?: boolean;
+  randomPose?: boolean;
+  skipControlNet?: boolean;
+  fillModelType?: 'standard' | 'nsfw';
+  bodySeedOverride?: number;
+  baseImagePath?: string;
+  denoise?: number;
 }
 
 export interface PortraitResult {
@@ -115,8 +144,11 @@ export interface PortraitCharacterData {
     cosmetics?: string;
     hygiene?: string;
     eyeColor?: string;
+    facialHair?: string;                   // From HEAD bodyPart; empty/"none" = skip
     bodyType?: string;                     // Build, height relative descriptors
     distinguishingFeatures?: string[];     // Birthmarks, tattoos, piercings
+    styleColors?: { primary?: string; secondary?: string; tertiary?: string }; // hex codes — secondary drives underwear color
+    styleAesthetics?: string[];            // up to 2 aesthetic descriptors — drives underwear style
   };
 
   // T1: Species/Seed
@@ -273,6 +305,16 @@ export interface ComfyUIWorkflowParams {
   nsfwUnlockWeight?: number;              // NSFW unlock LoRA strength (default 0.8)
   baseImagePath?: string;                  // img2img: uploaded base image filename
   denoise?: number;                        // img2img denoise (0.0-1.0, 1.0 = txt2img)
+
+  // ── Face-gen levers (from wizard overrides) ─────────────────
+  customPrompt?: string;                   // Full prompt override (passed through from overrides)
+  customPass2Prompt?: string;              // Pass-2 prompt (only used when runPass2)
+  pass1Guidance?: number;                  // FluxGuidance for Pass 1 (default 4.0)
+  pass2Guidance?: number;                  // FluxGuidance for Pass 2 re-run (default 4.0)
+  runPass2?: boolean;                      // Run Pass 2 (full workflow re-run with Pass 1 output as primary ref)
+  useTurbo?: boolean;                      // Enable 8-step Turbo LoRA on Pass 1
+  useTurboPass2?: boolean;                 // Enable 8-step Turbo LoRA on Pass 2
+  pass2RefNames?: string[];                // Uploaded ComfyUI names for Pass 2 secondary refs (after Pass 1 output)
 }
 
 export interface ComfyUIQueueResponse {
