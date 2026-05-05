@@ -33,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${bebasNeue.variable} ${comfortaa.variable} ${inknutAntiqua.variable} antialiased min-h-screen`}>
+      <body suppressHydrationWarning className={`${bebasNeue.variable} ${comfortaa.variable} ${inknutAntiqua.variable} antialiased min-h-screen`}>
         {children}
         <DiceOverlayLoader />
       </body>
