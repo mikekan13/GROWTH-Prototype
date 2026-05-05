@@ -67,7 +67,7 @@ export async function getProviderStatuses() {
   };
 }
 
-function getLocalProvider(): LocalProvider {
+export function getLocalProvider(): LocalProvider {
   if (!cachedLocal) cachedLocal = new LocalProvider();
   return cachedLocal;
 }
