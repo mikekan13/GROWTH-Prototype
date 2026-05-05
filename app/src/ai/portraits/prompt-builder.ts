@@ -34,6 +34,14 @@ export interface PromptBuildOptions {
   overrides?: PortraitOverrides;
   /** Creation mode: pure physical identity, no equipment/wounds/conditions */
   creationMode?: boolean;
+  /**
+   * True when the caller will supply FLUX.2 identity reference images. Currently
+   * accepted but not yet wired through main's prompt-builder logic (fork-side
+   * uses this to drop physical-identity text when refs are present). Accepted
+   * here so local.ts (FLUX.2) compiles. [NEEDS MIKE] — full FLUX.2 prompt
+   * reconciliation can come later if behaviour diverges.
+   */
+  hasReferences?: boolean;
 }
 
 export function buildPortraitPrompt(

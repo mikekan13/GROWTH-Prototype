@@ -1,56 +1,32 @@
-# ComfyUI Workflow Templates
+# ComfyUI Workflow Templates (FLUX.2)
 
 This directory contains ComfyUI workflow JSON files exported in **API format**.
+The pipeline is **FLUX.2 only** — FLUX.1 + PuLID workflows were dropped Apr 2026
+when the project moved to FLUX.2 Dev FP16 on H100 cloud pods.
 
 ## How to create workflow files
 
-1. Open ComfyUI at `http://127.0.0.1:8188`
+1. Open ComfyUI (cloud pod proxy URL or `http://127.0.0.1:8188` local)
 2. Design your workflow using the node editor
 3. Click the gear icon → "Save (API Format)"
 4. Save the exported JSON here with the matching filename
 
-## Required workflows
+## Active FLUX.2 workflows
 
-### `character-portrait.json` (Phase A)
-Basic character portrait generation WITHOUT identity preservation.
-Used for first-time portrait generation before persona lock.
-
-**Required nodes:**
-- GGUF Loader → FLUX.1 Dev Q4_0
-- CLIP Text Encode (positive) — title: "Positive"
-- CLIP Text Encode (negative) — title: "Negative"
-- KSampler (seed, steps, cfg)
-- Empty Latent Image (width, height)
-- VAE Decode
-- Save Image
-
-**Optional nodes (when style LoRA is available):**
-- LoRA Loader — title: "Style LoRA"
-
-### `character-portrait-pulid.json` (Phase B)
-Character portrait WITH PuLID identity preservation.
-Used for all regenerations after persona lock.
-
-**Additional nodes beyond basic:**
-- Load Image — title: "PuLID Reference"
-- PuLID Flux node (weight parameter)
-- InsightFace loader (for face embedding)
-
-### `character-portrait-campaign.json` (Phase D)
-Adds campaign-specific LoRA on top of PuLID workflow.
-
-**Additional nodes:**
-- LoRA Loader — title: "Campaign LoRA"
+| File | Purpose |
+|------|---------|
+| `flux2-t2i.json` | Plain text-to-image FLUX.2 generation (no refs) |
+| `flux2-face-cloud.json` | Face-lock generation, cloud H100 path |
+| `flux2-face-klein.json` | Face-lock generation, Klein-style variant |
+| `flux2-face-multiref.json` | Face-lock with multiple identity reference images |
+| `flux2-face-posed-multiref.json` | Face-lock + pose template + multi-ref |
+| `flux2-body-posed-multiref.json` | Full-body posed generation with multi-ref |
+| `flux2-edit-reference.json` | Reference-driven edit/regeneration |
+| `flux2-edit-with-refpull.json` | Edit while pulling identity from refs |
+| `flux2-edit-masked.json` | Masked region edit (inpaint-style) |
 
 ## Node naming convention
 
-The prompt injection system (`local.ts`) finds nodes by `class_type` and
-`_meta.title`. Use these exact titles:
-
-| Node | Title |
-|------|-------|
-| Positive prompt | "Positive" |
-| Negative prompt | "Negative" |
-| PuLID reference image | "PuLID Reference" |
-| Global style LoRA | "Style LoRA" |
-| Campaign genre LoRA | "Campaign LoRA" |
+The prompt injection system (`providers/local.ts`) finds nodes by `class_type`
+and `_meta.title`. Workflows must use these conventions so prompts and refs land
+in the right slots. See `local.ts` for the active key list.

@@ -3,12 +3,17 @@ import 'server-only';
 /**
  * GRO.WTH Portrait Pipeline — Local Provider (ComfyUI)
  *
- * Communicates with a local ComfyUI instance to generate character portraits
- * using FLUX.1 Dev + PuLID for identity preservation.
+ * Communicates with a ComfyUI instance (typically the RunPod H100 + FLUX.2 Dev
+ * stack — see pod-keepalive.ts) to generate character portraits. All face,
+ * body, and edit paths route through FLUX.2 multi-reference workflows; the
+ * legacy FLUX.1 PuLID / InfiniteYou / ControlNet / Kontext / Fill code was
+ * removed 2026-04-21. `COMFYUI_URL=http://127.0.0.1:8188` is still honored
+ * for local development against a self-hosted ComfyUI that has FLUX.2 models
+ * loaded.
  */
 
 import crypto from 'crypto';
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, execSync, type ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
@@ -21,94 +26,26 @@ import type {
   ProviderStatus,
   ComfyUIQueueResponse,
   ComfyUIWorkflowParams,
-  PortraitCharacterData,
 } from '../types';
-import { buildPortraitPrompt, type PromptBuildOptions } from '../prompt-builder';
-import { getDefaultStyleConfig, applyCampaignStyle, TRIGGER_NSFW } from '../style-config';
-
-/**
- * Hardcoded body-reference prompt template, literal port of the test-body-gen.js
- * recipe that produced the Tara reference outputs. Bypasses prompt-builder to
- * eliminate drift — character data is filled into a fixed template, nothing else.
- */
-function buildBodyReferencePrompt(char: PortraitCharacterData, allowNude: boolean): {
-  clipL: string;
-  t5xxl: string;
-  negativePrompt: string;
-} {
-  const identity = char.identity;
-  const seed = char.seed;
-  const age = identity.age || 25;
-  const sex = identity.sex || 'Female';
-  const seedName = seed?.name || 'Human';
-  const skin = identity.skinTone || 'Fair';
-  const eyes = identity.eyeColor || 'brown';
-  const build = identity.bodyType || 'average';
-  const hairColor = identity.hairColor || 'dark';
-  const hairLength = identity.hairLength || '';
-  const hairTexture = identity.hairTexture || 'straight';
-
-  const hairPhrase = hairLength
-    ? `${hairLength} ${hairTexture} ${hairColor} hair, hair made of individual strands, hair texture clearly visible`
-    : `${hairTexture} ${hairColor} hair tied back simply`;
-
-  const clothing = allowNude
-    ? 'nude, completely bare, no clothing, no accessories'
-    : 'wearing plain neutral grey bra and panties, simple modest underwear only';
-
-  const clothingSentence = allowNude
-    ? 'The character is completely nude with bare skin, no clothing whatsoever, no armor, no accessories.'
-    : 'The character wears only simple plain neutral grey underwear (bra and panties), no other clothing.';
-
-  // Single-pass full body 768x1152.
-  // Art-school / anatomy-study framing — FLUX learned anatomical accuracy from
-  // life-drawing reference photo data, so phrasing it as a STUDY/REFERENCE
-  // unlocks anatomy more reliably than explicit anatomical term lists.
-  const clipL = [
-    'nude figure study, life drawing reference photograph, art class model',
-    'full body uncensored anatomy reference, complete figure visible',
-    'standing facing camera straight on, front view, A-pose arms relaxed at sides',
-    'entire body from top of head to soles of feet, both feet on the ground at bottom of frame',
-    'in the style of ckpf, aidmafluxpro1.1',
-    'hyperrealistic, extremely detailed, subtle painterly quality',
-    `a ${age}-year-old ${sex} ${seedName}`,
-    hairPhrase,
-    `${skin} skin`,
-    `${eyes} eyes`,
-    `${build} build`,
-    clothing,
-    'plain bare skin, no body paint, no markings, no jewelry',
-    'full body reference shot, standing figure centered in frame, long shot framing, wide angle',
-    'neutral grey background, balanced even lighting',
-  ].join(', ');
-
-  const t5xxl = [
-    'A nude figure study photograph in the format of a life-drawing reference or art-class model pose. Full body uncensored anatomy reference, complete figure visible.',
-    'The subject stands facing the camera straight on, front view, in an A-pose with arms relaxed slightly away from the body.',
-    'The complete body is visible from the top of the head down to the soles of the feet — both feet planted on the ground at the very bottom of the frame, head at the top.',
-    `A ${age}-year-old ${sex} ${seedName} with ${hairPhrase}, ${skin} skin, ${eyes} eyes, ${build} build.`,
-    clothingSentence,
-    'Plain undecorated bare skin — no body paint, no tattoos, no markings, no jewelry, no gold, no accessories.',
-    `In the style of ckpf with aidmafluxpro1.1 detail. Hyperrealistic, extremely detailed.`,
-    'Full body reference shot, long shot framing, wide angle, neutral grey background, balanced even lighting.',
-  ].join(' ');
-
-  const negativePrompt = 'robe, cloak, cape, dress, gown, kimono, fabric panel, fabric drape, garment, robes, shawl, mantle, train, fabric flowing behind';
-
-  return { clipL, t5xxl, negativePrompt };
-}
+import { buildPortraitPrompt } from '../prompt-builder';
+import { composeStylePrompt } from '../growth-style-prompts';
+import { markUsed } from '../pod-keepalive';
+import { stripBackground } from '../rmbg';
+import { normalizeHex } from '../color-utils';
 
 const COMFYUI_URL = process.env.COMFYUI_URL || 'http://127.0.0.1:8188';
 const COMFYUI_PATH = process.env.COMFYUI_PATH || 'C:/AI/ComfyUI';
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
+// Remote ComfyUI (e.g. RunPod) — we can't fs.access models from this process, so
+// trust the remote instance and skip local filesystem pre-checks. Any model
+// mismatch surfaces as a ComfyUI /prompt 400 at submit time, which is the right
+// failure point anyway.
+const COMFYUI_REMOTE = !/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(COMFYUI_URL);
 
-// Default generation settings — FLUX GGUF on RTX 4060 8GB
-// Requires Ollama stopped. ~40s at 1024/20 steps with enough RAM free.
-const DEFAULT_STEPS = 20;
-const DEFAULT_CFG = 1.0;        // FLUX uses CFG 1.0 — guidance is in the text encoder node (3.5)
-const DEFAULT_WIDTH = 768;      // 768 until RAM upgrade, then 1024
-const DEFAULT_HEIGHT = 768;
-const MODEL_NAME = 'flux1-dev-Q4_K_S';
+// FLUX.2 defaults. Face is 1024² via pose template; body is 1024×1536.
+// The flux2 generator methods override these per-call as needed.
+const DEFAULT_CFG = 1.0;        // FLUX.2 uses CFG 1.0 + FluxGuidance (4.0) in workflow
+const DEFAULT_WIDTH = 1024;
+const DEFAULT_HEIGHT = 1024;
 
 // Polling settings
 const POLL_INTERVAL_MS = 5000;
@@ -174,304 +111,165 @@ export class LocalProvider implements ImageGenerationProvider {
     const startTime = Date.now();
 
     try {
-      // 1. Ensure ComfyUI is running and VRAM is available
+      // 1. Ensure ComfyUI is running (and on local installs, free VRAM).
       await this.ensureRunning();
-      await this.freeVram();
+      if (!COMFYUI_REMOTE) await this.freeVram();
 
-      // 2. Build prompt from character data
-      const styleConfig = getDefaultStyleConfig();
-      const config = applyCampaignStyle(styleConfig, input.campaignStyle);
-      const promptOutput = (input.creationMode === true && input.overrides?.composition === 'full_body')
-        ? buildBodyReferencePrompt(input.characterData, input.campaignStyle?.allowNudity === true)
-        : buildPortraitPrompt(input.characterData, {
-            campaignStyle: input.campaignStyle,
-            overrides: input.overrides,
-            creationMode: input.creationMode === true,
-          });
+      // 2. Decide whether identity refs will drive the face. When true we drop
+      //    physical-identity text from the prompt so it doesn't fight the refs.
+      const hasRefs = !!(
+        input.personaLock?.referenceImagePath ||
+        (input.personaLock?.referenceImagePaths && input.personaLock.referenceImagePaths.length > 0)
+      );
+      const promptOutput = buildPortraitPrompt(input.characterData, {
+        campaignStyle: input.campaignStyle,
+        overrides: input.overrides,
+        creationMode: input.creationMode === true,
+        hasReferences: hasRefs,
+      });
 
-      // Debug: log the prompt and mode
       console.log('[ComfyUI] anglePreset:', input.overrides?.anglePreset || 'none');
-      console.log('[ComfyUI] creationMode:', input.creationMode, '→ passed to builder:', input.creationMode === true, '| allowNudity:', input.campaignStyle?.allowNudity, '| composition:', input.overrides?.composition);
-      console.log('[ComfyUI] clip_l (FULL):', promptOutput.clipL);
-      console.log('[ComfyUI] t5xxl (FULL):', promptOutput.t5xxl);
-      console.log('[ComfyUI] Negative:', promptOutput.negativePrompt);
+      console.log('[ComfyUI] t5xxl:', promptOutput.t5xxl.slice(0, 200) + '…');
 
-      // 3. Prepare workflow parameters
+      // 3. Upload identity refs (dedup cache so ComfyUI can keep node-level cache).
+      const refCache = ((this as unknown as { _refCache?: Map<string, string> })._refCache ??= new Map());
+      const primary = input.personaLock?.referenceImagePath;
+      const secondaries = input.personaLock?.referenceImagePaths || [];
+      // Chain: primary first, then secondaries. FLUX.2 supports up to 10 refs;
+      // the flux2 methods cap at 5 (workflow slot count).
+      // Dedupe: personaLock sometimes contains the primary also in secondaries,
+      // which would feed the same image into two REF slots. Keep unique paths
+      // only, preserving primary-first order.
+      const seen = new Set<string>();
+      const dedupedRefs = [primary, ...secondaries].filter((r): r is string => {
+        if (!r || seen.has(r)) return false;
+        seen.add(r);
+        return true;
+      });
+      // Per-pass ref filters from the wizard. If a filter is undefined, that
+      // pass uses all dedupedRefs. We upload the UNION so both passes can
+      // resolve their refs to uploaded ComfyUI filenames.
+      const pass1RefFilter = Array.isArray(input.overrides?.pass1Refs) ? input.overrides!.pass1Refs as string[] : undefined;
+      const pass2RefFilter = Array.isArray(input.overrides?.pass2Refs) ? input.overrides!.pass2Refs as string[] : undefined;
+      const unionSet = new Set<string>();
+      (pass1RefFilter && pass1RefFilter.length > 0 ? pass1RefFilter : dedupedRefs).forEach(r => unionSet.add(r));
+      (pass2RefFilter && pass2RefFilter.length > 0 ? pass2RefFilter : dedupedRefs).forEach(r => unionSet.add(r));
+      // Preserve dedupedRefs' order for any ref in the union.
+      const refsToUpload = dedupedRefs.filter(r => unionSet.has(r));
+
+      // Upload each ref once; track original-path → uploaded-name map so both
+      // passes can resolve their assignments to ComfyUI filenames.
+      const refPathToName: Record<string, string> = {};
+      for (const r of refsToUpload) {
+        try {
+          let name = refCache.get(r);
+          if (!name) {
+            // RMBG: strip background from identity refs before upload. Cached on
+            // disk as `.clean.png` alongside the source, so this runs once per ref
+            // and is skipped on subsequent gens.
+            const abs = path.join(process.cwd(), 'public', r.replace(/^\//, ''));
+            let cleanedRef = r;
+            try {
+              const cleanedAbs = await stripBackground(abs);
+              const rel = '/' + path.relative(path.join(process.cwd(), 'public'), cleanedAbs).replace(/\\/g, '/');
+              cleanedRef = rel;
+              console.log(`[ComfyUI] RMBG ref "${r}" → "${cleanedRef}"`);
+            } catch (rmbgErr) {
+              console.warn(`[ComfyUI] RMBG failed for "${r}", using original:`, rmbgErr instanceof Error ? rmbgErr.message : rmbgErr);
+            }
+            name = await this.uploadReferenceImage(cleanedRef);
+            refCache.set(r, name);
+          }
+          refPathToName[r] = name;
+        } catch (err) {
+          console.warn(`[ComfyUI] skipping missing ref "${r}":`, err instanceof Error ? err.message : err);
+        }
+      }
+
+      // Resolve per-pass uploaded-name lists (in user-specified order).
+      const pass1Paths = (pass1RefFilter && pass1RefFilter.length > 0) ? pass1RefFilter : dedupedRefs;
+      const pass2Paths = (pass2RefFilter && pass2RefFilter.length > 0) ? pass2RefFilter : dedupedRefs;
+      const uploadedRefs = pass1Paths.map(p => refPathToName[p]).filter((n): n is string => !!n);
+      const pass2RefNames = pass2Paths.map(p => refPathToName[p]).filter((n): n is string => !!n);
+
+      // 4. Build the params object consumed by the flux2 path methods.
       const seed = input.overrides?.seed ?? Math.floor(Math.random() * 2147483647);
-      const quality = input.overrides?.quality || 'final';
-      const isSketch = quality === 'sketch';
-      const isDraft = quality === 'draft';
-      const isFinal = quality === 'final';
-      const isFaceLock = !!input.overrides?.anglePreset;  // Identity lock = clean face, minimal LoRAs
+      const isFullBody = input.overrides?.composition === 'full_body';
       const params: ComfyUIWorkflowParams = {
         clipL: promptOutput.clipL,
         t5xxl: promptOutput.t5xxl,
         negativePrompt: promptOutput.negativePrompt,
         seed,
-        // Body gen: 15 steps (vs 20) — same quality at lower wall time, since body
-        // detail needs less fine-sampling than face. Saves ~25% per body gen.
-        steps: isSketch ? 4 : isDraft ? 15 : (input.overrides?.composition === 'full_body' ? 15 : DEFAULT_STEPS),
+        // T10 recipe values — locked 2026-04-22 before the Klein/Turbo detour:
+        // Dev 32B at 20 steps, 1280×1280 face, 1024×1536 body. FLUX.2 is
+        // a rectified-flow model; 20 steps is the empirical sweet spot for
+        // identity resolution. Fewer smears identity; more plateaus.
+        // Turbo lever: when enabled, drop to 8 steps (LoRA handles convergence).
+        steps: input.overrides?.useTurbo === true ? 8 : 20,
         cfg: DEFAULT_CFG,
-        // Full-body generation needs vertical room — square 768×768 biases FLUX toward
-        // bust/half-body composition. Tall canvas is the only reliable enforcement.
-        // Body canvas: Tara test 768x1152. Face detail comes from a second-pass
-        // face-refine composite (refineBodyFace), not from bigger canvas.
-        // Single-pass body 768x1152 (Tara test recipe). Face-detailer pass to be
-        // added separately so the body comes out clean while we wire that up.
-        width: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 768 : DEFAULT_WIDTH),
-        height: isSketch ? 384 : isDraft ? 640 : (input.overrides?.composition === 'full_body' ? 1152 : DEFAULT_HEIGHT),
-        referenceImagePath: input.personaLock?.referenceImagePath,
-        // Body gen: lower PuLID primary to 0.7 — at 0.9 it anchors the composition
-        // to face-centric framing (PuLID's attention injection runs across all sampling
-        // steps, biasing the whole canvas). Face-lock Step 2 stays at 0.9.
-        // Step 1 discovery stays at config default (0.8).
-        pulidWeight: input.personaLock?.pulidWeight ?? (
-          input.overrides?.composition === 'full_body' ? 0.7 :
-          (isFaceLock && isFinal ? 0.9 : config.pulidWeight)
-        ),
-        // Delay PuLID start for non-front angles: lets ControlNet establish the profile
-        // rotation before PuLID anchors the face identity. At start_at=0, PuLID's
-        // forward-facing signal from the Step 2 front lock competes with CN's rotation
-        // cue from step 0 and often wins. Delaying to 0.3 gives CN a 30% runway.
-        pulidStartAt: (() => {
-          const a = input.overrides?.anglePreset;
-          return a && a !== 'front' ? 0.3 : 0.0;
-        })(),
-        pulidEndAt: 1.0,
-        styleLora: config.styleLora,
-        // Face-lock weights:
-        //   Step 1 (draft):  painterly 0.6, detail 0.5, dark 0.15 — safe discovery.
-        //   Step 2 (final):  painterly 0.75, detail 0.7, dark 0.3 — more fantasy/mood.
-        // Tara-test weight: 0.5 (config.loraStrength default).
-        styleLoraWeight: isSketch ? 0.6 : isFaceLock ? (isFinal ? 0.75 : 0.6) : config.loraStrength,
-        // Detail LoRA: match Tara-test weight (0.55) so hands/feet get the
-        // same crisp detail the Tara reference gens had.
-        detailLoraWeight: isSketch ? 0 : isFaceLock ? (isFinal ? 0.7 : 0.5) : 0.55,
-        campaignLora: isSketch ? undefined : 'dark-fantasy-v2-flux.safetensors',
-        // Campaign (dark-fantasy) LoRA OFF for creationMode body. The autotest3
-        // reference image was generated before this LoRA entered the workflow
-        // (commit 7701b7e6 added it). Stacking it on top of painterly+detail+NSFW
-        // compromises face detail.
-        campaignLoraWeight: isSketch ? 0
-          : isFaceLock ? (isFinal ? 0.3 : 0.15)
-          : (input.creationMode && input.overrides?.composition === 'full_body') ? 0
-          : 0.4,
-        // Hand detail LoRA only for face-lock final (close-up where hands might appear).
-        // Body gen at full-body framing = hands are tiny, not worth the LoRA compute.
-        handDetailLoraWeight: isFinal && input.overrides?.composition !== 'full_body' ? 0.6 : 0,
-        // Auto-enable NSFW LoRA for creationMode body gen regardless of campaign flag —
-        // nude body references are anatomical templates, not erotic content. Without it,
-        // FLUX Dev renders Barbie-smooth (no nipples, flat pubic area). NSFW unlock
-        // gives accurate anatomy, which is what we need for a character reference.
-        nsfwUnlock: isFinal && (
-          input.campaignStyle?.allowNudity
-          || (input.creationMode && input.overrides?.composition === 'full_body')
-        ),
-        nsfwUnlockWeight: 0.8,
-      };
+        // Back to 1280 baseline — 1536 experiment produced garbage; returning
+        // to the known-good identity-lock sweet spot until we debug.
+        width: isFullBody ? 1024 : 1280,
+        height: isFullBody ? 1536 : 1280,
+        referenceImagePath: uploadedRefs[0],
+        referenceImagePaths: uploadedRefs.slice(1),
+        customPrompt: input.overrides?.customPrompt as string | undefined,
+        customPass2Prompt: input.overrides?.customPass2Prompt as string | undefined,
+        // Face-gen lever values — consumed by generateFaceFlux2 for workflow injection + pass 2 re-run.
+        pass1Guidance: typeof input.overrides?.pass1Guidance === 'number' ? input.overrides.pass1Guidance : undefined,
+        pass2Guidance: typeof input.overrides?.pass2Guidance === 'number' ? input.overrides.pass2Guidance : undefined,
+        runPass2: input.overrides?.runPass2 === true,
+        useTurbo: input.overrides?.useTurbo === true,
+        useTurboPass2: input.overrides?.useTurboPass2 === true,
+        pass2RefNames,
+      } as ComfyUIWorkflowParams;
 
-      // 4. Upload reference images and split into primary + secondary PuLID refs.
-      // Primary (first entry) = referenceImagePath → own ApplyPulidFlux at pulidWeight (0.8).
-      // Secondaries (remaining entries) = chained in a SECOND ApplyPulidFlux at secondaryPulidWeight.
-      // Face gens cap at 3 refs (5+ OOMs on 8GB). Body gens bump to 5 —
-      // hair identity needs multiple angles, and the body workflow skips ControlNet
-      // so the VRAM saved goes into PuLID chain length.
-      const isFullBodyGen = input.overrides?.composition === 'full_body';
-      // For creationMode body: ONLY use the locked bald face as PuLID primary.
-      // Player photos as secondary refs were biasing pose/styling toward
-      // whatever the source photos showed (3/4 turn, decorations, etc.).
-      const isCreationBody = isFullBodyGen && input.creationMode === true;
-      const MAX_PULID_REFS = isCreationBody ? 1 : (isFullBodyGen ? 5 : 3);
-      const primaryIn = input.personaLock?.referenceImagePath;
-      const batchIn = isCreationBody ? [] : (input.personaLock?.referenceImagePaths || []);
-      const merged = [primaryIn, ...batchIn].filter((p): p is string => !!p);
-      const allInRaw = Array.from(new Set(merged));
-      const allIn = allInRaw.slice(0, MAX_PULID_REFS);
-      if (allInRaw.length > MAX_PULID_REFS) {
-        console.warn(`[ComfyUI] PuLID refs capped from ${allInRaw.length} to ${MAX_PULID_REFS} — 8GB VRAM budget`);
-      }
-      if (allIn.length > 0) {
-        console.log(`[ComfyUI] Uploading ${allIn.length} PuLID reference${allIn.length > 1 ? 's' : ''} (primary + ${allIn.length - 1} secondary)`);
-        const uploaded: string[] = [];
-        for (const r of allIn) {
-          try {
-            uploaded.push(await this.uploadReferenceImage(r));
-          } catch (err) {
-            console.warn(`[ComfyUI] Skipping missing reference "${r}":`, err instanceof Error ? err.message : err);
-          }
-        }
-        if (uploaded.length === 0) {
-          throw new Error('All reference images failed to upload — no valid PuLID refs available');
-        }
-        params.referenceImagePath = uploaded[0];
-        params.referenceImagePaths = uploaded.slice(1);  // secondaries only
-        // Body gen: 0.4 — strong enough for hair transfer from player photos.
-        // Face gen: 0.15 — anything higher contaminated the head-cap with ref hair.
-        params.secondaryPulidWeight = isFullBodyGen ? 0.4 : 0.15;
-        console.log(`[ComfyUI] PuLID primary: ${uploaded[0]} | ${uploaded.length - 1} secondaries @ weight ${params.secondaryPulidWeight}`);
+      if (uploadedRefs.length === 0) {
+        throw new Error('Portrait generation requires at least one reference image on the FLUX.2 path');
       }
 
-      // 4b. Upload ControlNet angle reference if provided.
-      // skipControlNet=true: ControlNet still loads (strength 0 = no influence) so we can
-      // keep using the InstantX workflow instead of routing to the broken pulid-only
-      // fallback. Net effect: PuLID does its job, ControlNet contributes nothing.
-      const anglePreset = input.overrides?.anglePreset;
-      const skipControlNet = input.overrides?.skipControlNet === true;
-      const useControlnet = !!anglePreset && await this.isControlNetAvailable();
-      if (useControlnet && input.overrides?.anglePreset) {
-        const angleRefPath = await this.getAngleReferenceImage(input.overrides.anglePreset);
-        console.log('[ComfyUI] ControlNet angle ref path:', angleRefPath);
-        if (angleRefPath) {
-          const uploadedAngleRef = await this.uploadReferenceImage(angleRefPath);
-          params.controlnetImagePath = uploadedAngleRef;
-          // Strength ladder:
-          //   skipControlNet (Step 1): 0.0 — ControlNet loads but does nothing.
-          //   front angle (Step 2):    0.75 — PuLID ref is already front-facing; mild enforcement.
-          //   non-front angles:        1.0 — PuLID ref is front-facing but we NEED to rotate.
-          //                            CN must win the pose fight against PuLID's forward-facing signal.
-          const isNonFrontAngle = !skipControlNet && anglePreset !== undefined && anglePreset !== 'front';
-          params.controlnetStrength = skipControlNet ? 0.0 : (isNonFrontAngle ? 1.0 : 0.75);
-          console.log(`[ComfyUI] ControlNet ref uploaded as: ${uploadedAngleRef} (strength=${params.controlnetStrength})`);
-        } else {
-          console.log('[ComfyUI] No angle reference found — ControlNet will be skipped');
-        }
-      }
+      // 5. Route to the appropriate FLUX.2 method.
+      const result = isFullBody
+        ? await this.generateBodyFlux2(input, params, promptOutput, startTime)
+        : await this.generateFaceFlux2(input, params, promptOutput, startTime);
 
-      // 4c. Upload base image for img2img refine pass
-      if (input.overrides?.baseImagePath) {
-        console.log('[ComfyUI] Uploading base image for img2img:', input.overrides.baseImagePath);
-        const uploadedBase = await this.uploadReferenceImage(input.overrides.baseImagePath);
-        params.baseImagePath = uploadedBase;
-        params.denoise = input.overrides.denoise ?? 0.65;
-        console.log('[ComfyUI] Base image uploaded as:', uploadedBase, '| denoise:', params.denoise);
-      }
-
-      console.log('[ComfyUI] Params — PuLID ref:', params.referenceImagePath || 'NONE', '| CN ref:', params.controlnetImagePath || 'NONE', '| Base:', params.baseImagePath || 'NONE');
-
-      // 5. Select workflow: ControlNet+PuLID → PuLID → Basic (with fallbacks)
-      //    Body gen skips InstantX — ControlNet fights the secondary-PuLID hair chain,
-      //    and A-pose doesn't need pose steering.
-      //
-      let outputInfo: { filename: string; subfolder: string; type: string };
-      const usePulid = !!params.referenceImagePath;
-      const workflowPriority: string[] = [];
-
-      if (!isFullBodyGen && useControlnet && usePulid && params.controlnetImagePath) {
-        workflowPriority.push('character-face-controlnet-instantx');
-        workflowPriority.push('character-face-controlnet');
-      }
-      if (usePulid) {
-        workflowPriority.push('character-portrait-pulid');
-      }
-      workflowPriority.push('character-portrait');
-
-      const workflowResult = await this.tryWorkflows(workflowPriority, params);
-      outputInfo = workflowResult.output;
-      const workflowUsed = workflowResult.workflowName;
-      const failedWorkflows = workflowResult.failedWorkflows;
-
-      // 8. Download generated image
-      let imageData = await this.downloadImage(
-        outputInfo.filename,
-        outputInfo.subfolder,
-        outputInfo.type,
-      );
-
-      // 8b. Face-detailer pass for creationMode body. BiSeNet (face_no_hair
-      // mask) → inpaint just the face oval with PuLID at higher PuLID weight.
-      // Body/torso/legs untouched. Adds ~90s.
-      const doFaceDetailer = input.creationMode === true
-        && input.overrides?.composition === 'full_body'
-        && !!params.referenceImagePath;
-      if (doFaceDetailer) {
-        try {
-          console.log('[ComfyUI] Face-detailer: BiSeNet mask + PuLID inpaint...');
-          imageData = await this.refineFaceWithBiSeNet(imageData, params);
-          console.log('[ComfyUI] Face-detailer done.');
-        } catch (err) {
-          console.warn('[ComfyUI] Face-detailer failed — keeping single-pass body:', err instanceof Error ? err.message : err);
-        }
-      }
-
-      // 9. Save to filesystem under a step subfolder:
-      //   'sketch'   — Step 1 face discovery (draft, no ControlNet)
-      //   'refined'  — Step 2 front-lock (final, ControlNet, angle=front)
-      //   'angles'   — Step 3 non-front angles (final, ControlNet, angle=profile/3-4)
-      //   'body'     — Step 4 full-body generation (final, composition=full_body)
-      const angle = input.overrides?.anglePreset;
-      const isFinalQuality = input.overrides?.quality === 'final';
-      const controlNetOn = input.overrides?.skipControlNet !== true;
-      const isFullBody = input.overrides?.composition === 'full_body';
-      let step: string = 'sketch';
-      if (isFullBody && isFinalQuality) {
-        step = 'body';
-      } else if (isFinalQuality && !!angle && controlNetOn) {
-        step = angle === 'front' ? 'refined' : 'angles';
-      }
-      const { imagePath, thumbnailPath } = await this.savePortrait(
-        input.characterId,
-        imageData,
-        step,
-      );
-
-      const generationTimeMs = Date.now() - startTime;
-
-      const metadata: PortraitMetadata = {
-        prompt: promptOutput.t5xxl,
-        clipL: promptOutput.clipL,
-        negativePrompt: promptOutput.negativePrompt,
-        seed,
-        model: MODEL_NAME,
-        steps: DEFAULT_STEPS,
-        cfg: DEFAULT_CFG,
-        width: DEFAULT_WIDTH,
-        height: DEFAULT_HEIGHT,
-        generationTimeMs,
-        pulidWeight: params.pulidWeight,
-        styleLoraName: params.styleLora,
-        styleLoraWeight: params.styleLoraWeight,
-        campaignLoraName: params.campaignLora,
-        campaignLoraWeight: params.campaignLoraWeight,
-        workflowUsed,
-        failedWorkflows,
-        debugRefs: `PuLID: ${params.referenceImagePath || 'NONE'} | CN: ${params.controlnetImagePath || 'NONE'}`,
-      } as PortraitMetadata & { workflowUsed: string; failedWorkflows: string[]; debugRefs: string };
+      if (result) return result;
 
       return {
-        success: true,
-        imageData,
-        imagePath,
-        thumbnailPath,
-        metadata,
+        success: false,
+        metadata: {
+          prompt: '', negativePrompt: '', seed,
+          model: 'flux2-dev-fp8mixed',
+          steps: params.steps ?? 20,
+          cfg: params.cfg ?? DEFAULT_CFG,
+          width: params.width ?? DEFAULT_WIDTH,
+          height: params.height ?? DEFAULT_HEIGHT,
+          generationTimeMs: Date.now() - startTime,
+        },
+        error: `flux2-${isFullBody ? 'body' : 'face'} pipeline returned null — see server logs`,
       };
-
     } catch (e) {
       return {
         success: false,
         metadata: {
-          prompt: '',
-          negativePrompt: '',
-          seed: 0,
-          model: MODEL_NAME,
-          steps: DEFAULT_STEPS,
-          cfg: DEFAULT_CFG,
-          width: DEFAULT_WIDTH,
-          height: DEFAULT_HEIGHT,
+          prompt: '', negativePrompt: '', seed: 0,
+          model: 'flux2-dev-fp8mixed',
+          steps: 20, cfg: DEFAULT_CFG,
+          width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT,
           generationTimeMs: Date.now() - startTime,
         },
         error: e instanceof Error ? e.message : String(e),
       };
     } finally {
-      // Release VRAM after generation
-      await this.releaseVram();
+      if (!COMFYUI_REMOTE) await this.releaseVram();
     }
   }
 
-  async extractIdentity(imageData: Buffer): Promise<IdentityData> {
-    // Phase B: This will call a ComfyUI workflow that extracts InsightFace
-    // embeddings from the portrait for PuLID identity preservation.
-    // For Phase A, the reference image itself is stored and used directly.
-    throw new Error('Identity extraction requires Phase B implementation (PuLID embedding workflow)');
+  async extractIdentity(_imageData: Buffer): Promise<IdentityData> {
+    // FLUX.2 multi-ref uses raw reference photos directly — no embedding
+    // extraction step needed. This method is kept to satisfy the
+    // ImageGenerationProvider interface but is never called on the FLUX.2 path.
+    throw new Error('extractIdentity is not implemented for FLUX.2 — reference images are used raw');
   }
 
   // ============================================================
@@ -479,6 +277,17 @@ export class LocalProvider implements ImageGenerationProvider {
   // ============================================================
 
   private async queuePrompt(workflow: object, clientId: string): Promise<ComfyUIQueueResponse> {
+    // Temporary diagnostic — dump every submission so we can replay user's
+    // failing requests directly against ComfyUI. Remove once the multi-ref
+    // failure mode is identified.
+    try {
+      const dumpDir = path.join(process.cwd(), 'tmp');
+      await fs.mkdir(dumpDir, { recursive: true });
+      const dumpPath = path.join(dumpDir, `comfy-submitted-${Date.now()}.json`);
+      await fs.writeFile(dumpPath, JSON.stringify(workflow, null, 2));
+      console.log(`[ComfyUI] Workflow dumped to: ${dumpPath}`);
+    } catch { /* best-effort */ }
+
     const res = await fetch(`${COMFYUI_URL}/prompt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -487,7 +296,6 @@ export class LocalProvider implements ImageGenerationProvider {
 
     if (!res.ok) {
       const errorText = await res.text();
-      // Dump the rejected workflow so we can diagnose validation errors with empty details.
       try {
         const dumpDir = path.join(process.cwd(), 'tmp');
         await fs.mkdir(dumpDir, { recursive: true });
@@ -598,427 +406,12 @@ export class LocalProvider implements ImageGenerationProvider {
     try {
       const content = await fs.readFile(workflowPath, 'utf-8');
       return JSON.parse(content);
-    } catch (e) {
+    } catch {
       throw new Error(
         `Workflow "${name}" not found at ${workflowPath}. ` +
         'Design your workflow in ComfyUI GUI and export it using "Save (API Format)".'
       );
     }
-  }
-
-  /**
-   * Inject generation parameters into a ComfyUI workflow JSON.
-   *
-   * ComfyUI workflows are node graphs exported as JSON. Each node has a numeric ID
-   * and an "inputs" object. We find nodes by class_type and inject our parameters.
-   *
-   * This is a generic injection that handles common node types. For custom workflows,
-   * the node IDs may need adjustment — the workflow JSON should use consistent naming.
-   */
-  private injectWorkflowParams(
-    workflow: Record<string, unknown>,
-    params: ComfyUIWorkflowParams,
-  ): Record<string, unknown> {
-    const w = JSON.parse(JSON.stringify(workflow)); // Deep clone
-
-    // Strip comment keys (e.g. _comment_pulid) — ComfyUI crashes on non-node keys
-    for (const key of Object.keys(w)) {
-      if (key.startsWith('_')) delete w[key];
-    }
-
-    // Auto-detect available models — fall back to old versions if new ones not downloaded yet
-    const modelFallbacks: Record<string, string> = {};
-    let useGgufClipLoader = true;  // Switch to standard DualCLIPLoader when using fp8 safetensors
-    try {
-      const { existsSync } = require('fs');
-      const q4ksPath = path.join(COMFYUI_PATH, 'models', 'unet', 'flux1-dev-Q4_K_S.gguf');
-      if (!existsSync(q4ksPath) || require('fs').statSync(q4ksPath).size < 6_800_000_000) {
-        modelFallbacks['flux1-dev-Q4_K_S.gguf'] = 'flux1-dev-Q4_0.gguf';
-      }
-      const t5fp8Path = path.join(COMFYUI_PATH, 'models', 'clip', 't5xxl_fp8_e4m3fn.safetensors');
-      const t5fp8Ready = existsSync(t5fp8Path) && require('fs').statSync(t5fp8Path).size > 4_800_000_000;  // ~4.89GB expected
-      if (!t5fp8Ready) {
-        modelFallbacks['t5xxl_fp8_e4m3fn.safetensors'] = 't5-v1_1-xxl-encoder-Q4_K_M.gguf';
-      } else {
-        useGgufClipLoader = false;  // fp8 safetensors complete — use standard loader
-      }
-      // Prefer FP8 Union Pro 2.0 (2.1GB) over full Union (6.6GB) — fits in 16GB RAM
-      const cnFp8Path = path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union-pro2-fp8.safetensors');
-      const cnFp8Ready = existsSync(cnFp8Path) && require('fs').statSync(cnFp8Path).size > 2_000_000_000;
-      if (!cnFp8Ready) {
-        // Fall back to full Union, then XLabs Canny
-        const cnUnionPath = path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union.safetensors');
-        if (!existsSync(cnUnionPath) || require('fs').statSync(cnUnionPath).size < 6_000_000_000) {
-          modelFallbacks['flux-controlnet-union-pro2-fp8.safetensors'] = 'flux-canny-controlnet-v3.safetensors';
-        } else {
-          modelFallbacks['flux-controlnet-union-pro2-fp8.safetensors'] = 'flux-controlnet-union.safetensors';
-        }
-      }
-    } catch { /* ignore */ }
-
-    for (const [nodeId, node] of Object.entries(w)) {
-      const n = node as Record<string, unknown>;
-      const classType = n.class_type as string;
-      const inputs = n.inputs as Record<string, unknown>;
-
-      if (!classType || !inputs) continue;
-
-      // Apply model fallbacks — swap new model names for old if not yet downloaded
-      for (const [newName, oldName] of Object.entries(modelFallbacks)) {
-        for (const key of Object.keys(inputs)) {
-          if (inputs[key] === newName) {
-            inputs[key] = oldName;
-            console.log(`[ComfyUI] Model fallback: ${newName} → ${oldName}`);
-          }
-        }
-      }
-
-      // Swap DualCLIPLoaderGGUF → DualCLIPLoader when using fp8 safetensors clip
-      if (!useGgufClipLoader && classType === 'DualCLIPLoaderGGUF') {
-        n.class_type = 'DualCLIPLoader';
-        console.log('[ComfyUI] Swapped DualCLIPLoaderGGUF → DualCLIPLoader (fp8 clip)');
-      }
-
-      // CLIPTextEncodeFlux — FLUX dual encoder with separate clip_l (tags) and t5xxl (sentences)
-      // Split encoding is the single biggest quality win for FLUX (50-75% improvement).
-      if (classType === 'CLIPTextEncodeFlux') {
-        const meta = (n._meta as Record<string, unknown>);
-        const title = meta?.title as string || '';
-
-        if (title.toLowerCase().includes('positive')) {
-          const nsfwTag = params.nsfwUnlock ? `${TRIGGER_NSFW}, ` : '';
-
-          // clip_l: tags/keywords — already built as tags by prompt-builder
-          // All 3 style LoRA triggers (ckpf, aidmafluxpro1.1, drkfnts style) are in the global style prefix
-          inputs.clip_l = nsfwTag + params.clipL;
-
-          // t5xxl: natural language sentences — already built as prose by prompt-builder
-          inputs.t5xxl = nsfwTag + params.t5xxl;
-
-          // Dynamic guidance: shorter prompts get higher guidance for better adherence
-          const promptWordCount = params.t5xxl.split(/\s+/).length;
-          if (promptWordCount < 30) {
-            inputs.guidance = 4.0;   // Short (face lock) — high adherence
-          } else if (promptWordCount > 60) {
-            inputs.guidance = 2.5;   // Long (full portrait) — avoid over-constraining
-          }
-          // else: keep workflow default (3.5)
-        }
-      }
-
-      // Standard CLIP Text Encode nodes — inject prompts (used for negative prompt)
-      if (classType === 'CLIPTextEncode') {
-        const meta = (n._meta as Record<string, unknown>);
-        const title = meta?.title as string || '';
-
-        if (title.toLowerCase().includes('positive')) {
-          inputs.text = params.clipL;  // Fallback for non-FLUX workflows
-        } else if (title.toLowerCase().includes('negative')) {
-          inputs.text = params.negativePrompt;
-        }
-      }
-
-      // KSampler — inject seed, steps, cfg, and img2img denoise
-      if (classType === 'KSampler' || classType === 'KSamplerAdvanced') {
-        if (inputs.seed !== undefined) inputs.seed = params.seed;
-        if (inputs.noise_seed !== undefined) inputs.noise_seed = params.seed;
-        if (inputs.steps !== undefined) inputs.steps = params.steps;
-        if (inputs.cfg !== undefined) inputs.cfg = params.cfg;
-        // img2img: set denoise < 1.0 to preserve base image composition
-        if (params.baseImagePath && params.denoise !== undefined) {
-          inputs.denoise = params.denoise;
-        }
-      }
-
-      // XlabsSampler — inject seed, steps (different field names)
-      if (classType === 'XlabsSampler') {
-        if (inputs.noise_seed !== undefined) inputs.noise_seed = params.seed;
-        if (inputs.steps !== undefined) inputs.steps = params.steps;
-      }
-
-      // Empty Latent Image — inject dimensions
-      if (classType === 'EmptyLatentImage') {
-        inputs.width = params.width;
-        inputs.height = params.height;
-      }
-
-      // PuLID node — inject weight, start_at, end_at, and reference image
-      if (classType.includes('PuLID') || classType.includes('pulid')) {
-        if (params.pulidWeight !== undefined && inputs.weight !== undefined) {
-          inputs.weight = params.pulidWeight;
-        }
-        if (params.pulidStartAt !== undefined && inputs.start_at !== undefined) {
-          inputs.start_at = params.pulidStartAt;
-        }
-        if (params.pulidEndAt !== undefined && inputs.end_at !== undefined) {
-          inputs.end_at = params.pulidEndAt;
-        }
-      }
-
-      // Load Image node — inject filenames based on title
-      if (classType === 'LoadImage') {
-        const meta = (n._meta as Record<string, unknown>);
-        const title = meta?.title as string || '';
-        if ((title.toLowerCase().includes('reference') || title.toLowerCase().includes('pulid')) && params.referenceImagePath) {
-          inputs.image = params.referenceImagePath;
-        }
-        if (title.toLowerCase().includes('controlnet') || title.toLowerCase().includes('angle')) {
-          if (params.controlnetImagePath) {
-            inputs.image = params.controlnetImagePath;
-          }
-        }
-      }
-
-      // ControlNet Apply — inject strength and end_percent (when present on the node).
-      // Non-front angles need CN holding through full sampling (end_percent 1.0) so pose
-      // rotation isn't undone in the final 20% of steps when CN would normally disengage.
-      if (classType === 'ApplyFluxControlNet' || classType === 'ApplyAdvancedFluxControlNet' || classType === 'ControlNetApplyAdvanced') {
-        if (params.controlnetStrength !== undefined && inputs.strength !== undefined) {
-          inputs.strength = params.controlnetStrength;
-        }
-        if (inputs.end_percent !== undefined && params.controlnetStrength !== undefined && params.controlnetStrength >= 0.9) {
-          inputs.end_percent = 1.0;
-        }
-      }
-
-      // Preprocessor — match resolution to generation size (Canny, DWPose, etc.)
-      if (classType === 'CannyEdgePreprocessor' || classType === 'Canny_Edge_Preprocessor' || classType === 'DWPreprocessor' || classType === 'OpenposePreprocessor') {
-        if (inputs.resolution !== undefined) {
-          const isDWPose = classType === 'DWPreprocessor';
-          inputs.resolution = isDWPose ? Math.min(params.width, 384) : params.width;
-        }
-        // detect_face=enable at res 384 matches the 9445b459 golden and gives the
-        // face-position/scale keypoints (eye/nose/mouth dots) needed for framing lock
-        // — without bleeding contours into the generation (that only happened at res 640).
-        // detect_hand stays disabled — hand keypoints not useful for head-only generation.
-        if (classType === 'DWPreprocessor' || classType === 'OpenposePreprocessor') {
-          if (inputs.detect_face !== undefined) inputs.detect_face = 'enable';
-          if (inputs.detect_hand !== undefined) inputs.detect_hand = 'disable';
-          inputs.detect_body = 'enable';
-        }
-      }
-
-      // LoRA Loader — inject style/campaign/hand/nsfw LoRA
-      if (classType === 'LoraLoader' || classType === 'LoRALoader') {
-        const meta = (n._meta as Record<string, unknown>);
-        const title = meta?.title as string || '';
-
-        if (title.toLowerCase().includes('style')) {
-          // Name override only when a style LoRA is explicitly configured. Weight
-          // override fires independently — otherwise face-lock's styleLoraWeight=0.6
-          // never applied because config.styleLora is undefined by default.
-          if (params.styleLora) {
-            inputs.lora_name = params.styleLora;
-          }
-          if (params.styleLoraWeight !== undefined) {
-            inputs.strength_model = params.styleLoraWeight;
-            inputs.strength_clip = params.styleLoraWeight;
-          }
-        } else if (title.toLowerCase().includes('campaign')) {
-          if (params.campaignLora) {
-            inputs.lora_name = params.campaignLora;
-          }
-          if (params.campaignLoraWeight !== undefined) {
-            inputs.strength_model = params.campaignLoraWeight;
-            inputs.strength_clip = params.campaignLoraWeight;
-          }
-        } else if (title.toLowerCase().includes('detail') && !title.toLowerCase().includes('hand')) {
-          if (params.detailLoraWeight !== undefined) {
-            inputs.strength_model = params.detailLoraWeight;
-            inputs.strength_clip = params.detailLoraWeight;
-          }
-        } else if (title.toLowerCase().includes('hand detail')) {
-          if (params.handDetailLoraWeight !== undefined) {
-            inputs.strength_model = params.handDetailLoraWeight;
-            inputs.strength_clip = params.handDetailLoraWeight;
-          }
-        } else if (title.toLowerCase().includes('nsfw unlock')) {
-          // NSFW LoRA: strength 0 (disabled) unless campaign allows nudity
-          if (params.nsfwUnlock) {
-            inputs.strength_model = params.nsfwUnlockWeight ?? 0.8;
-            inputs.strength_clip = params.nsfwUnlockWeight ?? 0.8;
-            console.log('[ComfyUI] NSFW Unlock LoRA enabled, strength:', params.nsfwUnlockWeight ?? 0.8);
-          } else {
-            inputs.strength_model = 0.0;
-            inputs.strength_clip = 0.0;
-          }
-        }
-      }
-    }
-
-    // ── Skip LoRAs at strength 0 by rewiring the chain ──
-    // If a LoRA has strength_model == 0 AND strength_clip == 0, remove it and
-    // point all downstream nodes that referenced its outputs to its inputs instead.
-    const loraNodes = Object.entries(w)
-      .filter(([, n]) => {
-        const cls = (n as Record<string, unknown>).class_type as string;
-        return cls === 'LoraLoader' || cls === 'LoRALoader';
-      })
-      .map(([id, n]) => ({ id, node: n as Record<string, unknown> }));
-
-    for (const { id, node } of loraNodes) {
-      const inputs = node.inputs as Record<string, unknown>;
-      if (inputs.strength_model === 0 && inputs.strength_clip === 0) {
-        // This LoRA is a no-op — rewire downstream refs to skip it
-        const modelInput = inputs.model; // e.g. ["16", 0]
-        const clipInput = inputs.clip;   // e.g. ["16", 1]
-        // Find all nodes that reference this LoRA's outputs and redirect
-        for (const [otherId, otherNode] of Object.entries(w)) {
-          if (otherId === id) continue;
-          const otherInputs = (otherNode as Record<string, unknown>).inputs as Record<string, unknown> | undefined;
-          if (!otherInputs) continue;
-          for (const [key, val] of Object.entries(otherInputs)) {
-            if (Array.isArray(val) && val[0] === id) {
-              if (val[1] === 0) otherInputs[key] = modelInput;  // model output
-              if (val[1] === 1) otherInputs[key] = clipInput;   // clip output
-            }
-          }
-        }
-        delete w[id];
-        const title = ((node._meta as Record<string, unknown>)?.title as string) || id;
-        console.log(`[ComfyUI] Skipped LoRA "${title}" (strength 0) — removed from chain`);
-      }
-    }
-
-    // ── img2img: replace EmptyLatentImage with VAEEncode of base image ──
-    // Used for refine pass: sketch establishes composition, draft adds style.
-    if (params.baseImagePath) {
-      // Find the EmptyLatentImage node and the KSampler that uses it
-      let emptyLatentId: string | null = null;
-      let ksamplerEntry: [string, Record<string, unknown>] | null = null;
-
-      for (const [id, node] of Object.entries(w)) {
-        const n = node as Record<string, unknown>;
-        if (n.class_type === 'EmptyLatentImage') emptyLatentId = id;
-        if (n.class_type === 'KSampler' || n.class_type === 'KSamplerAdvanced') {
-          ksamplerEntry = [id, n];
-        }
-      }
-
-      if (emptyLatentId && ksamplerEntry) {
-        // Find the VAE node ID (VAELoader or VAEDecode's vae input)
-        let vaeSourceId: string | null = null;
-        for (const [id, node] of Object.entries(w)) {
-          const n = node as Record<string, unknown>;
-          if (n.class_type === 'VAELoader') { vaeSourceId = id; break; }
-        }
-
-        if (vaeSourceId) {
-          // Add LoadImage node for the base image
-          const baseLoadId = '900';
-          w[baseLoadId] = {
-            class_type: 'LoadImage',
-            inputs: { image: params.baseImagePath },
-            _meta: { title: 'Base Image (img2img)' },
-          };
-
-          // Add VAEEncode node
-          const vaeEncodeId = '901';
-          w[vaeEncodeId] = {
-            class_type: 'VAEEncode',
-            inputs: {
-              pixels: [baseLoadId, 0],
-              vae: [vaeSourceId, 0],
-            },
-            _meta: { title: 'VAE Encode Base' },
-          };
-
-          // Rewire KSampler: latent_image from EmptyLatentImage → VAEEncode
-          const ksInputs = ksamplerEntry[1].inputs as Record<string, unknown>;
-          ksInputs.latent_image = [vaeEncodeId, 0];
-
-          // Remove EmptyLatentImage node
-          delete w[emptyLatentId];
-
-          console.log(`[ComfyUI] img2img: replaced EmptyLatentImage with VAEEncode of base image, denoise: ${params.denoise}`);
-        }
-      }
-    }
-
-    // ── Secondary PuLID: chain a second ApplyPulidFlux for low-weight detail refs ──
-    // Primary ApplyPulidFlux node (already configured above with image=referenceImagePath,
-    // weight=pulidWeight) handles the dominant identity.
-    // If we have secondary refs, chain a SECOND ApplyPulidFlux node:
-    //   - model input = primary node's output (stacks embeddings)
-    //   - image input = batched secondary refs (ImageBatch if >1)
-    //   - weight = secondaryPulidWeight (low, so they nudge details without taking over)
-    // Then rewire whatever consumed the primary's model output to consume the secondary's.
-    if (params.referenceImagePaths && params.referenceImagePaths.length > 0) {
-      let primaryId: string | null = null;
-      for (const [id, node] of Object.entries(w)) {
-        const ct = (node as Record<string, unknown>).class_type as string;
-        if (ct === 'ApplyPulidFlux') { primaryId = id; break; }
-      }
-
-      if (primaryId) {
-        const primaryNode = w[primaryId] as Record<string, unknown>;
-        const primaryInputs = primaryNode.inputs as Record<string, unknown>;
-        const secondaryCount = params.referenceImagePaths.length;
-        const secondaryWeight = params.secondaryPulidWeight ?? 0.3;
-
-        // Build LoadImage nodes for each secondary, then chain ImageBatch if >1.
-        let secondaryImageRef: unknown;
-        if (secondaryCount === 1) {
-          const loadId = 'pulid_sec_load_0';
-          w[loadId] = {
-            class_type: 'LoadImage',
-            inputs: { image: params.referenceImagePaths[0] },
-            _meta: { title: 'PuLID Secondary Ref' },
-          };
-          secondaryImageRef = [loadId, 0];
-        } else {
-          // First two LoadImages → ImageBatch, then chain more with additional ImageBatch nodes
-          const load0 = 'pulid_sec_load_0';
-          w[load0] = { class_type: 'LoadImage', inputs: { image: params.referenceImagePaths[0] }, _meta: { title: 'PuLID Secondary 0' } };
-          let lastOutput: unknown = [load0, 0];
-          for (let i = 1; i < secondaryCount; i++) {
-            const loadId = `pulid_sec_load_${i}`;
-            const batchId = `pulid_sec_batch_${i}`;
-            w[loadId] = { class_type: 'LoadImage', inputs: { image: params.referenceImagePaths[i] }, _meta: { title: `PuLID Secondary ${i}` } };
-            w[batchId] = { class_type: 'ImageBatch', inputs: { image1: lastOutput, image2: [loadId, 0] }, _meta: { title: `PuLID Secondary Batch ${i}` } };
-            lastOutput = [batchId, 0];
-          }
-          secondaryImageRef = lastOutput;
-        }
-
-        // Create the secondary ApplyPulidFlux, chained off the primary's model output.
-        const secondaryId = 'pulid_secondary_apply';
-        w[secondaryId] = {
-          class_type: 'ApplyPulidFlux',
-          inputs: {
-            model: [primaryId, 0],                 // chain: primary → secondary
-            pulid_flux: primaryInputs.pulid_flux,   // reuse same loader outputs
-            eva_clip: primaryInputs.eva_clip,
-            face_analysis: primaryInputs.face_analysis,
-            image: secondaryImageRef,
-            weight: secondaryWeight,
-            start_at: primaryInputs.start_at ?? 0,
-            end_at: primaryInputs.end_at ?? 1,
-          },
-          _meta: { title: 'PuLID Secondary (low weight)' },
-        };
-
-        // Rewire downstream: any node that referenced [primaryId, 0] for model flow
-        // should now reference [secondaryId, 0] so the secondary's output is what
-        // reaches the KSampler. (Nodes referencing primary for pulid_flux/eva_clip/
-        // face_analysis outputs are NOT rewired — those aren't model outputs.)
-        for (const [otherId, otherNode] of Object.entries(w)) {
-          if (otherId === primaryId || otherId === secondaryId) continue;
-          const otherInputs = (otherNode as Record<string, unknown>).inputs as Record<string, unknown> | undefined;
-          if (!otherInputs) continue;
-          for (const [key, val] of Object.entries(otherInputs)) {
-            if (Array.isArray(val) && val[0] === primaryId && val[1] === 0) {
-              // This was consuming primary's model output — redirect to secondary.
-              otherInputs[key] = [secondaryId, 0];
-            }
-          }
-        }
-
-        console.log(`[ComfyUI] PuLID chained: primary weight=${primaryInputs.weight}, secondary weight=${secondaryWeight} (${secondaryCount} ref${secondaryCount > 1 ? 's' : ''})`);
-      }
-    }
-
-    return w;
   }
 
   // ============================================================
@@ -1028,27 +421,50 @@ export class LocalProvider implements ImageGenerationProvider {
   private async savePortrait(
     characterId: string,
     imageData: Buffer,
-    step?: string,  // e.g. 'sketch' | 'refined' — creates a subfolder so step 1 vs step 2 outputs are organized
+    step?: string,
+    seed?: number,
+    meta?: Record<string, unknown>,
   ): Promise<{ imagePath: string; thumbnailPath: string }> {
     const generationId = crypto.randomUUID();
     const relDir = step
       ? path.join(PORTRAIT_ROOT, characterId, step)
       : path.join(PORTRAIT_ROOT, characterId);
     const dirPath = path.join('public', relDir);
+    const thumbsDir = path.join(dirPath, '.thumbs');
     await fs.mkdir(dirPath, { recursive: true });
+    await fs.mkdir(thumbsDir, { recursive: true });
 
-    // Save full portrait as WebP (display) and PNG (PuLID reference, max quality)
-    const webpPath = path.join(relDir, `${generationId}.webp`);
+    // PNG stays in main folder for easy browsing
     const pngPath = path.join(relDir, `${generationId}.png`);
+    await fs.writeFile(path.join('public', pngPath), imageData);
+
+    // WebP + thumbnail go into .thumbs subfolder (hidden from file browser)
+    const webpPath = path.join(relDir, '.thumbs', `${generationId}.webp`);
+    const thumbPath = path.join(relDir, '.thumbs', `${generationId}_thumb.webp`);
     await Promise.all([
       sharp(imageData).webp({ quality: 90 }).toFile(path.join('public', webpPath)),
-      fs.writeFile(path.join('public', pngPath), imageData),
+      sharp(imageData).resize(256, 256, { fit: 'cover' }).webp({ quality: 80 }).toFile(path.join('public', thumbPath)),
     ]);
 
-    const thumbPath = path.join(relDir, `${generationId}_thumb.webp`);
-    await sharp(imageData).resize(256, 256, { fit: 'cover' }).webp({ quality: 80 }).toFile(path.join('public', thumbPath));
+    // Save generation metadata in .thumbs (hidden from file browser)
+    const metaPath = path.join(relDir, '.thumbs', `${generationId}.meta.json`);
+    const metaData = {
+      generationId,
+      timestamp: new Date().toISOString(),
+      seed,
+      ...(meta || {}),
+    };
+    await fs.writeFile(path.join('public', metaPath), JSON.stringify(metaData, null, 2));
 
-    // Normalize to forward slashes for URLs (Windows path.join returns backslashes)
+    // Save seed to seeds.json for persistence (legacy compat)
+    if (seed !== undefined) {
+      const seedsPath = path.join('public', PORTRAIT_ROOT, characterId, 'seeds.json');
+      let seeds: Record<string, number> = {};
+      try { seeds = JSON.parse(await fs.readFile(seedsPath, 'utf-8')); } catch { /* new file */ }
+      seeds['/' + webpPath.replace(/\\/g, '/')] = seed;
+      await fs.writeFile(seedsPath, JSON.stringify(seeds, null, 2));
+    }
+
     return {
       imagePath: '/' + webpPath.replace(/\\/g, '/'),
       thumbnailPath: '/' + thumbPath.replace(/\\/g, '/'),
@@ -1064,7 +480,19 @@ export class LocalProvider implements ImageGenerationProvider {
    * The process persists across requests (singleton) and is cleaned up on app exit.
    */
   private async ensureRunning(): Promise<void> {
-    // Already running?
+    // Remote ComfyUI (cloud pod): hand off to the warm-keeper. markUsed() bumps
+    // the idle timer AND resumes the pod if it's currently hibernated (no-op
+    // if already running). The watcher auto-hibernates after 2 min of no calls.
+    if (COMFYUI_REMOTE) {
+      await markUsed();
+      if (await this.isAvailable()) return;
+      throw new Error(
+        `Remote ComfyUI at ${COMFYUI_URL} is not responding after pod resume. ` +
+        `Check RUNPOD_POD_ID / RUNPOD_API_KEY env vars, or run cloud-up.mjs manually.`
+      );
+    }
+
+    // Local dev: spawn ComfyUI if not already up.
     if (await this.isAvailable()) return;
 
     // Another request is already starting it — wait
@@ -1077,17 +505,12 @@ export class LocalProvider implements ImageGenerationProvider {
       // Verify ComfyUI directory exists
       await fs.access(path.join(COMFYUI_PATH, 'main.py'));
 
-      console.log('[ComfyUI] Starting server (PULID_KEEP_HAIR=1 for secondary PuLID hair transfer)...');
+      console.log('[ComfyUI] Starting server...');
       comfyProcess = spawn('python', ['main.py', '--normalvram', '--listen', '127.0.0.1', '--port', '8188'], {
         cwd: COMFYUI_PATH,
         stdio: 'ignore',
         detached: false,
         windowsHide: true,
-        // PULID_KEEP_HAIR=1 flips pulidflux.py's bg_label from default
-        // (masks hair) to the alternate (preserves hair). Required for the
-        // secondary PuLID chain in body gen — without it, secondaries only
-        // transfer face, not hair.
-        env: { ...process.env, PULID_KEEP_HAIR: '1' },
       });
 
       comfyProcess.on('error', (err) => {
@@ -1140,11 +563,10 @@ export class LocalProvider implements ImageGenerationProvider {
 
   /**
    * Free VRAM by unloading Ollama models.
-   * The RTX 4060 has 8GB VRAM shared between Ollama (gemma2:9b) and ComfyUI.
+   * For local dev against a self-hosted ComfyUI on the same workstation as
+   * an Ollama server. No-op on the remote-pod path — the pod is GPU-only.
    */
   private async freeVram(): Promise<void> {
-    const { execSync } = require('child_process');
-
     // Kill Ollama process entirely — it uses 4+ GB RAM even when idle
     try {
       execSync('taskkill /F /IM ollama.exe 2>nul', { stdio: 'ignore' });
@@ -1179,979 +601,802 @@ export class LocalProvider implements ImageGenerationProvider {
     }
   }
 
-  // ============================================================
-  // ControlNet Support
-  // ============================================================
-
-  /** Check if ControlNet model is available */
-  private async isControlNetAvailable(): Promise<boolean> {
-    // Check for InstantX Union (preferred) or XLabs Canny (fallback)
-    const candidates = [
-      path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union-pro2-fp8.safetensors'),
-      path.join(COMFYUI_PATH, 'models', 'controlnet', 'flux-controlnet-union.safetensors'),
-      path.join(COMFYUI_PATH, 'models', 'xlabs', 'controlnets', 'flux-canny-controlnet-v3.safetensors'),
-    ];
-    for (const p of candidates) {
-      try { await fs.access(p); return true; } catch { /* next */ }
-    }
-    return false;
-  }
-
   /**
-   * Get a bundled reference image for a specific angle. These are face-only
-   * photos at precise angles — ControlNet Canny extracts edges to force
-   * the generation composition. Identity comes from PuLID, not these refs.
+   * Edit an image using FLUX.2 Dev. Picks the right sub-workflow based on
+   * the caller's options: flux2-edit-with-refpull when an object-pull
+   * reference is supplied, flux2-edit-masked when a paint mask is present,
+   * else flux2-edit-reference for a whole-image edit.
+   * Takes a source image + text prompt describing the desired edit.
+   * Returns the edited image with identity preserved.
    */
-  private async getAngleReferenceImage(angle: string): Promise<string | null> {
-    // Map angle keys to bundled reference filenames
-    const ANGLE_REF_FILES: Record<string, string> = {
-      front: 'front.jpg',
-      three_quarter_left: 'three_quarter_left.jpg',
-      three_quarter_right: 'three_quarter_right.jpg',
-      profile_left: 'profile_left.jpg',
-      profile_right: 'profile_right.jpg',
-    };
+  async editImage(
+    sourceImagePath: string,
+    editPrompt: string,
+    options?: {
+      seed?: number;
+      guidance?: number;
+      characterId?: string;
+      paintData?: { mode: string; dataUrl: string; feather?: number };
+      /** Optional object-pull reference (photo/drawing/sketch). When set, the
+       *  workflow switches to flux2-edit-with-refpull and the prompt is
+       *  augmented with a restyle instruction so the item adopts the
+       *  character's GROWTH aesthetic regardless of the ref's source style. */
+      objectRefImagePath?: string;
+    },
+  ): Promise<PortraitResult> {
+    await this.ensureRunning();
 
-    const filename = ANGLE_REF_FILES[angle];
-    if (!filename) return null;
+    const seed = options?.seed ?? Math.floor(Math.random() * 2147483647);
+    const guidance = options?.guidance ?? 5.0;
+    const characterId = options?.characterId ?? 'anonymous';
+    const paintData = options?.paintData;
+    const objectRefImagePath = options?.objectRefImagePath;
+    console.log(`[Flux2Edit] editImage called: source=${sourceImagePath}, prompt="${editPrompt.slice(0,50)}", paint=${paintData?.mode || 'none'}, objRef=${objectRefImagePath ? 'yes' : 'no'}`);
 
-    const refPath = `${PORTRAIT_ROOT}/angle-refs/${filename}`;
-    // Try both relative and absolute paths (process.cwd() may vary)
-    const candidates = [
-      path.join('public', refPath),
-      path.join(process.cwd(), 'public', refPath),
-    ];
-
-    for (const fullRefPath of candidates) {
+    // 1. Resolve source path — prefer full-res PNG over .thumbs webp for both upload and local sharp ops
+    let resolvedSourcePath = sourceImagePath;
+    let absolutePath = path.join(process.cwd(), 'public', sourceImagePath.replace(/^\//, ''));
+    try { await fs.access(absolutePath); } catch {
+      const pngPath = absolutePath.replace(/\.thumbs[/\\]/, '').replace(/\.webp$/, '.png');
       try {
-        await fs.access(fullRefPath);
-        console.log(`[ControlNet] Found angle ref: ${fullRefPath}`);
-        return `/${refPath}`;
-      } catch {
-        // try next
+        await fs.access(pngPath);
+        absolutePath = pngPath;
+        resolvedSourcePath = sourceImagePath.replace(/\.thumbs[/\\]/, '').replace(/\.webp$/, '.png');
+      } catch { /* use original */ }
+    }
+    // If source is a .thumbs webp but PNG sibling exists, prefer PNG for upload too
+    if (sourceImagePath.includes('.thumbs') && sourceImagePath.endsWith('.webp')) {
+      const altRel = sourceImagePath.replace(/\.thumbs[/\\]/, '').replace(/\.webp$/, '.png');
+      const altAbs = path.join(process.cwd(), 'public', altRel.replace(/^\//, ''));
+      try { await fs.access(altAbs); resolvedSourcePath = altRel; absolutePath = altAbs; } catch { /* stick with thumb */ }
+    }
+    const uploadedName = await this.uploadReferenceImage(resolvedSourcePath);
+    console.log(`[Flux2Edit] Uploaded source image: ${uploadedName} (resolved from ${sourceImagePath})`);
+
+    // 2. Mask mode: prepare mask buffer for post-compositing after generation
+    let maskBuffer: Buffer | null = null;
+    let maskDims: { w: number; h: number } | null = null;
+    if (paintData?.mode === 'mask' && paintData.dataUrl) {
+      try {
+        const paintBuf = Buffer.from(paintData.dataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+        const sourceMeta = await sharp(absolutePath).metadata();
+        const sw = sourceMeta.width || 1024;
+        const sh = sourceMeta.height || 2048;
+        // Mask: dilate (expand at full opacity) by margin pixels, then light edge blur
+        // Single pipeline avoids raw/PNG buffer confusion
+        const margin = Math.max(0, paintData.feather ?? 20);
+        const blurRadius = margin > 0 ? Math.max(margin / 2, 2) : 2;
+        let pipeline = sharp(paintBuf)
+          .resize(sw, sh, { fit: 'fill' })
+          .flatten({ background: { r: 0, g: 0, b: 0 } })
+          .grayscale()
+          .blur(blurRadius);
+        if (margin > 0) {
+          pipeline = pipeline.threshold(128).blur(4);
+        }
+        maskBuffer = await pipeline.png().toBuffer();
+        maskDims = { w: sw, h: sh };
+        console.log(`[Flux2Edit] Mask prepared for post-composite: ${sw}x${sh}`);
+      } catch (maskErr) {
+        console.error('[Flux2Edit] Mask prep failed, no compositing will happen:', maskErr);
       }
     }
-    console.log(`[ControlNet] Angle reference not found for "${angle}". Tried:`, candidates);
-    return null;
-  }
 
-  /**
-   * Try workflows in priority order with fallbacks.
-   * First success wins; failures cascade to next workflow.
-   */
-  private failedWorkflows: string[] = [];
+    // 3. Pick the FLUX.2 edit workflow:
+    //    objectRefImagePath → flux2-edit-with-refpull (source + object-pull ref)
+    //    paintData mask     → flux2-edit-masked (SetLatentNoiseMask confine)
+    //    else               → flux2-edit-reference (whole-image edit)
+    const useObjectPull = !!objectRefImagePath && !paintData; // mutually exclusive with mask for now
+    const useMaskedWorkflow = !!(maskBuffer && maskDims) && !useObjectPull;
+    const workflowName = useObjectPull
+      ? 'flux2-edit-with-refpull'
+      : useMaskedWorkflow
+        ? 'flux2-edit-masked'
+        : 'flux2-edit-reference';
+    const workflow = await this.loadWorkflow(workflowName);
 
-  private async tryWorkflows(
-    workflowNames: string[],
-    params: ComfyUIWorkflowParams,
-  ): Promise<{ output: { filename: string; subfolder: string; type: string }; workflowName: string; failedWorkflows: string[] }> {
-    this.failedWorkflows = [];
-    for (let i = 0; i < workflowNames.length; i++) {
-      const name = workflowNames[i];
+    // Upload mask (masked path only)
+    let uploadedMaskName: string | null = null;
+    if (useMaskedWorkflow && maskBuffer) {
       try {
-        const workflow = await this.loadWorkflow(name);
-        const preparedWorkflow = this.injectWorkflowParams(workflow, params);
-        const clientId = crypto.randomUUID();
-        const queueResponse = await this.queuePrompt(preparedWorkflow, clientId);
-        const output = await this.waitForCompletion(queueResponse.prompt_id);
-        console.log(`[ComfyUI] Generation complete using workflow: ${name}`);
-        return { output, workflowName: name, failedWorkflows: this.failedWorkflows };
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        this.failedWorkflows.push(`${name}: ${errMsg}`);
-        const isLast = i === workflowNames.length - 1;
-        if (isLast) throw err;
-        console.warn(`[ComfyUI] Workflow "${name}" failed, trying next:`, errMsg);
+        uploadedMaskName = await this.uploadBuffer(maskBuffer, `edit-mask-${seed}.png`);
+        console.log(`[Flux2Edit] Uploaded mask: ${uploadedMaskName}`);
+      } catch (e) {
+        console.error('[Flux2Edit] mask upload failed — falling back to unmasked edit', e);
       }
     }
-    throw new Error('All workflows failed');
-  }
 
-  // ============================================================
-  // Two-Pass Hair Inpainting
-  // ============================================================
+    // Upload object-pull reference (object-pull path only)
+    let uploadedObjRefName: string | null = null;
+    if (useObjectPull && objectRefImagePath) {
+      try {
+        uploadedObjRefName = await this.uploadReferenceImage(objectRefImagePath);
+        console.log(`[Flux2Edit] Uploaded object-pull ref: ${uploadedObjRefName}`);
+      } catch (e) {
+        console.error('[Flux2Edit] object-ref upload failed — aborting edit', e);
+        throw new Error(`Could not upload object reference: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
 
-  /**
-   * Generate an oval face mask — white = face (keep), black = hair/background (inpaint).
-   * For ComfyUI inpainting, the MASK is what gets regenerated (white = inpaint).
-   * So we create an inverted mask: white everywhere EXCEPT the face oval.
-   */
-  private async generateHairMask(imageData: Buffer): Promise<Buffer> {
-    const meta = await sharp(imageData).metadata();
-    const w = meta.width || 640;
-    const h = meta.height || 640;
+    // Prompt augmentation for the object-pull path. Forces restyle even when
+    // the ref is a photo/drawing/sketch in a completely different style.
+    const effectiveEditPrompt = useObjectPull
+      ? `${editPrompt}\n\nThe second reference image shows the item to transfer. ` +
+        `Extract ONLY that item and apply it to the character in the first image. ` +
+        `Render the item in the same GROWTH aesthetic as the first image — identical ` +
+        `lighting, color grade, material treatment, and rendering style. Ignore the ` +
+        `second reference's original style completely (it may be a photo, drawing, or ` +
+        `simple sketch — all are valid inputs). The character's identity, pose, and ` +
+        `framing must stay exactly as in the first image; only the specified item changes.`
+      : editPrompt;
 
-    // Face oval: tight around face features only — expose forehead, sides, chin area for inpainting
-    const cx = Math.round(w / 2);
-    const cy = Math.round(h * 0.50);  // Face center at middle
-    const rx = Math.round(w * 0.22);  // Tight horizontal radius (just cheeks)
-    const ry = Math.round(h * 0.25);  // Tight vertical radius (eyes to mouth)
+    // 4. Inject parameters
+    const w = JSON.parse(JSON.stringify(workflow)) as Record<string, Record<string, unknown>>;
 
-    // Create SVG with white background (inpaint) and black oval (keep face)
-    const svg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${w}" height="${h}" fill="white"/>
-      <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="black"/>
-    </svg>`;
-
-    return sharp(Buffer.from(svg))
-      .png()
-      .toBuffer();
-  }
-
-  /**
-   * Pass 2: Inpaint the hair region of a face portrait.
-   * Takes the pass 1 image, generates a face-shaped mask, and inpaints
-   * everything outside the face with a hair-control prompt.
-   */
-  private async inpaintHair(
-    pass1Image: Buffer,
-    params: ComfyUIWorkflowParams,
-  ): Promise<Buffer> {
-    // 1. Generate the hair mask
-    const maskBuffer = await this.generateHairMask(pass1Image);
-
-    // 2. Upload pass 1 image and mask to ComfyUI
-    const pass1Name = await this.uploadBuffer(pass1Image, 'pass1_face.png');
-    const maskName = await this.uploadBuffer(maskBuffer, 'hair_mask.png');
-
-    // 3. Load and configure the inpainting workflow
-    const workflow = await this.loadWorkflow('hair-inpaint');
-    const w = JSON.parse(JSON.stringify(workflow));
-
-    // Strip comment keys
     for (const key of Object.keys(w)) {
       if (key.startsWith('_')) delete w[key];
     }
 
-    // Apply model fallbacks (same as main pipeline)
-    const { existsSync } = require('fs');
-    const q4ksPath = path.join(COMFYUI_PATH, 'models', 'unet', 'flux1-dev-Q4_K_S.gguf');
-    if (!existsSync(q4ksPath) || require('fs').statSync(q4ksPath).size < 6_800_000_000) {
-      for (const [, node] of Object.entries(w)) {
-        const inputs = (node as Record<string, unknown>).inputs as Record<string, unknown>;
-        if (inputs?.unet_name === 'flux1-dev-Q4_K_S.gguf') inputs.unet_name = 'flux1-dev-Q4_0.gguf';
-      }
-    }
-    const t5fp8Path = path.join(COMFYUI_PATH, 'models', 'clip', 't5xxl_fp8_e4m3fn.safetensors');
-    const t5fp8Ready = existsSync(t5fp8Path) && require('fs').statSync(t5fp8Path).size > 4_800_000_000;
-    if (t5fp8Ready) {
-      for (const [, node] of Object.entries(w)) {
-        if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
-          (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
-        }
-      }
-    } else {
-      for (const [, node] of Object.entries(w)) {
-        const inputs = (node as Record<string, unknown>).inputs as Record<string, unknown>;
-        if (inputs?.clip_name1 === 't5xxl_fp8_e4m3fn.safetensors') {
-          inputs.clip_name1 = 't5-v1_1-xxl-encoder-Q4_K_M.gguf';
-        }
-      }
-    }
-
-    // Inject prompts and images — split for dual CLIP encoding
-    const hairClipL = 'hair pulled back tightly, bun behind head, forehead exposed, ears visible, plain grey background';
-    const hairT5xxl = 'The subject has their hair pulled back very tightly in a bun behind the head. All hair is swept away from the face. The forehead is fully exposed and ears are visible. Plain grey background.';
-    const hairNegative = 'loose hair, bangs, hair on forehead, hair covering face';
-
     for (const [, node] of Object.entries(w)) {
-      const n = node as Record<string, unknown>;
-      const cls = n.class_type as string;
-      const inputs = n.inputs as Record<string, unknown>;
-      const title = ((n._meta as Record<string, unknown>)?.title as string) || '';
+      const classType = node.class_type as string;
+      const inputs = node.inputs as Record<string, unknown>;
+      if (!inputs) continue;
 
-      if (cls === 'CLIPTextEncodeFlux') {
-        inputs.clip_l = hairClipL;
-        inputs.t5xxl = hairT5xxl;
+      switch (classType) {
+        case 'LoadImage': {
+          const meta = node._meta as Record<string, string> | undefined;
+          if (meta?.title === 'Source Image') {
+            inputs.image = uploadedName;
+          } else if (meta?.title === 'Mask Image' && uploadedMaskName) {
+            inputs.image = uploadedMaskName;
+          } else if (meta?.title === 'Object Reference' && uploadedObjRefName) {
+            inputs.image = uploadedObjRefName;
+          }
+          break;
+        }
+        case 'CLIPTextEncode':
+          inputs.text = composeStylePrompt('finetune', effectiveEditPrompt);
+          break;
+        case 'FluxGuidance':
+          inputs.guidance = guidance;
+          break;
+        case 'RandomNoise':
+          inputs.noise_seed = seed;
+          break;
       }
-      if (cls === 'CLIPTextEncode' && title.toLowerCase().includes('negative')) {
-        inputs.text = hairNegative;
-      }
-      if (cls === 'LoadImage') {
-        if (title.includes('Pass 1')) inputs.image = pass1Name;
-        if (title.includes('Hair Mask')) inputs.image = maskName;
-      }
-      if (cls === 'KSampler') {
-        inputs.seed = params.seed + 1;  // Different seed from pass 1
-        inputs.steps = 15;
-        inputs.denoise = 0.85;
-      }
+
+      delete node._meta;
     }
+
 
     // 4. Queue and wait
     const clientId = crypto.randomUUID();
-    const queueResponse = await this.queuePrompt(w, clientId);
-    const outputInfo = await this.waitForCompletion(queueResponse.prompt_id);
+    console.log(`[Flux2Edit] Queuing edit: "${editPrompt.slice(0, 80)}" guidance=${guidance} seed=${seed}`);
+    const startMs = Date.now();
 
-    // 5. Download inpainted result
-    return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
-  }
-
-  /**
-   * AUTOTEST3 RECIPE — Body pass 2 (head extension only).
-   *
-   * Pass 1 produced a 768x768 body with feet visible at bottom, head cropped
-   * ABOVE the frame. This method pads UP by 384px (final canvas 768x1152),
-   * then inpaints the new top 384 strip with head + neck connecting to the
-   * existing shoulders. Bottom 768 (pass 1 body+feet) is preserved.
-   *
-   * Head gets a generous 384x768 region — large enough that PuLID renders a
-   * sharp face without "tiny floating egg head" artifacts.
-   */
-  private async outpaintHeadAbove(
-    bodyImage: Buffer,
-    params: ComfyUIWorkflowParams,
-  ): Promise<Buffer> {
-    const HEAD_BAND = 384;
-    const BODY_SIZE = 768;
-    const OUT_W = 768;
-    const OUT_H = HEAD_BAND + BODY_SIZE; // 1152
-
-    // 1. Pad pass 1 image upward (add 384 grey above).
-    const padded = await sharp(bodyImage)
-      .resize(BODY_SIZE, BODY_SIZE, { fit: 'fill' })
-      .extend({
-        top: HEAD_BAND, bottom: 0, left: 0, right: 0,
-        background: { r: 180, g: 180, b: 180 },
-      })
-      .png()
-      .toBuffer();
-
-    // 2. Mask: top 384 = white (inpaint), bottom 768 = black (preserve).
-    const maskSvg = `<svg width="${OUT_W}" height="${OUT_H}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${OUT_W}" height="${OUT_H}" fill="black"/>
-      <rect x="0" y="0" width="${OUT_W}" height="${HEAD_BAND}" fill="white"/>
-    </svg>`;
-    const maskBuf = await sharp(Buffer.from(maskSvg)).png().toBuffer();
-
-    const stamp = Date.now();
-    const paddedName = await this.uploadBuffer(padded, `body_p2_padded_${stamp}.png`);
-    const maskName = await this.uploadBuffer(maskBuf, `body_p2_mask_${stamp}.png`);
-
-    // 3. Load PuLID workflow + GGUF→fp8 swap
-    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
-    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
-    for (const node of Object.values(w) as Record<string, unknown>[]) {
-      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
-        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
-      }
-    }
-
-    // 4. Pass 2 prompt: head + neck attached to existing shoulders (visible at bottom of head strip).
-    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic photograph, extremely detailed, a head and face attached to the existing shoulders below by the neck, face centered horizontally, proportional adult human head, head fills the upper portion of the frame, neutral grey background, subtle painterly quality';
-    const p2T5xxl = 'Outpainting extension above an existing nude body photograph. The body in the lower portion of the frame continues upward with a proportionally sized adult head attached via the neck to the existing shoulders. The face is centered horizontally and looks straight ahead. Realistic head proportions, head smoothly attached to neck, head NOT floating or disconnected. Neutral grey background matching the existing body lighting.';
-    const p2Neg = 'floating head, disconnected head, head not attached to body, head separated from body, two heads, duplicate body, mini body, tiny person, robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet';
-
-    let emptyLatentId: string | null = null;
-    let vaeNodeId: string | null = null;
-    let ksamplerId: string | null = null;
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const ct = node.class_type as string;
-      if (ct === 'EmptyLatentImage') emptyLatentId = id;
-      if (ct === 'VAELoader') vaeNodeId = id;
-      if (ct === 'KSampler') ksamplerId = id;
-    }
-    if (!emptyLatentId || !vaeNodeId || !ksamplerId) {
-      throw new Error(`outpaintHeadAbove: missing nodes`);
-    }
-
-    const loadPaddedId = `p2_load_${stamp}`;
-    const loadMaskId = `p2_mask_${stamp}`;
-    const imgToMaskId = `p2_i2m_${stamp}`;
-    const growMaskId = `p2_grow_${stamp}`;
-    const vaeEncodeId = `p2_enc_${stamp}`;
-    const setMaskId = `p2_setmask_${stamp}`;
-
-    w[loadPaddedId] = { class_type: 'LoadImage', inputs: { image: paddedName }, _meta: { title: 'Pass2 Padded' } };
-    w[loadMaskId] = { class_type: 'LoadImage', inputs: { image: maskName }, _meta: { title: 'Pass2 Mask' } };
-    w[imgToMaskId] = { class_type: 'ImageToMask', inputs: { image: [loadMaskId, 0], channel: 'red' }, _meta: { title: 'Mask→Mask' } };
-    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 24, tapered_corners: true }, _meta: { title: 'Feather' } };
-    w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadPaddedId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'Encode' } };
-    w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'Noise Mask' } };
-
-    const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
-    ksamplerInputs.latent_image = [setMaskId, 0];
-    ksamplerInputs.denoise = 0.95;
-    ksamplerInputs.steps = 15;
-    ksamplerInputs.cfg = 1.0;
-    ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
-
-    delete w[emptyLatentId];
-
-    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const cls = node.class_type as string;
-      const inputs = node.inputs as Record<string, unknown>;
-      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
-      if (!inputs) continue;
-
-      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
-        inputs.clip_l = p2ClipL;
-        inputs.t5xxl = p2T5xxl;
-      }
-      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
-        inputs.text = p2Neg;
-      }
-      if (cls === 'ApplyPulidFlux') {
-        inputs.weight = 0.85;
-      }
-      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
-        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
-      }
-      // Pass 2 LoRAs: just detail. Keep it light to fit 8GB alongside PuLID + base + mask.
-      if (cls === 'LoraLoader') {
-        if (title.includes('detail') && !title.includes('hand')) {
-          inputs.strength_model = 0.55; inputs.strength_clip = 0.55;
-        } else {
-          inputs.strength_model = 0; inputs.strength_clip = 0;
-        }
-      }
-    }
-
-    // Strip 0-weight LoRAs
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      if ((node.class_type as string) !== 'LoraLoader') continue;
-      const inputs = node.inputs as Record<string, unknown>;
-      if (inputs.strength_model === 0 && inputs.strength_clip === 0) {
-        const modelIn = inputs.model;
-        const clipIn = inputs.clip;
-        for (const other of Object.values(w) as Record<string, unknown>[]) {
-          const oi = other.inputs as Record<string, unknown> | undefined;
-          if (!oi) continue;
-          for (const [k, v] of Object.entries(oi)) {
-            if (Array.isArray(v) && v[0] === id) {
-              if (v[1] === 0) oi[k] = modelIn;
-              if (v[1] === 1) oi[k] = clipIn;
-            }
-          }
-        }
-        delete w[id];
-      }
-    }
-
-    const clientId = crypto.randomUUID();
     const queueRes = await this.queuePrompt(w, clientId);
-    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
-    return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
-  }
+    const output = await this.waitForCompletion(queueRes.prompt_id);
+    let imageData = await this.downloadImage(output.filename, output.subfolder, output.type);
 
-  /**
-   * FACE-DETAILER for body gens (crop + upscale + inpaint + composite).
-   *
-   * 1. BiSeNet head mask gives us the face bounding box.
-   * 2. Crop the body to that bbox (with padding) and UPSCALE to 768x768 so
-   *    PuLID has enough pixels to actually paint identity.
-   * 3. Inpaint the head area at native 768 resolution with PuLID weight 0.95.
-   * 4. Downscale the refined crop back to the bbox dimensions.
-   * 5. Composite back into the body image, mask-feathered for seamless edge.
-   *
-   * Body/torso/legs/hair are mathematically untouchable — only the face bbox
-   * gets re-rendered.
-   */
-  private async refineFaceWithBiSeNet(
-    bodyImage: Buffer,
-    params: ComfyUIWorkflowParams,
-  ): Promise<Buffer> {
-    const stamp = Date.now();
-    const tmpRoot = path.join(process.cwd(), 'tmp', `face-refine-${stamp}`);
-    await fs.mkdir(tmpRoot, { recursive: true });
-    const bodyPath = path.join(tmpRoot, 'body.png');
-    await fs.writeFile(bodyPath, bodyImage);
+    const elapsedMs = Date.now() - startMs;
+    console.log(`[Flux2Edit] Edit complete in ${(elapsedMs / 1000).toFixed(1)}s`);
 
-    // 1. Run face_parse.py
-    const repoRoot = path.resolve(process.cwd(), '..');
-    const pythonExe = path.join(repoRoot, 'standalone', '.venv', 'Scripts', 'python.exe');
-    const scriptPath = path.join(repoRoot, 'standalone', 'scripts', 'face_parse.py');
-    const maskOutDir = path.join(tmpRoot, 'masks');
+    // 5. Simple dilated-user-mask composite (diagnostic simplification)
+    // Purpose: isolate whether "no change" is upstream (paint data / Kontext) or downstream (composite).
+    // Just take the user's painted mask, dilate it, feather, and swap in generated pixels there.
+    if (maskBuffer && maskDims) {
+      try {
+        const W = maskDims.w, H = maskDims.h;
+        const sourceBuf = await fs.readFile(absolutePath);
+        const srcRaw = await sharp(sourceBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        const genRaw = await sharp(imageData).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        const maskRaw = await sharp(maskBuffer).grayscale().raw().toBuffer({ resolveWithObject: true });
 
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn(pythonExe, [
-        scriptPath,
-        bodyPath,
-        '--out-dir', maskOutDir,
-        // eyes_brows = just eyes + brows. Most reliable detection on body shots
-        // — BiSeNet was trained on face close-ups and over-segments "skin" /
-        // "hair" labels on full-body images. Use the unambiguous eye/brow region
-        // to find the FACE CENTER, then we expand to a head-sized bbox around it.
-        '--region', 'eyes_brows',
-        '--feather', '0',
-      ], { stdio: 'pipe', windowsHide: true });
-      let stderr = '';
-      proc.stderr.on('data', (d) => { stderr += d.toString(); });
-      proc.on('exit', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`face_parse.py exited ${code}: ${stderr.slice(0, 400)}`));
-      });
-      proc.on('error', reject);
-    });
+        const N = W * H;
 
-    const eyesMaskPath = path.join(maskOutDir, 'mask_eyes_brows.png');
-    const eyesMaskBuf = await fs.readFile(eyesMaskPath);
-
-    // 2. Find bbox of the EYES region — that's the most reliable face anchor.
-    const bodyMeta = await sharp(bodyImage).metadata();
-    const W = bodyMeta.width || 768;
-    const H = bodyMeta.height || 1152;
-
-    const rawMask = await sharp(eyesMaskBuf).resize(W, H, { fit: 'fill' }).greyscale().raw().toBuffer();
-    let minX = W, minY = H, maxX = 0, maxY = 0;
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        if (rawMask[y * W + x] > 64) {
-          if (x < minX) minX = x;
-          if (y < minY) minY = y;
-          if (x > maxX) maxX = x;
-          if (y > maxY) maxY = y;
+        // Diagnostic: how different is gen from src? If ~0, Kontext produced a no-op.
+        let totalDiff = 0, changedPixels = 0;
+        for (let p = 0, i = 0; p < N; p++, i += 3) {
+          const d = Math.abs(srcRaw.data[i] - genRaw.data[i])
+                  + Math.abs(srcRaw.data[i + 1] - genRaw.data[i + 1])
+                  + Math.abs(srcRaw.data[i + 2] - genRaw.data[i + 2]);
+          totalDiff += d;
+          if (d > 30) changedPixels++;
         }
-      }
-    }
-    if (maxX <= minX || maxY <= minY) {
-      throw new Error('eyes mask empty — face not detected');
-    }
+        console.log(`[Flux2Edit] DIAG: gen-vs-src avg-diff=${(totalDiff / N).toFixed(2)}, changed-pixels=${changedPixels} (${(100 * changedPixels / N).toFixed(1)}%)`);
 
-    // Eye width is typically ~25% of head width. Expand to head bbox by scaling
-    // the eyes bbox up by ~5x (eyes are roughly 1/3 of head height, 1/2 of head width).
-    // Then snap to a square ~1.5x the head height (gives generous PuLID context).
-    const eyesW = maxX - minX;
-    const eyesH = maxY - minY;
-    const cx = Math.round((minX + maxX) / 2);
-    const cy = Math.round(maxY + eyesH * 0.6);  // shift down — eyes are ~upper-third of face
-    const headWidth = Math.max(Math.round(eyesW * 2.2), 200);   // head width from eye width
-    const headHeight = Math.max(Math.round(eyesH * 5.0), 240);  // head height from eye height
-    let side = Math.max(headWidth, headHeight);
-    side = Math.min(side, Math.min(W, H));  // never exceed image dims
-    // Snap to multiples of 8 for clean VAE encode
-    side = Math.floor(side / 8) * 8;
-    let cropX = Math.round(cx - side / 2);
-    let cropY = Math.round(cy - side / 2);
-    cropX = Math.max(0, Math.min(W - side, cropX));
-    cropY = Math.max(0, Math.min(H - side, cropY));
-    console.log(`[ComfyUI] Eyes bbox: (${minX},${minY})-(${maxX},${maxY}) → head crop ${side}x${side} @ (${cropX},${cropY})`);
+        // Diagnostic: how much did the user paint?
+        let userMaskCount = 0;
+        for (let p = 0; p < N; p++) if (maskRaw.data[p] > 100) userMaskCount++;
+        console.log(`[Flux2Edit] DIAG: user-mask pixels=${userMaskCount} (${(100 * userMaskCount / N).toFixed(1)}%)`);
 
-    // 3. Crop face region from body, upscale to 768x768
-    const faceCrop = await sharp(bodyImage)
-      .extract({ left: cropX, top: cropY, width: side, height: side })
-      .resize(768, 768, { fit: 'fill', kernel: 'lanczos3' })
-      .png()
-      .toBuffer();
-
-    // Inpaint mask for the upscaled crop: full white = regen the whole crop
-    // (it's all "head area" already since we sized the bbox to the head).
-    // Tiny black border so SetLatentNoiseMask doesn't pull from outside the
-    // edge — but the composite mask below feathers everything visible.
-    const cropMaskSvg = `<svg width="768" height="768" xmlns="http://www.w3.org/2000/svg">
-      <rect width="768" height="768" fill="black"/>
-      <rect x="32" y="32" width="704" height="704" fill="white"/>
-    </svg>`;
-    const cropMask = await sharp(Buffer.from(cropMaskSvg)).png().toBuffer();
-
-    const bodyName = await this.uploadBuffer(faceCrop, `face_crop_${stamp}.png`);
-    const maskName = await this.uploadBuffer(cropMask, `face_crop_mask_${stamp}.png`);
-
-    // 3. Build inpaint workflow
-    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
-    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
-    for (const node of Object.values(w) as Record<string, unknown>[]) {
-      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
-        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
-      }
-    }
-
-    // Face-focused prompt: tight on facial features. Body context preserved by mask.
-    const fdClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic close-up face, extremely detailed face, sharp focused eyes, fine pore skin texture, detailed lips, realistic facial features, soft natural lighting';
-    const fdT5xxl = 'A hyperrealistic close-up face with extremely detailed skin showing fine pore texture, sharp focused eyes with detailed iris, realistic lips, detailed eyebrows. Crisp focus on facial features.';
-    const fdNeg = 'blurry, soft focus, low detail, deformed face, distorted features, doll face, plastic skin, big head, oversized head';
-
-    let emptyLatentId: string | null = null;
-    let vaeNodeId: string | null = null;
-    let ksamplerId: string | null = null;
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const ct = node.class_type as string;
-      if (ct === 'EmptyLatentImage') emptyLatentId = id;
-      if (ct === 'VAELoader') vaeNodeId = id;
-      if (ct === 'KSampler') ksamplerId = id;
-    }
-    if (!emptyLatentId || !vaeNodeId || !ksamplerId) {
-      throw new Error('refineFaceWithBiSeNet: missing nodes');
-    }
-
-    const loadBodyId = `fd_load_${stamp}`;
-    const loadMaskId = `fd_mask_${stamp}`;
-    const imgToMaskId = `fd_i2m_${stamp}`;
-    const growMaskId = `fd_grow_${stamp}`;
-    const vaeEncodeId = `fd_enc_${stamp}`;
-    const setMaskId = `fd_setmask_${stamp}`;
-
-    w[loadBodyId] = { class_type: 'LoadImage', inputs: { image: bodyName }, _meta: { title: 'FD Body' } };
-    w[loadMaskId] = { class_type: 'LoadImage', inputs: { image: maskName }, _meta: { title: 'FD Mask' } };
-    w[imgToMaskId] = { class_type: 'ImageToMask', inputs: { image: [loadMaskId, 0], channel: 'red' }, _meta: { title: 'FD Mask→Mask' } };
-    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 4, tapered_corners: true }, _meta: { title: 'FD Feather' } };
-    w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadBodyId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'FD Encode' } };
-    w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'FD Noise Mask' } };
-
-    const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
-    ksamplerInputs.latent_image = [setMaskId, 0];
-    ksamplerInputs.denoise = 0.7;   // higher — actually rebuild the head with PuLID precision
-    ksamplerInputs.steps = 18;       // a few more steps so the refine resolves cleanly
-    ksamplerInputs.cfg = 1.0;
-    ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
-
-    delete w[emptyLatentId];
-
-    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const cls = node.class_type as string;
-      const inputs = node.inputs as Record<string, unknown>;
-      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
-      if (!inputs) continue;
-
-      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
-        inputs.clip_l = fdClipL;
-        inputs.t5xxl = fdT5xxl;
-      }
-      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
-        inputs.text = fdNeg;
-      }
-      if (cls === 'ApplyPulidFlux') {
-        inputs.weight = 0.95;  // near-max face lock — this is THE face refinement
-      }
-      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
-        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
-      }
-      if (cls === 'LoraLoader') {
-        if (title.includes('detail') && !title.includes('hand')) {
-          inputs.strength_model = 0.6; inputs.strength_clip = 0.6;
+        if (userMaskCount === 0) {
+          console.warn('[Flux2Edit] User mask is empty! paintData reached server but contains no paint. Returning raw gen output.');
         } else {
-          inputs.strength_model = 0; inputs.strength_clip = 0;
-        }
-      }
-    }
+          // Feather the user mask by blur alone — no erosion, no component detection
+          const featheredMask = await sharp(maskBuffer)
+            .grayscale()
+            .blur(8)
+            .raw()
+            .toBuffer({ resolveWithObject: true });
 
-    // Strip 0-weight LoRAs
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      if ((node.class_type as string) !== 'LoraLoader') continue;
-      const inputs = node.inputs as Record<string, unknown>;
-      if (inputs.strength_model === 0 && inputs.strength_clip === 0) {
-        const modelIn = inputs.model;
-        const clipIn = inputs.clip;
-        for (const other of Object.values(w) as Record<string, unknown>[]) {
-          const oi = other.inputs as Record<string, unknown> | undefined;
-          if (!oi) continue;
-          for (const [k, v] of Object.entries(oi)) {
-            if (Array.isArray(v) && v[0] === id) {
-              if (v[1] === 0) oi[k] = modelIn;
-              if (v[1] === 1) oi[k] = clipIn;
-            }
+          // Composite: result = gen * mask + src * (1 - mask)
+          const out = Buffer.alloc(srcRaw.data.length);
+          for (let i = 0, p = 0; i < out.length; i += 3, p++) {
+            const m = featheredMask.data[p] / 255;
+            out[i] = Math.round(genRaw.data[i] * m + srcRaw.data[i] * (1 - m));
+            out[i + 1] = Math.round(genRaw.data[i + 1] * m + srcRaw.data[i + 1] * (1 - m));
+            out[i + 2] = Math.round(genRaw.data[i + 2] * m + srcRaw.data[i + 2] * (1 - m));
           }
+          imageData = await sharp(out, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
+          console.log(`[Flux2Edit] Simple mask composite done`);
         }
-        delete w[id];
+      } catch (compErr) {
+        console.error('[Flux2Edit] Composite failed, using raw output:', compErr);
       }
+    } else {
+      console.log(`[Flux2Edit] No mask path — paintData=${!!paintData}, maskBuffer=${!!maskBuffer}, maskDims=${!!maskDims}`);
     }
 
-    const clientId = crypto.randomUUID();
-    const queueRes = await this.queuePrompt(w, clientId);
-    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
-    const refinedCrop768 = await this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
+    // 6. Save
+    const { imagePath, thumbnailPath } = await this.savePortrait(characterId, imageData, 'finetune');
 
-    // 4. Downscale refined crop back to the bbox dimensions
-    const refinedCropSized = await sharp(refinedCrop768)
-      .resize(side, side, { fit: 'fill', kernel: 'lanczos3' })
-      .png()
-      .toBuffer();
-
-    // 5. Build feathered alpha — a soft RECTANGULAR mask that feathers ~12%
-    //    of the side from the edges. Avoids hard rectangle seam without needing
-    //    BiSeNet to give us a perfect head silhouette.
-    const featherPx = Math.round(side * 0.12);
-    const alphaSvg = `<svg width="${side}" height="${side}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="lr" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="black"/>
-          <stop offset="${(featherPx / side).toFixed(3)}" stop-color="white"/>
-          <stop offset="${(1 - featherPx / side).toFixed(3)}" stop-color="white"/>
-          <stop offset="1" stop-color="black"/>
-        </linearGradient>
-        <linearGradient id="td" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="black"/>
-          <stop offset="${(featherPx / side).toFixed(3)}" stop-color="white"/>
-          <stop offset="${(1 - featherPx / side).toFixed(3)}" stop-color="white"/>
-          <stop offset="1" stop-color="black"/>
-        </linearGradient>
-        <mask id="m"><rect width="${side}" height="${side}" fill="url(#td)"/></mask>
-      </defs>
-      <rect width="${side}" height="${side}" fill="url(#lr)" mask="url(#m)"/>
-    </svg>`;
-    const cropMaskGrey = await sharp(Buffer.from(alphaSvg))
-      .greyscale()
-      .toBuffer();
-
-    const refinedWithAlpha = await sharp(refinedCropSized)
-      .ensureAlpha()
-      .joinChannel(cropMaskGrey)
-      .png()
-      .toBuffer();
-
-    // 6. Composite the refined head onto the body image at the bbox position
-    const composited = await sharp(bodyImage)
-      .composite([{ input: refinedWithAlpha, left: cropX, top: cropY, blend: 'over' }])
-      .png()
-      .toBuffer();
-
-    // Cleanup tmp dir (best effort)
-    fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
-
-    return composited;
+    return {
+      success: true,
+      imagePath,
+      thumbnailPath,
+      metadata: {
+        seed,
+        generationTimeMs: elapsedMs,
+        model: 'flux-kontext-dev',
+        prompt: editPrompt,
+        negativePrompt: '',
+        steps: 28,
+        cfg: 1.0,
+        width: 0,
+        height: 0,
+      } as PortraitMetadata,
+    };
   }
 
   /**
-   * (Disused) Body pass 2 that inpainted both head AND feet strips. Kept for
-   * reference — the simpler outpaintHeadAbove is the active path.
-   */
-  private async inpaintHeadAndFeet(
-    torsoImage: Buffer,
-    params: ComfyUIWorkflowParams,
-  ): Promise<Buffer> {
-    const TOP_BAND = 192;
-    const BOT_BAND = 192;
-    const TORSO_SIZE = 768;
-    const OUT_W = 768;
-    const OUT_H = TOP_BAND + TORSO_SIZE + BOT_BAND; // 1152
-
-    // 1. Pad torso image vertically with neutral grey (matches "neutral grey background" in prompt).
-    const padded = await sharp(torsoImage)
-      .resize(TORSO_SIZE, TORSO_SIZE, { fit: 'fill' })
-      .extend({
-        top: TOP_BAND,
-        bottom: BOT_BAND,
-        left: 0,
-        right: 0,
-        background: { r: 180, g: 180, b: 180 },
-      })
-      .png()
-      .toBuffer();
-
-    // 2. Build inpaint mask: white where we INPAINT (top + bottom), black where we PRESERVE (middle torso).
-    const maskSvg = `<svg width="${OUT_W}" height="${OUT_H}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${OUT_W}" height="${OUT_H}" fill="black"/>
-      <rect x="0" y="0" width="${OUT_W}" height="${TOP_BAND}" fill="white"/>
-      <rect x="0" y="${TOP_BAND + TORSO_SIZE}" width="${OUT_W}" height="${BOT_BAND}" fill="white"/>
-    </svg>`;
-    const maskBuf = await sharp(Buffer.from(maskSvg)).png().toBuffer();
-
-    // 3. Upload padded + mask to ComfyUI
-    const stamp = Date.now();
-    const paddedName = await this.uploadBuffer(padded, `body_pass2_padded_${stamp}.png`);
-    const maskName = await this.uploadBuffer(maskBuf, `body_pass2_mask_${stamp}.png`);
-
-    // 4. Load the PuLID workflow and mutate it for inpaint
-    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
-    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
-
-    // GGUF → fp8 swap (same as main pipeline)
-    for (const node of Object.values(w) as Record<string, unknown>[]) {
-      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
-        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
-      }
-    }
-
-    // Pass 2 prompt: emphasize head (top) + feet (bottom) context. Torso is preserved
-    // from pass 1 so we don't need to re-describe it — we just need FLUX to paint
-    // head + feet coherently onto the standing torso.
-    // Pass 2 prompt — middle is LOCKED (shoulders-to-knees torso from pass 1).
-    // Top 192px: head + neck connecting to existing shoulders.
-    // Bottom 192px: calves + feet connecting to existing knees.
-    const p2ClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic photograph, extremely detailed, a standing nude figure continues upward with a proportional head attached to the existing shoulders by the neck, face visible and centered, and continues downward with calves and bare feet attached below the existing knees, feet planted on the ground at the bottom of the frame, realistic human proportions, A-pose standing, neutral grey background, subtle painterly quality';
-    const p2T5xxl = 'Outpainting extension of a cropped body photograph. The existing body in the middle of the frame (shoulders to knees) continues upward with a proportionally sized head attached via neck to the existing shoulders, face visible and centered horizontally. Below the existing knees, the lower legs continue downward with calves and bare feet planted on the ground at the bottom of the frame. Realistic adult human proportions, not oversized head, not floating disconnected head, head smoothly attached to neck, feet clearly visible on the ground. Neutral grey background with even lighting matching the existing body.';
-    const p2Neg = 'floating head, disconnected head, head not attached to body, two bodies, mini body, tiny person, squished body, bobblehead, big head, oversized head, chibi, portrait framing, bust shot, close-up, duplicate body, extra figure, robe, cloak, cape, dress, gown, clothing, garment, jewelry, headdress, crown, hat, helmet';
-
-    // Find key nodes
-    let emptyLatentId: string | null = null;
-    let vaeNodeId: string | null = null;
-    let ksamplerId: string | null = null;
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const ct = node.class_type as string;
-      if (ct === 'EmptyLatentImage') emptyLatentId = id;
-      if (ct === 'VAELoader') vaeNodeId = id;
-      if (ct === 'KSampler') ksamplerId = id;
-    }
-    if (!emptyLatentId || !vaeNodeId || !ksamplerId) {
-      throw new Error(`inpaintHeadAndFeet: missing nodes — empty=${emptyLatentId} vae=${vaeNodeId} ksampler=${ksamplerId}`);
-    }
-
-    // Inject inpaint chain:
-    //   LoadImage(padded) → VAEEncode → SetLatentNoiseMask(mask) → KSampler
-    const loadPaddedId = `p2_load_padded_${stamp}`;
-    const loadMaskId = `p2_load_mask_${stamp}`;
-    const imgToMaskId = `p2_img_to_mask_${stamp}`;
-    const growMaskId = `p2_grow_mask_${stamp}`;
-    const vaeEncodeId = `p2_vae_enc_${stamp}`;
-    const setMaskId = `p2_set_mask_${stamp}`;
-
-    w[loadPaddedId] = { class_type: 'LoadImage', inputs: { image: paddedName }, _meta: { title: 'Pass2 Padded Body' } };
-    w[loadMaskId] = { class_type: 'LoadImage', inputs: { image: maskName }, _meta: { title: 'Pass2 Mask' } };
-    w[imgToMaskId] = { class_type: 'ImageToMask', inputs: { image: [loadMaskId, 0], channel: 'red' }, _meta: { title: 'Pass2 Mask→Mask' } };
-    w[growMaskId] = { class_type: 'GrowMask', inputs: { mask: [imgToMaskId, 0], expand: 16, tapered_corners: true }, _meta: { title: 'Pass2 Feather' } };
-    w[vaeEncodeId] = { class_type: 'VAEEncode', inputs: { pixels: [loadPaddedId, 0], vae: [vaeNodeId, 0] }, _meta: { title: 'Pass2 Encode' } };
-    w[setMaskId] = { class_type: 'SetLatentNoiseMask', inputs: { samples: [vaeEncodeId, 0], mask: [growMaskId, 0] }, _meta: { title: 'Pass2 Noise Mask' } };
-
-    // Rewire KSampler.latent_image FROM [emptyLatentId, 0] TO [setMaskId, 0].
-    // Pass 2 at 15 steps, denoise 0.9 — enough detail for head/feet while keeping
-    // pass 2 wall time to ~2 min. 20 steps at full denoise took 29 min under VRAM
-    // pressure; 15 is the sweet spot.
-    const ksamplerInputs = (w[ksamplerId] as Record<string, unknown>).inputs as Record<string, unknown>;
-    ksamplerInputs.latent_image = [setMaskId, 0];
-    ksamplerInputs.denoise = 0.9;
-    ksamplerInputs.steps = 15;
-    ksamplerInputs.cfg = 1.0;
-    ksamplerInputs.seed = Math.floor(Math.random() * 2147483647);
-
-    // Remove the unused EmptyLatentImage
-    delete w[emptyLatentId];
-
-    // Inject prompts + canvas dims + LoRA weights (match pass 1)
-    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const cls = node.class_type as string;
-      const inputs = node.inputs as Record<string, unknown>;
-      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
-      if (!inputs) continue;
-
-      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
-        inputs.clip_l = p2ClipL;
-        inputs.t5xxl = p2T5xxl;
-      }
-      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
-        inputs.text = p2Neg;
-      }
-      if (cls === 'ApplyPulidFlux') {
-        inputs.weight = 0.8;  // strong face lock at head region
-      }
-      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
-        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
-      }
-      // Pass 2 LoRAs: trim to just detail (for face sharpness). Style is already
-      // baked into the pass 1 torso; NSFW isn't needed at head/feet. This cuts
-      // ~1.5GB VRAM pressure so pass 2 fits on 8GB alongside PuLID + base + mask.
-      if (cls === 'LoraLoader') {
-        if (title.includes('detail') && !title.includes('hand')) {
-          inputs.strength_model = 0.55; inputs.strength_clip = 0.55;
-        } else {
-          inputs.strength_model = 0; inputs.strength_clip = 0;
-        }
-      }
-    }
-
-    // Strip 0-weight LoRAs from the chain (keeps stack clean)
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      if ((node.class_type as string) !== 'LoraLoader') continue;
-      const inputs = node.inputs as Record<string, unknown>;
-      if (inputs.strength_model === 0 && inputs.strength_clip === 0) {
-        const modelIn = inputs.model;
-        const clipIn = inputs.clip;
-        for (const other of Object.values(w) as Record<string, unknown>[]) {
-          const oi = other.inputs as Record<string, unknown> | undefined;
-          if (!oi) continue;
-          for (const [k, v] of Object.entries(oi)) {
-            if (Array.isArray(v) && v[0] === id) {
-              if (v[1] === 0) oi[k] = modelIn;
-              if (v[1] === 1) oi[k] = clipIn;
-            }
-          }
-        }
-        delete w[id];
-      }
-    }
-
-    // Queue + wait + download
-    const clientId = crypto.randomUUID();
-    const queueRes = await this.queuePrompt(w, clientId);
-    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
-    return this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
-  }
-
-  /**
-   * Two-stage face refine for full-body gens. Crops the head region, regens
-   * it at native face-lock resolution (768x768) with low denoise so PuLID
-   * can paint crisp facial detail, then composites back onto the body.
+   * FLUX.2 Dev face generation with multi-reference identity + angle-specific
+   * pose template. Replaces the PuLID/InfiniteYou/ControlNet stack.
    *
-   * This is the "head rendered separately at higher resolution then pasted
-   * onto the body" technique from the Tara sessions.
+   * - Pose template: public/portraits/pose-refs/{angle}.png (bald canonical
+   *   portrait). Run through Canny to strip color/identity; only structural
+   *   edges reach the model via ReferenceLatent.
+   * - Identity refs: the user's uploaded photos (already uploaded to ComfyUI
+   *   by the generatePortrait caller — names in params.referenceImagePath +
+   *   params.referenceImagePaths). Chained as ReferenceLatent anchors.
+   *
+   * Returns null if the workflow file or pose template is missing, or if the
+   * identity refs are empty — caller falls through to the legacy chain.
    */
-  private async refineBodyFace(
-    bodyImage: Buffer,
+  private async generateFaceFlux2(
+    input: PortraitInput,
     params: ComfyUIWorkflowParams,
-  ): Promise<Buffer> {
-    const meta = await sharp(bodyImage).metadata();
-    const W = meta.width || 768;
-    const H = meta.height || 1152;
+    promptOutput: { clipL: string; t5xxl: string; negativePrompt: string },
+    startTime: number,
+  ): Promise<PortraitResult | null> {
+    try {
+      // Collect identity ref names (already uploaded + RMBG'd by the caller)
+      const idRefs: string[] = [];
+      if (params.referenceImagePath) idRefs.push(params.referenceImagePath);
+      if (params.referenceImagePaths?.length) idRefs.push(...params.referenceImagePaths);
+      if (idRefs.length === 0) return null;
+      // Cap identity refs at 3 to leave room for pose (slot n+1) and style
+      // (slot n+2) in a 5-slot workflow.
+      const usedRefs = idRefs.slice(0, 3);
+      const n = usedRefs.length;
 
-    // Face crop: center-horizontal square covering head + some neck/shoulder.
-    // Head in a full body gen sits roughly in the top 0-30% of the frame.
-    // Square crop of size ~W (face typically ~W/3 wide, so W-sized crop leaves
-    // headroom above and includes shoulders below — good blend context).
-    const cropSize = W;                     // 768
-    const cropX = 0;                         // full width
-    const cropY = 0;                         // from top
-    const cropBuf = await sharp(bodyImage)
-      .extract({ left: cropX, top: cropY, width: cropSize, height: cropSize })
-      .png()
-      .toBuffer();
+      // Face gen is always front-facing. Angle variants live in the finetune step.
 
-    // Upload crop as img2img base
-    const baseName = await this.uploadBuffer(cropBuf, `body_face_crop_${Date.now()}.png`);
+      // New workflow: flux2-face-cloud.json — mirrors the cloud ComfyUI
+      // 'Image Edit (Flux.2 Dev)' subgraph the user verified works. 5 REF
+      // slots with linear chain REFLAT_5 → REFLAT_4 → ... → REFLAT_1 →
+      // GUIDER. By prepend rule, Image 1 in prompt = REFLAT_1 = primary
+      // subject. Slots: REF1..n = identity, REF_{n+1} = pose,
+      // REF_{n+2} = style.
+      const workflowName = 'flux2-face-cloud';
+      const wf = JSON.parse(JSON.stringify(await this.loadWorkflow(workflowName))) as Record<string, Record<string, unknown>>;
+      delete wf._comment;
 
-    // Load the PuLID workflow and configure for face refine
-    const w = JSON.parse(JSON.stringify(await this.loadWorkflow('character-portrait-pulid')));
-    for (const k of Object.keys(w)) if (k.startsWith('_')) delete w[k];
-
-    // GGUF → fp8 swap (same as main pipeline)
-    for (const node of Object.values(w) as Record<string, unknown>[]) {
-      if ((node as Record<string, unknown>).class_type === 'DualCLIPLoaderGGUF') {
-        (node as Record<string, unknown>).class_type = 'DualCLIPLoader';
+      // Populate identity refs into LOAD_REF1..n
+      for (let i = 0; i < n; i++) {
+        (wf[`LOAD_REF${i + 1}`].inputs as Record<string, unknown>).image = usedRefs[i];
       }
-    }
 
-    // Face-focused prompt: style-consistent, detail-focused, no body-composition talk
-    const faceClipL = 'in the style of ckpf, aidmafluxpro1.1, hyperrealistic fantasy portrait, extremely detailed, sharp focus, luminous detailed eyes, fine pore texture skin, close-up face portrait, face centered in frame, neutral grey background';
-    const faceT5xxl = 'A hyperrealistic close-up face portrait with extremely detailed skin showing fine pore texture, luminous detailed eyes, crisp sharp focus. Face centered in the frame with a neutral grey background.';
-    const faceNeg = 'blurry, low quality, deformed, disfigured, bad anatomy';
+      // Auto pose/style refs disabled — they pushed the slot count to 5 and
+      // tipped the cudaMallocAsync pool into OOM territory on multi-ref runs.
+      // Re-enable behind a toggle if/when needed.
+      const anglePoseActive = false;
+      const styleRefCount = 0;
+      const poseSlotIdx = n + 1;
+      const styleSlotIdx = n + 2;
 
-    // Face-refine params: low denoise (preserve composition), higher PuLID
-    const refineSeed = Math.floor(Math.random() * 2147483647);
+      // Total active ref slots
+      const kTotal = n;
 
-    for (const [, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      const cls = node.class_type as string;
-      const inputs = node.inputs as Record<string, unknown>;
-      const title = ((node._meta as Record<string, unknown>)?.title as string || '').toLowerCase();
-      if (!inputs) continue;
+      // Strip unused slots and rewire chain root.
+      // In the template, REFLAT_5 chains on GUIDANCE. If kTotal < 5, delete
+      // slots (kTotal+1)..5 and make REFLAT_kTotal chain on GUIDANCE instead.
+      for (let i = kTotal + 1; i <= 5; i++) {
+        delete wf[`LOAD_REF${i}`];
+        delete wf[`SCALE_REF${i}`];
+        delete wf[`ENCODE_REF${i}`];
+        delete wf[`REFLAT_${i}`];
+      }
+      if (kTotal < 5 && kTotal >= 1) {
+        (wf[`REFLAT_${kTotal}`].inputs as Record<string, unknown>).conditioning = ['GUIDANCE', 0];
+      }
 
-      if (cls === 'EmptyLatentImage') { inputs.width = 768; inputs.height = 768; }
-      if (cls === 'KSampler') {
-        inputs.seed = refineSeed;
-        inputs.steps = 15;
-        inputs.cfg = 1.0;
-        inputs.denoise = 0.45;
-      }
-      if (cls === 'CLIPTextEncodeFlux' && title.includes('positive')) {
-        inputs.clip_l = faceClipL;
-        inputs.t5xxl = faceT5xxl;
-      }
-      if (cls === 'CLIPTextEncode' && title.includes('negative')) {
-        inputs.text = faceNeg;
-      }
-      if (cls === 'ApplyPulidFlux') {
-        inputs.weight = 0.85;  // stronger for face-only refine
-      }
-      if (cls === 'LoadImage' && (title.includes('pulid') || title.includes('reference'))) {
-        if (params.referenceImagePath) inputs.image = params.referenceImagePath;
-      }
-      // LoRA weights match face-lock (detail for sharpness; skip hand-detail)
-      if (cls === 'LoraLoader') {
-        if (title.includes('style')) { inputs.strength_model = 0.5; inputs.strength_clip = 0.5; }
-        else if (title.includes('campaign')) { inputs.strength_model = 0.3; inputs.strength_clip = 0.3; }
-        else if (title.includes('hand detail')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
-        else if (title.includes('nsfw')) { inputs.strength_model = 0; inputs.strength_clip = 0; }
-        else if (title.includes('detail')) { inputs.strength_model = 0.7; inputs.strength_clip = 0.7; }
-      }
-    }
+      // Slot layout (cloud workflow + prepend rule):
+      //   Chain: GUIDANCE → REFLAT_kTotal → REFLAT_(kTotal-1) → ... → REFLAT_1 → GUIDER
+      //   Prepend rule: Image 1 in prompt = REFLAT_1 (last in chain, closest to guider).
+      //   REF1..n    = identity refs (primary subject)
+      //   REF_{n+1}  = pose ref
+      //   REF_{n+2}  = style ref
 
-    // Inject img2img: convert EmptyLatentImage to VAEEncode(base) → SetLatentNoiseMask-less img2img.
-    // Find the EmptyLatentImage node, replace with VAEEncode of the uploaded base.
-    let emptyLatentId: string | null = null;
-    let vaeNodeId: string | null = null;
-    for (const [id, node] of Object.entries(w) as [string, Record<string, unknown>][]) {
-      if ((node.class_type as string) === 'EmptyLatentImage') emptyLatentId = id;
-      if ((node.class_type as string) === 'VAELoader' || (node.class_type as string) === 'VAELoaderFlux') vaeNodeId = id;
-    }
-    if (emptyLatentId && vaeNodeId) {
-      const loadId = `face_base_load_${Date.now()}`;
-      w[loadId] = { class_type: 'LoadImage', inputs: { image: baseName }, _meta: { title: 'Face Base' } };
-      const encId = `face_base_enc_${Date.now()}`;
-      w[encId] = {
-        class_type: 'VAEEncode',
-        inputs: { pixels: [loadId, 0], vae: [vaeNodeId, 0] },
-        _meta: { title: 'Face Base Encode' },
+      // Prompt — user-verified on Comfy Cloud (2026-04-23) with identical
+      // model files:
+      //   "make a straight on portrait of the woman in image reference 1
+      //    but change the style to the image reference 2. Don't use the
+      //    face or hair from image reference 2."
+      // Pattern: composition+subject → "but change style to [style]" →
+      //          explicit targeted negation on style ref face/hair.
+      // Dynamic ref phrase using range form ("1-N" for >=2). Single ref says "image reference 1".
+      const idRefsPhrase = n === 1 ? 'image reference 1' : `image references 1-${n}`;
+      const defaultPrompt = (() => {
+        // Pass 1 = photorealistic identity lock, woven with structured physical
+        // attributes from the character sheet. FLUX.2 prefers natural prose
+        // sentences over comma-separated tag lists, so attributes are folded
+        // into a single descriptive sentence.
+        const id = input.characterData?.identity;
+        const sexRaw = (id?.sex || '').toString().toLowerCase();
+        const subject = sexRaw === 'female' ? 'woman' : sexRaw === 'male' ? 'man' : 'person';
+
+        // Build the descriptive clause. Each segment is a natural noun phrase.
+        const segments: string[] = [];
+        if (id?.skinTone) segments.push(`${id.skinTone.trim()} skin`);
+
+        const hairColor = id?.hairColor?.trim();
+        const hairTexture = id?.hairTexture?.trim();
+        const hairStyle = id?.hairStyle?.trim();
+        if (hairColor || hairTexture || hairStyle) {
+          const hairBits = [hairTexture, hairColor].filter(Boolean).join(' ');
+          let hair = hairBits ? `${hairBits} hair` : 'hair';
+          if (hairStyle) hair += ` styled in a ${hairStyle}`;
+          segments.push(hair);
+        }
+        if (id?.eyeColor) segments.push(`${id.eyeColor.trim()} eyes`);
+
+        const facial = id?.facialHair?.trim();
+        const facialLower = (facial || '').toLowerCase();
+        const noFacial = !facial || facialLower === 'none' || facialLower === 'clean-shaven' || facialLower === 'clean shaven' || facialLower === 'no';
+        if (!noFacial) segments.push(`a ${facial}`);
+
+        // Join into "with A, B, and C"
+        let physClause = '';
+        if (segments.length === 1) physClause = ` with ${segments[0]}`;
+        else if (segments.length === 2) physClause = ` with ${segments[0]} and ${segments[1]}`;
+        else if (segments.length >= 3) physClause = ` with ${segments.slice(0, -1).join(', ')}, and ${segments[segments.length - 1]}`;
+
+        let base =
+          `A photograph of a ${subject}${physClause} in ${idRefsPhrase}. Match their exact facial identity — face shape, skin tone, eyes, nose, lips, brows, and hair — from the references with high fidelity. Do not invent, average, or embellish features.\n` +
+          `Head-and-shoulders portrait, shoulders-up, straight-on front view, eye-level, looking directly at the camera, neutral expression with closed mouth. Nude, bare shoulders. No clothing.\n\n` +
+          `Plain mid-grey studio backdrop, completely flat and minimal. Soft, even, diffused studio lighting. No dramatic shadows.`;
+        if (anglePoseActive) {
+          base += ` Posed as shown in image reference ${poseSlotIdx}.`;
+        }
+        if (styleRefCount > 0) {
+          base += ` Rendered in the painted illustration art style of image reference ${styleSlotIdx}. Don't use the face, hair, or outfit from image reference ${styleSlotIdx}.`;
+        }
+        return base;
+      })();
+
+      const rawCustom = params.customPrompt?.trim();
+      // Placeholder substitution so custom prompts don't need to hard-code slots:
+      //   {id}    → "image reference 1" (single) | "image references 1 and 2" (etc.)
+      //   {pose}  → "image reference N+1" or ""
+      //   {style} → "image reference N+2" or ""
+      const customPrompt = rawCustom
+        ? rawCustom
+            .replaceAll('{id}', idRefsPhrase)
+            .replaceAll('{pose}', anglePoseActive ? `image reference ${poseSlotIdx}` : '')
+            .replaceAll('{style}', styleRefCount > 0 ? `image reference ${styleSlotIdx}` : '')
+        : undefined;
+      const finalPrompt = customPrompt && customPrompt.length > 0 ? customPrompt : defaultPrompt;
+      if (customPrompt) console.log(`[Flux2Face] using custom prompt override (${customPrompt.length} chars)`);
+
+      // Inject parameters. Cloud workflow drives width/height from GetImageSize
+      // on REF1, but we override for consistency with our T10 recipe.
+      const width  = params.width  ?? 1280;
+      const height = params.height ?? 1280;
+      const steps  = params.steps  ?? 20;
+      for (const node of Object.values(wf)) {
+        const cls = node.class_type as string;
+        const inp = node.inputs as Record<string, unknown> | undefined;
+        if (!inp) continue;
+        if (cls === 'CLIPTextEncode')        inp.text = finalPrompt;
+        if (cls === 'RandomNoise')           inp.noise_seed = params.seed;
+        if (cls === 'EmptyFlux2LatentImage') { inp.width = width; inp.height = height; inp.batch_size = 1; }
+        if (cls === 'Flux2Scheduler')        { inp.steps = steps; inp.width = width; inp.height = height; }
+        delete node._meta;
+      }
+
+      // Diagnostic: capture the ReferenceLatent chain for UI debug panel.
+      let chainDebug = '';
+      {
+        const refNodes = Object.entries(wf).filter(([k]) => k.startsWith('REFLAT_'));
+        const chainStr = refNodes.map(([k, node]) => {
+          const inp = node.inputs as Record<string, unknown>;
+          const cond = Array.isArray(inp?.conditioning) ? inp.conditioning[0] : '?';
+          return `${k}←${cond}`;
+        }).join(' | ');
+        const guiderCond = Array.isArray((wf.GUIDER?.inputs as Record<string, unknown>)?.conditioning)
+          ? ((wf.GUIDER.inputs as Record<string, unknown>).conditioning as unknown[])[0]
+          : '?';
+        chainDebug = `${chainStr} | guider←${guiderCond}`;
+        console.log(`[Flux2Face] chain: ${chainDebug}`);
+      }
+      // Runtime lever injection: pass 1 guidance + turbo LoRA.
+      // Workflow already has GUIDANCE (FluxGuidance) + LORA_TURBO (strength 0 = off) + SCHEDULER (steps 20) nodes wired.
+      if (wf.GUIDANCE && (wf.GUIDANCE.inputs as Record<string, unknown>)) {
+        const pass1G = typeof params.pass1Guidance === 'number' ? params.pass1Guidance : 4.0;
+        (wf.GUIDANCE.inputs as Record<string, unknown>).guidance = pass1G;
+      }
+      if (params.useTurbo) {
+        if (wf.LORA_TURBO && (wf.LORA_TURBO.inputs as Record<string, unknown>)) {
+          (wf.LORA_TURBO.inputs as Record<string, unknown>).strength_model = 1.0;
+        }
+        if (wf.SCHEDULER && (wf.SCHEDULER.inputs as Record<string, unknown>)) {
+          (wf.SCHEDULER.inputs as Record<string, unknown>).steps = 8;
+        }
+        console.log(`[Flux2Face] turbo lever ON — LORA_TURBO strength=1.0, SCHEDULER steps=8`);
+      }
+      console.log(`[Flux2Face] queueing — ${workflowName}, ${n} identity refs, ${width}x${height}, seed=${params.seed}, guidance=${(wf.GUIDANCE?.inputs as Record<string, unknown>)?.guidance ?? 4.0}, turbo=${params.useTurbo ? 'on' : 'off'}`);
+      const clientId = crypto.randomUUID();
+      const queueResponse = await this.queuePrompt(wf, clientId);
+      const output = await this.waitForCompletion(queueResponse.prompt_id);
+      const imageData = await this.downloadImage(output.filename, output.subfolder, output.type);
+
+      const isFinalQuality = input.overrides?.quality === 'final';
+      const step = isFinalQuality ? 'faces' : 'sketch';
+      const { imagePath, thumbnailPath } = await this.savePortrait(
+        input.characterId,
+        imageData,
+        step,
+        params.seed,
+      );
+
+      // Pass 2 — full workflow re-run with Pass 1 output as primary ref.
+      // Pass 1's output image becomes the identity anchor (slot 1); user-assigned
+      // pass2Refs fill the remaining slots as secondary refs for style/additional
+      // identity cues. Uses its own guidance, turbo, seed, and prompt.
+      let pass2Status: 'ok' | 'failed' | 'errored' | 'skipped' = 'skipped';
+      // Pass 2 default = minimal style-pull prompt. Pass 1 output is always
+      // slot 1; any Pass 2 refs sit at slots 2..N. Targeted-attribute pattern
+      // tells the model to keep the subject from slot 1 and pull only the
+      // visual style from the rest. If no Pass 2 refs are attached, the prompt
+      // degrades to a passthrough so the workflow still runs cleanly.
+      const buildPass2Default = (totalRefs: number): string => {
+        if (totalRefs <= 1) {
+          return `A head-and-shoulders portrait of the person from image reference 1, shoulders-up, nude, bare shoulders, no clothing.`;
+        }
+        const styleRange = totalRefs === 2 ? 'image reference 2' : `image references 2-${totalRefs}`;
+        return (
+          `Render the person from image reference 1 in the visual style of ${styleRange}. ` +
+          `Do not use the face, hair, skin, clothing, pose, framing, or background from ${styleRange} — only the art style and rendering.\n\n` +
+          `Painterly semi-realistic rendering with a slight CGI sheen and dark-fantasy mood. Highly detailed face, sharp features, fine skin texture with subtle subsurface scattering, soft specular highlights. Rembrandt lighting — a soft key light from the upper side casting a gentle triangle of light on the shadowed cheek, smooth falloff, no harsh shadows.\n\n` +
+          `Head-and-shoulders portrait, shoulders-up, straight-on front view, nude, bare shoulders, no clothing. Plain mid-grey studio backdrop, completely flat and minimal.`
+        );
       };
-      // Rewire any consumer of [emptyLatentId, 0] → [encId, 0]
-      for (const [otherId, otherNode] of Object.entries(w) as [string, Record<string, unknown>][]) {
-        if (otherId === loadId || otherId === encId) continue;
-        const inputs = otherNode.inputs as Record<string, unknown>;
-        if (!inputs) continue;
-        for (const [k, v] of Object.entries(inputs)) {
-          if (Array.isArray(v) && v[0] === emptyLatentId) inputs[k] = [encId, 0];
+      const cleanupPrompt: string | null = params.runPass2
+        ? (params.customPass2Prompt && params.customPass2Prompt.trim().length > 0
+            ? params.customPass2Prompt
+            : null) // resolve once we know p2n inside the try block
+        : null;
+      // Captures the actual Pass 2 prompt sent (custom or dynamically resolved
+      // default). Populated inside the try block; surfaced in metadata.
+      let actualPass2Prompt: string | null = null;
+      let finalResult: { imagePath: string; thumbnailPath: string; imageData: Buffer } = { imagePath, thumbnailPath, imageData };
+      if (params.runPass2) {
+        try {
+          // 1. Upload Pass 1 output as a fresh ref (no RMBG — already a clean generated portrait).
+          const pass1OutputName = await this.uploadBuffer(imageData, `pass1_${params.seed}.png`);
+
+          // 2. Build Pass 2 ref chain: [pass1Output, ...pass2RefNames] capped at 5 slots.
+          const pass2Refs = [pass1OutputName, ...(params.pass2RefNames ?? [])].slice(0, 5);
+          const p2n = pass2Refs.length;
+
+          // 3. Load fresh workflow clone for Pass 2.
+          const wf2 = JSON.parse(JSON.stringify(await this.loadWorkflow(workflowName))) as Record<string, Record<string, unknown>>;
+          delete wf2._comment;
+
+          // 4. Populate LOAD_REF1..p2n.
+          for (let i = 0; i < p2n; i++) {
+            (wf2[`LOAD_REF${i + 1}`].inputs as Record<string, unknown>).image = pass2Refs[i];
+          }
+          // Strip unused slots and rewire chain root.
+          for (let i = p2n + 1; i <= 5; i++) {
+            delete wf2[`LOAD_REF${i}`];
+            delete wf2[`SCALE_REF${i}`];
+            delete wf2[`ENCODE_REF${i}`];
+            delete wf2[`REFLAT_${i}`];
+          }
+          if (p2n < 5 && p2n >= 1) {
+            (wf2[`REFLAT_${p2n}`].inputs as Record<string, unknown>).conditioning = ['GUIDANCE', 0];
+          }
+
+          // 5. Pass 2 parameter injection — fresh seed so it doesn't collapse into Pass 1.
+          const pass2G = typeof params.pass2Guidance === 'number' ? params.pass2Guidance : 4.0;
+          const pass2Steps = params.useTurboPass2 ? 8 : 20;
+          const pass2Seed = Math.floor(Math.random() * 2147483647);
+          for (const node of Object.values(wf2)) {
+            const cls = node.class_type as string;
+            const inp = node.inputs as Record<string, unknown> | undefined;
+            if (!inp) continue;
+            if (cls === 'CLIPTextEncode')        inp.text = cleanupPrompt ?? buildPass2Default(p2n);
+            if (cls === 'RandomNoise')           inp.noise_seed = pass2Seed;
+            if (cls === 'EmptyFlux2LatentImage') { inp.width = width; inp.height = height; inp.batch_size = 1; }
+            if (cls === 'Flux2Scheduler')        { inp.steps = pass2Steps; inp.width = width; inp.height = height; }
+            delete node._meta;
+          }
+          // Guidance + Turbo override.
+          if (wf2.GUIDANCE?.inputs) (wf2.GUIDANCE.inputs as Record<string, unknown>).guidance = pass2G;
+          if (params.useTurboPass2) {
+            if (wf2.LORA_TURBO?.inputs) (wf2.LORA_TURBO.inputs as Record<string, unknown>).strength_model = 1.0;
+            if (wf2.SCHEDULER?.inputs)  (wf2.SCHEDULER.inputs as Record<string, unknown>).steps = 8;
+          }
+          actualPass2Prompt = cleanupPrompt ?? buildPass2Default(p2n);
+          console.log(`[Flux2Face] pass 2 queueing — ${p2n} refs, guidance=${pass2G}, steps=${pass2Steps}, turbo=${params.useTurboPass2 ? 'on' : 'off'}, prompt="${actualPass2Prompt.slice(0, 80)}"`);
+
+          // 6. Submit + download + save.
+          const p2ClientId = crypto.randomUUID();
+          const p2Queue = await this.queuePrompt(wf2, p2ClientId);
+          const p2Output = await this.waitForCompletion(p2Queue.prompt_id);
+          const p2ImageData = await this.downloadImage(p2Output.filename, p2Output.subfolder, p2Output.type);
+          const p2Saved = await this.savePortrait(input.characterId, p2ImageData, step, pass2Seed);
+          finalResult = { imagePath: p2Saved.imagePath, thumbnailPath: p2Saved.thumbnailPath, imageData: p2ImageData };
+          pass2Status = 'ok';
+          console.log(`[Flux2Face] pass 2 OK — ${finalResult.imagePath}`);
+        } catch (e) {
+          console.warn('[Flux2Face] pass 2 errored:', e instanceof Error ? e.message : e);
+          pass2Status = 'errored';
         }
       }
-      delete w[emptyLatentId];
+
+      const generationTimeMs = Date.now() - startTime;
+      return {
+        success: true,
+        imageData: finalResult.imageData,
+        imagePath: finalResult.imagePath,
+        thumbnailPath: finalResult.thumbnailPath,
+        metadata: {
+          prompt: finalPrompt,
+          pass2Prompt: pass2Status === 'ok' ? actualPass2Prompt : null,
+          clipL: promptOutput.clipL,
+          negativePrompt: promptOutput.negativePrompt,
+          seed: params.seed,
+          model: 'flux2-dev-fp8mixed',
+          steps,
+          cfg: 1,
+          width,
+          height,
+          generationTimeMs,
+          workflowUsed: workflowName,
+          debugRefs: `flux2: pose=${anglePoseActive ? 'on' : 'off'} | id=${n} refs | style=${styleRefCount} | ${width}x${height} | pass2=${pass2Status}\nchain: ${chainDebug}`,
+        } as PortraitMetadata & { workflowUsed: string; debugRefs: string; pass2Prompt: string | null },
+      };
+    } catch (e) {
+      console.error('[Flux2Face] failed:', e);
+      return null;
     }
-
-    // Queue + wait
-    const clientId = crypto.randomUUID();
-    const queueRes = await this.queuePrompt(w, clientId);
-    const outputInfo = await this.waitForCompletion(queueRes.prompt_id);
-    const refinedBuf = await this.downloadImage(outputInfo.filename, outputInfo.subfolder, outputInfo.type);
-
-    // Resize refined back to the crop size and composite onto body.
-    // Feather the bottom edge so the face-to-body transition doesn't show a seam.
-    const refinedSized = await sharp(refinedBuf)
-      .resize(cropSize, cropSize, { fit: 'fill' })
-      .png()
-      .toBuffer();
-
-    // Build a vertical alpha gradient: opaque at top, feathered at bottom 15%.
-    const featherPx = Math.round(cropSize * 0.15);
-    const alphaSvg = `<svg width="${cropSize}" height="${cropSize}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="${((cropSize - featherPx) / cropSize).toFixed(3)}" stop-color="white" stop-opacity="1"/>
-          <stop offset="1" stop-color="white" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <rect width="${cropSize}" height="${cropSize}" fill="url(#g)"/>
-    </svg>`;
-    const alphaBuf = await sharp(Buffer.from(alphaSvg)).extractChannel(0).toBuffer();
-
-    const refinedWithAlpha = await sharp(refinedSized)
-      .ensureAlpha()
-      .joinChannel(alphaBuf)
-      .png()
-      .toBuffer();
-
-    return sharp(bodyImage)
-      .composite([{ input: refinedWithAlpha, left: cropX, top: cropY, blend: 'over' }])
-      .png()
-      .toBuffer();
   }
 
   /**
-   * Crop a reference photo to just the face region before PuLID processes it.
-   * Removes hair context so PuLID only embeds facial identity, not hairstyle.
-   * For portrait/character art, face is typically centered in upper portion.
+   * FLUX.2 Dev full-body generation. Mirrors generateFaceFlux2:
+   *
+   * - Pose template: public/portraits/pose-refs/FrontBodyPose.png (canonical
+   *   full-body stand). Run through Canny in the workflow → only silhouette/
+   *   pose edges reach ReferenceLatent. No identity bleed from the template.
+   * - Identity refs: whatever the caller uploaded (user photos +/- the locked
+   *   face from the prior step). Slot 1 is the primary identity anchor —
+   *   typically the locked face so body gen stays consistent with the face
+   *   we already committed to. Chained through ReferenceLatent.
+   * - Render size: 1024x1536 (portrait aspect — full body plus margin).
+   *
+   * Returns null on any failure; the caller is responsible for falling back
+   * or surfacing the error.
    */
-  private async cropReferenceToFace(imagePath: string): Promise<Buffer> {
-    const absolutePath = path.join(process.cwd(), 'public', imagePath.replace(/^\//, ''));
-    const imageBuffer = await fs.readFile(absolutePath);
-    const meta = await sharp(imageBuffer).metadata();
-    const w = meta.width || 512;
-    const h = meta.height || 512;
+  /**
+   * Body generation = single-pass multi-reference. Slot 1 is the locked face
+   * from Pass 1 (anchors identity); slot 2 is the built-in body style ref
+   * (anchors painted/grunge mood). FLUX.2's ReferenceLatent chain handles
+   * identity preservation and style transfer in one sampling pass — no
+   * outpaint, no compositing, no chroma-key. Body description, build,
+   * underwear, lighting, and style negation all live in the prompt.
+   */
+  private async generateBodyFlux2(
+    input: PortraitInput,
+    params: ComfyUIWorkflowParams,
+    promptOutput: { clipL: string; t5xxl: string; negativePrompt: string },
+    startTime: number,
+  ): Promise<PortraitResult | null> {
+    try {
+      const facePath = input.personaLock?.referenceImagePath;
+      if (!facePath) {
+        console.warn('[Flux2Body] no locked face — cannot anchor identity');
+        return null;
+      }
 
-    // Face region: center-upper crop, ~45% of smallest dimension
-    const cropSize = Math.round(Math.min(w, h) * 0.45);
-    const left = Math.round((w - cropSize) / 2);
-    const top = Math.round(h * 0.15);  // Face starts ~15% from top in portraits
+      // Force canvas to 1024×1792 — params come in as 1536 from upstream
+      // (`height: isFullBody ? 1536 : 1280`), and at 1536 the model fills the
+      // full vertical extent and clips feet. 1792 gives the prompt's framing
+      // language room to leave margin above the head and below the feet.
+      const canvasW = 1024;
+      const canvasH = 1792;
+      const steps    = params.useTurbo === true ? 8 : 20;
+      const guidance = typeof params.pass1Guidance === 'number' ? params.pass1Guidance : 4.0;
 
-    const cropped = await sharp(imageBuffer)
-      .extract({
-        left: Math.max(0, left),
-        top: Math.max(0, top),
-        width: Math.min(cropSize, w - left),
-        height: Math.min(cropSize, h - top),
-      })
-      .resize(512, 512, { fit: 'contain', background: { r: 128, g: 128, b: 128 } })
-      .png()
-      .toBuffer();
+      // 1. Upload locked face as identity ref (slot 1).
+      const faceName = await this.uploadReferenceImage(facePath);
 
-    console.log(`[ComfyUI] Cropped ref: ${w}x${h} → ${cropSize}x${cropSize} face region @ (${left}, ${top})`);
-    return cropped;
+      // Style ref disabled: when present at any megapixel size it pulled the
+      // body composition (full-frame, tight crop) and clipped head/feet. Style
+      // mood now comes purely from the prompt's painterly/CGI/dark-fantasy
+      // language. Re-enable when we have a non-figurative texture-only ref.
+      const styleName: string | null = null;
+      const refs: string[] = [faceName];
+      const n = refs.length;
+
+      // 3. Build prompt (identity + body description + underwear + style transfer).
+      const finalPrompt = this.buildBodyPrompt(input, !!styleName);
+
+      // 4. Load + customize multi-ref workflow.
+      const wf = JSON.parse(JSON.stringify(await this.loadWorkflow('flux2-face-cloud'))) as Record<string, Record<string, unknown>>;
+      delete wf._comment;
+
+      for (let i = 0; i < n; i++) {
+        (wf[`LOAD_REF${i + 1}`].inputs as Record<string, unknown>).image = refs[i];
+      }
+      for (let i = n + 1; i <= 5; i++) {
+        delete wf[`LOAD_REF${i}`];
+        delete wf[`SCALE_REF${i}`];
+        delete wf[`ENCODE_REF${i}`];
+        delete wf[`REFLAT_${i}`];
+      }
+      if (n < 5 && n >= 1) {
+        (wf[`REFLAT_${n}`].inputs as Record<string, unknown>).conditioning = ['GUIDANCE', 0];
+      }
+
+      // Per-ref strength via encoded resolution (FLUX.2 weights refs by their
+      // latent token count, so smaller = weaker influence). Style ref dropped
+      // to 0.1MP — at 0.25MP its full-frame body composition was still pulling
+      // the figure to fill the canvas top-to-bottom and clipping head/feet.
+      // Identity ref stays at 1MP.
+      if (styleName && wf.SCALE_REF2?.inputs) {
+        (wf.SCALE_REF2.inputs as Record<string, unknown>).megapixels = 0.1;
+      }
+
+      // 5. Inject parameters.
+      for (const node of Object.values(wf)) {
+        const cls = node.class_type as string;
+        const inp = node.inputs as Record<string, unknown> | undefined;
+        if (!inp) continue;
+        if (cls === 'CLIPTextEncode')         inp.text = finalPrompt;
+        if (cls === 'RandomNoise')            inp.noise_seed = params.seed;
+        if (cls === 'EmptyFlux2LatentImage') { inp.width = canvasW; inp.height = canvasH; inp.batch_size = 1; }
+        if (cls === 'Flux2Scheduler')        { inp.steps = steps; inp.width = canvasW; inp.height = canvasH; }
+        if (cls === 'FluxGuidance')           inp.guidance = guidance;
+        delete node._meta;
+      }
+      if (params.useTurbo) {
+        if (wf.LORA_TURBO?.inputs) (wf.LORA_TURBO.inputs as Record<string, unknown>).strength_model = 1.0;
+        if (wf.SCHEDULER?.inputs)  (wf.SCHEDULER.inputs as Record<string, unknown>).steps = 8;
+      }
+
+      console.log(`[Flux2Body] queueing single-pass — ${n} refs (style=${styleName ? 'on' : 'off'}), ${canvasW}×${canvasH}, steps=${steps}, guidance=${guidance}, seed=${params.seed}`);
+      const clientId = crypto.randomUUID();
+      const queueResponse = await this.queuePrompt(wf, clientId);
+      const output = await this.waitForCompletion(queueResponse.prompt_id);
+      const imageData = await this.downloadImage(output.filename, output.subfolder, output.type);
+
+      const { imagePath, thumbnailPath } = await this.savePortrait(
+        input.characterId,
+        imageData,
+        'bodies',
+        params.seed,
+      );
+
+      const generationTimeMs = Date.now() - startTime;
+      return {
+        success: true,
+        imageData,
+        imagePath,
+        thumbnailPath,
+        metadata: {
+          prompt: finalPrompt,
+          clipL: promptOutput.clipL,
+          negativePrompt: promptOutput.negativePrompt,
+          seed: params.seed,
+          model: 'flux2-dev-fp8mixed',
+          steps,
+          cfg: 1,
+          width: canvasW,
+          height: canvasH,
+          generationTimeMs,
+          workflowUsed: 'flux2-face-cloud',
+          debugRefs: `flux2 body multi-ref: identity=${faceName} | style=${styleName ?? 'none'}`,
+        } as PortraitMetadata & { workflowUsed: string; debugRefs: string },
+      };
+    } catch (e) {
+      console.error('[Flux2Body] failed:', e);
+      return null;
+    }
   }
 
-  /** Upload a buffer directly to ComfyUI (not from disk) */
+  /**
+   * Build the body prompt for the single-pass multi-ref flow. Identity is
+   * pulled from image reference 1 (the locked face); art style is pulled
+   * from image reference 2 (body-style1.png) when present. Body proportions,
+   * underwear, and composition come from the character sheet + prompt.
+   */
+  private buildBodyPrompt(input: PortraitInput, hasStyle: boolean): string {
+    const id = input.characterData?.identity;
+    const sexRaw = (id?.sex || '').toString().toLowerCase();
+    const subject = sexRaw === 'female' ? 'woman' : sexRaw === 'male' ? 'man' : 'person';
+
+    // Physical attributes (skin / hair / eyes / build).
+    const segs: string[] = [];
+    if (id?.skinTone) segs.push(`${id.skinTone.trim()} skin`);
+
+    const hairLen = id?.hairLength?.trim();
+    const hairTex = id?.hairTexture?.trim();
+    const hairCol = id?.hairColor?.trim();
+    const hairSty = id?.hairStyle?.trim();
+    if (hairLen || hairTex || hairCol || hairSty) {
+      const hairBits = [hairLen, hairTex, hairCol].filter(Boolean).join(' ');
+      let hair = hairBits ? `${hairBits} hair` : 'hair';
+      if (hairSty) hair += ` styled in a ${hairSty}`;
+      segs.push(hair);
+    }
+    if (id?.eyeColor) segs.push(`${id.eyeColor.trim()} eyes`);
+    // Strip the height suffix the adapter bakes into bodyType (e.g.,
+    // "slim, 5'7\"") — height was throwing the proportions off. Use just
+    // the build descriptor.
+    const buildOnly = id?.bodyType?.split(',')[0]?.trim();
+    if (buildOnly) segs.push(`a ${buildOnly} body`);
+
+    let physClause = '';
+    if (segs.length === 1) physClause = ` with ${segs[0]}`;
+    else if (segs.length === 2) physClause = ` with ${segs[0]} and ${segs[1]}`;
+    else if (segs.length >= 3) physClause = ` with ${segs.slice(0, -1).join(', ')}, and ${segs[segs.length - 1]}`;
+
+    // Underwear: aesthetic descriptors + secondary style color (FLUX.2 reads hex directly).
+    const aesthetics = (id?.styleAesthetics || []).filter(Boolean).map(a => a.toLowerCase());
+    const aestheticPhrase = aesthetics.length === 0 ? '' :
+      aesthetics.length === 1 ? aesthetics[0] :
+      `${aesthetics[0]} and ${aesthetics[1]}`;
+    const secondaryHex = normalizeHex(id?.styleColors?.secondary);
+    const colorPhrase = secondaryHex || 'neutral';
+    const underwearPhrase = aestheticPhrase
+      ? `Wearing ${aestheticPhrase} ${colorPhrase} underwear.`
+      : `Wearing ${colorPhrase} underwear.`;
+
+    const styleSentence = hasStyle
+      ? ` Pull only the painterly brushwork, atmospheric grunge texture, and color rendering style from image reference 2 — nothing else. Do not use the body, pose, anatomy, framing, composition, clothing, underwear, face, hair, skin, or background from image reference 2.`
+      : '';
+
+    return (
+      `A full-length painted illustration of the ${subject} from image reference 1${physClause}, full body visible from the top of the head to the toes with the figure occupying about 80% of the frame height — clear empty grey space above the head and below the feet, the figure does NOT touch the top or bottom edges of the frame. Tall fashion-model proportions, approximately 8.5 heads tall, with a notably small head relative to the body and long elongated limbs. Match the exact facial identity, hair, and skin tone from image reference 1 with high fidelity. Slight A-pose, arms relaxed at the sides, standing straight facing the camera, neutral expression, looking forward.\n\n` +
+      `${underwearPhrase}\n\n` +
+      `Plain mid-grey studio backdrop. Soft Rembrandt lighting.\n\n` +
+      `Rendered as a painterly semi-realistic digital illustration with visible brushwork, soft painted edges, and a glossy CGI sheen on skin and surfaces — subtle subsurface scattering, polished highlights, smooth rendered textures. Muted desaturated color palette, dark-fantasy mood, atmospheric and slightly stylized — not a photograph, not photorealistic.${styleSentence}`
+    );
+  }
+
   private async uploadBuffer(buffer: Buffer, filename: string): Promise<string> {
     const formData = new FormData();
     formData.append('image', new Blob([new Uint8Array(buffer)]), filename);
