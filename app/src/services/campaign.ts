@@ -130,12 +130,29 @@ export async function expressInterest(userId: string, campaignId: string) {
 
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (campaign.status !== 'ACTIVE') throw new ValidationError('Campaign is not active');
-  if (campaign.gmUserId === userId) throw new ValidationError('You are the GM of this campaign');
+  if (campaign.gmUserId === userId) {
+    throw new ConflictError("You are this campaign's GM and cannot apply to it.");
+  }
 
   const existing = await prisma.campaignMember.findUnique({
     where: { campaignId_userId: { campaignId, userId } },
   });
-  if (existing) throw new ConflictError('You have already expressed interest');
+  if (existing) {
+    // Active membership (any non-rejected status) blocks new interest.
+    // REJECTED is allowed to re-apply (e.g. GM re-invites after testing).
+    if (existing.status === 'INTERESTED') {
+      throw new ConflictError('You already have a pending request for this campaign.');
+    }
+    if (existing.status !== 'REJECTED') {
+      throw new ConflictError("You're already a member of this campaign.");
+    }
+    // Recycle the REJECTED row back to INTERESTED rather than create a duplicate.
+    const member = await prisma.campaignMember.update({
+      where: { id: existing.id },
+      data: { status: 'INTERESTED', joinedAt: new Date() },
+    });
+    return { campaign: { id: campaign.id, name: campaign.name }, member };
+  }
 
   const member = await prisma.campaignMember.create({
     data: { campaignId, userId, status: 'INTERESTED' },
