@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import EntityCreationWizard from '@/components/entity/EntityCreationWizard';
+import { useRouter } from 'next/navigation';
 
 interface Entity {
   id: string;
@@ -36,7 +36,7 @@ function formatKrma(n: number): string {
 }
 
 export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) {
-  const [wizardEntityId, setWizardEntityId] = useState<string | null>(null);
+  const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,8 +63,7 @@ export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) 
       const res = await fetch(`/api/campaigns/${campaignId}/entities`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to create');
       const data = await res.json();
-      await fetchEntities();
-      setWizardEntityId(data.id);
+      router.push(`/character/${data.id}`);
     } catch {
       setError('Failed to create entity');
     } finally {
@@ -73,9 +72,7 @@ export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) 
   };
 
   const handleEntityClick = (entity: Entity) => {
-    if (entity.status === 'DRAFT' && isGM) {
-      setWizardEntityId(entity.id);
-    }
+    router.push(`/character/${entity.id}`);
   };
 
   if (loading) {
@@ -207,27 +204,6 @@ export default function EntitiesPanel({ campaignId, isGM }: EntitiesPanelProps) 
         </div>
       )}
 
-      {/* Entity Creation Wizard — full-screen overlay */}
-      {wizardEntityId && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto"
-          style={{ background: 'rgba(0,0,0,0.92)' }}
-        >
-          <div className="w-full max-w-3xl py-8 px-4">
-            <EntityCreationWizard
-              campaignId={campaignId}
-              entityId={wizardEntityId}
-              onCancel={() => {
-                setWizardEntityId(null);
-                fetchEntities();
-              }}
-              onComplete={() => {
-                setWizardEntityId(null);
-                fetchEntities();
-              }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
