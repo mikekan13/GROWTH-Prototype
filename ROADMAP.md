@@ -23,7 +23,7 @@ Sequencing rule: each game-side milestone after **M1** depends on the character 
 |---|---|---|---|
 | **M1** | **Character feature-complete** (gate) | 🟡 in progress | — |
 | M2 | Combat resolution loop closed | 🔴 todo | M1 |
-| M3 | GROvine + Fears systems live | 🟡 partial | M1 |
+| M3 | GROvine system live | 🟡 partial | M1 |
 | M4 | GodHead AI agents operational | 🟡 Phase 1 done, 2-9 todo | M1 (uses character data) |
 | M5 | KRMA flowing through subscription | 🟡 ledger done, billing-side todo | M6 (Stripe) |
 | M6 | Production infrastructure | 🔴 todo | — (parallel) |
@@ -64,7 +64,6 @@ The sheet is what's consulted/edited every session. Must work without GM interve
 - 🔴 Damage tracking with auto-conditions (depletion table effects auto-apply)
 - 🔴 Trait list (Nectars / Thorns / Blossoms) visible and editable
 - 🔴 Goals + Resistance display (read-only on sheet; editing in 1c/M3 panel)
-- 🔴 Fears display (visible to player, GM-assigned)
 
 ### 1c — Portrait Pipeline End-to-End
 
@@ -91,7 +90,7 @@ Things on the sheet that actually DO things in play.
 
 ### M1 exit criteria
 
-A new player can: join a campaign → fill backstory → go through the wizard with their GM → end with a crystallized character that has portrait, attributes, skills, traits, goals, fears, and inventory all functional. They can then sit at the canvas and the sheet supports a play session (rolls, damage, depletion, KRMA spend) without breaking.
+A new player can: join a campaign → fill backstory → go through the wizard with their GM → end with a crystallized character that has portrait, attributes, skills, traits, goals, and inventory all functional. They can then sit at the canvas and the sheet supports a play session (rolls, damage, depletion, KRMA spend) without breaking.
 
 ---
 
@@ -99,9 +98,9 @@ A new player can: join a campaign → fill backstory → go through the wizard w
 
 5ft grid combat per DESIGN-TRUTH §7.5. Time Stack ordering, ActionMod, attack/defense/damage, death triggers fire correctly. Encounter cards on canvas.
 
-## M3 — GROvine + Fears Systems Live _(stub)_
+## M3 — GROvine System Live _(stub)_
 
-Goals + Resistance + Opportunity UI complete. Nectars/Thorns/Blossoms apply mechanical effects. Fears assignment + check + alignment loop.
+Goals + Resistance + Opportunity UI complete. Nectars/Thorns/Blossoms apply mechanical effects.
 
 ## M4 — GodHead AI Agents Operational _(stub)_
 
@@ -224,12 +223,6 @@ Schema gaps still owed: `GodHeadMemory`, `GodHeadInvocation`, `GodHeadActionLog`
 ---
 
 ## Phase 3 Character Subsystem Work
-
-### Fear System
-- Data structure `{name, resistanceLevel 1-10, status, hiddenPower?}`.
-- `fearCheck` (FD + attribute vs Resistance × 2). DiceService.fearCheck() exists.
-- Confrontation tracking, GM assignment UI, `/fear` terminal command.
-- UI/data not yet wired beyond the dice helper.
 
 ### GROvine UI (simple G/R/O)
 - UI panel with G/R/O aspects, Active/Dormant/Completed/Failed states.

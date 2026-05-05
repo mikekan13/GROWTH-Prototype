@@ -23,7 +23,7 @@ const CONDITION_MAP: Record<string, string> = {
 };
 
 export default function CharacterSheet({ character }: CharacterSheetProps) {
-  const { identity, attributes, creation, conditions, traits, grovines, fears } = character;
+  const { identity, attributes, creation, conditions, traits, grovines } = character;
   const activeConditions = Object.entries(conditions).filter(([, v]) => v);
   const nectars = traits.filter(t => t.type === 'nectar');
   const blossoms = traits.filter(t => t.type === 'blossom');
@@ -200,24 +200,6 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
                 ))}
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Fears */}
-      {fears && fears.length > 0 && (
-        <div>
-          <div className="section-badge inline-block text-sm mb-3">Fears</div>
-          <div className="space-y-2">
-            {fears.map((f, i) => (
-              <div key={i} className="text-sm flex items-center gap-2">
-                <span className={`text-xs uppercase ${f.status === 'aligned' ? 'text-[var(--accent-gold)]' : 'text-[var(--accent-coral)]'}`}>
-                  [{f.status}]
-                </span>
-                <span>{f.name}</span>
-                <span className="text-[var(--surface-dark)]/40 text-xs">RL {f.resistanceLevel}</span>
-              </div>
-            ))}
           </div>
         </div>
       )}

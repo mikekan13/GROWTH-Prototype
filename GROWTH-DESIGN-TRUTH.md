@@ -527,17 +527,14 @@ Achieved 100/100 cross-LLM transfer (GPT-4o, DeepSeek, Claude). Can compress the
 
 ---
 
-## 18. FEARS
+## 18. RESERVED — FUTURE EXPANSION
 
-> Values and Addictions were CUT from the design 2026-04-19. Fears remain.
-
-- GM-assigned, NOT chosen by player.
-- Fears never fully go away.
-- Can be "aligned" (integrated into identity, granting paradoxical conditional powers).
-- Can be "removed" (extremely rare, represents reprogramming).
-- Hidden powers tied to fears — discovered through confrontation over time.
-- Resistance Levels 1-10.
-- Fear Checks: FD + attribute vs Resistance × 2.
+> **Values, Addictions, and Fears were explored and SHELVED.**
+>
+> - Values + Addictions were CUT 2026-04-19 (memory `values-addictions-not-current.md`). They are not a current GROWTH system.
+> - Fears is a future post-release expansion idea (memory `fears-not-current.md`, confirmed 2026-05-04). No mechanics are canon. Do not build for beta.
+>
+> If a future design pass adds any of these back, they belong in a new numbered section, not here.
 
 ---
 
