@@ -114,8 +114,11 @@ function extractIdentity(
     cosmetics: head?.cosmetics,
     hygiene: head?.hygiene,
     eyeColor: head?.eyeColor,
+    facialHair: head?.facialHair,
     bodyType: pd?.build ? `${pd.build}${pd.height ? `, ${Math.floor(pd.height / 12)}'${pd.height % 12}"` : ''}` : undefined,
     distinguishingFeatures: distinguishing.length > 0 ? distinguishing : undefined,
+    styleColors: charData.identity.styleColors,
+    styleAesthetics: charData.identity.styleAesthetics,
   };
 }
 
