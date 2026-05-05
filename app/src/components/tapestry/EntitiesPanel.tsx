@@ -139,9 +139,7 @@ export default function EntitiesPanel({ campaignId, isGM, onSelectCharacter }: E
             return (
               <div
                 key={entity.id}
-                className={`flex items-center gap-3 px-3 py-2 border border-white/5 transition-colors ${
-                  isDraft && isGM ? 'hover:bg-white/5 cursor-pointer' : ''
-                }`}
+                className="flex items-center gap-3 px-3 py-2 border border-white/5 transition-colors hover:bg-white/5 cursor-pointer"
                 style={{
                   background: isDraft ? 'rgba(62,184,154,0.03)' : 'rgba(0,0,0,0.2)',
                   borderColor: isDraft ? 'rgba(62,184,154,0.1)' : undefined,
