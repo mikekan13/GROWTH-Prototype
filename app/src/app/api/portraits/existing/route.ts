@@ -52,17 +52,30 @@ export async function GET(request: NextRequest) {
     let files: string[];
     try { files = await fs.readdir(dir); } catch { return; }
     for (const f of files) {
-      if (!f.endsWith('.webp') || f.includes('_thumb')) continue;
+      // Scan PNGs only — webps live in .thumbs/ and are resolved per-PNG
+      if (f.startsWith('.') || f.includes('_thumb') || f.endsWith('.json')) continue;
+      if (!f.endsWith('.png')) continue;
       try {
         const stat = await fs.stat(path.join(dir, f));
         if (!stat.isFile()) continue;
-        const url = subfolder
-          ? `/portraits/${characterId}/${subfolder}/${f}`
-          : `/portraits/${characterId}/${f}`;
+        // Return the webp URL if it exists in .thumbs/, otherwise the png
+        const baseName = f.replace(/\.(png|webp)$/, '');
+        const thumbsWebp = path.join(dir, '.thumbs', `${baseName}.webp`);
+        let url: string;
+        try {
+          await fs.access(thumbsWebp);
+          url = subfolder
+            ? `/portraits/${characterId}/${subfolder}/.thumbs/${baseName}.webp`
+            : `/portraits/${characterId}/.thumbs/${baseName}.webp`;
+        } catch {
+          url = subfolder
+            ? `/portraits/${characterId}/${subfolder}/${f}`
+            : `/portraits/${characterId}/${f}`;
+        }
         let angleKey: string | undefined;
         if (tier === 'angle') {
-          const pngSibling = path.join(dir, f.replace(/\.webp$/, '.png'));
-          angleKey = await readAngleKeyFromPng(pngSibling);
+          const pngPath = path.join(dir, `${baseName}.png`);
+          angleKey = await readAngleKeyFromPng(pngPath);
         }
         entries.push({ path: url, tier, mtime: stat.mtimeMs, angleKey });
       } catch { /* skip */ }
@@ -71,10 +84,12 @@ export async function GET(request: NextRequest) {
 
   try {
     await Promise.all([
-      scan('refined', 'refined'),
+      scan('faces', 'refined'),
+      scan('refined', 'refined'),  // legacy folder compat
       scan('sketch', 'sketch'),
       scan('angles', 'angle'),
-      scan('body', 'body'),
+      scan('bodies', 'body'),
+      scan('body', 'body'),  // legacy folder compat
       scan(null, 'sketch'),  // legacy/goldens at root default to sketch
     ]);
 
@@ -83,9 +98,16 @@ export async function GET(request: NextRequest) {
     for (const e of entries) if (!byPath.has(e.path)) byPath.set(e.path, e);
     const unique = Array.from(byPath.values()).sort((a, b) => b.mtime - a.mtime);
 
+    // Load seeds.json for seed persistence
+    let seeds: Record<string, number> = {};
+    try {
+      const seedsPath = path.join(process.cwd(), 'public', 'portraits', characterId, 'seeds.json');
+      seeds = JSON.parse(await fs.readFile(seedsPath, 'utf-8'));
+    } catch { /* no seeds file yet */ }
+
     return NextResponse.json({
-      images: unique.map(e => e.path),                            // backward-compat
-      candidates: unique.map(e => ({ imagePath: e.path, tier: e.tier, angleKey: e.angleKey })),
+      images: unique.map(e => e.path),
+      candidates: unique.map(e => ({ imagePath: e.path, tier: e.tier, angleKey: e.angleKey, seed: seeds[e.path] })),
     });
   } catch {
     return NextResponse.json({ images: [], candidates: [] });
