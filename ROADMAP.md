@@ -6,9 +6,122 @@ Last updated: 2026-05-02
 
 Project is mid-Phase 5 (Entity Creation + Forge Authoring). Core Character Sheet, Campaign Flow, Canvas, KRMA ledger, dice engine, and God-Head Phase 1 (3 seeded agents + Goal CRUD) are landed. Active critical path is the Entity Creation Wizard (Sessions A-G) backed by Kai blueprint authoring; portrait pipeline has pivoted to cloud-only on H100 + FLUX.2 Dev FP16.
 
-## Beta Scope (placeholder)
+## Beta Scope (locked 2026-05-04)
 
-> Beta scope to be locked in Phase 5 with Mike. Until then, this roadmap describes the full forward backlog; treat the sequencing as best-current-guess, not committed scope.
+**Beta = Production.** No "preview tier." Real money, real users, real consequences. Specifically:
+
+- **Subscribing GMs** can pay for an account, get a 5-seat campaign, invite players, and run a full campaign end-to-end (character creation → play → death/retirement).
+- **Players** can join a campaign (invite or public listing), build a character with their GM, and play through sessions.
+- **Timeline:** ASAP — no fixed launch date, but every milestone treated as on-deck.
+- **Quality bar:** every shipped feature behaves correctly, has error handling, and is observable in production.
+
+### Milestones (ordered by dependency, not by date)
+
+Sequencing rule: each game-side milestone after **M1** depends on the character sheet being feature-complete. **M6** (production infra) runs in parallel with the game-side work. **M7** (legal/support) also runs in parallel and is unblocked from day one.
+
+| # | Milestone | Status | Gated By |
+|---|---|---|---|
+| **M1** | **Character feature-complete** (gate) | 🟡 in progress | — |
+| M2 | Combat resolution loop closed | 🔴 todo | M1 |
+| M3 | GROvine + Fears systems live | 🟡 partial | M1 |
+| M4 | GodHead AI agents operational | 🟡 Phase 1 done, 2-9 todo | M1 (uses character data) |
+| M5 | KRMA flowing through subscription | 🟡 ledger done, billing-side todo | M6 (Stripe) |
+| M6 | Production infrastructure | 🔴 todo | — (parallel) |
+| M7 | Legal + support surface | 🔴 todo | — (parallel) |
+| **M8** | **Beta launch** — onboard first paying GMs | 🔴 todo | M1, M2, M3, M4, M5, M6, M7 |
+
+---
+
+## M1 — Character Feature-Complete (the gate)
+
+This is the load-bearing milestone. Without a sheet a player can fill, edit, and use during play, none of the game-side work matters. Four parallel sub-streams:
+
+### 1a — Creation Flow (player onboarding → wizard → crystallization)
+
+The Sessions A-G plan in "Active Critical Path" below IS this sub-stream. Restating in milestone terms:
+
+- ✅ A (partial): seed-catalog (48 seeds), EntitiesPanel, Tapestry Entities sub-tab, in-canvas selection (just landed)
+- 🟡 B: Wizard steps 1-3 (Identity + Seed + Root) — IdentityLockWizard merged from fork; Root step wired to forge
+- 🟡 C: Wizard step 4 (Attributes — WTH cut, no longer applies) — deterministic KV calc owed
+- 🟡 D: Wizard steps 5-6 (Skills + Traits) + Kai blueprint eval + Blueprint Tagger
+- 🔴 E: Wizard steps 7-8 (Goals + Review/Crystallize) + Council Router — full crystallization
+- 🔴 F: AI-assisted NPC speed creation (quick mode)
+- 🔴 G: Canvas "Place Entity" + PC application → creation bridge + retirement flow
+- 🔴 Player onboarding flow: Interest → Backstory → Wizard handoff (currently breaks at the handoff)
+
+### 1b — Live Sheet (what players use during play)
+
+The sheet is what's consulted/edited every session. Must work without GM intervention.
+
+- ✅ Identity / portrait / vitals display
+- ✅ Attribute display (9 attributes with level + current)
+- ✅ KRMA bar + crystallization line on canvas
+- 🟡 Skills CRUD inside SkillsCard (read-only currently)
+- 🟡 Skill check flow UX from sub-panel (server-side roll works; UX flow incomplete)
+- 🔴 Frequency three-operations UI (Spend / Deplete / Burn — Burn formula `[NEEDS MIKE]`)
+- 🔴 Inventory paperdoll (3-tier: Equipped / Carried / Possessions, per-Seed regions)
+- 🔴 Body parts + vitals tracking (HUMANOID_BODY default + condition application)
+- 🔴 Damage tracking with auto-conditions (depletion table effects auto-apply)
+- 🔴 Trait list (Nectars / Thorns / Blossoms) visible and editable
+- 🔴 Goals + Resistance display (read-only on sheet; editing in 1c/M3 panel)
+- 🔴 Fears display (visible to player, GM-assigned)
+
+### 1c — Portrait Pipeline End-to-End
+
+Cloud H100 + FLUX.2 Dev FP16 + PuLID-Flux. Just merged from fork.
+
+- ✅ Stage 1 face-lock (front)
+- 🟡 5-angle face lock (Kai mission plateau at 7/10 identity per memory)
+- 🔴 Body lock (full character with body type + age)
+- 🔴 Equipment overlay (visible gear)
+- 🔴 State-diff auto-regenerate (equipment / wound / age / narrative changes queue regen)
+- 🔴 Pod smoke test post-merge (blocked: no available H100s today; Mike trying tonight)
+
+### 1d — Mechanical Effects Wiring
+
+Things on the sheet that actually DO things in play.
+
+- ✅ Dice rolls server-side, KRMA ledger
+- 🟡 Skill check uses Skill Die + FD + Effort (server logic done; UI flow open)
+- 🔴 Nectars / Thorns apply roll modifiers (currently visible only)
+- 🔴 Blossoms (temporary buffs from Godheads during play)
+- 🔴 Death triggers: Frequency=0 in combat → Lady Death roll; Fated Age → Lady Death roll (different formulas, both use bodyResist + Fate Die per WTH-removal canon)
+- 🔴 Spirit Package on death (composition `[NEEDS MIKE]`)
+- 🔴 Goal completion → Nectar bestowed (custodian Godhead chooses); failure → Thorn
+
+### M1 exit criteria
+
+A new player can: join a campaign → fill backstory → go through the wizard with their GM → end with a crystallized character that has portrait, attributes, skills, traits, goals, fears, and inventory all functional. They can then sit at the canvas and the sheet supports a play session (rolls, damage, depletion, KRMA spend) without breaking.
+
+---
+
+## M2 — Combat Resolution Loop Closed _(stub — to be expanded next)_
+
+5ft grid combat per DESIGN-TRUTH §7.5. Time Stack ordering, ActionMod, attack/defense/damage, death triggers fire correctly. Encounter cards on canvas.
+
+## M3 — GROvine + Fears Systems Live _(stub)_
+
+Goals + Resistance + Opportunity UI complete. Nectars/Thorns/Blossoms apply mechanical effects. Fears assignment + check + alignment loop.
+
+## M4 — GodHead AI Agents Operational _(stub)_
+
+Sessions 2-9 from the existing God-Head plan in "Active Critical Path" below.
+
+## M5 — KRMA Flowing Through Subscription _(stub)_
+
+Stripe subscription → Watcher wallet allocation → character investment on approval → session rewards → death-split UI. Burn system (exponential cost formula `[NEEDS MIKE]`).
+
+## M6 — Production Infrastructure _(stub — runs parallel)_
+
+Stripe billing + recurring + cancellation. PostgreSQL migration off SQLite. Hosting (Vercel / Fly / Railway — TBD). Email verification + password reset. Sentry monitoring. Backups.
+
+## M7 — Legal + Support _(stub — runs parallel)_
+
+Terms of Service. Privacy Policy. Refund policy. Support contact. Basic onboarding docs.
+
+## M8 — Beta Launch
+
+Onboard first paying GMs. Monitor + iterate.
 
 ---
 
