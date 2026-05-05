@@ -15,6 +15,7 @@ export async function GET(
       character: {
         id: character.id,
         name: character.name,
+        entityType: character.entityType,  // CharacterTab uses this to decide editability (NPC editable for owning GM, PC read-only)
         status: character.status,
         data: JSON.parse(character.data),
         portrait: character.portrait,

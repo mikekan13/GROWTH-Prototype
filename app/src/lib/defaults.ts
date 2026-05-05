@@ -42,6 +42,7 @@ export function createDefaultCharacter(name: string): GrowthCharacter {
     },
     traits: [],
     grovines: [],
+    fears: [],
     vitals: {
       bodyParts: {
         HEAD: 0, TORSO: 0,

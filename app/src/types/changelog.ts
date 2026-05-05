@@ -19,6 +19,7 @@ export type ChangeCategory =
   | 'vitals'
   | 'identity'
   | 'levels'
+  | 'fear'
   | 'harvest'
   | 'backstory'
   | 'campaign'
