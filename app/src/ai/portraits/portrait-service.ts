@@ -127,7 +127,7 @@ export async function generateFromDescription(
   const provider = await getPortraitProvider(options?.preferCloud);
 
   // Build a persona lock stub if reference image(s) provided.
-  // Multiple refs (when available) get batched into PuLID for stronger identity lock.
+  // Multiple refs (when available) get chained as FLUX.2 ReferenceLatent anchors.
   const primaryRef = options?.referenceImagePath || options?.referenceImagePaths?.[0];
   const personaLock: PersonaLockData | null = primaryRef ? {
     referenceImagePath: primaryRef,
@@ -193,7 +193,7 @@ export async function acceptPortrait(
 /**
  * Lock a portrait as the character's permanent identity anchor.
  * This stores the reference image and prompt so all future generations
- * use PuLID to maintain the same face and appearance.
+ * use FLUX.2 multi-reference to maintain the same face and appearance.
  */
 export async function lockPersona(
   generationId: string,
