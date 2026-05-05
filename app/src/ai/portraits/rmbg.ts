@@ -43,11 +43,11 @@ export async function stripBackground(absolutePath: string): Promise<string> {
     if (cleanStat.mtimeMs >= srcStat.mtimeMs) return cleanPath;
   } catch { /* miss — proceed to generate */ }
 
-  const pipe = await getPipeline();
+  const pipe = (await getPipeline()) as unknown as (input: unknown) => Promise<Array<{ mask: { data: Uint8Array; width: number; height: number }; score?: number; label?: string }>>;
   const img = await RawImage.read(absolutePath);
   // image-segmentation pipeline returns [{ mask: RawImage, score, label }]
   // The mask is a single-channel foreground probability image (255 = foreground).
-  const res = await pipe(img) as Array<{ mask: { data: Uint8Array; width: number; height: number }; score?: number; label?: string }>;
+  const res = await pipe(img);
   const mask = res[0]?.mask;
   if (!mask) throw new Error('RMBG returned no mask');
 
