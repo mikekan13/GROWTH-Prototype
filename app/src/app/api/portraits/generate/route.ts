@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { generatePortrait, generateFromDescription } from '@/ai/portraits/portrait-service';
-import type { PortraitCharacterData } from '@/ai/portraits/types';
+import type { PortraitCharacterData, PortraitOverrides, CampaignStyleConfig } from '@/ai/portraits/types';
 
-// Allow up to 30 minutes for portrait generation (GGUF on low RAM is slow)
+// FLUX.2 on H100 finishes in well under a minute per image, but leave a
+// generous ceiling for cold-start pod resumes + first-call model swaps.
 export const maxDuration = 1800;
 
 /**
@@ -33,7 +34,16 @@ export async function POST(request: NextRequest) {
       console.warn('[portraits/generate] Malformed JSON body:', raw.slice(0, 200));
       return NextResponse.json({ error: 'Malformed JSON body', detail: parseErr instanceof Error ? parseErr.message : String(parseErr) }, { status: 400 });
     }
-    const { characterId, characterData, overrides, campaignStyle, preferCloud, referenceImagePath, referenceImagePaths, creationMode } = body;
+    // Narrow the unknown JSON body fields to their expected types at the
+    // destructuring point so downstream callers don't have to juggle unknowns.
+    const characterId          = typeof body.characterId === 'string' ? body.characterId : undefined;
+    const characterData        = body.characterData as PortraitCharacterData | undefined;
+    const overrides            = body.overrides as PortraitOverrides | undefined;
+    const campaignStyle        = body.campaignStyle as CampaignStyleConfig | undefined;
+    const preferCloud          = typeof body.preferCloud === 'boolean' ? body.preferCloud : undefined;
+    const referenceImagePath   = typeof body.referenceImagePath === 'string' ? body.referenceImagePath : undefined;
+    const referenceImagePaths  = Array.isArray(body.referenceImagePaths) ? (body.referenceImagePaths as string[]) : undefined;
+    const creationMode         = typeof body.creationMode === 'boolean' ? body.creationMode : undefined;
 
     if (!characterId && !characterData) {
       return NextResponse.json({ error: 'characterId or characterData is required' }, { status: 400 });
@@ -44,12 +54,12 @@ export async function POST(request: NextRequest) {
     if (characterData) {
       // Creation mode — inline data, no DB record needed
       result = await generateFromDescription(
-        characterData as PortraitCharacterData,
+        characterData,
         { campaignStyle, overrides, preferCloud, referenceImagePath, referenceImagePaths, creationMode },
       );
     } else {
-      // In-game mode — load from DB
-      result = await generatePortrait(characterId, {
+      // In-game mode — load from DB. characterId is defined here by the guard above.
+      result = await generatePortrait(characterId as string, {
         campaignStyle,
         overrides,
         preferCloud,
@@ -69,6 +79,7 @@ export async function POST(request: NextRequest) {
         generationTimeMs: result.metadata.generationTimeMs,
         model: result.metadata.model,
         prompt: result.metadata.prompt,
+        pass2Prompt: (result.metadata as unknown as Record<string, unknown>).pass2Prompt ?? null,
         negativePrompt: result.metadata.negativePrompt,
         workflowUsed: (result.metadata as unknown as Record<string, unknown>).workflowUsed || 'unknown',
         failedWorkflows: (result.metadata as unknown as Record<string, unknown>).failedWorkflows || [],
