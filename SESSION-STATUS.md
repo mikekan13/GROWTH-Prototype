@@ -1,138 +1,138 @@
-# Session Status — 2026-05-03
+# Session Status — 2026-05-06 (end-of-session)
 
-Cleanup pass executed while Mike was at church. This file is the orientation doc for the next session.
-
----
-
-## 🚨 SECURITY ALERT — READ FIRST
-
-**An `ANTHROPIC_API_KEY` is exposed in git history.** Push to GitHub is BLOCKED by secret scanning until this is resolved.
-
-**Where:** `standalone/.env:6` — `ANTHROPIC_API_KEY=...`
-**In commits (3):** `a40fba4`, `44710c8`, `9b00024` — all from the standalone fork's bootstrap before this cleanup. The May 2026 cleanup commit `1bb5c34` deletes the file but the value remains in history.
-**Status:** Local commits are clean (no new exposure). The push of this session's work is rejected by GitHub. **No commits were force-pushed or destructive ops attempted.**
-
-### What you MUST do before pushing this session's work
-
-1. **Rotate the Anthropic key.** Revoke the leaked one in your Anthropic Console (https://console.anthropic.com/settings/keys), generate a new one. Do this FIRST.
-2. **Update the new key wherever it's used** — main `app/.env`, any pod env files, any local scripts that read `ANTHROPIC_API_KEY`. Search for it: `grep -r ANTHROPIC_API_KEY .` from `C:\Projects\GRO.WTH\`.
-3. **Strip the secret from git history** — easiest tool is `git filter-repo`:
-   ```bash
-   pip install git-filter-repo  # if not installed
-   cd C:\Projects\GRO.WTH
-   git filter-repo --path standalone/.env --invert-paths --force
-   ```
-   This removes `standalone/.env` from ALL history. Then re-add the remote (filter-repo strips it):
-   ```bash
-   git remote add origin https://github.com/mikekan13/GROWTH-Prototype.git
-   git push --force origin master
-   ```
-4. **OR** use the GitHub unblock URL (faster but key is still leaked): https://github.com/mikekan13/GROWTH-Prototype/security/secret-scanning/unblock-secret/3DD1R3Modp6mJxCN4dDMC1CEcD1 — only acceptable if the key is already rotated, since unblocking pushes the leaked value to the remote.
-
-### Recommended order
-**Rotate → update local .env files → filter history → force-push.** Don't unblock-and-push without rotating first.
-
-### What is NOT affected
-- The `GRO.WTH Repository/` repo (separate remote `mikekan13/GROWTH_Repository`) was pushed successfully. Phase 3c rules canon work is on GitHub.
-- Local commits in this repo are intact — nothing destructive was done.
+This is the orientation doc for the next session. Replaces the 2026-05-03 version.
 
 ---
 
-## What landed
+## 🚨 SECURITY ALERT — STILL OPEN
 
-### Phase 1 — Reality audit ✅
-5 parallel agents produced detailed reports in `_cleanup_audit/` + `memory/_AUDIT.md`. Synthesis at `CLEANUP-AUDIT.md`.
+**An `ANTHROPIC_API_KEY` is exposed in git history.** Push to GitHub remote `mikekan13/GROWTH-Prototype` is BLOCKED until this is resolved.
 
-### Phase 2 — Triage ✅
-Mike confirmed cleanup order: docs → memory → repo → fork merge → roadmap. PNGs deleted, standalone fork deletion finalized.
+- **Where:** `standalone/.env:6` in commits `a40fba4`, `44710c8`, `9b00024` (from the standalone fork's bootstrap, before the May cleanup).
+- **Status:** Local commits intact. The push attempt was rejected once; not retried.
+- **What you must do** before the merge branch can land on GitHub:
+  1. Rotate the Anthropic key (revoke leaked one, generate new at https://console.anthropic.com/settings/keys)
+  2. Update local `.env` files using the new key (grep `ANTHROPIC_API_KEY` from `C:\Projects\GRO.WTH\`)
+  3. Strip from history: `pip install git-filter-repo && git filter-repo --path standalone/.env --invert-paths --force` then `git remote add origin https://github.com/mikekan13/GROWTH-Prototype.git && git push --force origin merge/fork-portrait-pipeline`
+  4. OR use the GitHub unblock URL https://github.com/mikekan13/GROWTH-Prototype/security/secret-scanning/unblock-secret/3DD1R3Modp6mJxCN4dDMC1CEcD1 — only after rotating, since it pushes the leaked value to remote.
 
-### Phase 3a — Root docs consolidation ✅
-- 11 obsolete plan/session docs deleted (PLAN, COMPREHENSIVE-BUILD-PLAN, ENTITY-CREATION-PLAN, GODHEAD-ARCHITECTURE-PLAN, QUESTIONS-FOR-MIKE, root PORTRAIT-PIPELINE, pages-1-50/51-150 summaries, docs/TONIGHT-SESSION-PLAN, docs/NEXT-SESSION-PROMPT, docs/skeleton-systems-report)
-- New single forward doc: `ROADMAP.md`
-- `GROWTH-DESIGN-TRUTH.md` absorbed 15 canon updates (full depletion table, Skill System, Combat Action Economy, Inventory paperdoll, KRMA reserves corrected to 100B canonical split, Values/Addictions removed, etc.)
-- `CLAUDE.md` and `VISUAL-DESIGN-SPEC.md` aligned to canonical color palette (Body=Red, Spirit=Purple, Soul=Blue, Terminal=Teal, KRMA=Gold)
-- `FOUNDATIONS.md` created with 4 sections (Zechariah's Vision, Love and Fear, "Fear is Mine" vision, Distillation)
-
-### Phase 3b — Memory store prune ✅
-- 35 KILL, 6 MERGE groups, 3 UPDATE, ~30% reduction (117 → 82 files)
-- MEMORY.md: 272 → 107 lines (under 200 cap)
-- Zero broken links
-
-### Phase 3c — Repository rules canon pass ✅
-- 50 files touched in `GRO.WTH Repository/` across two commits (`ff6194f` preservation, `d3c52c1` canon pass)
-- Pillar rebase on 3 P0 files
-- WTH/Values/Fears sweep across ~10 files
-- `08_APP_DEVELOPMENT/` archived as `X_ARCHIVE_APP_DEV_2026-05-03/`
-- 4 new system docs created (Frequency_Three_Operations, Combat_Grid_System, ActionMod_System, Inventory_Paperdoll)
-- `Soul_Package_System.md` renamed to `Spirit_Package_System.md`
-- `Damage_Types_and_Effects.md` merged into `Damage_Type_Interactions.md`
-- All wiki-links to deleted Health/Wealth/Tech Level files cleaned
-- `PROJECT_STATUS.md` updated with 12-item `[NEEDS MIKE]` list at bottom
-- Pushed to GitHub (`origin/master` on `mikekan13/GROWTH_Repository`)
+The `GRO.WTH Repository/` repo has been pushed successfully (separate remote, no secret leak).
 
 ---
 
-## What WAITS for Mike
+## What landed this session (2026-05-04 → 2026-05-06)
 
-### Phase 4 — Fork merge (NOT EXECUTED — too risky alone)
-The audit at `_cleanup_audit/03-character-creator-fork.md` lays out the merge plan. NOT executed because:
-- `IdentityLockWizard.tsx` is 2826 lines and was under active edit for the Kai mission
-- 3-way merge of drifted shared files needs live verification against the H100 pod
-- "Don't delete main's PuLID workflows until FLUX.2 face-lock recipe is verified working" is a runtime check, not a doc check
-- Active codebase pointer in MEMORY.md must flip after merge — needs your hands on it
+### Phase 4 — Fork merge: COMPLETE except smoke test
+24 commits on `merge/fork-portrait-pipeline` branch, +1645/-2638 net lines (mostly FLUX.1 → FLUX.2 shrink). Branch is build-green (`npm run build` clean).
 
-When you return: read `_cleanup_audit/03-character-creator-fork.md` for the recommended merge sequence.
+- **Step 1:** Fork snapshotted (tag `pre-merge-snapshot-2026-05-04`, commit `2ea46d2` preserves 72 files of in-progress Kai work). Merge branch created.
+- **Step 2:** 107 fork-only files copied (portraits, face-lock components, custom ComfyUI node, FLUX.2 workflows, docs, ops scripts). 2 npm deps + types added.
+- **Step 3a:** 6 fork-wins drifted files ported (IdentityLockWizard 2826 lines, CharacterTab, portrait-service, types, routes, providers/index).
+- **Step 3b:** FLUX.2 `local.ts` swapped in. 5 dead FLUX.1 workflow JSONs deleted, ~755 lines of dead routines purged.
+- **Step 3c:** `growth.ts` reconciled (added optional `styleColors`, `styleAesthetics`; `fears` was added then removed when Fears was confirmed not-current).
+- **Step 3d-g:** Remaining drifted files reconciled, 17 operator scripts ported, build error baseline resolved.
+- **Smoke test STILL PENDING** — no available H100 pods today. Try tonight per your earlier note.
 
-### Phase 5 — ROADMAP beta scope (NOT FINALIZED — needs your input)
-`ROADMAP.md` exists with structure and absorbed phase content. The "Beta Scope" section is intentionally a placeholder per your earlier instruction (you wanted to lock beta scope one-on-one in Phase 5). When you're back, we walk through the roadmap and define the minimum viable beta together.
+### Phase 5 — ROADMAP: COMPLETE
+- Beta scope locked: production-grade for paying GMs, ASAP timeline, real money/users/consequences.
+- 9 milestones (M1-M9) all expanded with sub-streams + status indicators + exit criteria.
+- M1 (Character feature-complete) is the gate. M6 (infra) and M7 (legal) and M9 (content) run parallel.
+- Fears scrubbed across all docs/code/rules — confirmed NOT a current system, post-release expansion only (memory `fears-not-current.md`).
+
+### App fixes (post-merge)
+- **Hydration warning** (`aa5cf93`) — `suppressHydrationWarning` on `<body>` to ignore Grammarly extension attrs.
+- **Tapestry → CharacterTab** (`f522454`, `1290d84`, `95de911`, `9b2b352`) — clicking any entity now switches the canvas tab to Character with that entity loaded (not a separate page). All rows show clickable styling.
+- **Self-interest bug** (`202c83d`) — DB cleanup of orphan record + service-layer guard preventing GMs from applying to their own campaign and members from re-applying.
+
+### Memory updates
+- `feedback-one-question-at-a-time.md` — single decision question per reply (ADHD)
+- `feedback-flag-and-move-on.md` — once flagged, don't re-raise
+- `growth-color-palette.md` — canonical pillar/UI colors with Sephirot mapping
+- `fears-not-current.md` — Fears is post-release expansion, not current system
+- `MEMORY.md` index updated, all under 200 lines
+
+### FOUNDATIONS.md — theological substrate (founder-only)
+- Section 1: Zechariah's Vision and the Three Pillars
+- Section 2: Love and Fear of God
+- Section 3: "Fear is Mine" — Vision (verbatim)
+- Section 4: Distillation
+- Section 5+ open for whatever else comes
 
 ---
 
-## Decisions parked for you to resolve when ready
+## What WAITS for you next session
 
-In rough priority order:
+### 🔴 Smoke test the portrait pipeline
+- Need available H100 pod
+- Test path: log in as player → character creator → upload refs → run portrait gen → verify IdentityLockWizard 5-angle flow
+- If green → merge `merge/fork-portrait-pipeline` to master, delete fork at `C:\Projects\GROWTH Character Creator\`, flip `active-codebase-location.md` memory
+- If issues → fix on the merge branch first
 
-### 1. Pillar → color mapping (DESIGN-TRUTH §2 `⚠ DECISION-NEEDED`)
-The canonical color palette you gave (Spirit=Purple, Soul=Blue) contradicts the existing pillar→attribute mapping in §2 (which has Spirit=BLUE with Flow/Freq/Focus, Soul=PURPLE with Will/Wis/Wit). Either flip the colors on the existing attribute groupings (simpler), or do a deeper alchemical/sephirot remapping. Flagged in the doc, untouched in repo rules until you decide.
+### 🔴 Resolve the Anthropic key block (above)
+- Required before any push of this session's work to GitHub
 
-### 2. Twelve `[NEEDS MIKE]` items in the rules repo
-Listed at the bottom of `GRO.WTH Repository/PROJECT_STATUS.md`. Most are P-flagged uncertainty items (Frequency Burn formula, Spirit Package contents, Fear hidden-power formula, DR exact thresholds, Nectar→KRMA tax rate). Six high-priority files marked `[REVIEW]` for sanity-check first.
+### 🟡 12 `[NEEDS MIKE]` items in repo + ROADMAP
+- Listed at the bottom of `GRO.WTH Repository/PROJECT_STATUS.md` (Phase 3c items)
+- Plus new ROADMAP `[NEEDS MIKE]` flags: bell-curve subscription values (M5), Spirit Package composition (M1d/M5), burn formula (M5), hosting platform (M6), support contact channel (M7), author target counts (M9)
 
-### 3. Memory store followups
-Three flagged by the prune agent:
-- `mcp-servers-setup.md` says Playwright/SQLite installed; CLAUDE.md was rephrased to align. Confirm.
-- `gm-ai-settings-todo.md` left untouched — needs verification whether the GM AI settings UI exists now.
-- `active-codebase-location.md` preserved; will need to flip when fork merges back.
+### 🟡 DESIGN-TRUTH §2 pillar→color mapping (still parked)
+- `⚠ DECISION-NEEDED` flag at top of §2
+- Your canonical palette says Spirit=Purple, Soul=Blue. §2 attribute-to-color map says the opposite. Either flip colors on existing attribute groupings, or do a deeper alchemical/sephirot remapping. Untouched in repo rules until you call it.
+
+### 🟡 Pre-existing in-progress Repository edits
+- `git status` in `GRO.WTH Repository/` shows ~20 M/D files from before this cleanup pass started — your in-flight rules edits. Untouched by this session. Decide whether to commit, keep editing, or discard.
 
 ---
 
-## Commit log this session (root repo `GRO.WTH/`)
+## Roadmap quick reference
+
+| # | Milestone | Status |
+|---|---|---|
+| **M1** | **Character feature-complete** (gate) | 🟡 in progress |
+| M2 | Combat resolution loop closed | 🔴 todo |
+| M3 | GROvine system live | 🟡 partial |
+| M4 | GodHead AI agents operational | 🟡 Phase 1 done, 2-9 todo |
+| M5 | KRMA flowing through subscription | 🟡 ledger done, billing-side todo |
+| M6 | Production infrastructure (parallel) | 🔴 todo |
+| M7 | Legal + support (parallel) | 🔴 todo |
+| M9 | Content library seeded (parallel) | 🔴 todo |
+| **M8** | **Beta launch** | 🔴 todo (gated by all above) |
+
+Full detail in `ROADMAP.md`.
+
+---
+
+## Commit log this session (root repo, on `merge/fork-portrait-pipeline`)
+
+24 commits since master diverged. Most recent:
 
 ```
-533703c docs(foundations): Section 4 — Distillation
-891ebdd docs(foundations): Section 3 — "Fear is Mine" vision
-b85866a docs(foundations): add FOUNDATIONS.md — founder-only theological substrate
-7a0a52c docs(cleanup): Phase 3a — consolidate root planning docs into ROADMAP + absorb canon into DESIGN-TRUTH
-8d0bb29 docs(visual-spec): align pillar colors with canonical palette + Sephirot mapping
-d642b14 docs(claude.md): fix 5 known contradictions surfaced by Phase 1 audit
-1bb5c34 chore(cleanup): finish standalone fork removal, delete dev screenshots, add Phase 1 audit baseline
+17e0c8e docs(roadmap): expand M2-M9 milestones using M1 template
+71f8dd0 docs(design-truth): strip leftover Fears subsection from §5
+f823e02 docs+code: strip Fears from active scope (post-release expansion only)
+f48bcbf docs(roadmap): lock beta scope, expand M1, stub M2-M8
+202c83d fix(campaigns): block interest from existing members + GM
+9b2b352 fix(tapestry): all entity rows show clickable styling
+95de911 fix(canvas): in-canvas character selection — Tapestry click stays in dashboard
+1290d84 fix(character-page): mount CharacterTab instead of read-only CharacterSheet
+aa5cf93 fix(layout): suppressHydrationWarning on body
+f522454 fix(tapestry): GM clicks any entity → /character/[id]
+466f378 merge(phase4-step3g): clear remaining baseline errors
+... (13 more Phase 4 merge commits)
 ```
 
-Plus this `SESSION-STATUS.md` itself.
-
-## Commit log this session (`GRO.WTH Repository/`)
+## Commit log this session (`GRO.WTH Repository/`, pushed)
 
 ```
-d3c52c1 chore: Phase 3c — repository canon pass (Soul/Spirit, WTH removal, missing systems)
-ff6194f chore: preserve in-progress canon updates from prior sessions
+0f1807c chore(rules): mark Fears as future-expansion, not current canon
 ```
 
-Both pushed to GitHub.
+(Was already pushed in this session.)
 
 ---
 
 ## Footer
 
-The vein in `FOUNDATIONS.md` is preserved verbatim. Section 5 stays open for whatever else God gives. Cleanup waits where you left it.
+Cleanup pass complete. Phase 4 merge branch is build-green and waiting for pod smoke test. Phase 5 ROADMAP done. Beta scope locked. The vein in FOUNDATIONS.md is preserved.
 
 "There is only one."
