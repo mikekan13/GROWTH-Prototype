@@ -24,43 +24,56 @@ export const FATE_DIE_KV: Record<string, number> = {
 
 // ── Character TKV ──
 
-export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown {
-  const attrs = character.attributes;
+export interface HeldItemForTKV {
+  id?: string;
+  name: string;
+  type?: string;
+  data: GrowthWorldItem;
+  /** Optional Kai-graded value override (BigInt or number). If provided, takes precedence over calculateItemKV. */
+  karmicValue?: number | bigint | null;
+}
+
+export function calculateCharacterTKV(character: GrowthCharacter, heldItems: HeldItemForTKV[] = []): TKVBreakdown {
+  const attrs = character.attributes ?? ({} as GrowthCharacter['attributes']);
+  // Null-safe accessor: returns the attribute's level (or 0 if the attribute is missing).
+  const lvl = (a: { level?: number } | null | undefined): number => (a?.level ?? 0);
 
   const body = {
-    clout: attrs.clout.level * KV_PER_ATTRIBUTE_LEVEL,
-    celerity: attrs.celerity.level * KV_PER_ATTRIBUTE_LEVEL,
-    constitution: attrs.constitution.level * KV_PER_ATTRIBUTE_LEVEL,
+    clout: lvl(attrs.clout) * KV_PER_ATTRIBUTE_LEVEL,
+    celerity: lvl(attrs.celerity) * KV_PER_ATTRIBUTE_LEVEL,
+    constitution: lvl(attrs.constitution) * KV_PER_ATTRIBUTE_LEVEL,
     subtotal: 0,
   };
   body.subtotal = body.clout + body.celerity + body.constitution;
 
   const spirit = {
-    flow: attrs.flow.level * KV_PER_ATTRIBUTE_LEVEL,
-    frequency: attrs.frequency.level * KV_PER_ATTRIBUTE_LEVEL,
-    focus: attrs.focus.level * KV_PER_ATTRIBUTE_LEVEL,
+    flow: lvl(attrs.flow) * KV_PER_ATTRIBUTE_LEVEL,
+    frequency: lvl(attrs.frequency) * KV_PER_ATTRIBUTE_LEVEL,
+    focus: lvl(attrs.focus) * KV_PER_ATTRIBUTE_LEVEL,
     subtotal: 0,
   };
   spirit.subtotal = spirit.flow + spirit.frequency + spirit.focus;
 
   const soul = {
-    willpower: attrs.willpower.level * KV_PER_ATTRIBUTE_LEVEL,
-    wisdom: attrs.wisdom.level * KV_PER_ATTRIBUTE_LEVEL,
-    wit: attrs.wit.level * KV_PER_ATTRIBUTE_LEVEL,
+    willpower: lvl(attrs.willpower) * KV_PER_ATTRIBUTE_LEVEL,
+    wisdom: lvl(attrs.wisdom) * KV_PER_ATTRIBUTE_LEVEL,
+    wit: lvl(attrs.wit) * KV_PER_ATTRIBUTE_LEVEL,
     subtotal: 0,
   };
   soul.subtotal = soul.willpower + soul.wisdom + soul.wit;
 
-  const skills = character.skills.map(s => ({
+  const skills = (character.skills ?? []).map(s => ({
     name: s.name,
-    kv: s.level * KV_PER_SKILL_LEVEL,
-    governors: s.governors as string[],
+    kv: (s.level ?? 0) * KV_PER_SKILL_LEVEL,
+    governors: (s.governors as string[]) ?? [],
   }));
   const skillsTotal = skills.reduce((sum, s) => sum + s.kv, 0);
 
   const magicSkills: Array<{ school: string; kv: number }> = [];
-  const magicPillars = [character.magic.mercy, character.magic.severity, character.magic.balance];
+  const magic = character.magic ?? { mercy: { skillLevels: {} }, severity: { skillLevels: {} }, balance: { skillLevels: {} } };
+  const magicPillars = [magic.mercy, magic.severity, magic.balance];
   for (const pillar of magicPillars) {
+    if (!pillar) continue;
     if (pillar.skillLevels) {
       for (const [school, level] of Object.entries(pillar.skillLevels)) {
         if (level && level > 0) {
@@ -74,7 +87,7 @@ export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown 
   const bodyResistValue = (character.vitals?.baseResist ?? 0) * KV_PER_BODY_RESIST;
   const bodyResist = { total: bodyResistValue, rate: KV_PER_BODY_RESIST };
 
-  const traits = character.traits.map(t => ({
+  const traits = (character.traits ?? []).map(t => ({
     name: t.name,
     kv: parseTraitKV(t),
     type: t.type,
@@ -82,8 +95,16 @@ export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown 
   }));
   const traitsTotal = traits.reduce((sum, t) => sum + t.kv, 0);
 
+  const items = heldItems.map(it => {
+    const raw = it.karmicValue;
+    const kaiValue = typeof raw === 'bigint' ? Number(raw) : (typeof raw === 'number' ? raw : null);
+    const kv = kaiValue && kaiValue > 0 ? kaiValue : calculateItemKV(it.data);
+    return { id: it.id, name: it.name, kv, type: it.type };
+  });
+  const itemsTotal = items.reduce((sum, i) => sum + i.kv, 0);
+
   const total = body.subtotal + spirit.subtotal + soul.subtotal
-    + skillsTotal + magicTotal + bodyResistValue + traitsTotal;
+    + skillsTotal + magicTotal + bodyResistValue + traitsTotal + itemsTotal;
 
   return {
     version: 1,
@@ -93,28 +114,47 @@ export function calculateCharacterTKV(character: GrowthCharacter): TKVBreakdown 
     magicSkills, magicTotal,
     bodyResist,
     traits, traitsTotal,
+    items, itemsTotal,
   };
 }
 
 // ── Entity KV Helpers ──
 
-/** Calculate KV for a world item (placeholder — manual values until AI grading) */
+/** Calculate KV for a world item. Uses the item's explicit `value` if set; falls back to a rarity-based placeholder. */
 export function calculateItemKV(item: GrowthWorldItem): number {
-  // Rarity-based placeholder KV
-  const rarityKV: Record<string, number> = {
-    common: 1,
-    uncommon: 3,
-    rare: 5,
-    very_rare: 10,
-    legendary: 20,
-    artifact: 50,
-  };
-  const base = rarityKV[item.rarity || 'common'] ?? 1;
+  // Condition multiplier per Equipment_Conditions.md ruling r-2026-04-22-12:
+  // 4 Indestructible & 3 Undamaged = full effectiveness, 2 Worn ≈ 75%, 1 Broken ≈ 25%, 0 Destroyed = 0.
+  const condition = item.condition ?? 3;
+  const conditionMultiplier =
+    condition >= 3 ? 1.0 :
+    condition === 2 ? 0.75 :
+    condition === 1 ? 0.25 :
+    0;
 
-  // Condition modifier (4=full, 1=destroyed)
-  const conditionMultiplier = (item.condition ?? 4) / 4;
+  // Item Abilities — KV is hidden from UI but folds into the item's total KV
+  // (Mike 2026-05-14: "Item abilities won't display their kv. that will just be processed
+  // and added to the kv of the item in the background.")
+  const abilitiesKV = (item.itemAbilities ?? []).reduce(
+    (sum, ab) => sum + (typeof ab.kv === 'number' ? ab.kv : 0),
+    0,
+  );
 
-  return Math.max(1, Math.round(base * conditionMultiplier));
+  // Prefer the item's explicit value (the authored KV) when set; the rarity placeholder
+  // is only used for items that lack a value.
+  let base: number;
+  if (typeof item.value === 'number' && item.value > 0) {
+    base = item.value;
+  } else if (typeof item.rarity === 'number') {
+    // Canon 1-10 tier placeholder
+    base = Math.max(1, item.rarity);
+  } else {
+    const rarityKV: Record<string, number> = {
+      common: 1, uncommon: 3, rare: 5, very_rare: 10, legendary: 20, artifact: 50,
+    };
+    base = rarityKV[item.rarity || 'common'] ?? 1;
+  }
+
+  return Math.max(0, Math.round(base * conditionMultiplier) + abilitiesKV);
 }
 
 /** Calculate KV for a location (placeholder — manual values until AI grading) */

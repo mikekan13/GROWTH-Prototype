@@ -657,16 +657,18 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
   if (!isExpanded) {
     return (
-      <div className="relative">
+      <div className="relative" data-character-id={node.id} data-drop-zone="character">
         <div
           className={`flex bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-lg p-3 text-white hover:border-gray-600 transition-all select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           style={{
             width: '500px', height: '220px', userSelect: 'none',
-            borderColor: isDropTarget ? '#4ade80' : 'rgba(55, 65, 81, 0.5)',
-            boxShadow: isDropTarget ? '0 0 30px rgba(74, 222, 128, 0.4), inset 0 0 15px rgba(74, 222, 128, 0.1)' : 'none',
-            filter: isDragging
-              ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
-              : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
+            borderColor: isDropTarget ? '#ffcc78' : 'rgba(55, 65, 81, 0.5)',
+            willChange: isDropTarget ? 'filter' : 'transform',
+            filter: isDropTarget
+              ? 'drop-shadow(0 0 6px #ffcc78) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
+              : isDragging
+                ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
+                : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
           }}
           onMouseDown={handleMouseDown}
           onContextMenu={handleContextMenu}
@@ -813,17 +815,17 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   };
 
   return (
-    <div className="relative" ref={cardRef}>
+    <div className="relative" ref={cardRef} data-character-id={node.id} data-drop-zone="character">
       <div
         className={`relative character-card text-white select-none ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
         style={{
-          width: '1885px', willChange: 'transform', userSelect: 'none', transformOrigin: '960px 250px', transition: 'filter 0.2s',
-          outline: isDropTarget ? '3px solid #4ade80' : 'none',
-          borderRadius: isDropTarget ? '8px' : undefined,
-          boxShadow: isDropTarget ? '0 0 40px rgba(74, 222, 128, 0.3)' : 'none',
-          filter: isDragging
-            ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
-            : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
+          width: '1885px', willChange: isDropTarget ? 'filter' : 'transform', userSelect: 'none', transformOrigin: '960px 250px',
+          // Swap depth shadows for a gold glow when hovered (same filter count, no perf regression vs baseline).
+          filter: isDropTarget
+            ? 'drop-shadow(0 0 6px #ffcc78) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
+            : isDragging
+              ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
+              : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
         }}
         onMouseDown={handleMouseDown}
         onContextMenu={handleContextMenu}

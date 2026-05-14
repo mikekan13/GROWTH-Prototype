@@ -49,7 +49,9 @@ export const TRAIT_KV_GUARDRAILS = {
 
 // ── TKV Calculation ──
 
-export function calculateTKV(character: GrowthCharacter): TKVBreakdown {
+import { calculateItemKV, type HeldItemForTKV } from '@/lib/kv-calculator';
+
+export function calculateTKV(character: GrowthCharacter, heldItems: HeldItemForTKV[] = []): TKVBreakdown {
   const attrs = character.attributes;
 
   // Body attributes
@@ -118,8 +120,17 @@ export function calculateTKV(character: GrowthCharacter): TKVBreakdown {
   }));
   const traitsTotal = traits.reduce((sum, t) => sum + t.kv, 0);
 
+  // Held items contribute to TKV (per Mike 2026-05-13: "anything on a player sheet counts")
+  const items = heldItems.map(it => {
+    const raw = it.karmicValue;
+    const kaiValue = typeof raw === 'bigint' ? Number(raw) : (typeof raw === 'number' ? raw : null);
+    const kv = kaiValue && kaiValue > 0 ? kaiValue : calculateItemKV(it.data);
+    return { id: it.id, name: it.name, kv, type: it.type };
+  });
+  const itemsTotal = items.reduce((sum, i) => sum + i.kv, 0);
+
   const total = body.subtotal + spirit.subtotal + soul.subtotal
-    + skillsTotal + magicTotal + bodyResist.total + traitsTotal;
+    + skillsTotal + magicTotal + bodyResist.total + traitsTotal + itemsTotal;
 
   return {
     version: EVALUATOR_VERSION,
@@ -129,6 +140,7 @@ export function calculateTKV(character: GrowthCharacter): TKVBreakdown {
     magicSkills, magicTotal,
     bodyResist,
     traits, traitsTotal,
+    items, itemsTotal,
   };
 }
 

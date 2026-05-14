@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { PhysicalDescription, BodyPartDescription } from '@/types/growth';
+import type { HeldItemData } from '@/types/item';
 import IdentityLockWizard from './IdentityLockWizard';
+import InventorySection from './InventorySection';
 
 const GENDER_OPTIONS = ['', 'Male', 'Female', 'Non-binary', 'Other'] as const;
 const BUILD_OPTIONS = [
@@ -129,6 +131,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [heldItems, setHeldItems] = useState<HeldItemData[]>([]);
 
   const selectedSeed = useMemo(
     () => campaignSeeds.find(s => s.name === selectedSeedName),
@@ -172,6 +175,39 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
       });
     return () => { cancelled = true; };
   }, [selectedCharacterId, overrideCharacter?.id]);
+
+  // Fetch this character's held items (live from CampaignItem rows).
+  useEffect(() => {
+    const charId = effectiveCharacter?.id;
+    if (!campaignId || !charId) {
+      setHeldItems([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/campaigns/${campaignId}/items`)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(({ items }) => {
+        if (cancelled || !Array.isArray(items)) return;
+        const owned: HeldItemData[] = items
+          .filter((it: { holderId?: string | null }) => it.holderId === charId)
+          .map((it: { id: string; name: string; type: string; status: string; data: string }) => {
+            let parsed: unknown = {};
+            try { parsed = JSON.parse(it.data); } catch { /* keep empty */ }
+            return {
+              id: it.id,
+              name: it.name,
+              type: it.type as HeldItemData['type'],
+              status: it.status,
+              data: parsed as HeldItemData['data'],
+            };
+          });
+        setHeldItems(owned);
+      })
+      .catch(() => {
+        if (!cancelled) setHeldItems([]);
+      });
+    return () => { cancelled = true; };
+  }, [campaignId, effectiveCharacter?.id]);
 
   // Fetch seeds available in this campaign
   useEffect(() => {
@@ -1004,6 +1040,25 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               {generationError}
             </div>
           )}
+        </div>
+
+        {/* INVENTORY */}
+        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-base uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+                Inventory
+              </div>
+              <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                {effectiveCharacter
+                  ? 'Items held by this character. Drag items from the canvas onto this character to add; remove on the canvas card.'
+                  : 'Inventory will appear once a character record exists.'}
+              </div>
+            </div>
+          </div>
+          <div style={{ color: '#ccc' }}>
+            <InventorySection items={heldItems} />
+          </div>
         </div>
 
         {/* BACKSTORY */}

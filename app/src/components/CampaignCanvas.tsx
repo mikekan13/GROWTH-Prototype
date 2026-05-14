@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthLocation } from '@/types/location';
 import type { GrowthWorldItem } from '@/types/item';
-import { calculateCharacterTKV, calculateItemKV, calculateLocationKV } from '@/lib/kv-calculator';
+import { calculateCharacterTKV, calculateItemKV, calculateLocationKV, type HeldItemForTKV } from '@/lib/kv-calculator';
 import { recomputeAugments } from '@/lib/character-actions';
 import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
@@ -389,6 +389,18 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => { cancelled = true; };
   }, [isGM, campaign.id]);
 
+  // Held items for a character (filtered from canvas nodes); used for TKV item-contribution
+  const getHeldItemsForCharacter = useCallback((charId: string, nodeList: CanvasNode[]): HeldItemForTKV[] => {
+    return nodeList
+      .filter(n => n.type === 'item' && n.holderId === charId && n.itemData)
+      .map(n => ({
+        id: n.id,
+        name: n.name,
+        type: n.itemType,
+        data: n.itemData as unknown as import('@/types/item').GrowthWorldItem,
+      }));
+  }, []);
+
   // Calculate KV for an entity by looking it up in nodes
   const getEntityKV = useCallback((nodeId: string, nodeType: string): number => {
     const node = nodes.find(n => n.id === nodeId);
@@ -397,7 +409,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       try {
         const charData = node.characterData as unknown as GrowthCharacter;
         if (charData?.attributes) {
-          const tkv = calculateCharacterTKV(charData);
+          const heldItems = getHeldItemsForCharacter(nodeId, nodes);
+          const tkv = calculateCharacterTKV(charData, heldItems);
           return tkv.total;
         }
       } catch { /* fallback */ }
@@ -508,13 +521,14 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       try {
         const charData = n.characterData as unknown as GrowthCharacter;
         if (charData?.attributes) {
-          const tkv = calculateCharacterTKV(charData);
+          const heldItems = getHeldItemsForCharacter(n.id, nodeList);
+          const tkv = calculateCharacterTKV(charData, heldItems);
           return { ...n, characterData: { ...n.characterData, tkv: tkv.total } as Record<string, unknown> };
         }
       } catch { /* keep original */ }
       return n;
     });
-  }, []);
+  }, [getHeldItemsForCharacter]);
 
   // Sync local nodes when server re-fetches (e.g. after revert)
   useEffect(() => {
@@ -532,7 +546,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     let tkvValue = 0;
     try {
       if (augmented?.attributes) {
-        tkvValue = calculateCharacterTKV(augmented).total;
+        const heldItems = getHeldItemsForCharacter(nodeId, nodes);
+        tkvValue = calculateCharacterTKV(augmented, heldItems).total;
       }
     } catch { /* fallback to 0 */ }
     const charWithTKV = { ...augmented, tkv: tkvValue } as unknown as Record<string, unknown>;
@@ -677,8 +692,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         alert(data.error || 'Failed to transfer item');
         return;
       }
-      // Update local node state immediately for responsive UI
-      setNodes(prev => prev.map(n =>
+      // Update local node state immediately for responsive UI, then re-stamp TKV
+      // so the affected character's TKV reflects the new inventory contents.
+      setNodes(prev => stampTKV(prev.map(n =>
         n.id === itemId ? {
           ...n,
           holderId,
@@ -686,11 +702,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             ? prev.find(c => c.id === holderId)?.name
             : undefined,
         } : n
-      ));
+      )));
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id]);
+  }, [campaign.id, stampTKV]);
 
   const handleDeleteCharacter = useCallback(async () => {
     if (!deleteTarget) return;

@@ -152,6 +152,8 @@ export interface TKVBreakdown {
   bodyResist: { total: number; rate: number };  // Body resist KV (2 KRMA per point)
   traits: Array<{ name: string; kv: number; type: string; deathClassification?: 'kept' | 'destroyed' }>;
   traitsTotal: number;
+  items: Array<{ id?: string; name: string; kv: number; type?: string }>;
+  itemsTotal: number;
 }
 
 export interface DeathSplitComponent {

@@ -108,12 +108,15 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       itemData = JSON.parse(item.data);
     } catch { /* use null */ }
 
+    const storedX = typeof itemData?.x === 'number' ? itemData.x : null;
+    const storedY = typeof itemData?.y === 'number' ? itemData.y : null;
+
     return {
       id: item.id,
       type: 'item' as const,
       name: item.name,
-      x: 600 + index * 280,
-      y: 300 + index * 80,
+      x: storedX ?? 600 + index * 280,
+      y: storedY ?? 300 + index * 80,
       status: item.status,
       itemType: item.type,
       itemData: itemData,

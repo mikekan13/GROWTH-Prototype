@@ -32,7 +32,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
   {
     name: 'Human',
     description: 'Humans are diverse and adaptable, originating from countless worlds across fantasy and sci-fi civilizations. Highly versatile and resourceful.',
-    baseFateDie: fateDie(6),
+    baseFateDie: fateDie(8),
     frequency: 40,
     fatedAge: 80,
     baseResist: 15,
@@ -45,7 +45,7 @@ export const SEED_CATALOG: GrowthSeed[] = [
   {
     name: 'Altered Human',
     description: 'Infinite variations/mutations of humans for those who want to be different than baseline.',
-    baseFateDie: fateDie(6),
+    baseFateDie: fateDie(8),
     frequency: 70,
     fatedAge: 85,
     baseResist: 15,

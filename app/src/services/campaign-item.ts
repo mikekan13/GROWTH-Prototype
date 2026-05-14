@@ -25,9 +25,10 @@ export const updateCampaignItemSchema = z.object({
 // --- Default Data ---
 
 function createDefaultItem(): Record<string, unknown> {
+  // condition: 3 = Undamaged (canon ruling r-2026-04-22-12; max for ordinary items)
   return {
     description: '',
-    condition: 4,
+    condition: 3,
     weightLevel: 1,
     tags: [],
   };

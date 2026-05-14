@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { GrowthWorldItem, WorldItemType } from '@/types/item';
-import { ITEM_TYPE_ICONS, RARITY_COLORS, formatDamage, getConditionLabel, getConditionColor } from '@/types/item';
+import { ITEM_TYPE_ICONS, formatDamage, getConditionLabel, getConditionColor, getRarityColor, getRarityLabel } from '@/types/item';
 import { getWeightLabel } from '@/types/material';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
 
   const data = node.data;
   const typeIcon = ITEM_TYPE_ICONS[node.type] || '\u{1F4E6}';
-  const rarityColor = data.rarity ? RARITY_COLORS[data.rarity] : '#c0c0c0';
+  const rarityColor = getRarityColor(data.rarity);
   const conditionColor = data.condition ? getConditionColor(data.condition) : '#808080';
   const conditionLabel = data.condition ? getConditionLabel(data.condition) : 'Unknown';
 
@@ -172,7 +172,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
               letterSpacing: '0.1em',
             }}>
-              {data.rarity ? data.rarity.replace('_', ' ') : node.type.replace('_', ' ')}
+              {data.rarity ? getRarityLabel(data.rarity) : node.type.replace('_', ' ')}
             </span>
           </div>
 
@@ -280,7 +280,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
                 <span style={{ textTransform: 'capitalize' }}>{node.type.replace('_', ' ')}</span>
                 {data.rarity && (
                   <span style={{ color: rarityColor, marginLeft: 8, textTransform: 'uppercase', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.1em' }}>
-                    {data.rarity.replace('_', ' ')}
+                    {getRarityLabel(data.rarity)}
                   </span>
                 )}
               </div>

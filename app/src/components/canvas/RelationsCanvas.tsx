@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import CharacterCard from "./CharacterCard";
@@ -24,7 +24,7 @@ import type { CanvasFolder } from "@/types/canvas";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions } from "./FolderGroup";
 import FolderGroup from "./FolderGroup";
 
-// ── Interfaces ──────────────────────────────────────────────────────────────
+// â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CanvasNode {
   id: string;
@@ -93,13 +93,13 @@ interface RelationsCanvasProps {
   onRestComplete?: () => void;
   onSkillCheck?: (characterId: string, skillName: string | undefined, attributeName: string | undefined, dr: number, revealDR: boolean) => void;
   onContestedCheck?: (characterId: string, characterName: string, skillName: string, governors: string[], revealDR: boolean) => void;
-  /** When set, canvas is in contested check mode — waiting for defender click */
+  /** When set, canvas is in contested check mode â€” waiting for defender click */
   contestedAttackerId?: string;
   onContestedDefenderSelect?: (characterId: string, characterName: string, skillName: string, governors: string[]) => void;
   isGM?: boolean;
 }
 
-// ── Component ───────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function RelationsCanvas({
   nodes = [],
@@ -133,10 +133,10 @@ export default function RelationsCanvas({
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ── Zoom constants ──
+  // â”€â”€ Zoom constants â”€â”€
   // zoom < 1 = zoomed IN (smaller viewBox), zoom > 1 = zoomed OUT (larger viewBox)
   const BASE_HEIGHT = 924;
-  const MIN_ZOOM = 1.0;   // max zoom IN — 1x base magnification
+  const MIN_ZOOM = 1.0;   // max zoom IN â€” 1x base magnification
   const MAX_ZOOM = 6.0;   // max zoom OUT
   const ZOOM_IN_FACTOR = 0.9;
   const ZOOM_OUT_FACTOR = 1.1;
@@ -159,7 +159,7 @@ export default function RelationsCanvas({
   // Round zoom to 4 decimal places to prevent floating-point drift
   const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) * 1e4) / 1e4;
 
-  // ── localStorage helpers ──
+  // â”€â”€ localStorage helpers â”€â”€
   const storageKey = (key: string) => `canvas-${campaignId}-${key}`;
 
   function loadJSON<T>(key: string, fallback: T): T {
@@ -175,7 +175,7 @@ export default function RelationsCanvas({
     try { localStorage.setItem(storageKey(key), JSON.stringify(value)); } catch { /* ignore */ }
   }
 
-  // ── Core canvas state ──
+  // â”€â”€ Core canvas state â”€â”€
   // Camera stores only position + zoom; viewBox width/height are ALWAYS derived from zoom.
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
@@ -196,7 +196,7 @@ export default function RelationsCanvas({
     }
     return { x: -BASE_WIDTH / 2, y: -BASE_HEIGHT / 2 };
   });
-  // viewBox is derived — never set width/height independently
+  // viewBox is derived â€” never set width/height independently
   const viewBox = {
     x: camera.x,
     y: camera.y,
@@ -208,7 +208,7 @@ export default function RelationsCanvas({
   const [isDragging, setIsDragging] = useState(false);
   const [animationTime, setAnimationTime] = useState(0);
 
-  // ── Node position & layering state ──
+  // â”€â”€ Node position & layering state â”€â”€
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => {
     const stored = loadJSON<[string, { x: number; y: number }][]>('positions', []);
     return new Map(stored);
@@ -223,12 +223,16 @@ export default function RelationsCanvas({
     return stored.length > 0 ? Math.max(...stored.map(([, z]) => z)) + 1 : 1;
   });
 
-  // ── Node expand/collapse state (persisted per campaign) ──
+  // â”€â”€ Node expand/collapse state (persisted per campaign) â”€â”€
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
     return new Set(loadJSON<string[]>('expanded', []));
   });
 
-  // ── Inventory sub-panel state ──
+  // â”€â”€ Inventory sub-panel state â”€â”€
+  // Highlights the drop-target character when an inventory ROW is being dragged
+  // (separate from `draggingItemId` which tracks canvas-card drags).
+  const [invDragHoverCharId, setInvDragHoverCharId] = useState<string | null>(null);
+
   const [inventoryOpenNodes, setInventoryOpenNodes] = useState<Set<string>>(() => {
     return new Set(loadJSON<string[]>('inventoryOpen', []));
   });
@@ -255,11 +259,11 @@ export default function RelationsCanvas({
     return () => { observers.forEach(o => o.disconnect()); observers.clear(); };
   }, []);
 
-  // ── Item drag-and-drop state ──
+  // â”€â”€ Item drag-and-drop state â”€â”€
   // Tracks which item node is actively being dragged (for character card drop-target highlighting)
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
-  // ── Sub-panel state (vitals, traits, skills, magic, backstory, harvests) ──
+  // â”€â”€ Sub-panel state (vitals, traits, skills, magic, backstory, harvests) â”€â”€
   const [panelOpenNodes, setPanelOpenNodes] = useState<Map<string, Set<string>>>(() => {
     const stored = loadJSON<[string, string[]][]>('panelOpen', []);
     return new Map(stored.map(([id, panels]) => [id, new Set(panels)]));
@@ -269,10 +273,10 @@ export default function RelationsCanvas({
     return new Map(stored);
   });
 
-  // ── Persist all canvas state ──
+  // â”€â”€ Persist all canvas state â”€â”€
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounced save — batches rapid state changes into one write
+  // Debounced save â€” batches rapid state changes into one write
   const persistState = useCallback(() => {
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
@@ -294,8 +298,8 @@ export default function RelationsCanvas({
   }, [persistState]);
 
   // Measure circle positions from DOM once after expand/panel changes settle.
-  // Stored as offsets from the card wrapper's top-left in SVG units (cardWidth × cardHeight),
-  // so they don't change with zoom/pan/drag — just add cardLeft/cardTop at render time.
+  // Stored as offsets from the card wrapper's top-left in SVG units (cardWidth Ã— cardHeight),
+  // so they don't change with zoom/pan/drag â€” just add cardLeft/cardTop at render time.
   useEffect(() => {
     const timer = setTimeout(() => {
       const svg = svgRef.current;
@@ -457,7 +461,7 @@ export default function RelationsCanvas({
     });
   }, []);
 
-  // ── Debug overlay state ──
+  // â”€â”€ Debug overlay state â”€â”€
   const [showDebug, setShowDebug] = useState(false);
   const [fps, setFps] = useState(0);
   const fpsFramesRef = useRef(0);
@@ -500,11 +504,11 @@ export default function RelationsCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox is derived from camera+zoom; using those deps directly avoids infinite loops
   }, [showDebug, camera.x, camera.y, zoom]);
 
-  // ── Node dragging state ──
+  // â”€â”€ Node dragging state â”€â”€
   const [dragNodeId, setDragNodeId] = useState<string | null>(null);
   const [dragStartSvg, setDragStartSvg] = useState<{ x: number; y: number } | null>(null);
 
-  // ── Folder dragging state ──
+  // â”€â”€ Folder dragging state â”€â”€
   const [dragFolderId, setDragFolderId] = useState<string | null>(null);
   const [folderDragStartSvg, setFolderDragStartSvg] = useState<{ x: number; y: number } | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
@@ -522,7 +526,7 @@ export default function RelationsCanvas({
   const animationRafRef = useRef<number>(0);
   const panRafRef = useRef<number>(0);
 
-  // ── Animation timer (RAF-based) ──
+  // â”€â”€ Animation timer (RAF-based) â”€â”€
   useEffect(() => {
     let lastTime = performance.now();
     const animate = (currentTime: number) => {
@@ -535,7 +539,7 @@ export default function RelationsCanvas({
     return () => cancelAnimationFrame(animationRafRef.current);
   }, []);
 
-  // ── Initialize node positions & z-indices from props ──
+  // â”€â”€ Initialize node positions & z-indices from props â”€â”€
   useEffect(() => {
     setNodePositions((prev) => {
       const next = new Map(prev);
@@ -562,7 +566,7 @@ export default function RelationsCanvas({
     });
   }, [nodes, maxZIndex]);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const getNodePosition = useCallback(
     (nodeId: string, fallbackX: number, fallbackY: number) => {
@@ -586,7 +590,7 @@ export default function RelationsCanvas({
     });
   }, []);
 
-  // ── Guitar string pluck effect on KRMA line ──
+  // â”€â”€ Guitar string pluck effect on KRMA line â”€â”€
   // The card physically pushes through the line like a finger on a guitar string.
   // When the card passes through or releases, the string bounces back naturally.
   const pluckRef = useRef<{ x: number; amplitude: number; radius: number; startTime: number } | null>(null);
@@ -606,7 +610,7 @@ export default function RelationsCanvas({
     }
   }, [nodes, expandedNodes]);
 
-  // Clamp drag offset Y for nodes inside party folders — bottom edge can't cross KRMA line (y=0)
+  // Clamp drag offset Y for nodes inside party folders â€” bottom edge can't cross KRMA line (y=0)
   const clampPartyDragY = useCallback((nodeId: string, offsetY: number): number => {
     const partyFolder = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
     if (!partyFolder) return offsetY;
@@ -615,7 +619,7 @@ export default function RelationsCanvas({
     // bottomH: how far below center the card extends (120 compact, 480 expanded)
     const bottomH = expandedNodes.has(nodeId) ? 480 : 120;
     const PARTY_LINE_BUFFER = 10;
-    // Card bottom edge after drag: pos.y + offsetY + bottomH  must stay ≤ -PARTY_LINE_BUFFER
+    // Card bottom edge after drag: pos.y + offsetY + bottomH  must stay â‰¤ -PARTY_LINE_BUFFER
     const maxOffsetY = -PARTY_LINE_BUFFER - bottomH - pos.y;
     return Math.min(offsetY, maxOffsetY);
   }, [expandedNodes]);
@@ -690,7 +694,7 @@ export default function RelationsCanvas({
     return offsetY;
   };
 
-  // Measure panel height via ResizeObserver — returns a ref callback for the panel wrapper div
+  // Measure panel height via ResizeObserver â€” returns a ref callback for the panel wrapper div
   const measurePanelRef = useCallback((panelKey: string) => {
     return (el: HTMLDivElement | null) => {
       const observers = panelObserversRef.current;
@@ -711,7 +715,7 @@ export default function RelationsCanvas({
     };
   }, []);
 
-  // Compute line deflection — card pushes through like a finger on a string
+  // Compute line deflection â€” card pushes through like a finger on a string
   const getLineDeflection = useCallback((segmentX: number, time: number): number => {
     // Helper: compute the shape factor for a given X distance from card center
     const shapeAt = (dx: number, radius: number) => {
@@ -777,7 +781,7 @@ export default function RelationsCanvas({
     return dragDeflection + pluckDeflection;
   }, [dragOffsets, nodePositions, getCardHalfWidth, folders]);
 
-  // Detect when a card leaves the line's zone (passes through or releases) → trigger pluck
+  // Detect when a card leaves the line's zone (passes through or releases) â†’ trigger pluck
   const prevNearLineRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     // Which nodes are currently deflecting the line?
@@ -801,7 +805,7 @@ export default function RelationsCanvas({
     // Check for nodes that just left the deflection zone (passed through or released)
     for (const nodeId of prevNearLineRef.current) {
       if (!currentNear.has(nodeId)) {
-        // Node left the zone — hand off its deflection to pluck vibration
+        // Node left the zone â€” hand off its deflection to pluck vibration
         const info = lastDeflectionRef.current.get(nodeId);
         if (info && Math.abs(info.peakDeflection) > 5) {
           pluckRef.current = {
@@ -818,7 +822,7 @@ export default function RelationsCanvas({
     prevNearLineRef.current = currentNear;
   }, [dragOffsets, nodePositions, animationTime]);
 
-  // ── Line crossing + shimmer state ──
+  // â”€â”€ Line crossing + shimmer state â”€â”€
   const [shimmeringNodes, setShimmeringNodes] = useState<Set<string>>(new Set());
 
   /** Imperatively move a node to a new Y position */
@@ -831,7 +835,7 @@ export default function RelationsCanvas({
     });
   }, []);
 
-  // ── Drag-end line-crossing detection (runs AFTER React paints) ──
+  // â”€â”€ Drag-end line-crossing detection (runs AFTER React paints) â”€â”€
   // Track which nodes are currently being dragged and their Y when drag started
   const prevDraggingRef = useRef<Set<string>>(new Set());
   const dragStartYRef = useRef<Map<string, number>>(new Map());
@@ -839,7 +843,7 @@ export default function RelationsCanvas({
   useEffect(() => {
     const currentDragging = new Set(dragOffsets.keys());
 
-    // Detect drag starts — record starting Y position
+    // Detect drag starts â€” record starting Y position
     for (const nodeId of currentDragging) {
       if (!prevDraggingRef.current.has(nodeId) && !dragStartYRef.current.has(nodeId)) {
         const pos = nodePositions.get(nodeId);
@@ -849,7 +853,7 @@ export default function RelationsCanvas({
       }
     }
 
-    // Detect drag ends — check for line crossing
+    // Detect drag ends â€” check for line crossing
     for (const nodeId of prevDraggingRef.current) {
       if (!currentDragging.has(nodeId)) {
         const startY = dragStartYRef.current.get(nodeId);
@@ -864,8 +868,8 @@ export default function RelationsCanvas({
 
         // Use the card's EDGE for line crossing, not the center.
         // The leading edge depends on drag direction:
-        //   dragging UP (crystallize) → bottom edge = pos.y + halfH
-        //   dragging DOWN (dissolve)  → top edge    = pos.y - halfH
+        //   dragging UP (crystallize) â†’ bottom edge = pos.y + halfH
+        //   dragging DOWN (dissolve)  â†’ top edge    = pos.y - halfH
         const node_ = nodes.find(n => n.id === nodeId);
         const isExp = expandedNodes.has(nodeId);
         const halfH = node_?.type === 'character' ? (isExp ? 250 : 120)
@@ -922,7 +926,7 @@ export default function RelationsCanvas({
     [camera, zoom]
   );
 
-  // ── Connection styling ────────────────────────────────────────────────────
+  // â”€â”€ Connection styling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const getConnectionColor = useCallback((type: CanvasConnection["type"]) => {
     switch (type) {
@@ -935,7 +939,7 @@ export default function RelationsCanvas({
     }
   }, []);
 
-  // ── Node type helpers ─────────────────────────────────────────────────────
+  // â”€â”€ Node type helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const getNodeTypeIcon = useCallback((type: CanvasNode["type"]) => {
     switch (type) {
@@ -960,7 +964,7 @@ export default function RelationsCanvas({
     }
   }, []);
 
-  // ── Pan handlers ──────────────────────────────────────────────────────────
+  // â”€â”€ Pan handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -984,7 +988,7 @@ export default function RelationsCanvas({
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
-      // ── Folder drag (moves all member nodes together) ──
+      // â”€â”€ Folder drag (moves all member nodes together) â”€â”€
       if (dragFolderId && folderDragStartSvg) {
         const current = clientToSvg(e.clientX, e.clientY);
         const dx = current.x - folderDragStartSvg.x;
@@ -1012,7 +1016,7 @@ export default function RelationsCanvas({
             }
             const MIN_FOLDER_H = 120;
             if (maxBottom > -Infinity) {
-              // Compute the unclamped visual bottom — must match FolderGroupRect bounds.
+              // Compute the unclamped visual bottom â€” must match FolderGroupRect bounds.
               // The bottom edge is the max of: posY+MIN_FOLDER_H, posY+userHeight, contentBottom.
               // We clamp dy so NONE of these exceed y=0, preventing the render clamp
               // from auto-shrinking the folder instead of the drag stopping.
@@ -1071,7 +1075,7 @@ export default function RelationsCanvas({
         return;
       }
 
-      // ── Node drag ──
+      // â”€â”€ Node drag â”€â”€
       if (dragNodeId && dragStartSvg) {
         const current = clientToSvg(e.clientX, e.clientY);
         const dx = current.x - dragStartSvg.x;
@@ -1117,7 +1121,7 @@ export default function RelationsCanvas({
               }
               bounds = { x: anchorX, y: anchorY, width: w, height: h };
             } else {
-              // Empty folder — use stored/default position for drop detection
+              // Empty folder â€” use stored/default position for drop detection
               const w = Math.max(MIN_FOLDER_W, f.userWidth || 0);
               const h = Math.max(MIN_FOLDER_H, f.userHeight || 0);
               const fx = f.posX ?? -w / 2;
@@ -1139,7 +1143,7 @@ export default function RelationsCanvas({
         return;
       }
 
-      // ── Canvas pan ──
+      // â”€â”€ Canvas pan â”€â”€
       if (!isPanning || !isDragging) return;
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -1163,7 +1167,7 @@ export default function RelationsCanvas({
   );
 
   const handleMouseUp = useCallback(() => {
-    // ── Finish folder drag (moves all member nodes) ──
+    // â”€â”€ Finish folder drag (moves all member nodes) â”€â”€
     if (dragFolderId) {
       const folder = foldersRef.current.find(f => f.id === dragFolderId);
       if (folder) {
@@ -1242,7 +1246,7 @@ export default function RelationsCanvas({
       return;
     }
 
-    // ── Finish node drag ──
+    // â”€â”€ Finish node drag â”€â”€
     if (dragNodeId) {
       const offset = dragOffsets.get(dragNodeId);
       if (offset && (offset.x !== 0 || offset.y !== 0)) {
@@ -1297,7 +1301,7 @@ export default function RelationsCanvas({
     }
   }, [isPanning, isDragging, dragNodeId, dragFolderId, handleMouseMove, handleMouseUp]);
 
-  // ── Zoom handler ──────────────────────────────────────────────────────────
+  // â”€â”€ Zoom handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -1315,7 +1319,7 @@ export default function RelationsCanvas({
       const newZoom = clampZoom(zoom * zoomFactor);
 
       if (newZoom !== zoom) {
-        // Derive width/height from base dimensions — no chained multiplication
+        // Derive width/height from base dimensions â€” no chained multiplication
         const newWidth = BASE_WIDTH * newZoom;
         const newHeight = BASE_HEIGHT * newZoom;
         setZoom(newZoom);
@@ -1330,7 +1334,7 @@ export default function RelationsCanvas({
     [camera, zoom]
   );
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1360,7 +1364,7 @@ export default function RelationsCanvas({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedNode, nodes]);
 
-  // ── Render connection ─────────────────────────────────────────────────────
+  // â”€â”€ Render connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const renderConnection = (connection: CanvasConnection) => {
     const fromNode = nodes.find((n) => n.id === connection.from);
@@ -1426,7 +1430,7 @@ export default function RelationsCanvas({
     );
   };
 
-  // ── Render character card (foreignObject with full CharacterCard) ────────
+  // â”€â”€ Render character card (foreignObject with full CharacterCard) â”€â”€â”€â”€â”€â”€â”€â”€
 
   const renderCharacterCard = (node: CanvasNode, visualX: number, visualY: number) => {
     const isNodeExpanded = expandedNodes.has(node.id);
@@ -1465,7 +1469,7 @@ export default function RelationsCanvas({
     const vitals = charData?.vitals as Record<string, unknown> | null;
     const carryLevel = (vitals?.carryLevel as number) ?? 1;
     // Check if an item is being dragged near this character (for drop-target highlighting)
-    const isDropTarget = draggingItemId != null && (() => {
+    const isDropTarget = invDragHoverCharId === node.id || (draggingItemId != null && (() => {
       const dragOffset = dragOffsets.get(draggingItemId);
       if (!dragOffset) return false;
       const itemNode = nodes.find(n => n.id === draggingItemId);
@@ -1473,11 +1477,34 @@ export default function RelationsCanvas({
       const itemPos = getNodePosition(itemNode.id, itemNode.x, itemNode.y);
       const itemVisX = itemPos.x + dragOffset.x;
       const itemVisY = itemPos.y + dragOffset.y;
-      // Check if item is within character card bounds (generous hitbox)
-      const dx = Math.abs(itemVisX - visualX);
-      const dy = Math.abs(itemVisY - visualY);
-      return dx < cardWidth / 2 + 100 && dy < cardHeight / 2 + 100;
-    })();
+      // Use the item's actual half-extents so ANY overlap counts (rect-vs-rect)
+      const itemHalf = getCardHalfWidth(draggingItemId);
+
+      // Rect-vs-rect overlap against character card bounds
+      const cdx = Math.abs(itemVisX - visualX);
+      const cdy = Math.abs(itemVisY - visualY);
+      if (cdx < cardWidth / 2 + itemHalf && cdy < cardHeight / 2 + itemHalf) return true;
+
+      // Rect-vs-rect overlap against open inventory panel
+      if (inventoryOpenNodes.has(node.id) && isNodeExpanded) {
+        const cardLeft = visualX - cardWidth / 2;
+        const cardTop = visualY - cardHeight / 2;
+        const cachedAnchor = circleOffsetsRef.current.get('inventory');
+        const anchorX = cachedAnchor ? (cardLeft + cachedAnchor.dx) : (cardLeft + 436 + 88);
+        const anchorY = cachedAnchor ? (cardTop + cachedAnchor.dy) : (cardTop + 515 + 13);
+        const invOffset = inventoryOffsets.get(node.id) || { x: 0, y: 20 };
+        const panelCenterX = anchorX + invOffset.x;
+        const panelTopY = anchorY + invOffset.y;
+        const panelW = 433;
+        const panelH = panelHeightsRef.current.get(`_inv_${node.id}`) || 700;
+        const panelCenterY = panelTopY + panelH / 2;
+        const inPanel =
+          Math.abs(itemVisX - panelCenterX) < panelW / 2 + itemHalf &&
+          Math.abs(itemVisY - panelCenterY) < panelH / 2 + itemHalf;
+        if (inPanel) return true;
+      }
+      return false;
+    })());
     const isShimmering = shimmeringNodes.has(node.id);
     // Direction-aware backlight: Red = going up (crystallizing), Blue = going down (dissolving)
     const preDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
@@ -1503,7 +1530,7 @@ export default function RelationsCanvas({
           />
         )}
 
-        {/* ── Tether lines + panel-end dots (BEFORE card = behind it) ── */}
+        {/* â”€â”€ Tether lines + panel-end dots (BEFORE card = behind it) â”€â”€ */}
         {isInventoryOpen && (() => {
           const cardLeft = visualX - cardWidth / 2;
           const cardTop = visualY - cardHeight / 2;
@@ -1586,10 +1613,10 @@ export default function RelationsCanvas({
               bringNodeToFront(nodeId);
 
               // NOTE: Do NOT update folder posX/posY here. posX/posY are only set by
-              // explicit resize handles and folder drag — card movement within the folder
+              // explicit resize handles and folder drag â€” card movement within the folder
               // is handled by auto-sizing in the bounds computation (content.x/content.y).
 
-              // Check if dropped onto a folder — add to it
+              // Check if dropped onto a folder â€” add to it
               const curFolders = foldersRef.current;
               const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
               const MIN_FW = 620;
@@ -1658,7 +1685,7 @@ export default function RelationsCanvas({
           </div>
         </foreignObject>
 
-        {/* ── Tether anchor dots (AFTER card = on top, fills in the button like a selection indicator) ── */}
+        {/* â”€â”€ Tether anchor dots (AFTER card = on top, fills in the button like a selection indicator) â”€â”€ */}
         {isInventoryOpen && (() => {
           const cardLeft = visualX - cardWidth / 2;
           const cardTop = visualY - cardHeight / 2;
@@ -1688,7 +1715,7 @@ export default function RelationsCanvas({
           );
         })}
 
-        {/* ── All panels: sorted so last-dragged renders on top ── */}
+        {/* â”€â”€ All panels: sorted so last-dragged renders on top â”€â”€ */}
         {isNodeExpanded && [
           ...(isInventoryOpen ? ['_inv'] : []),
           ...nodePanels,
@@ -1789,6 +1816,64 @@ export default function RelationsCanvas({
                         onItemUpdate?.(itemId, { ...itemNode.itemData, equipped });
                       }
                     }}
+                    onDragHover={(clientX, clientY) => {
+                      // Live hover highlight: find the character under the cursor via DOM hit-test
+                      const el = document.elementFromPoint(clientX, clientY);
+                      const zone = el?.closest('[data-character-id]') as HTMLElement | null;
+                      const id = zone?.dataset.characterId ?? null;
+                      setInvDragHoverCharId(id);
+                    }}
+                    onDragChange={(active) => {
+                      if (!active) setInvDragHoverCharId(null);
+                    }}
+                    onDragEnd={(itemId, clientX, clientY) => {
+                      setInvDragHoverCharId(null);
+                      // Convert client coords to SVG world coords (needed for empty-canvas drop position)
+                      const drop = clientToSvg(clientX, clientY);
+
+                      // 1) DOM-based hit-test: an inventory panel under the cursor wins.
+                      // The InventoryCard root carries data-character-id (see InventoryCard.tsx).
+                      let targetCharId: string | null = null;
+                      const el = document.elementFromPoint(clientX, clientY);
+                      const dropZone = el?.closest('[data-character-id]') as HTMLElement | null;
+                      if (dropZone) targetCharId = dropZone.dataset.characterId ?? null;
+
+                      // 2) Fallback: canvas-coord math for character cards (when DOM lookup misses)
+                      if (!targetCharId) {
+                        const target = nodes.find(n => {
+                          if (n.type !== 'character') return false;
+                          const charPos = getNodePosition(n.id, n.x, n.y);
+                          const charExpanded = expandedNodes.has(n.id);
+                          const cw = charExpanded ? 1920 : 520;
+                          const ch = charExpanded ? 500 : 240;
+                          return Math.abs(drop.x - charPos.x) < cw / 2 + 80 && Math.abs(drop.y - charPos.y) < ch / 2 + 80;
+                        });
+                        if (target) targetCharId = target.id;
+                      }
+
+                      const target = targetCharId ? nodes.find(n => n.id === targetCharId) : null;
+
+                      const itemNode = nodes.find(n => n.id === itemId);
+                      const currentHolder = itemNode?.holderId ?? null;
+
+                      if (target) {
+                        // Dropped on a character (or their inventory panel)
+                        if (target.id === currentHolder) return; // same-inventory drop = no-op
+                        onItemTransfer?.(itemId, target.id);
+                      } else {
+                        // Dropped on empty canvas — detach AND place at drop point
+                        onItemTransfer?.(itemId, null);
+                        if (itemNode?.itemData) {
+                          onItemUpdate?.(itemId, { ...itemNode.itemData });
+                        }
+                        setNodePositions(prev => {
+                          const next = new Map(prev);
+                          next.set(itemId, { x: drop.x, y: drop.y });
+                          return next;
+                        });
+                        onNodePositionChange?.(itemId, drop.x, drop.y);
+                      }
+                    }}
                     onClose={() => toggleInventory(node.id)}
                   />
                 </div>
@@ -1862,7 +1947,7 @@ export default function RelationsCanvas({
                           type: 'game_event',
                           characterId: node.id,
                           characterName: node.name,
-                          payload: { kind: 'game_event', eventType: 'skill_request', description: `Requested skill: "${request.name}" (gov: ${request.governors.join(', ')})${request.description ? ` — ${request.description}` : ''}` },
+                          payload: { kind: 'game_event', eventType: 'skill_request', description: `Requested skill: "${request.name}" (gov: ${request.governors.join(', ')})${request.description ? ` â€” ${request.description}` : ''}` },
                         }),
                       });
                     });
@@ -1974,7 +2059,7 @@ export default function RelationsCanvas({
     );
   };
 
-  // ── Main render ───────────────────────────────────────────────────────────
+  // â”€â”€ Main render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const selectedNodeData = selectedNode ? nodes.find((n) => n.id === selectedNode) : null;
 
@@ -1993,7 +2078,7 @@ export default function RelationsCanvas({
         onWheel={handleWheel}
         style={{ cursor: isPanning ? "grabbing" : "grab" }}
       >
-        {/* ── Definitions ── */}
+        {/* â”€â”€ Definitions â”€â”€ */}
         <defs>
           {/* Grid pattern */}
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
@@ -2084,11 +2169,11 @@ export default function RelationsCanvas({
           </linearGradient>
         </defs>
 
-        {/* ── Background (extends beyond viewBox to cover pan) ── */}
+        {/* â”€â”€ Background (extends beyond viewBox to cover pan) â”€â”€ */}
         <rect x={viewBox.x - viewBox.width} y={viewBox.y - viewBox.height} width={viewBox.width * 3} height={viewBox.height * 3} fill="url(#grid)" data-bg="grid" />
         <rect x={viewBox.x - viewBox.width} y={viewBox.y - viewBox.height} width={viewBox.width * 3} height={viewBox.height * 3} fill="url(#circuits)" opacity="0.3" data-bg="circuits" />
 
-        {/* ── THE KRMA LINE ── */}
+        {/* â”€â”€ THE KRMA LINE â”€â”€ */}
         <g>
           {(() => {
             const segments: string[] = [];
@@ -2229,10 +2314,10 @@ export default function RelationsCanvas({
 
         {/* Creation Toolbox moved to HTML overlay (always visible in viewport) */}
 
-        {/* ── Connections (behind nodes) ── */}
+        {/* â”€â”€ Connections (behind nodes) â”€â”€ */}
         {connections.map((c) => renderConnection(c))}
 
-        {/* ── Folder backgrounds (behind cards) ── */}
+        {/* â”€â”€ Folder backgrounds (behind cards) â”€â”€ */}
         {folders.map(folder => {
           const nodeTypes = new Map(nodes.map(n => [n.id, n.type]));
           const folderChars = nodes
@@ -2310,7 +2395,7 @@ export default function RelationsCanvas({
           );
         })}
 
-        {/* ── Character nodes (foreignObject cards) — sorted by z-index ── */}
+        {/* â”€â”€ Character nodes (foreignObject cards) â€” sorted by z-index â”€â”€ */}
         {/* Hide nodes inside collapsed folders */}
         {nodes
           .filter((n) => n.type === "character")
@@ -2342,7 +2427,7 @@ export default function RelationsCanvas({
             return renderCharacterCard(node, visualX, visualY);
           })}
 
-        {/* ── Location nodes (foreignObject cards) — sorted by z-index ── */}
+        {/* â”€â”€ Location nodes (foreignObject cards) â€” sorted by z-index â”€â”€ */}
         {nodes
           .filter((n) => n.type === "location" && n.locationData)
           .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
@@ -2443,7 +2528,7 @@ export default function RelationsCanvas({
             );
           })}
 
-        {/* ── Item nodes (foreignObject cards) — only unassigned items, sorted by z-index ── */}
+        {/* â”€â”€ Item nodes (foreignObject cards) â€” only unassigned items, sorted by z-index â”€â”€ */}
         {nodes
           .filter((n) => n.type === "item" && n.itemData && !n.holderId)
           .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
@@ -2517,18 +2602,37 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteItem}
                     onPositionChange={(nodeId, x, y) => {
-                      // Check if item was dropped on a character card
+                      // ANY overlap between the dragged item and a target = droppable (Mike 2026-05-14)
+                      const itemHalf = getCardHalfWidth(nodeId);
                       const dropTarget = nodes.find(n => {
                         if (n.type !== 'character') return false;
                         const charPos = getNodePosition(n.id, n.x, n.y);
                         const charExpanded = expandedNodes.has(n.id);
                         const cw = charExpanded ? 1920 : 520;
                         const ch = charExpanded ? 500 : 240;
-                        return Math.abs(x - charPos.x) < cw / 2 + 80 && Math.abs(y - charPos.y) < ch / 2 + 80;
+                        // Rect-vs-rect overlap with character card
+                        const inCharBox = Math.abs(x - charPos.x) < cw / 2 + itemHalf && Math.abs(y - charPos.y) < ch / 2 + itemHalf;
+                        if (inCharBox) return true;
+                        // Rect-vs-rect overlap with open inventory panel
+                        if (inventoryOpenNodes.has(n.id) && charExpanded) {
+                          const cardLeft = charPos.x - cw / 2;
+                          const cardTop = charPos.y - ch / 2;
+                          const cachedAnchor = circleOffsetsRef.current.get('inventory');
+                          const anchorX = cachedAnchor ? (cardLeft + cachedAnchor.dx) : (cardLeft + 436 + 88);
+                          const anchorY = cachedAnchor ? (cardTop + cachedAnchor.dy) : (cardTop + 515 + 13);
+                          const invOffset = inventoryOffsets.get(n.id) || { x: 0, y: 20 };
+                          const panelCenterX = anchorX + invOffset.x;
+                          const panelTopY = anchorY + invOffset.y;
+                          const panelW = 433;
+                          const panelH = panelHeightsRef.current.get(`_inv_${n.id}`) || 700;
+                          const panelCenterY = panelTopY + panelH / 2;
+                          return Math.abs(x - panelCenterX) < panelW / 2 + itemHalf && Math.abs(y - panelCenterY) < panelH / 2 + itemHalf;
+                        }
+                        return false;
                       });
 
                       if (dropTarget && onItemTransfer) {
-                        // Item dropped on character — transfer to their inventory
+                        // Item dropped on character â€” transfer to their inventory
                         onItemTransfer(nodeId, dropTarget.id);
                       } else {
                         // Normal position update
@@ -2567,7 +2671,7 @@ export default function RelationsCanvas({
             );
           })}
 
-        {/* ── Non-card nodes (circle icons for npc/quest) — sorted by z-index ── */}
+        {/* â”€â”€ Non-card nodes (circle icons for npc/quest) â€” sorted by z-index â”€â”€ */}
         {nodes
           .filter((n) => n.type !== "character" && !(n.type === "location" && n.locationData) && !(n.type === "item" && n.itemData))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
@@ -2639,7 +2743,7 @@ export default function RelationsCanvas({
           })}
       </svg>
 
-      {/* ── Canvas Toolbox (follows camera on the KRMA line) ── */}
+      {/* â”€â”€ Canvas Toolbox (follows camera on the KRMA line) â”€â”€ */}
       <CanvasToolbox
         viewBox={viewBox}
         zoom={zoom}
@@ -2679,7 +2783,7 @@ export default function RelationsCanvas({
         }}
       />
 
-      {/* ── Folder header overlays ── */}
+      {/* â”€â”€ Folder header overlays â”€â”€ */}
       {folders.map(folder => {
         const folderChars = nodes
           .filter(n => folder.nodeIds.includes(n.id) && n.type === 'character' && n.characterData)
@@ -2717,7 +2821,7 @@ export default function RelationsCanvas({
         );
       })}
 
-      {/* ── Debug overlay (Ctrl+D) ── */}
+      {/* â”€â”€ Debug overlay (Ctrl+D) â”€â”€ */}
       {showDebug && (() => {
         const expectedW = BASE_WIDTH * zoom;
         const expectedH = BASE_HEIGHT * zoom;
@@ -2761,7 +2865,7 @@ export default function RelationsCanvas({
             <div className="space-y-0.5 mb-2 pt-1 border-t border-[var(--accent-teal)]/20">
               <div className="text-[8px] tracking-[0.15em] uppercase opacity-40 mb-0.5">CAMERA</div>
               <Row label="Zoom" value={`${zoom.toFixed(4)}x (${zoomPct}%)`} />
-              <Row label="Range" value={`${MIN_ZOOM}–${MAX_ZOOM}`} />
+              <Row label="Range" value={`${MIN_ZOOM}â€“${MAX_ZOOM}`} />
               <Row label="Cam X,Y" value={`${camera.x.toFixed(1)}, ${camera.y.toFixed(1)}`} />
               <Row label="VB Size" value={`${Math.round(viewBox.width)}x${Math.round(viewBox.height)}`} />
               <Row label="Base" value={`${BASE_WIDTH}x${BASE_HEIGHT}`} />
@@ -2791,7 +2895,7 @@ export default function RelationsCanvas({
         );
       })()}
 
-      {/* ── Node details panel (bottom-left) ── */}
+      {/* â”€â”€ Node details panel (bottom-left) â”€â”€ */}
       {selectedNodeData && (
         <div
           className="absolute bottom-4 left-4 rounded-lg p-4 max-w-sm font-[family-name:var(--font-terminal)]"
@@ -2882,7 +2986,7 @@ export default function RelationsCanvas({
   );
 }
 
-// ── Canvas Toolbox (viewport-fixed overlay) ──────────────────────────────────
+// â”€â”€ Canvas Toolbox (viewport-fixed overlay) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import { ITEM_TYPE_ICONS } from '@/types/item';
 
@@ -2914,7 +3018,7 @@ function CanvasToolbox({
 
   const publishedItems = (forgeItems || []).filter(f => f.type === 'item');
 
-  // Position derived directly from viewBox state — no CTM, no frame-lag wobble.
+  // Position derived directly from viewBox state â€” no CTM, no frame-lag wobble.
   // X: always centered horizontally in the visible area.
   // Y: locked to KRMA line (SVG Y=0) mapped to container fraction.
   const screenX = '50%';
@@ -3042,12 +3146,56 @@ function CanvasToolbox({
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" /><line x1="6" y1="2" x2="6" y2="4" /><line x1="10" y1="2" x2="10" y2="4" /><line x1="14" y1="2" x2="14" y2="4" /></svg>}
               label="Item"
               color="#ffcc78"
-              onClick={() => {
-                const name = window.prompt('Item name:');
-                if (name?.trim()) onCreateItem?.(name.trim(), 'misc');
-              }}
+              onClick={() => setShowForgeItems(v => !v)}
             />
           </div>
+
+          {/* Forge item picker - opened by the Item button above */}
+          {showForgeItems && (
+            <div style={{ marginBottom: 8, maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 4, background: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.25)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#ffcc78', letterSpacing: '0.08em', padding: '2px 4px 6px' }}>
+                {'⚒'} PLACE FROM FORGE {publishedItems.length > 0 ? `(${publishedItems.length})` : ''}
+              </div>
+              {publishedItems.length === 0 ? (
+                <div style={{ padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.4 }}>
+                  No items in your forge yet. Author one via the Forge to make it available here.
+                </div>
+              ) : (
+                publishedItems.map(fi => (
+                  <button
+                    key={fi.id}
+                    onClick={() => {
+                      const spawnX = viewBox.x + viewBox.width / 3;
+                      const spawnY = viewBox.y + viewBox.height / 3;
+                      onCreateItemFromForge?.(
+                        fi.name,
+                        fi.type === 'item' ? ((fi.data.itemType as string) || 'misc') : 'misc',
+                        { ...fi.data, x: spawnX, y: spawnY },
+                      );
+                      setShowForgeItems(false);
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 4,
+                      color: 'white',
+                      fontSize: 10,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span>{ITEM_TYPE_ICONS[(fi.data.itemType || 'misc') as keyof typeof ITEM_TYPE_ICONS] || '📦'}</span>
+                    <span style={{ flex: 1 }}>{fi.name}</span>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>PLACE</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
 
           {/* Create Party folder */}
           {!(folders || []).some(f => f.type === 'party') && (nodes || []).filter(n => n.type === 'character').length > 0 && (
@@ -3079,63 +3227,7 @@ function CanvasToolbox({
             </div>
           )}
 
-          {/* Place from Forge */}
-          {publishedItems.length > 0 && (
-            <div>
-              <button
-                onClick={() => setShowForgeItems(!showForgeItems)}
-                style={{
-                  width: '100%',
-                  padding: '5px 8px',
-                  background: showForgeItems ? 'rgba(255,204,120,0.2)' : 'rgba(255,255,255,0.1)',
-                  border: `1px solid ${showForgeItems ? 'rgba(255,204,120,0.4)' : 'rgba(255,255,255,0.2)'}`,
-                  borderRadius: 6,
-                  color: showForgeItems ? '#ffcc78' : 'rgba(255,255,255,0.8)',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                <span>{'\u2692'} PLACE FROM FORGE ({publishedItems.length})</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ transform: showForgeItems ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {showForgeItems && (
-                <div style={{ marginTop: 4, maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {publishedItems.map(fi => (
-                    <button
-                      key={fi.id}
-                      onClick={() => {
-                        onCreateItemFromForge?.(fi.name, fi.type === 'item' ? ((fi.data.itemType as string) || 'misc') : 'misc', fi.data);
-                      }}
-                      style={{
-                        padding: '4px 8px',
-                        background: 'rgba(255,255,255,0.08)',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: 4,
-                        color: 'white',
-                        fontSize: 10,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <span>{ITEM_TYPE_ICONS[(fi.data.itemType || 'misc') as keyof typeof ITEM_TYPE_ICONS] || '\uD83D\uDCE6'}</span>
-                      <span style={{ flex: 1 }}>{fi.name}</span>
-                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>PLACE</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* (forge picker moved up - opens directly from the Item Toolbox button) */}
         </div>
       )}
     </div>
