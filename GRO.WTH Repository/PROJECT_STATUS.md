@@ -1,8 +1,123 @@
 # PROJECT_STATUS.md
 
-**Last Updated:** 2025-08-22  
-**Current Phase:** GROvine System Integration & Core Rule Validation  
-**Overall Progress:** ~97% Complete
+**Last Updated:** 2026-05-03
+**Current Phase:** Phase 3c canon-cleanup pass complete — Soul/Spirit swap propagated, WTH/Values/Fears/Soul-Package legacy refs scrubbed, missing-system docs added
+**Overall Progress:** Repository now reflects May 2026 canon for the load-bearing systems; ~12 P-flagged items remain for Mike
+
+---
+
+## 2026-05-03 — Phase 3c canon cleanup pass (Claude, autonomous)
+
+Mike granted full autonomy for this pass. All edits source from `GROWTH-DESIGN-TRUTH.md`, `FOUNDATIONS.md`, `VISUAL-DESIGN-SPEC.md`, and canonical memory files. Items needing Mike's input are marked `[NEEDS MIKE]` inline.
+
+### Pillar rebase (P0)
+- `02_CHARACTER_CREATION/Three_Pillar_Attributes.md` — added post-Jan-2026 swap canon note (Spirit = Sulfur = Flow/Frequency/Focus; Soul = Mercury = Will/Wisdom/Wit). Color hex codes intentionally omitted (DECISION-NEEDED in DESIGN-TRUTH §2). Frequency block rewritten as Spend / Deplete / Burn (links to new `Frequency_Three_Operations.md`). Death-save block updated to bodyResist + Fate Die.
+- `06_META_SYSTEMS/Soul_Package_System.md` → renamed `Spirit_Package_System.md` via `git mv`. Composition table flagged `[NEEDS MIKE]`. Two-death-systems explainer added.
+- `04_MAGIC_PILLARS/Three_Pillars_Overview.md` — explicit canon note that all three magic pillars (Mercy/Severity/Balance) draw from the **Spirit pillar** post-swap. Orthodox reframing of Wild Casting / Spell Weaving added.
+
+### WTH / Values / Fears sweep (P1)
+- `02_CHARACTER_CREATION/Character_Approval_Process.md` — Health_Level link replaced with bodyResist + fatedAge.
+- `02_CHARACTER_CREATION/Harvests_System.md` — Tech Levels / Wealth Level reward callouts rewritten as currency / setting+skills.
+- `06_META_SYSTEMS/Lady_Death_Protocols.md` — death trigger formula corrected (FD + bodyResist, not FD + Health Level), two-death-systems documented, Soul_Package_System link → Spirit_Package_System, dead Health_Level link removed.
+- `07_REFERENCE_TABLES/KRMA_Costs_Table.md` — Tech Level / Wealth Level row removed from Character Creation Costs.
+- `07_REFERENCE_TABLES/Weapon_Examples_Table.md` — Wealth Level / Technology Level sections rewritten as currency / setting + skills.
+- `07_REFERENCE_TABLES/Character_Sheet_Audit_Summary.md` — flagged historical (legacy beta sheets), WTH research items struck through.
+- `07_REFERENCE_TABLES/Complete_Materials_Reference.md` — "Tech Level I/II/III/IV/VIII" headings converted to historical-era flavor (Stone Age / Bronze Age / Iron Age / industrial / mythic).
+- `09_EXAMPLES_LIBRARY/Character_Creation_Example_Human_Scholar.md` — Health Level → fatedAge, Wealth Level → currency, Tech Level → setting + skills, Fears section retired (kept narrative flavor only).
+- `09_EXAMPLES_LIBRARY/Roots_Reference_Examples.md` — header note that "Wealth Level: N" entries are now currency-tier shorthand, not a per-character mechanic.
+- `06_META_SYSTEMS/Godheads_System.md`, `06_META_SYSTEMS/KRMA_System.md` — Soul_Package_System link refs rewritten to Spirit_Package_System.
+
+### Folder archival (P4)
+- `08_APP_DEVELOPMENT/` → `git mv` to `X_ARCHIVE_APP_DEV_2026-05-03/`. README.md added explaining supersession by `app/docs/` and `docs/` in the live app repo.
+
+### New missing-system docs
+- `01_CORE_RULES/Frequency_Three_Operations.md` — Spend / Deplete / Burn distinction (Burn formula `[NEEDS MIKE]`).
+- `01_CORE_RULES/Combat_Grid_System.md` — 5ft squares, encounter cards, action economy (movement rate, diagonals, cover all `[NEEDS MIKE]`).
+- `01_CORE_RULES/ActionMod_System.md` — base 0, items + traits only.
+- `02_CHARACTER_CREATION/Inventory_Paperdoll.md` — three-tier system + per-Seed paperdoll regions, default humanoid 10 regions.
+
+### Duplicates merged
+- `05_COMBAT_STRUCTURE/Damage_Types_and_Effects.md` deleted; unique content (Resolution Order, Massive Damage Rule, Ongoing Effects) folded into `Damage_Type_Interactions.md` which is now the canonical damage-type reference.
+
+### Items still needing Mike
+1. **Pillar→color mapping** — DECISION-NEEDED in DESIGN-TRUTH §2.
+2. **Frequency Burn formula** — exact KRMA cost per outcome shift, what kinds of outcomes.
+3. **Spirit Package contents** — exact attribute fractions post-swap; treatment of Frequency on combat vs Fated Age death; Thorn lien persistence rules.
+4. **Damage-type → attribute affinity table** — confirm post-swap pillar assignments still hold for Decay (→ Focus, now Spirit) and Cold (→ Willpower, still Soul).
+5. **Combat grid** — squares-per-action movement rate, diagonal cost, cover, reach.
+6. **ActionMod stacking & cap.**
+7. **Inventory paperdoll** — per-region weight caps, multi-region items, dual-wielding rules.
+8. **Mana derivation formula** post-swap (Human_Scholar example flagged).
+9. **Decline-a-Nectar tax rate** (still tracked from prior audit).
+10. **Fated Age KV curve** for long-lived Seeds.
+11. ~~**Hidden-power-of-Fear**~~ — Removed 2026-05-04: Fears is reserved for future expansion, not a current system (memory `fears-not-current.md`).
+12. **DR exact thresholds** for Terminal-difficulty colors.
+
+---
+
+## 2026-04-22 — Rulebook Audit Session (section 01_CORE_RULES)
+
+New companion doc created at `rulebook/rulebook.md` in the app repo — a terse,
+structured canonical rulebook that supersedes this wiki on mechanics. This
+wiki (comprehensive prose) remains the long-form reference. Each audited
+file now carries a `**Rulebook:**` pointer to its canonical section.
+
+### Changes
+- **Deleted** (per ruling r-2026-04-22-03, WTH per-character levels retired 2026-04-05):
+  - `01_CORE_RULES/Health_Level_System.md`
+  - `01_CORE_RULES/Technology_Level_System.md`
+  - `01_CORE_RULES/Wealth_Level_System.md`
+- **Headers updated** (added `**Rulebook:**` field, refreshed `Last Updated`):
+  - `Basic_Resolution_System.md`
+  - `Attribute_Depletion_Effects.md`
+  - `Skill_System_Overview.md`
+  - `Skill_Level_Progression.md` — also appended "Character Creation Soft Cap" section (ruling r-2026-04-22-02)
+  - `GROvine_System.md` — status flipped to `#needs-review`; capacity mechanics clarified per ruling r-2026-04-22-01; WTH language in opening paragraph corrected
+- **Rulings file** created at `rulebook/rulings.md` — three rulings recorded (GRO.vine capacity, skill cap creation vs lifetime, WTH retirement)
+
+### Open items for next audit
+- ~~Section 02 (Character Creation)~~ — **DONE 2026-04-22**
+- ~~Section 03 (Items & Crafting)~~ — **DONE 2026-04-22**
+- Section 04 (Magic Pillars) — next up
+- Remaining open design items (tracked in `rulebook/rulebook.md` end-of-file):
+  - Contested check sequence (attacker→defender chain) not in written rules; SSE code has it
+  - GROvine Opportunity Cycle (gift types, liens, proxy wars) needs Mike's walkthrough
+  - Decline-a-Nectar tax rate — unspecified
+  - Fated Age KV curve for longer-lived Seeds (Elf 500, Dragon 1500, etc.)
+  - Nectar/Thorn individual KV grading — case-by-case rulings as needed
+
+## 2026-04-22 — Section 03 audit (Items & Crafting)
+
+Six rulings captured (r-2026-04-22-10 through -16, covering: 5 KRMA/year rate, max Root age 25, 5-level condition scale, Tech Level retirement, armor multipliers, item KV grading, WTH-encumbrance cleanup).
+
+### Changes
+- **Header updates** — all 5 files in `03_ITEMS_CRAFTING/` flipped from `#needs-validation` to `#validated` with `Rulebook:` pointers and refreshed date
+- **`Weapon_System.md`** — no content changes (already solid)
+- **`Material_System.md`** — all Tech Level references stripped (property block, table columns, combination formula, item creation step, crafting integration text, links)
+- **`Armor_System.md`** — Condition Effects updated to 5-level scale; Leather layering example recalculated with round-down rule
+- **`Equipment_Conditions.md`** — rewrote Condition States section to 5 levels (0 Destroyed → 4 Indestructible); fixed Repair Difficulty to reflect destroyed items don't exist
+- **`Inventory_and_Encumbrance_System.md`** — "Assets System" deleted, "Technology Level Effects" deleted, Wealth_Level refs stripped from Starting Equipment
+- **`Character_Sheet_Validation.md`** (section 02) — Condition States expanded to 5 levels to match ruling r-2026-04-22-12
+
+### Rulebook §9 Items & Crafting added
+New section covering materials, weapons, 5-level condition scale, armor resist formula, item KV principles, inventory/encumbrance. Six subsections, fully cross-referenced.
+
+## 2026-04-22 — Section 02 audit
+
+Six rulings (r-2026-04-22-04 through -09) captured covering age-to-KV rate,
+Nectar/Thorn acquisition (Fears retirement), Harvest reward math, inherent-
+abilities retirement, WTH section deletion, canonical attribute order.
+
+### Changes
+- **Status flips** (all to `#validated` unless noted):
+  - `Three_Pillar_Attributes.md` — already validated; header refreshed, Spirit ordering corrected
+  - `Seeds_Roots_Branches_System.md` — `#needs-validation` → `#validated`; Health_Level ref replaced with `fatedAge`; "inherent abilities" language retired; age-cost rate documented
+  - `Nectars_and_Thorns_System.md` — `#needs-validation` → `#validated`; Fears-based acquisition rewritten per ruling r-2026-04-22-06
+  - `Harvests_System.md` — `#needs-validation` → `#validated`; time=reward-budget rule added (r-2026-04-22-07)
+  - `Character_Approval_Process.md` — `#needs-validation` → `#validated`
+  - `Character_Sheet_Validation.md` — `#needs-validation` → `#validated`; WTH sections (Tech Level Restrictions, Wealth Level) deleted; "Research Needed" WTH items removed
+- **Rulebook sections added**: §6 Character Creation, §7 Nectars/Thorns/Blossoms, §8 Harvests
+- **Canonical attribute order locked** across rulebook and repo
 
 ---
 

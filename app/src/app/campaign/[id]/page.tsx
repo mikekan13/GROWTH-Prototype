@@ -60,22 +60,38 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   const charNameMap = new Map(campaign.characters.map(c => [c.id, c.name]));
   const locNameMap = new Map(campaign.locations.map(l => [l.id, l.name]));
 
+  // A character belongs on the canvas when either:
+  //  (a) status is APPROVED or ACTIVE — these auto-place into the world on lock-in,
+  //  (b) the GM has explicitly placed it via the Tools→Character picker (canvasX/Y set).
+  // DRAFT/SUBMITTED-without-position stay in the Tapestry tab (entities API) until placed.
+  const canvasCharacters = campaign.characters.filter(c => {
+    if (c.status === 'APPROVED' || c.status === 'ACTIVE') return true;
+    try {
+      const d = JSON.parse(c.data);
+      return typeof d?.canvasX === 'number' && typeof d?.canvasY === 'number';
+    } catch { return false; }
+  });
+
   // Transform characters to CanvasNode format with full data
-  const characterNodes = campaign.characters.map((char, index) => {
-    let charData = null;
+  const characterNodes = canvasCharacters.map((char, index) => {
+    let charData: (Record<string, unknown> & { canvasX?: number; canvasY?: number }) | null = null;
     try {
       const parsed = JSON.parse(char.data);
       // Recompute augments from equipped items + traits on load
       const { character: augmented } = recomputeAugments(parsed);
-      charData = augmented as unknown as Record<string, unknown>;
+      charData = augmented as unknown as Record<string, unknown> & { canvasX?: number; canvasY?: number };
     } catch { /* use null */ }
+
+    // Prefer GM-placed canvas position; fall back to a deterministic auto-layout.
+    const storedX = typeof charData?.canvasX === 'number' ? charData.canvasX : undefined;
+    const storedY = typeof charData?.canvasY === 'number' ? charData.canvasY : undefined;
 
     return {
       id: char.id,
       type: 'character' as const,
       name: char.name,
-      x: 200 + index * 300,
-      y: -200 - index * 80,
+      x: storedX ?? (200 + index * 300),
+      y: storedY ?? (-200 - index * 80),
       status: char.status,
       portrait: char.portrait,
       characterData: charData,

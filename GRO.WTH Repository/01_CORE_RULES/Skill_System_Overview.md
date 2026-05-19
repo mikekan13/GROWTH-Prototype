@@ -3,7 +3,8 @@
 **Status:** #validated  
 **Source:** skill_system_design_session.md via AI Initiate Learning Session  
 **Security:** PUBLIC  
-**Last Updated:** 2025-09-01
+**Rulebook:** `rulebook/rulebook.md` §2 (Skill Progression)  
+**Last Updated:** 2026-04-22
 
 ---
 

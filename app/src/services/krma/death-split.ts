@@ -10,6 +10,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { executeBatch, type CreateTransactionInput } from './ledger';
 import { getWalletByOwner, getWalletByCampaign, getWalletByCharacter, getSystemWallet } from './wallet';
 import { calculateTKV, calculateDeathSplit, hashEvaluator } from './evaluator';
+import { emit as emitGodHeadEvent } from '../godhead-dispatcher';
 import type { GrowthCharacter } from '@/types/growth';
 import type { TransactionRecord, DeathSplitManifest } from '@/types/krma';
 import { SYSTEM_WALLETS } from '@/types/krma';
@@ -150,6 +151,17 @@ export async function executeDeathSplit(
     data: { status: 'DEAD' },
   });
 
+  // Notify Lady Death — she manages the Spirit Package and may decide to
+  // memorialize the death in her memory. Fire-and-forget.
+  void emitGodHeadEvent('character.died', {
+    characterId,
+    campaignId,
+    cause: deathContext.cause,
+    sessionId: deathContext.sessionId,
+    spiritPackageKV: manifest.toPlayer,
+    batchId,
+  }).catch(() => { /* swallow */ });
+
   return {
     transactions: results,
     manifest,
@@ -162,4 +174,47 @@ export async function executeDeathSplit(
 function capAmount(desired: bigint, available: bigint): bigint {
   if (available <= BigInt(0)) return BigInt(0);
   return desired > available ? available : desired;
+}
+
+/**
+ * Preview the death split WITHOUT executing it. Returns the manifest so the
+ * GM can confirm before triggering `executeDeathSplit`. Pure read — no
+ * transactions written.
+ */
+export async function previewDeathSplit(
+  characterId: string,
+  campaignId: string,
+): Promise<{
+  tkv: ReturnType<typeof calculateTKV>;
+  manifest: DeathSplitManifest;
+  characterWalletBalance: string;
+  characterName: string;
+}> {
+  const character = await prisma.character.findUnique({ where: { id: characterId } });
+  if (!character) throw new NotFoundError('Character not found');
+  if (character.campaignId !== campaignId) {
+    throw new ValidationError('Character does not belong to this campaign');
+  }
+  let charData: GrowthCharacter;
+  try {
+    charData = JSON.parse(character.data) as GrowthCharacter;
+  } catch {
+    throw new ValidationError('Invalid character data');
+  }
+  const tkv = calculateTKV(charData);
+  const manifest = calculateDeathSplit(charData, tkv);
+
+  // Character wallet may not exist yet (no crystallization done).
+  let charWalletBalance = BigInt(0);
+  try {
+    const wallet = await getWalletByCharacter(characterId);
+    charWalletBalance = wallet.balance;
+  } catch { /* no wallet, balance is 0 */ }
+
+  return {
+    tkv,
+    manifest,
+    characterWalletBalance: charWalletBalance.toString(),
+    characterName: character.name,
+  };
 }

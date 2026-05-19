@@ -1,8 +1,10 @@
 # Armor_System.md
 
-**Status:** #needs-validation
-**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Status:** #validated
+**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, User clarification 2025-10-03, ruling 2026-04-22
+**Security:** PUBLIC
+**Rulebook:** `rulebook/rulebook.md` §9.4 (Armor Resistance)
+**Last Updated:** 2026-04-22
 
 ---
 
@@ -54,11 +56,11 @@ See [[Material_System]] and "Items - Material Mods.csv" for available material m
 - **Maximum:** 3 layers total
 - **Stacking:** Resistances add together
 
-**Example:** 3 layers of Leather Clothing
-- Layer 1: 9 resistance (17÷2, rounded up)  
-- Layer 2: +9 resistance  
-- Layer 3: +9 resistance  
-- **Total:** 27 resistance
+**Example:** 3 layers of Leather Clothing (Leather base Resist = 17)
+- Layer 1: 8 resistance (17 × 0.5 = 8.5 → rounded down to 8, per ruling r-2026-04-22-14)
+- Layer 2: +8 resistance
+- Layer 3: +8 resistance
+- **Total:** 24 resistance
 
 ### Armor Combination Rules
 - **Light + Clothing:** Light armor over clothing layers
@@ -73,10 +75,13 @@ See [[Material_System]] and "Items - Material Mods.csv" for available material m
 
 ## Condition Effects
 
-**Undamaged:** Full protection value  
-**Worn:** Slight reduction in effectiveness  
-**Broken:** Significant protection loss  
-**Destroyed:** No protection, may hinder movement
+See [[Equipment_Conditions]] for the canonical 5-level scale (0–4). Summary:
+
+- **4 — Indestructible:** Full protection, cannot degrade. Super rare special property.
+- **3 — Undamaged:** Full protection value (normal max).
+- **2 — Worn:** Slight reduction in effectiveness.
+- **1 — Broken:** Significant protection loss. Effective Resist halved.
+- **0 — Destroyed:** Armor no longer exists.
 
 ## Mobility and Comfort
 

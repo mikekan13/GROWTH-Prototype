@@ -662,13 +662,20 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           className={`flex bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-lg p-3 text-white hover:border-gray-600 transition-all select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           style={{
             width: '500px', height: '220px', userSelect: 'none',
-            borderColor: isDropTarget ? '#ffcc78' : 'rgba(55, 65, 81, 0.5)',
+            // ACTIVE = crystallized: subtle gold border. Drop target still wins.
+            borderColor: isDropTarget
+              ? '#ffcc78'
+              : node.status === 'ACTIVE'
+                ? 'rgba(255, 204, 120, 0.65)'
+                : 'rgba(55, 65, 81, 0.5)',
             willChange: isDropTarget ? 'filter' : 'transform',
             filter: isDropTarget
               ? 'drop-shadow(0 0 6px #ffcc78) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
               : isDragging
                 ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
-                : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
+                : node.status === 'ACTIVE'
+                  ? 'drop-shadow(0 0 4px rgba(255, 204, 120, 0.35)) drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5))'
+                  : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
           }}
           onMouseDown={handleMouseDown}
           onContextMenu={handleContextMenu}
@@ -821,11 +828,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         style={{
           width: '1885px', willChange: isDropTarget ? 'filter' : 'transform', userSelect: 'none', transformOrigin: '960px 250px',
           // Swap depth shadows for a gold glow when hovered (same filter count, no perf regression vs baseline).
+          // ACTIVE = crystallized: subtle ambient gold glow.
           filter: isDropTarget
             ? 'drop-shadow(0 0 6px #ffcc78) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
             : isDragging
               ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
-              : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
+              : node.status === 'ACTIVE'
+                ? 'drop-shadow(0 0 5px rgba(255, 204, 120, 0.4)) drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5))'
+                : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
         }}
         onMouseDown={handleMouseDown}
         onContextMenu={handleContextMenu}

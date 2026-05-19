@@ -6,7 +6,7 @@ import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
 import type { GrowthCharacter } from "@/types/growth";
 import type { HeldItemData } from "@/types/item";
-import { addSkill, removeSkill, updateSkillLevel } from "@/lib/character-actions";
+import { addSkill, removeSkill, updateSkillLevel, addTrait, removeTrait, updateTrait } from "@/lib/character-actions";
 import VitalsCard from "./VitalsCard";
 import TraitsCard from "./TraitsCard";
 import SkillsCard from "./SkillsCard";
@@ -77,6 +77,8 @@ interface RelationsCanvasProps {
   onNodeClick?: (node: CanvasNode) => void;
   onNodePositionChange?: (nodeId: string, x: number, y: number) => void;
   onCreateCharacter?: (name: string) => void;
+  /** Place an existing campaign character on the canvas at (x,y). Persists position server-side. */
+  onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
   onDeleteCharacter?: (nodeId: string) => void;
   onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
   onCreateLocation?: (name: string, type: string) => void;
@@ -110,6 +112,7 @@ export default function RelationsCanvas({
   onNodeClick,
   onNodePositionChange,
   onCreateCharacter,
+  onPlaceCharacter,
   onDeleteCharacter,
   onCharacterUpdate,
   onCreateLocation,
@@ -1904,7 +1907,23 @@ export default function RelationsCanvas({
               case 'vitals':
                 return <VitalsCard vitals={(charData.vitals as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'traits':
-                return <TraitsCard traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string }>) || []} fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined} onClose={() => togglePanel(node.id, panelKey)} />;
+                return <TraitsCard
+                  traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string }>) || []}
+                  fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined}
+                  onClose={() => togglePanel(node.id, panelKey)}
+                  onAddTrait={onCharacterUpdate ? (trait) => {
+                    const result = addTrait(charData as unknown as GrowthCharacter, trait);
+                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
+                  } : undefined}
+                  onRemoveTrait={onCharacterUpdate ? (type, name) => {
+                    const result = removeTrait(charData as unknown as GrowthCharacter, type, name);
+                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
+                  } : undefined}
+                  onUpdateTrait={onCharacterUpdate ? (type, name, updates) => {
+                    const result = updateTrait(charData as unknown as GrowthCharacter, type, name, updates);
+                    if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
+                  } : undefined}
+                />;
               case 'skills':
                 return <SkillsCard
                   skills={(charData.skills as SkillItem[]) || []}
@@ -2747,10 +2766,12 @@ export default function RelationsCanvas({
       <CanvasToolbox
         viewBox={viewBox}
         zoom={zoom}
+        campaignId={campaignId}
         forgeItems={forgeItems}
         folders={folders}
         nodes={nodes}
         onCreateCharacter={onCreateCharacter}
+        onPlaceCharacter={onPlaceCharacter}
         onCreateLocation={onCreateLocation}
         onCreateItem={onCreateItem}
         onCreateItemFromForge={onCreateItemFromForge}
@@ -2993,10 +3014,12 @@ import { ITEM_TYPE_ICONS } from '@/types/item';
 function CanvasToolbox({
   viewBox,
   zoom,
+  campaignId,
   forgeItems,
   folders,
   nodes,
-  onCreateCharacter,
+  onCreateCharacter: _onCreateCharacter,
+  onPlaceCharacter,
   onCreateLocation,
   onCreateItem,
   onCreateItemFromForge,
@@ -3004,10 +3027,12 @@ function CanvasToolbox({
 }: {
   viewBox: { x: number; y: number; width: number; height: number };
   zoom: number;
+  campaignId: string;
   forgeItems?: ForgeItemSummary[];
   folders?: CanvasFolder[];
   nodes?: CanvasNode[];
   onCreateCharacter?: (name: string) => void;
+  onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
   onCreateLocation?: (name: string, type: string) => void;
   onCreateItem?: (name: string, type: string) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
@@ -3015,8 +3040,30 @@ function CanvasToolbox({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showForgeItems, setShowForgeItems] = useState(false);
+  const [showCharacterPicker, setShowCharacterPicker] = useState(false);
+  const [pickerCharacters, setPickerCharacters] = useState<Array<{ id: string; name: string; entityType: string; status: string; seedName: string | null; stewardName: string | null; tkv: number | null }>>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
 
   const publishedItems = (forgeItems || []).filter(f => f.type === 'item');
+
+  // Lazy fetch of the campaign character roster when the picker opens.
+  // We re-fetch every open so newly-locked characters appear without a page reload.
+  useEffect(() => {
+    if (!showCharacterPicker) return;
+    let cancelled = false;
+    setPickerLoading(true);
+    fetch(`/api/campaigns/${campaignId}/entities`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(data => {
+        if (cancelled) return;
+        setPickerCharacters(data.entities || []);
+      })
+      .catch(() => { if (!cancelled) setPickerCharacters([]); })
+      .finally(() => { if (!cancelled) setPickerLoading(false); });
+    return () => { cancelled = true; };
+  }, [showCharacterPicker, campaignId]);
+
+  const nodeIdSet = new Set((nodes || []).filter(n => n.type === 'character').map(n => n.id));
 
   // Position derived directly from viewBox state â€” no CTM, no frame-lag wobble.
   // X: always centered horizontally in the visible area.
@@ -3128,10 +3175,7 @@ function CanvasToolbox({
             <ToolboxButton
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
               label="Character"
-              onClick={() => {
-                const name = window.prompt('Character name:');
-                if (name?.trim()) onCreateCharacter?.(name.trim());
-              }}
+              onClick={() => setShowCharacterPicker(v => !v)}
             />
             <ToolboxButton
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>}
@@ -3149,6 +3193,71 @@ function CanvasToolbox({
               onClick={() => setShowForgeItems(v => !v)}
             />
           </div>
+
+          {/* Character picker — opened by the Character button above */}
+          {showCharacterPicker && (
+            <div style={{ marginBottom: 8, maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 4, background: 'rgba(34,171,148,0.06)', border: '1px solid rgba(34,171,148,0.3)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#22ab94', letterSpacing: '0.08em', padding: '2px 4px 6px' }}>
+                {'☸'} PLACE CHARACTER ON CANVAS {pickerCharacters.length > 0 ? `(${pickerCharacters.length})` : ''}
+              </div>
+              {pickerLoading ? (
+                <div style={{ padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.45)', textAlign: 'center' }}>Loading…</div>
+              ) : pickerCharacters.length === 0 ? (
+                <div style={{ padding: '12px 8px', fontSize: 10, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 1.4 }}>
+                  No characters in this campaign yet. Use the Tapestry tab to accept a Trailblazer applicant or author NPCs.
+                </div>
+              ) : (
+                pickerCharacters.map(ch => {
+                  const onCanvas = nodeIdSet.has(ch.id);
+                  const statusColor = ch.status === 'ACTIVE' ? '#22ab94'
+                    : ch.status === 'APPROVED' ? '#ffcc78'
+                    : ch.status === 'SUBMITTED' ? '#b4a7d6'
+                    : ch.status === 'DRAFT' ? 'rgba(255,255,255,0.4)'
+                    : '#888';
+                  return (
+                    <button
+                      key={ch.id}
+                      onClick={() => {
+                        // Characters live BELOW the KRMA line (y > 0). Place near
+                        // the viewport center, slightly below the line so the card
+                        // is immediately visible.
+                        const spawnX = viewBox.x + viewBox.width / 2;
+                        const spawnY = Math.max(viewBox.y + viewBox.height / 2, 200);
+                        onPlaceCharacter?.(ch.id, spawnX, spawnY);
+                        setShowCharacterPicker(false);
+                      }}
+                      style={{
+                        padding: '6px 8px',
+                        background: onCanvas ? 'rgba(34,171,148,0.18)' : 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${onCanvas ? 'rgba(34,171,148,0.45)' : 'rgba(255,255,255,0.15)'}`,
+                        borderRadius: 4,
+                        color: 'white',
+                        fontSize: 10,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{
+                        width: 6, height: 6, borderRadius: '50%', background: statusColor, flexShrink: 0,
+                      }} />
+                      <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.name}</span>
+                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {[ch.seedName, ch.stewardName, ch.status].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                      <span style={{ fontSize: 8, color: onCanvas ? '#22ab94' : 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>
+                        {onCanvas ? 'REPOSITION' : 'PLACE'}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
 
           {/* Forge item picker - opened by the Item button above */}
           {showForgeItems && (

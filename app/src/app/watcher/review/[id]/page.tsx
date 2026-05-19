@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { canEditCharacter } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import BackstoryReview from '@/components/BackstoryReview';
+import MechanicsPanel from '@/components/character/MechanicsPanel';
 import Link from 'next/link';
 
 export default async function ReviewBackstoryPage({ params }: { params: Promise<{ id: string }> }) {
@@ -54,6 +55,14 @@ export default async function ReviewBackstoryPage({ params }: { params: Promise<
             responses={JSON.parse(character.backstory.responses)}
             status={character.backstory.status}
             existingNotes={character.backstory.gmNotes}
+          />
+        </div>
+
+        <div className="mt-8 border-t border-white/10 pt-6">
+          <MechanicsPanel
+            characterId={character.id}
+            campaignId={character.campaign!.id}
+            characterStatus={character.status}
           />
         </div>
       </div>

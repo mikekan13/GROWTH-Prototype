@@ -2,7 +2,9 @@
 
 **Status:** #validated   
 **Source:** Core Rulebook v0.4.4.md, Skilled vs Unskilled Checks — Change Spec (v0.1).md  
-**Last Updated:** 2025-08-11
+**Security:** PUBLIC  
+**Rulebook:** `rulebook/rulebook.md` §1 (Resolution)  
+**Last Updated:** 2026-04-22
 
 ---
 

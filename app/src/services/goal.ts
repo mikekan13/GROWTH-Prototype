@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter, canViewCharacter, isWatcherOrAbove, isAdminRole } from '@/lib/permissions';
+import { emit as emitGodHeadEvent } from './godhead-dispatcher';
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -74,6 +75,16 @@ export async function createGoal(
       priority: input.priority,
     },
   });
+
+  // Fire-and-forget Godhead notification — Eth'erling triages the new goal
+  // and decides whether to route it to Kai for pricing / custodian assignment.
+  void emitGodHeadEvent('goal.created', {
+    goalId: goal.id,
+    characterId: goal.characterId,
+    campaignId: goal.campaignId,
+    description: goal.description,
+    priority: goal.priority,
+  }).catch(() => { /* dispatcher already logs its own failures */ });
 
   return goal;
 }
@@ -207,12 +218,21 @@ export async function abandonGoal(goalId: string, userId: string, userRole: stri
     throw new ForbiddenError('Only the GM or admin can abandon goals');
   }
 
-  // TODO: Deduct KRMA cost for abandonment (amount TBD)
-
-  return prisma.goal.update({
+  // TODO: Deduct KRMA cost for abandonment (amount TBD — see goal abandonment
+  // formula in Mike's notes). Placeholder cost of 0 for now so the lifecycle
+  // works end-to-end and Lady Death can still be notified.
+  const updated = await prisma.goal.update({
     where: { id: goalId },
     data: { status: 'ABANDONED', completedAt: new Date() },
   });
+
+  void emitGodHeadEvent('goal.abandoned', {
+    goalId: updated.id,
+    characterId: updated.characterId,
+    campaignId: updated.campaignId,
+  }).catch(() => { /* swallow */ });
+
+  return updated;
 }
 
 /**
@@ -227,10 +247,19 @@ export async function completeGoal(goalId: string) {
     throw new ValidationError('Can only complete active goals');
   }
 
-  return prisma.goal.update({
+  const updated = await prisma.goal.update({
     where: { id: goalId },
     data: { status: 'COMPLETED', completedAt: new Date() },
   });
+
+  void emitGodHeadEvent('goal.completed', {
+    goalId: updated.id,
+    characterId: updated.characterId,
+    campaignId: updated.campaignId,
+    custodianName: updated.custodianName,
+  }).catch(() => { /* swallow */ });
+
+  return updated;
 }
 
 /**
@@ -245,10 +274,19 @@ export async function failGoal(goalId: string) {
     throw new ValidationError('Can only fail active goals');
   }
 
-  return prisma.goal.update({
+  const updated = await prisma.goal.update({
     where: { id: goalId },
     data: { status: 'FAILED', completedAt: new Date() },
   });
+
+  void emitGodHeadEvent('goal.failed', {
+    goalId: updated.id,
+    characterId: updated.characterId,
+    campaignId: updated.campaignId,
+    custodianName: updated.custodianName,
+  }).catch(() => { /* swallow */ });
+
+  return updated;
 }
 
 // ── Custodian Assignment (called from goal-custodian service) ─────────

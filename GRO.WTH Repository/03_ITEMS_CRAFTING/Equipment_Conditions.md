@@ -1,44 +1,49 @@
 # Equipment_Conditions.md
 
-**Status:** #needs-validation  
-**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md  
-**Last Updated:** 2025-08-07
+**Status:** #validated  
+**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, ruling 2026-04-22  
+**Security:** PUBLIC  
+**Rulebook:** `rulebook/rulebook.md` §9.3 (Equipment Condition Scale)  
+**Last Updated:** 2026-04-22
 
 ---
 
 # Equipment Conditions
 
-All equipment in GROWTH degrades through use and can exist in four distinct condition states.
+All equipment in GROWTH degrades through use and exists on a **5-level condition scale (0–4)**. Per ruling r-2026-04-22-12:
 
 ## Condition States
 
-### Undamaged
-**Description:** Perfect working condition  
+### 4 — Indestructible
+**Description:** Special / super rare. Cannot be destroyed.  
+**Mechanical Effect:** Full effectiveness, cannot drop below level 4.  
+**Notes:** This is a property of the item (usually from exotic materials, enchantment, or narrative importance), not a maintenance state. Most items will never hit this level.
+
+### 3 — Undamaged
+**Description:** Perfect working condition. The normal max for ordinary items.  
 **Mechanical Effect:** Full effectiveness  
 **Durability:** 100% of base resistance  
 **Performance:** No penalties  
 **Market Value:** Full price
 
-### Worn
+### 2 — Worn
 **Description:** Shows signs of use but fully functional  
 **Mechanical Effect:** Slight reduction in performance  
 **Durability:** ~75% of base resistance  
 **Performance:** Minor penalties to precision tasks  
 **Market Value:** 75-90% of full price
 
-### Broken  
+### 1 — Broken  
 **Description:** Significantly damaged but partially usable  
-**Mechanical Effect:** Major performance reduction  
+**Mechanical Effect:** Major performance reduction. **Effective Resist halved.**  
 **Durability:** ~25% of base resistance  
 **Performance:** Serious penalties, may fail at critical moments  
 **Market Value:** 10-25% of full price
 
-### Destroyed
-**Description:** Completely unusable  
-**Mechanical Effect:** No function  
-**Durability:** 0 resistance  
-**Performance:** Cannot be used  
-**Market Value:** Scrap materials only
+### 0 — Destroyed
+**Description:** The item no longer exists — it has been rendered down to scrap or vanished entirely.  
+**Mechanical Effect:** N/A — item is gone.  
+**Recovery:** A destroyed item cannot be repaired. Any recoverable raw material may be salvaged at GM discretion.
 
 ## Condition Degradation
 
@@ -63,9 +68,9 @@ All equipment in GROWTH degrades through use and can exist in four distinct cond
 **Time Investment:** Varies by complexity and damage level
 
 ### Repair Difficulty
-**Worn → Undamaged:** Moderate skill check  
-**Broken → Worn:** Hard skill check, may require replacement parts  
-**Destroyed → Broken:** Very hard, often more expensive than replacement
+**Worn (2) → Undamaged (3):** Moderate skill check  
+**Broken (1) → Worn (2):** Hard skill check, may require replacement parts  
+**Destroyed (0):** Not repairable — the item no longer exists. Salvage raw materials and craft anew.
 
 ## Condition Detection
 

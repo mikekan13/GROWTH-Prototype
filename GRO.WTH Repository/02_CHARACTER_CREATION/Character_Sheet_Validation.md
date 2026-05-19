@@ -1,9 +1,10 @@
 # Character_Sheet_Validation.md
 
-**Status:** #needs-validation  
-**Source:** GROWTH Character Sheets Audit Report.md  
+**Status:** #validated  
+**Source:** GROWTH Character Sheets Audit Report.md, ruling 2026-04-22  
 **Security:** PUBLIC  
-**Last Updated:** 2025-08-11
+**Rulebook:** `rulebook/rulebook.md` §2, §3, §7 (skills, attributes, nectars/thorns validation)  
+**Last Updated:** 2026-04-22
 
 ---
 
@@ -66,28 +67,19 @@ This file documents validation rules for GROWTH character sheets based on audit 
 ## Item System Validation
 
 ### Condition States
-**Standard Terms:**
-- **4 - Indestructible**
-- **3 - Undamaged** 
+**Standard Terms (ruling r-2026-04-22-12, see `rulebook/rulebook.md` §9.3):**
+- **4 - Indestructible** (super rare — cannot be destroyed)
+- **3 - Undamaged** (perfect, normal max)
 - **2 - Worn**
 - **1 - Broken**
+- **0 - Destroyed** (item no longer exists)
 
 **Quantity-Based Items (Ammo, etc.):**
 - **2 - Sufficient** (equivalent to Worn)
 - **1 - Finite** (equivalent to Broken)
 
 **Broken Item Effects:** When Condition = 1, effective Resist is halved
-
-### Tech Level Restrictions
-**Usage vs Creation:**
-- **Some items:** Require Tech Level to **use** 
-- **Other items:** Only require Tech Level to **create** (can use if obtained)
-- **Sheet Should:** Flag items requiring higher Tech Level than character has
-
-### Wealth Level (No Usage Restrictions)
-- **Rule:** No wealth restrictions on **using** items
-- **Impact:** Can use high-wealth items if somehow obtained
-- **Sheet Should:** Not block usage based on wealth disparity
+**Destroyed Items:** When Condition = 0, the item is gone. Sheet should remove it from inventory entirely.
 
 ## Nectars and Thorns Validation
 
@@ -104,11 +96,11 @@ This file documents validation rules for GROWTH character sheets based on audit 
 ## Research Needed Items
 
 **Flag for Future Updates:**
-- **Tech Level Life Extension:** Exact formula for lifespan modification
-- **Wealth Level Mechanics:** Full 1-10 scale descriptions and effects  
 - **Clout-to-Carry Level:** Precise mapping formula
 - **Material Mod Notations:** Legend for resistance column letters (R, P, V, D, etc.)
-- **Lifespan Level Base Values:** Years for each Lifespan Level 1-10
+- **Age-to-KV rate:** Empirical validation — build Human-seed-at-age-18 reference character and re-derive per-year KV value (currently 2 KRMA/year placeholder, ruling r-2026-04-22-04)
+
+*WTH-related research items (Tech Level Life Extension, Wealth Level Mechanics, Lifespan Level Base Values) were removed along with the WTH system 2026-04-05.*
 
 ---
 

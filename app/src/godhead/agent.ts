@@ -36,6 +36,10 @@ import './tools/propose-resistance';
 import './tools/draft-blueprint';
 import './tools/send-message-to-gm';
 import './tools/transfer-krma';
+import './tools/evaluate-blueprint';
+import './tools/process-death';
+import './tools/decay-blueprint';
+import './tools/route-to-godhead';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 

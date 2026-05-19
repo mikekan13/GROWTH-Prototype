@@ -1,14 +1,17 @@
 # Complete_Materials_Reference.md
 
-**Status:** #needs-validation  
-**Source:** GROWTH Material and Item Creation Artifact, Claude Material System Dump.md  
-**Last Updated:** 2025-08-12
+**Status:** #needs-review
+**Source:** GROWTH Material and Item Creation Artifact, Claude Material System Dump.md
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
 
+> **WTH retirement (2026-04-05):** Section headings below previously read "Tech Level I/II/III/IV/VIII." Per-character Tech Level no longer exists — these headings are now **historical eras** (flavor / setting context), not a mechanical gate. What materials a character can use or craft is gated by their **skills** and the **campaign's setting**, not a numeric Tech Level.
+
 # Complete Materials Reference
 
-## Primitive Era Materials (Tech Level I)
+## Primitive Era Materials (historical era — Stone Age)
 
 ### Soft Materials
 
@@ -34,7 +37,7 @@
 | Flint | 18 | 2-Common | 4-Moderate | 0.1 | Fragile, Sharp |
 | Obsidian | 20 | 3-Standard | 4-Moderate | 0.3 | Brittle, Sharp, Unrepairable |
 
-## Early Metal Age (Tech Level II)
+## Early Metal Age (historical era — Bronze Age)
 
 ### Hard Materials
 
@@ -45,7 +48,7 @@
 | Bronze | 28 | 3-Standard | 4-Moderate | 0.5 | Heat Resistant, Electric Vulnerable |
 | Brass | 26 | 4-Uncommon | 4-Moderate | 0.6 | Heat Resistant, Electric Vulnerable |
 
-## Iron Age (Tech Level III)
+## Iron Age (historical era)
 
 ### Hard Materials
 
@@ -57,7 +60,7 @@
 | Steel (Low Carbon) | 35 | 4-Uncommon | 5-Heavy | 0.6 | Heat Resistant, Electric Vulnerable |
 | Steel (High Carbon) | 38 | 4-Uncommon | 5-Heavy | 0.7 | Heat Resistant, Electric Vulnerable, Brittle |
 
-## Advanced Materials (Tech Level IV+)
+## Advanced Materials (industrial / modern era)
 
 ### Soft Materials
 
@@ -103,7 +106,7 @@
 | Diamond | 23 | 8-Legendary | 4-Moderate | 0.9 | Brittle, Sharp, Heat Resistant, Unrepairable |
 | Ruby | 21 | 7-Very Rare | 4-Moderate | 0.9 | Brittle, Heat Proof, Sharp |
 
-## Impossible Materials (Tech Level VIII+)
+## Impossible Materials (mythic / setting-dependent)
 
 ### Legendary Materials
 
@@ -123,19 +126,19 @@
 
 ## Material Processing Examples
 
-### Basic Processing (Tech I-II)
+### Basic Processing (pre-industrial settings)
 
 - **Tanned Leather:** +2 Resist, removes some Absorbent weakness
 - **Seasoned Wood:** +1 Resist, reduces Flammable severity
 - **Tempered Bronze:** +3 Resist, adds Protective modifier
 
-### Advanced Processing (Tech III+)
+### Advanced Processing (iron-and-beyond settings)
 
 - **Heat-Treated Steel:** +5 Resist, reduces Brittle
 - **Alloyed Metals:** Combine properties of component metals
 - **Chemical Treatment:** Add specific resistance modifiers
 
-### Magical Enhancement (Variable Tech)
+### Magical Enhancement (setting-dependent)
 
 - **Blessed Materials:** Add divine resistance properties
 - **Elemental Infusion:** Gain elemental damage immunity/vulnerability
@@ -145,7 +148,7 @@
 
 ### For GMs
 - **Resource Abundance:** Fractional KV allows generous material availability
-- **Tech Progression:** Control material access through tech level requirements
+- **Setting-Driven Access:** Control material access through campaign setting + character skills (no per-character Tech Level — see WTH retirement note above)
 - **Custom Creation:** Use existing materials as templates for new variants
 
 ### For Players
@@ -161,6 +164,6 @@
 ---
 
 ## Links
-- Related: [[Material_System]], [[Equipment_Conditions]], [[Tech_Level_System]]
+- Related: [[Material_System]], [[Equipment_Conditions]]
 - References: [[Item_Creation_Formula]], [[KV_Economic_System]]
 - Examples: [[Material_Combination_Examples]], [[Processing_Techniques]]

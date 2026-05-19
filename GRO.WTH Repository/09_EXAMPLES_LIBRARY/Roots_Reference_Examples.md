@@ -1,8 +1,9 @@
 # Roots_Reference_Examples.md
 
-**Status:** #needs-validation  
-**Source:** Seeds.pdf from 10_ARCHIVE_ORIGINS  
-**Last Updated:** 2025-08-10
+**Status:** #needs-review
+**Source:** Seeds.pdf from 10_ARCHIVE_ORIGINS
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
 
@@ -10,12 +11,14 @@
 
 Reference tables of specific Roots with statistical mechanics, providing concrete examples for character background creation. These pre-designed examples show how childhood and upbringing experiences can be mechanically represented.
 
+> **WTH retirement (2026-04-05):** Per-character "Wealth Level" was removed. The "Wealth Level: N" entries below are now **wealth-tier shorthand** for the GM (1=destitute … 10=fabulously rich) translated into campaign-flavored currency at character-creation time, NOT a per-character mechanical level the sheet tracks.
+
 ## Root Mechanics Overview
 
 Roots represent formative childhood experiences and provide:
 - **Age Addition:** Years added to character's starting age
 - **Karma Cost (KV):** GM karma investment required
-- **Wealth Level:** Starting economic resources
+- **Starting Currency Tier:** Translated by GM into campaign-flavored currency at creation (no per-character "Wealth Level")
 - **Skills:** Proficiencies gained from upbringing
 - **Attributes:** Modifications to base statistics
 - **Social Connections:** Network and reputation effects

@@ -1,8 +1,11 @@
 # Character_Creation_Example_Human_Scholar.md
 
-**Status:** #needs-validation  
-**Source:** Demonstrates character creation systems in practice  
-**Last Updated:** 2025-08-09
+**Status:** #needs-review
+**Source:** Demonstrates character creation systems in practice
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
+
+> **MAY 2026 SWEEP NOTE:** This example pre-dates the WTH retirement (2026-04-05) and the clarification (2026-05-04) that Fears is reserved for future expansion, not a current system. WTH-level fields and Fears section have been corrected below. Numbers (skill levels, KV totals) were not re-derived — treat as illustrative. Spirit/Soul attribute groupings now reflect the post-Jan-2026 swap (Spirit = Flow/Frequency/Focus, Soul = Will/Wisdom/Wit).
 
 ---
 
@@ -21,7 +24,8 @@ This example demonstrates creating a scholarly character focused on knowledge, m
 **Chosen Seed:** Human - Standard Template
 - **Starting Frequency Budget:** 100 points
 - **Base Fate Die:** d6 (reliable human baseline)
-- **Natural [[Health_Level_System|Health Level]]:** 5 (~150 year natural lifespan) 
+- **Fated Age:** ~80 years (Human Seed default — replaces the retired "Health Level" concept)
+- **bodyResist:** Seed-defined (death resistance — see [[Lady_Death_Protocols]])
 - **Inherent Abilities:** None (balanced with higher Frequency)
 - **Attribute Baselines:** All attributes start at 8
 
@@ -42,8 +46,8 @@ This example demonstrates creating a scholarly character focused on knowledge, m
   - Wit +4 (brilliant analytical mind)
   - Wisdom +2 (scholarly insight)
   - Constitution -2 (sedentary lifestyle)
-- **Starting Wealth:** Level 6 (Affluent - professor's salary)
-- **Technology Level:** 4 (Renaissance era knowledge)
+- **Starting Currency:** Affluent professor's salary (campaign-flavored currency backed by KRMA value — no per-character "Wealth Level")
+- **Technology Access:** Renaissance-era setting; relevant skills (Magic Theory, Research, Literacy) gate what tech the character can use or build
 - **Social Connections:** Academic network, library access
 
 ## Step 4: Custom Branch Creation (GM)
@@ -119,14 +123,11 @@ This example demonstrates creating a scholarly character focused on knowledge, m
 - Discover the truth behind the ancient texts he stole
 - *Available 4th GRO.vine slot (Human "Ambitious" nectar provides +1 capacity)*
 
-**Fears:**
-- Capture by political enemies
-- Loss of his research and life's work  
-- Being wrong about his theories
+> **Fears:** Reserved for future expansion. Not a current GROWTH system. See FOUNDATIONS.md and design-truth §18. Lysander's anxieties are narrative flavor, expressed through his GRO.vines and Thorns rather than a separate mechanic.
 
-## Step 6: Starting Equipment and Wealth
+## Step 6: Starting Equipment and Currency
 
-**Wealth Level 6 (Affluent):** 18 Wealth Checks available (6 levels × 3 checks)
+**Affluent professor's purse:** Equivalent to several months of comfortable living expenses in campaign currency. *(Per WTH retirement 2026-04-05: there is no "Wealth Check" mechanic — currency is just currency.)*
 
 **Starting Equipment:**
 - **Research Materials:** Ancient text fragments, notes, maps
@@ -137,10 +138,12 @@ This example demonstrates creating a scholarly character focused on knowledge, m
 
 ## Step 7: Magic and Mana
 
-**Mana Calculation:** 
-- **Soul Mana:** KV 170 ÷ 10 = 17 points
-- **Body Mana:** Constitution 6 = 6 points  
-- **Spirit Mana:** (Willpower + Wisdom + Wit) ÷ 3 = (8+10+12) ÷ 3 = 10 points
+**Mana Calculation (legacy formula — pending mana-system review):**
+- **Spirit Mana:** From the Spirit pillar (Flow + Frequency + Focus). *(Post-Jan-2026 swap: this is the Spirit pillar, not the Soul pillar.)*
+- **Body Mana:** Constitution 6 = 6 points
+- **Soul Mana:** (Willpower + Wisdom + Wit) ÷ 3 = (8+10+12) ÷ 3 = 10 points *(post-swap: this is the Soul pillar)*
+
+> **[NEEDS MIKE]** — mana derivation formula was authored pre-swap and uses old labels. Confirm whether mana derives from Spirit pillar, Soul pillar, or both, post-swap.
 
 **Known Spells:** 
 - **Light** (Alteration/Mercy) - Theoretical knowledge, basic practice

@@ -1,13 +1,15 @@
 # Character_Sheet_Audit_Summary.md
 
-**Status:** #validated  
-**Source:** GROWTH Character Sheets Audit Report.md (ChatGPT Analysis)  
-**Security:** PUBLIC  
-**Last Updated:** 2025-08-11
+**Status:** #archive-only
+**Source:** GROWTH Character Sheets Audit Report.md (ChatGPT Analysis)
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
 
-> **Note:** This audit was performed against the **legacy Google Sheets-based character sheets** (beta v0.5 and v1.2). The current implementation uses Prisma/SQLite and is not subject to these findings.
+> **HISTORICAL DOCUMENT.** This audit was performed against the **legacy Google Sheets-based character sheets** (beta v0.5 and v1.2). The current implementation uses Prisma/SQLite and is not subject to these findings.
+>
+> **WTH-related sections retired (2026-04-05):** "Tech Levels" and "Wealth Levels" research subsections, "Tech/Wealth Level display" and "Tech Level usage restriction warnings" tasks are all moot — per-character WTH levels were removed from the game. They are preserved below in struck-through form only as a historical record of what the legacy sheet attempted to track.
 
 # Character Sheet Audit Summary
 
@@ -46,14 +48,14 @@ This summary extracts validated findings from ChatGPT's audit of GROWTH beta cha
 
 ## ⚠️ Research Required
 
-**Tech Levels:**
-- Life extension formula (how Tech Level affects lifespan)
-- Full 1-10 scale descriptions and capabilities
-- Item usage vs creation restrictions clarification
+~~**Tech Levels:**~~ *(retired 2026-04-05 — Tech access is gated by skills + campaign setting, not a per-character level)*
+~~- Life extension formula (how Tech Level affects lifespan)~~
+~~- Full 1-10 scale descriptions and capabilities~~
+~~- Item usage vs creation restrictions clarification~~
 
-**Wealth Levels:**  
-- Complete 1-10 scale descriptions and effects
-- Acquisition difficulty mechanics (no usage restrictions confirmed)
+~~**Wealth Levels:**~~ *(retired 2026-04-05 — wealth is campaign-flavored currency backed by KRMA value)*
+~~- Complete 1-10 scale descriptions and effects~~
+~~- Acquisition difficulty mechanics (no usage restrictions confirmed)~~
 
 **Carry System:**
 - Exact Clout-to-Carry Level formula (known: ~Clout 80 = CL10 max)
@@ -70,7 +72,7 @@ This summary extracts validated findings from ChatGPT's audit of GROWTH beta cha
 - Max roll calculations (Fate Die max + Skill Level)
 - Constitution depletion detection ("Exhausted" display)
 - Item weight categories and basic inventory tracking
-- Tech/Wealth Level display (numeric + descriptors)
+- ~~Tech/Wealth Level display (numeric + descriptors)~~ *(WTH retired 2026-04-05)*
 
 ### Broken Features ❌  
 - Carry Level auto-calculation (shows #REF! or wrong values)
@@ -79,7 +81,7 @@ This summary extracts validated findings from ChatGPT's audit of GROWTH beta cha
 - Nectars/Thorns limit validation absent
 
 ### Missing Features 📋
-- Tech Level usage restriction warnings
+- ~~Tech Level usage restriction warnings~~ *(WTH retired 2026-04-05)*
 - Material mod notation system
 - Fated Age calculation and tracking
 - Death save counter for characters past Fated Age
@@ -92,9 +94,9 @@ This summary extracts validated findings from ChatGPT's audit of GROWTH beta cha
    - Add Nectars/Thorns count validation
 
 2. **Medium Priority (Quality of Life):**
-   - Replace confusing "Coin" terminology  
+   - Replace confusing "Coin" terminology
    - Add encumbrance detection logic
-   - Tech Level restriction warnings
+   - ~~Tech Level restriction warnings~~ *(WTH retired 2026-04-05)*
 
 3. **Low Priority (Enhancement):**
    - Fated Age calculation assistance

@@ -1,8 +1,10 @@
 # Skill_Level_Progression.md
 
 **Status:** #validated  
-**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, skill_system_design_session.md  
-**Last Updated:** 2025-09-01
+**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, skill_system_design_session.md, ruling 2026-04-22  
+**Security:** PUBLIC  
+**Rulebook:** `rulebook/rulebook.md` §2 (Skill Progression)  
+**Last Updated:** 2026-04-22
 
 ---
 
@@ -26,6 +28,14 @@
 **Professional Levels (8-11):** d8 represents skilled professional capability  
 **Master Levels (12-19):** d12 with increasing effort capacity for consistency  
 **Godlike (Level 20):** d20 represents divine-level skill mastery
+
+## Character Creation Soft Cap
+
+At **character creation**, the practical soft cap per skill is approximately **10**, reaching up to **12** only in extreme tuning — an older character stacking contributions from Root + multiple Branches onto the same skill. The hard cap of 20 is reserved for lifetime play: skills can climb to 20 through extended campaign progression, but doing so across multiple skills represents significant real play time.
+
+**Evaluator implication:** blueprints (Roots, Branches) that would push a newly-created character past skill level 10 should trigger extra scrutiny; past 12 should be flagged as unusual and require explicit justification.
+
+*Source: ruling 2026-04-22 (see [[../../../rulebook/rulings.md|rulings.md]] r-2026-04-22-02)*
 
 ## Combat Skills
 

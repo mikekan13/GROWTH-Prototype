@@ -3,7 +3,8 @@
 **Status:** #validated  
 **Source:** attribute depletions.md, Skilled vs Unskilled Checks — Change Spec (v0.1).md  
 **Security:** PUBLIC  
-**Last Updated:** 2025-08-11
+**Rulebook:** `rulebook/rulebook.md` §3 (Attributes & Depletion)  
+**Last Updated:** 2026-04-22
 
 ---
 

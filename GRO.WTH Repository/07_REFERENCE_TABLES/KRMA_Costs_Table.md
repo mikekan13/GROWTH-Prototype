@@ -1,8 +1,11 @@
 # KRMA_Costs_Table.md
 
-**Status:** #needs-validation  
-**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md  
-**Last Updated:** 2025-08-07
+**Status:** #needs-review
+**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
+
+> **WTH retirement (2026-04-05):** Per-character Tech Level and Wealth Level rows have been removed from Character Creation Costs. Tech access is gated by skills + campaign setting; wealth is campaign-flavored currency, not a per-character level.
 
 ---
 
@@ -33,26 +36,39 @@ Complete reference for all [[KRMA_System|KRMA]] expenditure costs and character 
 
 ## Skill Proficiency Advancement
 
-| Skill Level | KRMA Cost | Die Upgrade | Training Time |
-|---|---|---|---|
-| **Apprentice (d2)** | 10 KRMA | Untrained → d2 | Months of practice |
-| **Novice (d3)** | 14 KRMA | d2 → d3 | Additional months |
-| **Student (d4)** | 19 KRMA | d3 → d4 | Year of study |
+**Skill levels go 1 to 20.** Levels 1-3 are flat bonuses (+1, +2, +3 to the Fate Die roll — no Skill Die rolled). Skill Die starts at level 4. **There are no d2 or d3 dice** (Mike confirmed 2026-05-11; corrects earlier `#needs-review` table that listed Apprentice d2 / Novice d3 / Student d4 — those KRMA values were stale).
 
-*Note: Higher skill levels require extraction from Core Rulebook for complete cost progression*
+Full level → die mapping is in [[../01_CORE_RULES/Skill_Level_Progression]] (#validated). Summary:
 
-## Attribute Enhancement
+| Skill Level | Die | Effect on rolls |
+|---|---|---|
+| 1 / 2 / 3 | none | Flat +1 / +2 / +3 to FD roll |
+| 4-5 | d4 | Roll Skill Die + Fate Die |
+| 6-7 | d6 | Roll Skill Die + Fate Die |
+| 8-11 | d8 | Roll Skill Die + Fate Die |
+| 12-19 | d12 | Roll Skill Die + Fate Die |
+| 20 | d20 | Roll Skill Die + Fate Die |
 
-| Attribute Increase | KRMA Cost | Restrictions | Duration |
-|---|---|---|---|
-| **Any Attribute +2** | 50 KRMA | Once only per attribute | Permanent |
-| **Attribute +1** | 25 KRMA | Multiple purchases allowed | Permanent |
+**KRMA cost per level (post-creation advancement):**
 
-### Attribute Enhancement Rules
-**One-Time Bonus:** The +2 enhancement can only be purchased once per attribute  
-**Cumulative Effect:** Multiple +1 enhancements can stack  
-**Training Required:** Enhancement requires appropriate training time  
-**GM Approval:** All attribute enhancements require GM approval
+| Skill Type | KRMA per +1 level |
+|---|---|
+| Non-magic skill | **1 KRMA** |
+| Magic skill | **2 KRMA** |
+
+Same 1:1 / 2:1 conversion applies whether the level being advanced is flat-bonus (1-3) or die-rolling (4+). Source: Mike, 2026-05-11. See [[../01_CORE_RULES/Skill_Level_Progression]], `memory/skill-tiers-start-at-d4`, and `memory/attributes-and-skills-krma-rates`.
+
+## Attribute Enhancement (post-creation advancement)
+
+**All attribute levels are 1:1 KRMA:Frequency:level** (Mike confirmed 2026-05-11). Body / Spirit / Soul pillar distinctions do NOT change the cost — the legacy Body=4 / Mind=8 entries below in Character Creation Costs are **outdated** and should be ignored.
+
+| Attribute Action | KRMA Cost | Notes |
+|---|---|---|
+| **Any attribute +1 level** | **1 KRMA** | Universal rate. Reduces Frequency Max by 1 (the canonical Spend operation). |
+
+Trainable mechanic: a failed non-skill attribute check marks that attribute as **trainable**. On rest, the player may Spend 1 Frequency to advance the trainable attribute by 1 level. Same loop applies to failed skill checks (1 KRMA per skill level, or 2 KRMA for magic skills).
+
+*Source: `memory/trainable-attribute-skill-growth`, `memory/attributes-and-skills-krma-rates`.*
 
 ## Special Purchases
 
@@ -81,21 +97,64 @@ Complete reference for all [[KRMA_System|KRMA]] expenditure costs and character 
 
 | Creation Option | KRMA Cost | Budget Impact | Notes |
 |---|---|---|---|
-| **Tech Level Above Simple (2)** | 10 KRMA | Per level | Technology access |
-| **Wealth Level Above Middle Class (5)** | 10 KRMA | Per level | Starting resources |
 | **Attunement** | 15 KRMA | Special ability | Magical sensitivity |
 | **Supernatural Access** | 30 KRMA | Major ability | Inherent magic/powers |
-| **Body Attributes** | 4 KRMA | Per point increase | Physical enhancement |
-| **Mind Attributes** | 8 KRMA | Per point increase | Mental enhancement |
+| ~~Body Attributes (4 KRMA)~~ | **STALE — DO NOT USE** | — | Corrected 2026-05-11: all attribute levels are 1:1 KRMA. See Attribute Enhancement section above. |
+| ~~Mind Attributes (8 KRMA)~~ | **STALE — DO NOT USE** | — | Same as above. The 4/8 distinction never reflected canon. |
 
 ### Character Creation Budget
-**Starting Recommended:** ~50 KV (Karmic Value)  
-**Base Template:** 200 KV (100 Seed + 100 Root - Age×2)  
+**Starting Recommended:** ~50 KV (Karmic Value)
+**Base Template:** 200 KV (100 Seed + 100 Root - Age×2) — legacy paper anchor; see TKV tier framework in [[Seeds_Roots_Branches_System]] for current canon (Low 130-220, Medium 220-350, High 350-550, Premium 550+).
 **Annual Earning Rate:** ~156 KRMA per year of play
 
 ### Branch Examples with Costs
 - **Arcane Awakening:** 27 KRMA (Trayman version)
 - **Sailor (Greenhorn):** 12 KRMA (+2 age, attribute/skill bonuses)
+
+## Seed Component Costs (canon — locked 2026-05-08 / 2026-05-09)
+
+**Status:** #needs-validation — formulas locked during the Elven design session and confirmed against the locked Elven seed (seedKV 476). Full reasoning in `WIP-elven-seed-design.md` and `elven-seed-research-2026-05-08.md`.
+
+These are the per-component KRMA contributions to a **seedKV** (the cost a GM pays to spawn one character of that Seed). All contributions are **positive-only** — refund-style negatives are forbidden and must be encoded as Thorn liens (see [[Nectars_and_Thorns_System]] and `memory/negatives-only-in-thorns-liens`).
+
+| Component | KRMA Cost | Notes |
+|---|---|---|
+| **1 attribute aug** | 1 KRMA | Same rate as Frequency budget point. Seeds contribute augs, NOT levels. |
+| **Starting Frequency budget** | 1 KRMA per point | The pool of Frequency the player spends on Roots/Branches at creation. |
+| **Base Resist** | 2 KRMA per point | Defensive stat for body parts in combat (NOT a death-roll modifier). Positive-only, absolute. |
+| **Base Fate Die** | d4 = 5, d6 = 10, **d8 = 20 (system default)**, d12 = 40, d20 = 80 | Source: `rulebook/rulebook.md` §3 |
+| **Fated Age** | `ceil(fatedAge × 0.5)` | Approach 2, LOCKED 2026-05-08. Absolute, every cycle costs positive KRMA, no refunds. Worked examples: Human 80yr = +40, Goblinoid 45yr = +23, Elven 1000yr = +500, Celestial 1500yr = +750. |
+| **Starting skill (rare)** | **1 KRMA × skill level** (non-magic) or **2 KRMA × skill level** (magic). Capped at level 4 (d4) for seed grants. | Seeds default to 0 skills. Exception: species with innate-born trained ability grant a skill at level 1-4 (never higher at the seed level). Levels 1-3 are flat-bonus skills (no die); level 4 = d4. Cost example: level 4 non-magic = 4 KRMA. |
+| **Nectar** | Kai-graded individually | No formula. Baseline scale: +1 flat mod to a roll ≈ 5 KV (contextual / situational bonuses score lower). Graded with synergy awareness — same Nectar in a different seed re-grades differently. |
+| **Thorn (lien)** | Kai-graded individually (negative) | Functions as a **lien** collected by Lady Death (or the sponsoring Godhead) at the character's death. Not a creation refund. |
+
+**Application formula:**
+
+```
+seedKV = sum(augs)
+       + (1 × frequencyBudget)
+       + (2 × baseResist)
+       + fateDieKV
+       + ceil(fatedAge × 0.5)
+       + sum(starting skill costs)
+       + sum(Nectar Kai-grades)
+       - sum(Thorn lien magnitudes)
+```
+
+### Age-Cost Ratio (Roots/Branches reductions)
+
+Separate from `fatedAgeKV` above. Adding age to a **Root or Branch** reduces that Root/Branch's Frequency cost at the rate of **1 year = 2 KRMA reduction** (ruling r-2026-04-22-04). This is the *Root/Branch reduction* axis and is **decoupled** from the Seed's `fatedAgeKV` formula by design (lifespan-as-resource vs. age-as-narrative-content).
+
+### TKV Tier Anchors (for balancing new seeds)
+
+| Tier | seedKV range | Reference |
+|---|---|---|
+| Low | 130 – 220 | Human ≈ 225 paper |
+| Medium | 220 – 350 | Altered Human ≈ 350 paper |
+| High | 350 – 550 | Elven = 476 LOCKED |
+| Premium | 550+ | Celestial proposed ≈ 685 |
+
+Aug totals are NOT fixed across seeds — vary aug magnitude to the seed's identity, then size other components to land in the desired tier. See [[Seeds_Roots_Branches_System]] §"TKV Tier Framework".
 
 ## Group and Campaign Costs
 
@@ -121,6 +180,6 @@ Complete reference for all [[KRMA_System|KRMA]] expenditure costs and character 
 ---
 
 ## Links
-- Related: [[KRMA_System]], [[Character_Advancement]], [[Skill_Level_Progression]]
+- Related: [[KRMA_System]], [[Character_Advancement]], [[Skill_Level_Progression]], [[Seeds_Roots_Branches_System]], [[Seed_KV_Formulas]], [[Nectars_and_Thorns_System]]
 - References: [[Character_Creation_Costs]], [[Advanced_KRMA_Options]]
-- Examples: [[KRMA_Spending_Strategies]]
+- Examples: [[KRMA_Spending_Strategies]], `WIP-elven-seed-design.md`

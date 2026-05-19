@@ -154,6 +154,10 @@ export interface TKVBreakdown {
   traitsTotal: number;
   items: Array<{ id?: string; name: string; kv: number; type?: string }>;
   itemsTotal: number;
+  // Seed-contributed creation values (optional — present once mechanics are applied)
+  augs?: { total: number; rate: number };
+  fateDie?: { die: string; kv: number };
+  fatedAge?: { years: number; kv: number };
 }
 
 export interface DeathSplitComponent {

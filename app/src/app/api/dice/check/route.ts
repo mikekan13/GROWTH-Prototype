@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { prisma } from '@/lib/db';
 import { DiceService } from '@/services/dice';
-import type { FateDie } from '@/types/growth';
+import { computeTraitModifier } from '@/lib/trait-modifiers';
+import type { FateDie, GrowthCharacter, GrowthTrait } from '@/types/growth';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const params = CheckSchema.parse(body);
 
+    // ── Trait modifiers — look up the character's nectars/thorns/blossoms
+    //    and compute any "+N to <skill|attribute|pillar> checks" rules that
+    //    apply to this check, then fold into flatModifiers.
+    let traitModTotal = 0;
+    let traitApplied: Array<{ amount: number; target: string; from: 'nectar' | 'blossom' | 'thorn' }> = [];
+    try {
+      const character = await prisma.character.findUnique({ where: { id: params.characterId } });
+      if (character) {
+        const data = JSON.parse(character.data) as Partial<GrowthCharacter>;
+        const traits = (data.traits ?? []) as GrowthTrait[];
+        const out = computeTraitModifier(traits, {
+          skillName: params.skillName,
+          effortAttribute: params.effortAttribute,
+        });
+        traitModTotal = out.total;
+        traitApplied = out.applied;
+      }
+    } catch {
+      // If the character lookup fails for any reason, fall through with no
+      // trait modifier rather than failing the check.
+    }
+
+    const combinedFlat = params.flatModifiers + traitModTotal;
+
     const result = params.isSkilled
       ? DiceService.skilledCheck({
           characterId: params.characterId,
@@ -37,7 +63,7 @@ export async function POST(request: NextRequest) {
           effort: params.effort,
           effortAttribute: params.effortAttribute,
           dr: params.dr,
-          flatModifiers: params.flatModifiers,
+          flatModifiers: combinedFlat,
         })
       : DiceService.unskilledCheck({
           characterId: params.characterId,
@@ -45,7 +71,7 @@ export async function POST(request: NextRequest) {
           effort: params.effort,
           effortAttribute: params.effortAttribute,
           dr: params.dr,
-          flatModifiers: params.flatModifiers,
+          flatModifiers: combinedFlat,
         });
 
     return NextResponse.json({
@@ -61,6 +87,8 @@ export async function POST(request: NextRequest) {
       success: result.success,
       margin: result.margin,
       timestamp: result.timestamp,
+      traitModifier: traitModTotal,
+      traitApplied,
     });
   } catch (error) {
     return errorResponse(error);

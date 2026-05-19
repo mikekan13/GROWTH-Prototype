@@ -591,6 +591,62 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
   }, [campaign.id, router]);
 
+  // Place (or reposition) an existing campaign character onto the canvas.
+  // Optimistic: add/move the node locally so it appears instantly, then persist
+  // canvas coordinates via the server (PATCH-equivalent) so it survives reloads.
+  const handlePlaceCharacter = useCallback(async (characterId: string, x: number, y: number) => {
+    // Optimistic local update — if the node already exists, reposition; otherwise fetch + add.
+    setNodes(prev => {
+      const existingIdx = prev.findIndex(n => n.id === characterId && n.type === 'character');
+      if (existingIdx >= 0) {
+        return prev.map(n => n.id === characterId ? { ...n, x, y } : n);
+      }
+      return prev;
+    });
+
+    // If the character isn't already on the canvas, hydrate its data and add a node.
+    if (!nodes.some(n => n.id === characterId && n.type === 'character')) {
+      try {
+        const res = await fetch(`/api/characters/${characterId}`);
+        if (res.ok) {
+          const { character } = await res.json();
+          const parsed = (() => {
+            try { return typeof character.data === 'string' ? JSON.parse(character.data) : character.data; }
+            catch { return null; }
+          })();
+          setNodes(prev => {
+            if (prev.some(n => n.id === characterId)) return prev;
+            return stampTKV([
+              ...prev,
+              {
+                id: characterId,
+                type: 'character' as const,
+                name: character.name,
+                x, y,
+                status: character.status,
+                portrait: character.portrait,
+                characterData: parsed,
+              },
+            ]);
+          });
+        }
+      } catch {
+        // Silent — server persist below is still attempted.
+      }
+    }
+
+    // Persist position
+    try {
+      await fetch(`/api/characters/${characterId}/canvas-position`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x, y }),
+      });
+    } catch {
+      // Persistence failed; the optimistic node will revert on reload.
+    }
+  }, [nodes, stampTKV]);
+
   const handleCreateLocation = useCallback(async (name: string, type: string) => {
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}/locations`, {
@@ -917,6 +973,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             campaignId={campaign.id}
             crystallizedEntityIds={crystallizedEntityIds}
             onCreateCharacter={handleCreateCharacter}
+            onPlaceCharacter={handlePlaceCharacter}
             onDeleteCharacter={(nodeId) => setDeleteTarget(nodeId)}
             onCharacterUpdate={handleCharacterUpdate}
             onCreateLocation={handleCreateLocation}

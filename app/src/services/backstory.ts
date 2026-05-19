@@ -53,6 +53,21 @@ export async function submitBackstory(
   });
 }
 
+/**
+ * Internal: bump Character.status when GM acts on backstory.
+ * APPROVED → character.status='SUBMITTED' (GM ready to apply mechanics)
+ * REVISION → character.status stays 'DRAFT' (player iterating)
+ */
+async function syncCharacterStatusFromBackstory(characterId: string, backstoryStatus: 'APPROVED' | 'REVISION') {
+  if (backstoryStatus === 'APPROVED') {
+    await prisma.character.update({
+      where: { id: characterId },
+      data: { status: 'SUBMITTED' },
+    });
+  }
+  // REVISION: leave character.status as DRAFT so player can keep editing.
+}
+
 export async function reviewBackstory(
   characterId: string,
   userId: string,
@@ -69,8 +84,12 @@ export async function reviewBackstory(
     throw new ForbiddenError('Only GM can review backstories');
   }
 
-  return prisma.characterBackstory.update({
+  const updated = await prisma.characterBackstory.update({
     where: { characterId },
     data: { status: input.status, gmNotes: input.gmNotes || null },
   });
+
+  await syncCharacterStatusFromBackstory(characterId, input.status);
+
+  return updated;
 }

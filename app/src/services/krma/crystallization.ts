@@ -10,6 +10,8 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import type { CrystallizationLedgerEntry, EntityType } from '@/types/crystallization';
+import { executeTransaction } from './ledger';
+import { createCharacterWallet, getWalletByCampaign, getWalletByCharacter } from './wallet';
 
 // ── Schemas ──
 
@@ -91,6 +93,62 @@ export async function crystallizeEntity(
       }),
     },
   });
+
+  // ── KRMA investment (CHARACTER only for now) ────────────────────────────
+  // When a character crystallizes, KRMA equal to its TKV is transferred from
+  // the campaign wallet into a per-character wallet. On dissolve, it returns.
+  // Locations and items don't yet have per-entity wallets; their KV is only
+  // tracked in the campaignEvent ledger above.
+  if (input.entityType === 'character' && input.karmicValue > 0) {
+    try {
+      const campaignWallet = await getWalletByCampaign(campaignId);
+      if (input.action === 'crystallize') {
+        // Lazy-create the character wallet on first crystallization.
+        let charWallet;
+        try {
+          charWallet = await getWalletByCharacter(input.entityId);
+        } catch {
+          charWallet = await createCharacterWallet(input.entityId, campaignId);
+        }
+        await executeTransaction({
+          fromWalletId: campaignWallet.id,
+          toWalletId: charWallet.id,
+          amount: BigInt(input.karmicValue),
+          state: 'LOCK',
+          reason: 'CHARACTER_INVEST',
+          description: `Invested ${input.karmicValue} KRMA into ${input.entityName}`,
+          metadata: { entityId: input.entityId, entityName: input.entityName, crystallizationId: entry.id },
+          campaignId,
+          actorId: gmUserId,
+          actorType: 'GM',
+          idempotencyKey: `crystallize::${entry.id}`,
+        });
+      } else if (input.action === 'dissolve') {
+        // Refund from character wallet back to campaign.
+        const charWallet = await getWalletByCharacter(input.entityId);
+        await executeTransaction({
+          fromWalletId: charWallet.id,
+          toWalletId: campaignWallet.id,
+          amount: BigInt(input.karmicValue),
+          state: 'UNLOCK',
+          reason: 'CHARACTER_ADJUST',
+          description: `Dissolved ${input.entityName} — refunded ${input.karmicValue} KRMA`,
+          metadata: { entityId: input.entityId, entityName: input.entityName, crystallizationId: entry.id },
+          campaignId,
+          actorId: gmUserId,
+          actorType: 'GM',
+          idempotencyKey: `dissolve::${entry.id}`,
+        });
+      }
+    } catch (err) {
+      // If the wallet transfer fails, the crystallization event is still recorded
+      // (the campaignEvent above succeeded). Surface the error so the caller can
+      // see it but don't roll back the ledger entry — they remain reconcilable.
+      throw new ValidationError(
+        `Crystallization recorded but KRMA transfer failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
 
   return entry;
 }

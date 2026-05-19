@@ -1,10 +1,13 @@
 # Damage_Type_Interactions.md
 
-**Status:** #needs-validation
-**Source:** Claude Damage Knowledge dump.md, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Status:** #needs-review
+**Source:** Claude Damage Knowledge dump.md, User clarification 2025-10-03, merged 2026-05-03 (absorbs former `Damage_Types_and_Effects.md`)
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
+
+> **Merged 2026-05-03:** This file is the **canonical** damage-type reference. The former `Damage_Types_and_Effects.md` (substantively duplicative — same 7 types, same vs-Soft/Hard/Body matrix) has been removed; its unique content (Damage Resolution Order, Massive Damage Rule, Ongoing Effects callout) has been folded in below.
 
 # Damage Type Interactions and Material Modifiers
 
@@ -20,8 +23,39 @@ GROWTH's damage system uses **7 core damage types** with **specific material int
 
 ## Damage Expression Format
 
-**Damage String:** `P:S:H/D\C:B:E`  
+**Damage String:** `P:S:H/D\C:B:E`
 **Example:** `10:5:8/3\2:7:4` = 10 Piercing, 5 Slashing, 8 Heat, 3 Decay, 2 Cold, 7 Bashing, 4 Energy
+
+## Damage Resolution Order
+
+When multiple damage types apply in a single hit, they resolve in this fixed order regardless of the order they were applied or rolled:
+
+**Piercing → Slashing → Heat → Decay → Cold → Bashing → Energy**
+
+This guarantees consistent layer-by-layer math when armor and material modifiers are involved.
+
+## Massive Damage Rule (Universal)
+
+**Threshold:** Damage equal to **3× the target material's resistance value** causes **instant destruction** of that item or layer.
+
+- Skips condition degradation entirely.
+- Applies to **all damage types** — not just Piercing.
+- Overflow continues: remaining damage = `Total Damage − Resistance Value` continues to the next layer (or to the body).
+
+**Examples:**
+- Steel armor (20 resist): 60+ damage → instant destruction.
+- 75 damage vs 20 resist → destroyed; 55 damage continues to next layer.
+
+## Ongoing Effects
+
+GROWTH damage types have **no inherent ongoing damage** in the core rules. Persistent / over-time effects are created through:
+
+- **Nectars / Thorns** — character abilities that apply persistent conditions.
+- **Material modifiers** — items with "Flammable", "Self-Healing", "Combustible", etc.
+- **Spells / magic** — custom magical effects that persist over time.
+- **Environmental hazards** — campaign-specific (burning rooms, acid pools).
+
+**KRMA Cost Principle applies:** unusual or powerful ongoing effects cost more KRMA to create. The base 7-type damage system is the cheap default.
 
 ## Material Resistance Types
 
@@ -112,14 +146,16 @@ GROWTH's damage system uses **7 core damage types** with **specific material int
 
 ## Natural Damage-Attribute Affinities (KRMA Efficient)
 
-### Efficient Pairings
-**Piercing (P)** → **Clout** - Physical force and penetration  
-**Slashing (S)** → **Celerity** - Speed and precision cutting  
-**Heat (H)** → **Constitution** - Physical endurance against temperature  
-**Decay (D)** → **Focus** - Will to resist corruption  
-**Cold (C)** → **Willpower** - Mental resistance to numbing effects  
-**Bashing (B)** → **Wisdom** - Understanding how to absorb impact  
-**Energy (E)** → **Wit** - Mental processing of energy effects
+### Efficient Pairings (post-Jan-2026 pillar labels)
+**Piercing (P)** → **Clout** (Body) — physical force and penetration
+**Slashing (S)** → **Celerity** (Body) — speed and precision cutting
+**Heat (H)** → **Constitution** (Body) — physical endurance against temperature
+**Decay (D)** → **Focus** (Spirit) — will to resist corruption
+**Cold (C)** → **Willpower** (Soul) — mental resistance to numbing effects
+**Bashing (B)** → **Wisdom** (Soul) — understanding how to absorb impact
+**Energy (E)** → **Wit** (Soul) — mental processing of energy effects
+
+> **[NEEDS MIKE]** — this affinity table predates the Jan 2026 Soul/Spirit swap. Two of the seven damage types (Decay, Cold) crossed pillars in the swap; confirm whether the affinities still hold post-swap or whether they should rebalance now that Flow/Frequency/Focus live on Spirit and Will/Wisdom/Wit live on Soul.
 
 ### KRMA Efficiency Benefits
 **Aligned Targeting:** Using natural affinities costs less [[KRMA_System|KRMA]]  

@@ -1,8 +1,9 @@
 # Weapon_Examples_Table.md
 
-**Status:** #needs-validation
+**Status:** #needs-review
 **Source:** Derived from Weapon_System.md and general weapon categories, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
 
@@ -65,14 +66,14 @@ All weapons are subject to the [[Equipment_Conditions|condition degradation syst
 
 ## Integration with Other Systems
 
-### Wealth Level
-Weapon acquisition is limited by character [[Wealth_Level_System|Wealth Level]] and availability.
+### Currency / Wealth
+Weapon acquisition costs campaign-flavored currency (backed by KRMA value) and is gated by availability in the campaign setting. *(Per WTH retirement 2026-04-05: there is no per-character "Wealth Level." Use currency prices and item KV.)*
 
-### Technology Level  
-Weapon types are restricted by campaign [[Technology_Level_System|Technology Level]]:
-- **Levels 1-2:** Stone, bone, basic metal weapons
-- **Levels 3-4:** Advanced metallurgy, gunpowder weapons
-- **Levels 5+:** Modern and advanced weapons
+### Technology Access
+Weapon types are restricted by **campaign setting** (what tech exists in the world) and by character **skills** (what the character knows how to use or build). *(Per WTH retirement 2026-04-05: per-character "Tech Level" is gone. Setting + skills handle technology.)*
+- **Primitive setting:** Stone, bone, basic metal weapons
+- **Pre-industrial / medieval:** Advanced metallurgy, early firearms
+- **Modern / advanced:** Modern and advanced weapons
 
 ### Encumbrance
 All weapons contribute to [[Inventory_and_Encumbrance_System|carrying capacity]] based on size and material.

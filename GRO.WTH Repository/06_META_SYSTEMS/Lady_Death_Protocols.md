@@ -1,9 +1,9 @@
 # Lady_Death_Protocols.md
 
-**Status:** #needs-validation  
-**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05  
-**Security:** PUBLIC  
-**Last Updated:** 2026-04-05
+**Status:** #needs-review
+**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05, GROWTH-DESIGN-TRUTH §7.5 / §13 / §15
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
 
@@ -52,7 +52,13 @@ Lady Death's choice is driven by her own contracts, emblems, personality, econom
 ## Death Process
 
 ### Death Trigger
-When a character's Frequency pool reaches zero (after all attribute pools have been depleted) and takes further damage, they enter **Death's Door** — Fate Die + Health Level vs Lady Death's roll.
+
+There are **two independent death systems** (per GROWTH-DESIGN-TRUTH §7.5):
+
+- **Combat Death:** Frequency current pool reaches zero (typically after all attribute pools have been depleted and overflow has consumed Frequency). Roll = **FD + bodyResist** vs Lady Death's roll. 3-strike rule.
+- **Fated Age Death:** character reaches their `fatedAge` (Seed-defined). Roll = **bodyResist + mods** vs Lady Death's roll (no FD). 3-strike rule, independent of combat strikes.
+
+*(Per WTH retirement 2026-04-05: per-character "Health Level" no longer exists. Death resistance is `bodyResist` (2:1 KRMA ratio) plus the Fate Die — 5/10/20/40/80 for d4/d6/d8/d12/d20.)*
 
 ### Death Split
 
@@ -66,9 +72,10 @@ When a character's Frequency pool reaches zero (after all attribute pools have b
 
 ### Spirit Package Formation
 The **Spirit Package** is the player's "severance" from the campaign:
-- Spirit attributes (100%) + Soul attributes (50%) + kept Nectars/Thorns/imprints
+- Spirit attributes (legacy: 100%) + Soul attributes (legacy: 50%) + kept Nectars/Thorns/imprints
 - Owned by player's account, custodied by Lady Death
-- See [[Soul_Package_System]] for full details on what players can do with it
+- See [[Spirit_Package_System]] for full details on what players can do with it
+- **[NEEDS MIKE]** — exact composition fractions are under review post-Jan-2026 Soul/Spirit swap. The death-split table above preserves the legacy hypothesis pending Mike's confirmation.
 
 ## Contract Obligations
 
@@ -115,7 +122,7 @@ Lady Death has her own [[GROvine_System|GRO.vines]] like every other entity. She
 ### [[KRMA_System]]
 Lady Death is the primary recipient of Frequency from deaths. This is redistributive (stays in economy), not deflationary.
 
-### [[Soul_Package_System]]
+### [[Spirit_Package_System]]
 Lady Death custodies Spirit Packages. Player owns them, she manages them.
 
 ### [[Godheads_System]]
@@ -127,6 +134,6 @@ Terminal enforces Lady Death's contracts via Selva/Triu/Trayman.
 ---
 
 ## Links
-- Related: [[Soul_Package_System]], [[KRMA_System]], [[Terminal_Interface]], [[Godheads_System]]
-- References: [[Health_Level_System]], [[GROvine_System]]
+- Related: [[Spirit_Package_System]], [[KRMA_System]], [[Terminal_Interface]], [[Godheads_System]]
+- References: [[GROvine_System]], [[Three_Pillar_Attributes]]
 - Examples: [[Lady_Death_Encounter_Scenarios]]

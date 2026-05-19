@@ -1,9 +1,9 @@
 # Godheads_System.md
 
 **Status:** #needs-validation  
-**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05, God-Head Architecture Session 2026-04-04  
+**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05, God-Head Architecture Session 2026-04-04, Elven Seed Design 2026-05-08, GM-Flag Mechanic 2026-05-10  
 **Security:** PUBLIC  
-**Last Updated:** 2026-04-05
+**Last Updated:** 2026-05-10
 
 ---
 
@@ -28,7 +28,7 @@ Every God-head falls under one of three pillars:
 
 | Pillar | Reserve | God-heads |
 |--------|---------|-----------|
-| **Balance** | 12.5B | Lady Death, Kai, Eth'erling (MVP trio) |
+| **Balance** | 12.5B | Lady Death, Kai, Et'herling (MVP trio) |
 | **Mercy** | 6.25B | TBD |
 | **Severity** | 6.25B | TBD |
 
@@ -122,13 +122,39 @@ Every living entity in a campaign has GRO.vines, potentially serviced by differe
 
 ## MVP God-heads
 
-| God-head | Pillar | Domain | Role |
-|----------|--------|--------|------|
-| **Lady Death** | Balance | Mortality, death contracts | Frequency collector, Spirit Package custodian |
-| **Kai** | Balance | Balance, evaluation | KV evaluation, forge balance |
-| **Eth'erling** | Balance | Balance (female) | Validation, oversight |
+| God-head | Pillar | Domain | Pronouns | Role |
+|----------|--------|--------|----------|------|
+| **Lady Death** | Balance | Mortality, death contracts | she/her | Frequency collector, Spirit Package custodian, default Thorn-lien recipient |
+| **Kai** | Balance | Balance, evaluation, chaos | she/her | KV evaluation (Selva→Creator→Kai→Et'herling chain), forge balance, accountable for grading correctness |
+| **Et'herling** (formerly "Eth'erling") | Balance | Justice, validation, oversight | she/her | Final synthesis in authoring chain; unbiased reviewer for [[GM_Flag_Mechanic|GM-flagged blocks]] |
 
 **Deferred:** Val, Thomas, Jewel — after core infrastructure works.
+
+### Et'herling — Elven Heritage (locked 2026-05-08) #needs-validation
+
+**Et'herling was Elven before ascending to Godhead status.** Pronoun: **she/her**.
+
+**Why this matters:**
+- Et'herling is the **natural canonical owner** of Nectar blocks intrinsic to the Elven seed (e.g., the locked **First-Born** Nectar). She carries the Elven lineage; her sponsorship of Elven-archetype traits is thematically right.
+- When authoring future Elven content (sub-seeds, [[Seeds_Roots_Branches_System|Roots, Branches]], Nectars), Et'herling is a natural sponsoring Godhead.
+- For other seeds, default sponsorship is open per the block-ownership model — each block can independently belong to whichever Godhead best fits its essence.
+- **Source:** `WIP-elven-seed-design.md` (locked 2026-05-09).
+
+### Block Ownership Examples
+
+Each block (Seed, [[Nectars_and_Thorns_System|Nectar, Thorn]], etc.) is owned by a Godhead. Seed-bound traits inherit ownership from their original sponsor.
+
+| Godhead | Typical Ownership |
+|---|---|
+| **Et'herling** | Elven Nectars (heritage); elegant/cosmic species; final-synthesis blocks |
+| **Kai** | Crafted/structural seeds (Synthetic, Machine-Hybrid, Dwarven); all graded blocks (she grades the chain) |
+| **Lady Death** | All Thorn liens (default); death-adjacent seeds (Astral Drifter, possibly Orcish) |
+
+## Block Grading & Live Balance
+
+- **Synergy-aware grading**: Kai grades blocks **with synergies considered**, not in isolation. See [[Block_Grading_Principles]] for the full framework.
+- **GM-flag mechanic**: GMs can flag blocks as overpowered. Et'herling reviews. If confirmed OP, Kai pays the flagger a KRMA reward from her own wallet and reworks the block metaverse-wide. See [[GM_Flag_Mechanic]].
+- **Kai's accountability loop**: knowing that confirmed-OP flags drain her wallet directly creates pressure to grade rigorously up front.
 
 ## Technical Implementation
 
@@ -145,7 +171,7 @@ God-heads are the primary conduit for new KRMA entering campaigns via GRO.vine g
 ### [[Lady_Death_Protocols]] — Death Economy
 Lady Death is a God-head with special death-related functions and the Frequency collection role.
 
-### [[Soul_Package_System]] — Spirit Package Custodianship
+### [[Spirit_Package_System]] — Spirit Package Custodianship
 Lady Death custodies Spirit Packages from dead characters.
 
 ### [[Terminal_Interface]] — Authority
@@ -154,6 +180,6 @@ Terminal enforces God-head contracts via Selva/Triu/Trayman.
 ---
 
 ## Links
-- Related: [[Terminal_Interface]], [[KRMA_System]], [[Soul_Package_System]], [[Lady_Death_Protocols]]
-- References: [[GROvine_System]], [[Nectars_and_Thorns_System]]
+- Related: [[Terminal_Interface]], [[KRMA_System]], [[Spirit_Package_System]], [[Lady_Death_Protocols]], [[GM_Flag_Mechanic]], [[Block_Grading_Principles]]
+- References: [[GROvine_System]], [[Nectars_and_Thorns_System]], [[Seeds_Roots_Branches_System]]
 - Examples: [[Godhead_Campaign_Integration_Scenarios]]

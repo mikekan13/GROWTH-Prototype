@@ -1110,7 +1110,25 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               {saving ? 'Saving...' : dirty ? 'Save Draft' : 'Saved'}
             </button>
             <button
-              onClick={() => { /* TODO: submit to Watcher */ }}
+              onClick={async () => {
+                if (!characterName || !backstoryText) return;
+                // Save current draft first so the Watcher sees the latest.
+                await save();
+                // Transition character status to SUBMITTED. For non-character
+                // (member-stage) flows this is a no-op — the watcher already
+                // sees the characterDesc via the member endpoint.
+                if (effectiveCharacter?.id) {
+                  try {
+                    await fetch(`/api/characters/${effectiveCharacter.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'SUBMITTED' }),
+                    });
+                  } catch (err) {
+                    console.error('Submit failed:', err);
+                  }
+                }
+              }}
               disabled={!characterName || !backstoryText}
               className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
               style={{

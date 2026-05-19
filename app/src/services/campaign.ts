@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ConflictError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove, isAdminRole, canManageCampaign } from '@/lib/permissions';
 import { createCampaignWallet } from '@/services/krma/wallet';
+import { createDraftCharacterForMember } from '@/services/character';
 
 // --- Schemas ---
 
@@ -185,6 +186,17 @@ export async function reviewInterest(
     where: { id: memberId },
     data: { status: action },
   });
+
+  // On Accept: auto-create a draft Character + empty Backstory so the player
+  // immediately has somewhere to go from the trailblazer dashboard.
+  if (action === 'BACKSTORY') {
+    const userRow = await prisma.user.findUnique({
+      where: { id: member.userId },
+      select: { username: true },
+    });
+    const fallbackName = userRow?.username ? `${userRow.username}'s Character` : 'New Character';
+    await createDraftCharacterForMember(member.userId, member.campaignId, fallbackName);
+  }
 
   return updated;
 }

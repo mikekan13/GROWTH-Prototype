@@ -146,7 +146,7 @@ Health 10 (immortality) costs ~3,990 cumulative — an entire god-tier character
 
 ## KRMA and Death
 
-See [[Lady_Death_Protocols]] and [[Soul_Package_System]] for full details.
+See [[Lady_Death_Protocols]] and [[Spirit_Package_System]] for full details.
 
 ### Death Split
 
@@ -216,6 +216,6 @@ Two things bundled:
 ---
 
 ## Links
-- Related: [[Soul_Package_System]], [[Lady_Death_Protocols]], [[Godheads_System]], [[Terminal_Interface]]
+- Related: [[Spirit_Package_System]], [[Lady_Death_Protocols]], [[Godheads_System]], [[Terminal_Interface]]
 - References: [[KRMA_Costs_Table]], [[GROvine_System]]
 - Examples: [[KRMA_Spending_Strategies]]

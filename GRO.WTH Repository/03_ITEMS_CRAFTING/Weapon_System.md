@@ -1,8 +1,10 @@
 # Weapon_System.md
 
-**Status:** #needs-validation
-**Source:** compass_artifact_wf-022ea623-0c93-4446-a62d-bf3438f6292f_text_markdown.md, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Status:** #validated
+**Source:** compass_artifact_wf-022ea623-0c93-4446-a62d-bf3438f6292f_text_markdown.md, User clarification 2025-10-03, ruling 2026-04-22
+**Security:** PUBLIC
+**Rulebook:** `rulebook/rulebook.md` §9.2 (Weapons)
+**Last Updated:** 2026-04-22
 
 ---
 

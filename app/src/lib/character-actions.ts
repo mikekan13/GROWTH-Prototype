@@ -9,7 +9,7 @@
  * array of what happened (for logging, undo, AI audit trail).
  */
 
-import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, SkillGovernor, AugmentSource } from '@/types/growth';
+import type { GrowthCharacter, GrowthAttributes, GrowthConditions, GrowthSkill, GrowthTrait, SkillGovernor, AugmentSource } from '@/types/growth';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -455,6 +455,24 @@ export function recomputeAugments(character: GrowthCharacter): ActionResult {
     }
   }
 
+  // Collect from seed (creation.seed.augments) — set by applyCreationGrants.
+  // Treated as a permanent positive source so it shows up in the breakdown UI.
+  const seedAugs = c.creation?.seed?.augments;
+  const seedName = c.creation?.seed?.name;
+  if (seedAugs && seedName) {
+    for (const attr of STANDARD_ATTRS) {
+      const v = (seedAugs as Record<string, number | undefined>)[attr] ?? 0;
+      if (v && v !== 0 && sourcesMap[attr]) {
+        sourcesMap[attr].push({
+          name: `Seed: ${seedName}`,
+          value: v,
+          sourceType: 'other',
+          description: 'Seed-granted augment',
+        });
+      }
+    }
+  }
+
   // Apply to each attribute
   for (const attrName of STANDARD_ATTRS) {
     const attr = c.attributes[attrName];
@@ -475,5 +493,85 @@ export function recomputeAugments(character: GrowthCharacter): ActionResult {
     }
   }
 
+  return { character: c, changes };
+}
+
+// ── Trait Actions ──────────────────────────────────────────────────────────
+
+/**
+ * Add a trait (nectar / blossom / thorn) to the character. Idempotent on
+ * (type, lowercased name) — duplicates are silently merged.
+ */
+export function addTrait(
+  character: GrowthCharacter,
+  trait: { name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string },
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.traits)) c.traits = [];
+  const name = trait.name.trim();
+  if (!name) return { character: c, changes: ['Trait name is required'] };
+  const key = `${trait.type}::${name.toLowerCase()}`;
+  const existing = c.traits.find(t => `${t.type}::${t.name.toLowerCase()}` === key);
+  if (existing) return { character: c, changes: [`Trait "${name}" already exists`] };
+  const next: GrowthTrait = {
+    name,
+    type: trait.type,
+    category: (trait.category as GrowthTrait['category']) ?? 'utility',
+    description: trait.description ?? '',
+    source: trait.source,
+    mechanicalEffect: trait.mechanicalEffect,
+  };
+  c.traits.push(next);
+  return { character: c, changes: [`Added ${trait.type}: ${name}`] };
+}
+
+/**
+ * Remove a trait by (type, name). Case-insensitive on name.
+ */
+export function removeTrait(
+  character: GrowthCharacter,
+  type: 'nectar' | 'blossom' | 'thorn',
+  name: string,
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.traits)) c.traits = [];
+  const key = `${type}::${name.toLowerCase()}`;
+  const idx = c.traits.findIndex(t => `${t.type}::${t.name.toLowerCase()}` === key);
+  if (idx === -1) return { character: c, changes: [`Trait "${name}" not found`] };
+  c.traits.splice(idx, 1);
+  return { character: c, changes: [`Removed ${type}: ${name}`] };
+}
+
+/**
+ * Patch a trait's editable fields. Identified by (type, name) — the original key.
+ */
+export function updateTrait(
+  character: GrowthCharacter,
+  type: 'nectar' | 'blossom' | 'thorn',
+  name: string,
+  updates: { description?: string; mechanicalEffect?: string; source?: string; category?: string },
+): ActionResult {
+  const c = deepCloneCharacter(character);
+  if (!Array.isArray(c.traits)) c.traits = [];
+  const key = `${type}::${name.toLowerCase()}`;
+  const trait = c.traits.find(t => `${t.type}::${t.name.toLowerCase()}` === key);
+  if (!trait) return { character: c, changes: [`Trait "${name}" not found`] };
+  const changes: string[] = [];
+  if (updates.description !== undefined && updates.description !== trait.description) {
+    trait.description = updates.description;
+    changes.push(`${name}: description updated`);
+  }
+  if (updates.mechanicalEffect !== undefined && updates.mechanicalEffect !== trait.mechanicalEffect) {
+    trait.mechanicalEffect = updates.mechanicalEffect;
+    changes.push(`${name}: mechanical effect updated`);
+  }
+  if (updates.source !== undefined && updates.source !== trait.source) {
+    trait.source = updates.source;
+    changes.push(`${name}: source updated`);
+  }
+  if (updates.category !== undefined && updates.category !== trait.category) {
+    trait.category = updates.category as GrowthTrait['category'];
+    changes.push(`${name}: category → ${updates.category}`);
+  }
   return { character: c, changes };
 }

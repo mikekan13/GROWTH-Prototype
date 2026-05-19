@@ -14,8 +14,36 @@ export interface GrowthEncounter {
   notes?: string;               // GM notes
   objectives?: string[];        // What players need to accomplish
   rewards?: string[];           // Potential rewards
-  // [PLACEHOLDER] Time Stack ordering — needs full combat resolution integration
-  // [PLACEHOLDER] Environmental effects — terrain, weather, lighting modifiers
+  /** Time Stack — deterministic initiative order. See lib/time-stack.ts. */
+  timeStack?: TimeStackEntry[];
+  /** Environmental effects — terrain, weather, lighting modifiers. */
+  environment?: EnvironmentalEffect[];
+}
+
+export interface TimeStackEntry {
+  participantId: string;
+  /** Combined initiative score used for ordering. */
+  score: number;
+  /** Pillar tier — Mercy (Flow-led), Balance, or Severity (Focus-led). */
+  pillarTier: 'mercy' | 'balance' | 'severity';
+}
+
+export type EnvironmentalEffectKind =
+  | 'terrain'        // difficult ground, slick, cramped, etc.
+  | 'weather'        // rain, snow, fog
+  | 'lighting'       // dim, dark, blinding
+  | 'hazard'         // fire, poison cloud, falling debris
+  | 'aura';          // magical / pillar-resonant zones
+
+export interface EnvironmentalEffect {
+  id: string;
+  kind: EnvironmentalEffectKind;
+  name: string;
+  description?: string;
+  /** Flat modifier applied to all participants' checks while active. */
+  flatModifier?: number;
+  /** Restricts the modifier to a specific pillar or skill. */
+  appliesTo?: 'all' | 'body' | 'spirit' | 'soul' | string;
 }
 
 export interface EncounterParticipant {

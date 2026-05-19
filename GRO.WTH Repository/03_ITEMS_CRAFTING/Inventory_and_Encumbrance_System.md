@@ -1,8 +1,10 @@
 # Inventory_and_Encumbrance_System.md
 
-**Status:** #needs-validation  
-**Source:** chatgptGROWTHdump.md  
-**Last Updated:** 2025-08-07
+**Status:** #validated  
+**Source:** chatgptGROWTHdump.md, ruling 2026-04-22  
+**Security:** PUBLIC  
+**Rulebook:** `rulebook/rulebook.md` §9.6 (Inventory & Encumbrance)  
+**Last Updated:** 2026-04-22
 
 ---
 
@@ -83,19 +85,14 @@ The **Inventory and Encumbrance** system uses **Weight Levels** and **Carry Leve
 **Specialized Containers:** Some containers provide specific benefits (quivers, spell component pouches)  
 **Magical Containers:** Enchanted containers may have special carrying properties
 
-## Assets System
+## Transportation
 
-### Large Asset Management
-**Beyond Carrying:** Houses, vehicles, businesses, land ownership
-**Abstract Ownership:** System for managing non-portable valuable assets
-**[[Wealth_Level_System|Wealth Level]] Integration:** Large assets tie to character wealth
-**Campaign Integration:** Major assets create adventure opportunities and responsibilities
-
-### Transportation Systems
 **Mounts and Vehicles:** Increase effective carrying capacity  
 **Cargo Systems:** Wagons, ships, and other cargo transport  
 **Hirelings:** Employing others to carry equipment  
 **Magical Transport:** Supernatural methods of moving equipment
+
+*(The old "Assets System" section tracking houses/land via Wealth Level was removed 2026-04-22 per the WTH retirement. Large-asset management is narrative/GM-discretion now.)*
 
 ## Special Carrying Rules
 
@@ -125,12 +122,6 @@ The **Inventory and Encumbrance** system uses **Weight Levels** and **Carry Leve
 **Quality Correlation:** Higher quality items may be lighter or easier to carry  
 **Magical Enhancement:** Enchanted items may have reduced effective Weight Levels
 
-### [[Technology_Level_System]] Effects
-**Advanced Materials:** Higher tech levels provide lighter, stronger materials  
-**Mechanical Assistance:** Technology can provide carrying capacity enhancement  
-**Storage Innovation:** Advanced technology creates better storage solutions  
-**Weight Reduction:** More advanced equipment often weighs less for same capability
-
 ### Combat Integration
 **Equipment Access:** Time required to access stored vs carried combat equipment  
 **Action Economy:** Drawing items from different storage locations costs actions  
@@ -140,7 +131,6 @@ The **Inventory and Encumbrance** system uses **Weight Levels** and **Carry Leve
 ## Character Creation Implications
 
 ### Starting Equipment
-**[[Wealth_Level_System|Wealth Level]] Limits:** Starting wealth determines available equipment  
 **Carry Capacity Planning:** Must consider character's ability to carry desired equipment  
 **Equipment Priorities:** Players must choose most important items within carrying limits  
 **Growth Planning:** Consider how equipment needs will change as character advances

@@ -22,6 +22,7 @@ interface GoalData {
   milestones?: string | null;
   nectarsEarned: number;
   createdAt: string;
+  completedAt?: string | null;
 }
 
 interface GoalCardProps {
@@ -207,8 +208,10 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
           <div className="flex flex-wrap gap-1 mb-3">
             {[
               { key: 'ACTIVE', label: `ACTIVE (${activeGoals.length})`, color: '#3EB89A' },
-              { key: 'ALL', label: `ALL (${goals.length})` },
               { key: 'COMPLETED', label: `DONE (${goals.filter(g => g.status === 'COMPLETED').length})`, color: '#D4A830' },
+              { key: 'FAILED', label: `FAILED (${goals.filter(g => g.status === 'FAILED').length})`, color: '#E8585A' },
+              { key: 'ABANDONED', label: `LEFT (${goals.filter(g => g.status === 'ABANDONED').length})`, color: '#888' },
+              { key: 'ALL', label: `ALL (${goals.length})` },
             ].map(f => (
               <button key={f.key} onClick={e => { e.stopPropagation(); setFilter(f.key); }} onMouseDown={e => e.stopPropagation()}
                 className="px-2 py-1 text-xs transition-colors uppercase"
@@ -270,6 +273,11 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                           {goal.nectarsEarned > 0 && (
                             <span className="text-[9px]" style={{ color: '#ffcc78' }}>
                               {'\u2736'}{goal.nectarsEarned}
+                            </span>
+                          )}
+                          {goal.completedAt && goal.status !== 'ACTIVE' && (
+                            <span className="text-[9px]" style={{ color: '#666' }}>
+                              {ss.label.toLowerCase()} {new Date(goal.completedAt).toLocaleDateString()}
                             </span>
                           )}
                         </div>

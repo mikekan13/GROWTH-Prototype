@@ -103,8 +103,30 @@ export function calculateCharacterTKV(character: GrowthCharacter, heldItems: Hel
   });
   const itemsTotal = items.reduce((sum, i) => sum + i.kv, 0);
 
+  // ── Seed-contributed values (only counted if creation mechanics have been applied) ──
+  // Attribute augs: each aug point = 1 KRMA per locked formula (Seed_KV_Formulas.md)
+  const augsTotal = Object.values(attrs).reduce((sum, a) => {
+    const pos = (a as { augmentPositive?: number })?.augmentPositive ?? 0;
+    const neg = (a as { augmentNegative?: number })?.augmentNegative ?? 0;
+    return sum + pos + neg;
+  }, 0);
+  const augs = { total: augsTotal, rate: 1 };
+
+  // Fate Die: d4=5, d6=10, d8=20, d12=40, d20=80 from creation.seed.baseFateDie
+  const dieKey = character.creation?.seed?.baseFateDie;
+  const fateDieValue = dieKey ? (FATE_DIE_KV[dieKey] ?? 0) : 0;
+  const fateDie = { die: dieKey ?? '', kv: fateDieValue };
+
+  // Fated Age: ceil(years * 0.5) per locked Approach 2 formula
+  // Pull from creation.fatedAge (set by applyCreationGrants) or character.fatedAge
+  const creationFatedAge = character.creation?.fatedAge;
+  const fatedAgeYears = creationFatedAge ?? character.fatedAge ?? 0;
+  const fatedAgeValue = fatedAgeYears > 0 ? Math.ceil(fatedAgeYears * 0.5) : 0;
+  const fatedAge = { years: fatedAgeYears, kv: fatedAgeValue };
+
   const total = body.subtotal + spirit.subtotal + soul.subtotal
-    + skillsTotal + magicTotal + bodyResistValue + traitsTotal + itemsTotal;
+    + skillsTotal + magicTotal + bodyResistValue + traitsTotal + itemsTotal
+    + augsTotal + fateDieValue + fatedAgeValue;
 
   return {
     version: 1,
@@ -115,6 +137,7 @@ export function calculateCharacterTKV(character: GrowthCharacter, heldItems: Hel
     bodyResist,
     traits, traitsTotal,
     items, itemsTotal,
+    augs, fateDie, fatedAge,
   };
 }
 

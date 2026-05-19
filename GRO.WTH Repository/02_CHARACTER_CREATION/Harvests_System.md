@@ -1,8 +1,10 @@
 # Harvests_System.md
 
-**Status:** #needs-validation  
-**Source:** Core Rulebook v0.4.4.md (lines 637-677)  
-**Last Updated:** 2025-08-07
+**Status:** #validated  
+**Source:** Core Rulebook v0.4.4.md (lines 637-677), ruling 2026-04-22  
+**Security:** PUBLIC  
+**Rulebook:** `rulebook/rulebook.md` §8 (Harvests)  
+**Last Updated:** 2026-04-22
 
 ---
 
@@ -18,6 +20,13 @@
 **Pattern Recognition:** Seeds (1), Roots (2), Branches (3), Harvests (4) - the natural character development sequence
 
 ## Harvest Mechanics
+
+*Per ruling r-2026-04-22-07: a Harvest is a **package of rewards** bought with time. The in-game time the character invests is the reward budget, converted at the age-to-KV rate (see [[Seeds_Roots_Branches_System]] Frequency Budget System — currently 2 KRMA per year of age, pending empirical validation).*
+
+### Reward Budget = Time Invested
+- The character ages by the duration of the Harvest (e.g. a one-year training montage = +1 year to current age).
+- The aged years × age-to-KV rate = the KV budget the GM has to allocate as rewards (attribute improvements, skills, Nectars, equipment, etc.).
+- This ties Harvests directly to the same KV math that governs Roots/Branches at character creation.
 
 ### GM-Initiated Process
 **Trigger:** GM essentially asks "What were you doing during this stretch of time?"  
@@ -63,8 +72,8 @@
 - **Attribute Increases:** Direct statistical improvements
 - **Skill Development:** New skills or skill level increases  
 - **Equipment:** Enhanced or new items
-- **[[KRMA_Costs_Table|Wealth]]:** Improved financial status
-- **Tech Levels:** Access to better technology
+- **Currency / wealth:** Improved financial status. *(Per WTH retirement 2026-04-05: there is no per-character "Wealth Level." Wealth is just campaign-flavored currency backed by KRMA value.)*
+- **Technology access:** New skills or contacts that unlock better technology. *(Tech Level retired 2026-04-05 — what tech a character can use is gated by relevant skills and the campaign's setting, not a per-character number.)*
 - **[[Nectars_and_Thorns_System|Nectars]]:** New beneficial traits from experiences
 
 ## Time Investment Requirements
@@ -76,7 +85,7 @@
 
 ### Mechanical Aging
 **Consequence:** Character advancement through Harvests costs time from lifespan
-**Integration:** Works with [[Health_Level_System|Fated Age]] mechanics
+**Integration:** Works with the character's `fatedAge` (set by Seed)
 **Realistic Development:** Reflects that mastery requires time investment  
 **Strategic Choice:** Players must balance immediate power vs long-term survival
 

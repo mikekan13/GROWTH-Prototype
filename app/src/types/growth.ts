@@ -71,7 +71,18 @@ export interface GrowthCreation {
     name?: string;
     description?: string;
     baseFateDie: FateDie;  // Determines max Nectars+Thorns
+    // Per-attribute aug contributions from the seed (canonical source — flows
+    // through recomputeAugments). Set by applyCreationGrants.
+    augments?: {
+      clout?: number; celerity?: number; constitution?: number;
+      focus?: number; flow?: number;
+      willpower?: number; wisdom?: number; wit?: number;
+    };
   };
+  // Lifespan from the assigned seed (years) — drives TKV's fatedAge component.
+  fatedAge?: number;
+  // ForgeItem ID for the assigned seed, used for re-applying grants and audit trail.
+  seedForgeItemId?: string;
   root?: {
     name: string;
     description: string;

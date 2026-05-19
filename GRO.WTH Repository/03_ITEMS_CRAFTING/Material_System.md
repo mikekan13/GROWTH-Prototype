@@ -1,8 +1,11 @@
 # Material_System.md
 
-**Status:** #needs-validation
-**Source:** GROWTH Material and Item Creation Artifact, Claude Material System Dump.md, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Status:** #validated
+**Source:** GROWTH Material and Item Creation Artifact, Claude Material System Dump.md, User clarification 2025-10-03, ruling 2026-04-22
+**Security:** PUBLIC
+**Rulebook:** `rulebook/rulebook.md` §9.1 (Materials)
+**Last Updated:** 2026-04-22
+**Note:** Per ruling r-2026-04-22-13, all references to Tech Level have been removed from this file. Skill-gating replaces Tech Level gating where applicable.
 
 ---
 
@@ -13,7 +16,7 @@ The GROWTH material system operates on the principle: **materials are potential,
 ## Design Philosophy: Base Properties + Material Modifiers
 
 **Core Principle:**
-Materials have **base properties** (Resist, Tech Level, Rarity, Weight) that interact with **global crafting rules**. Material **modifiers** (like Nectars/Thorns for characters) change or add rules for specific materials.
+Materials have **base properties** (Resist, Rarity, Weight) that interact with **global crafting rules**. Material **modifiers** (like Nectars/Thorns for characters) change or add rules for specific materials.
 
 **KRMA Cost Principle:**
 - **Base properties:** Standard behavior following global rules (cheap in KRMA)
@@ -35,8 +38,6 @@ The materials listed here are **example baseline materials** for training KRMA e
 - **Hard Materials:** Rigid, dense (metals, stone, crystal). Excel at stopping direct impacts, cannot be meaningfully layered, require specialized tools
 - **Hybrid Materials:** Advanced/magical materials exhibiting properties of both types
 
-**Tech Level (1-10+):** Technological sophistication required to work with the material effectively
-
 **Rarity Tier (1-10):** From Ubiquitous (dirt, air) to Impossible (materials transcending normal existence)
 
 **Fractional KV:** All raw materials have KV values below 1 (0.0000000000001 to 0.9999999999999) to prevent inflation and maintain economic balance
@@ -45,26 +46,26 @@ The materials listed here are **example baseline materials** for training KRMA e
 
 ### Soft Materials
 
-| Material | Base Resist | Tech Level | Rarity | Weight Category | Key Modifiers |
-|---|---|---|---|---|---|
-| Cotton | 1 | 1 | 2 | Featherlight (1) | Absorbent, Flammable, Flexible 2 |
-| Leather | 17 | 1 | 2 | Trivial (2) | Absorbent, Flammable, Flexible 2 |
-| Kevlar | 25 | 4 | 5 | Light (3) | Heat Resistant, Flexible 1 |
-| Graphene | 29 | 5 | 7 | Featherlight (1) | Electric Proof, Heat Resistant |
-| Carbyne | 30 | 6 | 8 | Featherlight (1) | Electric Proof, Flexible 3 |
+| Material | Base Resist | Rarity | Weight Category | Key Modifiers |
+|---|---|---|---|---|
+| Cotton | 1 | 2 | Featherlight (1) | Absorbent, Flammable, Flexible 2 |
+| Leather | 17 | 2 | Trivial (2) | Absorbent, Flammable, Flexible 2 |
+| Kevlar | 25 | 5 | Light (3) | Heat Resistant, Flexible 1 |
+| Graphene | 29 | 7 | Featherlight (1) | Electric Proof, Heat Resistant |
+| Carbyne | 30 | 8 | Featherlight (1) | Electric Proof, Flexible 3 |
 
 ### Hard Materials
 
-| Material | Base Resist | Tech Level | Rarity | Weight Category | Key Modifiers |
-|---|---|---|---|---|---|
-| Wood | 10 | 1 | 1 | Moderate (4) | Flammable, Absorbent, Heat Resistant |
-| Stone | 16 | 1 | 1 | Heavy (5) | Fragile, Cold Resistant |
-| Bronze | 28 | 2 | 3 | Moderate (4) | Heat Resistant, Electric Vulnerable |
-| Cast Iron | 25 | 2 | 3 | Hefty (6) | Brittle, Heat Resistant, Electric Vulnerable |
-| Steel (Wrought) | 30 | 3 | 3 | Heavy (5) | Heat Resistant, Electric Vulnerable |
-| Diamond | 23 | 4 | 8 | Moderate (4) | Brittle, Sharp, Heat Resistant |
-| Carbon Fiber | 26 | 5 | 6 | Light (3) | Featherlight, Brittle |
-| Adamant | 32 | 6 | 9 | Heavy (5) | Heat Proof, Cold Proof |
+| Material | Base Resist | Rarity | Weight Category | Key Modifiers |
+|---|---|---|---|---|
+| Wood | 10 | 1 | Moderate (4) | Flammable, Absorbent, Heat Resistant |
+| Stone | 16 | 1 | Heavy (5) | Fragile, Cold Resistant |
+| Bronze | 28 | 3 | Moderate (4) | Heat Resistant, Electric Vulnerable |
+| Cast Iron | 25 | 3 | Hefty (6) | Brittle, Heat Resistant, Electric Vulnerable |
+| Steel (Wrought) | 30 | 3 | Heavy (5) | Heat Resistant, Electric Vulnerable |
+| Diamond | 23 | 8 | Moderate (4) | Brittle, Sharp, Heat Resistant |
+| Carbon Fiber | 26 | 6 | Light (3) | Featherlight, Brittle |
+| Adamant | 32 | 9 | Heavy (5) | Heat Proof, Cold Proof |
 
 ## Material Modifier Categories
 
@@ -110,7 +111,6 @@ The materials listed here are **example baseline materials** for training KRMA e
 ```
 Final Resist = (Primary Resist + Subordinate Resist) ÷ 2
 Final Type = Primary Material's Type
-Tech Level = Highest tech level among components
 ```
 
 **Advanced System (Future with ML):**
@@ -133,17 +133,16 @@ Final Resist = (Primary Resist × Primary %) + (Subordinate Resist × Subordinat
 2. **Select Primary Material:** Main material that dictates overall nature
 3. **Add Subordinate Materials:** Supporting materials for specific properties
 4. **Calculate Final Resist:** Apply combination formula
-5. **Determine Tech Level:** Use highest tech requirement
-6. **Apply Material Mods:** Combine all modifiers from components
-7. **Calculate Weight:** Consider item design and material properties
-8. **Determine Value:** Combine material values with craftsmanship
-9. **Finalize Description:** Create complete item stat block
+5. **Apply Material Mods:** Combine all modifiers from components
+6. **Calculate Weight:** Consider item design and material properties
+7. **Determine Value:** Combine material values with craftsmanship
+8. **Finalize Description:** Create complete item stat block
 
 ### Crafting Integration
 
 Materials determine:
 - **Tool Requirements:** Specialized tools needed for material type
-- **Skill Checks:** Difficulty based on material properties and tech level
+- **Skill Checks:** Difficulty based on material properties and crafting skill required
 - **Time Investment:** Complex materials require longer crafting
 - **Quality Outcomes:** Material properties affect final item effectiveness
 - **KV Transformation:** Materials (fractional KV) become items (meaningful KV ≥1)
@@ -181,5 +180,5 @@ Materials determine:
 
 ## Links  
 - Related: [[Equipment_Conditions]], [[Armor_System]], [[Weapon_System]], [[Prima_Materia_System]]
-- References: [[KV_Economic_System]], [[Crafting_Tools_Table]], [[Tech_Level_Progression]]
+- References: [[KV_Economic_System]], [[Crafting_Tools_Table]]
 - Examples: [[Material_Combination_Examples]], [[Custom_Material_Creation]]

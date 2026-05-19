@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { canViewCharacter } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import CharacterPageClient from './CharacterPageClient';
+import CreationReviewBanner from '@/components/character/CreationReviewBanner';
 
 export default async function CharacterPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -35,6 +36,11 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
       <div className="mb-4 text-xs text-[var(--surface-dark)]/40 uppercase tracking-wider">
         {character.campaign?.name ?? 'No Campaign'} | {character.status}
       </div>
+      <CreationReviewBanner
+        characterId={character.id}
+        status={character.status}
+        isOwner={isOwner}
+      />
       <CharacterPageClient
         campaignId={character.campaign?.id ?? ''}
         isGM={isGM}
@@ -45,6 +51,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
           name: character.name,
           data: character.data,
           entityType: character.entityType,
+          status: character.status,
         }}
         canEdit={canEdit}
       />

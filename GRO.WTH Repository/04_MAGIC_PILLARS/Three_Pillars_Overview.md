@@ -1,8 +1,9 @@
 # Three_Pillars_Overview.md
 
-**Status:** #needs-validation  
-**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md  
-**Last Updated:** 2025-08-07
+**Status:** #needs-review
+**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, GROWTH-DESIGN-TRUTH §7 (Magic System)
+**Security:** PUBLIC
+**Last Updated:** 2026-05-03
 
 ---
 
@@ -10,8 +11,12 @@
 
 The GROWTH magic system is organized around **three fundamental pillars** that govern all magical practice: **Mercy**, **Severity**, and **Balance**.
 
+> **CANON NOTE (post-Jan-2026 swap):** All three magic pillars are powered by attributes from the **Spirit pillar** (Sulfur — Flow / Frequency / Focus). Older docs that referred to magic as "Soul-pillar magic" are using the pre-swap label and are wrong. Magic is fundamentally a Spirit-pillar phenomenon.
+
+> **Orthodox reframing (per DESIGN-TRUTH §7):** "Wild Casting" is not heretical. It maps to *raw spiritual gift before discernment* — efficacious but unpredictable. "Spell Weaving" maps to *disciplined cooperation with grace* — synergeia, the practiced craft of channeling. Both are real; the latter is safer.
+
 ## Pillar of Mercy
-*Governed by [[Three_Pillar_Attributes|Flow]] attribute*
+*Governed by [[Three_Pillar_Attributes|Flow]] attribute (Spirit pillar)*
 
 **Philosophy:** Receiving, acceptance, divine inspiration  
 **Approach:** Passive magical connection, working with natural forces  
@@ -20,8 +25,8 @@ The GROWTH magic system is organized around **three fundamental pillars** that g
 - **[[Restoration]]** - Healing and growth
 - **[[Fortune]]** - Luck manipulation and augmentation
 
-## Pillar of Severity  
-*Governed by [[Three_Pillar_Attributes|Focus]] attribute*
+## Pillar of Severity
+*Governed by [[Three_Pillar_Attributes|Focus]] attribute (Spirit pillar)*
 
 **Philosophy:** Giving, manifestation, divine will  
 **Approach:** Active magical projection, imposing will on reality  
@@ -31,7 +36,7 @@ The GROWTH magic system is organized around **three fundamental pillars** that g
 - **[[Conjuration]]** - Summoning and portals
 
 ## Pillar of Balance
-*Uses combinations of attributes*
+*Uses combinations of [[Three_Pillar_Attributes|Flow + Focus]] (both Spirit-pillar attributes — synthesis of Mercy and Severity)*
 
 **Philosophy:** Harmony between opposing forces  
 **Approach:** Synthesis of Mercy and Severity principles  
