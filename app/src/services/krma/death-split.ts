@@ -94,7 +94,10 @@ export async function executeDeathSplit(
     }
   }
 
-  // Spirit/Soul to player → Spirit Package
+  // Spirit/Soul "to player" is DEPRECATED under the transformation model.
+  // Kept components stay on the character wallet (ghost) — no transfer fires.
+  // Pre-2026-05-19 manifests may still set toPlayer > 0; honor them for
+  // backwards compatibility so old in-flight deaths don't get stuck.
   if (manifest.toPlayer > 0) {
     const amount = capAmount(BigInt(manifest.toPlayer), characterWallet.balance - BigInt(manifest.toCampaign));
     if (amount > BigInt(0)) {
@@ -104,7 +107,7 @@ export async function executeDeathSplit(
         amount,
         state: 'UNLOCK',
         reason: 'DEATH_SPIRIT_TO_PLAYER',
-        description: `Death: Spirit Package → player ownership`,
+        description: `Death (legacy split): Spirit Package → player ownership`,
         metadata: {
           ...baseMeta,
           components: manifest.components.filter(c => c.destination === 'player'),
@@ -145,10 +148,18 @@ export async function executeDeathSplit(
     results = await executeBatch(transactions);
   }
 
-  // Update character status to DEAD
+  // ── Character transformation (locked Mike 2026-05-19) ──
+  // The character is NOT destroyed; they become a ghost. Mutate their data
+  // blob in place: zero body attributes/skills, halve soul attributes/skills,
+  // strip body-pillared traits, zero max Frequency, keep Spirit + non-body.
+  // status moves to 'GHOST'.
+  const ghostData = transformCharacterToGhost(charData);
   await prisma.character.update({
     where: { id: characterId },
-    data: { status: 'DEAD' },
+    data: {
+      status: 'GHOST',
+      data: JSON.stringify(ghostData),
+    },
   });
 
   // Notify Lady Death — she manages the Spirit Package and may decide to
@@ -174,6 +185,84 @@ export async function executeDeathSplit(
 function capAmount(desired: bigint, available: bigint): bigint {
   if (available <= BigInt(0)) return BigInt(0);
   return desired > available ? available : desired;
+}
+
+/**
+ * Transform a living character into a ghost form per the death canon
+ * (Mike 2026-05-19). Pure function — caller persists the result.
+ *
+ * Mutations:
+ *  - Body attributes (clout, celerity, constitution) → level=0, current=0, augments=0
+ *  - Soul attributes (willpower, wisdom, wit) → level halved, current clamped
+ *  - Frequency → level=0, current=0 (capacity stripped to Lady Death)
+ *  - Flow + Focus → unchanged
+ *  - Skills with any body governor → removed
+ *  - Skills with only soul governor → level halved (rounds down)
+ *  - Skills with only spirit governor → unchanged
+ *  - Traits pillared body → removed
+ *  - Traits pillared soul → kept (the KRMA value is split; the trait itself is binary present/absent)
+ *  - Traits pillared spirit (or un-tagged) → kept
+ *  - vitals.baseResist → 0 (body property)
+ */
+function transformCharacterToGhost(character: GrowthCharacter): GrowthCharacter {
+  const c = JSON.parse(JSON.stringify(character)) as GrowthCharacter;
+
+  const BODY_ATTRS: ReadonlyArray<keyof GrowthCharacter['attributes']> = ['clout', 'celerity', 'constitution'];
+  const SOUL_ATTRS: ReadonlyArray<keyof GrowthCharacter['attributes']> = ['willpower', 'wisdom', 'wit'];
+
+  if (c.attributes) {
+    for (const a of BODY_ATTRS) {
+      if (c.attributes[a]) {
+        c.attributes[a] = { level: 0, current: 0, augmentPositive: 0, augmentNegative: 0 };
+      }
+    }
+    for (const a of SOUL_ATTRS) {
+      const attr = c.attributes[a];
+      if (attr && (attr.level ?? 0) > 0) {
+        const newLevel = Math.floor((attr.level ?? 0) / 2);
+        attr.level = newLevel;
+        if ((attr.current ?? 0) > newLevel) attr.current = newLevel;
+      }
+    }
+    if (c.attributes.frequency) {
+      c.attributes.frequency = { level: 0, current: 0 };
+    }
+  }
+
+  // Skills — drop body, halve soul, keep spirit
+  const BODY_GOV = new Set(['clout', 'celerity', 'constitution']);
+  const SOUL_GOV = new Set(['willpower', 'wisdom', 'wit']);
+  if (Array.isArray(c.skills)) {
+    c.skills = c.skills.filter(s => {
+      const govs = (s.governors as string[]) ?? [];
+      const hasBody = govs.some(g => BODY_GOV.has(g));
+      if (hasBody) return false;
+      return true;
+    }).map(s => {
+      const govs = (s.governors as string[]) ?? [];
+      const hasSoul = govs.some(g => SOUL_GOV.has(g));
+      if (hasSoul) {
+        return { ...s, level: Math.floor((s.level ?? 0) / 2) };
+      }
+      return s;
+    });
+  }
+
+  // Traits — drop body-pillared; keep spirit + soul (the KRMA half-strip is
+  // handled at the ledger; the trait itself remains as identity).
+  if (Array.isArray(c.traits)) {
+    c.traits = c.traits.filter(t => {
+      const pillar = (t as { pillar?: 'body' | 'spirit' | 'soul' }).pillar ?? 'spirit';
+      return pillar !== 'body';
+    });
+  }
+
+  // Body resist is a body property → 0
+  if (c.vitals) {
+    c.vitals.baseResist = 0;
+  }
+
+  return c;
 }
 
 /**

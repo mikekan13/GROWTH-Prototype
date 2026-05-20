@@ -1,156 +1,94 @@
 # Items Blocked on Mike
 
-> Last updated: 2026-05-19 (end of autonomous build pass)
+> Last updated: 2026-05-20 (after Mike's resolution doc + autonomous build pass)
 >
-> This is everything I (Claude) need from you to continue. Each item has:
-> what's blocked, why, and a one-line ask. Work through these in the order
-> that suits you — most are independent of each other.
+> Resolved items kept as short stubs for reference. Active blockers live at the bottom.
 
 ---
 
-## Tier 1 — Unblocks the most downstream work
+## RESOLVED
 
-### 1. ~~Burn formula (M5e)~~ ✅ RESOLVED 2026-05-19
-- Burn = true permanent KRMA removal from the metaverse (NOT raw→crystallized conversion).
-- 1 max Frequency = 1 KRMA. Burning N KRMA reduces max Freq by N.
-- Cost judged by a high-level Godhead (Kai today; Terminal-tier eventually).
-- Anti-deflationary scaling: `scaledCost = baseCost × (1 + burnSinkBalance / 50_000)`. ~1×→~2× over year 2.
+### 1. ~~Burn formula~~ ✅ 2026-05-19
+- True permanent KRMA removal; 1 max Freq = 1 KRMA; anti-deflationary scaling `cost = baseCost × (1 + burnSinkBalance/50_000)`.
 - Built: `services/burn.ts`, `app/api/characters/[id]/burn`.
 
-### 2. Spirit Package composition (M1d / M5d)
-- **Blocks:** Death-split UI labels (I built the modal but the "Spirit Package" component breakdown is generic), full death wiring.
-- **Why blocked:** Roadmap marks composition `[NEEDS MIKE]`. I know it routes to player wallet but not the per-component split.
-- **Ask:** What goes into a Spirit Package? Body→campaign, Frequency→Lady Death, but the player-bound portion — is it Soul KV? Soul + named traits? Confirm the components.
+### 2. ~~Spirit Package = transformation~~ ✅ 2026-05-19
+- Character is NOT destroyed; transforms to ghost (`status: 'GHOST'`).
+- Body strips to GM; soul halves to Lady Death; max Frequency capacity → Lady Death; Spirit + non-body kept.
+- Built: rewrote `calculateDeathSplit`, `calculateSkillSplit`, `executeDeathSplit`, added `transformCharacterToGhost`.
 
-### 3. Body composition system (M1b / M2b)
-- **Blocks:** Body-part-targeted damage, non-humanoid seeds (Halfling, Goblinoid, Nephilim), inventory paperdoll per-Seed regions.
-- **Why blocked:** Memory says "modular, custom bodies are coming — discussed before implementing."
-- **Ask:** A 15-minute design conversation. Memory has notes — parts-as-items in nested containers, Piercing = Container Penetration, sense/action catalogs. Want to lock the data shape together.
+### 3. ~~Tara = Lady Death~~ ✅ 2026-05-19
+Same entity, two names.
 
-### 4. Creature Size system
-- **Blocks:** Halfling, Goblinoid, Nephilim seed designs and any size-defined seed authoring.
-- **Why blocked:** Categories + per-category effects (reach, weapon sizing) not yet defined.
-- **Ask:** Pick canonical size categories (e.g. Tiny / Small / Medium / Large / Huge) and what each one mechanically does.
+### 4. ~~Nectar/Thorn pillar classification~~ ✅ 2026-05-19
+- Explicit `pillar: 'body' | 'spirit' | 'soul'` field added to `GrowthTrait`. Required at authoring; legacy un-tagged defaults to spirit.
+- Built: type added, `TraitsCard` add-form has pillar picker, `addTrait`/`updateTrait` accept pillar, `character-grants` reads it from seed/root/branch data.
 
----
+### 5. ~~Body composition system~~ ✅ 2026-05-19
+- Body parts = items with `isBodyPart`, `partName`, `contains` (nested item array).
+- Damage cascade: outer absorbs to resist, excess passes through. Piercing → designated internal; others → even split.
+- "Body" damage type retired in favor of material + typed damage.
+- Built: extended `GrowthWorldItem`, new `lib/body-damage.ts` with `routeDamage`, `HUMAN_BASELINE_ANATOMY`.
 
-## Tier 2 — Economic & subscription
+### 6. ~~Creature size~~ ✅ 2026-05-19
+- `width × length` footprint + descriptive `height`. Open-ended scaling.
+- Hard rules: reach scales with footprint; squeeze through opening 1 smaller.
+- Carry capacity/push-pull stay Clout; cover/LOS are Terminal contextual rulings.
+- Built: `CreatureSize` type, `lib/creature-size.ts`, `HUMAN_BASELINE_SIZE`.
 
-### 5. GM subscription bell-curve values (M5a)
-- **Blocks:** Subscription → wallet allocation hook.
-- **Why blocked:** Need the actual KRMA numbers for the bell-curve distribution.
-- **Ask:** "First payment lump sum = X KRMA; monthly drip = Y KRMA at month 1, decaying via Z curve to floor of W by month 12" — fill in numbers.
+### 7. ~~GM subscription drip~~ ✅ 2026-05-19
+- 15k lump on subscribe. Curve: 2.5k m1 → 10k m12 peak → 3k m36+ steady.
+- Built: `services/subscription-drip.ts` with `monthlyDrip()` + `cumulativeDrip()`.
+- Parked (not blocking): sunset cash subscription / KRMA-as-service-payment.
 
-### 6. Goal abandonment KRMA cost
-- **Blocks:** Goal-cancel UX feels free right now (placeholder cost of 0). Currently the goal.ts comment says "amount TBD."
-- **Why blocked:** No formula yet.
-- **Ask:** Flat cost? Percentage of priority? Something tied to the resistance entities already invested?
+### 8. ~~Goal abandonment~~ ✅ 2026-05-19
+- No flat cost. Triggers Godhead reaction event; heavy investment → Godhead may apply a Thorn directly.
+- Built: removed TODO from `goal.ts`, dispatcher routes `goal.abandoned` to Eth'erling.
 
-### 7. Brevity-Thorn template
-- **Blocks:** Short-lived seed authoring (anything where the seed is meant to expire fast).
-- **Why blocked:** Open question from May 8 KRMA economy research.
-- **Ask:** Confirm whether short-lived seeds get a built-in Thorn template that handles their expiration, or whether each authoring case is bespoke.
+### 9. ~~Brevity-Thorn~~ ✅ struck 2026-05-19
+Not a real concept. Lifespan is its own track, authored per seed. Removed from doc.
 
----
+### 10. ~~Beta content targets~~ ✅ 2026-05-19
+- No hard counts; Seeds/Roots/Branches are agnostic ever-expanding pools (NOT nested per-seed).
+- Beta gate is qualitative: drop-in test. Hand-author solid base examples, AI-generate the rest.
 
-## Tier 3 — Production infrastructure
+### 11. ~~Magic system~~ ✅ confirmed 2026-05-19
+- 10 Schools across 3 Pillars (Mercy/Severity/Balance). Wild casting + Woven spells. Mana pool. Multi-school = weakest skill.
+- Repo files in `04_MAGIC_PILLARS/*` confirmed canon.
 
-### 8. Hosting platform decision (M6c)
-- **Blocks:** Production deploy pipeline, custom domain, TLS, env var management.
-- **Why blocked:** Vercel vs Fly vs Railway is your call (cost, region, latency, comfort).
-- **Ask:** Pick one. I'll wire the CI/CD config and env scaffolding around it.
+### 12. ~~Item quality tier names~~ ✅ 2026-05-19
+- Crude / Common / Sound / Fine / Refined / Superior / Exquisite / Masterwork / Mythic / Divine.
+- Flavor only, zero mechanical weight.
+- Built: `QUALITY_TIER_NAMES`, `getQualityTierName()` in `types/item.ts`.
 
-### 9. Stripe account + product/price IDs (M6a)
-- **Blocks:** M5a (subscription → wallet), beta launch.
-- **Why blocked:** Needs your Stripe account.
-- **Ask:** Create account, define one product with the GM seat-bundle price, share publishable key + price IDs.
+### 13. ~~Email provider~~ ✅ Resend 2026-05-19
+- Built: `lib/email.ts` `ResendEmailProvider`. Env: `EMAIL_PROVIDER=resend` + `RESEND_API_KEY`.
 
-### 10. Schema drift fix
-- **Blocks:** Email verification + password reset DB persistence (currently in-memory only). Also blocks any future migrations because the next one will reset the dev DB.
-- **Why blocked:** Pre-existing schema changes (GodHead index additions in latest migrations) haven't been applied to `dev.db`; running `prisma migrate dev` triggers a full reset and I didn't want to wipe your test data.
-- **Ask:** Run `npx prisma migrate reset` when ready (will wipe dev.db), then `npx tsx scripts/seed-admin.ts && scripts/seed-canonical-seeds.ts && scripts/seed-test-srb.ts && scripts/seed-pipeline-character.ts` to repopulate. After that I can add the EmailVerificationToken + PasswordResetToken models cleanly.
-
----
-
-## Tier 4 — Legal & support (M7)
-
-### 11. Terms of Service [NEEDS LAWYER]
-### 12. Privacy Policy [NEEDS LAWYER]
-### 13. Refund policy [NEEDS LAWYER]
-### 14. Acceptable use policy [NEEDS LAWYER]
-- **Blocks:** Beta launch (can't take money without these).
-- **Why blocked:** Needs a lawyer.
-- **Ask:** Engage a lawyer once Stripe is in place. I can draft FIRST DRAFTS for the lawyer to revise — just say the word.
-
-### 15. Support contact channel
-- **Blocks:** Support inbox monitoring, status page, bug-report path inside the app.
-- **Why blocked:** Email? Ticket system? Discord?
-- **Ask:** "support@gro.wth, monitored daily" or similar — give me an answer and I'll wire the channel.
+### 14. ~~Anthropic API keys~~ ✅ directive 2026-05-19
+- Separate scoped keys per service domain (Godhead dispatcher, character gen, in-session tracking, UI). Specific key architecture delegated to engineer.
 
 ---
 
-## Tier 5 — Content library targets (M9)
+## STILL OPEN (active blockers — none requiring design input)
 
-### 16. Beta content counts
-- **Blocks:** M9 — content seeding for beta launch.
-- **Why blocked:** No target counts.
-- **Ask:** For beta, how many of each:
-  - **Seeds** (suggest 12-15)
-  - **Roots per Seed** (suggest 3-5)
-  - **Branches per Root** (suggest 2-3)
-  - **Nectars** (suggest 20-30)
-  - **Thorns** (suggest 20-30)
-  - **Items** (suggest 30-50: weapons, armor, gear)
-  - **Spells** (suggest 20-30 across schools)
+Nothing currently blocks coding work on the resolved items.
 
-### 17. Magic system mechanics confirmation
-- **Blocks:** Spell library authoring.
-- **Why blocked:** Roadmap says "mechanics confirmed against current canon" is needed before authoring.
-- **Ask:** Confirm the magic resolution model (does it use a skill check? KRMA spend? Both?) for beta — even minimal canon is fine.
+### Production-side (not engineering blockers, but required for beta launch):
+- **Hosting platform** decision (Vercel / Fly / Railway).
+- **Stripe** account + product/price IDs.
+- **Schema drift fix** — pre-existing prisma migrations need to be applied to dev.db; running `prisma migrate dev` would reset. Decide when to migrate (will wipe dev data; re-seed via existing scripts after).
+- **Legal docs** — ToS / Privacy / Refund / Acceptable Use (needs lawyer).
+- **Support contact channel** — email, ticket system, Discord?
 
-### 18. Quality field per-tier descriptions
-- **Blocks:** Item Quality UX clarity.
-- **Why blocked:** Old "Poor / Standard / etc." list was rejected; no replacement.
-- **Ask:** Optional — name the 1-10 quality tiers (e.g. "1=junk, 5=well-made, 10=masterwork"). Numeric works fine without names.
-
----
-
-## Tier 6 — Small confirmations
-
-### 19. Anthropic API key for dispatcher
-- **Blocks:** Real Godhead behavior in dev (currently dispatcher records PENDING invocations but doesn't run the agent loop).
-- **Why blocked:** I won't burn your tokens without permission.
-- **Ask:** Add `ANTHROPIC_API_KEY` to `app/.env` and `GODHEAD_DISPATCHER=enabled`. Or tell me which env file to add them to.
-
-### 20. Email provider choice (post-MVP)
-- **Blocks:** Production email delivery (currently uses console-log stub).
-- **Why blocked:** Need API key.
-- **Ask:** Pick one — Resend / Postmark / SES — and share API key. Already env-swappable.
-
-### 21. Wizard AI generation wiring (EntityCreationWizard.tsx:715,733)
-- **Blocks:** Quick-mode NPC speed creation (M1f).
-- **Why blocked:** Endpoint needs to read campaign context; you mentioned ANTHROPIC_API_KEY is needed first.
-- **Ask:** Combine with #19 — once API key is set, this unblocks.
-
----
-
-## Tier 7 — Design conversations that should happen eventually (not blocking)
-
-- **GM "flag overpowered" mechanic** — repo doc exists, no implementation. Post-beta.
-- **KRMA → ledger crypto** — long-term equity vision. Depends on legality + working product first.
-- **Reversible book** — Flow-front/Focus-back lore + mechanics. AI-assisted page creation. App comes first.
-- **Oracle / AI co-GM** — VAD → ASR → diarization → game state derivation. Too complex for beta.
+### Future / post-beta:
+- Sunset cash subscription model + KRMA-as-service-payment plumbing.
+- Spirit-economy income path for ghosts to rebuild Frequency capacity (currently stuck at 0 max).
+- GM "flag overpowered" mechanic.
+- AI Oracle (co-GM).
+- KRMA → ledger crypto / equity endgame.
 
 ---
 
 ## How to work this list
 
-When you're back, easiest path is probably:
-
-1. **Skim Tier 1** — pick whichever feels easiest to verbalize. We can knock out 2-3 of those in a single sitting.
-2. **Tier 2 + Tier 3** — most are short numeric answers or platform picks; quick.
-3. **Tier 5** — give me target counts and I'll author the content through the Forge chain.
-4. **Tier 4** — handle when you're ready to take real money.
-5. **Tier 6** — small env/key tasks. Do these whenever.
-
-I'll resume work from this list each session.
+The active blockers section is intentionally empty — pick up engineering with the resolved canon as the source of truth. If a new design question surfaces during implementation, add it here.

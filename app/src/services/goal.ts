@@ -218,9 +218,13 @@ export async function abandonGoal(goalId: string, userId: string, userRole: stri
     throw new ForbiddenError('Only the GM or admin can abandon goals');
   }
 
-  // TODO: Deduct KRMA cost for abandonment (amount TBD — see goal abandonment
-  // formula in Mike's notes). Placeholder cost of 0 for now so the lifecycle
-  // works end-to-end and Lady Death can still be notified.
+  // NO flat or proportional KRMA cost on abandonment (locked Mike 2026-05-19).
+  // Goals are declared intentions; the investors are the Godheads (via the
+  // Opportunity flow that feeds the goal). Abandonment is a Godhead REACTION
+  // event — the godhead that invested Opportunities into this goal evaluates
+  // contextually (investment size, thread progress, narrative weight) and may
+  // apply a Thorn directly via the existing trait CRUD path. No new penalty
+  // subsystem; reuses the existing Thorn mechanic.
   const updated = await prisma.goal.update({
     where: { id: goalId },
     data: { status: 'ABANDONED', completedAt: new Date() },
@@ -230,6 +234,8 @@ export async function abandonGoal(goalId: string, userId: string, userRole: stri
     goalId: updated.id,
     characterId: updated.characterId,
     campaignId: updated.campaignId,
+    // Custodian gets first crack at reacting; if none, Eth'erling triages.
+    custodianName: updated.custodianName,
   }).catch(() => { /* swallow */ });
 
   return updated;

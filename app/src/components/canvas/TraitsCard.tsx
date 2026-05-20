@@ -6,6 +6,7 @@ import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 export interface TraitItem {
   name: string;
   type: 'nectar' | 'blossom' | 'thorn';
+  pillar?: 'body' | 'spirit' | 'soul';
   category?: string;
   description?: string;
   source?: string;
@@ -35,6 +36,7 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<'nectar' | 'blossom' | 'thorn'>('nectar');
+  const [newPillar, setNewPillar] = useState<'body' | 'spirit' | 'soul'>('spirit');
   const [newDescription, setNewDescription] = useState('');
   const [newEffect, setNewEffect] = useState('');
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -43,13 +45,14 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
   const isEditable = !!(onAddTrait || onRemoveTrait || onUpdateTrait);
 
   const resetAdd = () => {
-    setNewName(''); setNewType('nectar'); setNewDescription(''); setNewEffect(''); setShowAddForm(false);
+    setNewName(''); setNewType('nectar'); setNewPillar('spirit'); setNewDescription(''); setNewEffect(''); setShowAddForm(false);
   };
   const submitAdd = () => {
     if (!onAddTrait || !newName.trim()) return;
     onAddTrait({
       name: newName.trim(),
       type: newType,
+      pillar: newPillar,
       category: 'utility',
       description: newDescription.trim() || undefined,
       mechanicalEffect: newEffect.trim() || undefined,
@@ -126,6 +129,21 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
                         backgroundColor: newType === t ? TYPE_STYLES[t].color : '#1a1a2e',
                         color: newType === t ? '#1a1a2e' : TYPE_STYLES[t].color,
                         border: `1px solid ${TYPE_STYLES[t].color}` }}>{TYPE_STYLES[t].label}</button>
+                  ))}
+                </div>
+                <div className="flex gap-1 items-center">
+                  <span className="text-[9px]" style={{ color: '#888', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>Pillar:</span>
+                  {([
+                    { key: 'body' as const, color: '#f7525f', label: 'BODY' },
+                    { key: 'spirit' as const, color: '#582a72', label: 'SPIRIT' },
+                    { key: 'soul' as const, color: '#002f6c', label: 'SOUL' },
+                  ]).map(p => (
+                    <button key={p.key} type="button" onClick={e => { e.stopPropagation(); setNewPillar(p.key); }} onMouseDown={e => e.stopPropagation()}
+                      className="px-2 py-0.5 text-[9px] uppercase"
+                      style={{ borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em',
+                        backgroundColor: newPillar === p.key ? p.color : '#1a1a2e',
+                        color: newPillar === p.key ? '#fff' : p.color,
+                        border: `1px solid ${p.color}` }}>{p.label}</button>
                   ))}
                 </div>
                 <input type="text" value={newName} onChange={e => setNewName(e.target.value)} onMouseDown={e => e.stopPropagation()}

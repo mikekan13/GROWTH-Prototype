@@ -146,32 +146,52 @@ export function applyCreationGrants(
   next.skills = Array.from(skillByName.values());
 
   // ── Traits: nectars + thorns from all three sources (deduped by name)
-  const traitByKey = new Map<string, { name: string; type: 'nectar' | 'thorn'; category: 'utility'; description: string; source: string }>();
+  //
+  // Pillar tag (Mike 2026-05-19): required ternary 'body' | 'spirit' | 'soul'.
+  // Seeds/roots/branches that pre-date this field default to 'spirit' here
+  // (the safe-kept bucket for death-engine routing). Future authoring should
+  // pass an array of { name, pillar } objects instead of bare strings; this
+  // function reads either shape.
+  type PillarKind = 'body' | 'spirit' | 'soul';
+  type TraitEntry = { name: string; type: 'nectar' | 'thorn'; pillar: PillarKind; category: 'utility'; description: string; source: string };
+  const traitByKey = new Map<string, TraitEntry>();
   for (const t of next.traits ?? []) {
     traitByKey.set(`${t.type}::${t.name.toLowerCase()}`, t as never);
   }
-  const pushTraits = (names: string[], type: 'nectar' | 'thorn', source: string) => {
-    for (const name of names) {
-      const key = `${type}::${name.toLowerCase()}`;
+  const normalizeOne = (entry: unknown): { name: string; pillar: PillarKind } | null => {
+    if (typeof entry === 'string') return { name: entry, pillar: 'spirit' };
+    if (entry && typeof entry === 'object' && 'name' in entry) {
+      const obj = entry as { name: string; pillar?: PillarKind };
+      const p = obj.pillar;
+      return { name: obj.name, pillar: p === 'body' || p === 'soul' ? p : 'spirit' };
+    }
+    return null;
+  };
+  const pushTraits = (raw: unknown[] | undefined, type: 'nectar' | 'thorn', source: string) => {
+    for (const e of raw ?? []) {
+      const norm = normalizeOne(e);
+      if (!norm) continue;
+      const key = `${type}::${norm.name.toLowerCase()}`;
       if (traitByKey.has(key)) continue;
       traitByKey.set(key, {
-        name,
+        name: norm.name,
         type,
+        pillar: norm.pillar,
         category: 'utility',
         description: '',
         source,
       });
     }
   };
-  pushTraits(seed.data.nectars ?? [], 'nectar', `Seed: ${seed.name}`);
-  pushTraits(seed.data.thorns ?? [], 'thorn', `Seed: ${seed.name}`);
+  pushTraits(seed.data.nectars as unknown[] | undefined, 'nectar', `Seed: ${seed.name}`);
+  pushTraits(seed.data.thorns as unknown[] | undefined, 'thorn', `Seed: ${seed.name}`);
   for (const r of roots) {
-    pushTraits(r.data.nectars ?? [], 'nectar', `Root: ${r.name}`);
-    pushTraits(r.data.thorns ?? [], 'thorn', `Root: ${r.name}`);
+    pushTraits(r.data.nectars as unknown[] | undefined, 'nectar', `Root: ${r.name}`);
+    pushTraits(r.data.thorns as unknown[] | undefined, 'thorn', `Root: ${r.name}`);
   }
   for (const b of branches) {
-    pushTraits(b.data.nectars ?? [], 'nectar', `Branch: ${b.name}`);
-    pushTraits(b.data.thorns ?? [], 'thorn', `Branch: ${b.name}`);
+    pushTraits(b.data.nectars as unknown[] | undefined, 'nectar', `Branch: ${b.name}`);
+    pushTraits(b.data.thorns as unknown[] | undefined, 'thorn', `Branch: ${b.name}`);
   }
   next.traits = Array.from(traitByKey.values()) as GrowthCharacter['traits'];
 

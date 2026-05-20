@@ -192,11 +192,22 @@ export type TraitCategory =
   | 'combat' | 'learning' | 'magic' | 'social' | 'utility'
   | 'supernatural' | 'supertech' | 'natural';
 
+export type TraitPillar = 'body' | 'spirit' | 'soul';
+
 export interface GrowthTrait {
   name: string;
   category: TraitCategory;
   description: string;
   type: 'nectar' | 'blossom' | 'thorn';
+  /**
+   * Required pillar tag (locked Mike 2026-05-19). Determines death-engine
+   * routing: body → stripped to GM; soul → halved to Lady Death;
+   * spirit → kept. Ternary so future logic can distinguish Spirit from Soul
+   * without re-tagging the catalog. Optional only on legacy un-tagged
+   * records — new authoring requires it, and the death engine defaults
+   * missing-pillar traits to 'spirit' (the safe-kept bucket).
+   */
+  pillar?: TraitPillar;
   source?: string;          // Where it came from (GRO.vine name, Godhead, etc.)
   mechanicalEffect?: string; // E.g. "+1 GRO.vine capacity", "+2 Restoration"
   // nectar = permanent positive (from completing GRO.vines)
@@ -338,6 +349,22 @@ export interface GrowthIdentity {
   // Style fields (portrait pipeline / character creator)
   styleColors?: { primary: string; secondary: string; tertiary: string }; // hex codes — secondary drives underwear color
   styleAesthetics?: string[];     // up to 2 aesthetic descriptors — drives underwear style
+  /**
+   * Creature size (locked Mike 2026-05-19).
+   * - `width` × `length` = grid footprint in 5ft squares (e.g. 1×1 humanoid, 2×3 horse).
+   * - `height` is descriptive, used by the Terminal for contextual rulings
+   *   (doorways, ceilings, reach narrative). No fixed unit — game-context (feet/meters/abstract).
+   * Open-ended scaling — supports planet-scale entities. Effects reference these
+   * values numerically in their own text. See lib/creature-size.ts for helpers.
+   */
+  size?: CreatureSize;
+}
+
+/** Asymmetric grid footprint + descriptive height. */
+export interface CreatureSize {
+  width: number;
+  length: number;
+  height?: number;
 }
 
 // Backstory

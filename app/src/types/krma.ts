@@ -163,8 +163,15 @@ export interface TKVBreakdown {
 export interface DeathSplitComponent {
   source: string;         // e.g. "attribute:clout", "skill:Swordsmanship", "trait:Fire Resist"
   kv: number;
-  destination: 'campaign' | 'player' | 'lady_death';
-  reason: string;         // e.g. "Body attribute → 100% to GM"
+  /**
+   * - 'campaign'   → transfer to GM wallet (body strips)
+   * - 'lady_death' → transfer to Lady Death system wallet (soul halves, frequency capacity)
+   * - 'kept'       → no transfer; KRMA stays on the character/ghost wallet. Recorded for UI/audit.
+   * - 'player'     → DEPRECATED in the post-2026-05-19 transformation model.
+   *                   Retained in the union for back-compat with old manifest data.
+   */
+  destination: 'campaign' | 'player' | 'lady_death' | 'kept';
+  reason: string;
 }
 
 export interface DeathSplitManifest {

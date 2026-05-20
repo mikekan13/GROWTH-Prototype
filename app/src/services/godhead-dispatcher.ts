@@ -56,7 +56,11 @@ const ROUTING_TABLE: Record<GodHeadEvent, ReadonlyArray<string>> = {
   'goal.created': ['Eth\'erling'],
   'goal.completed': ['Eth\'erling'],
   'goal.failed': ['Eth\'erling'],
-  'goal.abandoned': ['Lady Death'],
+  // Abandonment: the custodian godhead (the one who invested Opportunities
+  // into this goal) reacts contextually — see services/goal.ts abandonGoal
+  // for the policy. If the goal had no custodian assigned, Eth'erling triages
+  // and may delegate to Lady Death for the narrative weight.
+  'goal.abandoned': ['Eth\'erling'],
 
   // Blueprint chain: Kai prices, Eth'erling synthesizes.
   'blueprint.submitted': ['Kai'],

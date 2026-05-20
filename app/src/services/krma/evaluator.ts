@@ -257,14 +257,29 @@ export function validateTraitKV(
 }
 
 // ── Death Split Calculation ──
+//
+// Transformation model (locked Mike 2026-05-19): the character is NOT destroyed
+// on death — they continue as a ghost form. The split:
+//   • Body attrs/skills/body-pillared traits/body resist → stripped, KRMA → GM
+//   • Soul attrs + soul-governed skills → halved; lost half KRMA → Lady Death
+//   • Frequency capacity (max level) → 0; full KRMA value → Lady Death
+//   • Spirit (Flow, Focus) attrs/skills/magic skills → kept on character
+//   • Non-body traits (spirit/soul pillar) → kept on character
+//
+// "kept" entries do NOT appear in the manifest's transfer totals — they
+// stay on the character wallet. They DO appear as components with
+// destination 'kept' for audit/UI rendering.
 
 export function calculateDeathSplit(character: GrowthCharacter, tkv: TKVBreakdown): DeathSplitManifest {
   const components: DeathSplitComponent[] = [];
   let toCampaign = 0;
-  let toPlayer = 0;
+  // toPlayer kept for back-compat with the manifest type — the new
+  // transformation model leaves all "kept" KRMA on the character wallet,
+  // not transferred to the player. We always set toPlayer = 0 here.
+  const toPlayer = 0;
   let toLadyDeath = 0;
 
-  // Body attributes → 100% to campaign (GM)
+  // Body attributes → 100% to campaign
   for (const attr of BODY_ATTRIBUTES) {
     const kv = tkv.body[attr];
     if (kv > 0) {
@@ -272,113 +287,137 @@ export function calculateDeathSplit(character: GrowthCharacter, tkv: TKVBreakdow
         source: `attribute:${attr}`,
         kv,
         destination: 'campaign',
-        reason: `Body attribute → 100% to GM`,
+        reason: `Body attribute → stripped to GM`,
       });
       toCampaign += kv;
     }
   }
 
-  // Soul attributes → halved (50% campaign, 50% player)
+  // Soul attributes → halved, the lost half → Lady Death; remaining half stays on character
   for (const attr of SOUL_ATTRIBUTES) {
     const kv = tkv.soul[attr];
     if (kv > 0) {
-      const half = Math.floor(kv / 2);
-      const remainder = kv - half;
-      components.push({
-        source: `attribute:${attr}`,
-        kv: half,
-        destination: 'campaign',
-        reason: `Soul attribute → 50% to GM`,
-      });
-      components.push({
-        source: `attribute:${attr}`,
-        kv: remainder,
-        destination: 'player',
-        reason: `Soul attribute → 50% to player Spirit Package`,
-      });
-      toCampaign += half;
-      toPlayer += remainder;
+      const lost = Math.floor(kv / 2);
+      const kept = kv - lost;
+      if (lost > 0) {
+        components.push({
+          source: `attribute:${attr}`,
+          kv: lost,
+          destination: 'lady_death',
+          reason: `Soul attribute → half stripped to Lady Death`,
+        });
+        toLadyDeath += lost;
+      }
+      if (kept > 0) {
+        components.push({
+          source: `attribute:${attr}`,
+          kv: kept,
+          destination: 'kept',
+          reason: `Soul attribute → half retained on ghost`,
+        });
+      }
     }
   }
 
-  // Spirit attributes (Flow, Focus) → 100% to player
+  // Spirit Flow + Focus → kept (NOT transferred). Recorded as components for UI clarity.
+  // (SPIRIT_ATTRIBUTES already excludes 'frequency' by design — frequency
+  // capacity is handled separately and routes to Lady Death.)
   for (const attr of SPIRIT_ATTRIBUTES) {
     const kv = tkv.spirit[attr as keyof typeof tkv.spirit] as number;
     if (kv > 0) {
       components.push({
         source: `attribute:${attr}`,
         kv,
-        destination: 'player',
-        reason: `Spirit attribute → 100% to player Spirit Package`,
+        destination: 'kept',
+        reason: `Spirit ${attr} → retained on ghost`,
       });
-      toPlayer += kv;
     }
   }
 
-  // Frequency → 100% to Lady Death
+  // Frequency CAPACITY → Lady Death. The KV reflects level (max), not current pool.
   const freqKV = tkv.spirit.frequency;
   if (freqKV > 0) {
     components.push({
       source: 'attribute:frequency',
       kv: freqKV,
       destination: 'lady_death',
-      reason: 'Frequency → Lady Death tax',
+      reason: 'Frequency capacity → Lady Death (ghost has no Frequency)',
     });
     toLadyDeath += freqKV;
   }
 
-  // Skills — split by governing attributes
+  // Skills — body-governed strip; soul-governed halve; pure-spirit kept; mixed
+  // body-soul defaults to stripping (body presence dominates by canon — body
+  // is the more aggressive rule).
   for (const skill of tkv.skills) {
     const split = calculateSkillSplit(skill.name, skill.kv, skill.governors);
     components.push(...split.components);
     toCampaign += split.toCampaign;
-    toPlayer += split.toPlayer;
+    toLadyDeath += split.toLadyDeath;
   }
 
-  // Magic school skills — governed by Flow (mercy), Focus (severity), or both (balance)
-  // All Spirit-governed → 100% to player
+  // Magic school skills — Spirit-pillar (Flow/Focus governed) → kept on ghost.
   for (const ms of tkv.magicSkills) {
     if (ms.kv > 0) {
       components.push({
         source: `magic:${ms.school}`,
         kv: ms.kv,
-        destination: 'player',
-        reason: 'Magic skill (Spirit-governed) → 100% to player',
+        destination: 'kept',
+        reason: 'Magic school (Spirit-governed) → retained on ghost',
       });
-      toPlayer += ms.kv;
     }
   }
 
-  // Traits (Nectars/Thorns) — kept or destroyed per classification
+  // Traits routed by their explicit `pillar` tag (locked Mike 2026-05-19).
+  // Legacy un-tagged traits default to spirit (the safe-kept bucket).
   for (const trait of tkv.traits) {
     if (trait.kv === 0) continue;
-    const classification = trait.deathClassification ?? 'destroyed';
-    if (classification === 'kept') {
-      components.push({
-        source: `trait:${trait.name}`,
-        kv: trait.kv,
-        destination: 'player',
-        reason: `${trait.type} (kept) → retained in Spirit Package`,
-      });
-      toPlayer += trait.kv;
-    } else {
+    const pillar = (trait as { pillar?: 'body' | 'spirit' | 'soul' }).pillar ?? 'spirit';
+    if (pillar === 'body') {
       components.push({
         source: `trait:${trait.name}`,
         kv: trait.kv,
         destination: 'campaign',
-        reason: `${trait.type} (destroyed) → KV returned to GM`,
+        reason: `${trait.type} (body) → stripped to GM`,
       });
       toCampaign += trait.kv;
+    } else if (pillar === 'soul') {
+      const lost = Math.floor(trait.kv / 2);
+      const kept = trait.kv - lost;
+      if (lost > 0) {
+        components.push({
+          source: `trait:${trait.name}`,
+          kv: lost,
+          destination: 'lady_death',
+          reason: `${trait.type} (soul) → half to Lady Death`,
+        });
+        toLadyDeath += lost;
+      }
+      if (kept > 0) {
+        components.push({
+          source: `trait:${trait.name}`,
+          kv: kept,
+          destination: 'kept',
+          reason: `${trait.type} (soul) → half retained on ghost`,
+        });
+      }
+    } else {
+      components.push({
+        source: `trait:${trait.name}`,
+        kv: trait.kv,
+        destination: 'kept',
+        reason: `${trait.type} (spirit) → retained on ghost`,
+      });
     }
   }
 
-  // Body resist KV → goes to campaign (physical attribute, same as Body)
+  // Body resist KV → stripped to campaign (a body property)
   if (tkv.bodyResist.total > 0) {
     components.push({
       source: 'bodyResist',
       kv: tkv.bodyResist.total,
       destination: 'campaign',
-      reason: 'Body resist → 100% to GM',
+      reason: 'Body resist → stripped to GM',
     });
     toCampaign += tkv.bodyResist.total;
   }
@@ -408,68 +447,69 @@ function calculateSkillSplit(
   name: string,
   kv: number,
   governors: string[],
-): { toCampaign: number; toPlayer: number; components: DeathSplitComponent[] } {
+): { toCampaign: number; toLadyDeath: number; components: DeathSplitComponent[] } {
   if (kv === 0 || governors.length === 0) {
-    return { toCampaign: 0, toPlayer: 0, components: [] };
+    return { toCampaign: 0, toLadyDeath: 0, components: [] };
   }
 
-  // Classify each governor by pillar
   const pillars = governors.map(g => getAttributePillar(g));
   const hasBody = pillars.includes('body');
   const hasSoul = pillars.includes('soul');
   const hasSpirit = pillars.includes('spirit');
 
-  // Purely one pillar
-  if (!hasBody && !hasSoul && hasSpirit) {
-    return {
-      toCampaign: 0,
-      toPlayer: kv,
-      components: [{
-        source: `skill:${name}`,
-        kv,
-        destination: 'player',
-        reason: 'Spirit-governed skill → 100% to player',
-      }],
-    };
-  }
-
-  if (hasBody && !hasSoul && !hasSpirit) {
+  // Body presence ⇒ strip entirely. Body wins on mixed governors (per canon —
+  // body is the most aggressive rule, applied first).
+  if (hasBody) {
     return {
       toCampaign: kv,
-      toPlayer: 0,
+      toLadyDeath: 0,
       components: [{
         source: `skill:${name}`,
         kv,
         destination: 'campaign',
-        reason: 'Body-governed skill → 100% to GM',
+        reason: 'Body-governed skill → stripped to GM',
       }],
     };
   }
 
-  if (!hasBody && hasSoul && !hasSpirit) {
-    // Soul-governed → halved like soul attributes
-    const half = Math.floor(kv / 2);
-    const remainder = kv - half;
+  // Soul presence (no body) ⇒ halve to Lady Death, retain rest.
+  if (hasSoul) {
+    const lost = Math.floor(kv / 2);
+    const kept = kv - lost;
+    const comps: DeathSplitComponent[] = [];
+    if (lost > 0) {
+      comps.push({ source: `skill:${name}`, kv: lost, destination: 'lady_death', reason: 'Soul-governed skill → half to Lady Death' });
+    }
+    if (kept > 0) {
+      comps.push({ source: `skill:${name}`, kv: kept, destination: 'kept', reason: 'Soul-governed skill → half retained on ghost' });
+    }
+    return { toCampaign: 0, toLadyDeath: lost, components: comps };
+  }
+
+  // Pure Spirit governance ⇒ kept on ghost.
+  if (hasSpirit) {
     return {
-      toCampaign: half,
-      toPlayer: remainder,
-      components: [
-        { source: `skill:${name}`, kv: half, destination: 'campaign', reason: 'Soul-governed skill → 50% to GM' },
-        { source: `skill:${name}`, kv: remainder, destination: 'player', reason: 'Soul-governed skill → 50% to player' },
-      ],
+      toCampaign: 0,
+      toLadyDeath: 0,
+      components: [{
+        source: `skill:${name}`,
+        kv,
+        destination: 'kept',
+        reason: 'Spirit-governed skill → retained on ghost',
+      }],
     };
   }
 
-  // Mixed governors → halved (conservative default)
-  const half = Math.floor(kv / 2);
-  const remainder = kv - half;
+  // Unknown governor (shouldn't happen) — keep, log via reason.
   return {
-    toCampaign: half,
-    toPlayer: remainder,
-    components: [
-      { source: `skill:${name}`, kv: half, destination: 'campaign', reason: 'Mixed-governed skill → 50% to GM' },
-      { source: `skill:${name}`, kv: remainder, destination: 'player', reason: 'Mixed-governed skill → 50% to player' },
-    ],
+    toCampaign: 0,
+    toLadyDeath: 0,
+    components: [{
+      source: `skill:${name}`,
+      kv,
+      destination: 'kept',
+      reason: 'Unclassified skill governor — retained by default',
+    }],
   };
 }
 

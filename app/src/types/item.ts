@@ -44,7 +44,7 @@ export interface GrowthWorldItem {
   materialModifiers?: string[];    // DEPRECATED: same concept as `properties`. Kept for back-compat.
 
   // ── Quality, Rarity, Value ──
-  quality?: number;                // 1-10 (canon — descriptions TBD)
+  quality?: number;                // 1-10 (canon — see QUALITY_TIER_NAMES for flavor label, zero mechanical weight)
   // Rarity canon is 1-10 (Material_System.md:41). Old 6-bucket enum kept for back-compat with existing data.
   rarity?: ItemRarity | number;
   value?: number;                  // KV value
@@ -88,9 +88,46 @@ export interface GrowthWorldItem {
   // ── GM and free-form metadata ──
   notes?: string;
   tags?: string[];
+
+  // ── Body composition (locked Mike 2026-05-19) ──
+  // Everything is an item. Body parts are items that can't be unequipped, and
+  // they nest other items (Head contains Brain, Eyes, Tongue, etc.). Armor +
+  // body + organs form a single unified container chain. See lib/body-damage.ts.
+  /** True if this item is a body part of the bearer. Cannot be unequipped via normal UI. */
+  isBodyPart?: boolean;
+  /** Functional label for the part (e.g. "Head", "Left Eye", "Heart"). Each instance is distinct — Left Eye and Right Eye are separate parts. */
+  partName?: string;
+  /** Nested items this part/container holds. Standard cascade: outer absorbs up to resist, excess passes through to internals. */
+  contains?: GrowthWorldItem[];
 }
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';
+
+/**
+ * Quality tier flavor names — pure rarity labels, ZERO mechanical weight
+ * (locked Mike 2026-05-19). Index 0 = quality 1 (Crude), index 9 = quality 10 (Divine).
+ */
+export const QUALITY_TIER_NAMES = [
+  'Crude',
+  'Common',
+  'Sound',
+  'Fine',
+  'Refined',
+  'Superior',
+  'Exquisite',
+  'Masterwork',
+  'Mythic',
+  'Divine',
+] as const;
+export type QualityTierName = typeof QUALITY_TIER_NAMES[number];
+
+/** Flavor label for a quality value (1-10). null for out-of-range. */
+export function getQualityTierName(quality: number | undefined): QualityTierName | null {
+  if (typeof quality !== 'number') return null;
+  const idx = Math.round(quality) - 1;
+  if (idx < 0 || idx >= QUALITY_TIER_NAMES.length) return null;
+  return QUALITY_TIER_NAMES[idx];
+}
 
 // Canonical item properties — universal, not weapon-specific (Mike 2026-05-14).
 // Inherited from constituent materials; may be dampened/cancelled by material makeup.

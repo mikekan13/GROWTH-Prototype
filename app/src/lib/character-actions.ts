@@ -504,7 +504,7 @@ export function recomputeAugments(character: GrowthCharacter): ActionResult {
  */
 export function addTrait(
   character: GrowthCharacter,
-  trait: { name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string },
+  trait: { name: string; type: 'nectar' | 'blossom' | 'thorn'; pillar?: 'body' | 'spirit' | 'soul'; category?: string; description?: string; source?: string; mechanicalEffect?: string },
 ): ActionResult {
   const c = deepCloneCharacter(character);
   if (!Array.isArray(c.traits)) c.traits = [];
@@ -516,13 +516,14 @@ export function addTrait(
   const next: GrowthTrait = {
     name,
     type: trait.type,
+    pillar: trait.pillar ?? 'spirit',
     category: (trait.category as GrowthTrait['category']) ?? 'utility',
     description: trait.description ?? '',
     source: trait.source,
     mechanicalEffect: trait.mechanicalEffect,
   };
   c.traits.push(next);
-  return { character: c, changes: [`Added ${trait.type}: ${name}`] };
+  return { character: c, changes: [`Added ${trait.type} (${next.pillar}): ${name}`] };
 }
 
 /**
@@ -549,7 +550,7 @@ export function updateTrait(
   character: GrowthCharacter,
   type: 'nectar' | 'blossom' | 'thorn',
   name: string,
-  updates: { description?: string; mechanicalEffect?: string; source?: string; category?: string },
+  updates: { description?: string; mechanicalEffect?: string; source?: string; category?: string; pillar?: 'body' | 'spirit' | 'soul' },
 ): ActionResult {
   const c = deepCloneCharacter(character);
   if (!Array.isArray(c.traits)) c.traits = [];
@@ -572,6 +573,10 @@ export function updateTrait(
   if (updates.category !== undefined && updates.category !== trait.category) {
     trait.category = updates.category as GrowthTrait['category'];
     changes.push(`${name}: category → ${updates.category}`);
+  }
+  if (updates.pillar !== undefined && updates.pillar !== trait.pillar) {
+    trait.pillar = updates.pillar;
+    changes.push(`${name}: pillar → ${updates.pillar}`);
   }
   return { character: c, changes };
 }
