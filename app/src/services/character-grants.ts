@@ -10,6 +10,8 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import type { GrowthCharacter, FateDie, SkillGovernor } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
+import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
+import type { GrowthWorldItem } from '@/types/item';
 
 type AttrKey = 'clout' | 'celerity' | 'constitution' | 'focus' | 'flow' | 'willpower' | 'wisdom' | 'wit';
 const ATTR_KEYS: AttrKey[] = ['clout', 'celerity', 'constitution', 'focus', 'flow', 'willpower', 'wisdom', 'wit'];
@@ -24,6 +26,13 @@ interface SeedData {
   skills: string[];
   nectars: string[];
   thorns: string[];
+  /**
+   * Optional per-seed anatomy declaration. If absent, the character gets
+   * HUMAN_BASELINE_ANATOMY (the default). Each seed should eventually
+   * declare its own — Human eyes and Elven eyes are distinct items, no
+   * inheritance from a shared base (per Mike 2026-05-19).
+   */
+  bodyAnatomy?: GrowthWorldItem;
 }
 
 interface RootBranchData {
@@ -81,6 +90,12 @@ export function applyCreationGrants(
     bodyParts: {}, baseResist: 0, restRate: 1, carryLevel: 1, weightStatus: 'Fine',
   };
   next.vitals.baseResist = seed.data.baseResist;
+
+  // Body anatomy — seed declares its own; fall back to Human baseline.
+  // The tree is a deep copy so per-character damage doesn't mutate the
+  // shared baseline.
+  const baseline = (seed.data.bodyAnatomy ?? HUMAN_BASELINE_ANATOMY) as GrowthWorldItem;
+  next.bodyAnatomy = JSON.parse(JSON.stringify(baseline));
 
   // Seed augments (positive only by canon; thorns drive negatives)
   for (const k of ATTR_KEYS) {

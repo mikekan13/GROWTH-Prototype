@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (user) {
-      invalidateTokensForUser(user.id, 'password_reset');
-      const token = issueToken(user.id, 'password_reset');
+      await invalidateTokensForUser(user.id, 'password_reset');
+      const token = await issueToken(user.id, 'password_reset');
       const resetUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/auth/reset?token=${token}`;
       await sendEmail({
         to: user.email,

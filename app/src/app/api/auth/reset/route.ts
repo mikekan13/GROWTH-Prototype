@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { token, newPassword } = ResetSchema.parse(body);
 
-    const consumed = consumeToken(token, 'password_reset');
+    const consumed = await consumeToken(token, 'password_reset');
     if (!consumed) throw new ValidationError('Invalid or expired reset link');
 
     const passwordHash = await hashPassword(newPassword);

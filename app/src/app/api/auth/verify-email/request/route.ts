@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!user) throw new ValidationError('User not found');
 
-    invalidateTokensForUser(user.id, 'email_verification');
-    const token = issueToken(user.id, 'email_verification');
+    await invalidateTokensForUser(user.id, 'email_verification');
+    const token = await issueToken(user.id, 'email_verification');
     const verifyUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/api/auth/verify-email/${token}`;
 
     await sendEmail({

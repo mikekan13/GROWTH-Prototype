@@ -8,20 +8,87 @@ datasource db {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  username       String     @unique
-  email          String     @unique
-  passwordHash   String
-  role           String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
-  profile        String?    // JSON<TrailblazerProfile>
-  watcherProfile String?    // JSON<WatcherProfile> (GM-specific, only for WATCHER/ADMIN roles)
-  campaigns      Campaign[]       @relation("GMCampaigns")
-  characters     Character[]
-  memberships    CampaignMember[]
-  wallet         Wallet?
-  sessions       Session[]
-  accessCodes    AccessCode[]
-  createdAt      DateTime   @default(now())
+  id                 String     @id @default(cuid())
+  username           String     @unique
+  email              String     @unique
+  passwordHash       String
+  emailVerifiedAt    DateTime?
+  role               String     @default("TRAILBLAZER") // ADMIN, WATCHER, TRAILBLAZER, GODHEAD
+  profile            String?    // JSON<TrailblazerProfile>
+  watcherProfile     String?    // JSON<WatcherProfile> (GM-specific, only for WATCHER/ADMIN roles)
+  campaigns          Campaign[]       @relation("GMCampaigns")
+  characters         Character[]
+  memberships        CampaignMember[]
+  wallet             Wallet?
+  sessions           Session[]
+  accessCodes        AccessCode[]
+  emailVerifications EmailVerificationToken[]
+  passwordResets     PasswordResetToken[]
+  subscription       Subscription?
+  createdAt          DateTime   @default(now())
+}
+
+// ── Auth: short-lived single-use tokens for email verification & password reset ──
+// Issued by route handlers; consumed by the verify/reset endpoints. Tokens
+// auto-expire via the expiresAt column (the consumer also checks it). On
+// successful consumption we mark consumedAt so the row can be archived
+// (kept for audit; not re-used). Cascade-delete with the user.
+
+model EmailVerificationToken {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  token      String   @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  token      String   @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ── Subscription: tracks a paying GM through their lifecycle ─────────────
+// Drives the monthlyDrip() schedule. Stripe IDs are optional so we can run
+// dev/admin-flow subs without a Stripe account; the webhook layer fills
+// them in when real billing comes online.
+//
+// status:
+//   ACTIVE   — subscription is current; drips owed
+//   PAST_DUE — payment failed; drips paused until ACTIVE again
+//   CANCELED — user cancelled; no more drips; existing wallet KRMA stays
+//   FREE     — admin-granted free tier; drips apply normally
+
+model Subscription {
+  id                  String   @id @default(cuid())
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String   @unique
+  status              String   @default("ACTIVE") // ACTIVE | PAST_DUE | CANCELED | FREE
+  plan                String   @default("watcher_default")
+  // Anchor for the monthlyDrip() curve. Set at subscribe time; immutable.
+  subscribedAt        DateTime @default(now())
+  // Tracking — last drip we successfully ran. NULL = lump not yet paid.
+  lastDripAt          DateTime?
+  lastDripMonthIndex  Int      @default(0) // 0 = lump only; N = monthly drip #N already paid
+  // Stripe linkage (optional until billing comes online)
+  stripeCustomerId    String?  @unique
+  stripeSubId         String?  @unique
+  // Free-form metadata
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status])
 }
 
 model Campaign {

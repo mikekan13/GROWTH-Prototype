@@ -392,6 +392,18 @@ export interface GrowthCharacter {
   backstory: GrowthBackstory;
   harvests: GrowthHarvest[];
   notes: string;
+  /**
+   * Body anatomy — the nested container tree of body parts (locked Mike 2026-05-19).
+   * Items are the universal primitive; body parts are items with `isBodyPart: true`.
+   * See `lib/body-damage.ts` for the cascade engine, `HUMAN_BASELINE_ANATOMY` for
+   * the default. Each seed declares its own anatomy from scratch (no inheritance);
+   * legacy characters created before this field default to the Human baseline.
+   *
+   * Typed loosely as `unknown` here to avoid a circular type dependency with the
+   * item module — consumers cast to `GrowthWorldItem` from `@/types/item` after
+   * importing.
+   */
+  bodyAnatomy?: unknown;
 }
 
 // User roles
