@@ -87,8 +87,11 @@ export async function createSubscription(
         notes: validated.notes,
       },
     });
-    // Lump-sum allocation is fired exactly once, on first creation.
-    lumpTxId = await allocateSubscribeLump(validated.userId, actorId);
+    // Lump-sum allocation is fired exactly once per subscription row. The
+    // idempotency key includes sub.id so that a cancel→resubscribe (a new
+    // Subscription row) re-pays the lump rather than aliasing to the
+    // previous row's cached transaction.
+    lumpTxId = await allocateSubscribeLump(validated.userId, sub.id, actorId);
   }
 
   return { subscription: sub, lumpTransactionId: lumpTxId };
@@ -185,7 +188,7 @@ export async function runDripForAll(actorId: string, now: Date = new Date()) {
 
 // ── Internal helpers ─────────────────────────────────────────────────────
 
-async function allocateSubscribeLump(userId: string, actorId: string): Promise<string> {
+async function allocateSubscribeLump(userId: string, subscriptionId: string, actorId: string): Promise<string> {
   const reserveWallet = await getReserveWallet(SUBSCRIPTION_RESERVE_LABEL);
   const userWallet = await getWalletByOwner(userId);
   const tx = await executeTransaction({
@@ -195,10 +198,10 @@ async function allocateSubscribeLump(userId: string, actorId: string): Promise<s
     state: 'FLUID',
     reason: 'GM_ALLOCATION',
     description: 'Subscription — initial lump-sum allocation',
-    metadata: { userId, kind: 'subscribe_lump' },
+    metadata: { userId, subscriptionId, kind: 'subscribe_lump' },
     actorId,
     actorType: 'SYSTEM',
-    idempotencyKey: `sub-lump::${userId}`,
+    idempotencyKey: `sub-lump::${subscriptionId}`,
   });
   return tx.id;
 }

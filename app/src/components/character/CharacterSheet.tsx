@@ -10,6 +10,10 @@ import InventorySection from './InventorySection';
 
 interface CharacterSheetProps {
   character: GrowthCharacter;
+  /** Optional — when provided, exposes Frequency ops trigger. */
+  characterId?: string;
+  /** Optional — fired after a mutating action so the parent can refresh. */
+  onRefresh?: () => void;
 }
 
 const FATE_DIE_LABELS: Record<string, string> = {
@@ -22,7 +26,7 @@ const CONDITION_MAP: Record<string, string> = {
   overwhelmed: 'WIL 0', confused: 'WIS 0', incoherent: 'WIT 0',
 };
 
-export default function CharacterSheet({ character }: CharacterSheetProps) {
+export default function CharacterSheet({ character, characterId, onRefresh }: CharacterSheetProps) {
   const { identity, attributes, creation, conditions, traits, grovines } = character;
   const activeConditions = Object.entries(conditions).filter(([, v]) => v);
   const nectars = traits.filter(t => t.type === 'nectar');
@@ -112,7 +116,15 @@ export default function CharacterSheet({ character }: CharacterSheetProps) {
               Spirit <span className="text-[var(--surface-dark)]/30">(Sulfur)</span>
             </div>
             <AttributeBlock name="Flow" abbr="FLO" attribute={attributes.flow} pillarColor={PILLARS.spirit.color} />
-            <AttributeBlock name="Frequency" abbr="FRQ" attribute={attributes.frequency} pillarColor={PILLARS.spirit.color} isFrequency />
+            <AttributeBlock
+              name="Frequency"
+              abbr="FRQ"
+              attribute={attributes.frequency}
+              pillarColor={PILLARS.spirit.color}
+              isFrequency
+              characterId={characterId}
+              onFrequencyOpApplied={onRefresh}
+            />
             <AttributeBlock name="Focus" abbr="FOC" attribute={attributes.focus} pillarColor={PILLARS.spirit.color} />
           </div>
 

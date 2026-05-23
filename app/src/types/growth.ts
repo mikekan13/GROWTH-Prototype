@@ -194,11 +194,34 @@ export type TraitCategory =
 
 export type TraitPillar = 'body' | 'spirit' | 'soul';
 
+/**
+ * Structured roll modifier carried by a trait. Optional — when present,
+ * the skill-check pipeline (services/trait-modifiers.ts) sums matching
+ * modifiers into the roll total automatically.
+ *
+ * Empty `skillNamePattern` + empty `governorAttribute` = applies to all rolls.
+ * Otherwise the modifier only fires when the rolled check matches the pattern
+ * (case-insensitive substring) AND/OR uses the named governor.
+ */
+export interface RollModifier {
+  flat: number;                  // +N to roll total (negative for penalties)
+  skillNamePattern?: string;     // substring match (case-insensitive) on skill name
+  governorAttribute?: string;    // require this governor attribute on the rolled check
+  label?: string;                // optional human-friendly source label for UI
+}
+
 export interface GrowthTrait {
   name: string;
   category: TraitCategory;
   description: string;
   type: 'nectar' | 'blossom' | 'thorn';
+  /**
+   * Optional structured roll modifiers. The runtime sums applicable ones
+   * during skill checks. Keep simple: flat bonuses keyed by skill/governor.
+   * Complex effects (resource generation, conditional triggers) belong in
+   * Kai-authored mechanical effects with their own handler hooks.
+   */
+  rollModifiers?: RollModifier[];
   /**
    * Required pillar tag (locked Mike 2026-05-19). Determines death-engine
    * routing: body → stripped to GM; soul → halved to Lady Death;

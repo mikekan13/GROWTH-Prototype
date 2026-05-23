@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SEED_CATALOG, FATE_DIE_VALUE, getSeed } from '@/lib/seed-catalog';
-import type { GrowthSeed, FateDie } from '@/types/growth';
+import type { GrowthSeed, FateDie, SkillGovernor } from '@/types/growth';
+import { PILLARS } from '@/types/growth';
 
 // --- Wizard state shape ---
 // ForgeBlock = a selected forge item (root, branch, skill, trait, etc.)
@@ -13,6 +14,33 @@ export interface ForgeBlock {
   data: Record<string, unknown>;
 }
 
+export type AttributeName =
+  | 'clout' | 'celerity' | 'constitution'
+  | 'flow' | 'frequency' | 'focus'
+  | 'willpower' | 'wisdom' | 'wit';
+
+export interface DraftSkill {
+  name: string;
+  level: number;
+  governors: SkillGovernor[];
+  description?: string;
+  forgeItemId?: string;
+}
+
+export interface DraftTrait {
+  name: string;
+  type: 'nectar' | 'thorn';
+  description?: string;
+  pillar?: 'body' | 'spirit' | 'soul';
+  mechanicalEffect?: string;
+  forgeItemId?: string;
+}
+
+export interface DraftGoal {
+  description: string;
+  priority: number; // 1-5
+}
+
 export interface EntityDraft {
   // Step 1: Intake
   name: string;
@@ -20,8 +48,17 @@ export interface EntityDraft {
   targetKV: number;
   // Step 2: Seed
   seed: GrowthSeed | null;
-  // Step 3: Root (selected from campaign forge)
+  // Step 3: Root + Branches (selected from campaign forge)
   root: ForgeBlock | null;
+  branches: ForgeBlock[];
+  // Step 4: Attribute levels (1-20)
+  attributes: Record<AttributeName, number>;
+  // Step 5: Selected skills
+  skills: DraftSkill[];
+  // Step 6: Selected nectars + thorns
+  traits: DraftTrait[];
+  // Step 7: Initial goals (max 5)
+  goals: DraftGoal[];
 }
 
 const STEPS = [
@@ -51,6 +88,12 @@ interface Props {
   onComplete: () => void;
 }
 
+const DEFAULT_ATTRIBUTES: Record<AttributeName, number> = {
+  clout: 1, celerity: 1, constitution: 1,
+  flow: 1, frequency: 1, focus: 1,
+  willpower: 1, wisdom: 1, wit: 1,
+};
+
 function createEmptyDraft(): EntityDraft {
   return {
     name: '',
@@ -58,7 +101,24 @@ function createEmptyDraft(): EntityDraft {
     targetKV: 500,
     seed: null,
     root: null,
+    branches: [],
+    attributes: { ...DEFAULT_ATTRIBUTES },
+    skills: [],
+    traits: [],
+    goals: [],
   };
+}
+
+// KRMA cost constants — mirror lib/kv-calculator.ts
+const KV_PER_ATTR = 1;
+const KV_PER_SKILL = 1;
+
+function computeRunningKV(draft: EntityDraft): number {
+  const attrSum = Object.values(draft.attributes).reduce((s, v) => s + v, 0);
+  const skillSum = draft.skills.reduce((s, sk) => s + sk.level, 0);
+  const fateDie = (draft.seed?.baseFateDie ?? 'd6');
+  const fateKV = FATE_DIE_VALUE[fateDie] ?? 10;
+  return attrSum * KV_PER_ATTR + skillSum * KV_PER_SKILL + fateKV;
 }
 
 // --- Step 1: Intake ---
@@ -627,6 +687,718 @@ function RootStep({
   );
 }
 
+// --- Step 3 (companion): Branches multi-select ---
+function BranchesPanel({
+  draft,
+  onChange,
+  campaignId,
+}: {
+  draft: EntityDraft;
+  onChange: (updates: Partial<EntityDraft>) => void;
+  campaignId: string;
+}) {
+  const [branches, setBranches] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown> }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchBranches() {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/forge?type=branch&status=published`);
+        if (res.ok) {
+          const data = await res.json();
+          setBranches(data.items || []);
+        }
+      } catch { /* silent */ }
+      setLoading(false);
+    }
+    fetchBranches();
+  }, [campaignId]);
+
+  const selectedIds = new Set(draft.branches.map(b => b.id));
+  const toggle = (item: typeof branches[number]) => {
+    if (selectedIds.has(item.id)) {
+      onChange({ branches: draft.branches.filter(b => b.id !== item.id) });
+    } else {
+      onChange({
+        branches: [
+          ...draft.branches,
+          { id: item.id, name: item.name, type: item.type, data: item.data },
+        ],
+      });
+    }
+  };
+
+  return (
+    <div className="mt-6 pt-6" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-baseline justify-between mb-3">
+        <span className="text-[12px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.15em] text-white/40">
+          Branches <span className="text-white/20">(optional)</span>
+        </span>
+        <span className="text-[11px] font-[family-name:var(--font-terminal)] text-white/30">
+          {draft.branches.length} selected
+        </span>
+      </div>
+      {loading ? (
+        <div className="text-center py-6 text-[12px] text-white/20 font-[family-name:var(--font-terminal)]">Loading branches...</div>
+      ) : branches.length === 0 ? (
+        <div className="text-center py-4 text-[11px] text-white/20 font-[family-name:var(--font-terminal)]">
+          No published branches in this campaign.
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {branches.map(b => {
+            const sel = selectedIds.has(b.id);
+            return (
+              <button
+                key={b.id}
+                onClick={() => toggle(b)}
+                className="px-2.5 py-1 text-[11px] uppercase tracking-[0.08em] font-[family-name:var(--font-terminal)] border transition-colors"
+                style={{
+                  borderColor: sel ? '#3E78C0' : 'rgba(255,255,255,0.12)',
+                  background: sel ? 'rgba(62,120,192,0.18)' : 'rgba(0,0,0,0.3)',
+                  color: sel ? '#3E78C0' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {b.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Step 4: Attributes ---
+function AttributesStep({
+  draft,
+  onChange,
+}: {
+  draft: EntityDraft;
+  onChange: (updates: Partial<EntityDraft>) => void;
+}) {
+  const setAttr = (name: AttributeName, value: number) => {
+    const clamped = Math.max(1, Math.min(20, Math.floor(value)));
+    onChange({ attributes: { ...draft.attributes, [name]: clamped } });
+  };
+
+  const attrTotal = Object.values(draft.attributes).reduce((s, v) => s + v, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
+        Tune each attribute (1-20). Each level costs 1 KRMA. Seed augments apply on top at crystallization.
+      </div>
+
+      {(['body', 'spirit', 'soul'] as const).map(pillarKey => {
+        const pillar = PILLARS[pillarKey];
+        return (
+          <div key={pillarKey} className="border p-4" style={{ borderColor: `${pillar.color}33`, background: 'rgba(0,0,0,0.2)' }}>
+            <div className="flex items-baseline gap-2 mb-3">
+              <span
+                className="text-[12px] font-[family-name:var(--font-header)] tracking-[0.2em] uppercase"
+                style={{ color: pillar.color }}
+              >
+                {pillar.name}
+              </span>
+              <span className="text-[10px] font-[family-name:var(--font-terminal)] text-white/30 uppercase">
+                {pillar.alchemical}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {pillar.attributes.map(attrName => {
+                const level = draft.attributes[attrName as AttributeName];
+                const seedAug = (draft.seed?.attributes?.[attrName as keyof GrowthSeed['attributes']] ?? 0);
+                return (
+                  <div key={attrName} className="flex items-center gap-3">
+                    <label className="text-[12px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.1em] text-white/60 w-28">
+                      {attrName}
+                    </label>
+                    <button
+                      onClick={() => setAttr(attrName as AttributeName, level - 1)}
+                      disabled={level <= 1}
+                      className="w-7 h-7 text-[14px] border text-white/60 disabled:opacity-25 hover:text-white transition-colors"
+                      style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={level}
+                      onChange={(e) => setAttr(attrName as AttributeName, Number(e.target.value) || 1)}
+                      className="w-14 px-2 py-1 text-center text-[13px] font-[family-name:var(--font-bebas-neue)] bg-black/40 border text-white"
+                      style={{ borderColor: `${pillar.color}55` }}
+                    />
+                    <button
+                      onClick={() => setAttr(attrName as AttributeName, level + 1)}
+                      disabled={level >= 20}
+                      className="w-7 h-7 text-[14px] border text-white/60 disabled:opacity-25 hover:text-white transition-colors"
+                      style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+                    >
+                      +
+                    </button>
+                    {seedAug > 0 && (
+                      <span className="text-[10px] font-[family-name:var(--font-terminal)] text-white/40 ml-1">
+                        +{seedAug} from seed
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="flex items-center justify-between p-3 border" style={{ borderColor: 'rgba(255,204,120,0.25)', background: 'rgba(255,204,120,0.04)' }}>
+        <span className="text-[12px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.12em] text-[#ffcc78]">
+          Attribute Total
+        </span>
+        <span className="text-[18px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+          {attrTotal} <span className="text-[12px] text-white/40">Ҝ</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// --- Step 5: Skills ---
+function SkillsStep({
+  draft,
+  onChange,
+  campaignId,
+}: {
+  draft: EntityDraft;
+  onChange: (updates: Partial<EntityDraft>) => void;
+  campaignId: string;
+}) {
+  const [available, setAvailable] = useState<Array<{ id: string; name: string; data: Record<string, unknown> }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    async function fetchSkills() {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/forge?type=skill&status=published`);
+        if (res.ok) {
+          const data = await res.json();
+          setAvailable(data.items || []);
+        }
+      } catch { /* silent */ }
+      setLoading(false);
+    }
+    fetchSkills();
+  }, [campaignId]);
+
+  const selectedIds = new Set(draft.skills.map(s => s.forgeItemId).filter(Boolean));
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return available;
+    const q = search.toLowerCase();
+    return available.filter(s =>
+      s.name.toLowerCase().includes(q)
+      || (s.data?.description as string)?.toLowerCase().includes(q),
+    );
+  }, [available, search]);
+
+  const addSkill = (item: typeof available[number]) => {
+    const governors = (item.data?.governors as SkillGovernor[]) || ['willpower'];
+    const description = item.data?.description as string | undefined;
+    onChange({
+      skills: [
+        ...draft.skills,
+        { name: item.name, level: 1, governors, description, forgeItemId: item.id },
+      ],
+    });
+  };
+
+  const updateLevel = (idx: number, level: number) => {
+    const clamped = Math.max(1, Math.min(20, Math.floor(level)));
+    const next = [...draft.skills];
+    next[idx] = { ...next[idx], level: clamped };
+    onChange({ skills: next });
+  };
+
+  const removeSkill = (idx: number) => {
+    onChange({ skills: draft.skills.filter((_, i) => i !== idx) });
+  };
+
+  const totalKV = draft.skills.reduce((s, sk) => s + sk.level, 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
+        Add skills from published forge items. Each skill level costs 1 KRMA. Magic skills cost 2 KRMA per level.
+      </div>
+
+      {/* Selected skills */}
+      {draft.skills.length > 0 && (
+        <div className="space-y-1.5">
+          {draft.skills.map((sk, idx) => (
+            <div key={idx} className="flex items-center gap-2 p-2 border"
+              style={{ borderColor: '#ffcc7833', background: 'rgba(255,204,120,0.05)' }}
+            >
+              <span className="flex-1 text-[13px] font-[family-name:var(--font-terminal)] text-white/80">
+                {sk.name}
+              </span>
+              <div className="flex gap-0.5">
+                {sk.governors.slice(0, 3).map(g => (
+                  <span key={g} className="text-[9px] px-1 py-0.5 uppercase font-[family-name:var(--font-terminal)] text-white/50"
+                    style={{ background: 'rgba(255,255,255,0.05)' }}
+                  >
+                    {g.slice(0, 3)}
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={() => updateLevel(idx, sk.level - 1)}
+                disabled={sk.level <= 1}
+                className="w-6 h-6 text-[12px] border text-white/60 disabled:opacity-25"
+                style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+              >−</button>
+              <span className="w-6 text-center text-[13px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+                {sk.level}
+              </span>
+              <button
+                onClick={() => updateLevel(idx, sk.level + 1)}
+                disabled={sk.level >= 20}
+                className="w-6 h-6 text-[12px] border text-white/60 disabled:opacity-25"
+                style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+              >+</button>
+              <button
+                onClick={() => removeSkill(idx)}
+                className="w-6 h-6 text-[12px] text-white/30 hover:text-[#E8585A]"
+              >✕</button>
+            </div>
+          ))}
+          <div className="flex items-center justify-between p-2 text-[11px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.1em]"
+            style={{ background: 'rgba(255,204,120,0.04)' }}
+          >
+            <span className="text-white/40">Skill Subtotal</span>
+            <span className="text-[#ffcc78]">{totalKV} Ҝ</span>
+          </div>
+        </div>
+      )}
+
+      {/* Available skills */}
+      <div className="pt-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search published skills..."
+          className="w-full px-3 py-2 text-[12px] font-[family-name:var(--font-terminal)] bg-black/40 border text-white placeholder:text-white/25"
+          style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+        />
+      </div>
+
+      {loading ? (
+        <div className="text-center py-6 text-[12px] text-white/20 font-[family-name:var(--font-terminal)]">Loading...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-6 border border-dashed text-[12px] text-white/25 font-[family-name:var(--font-terminal)]"
+          style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+        >
+          {available.length === 0 ? 'No published skills in campaign forge.' : 'No matches.'}
+        </div>
+      ) : (
+        <div className="space-y-1 max-h-72 overflow-y-auto">
+          {filtered.map(item => {
+            const used = selectedIds.has(item.id);
+            const desc = item.data?.description as string | undefined;
+            return (
+              <button
+                key={item.id}
+                onClick={() => !used && addSkill(item)}
+                disabled={used}
+                className="w-full text-left p-2 border transition-colors disabled:opacity-40"
+                style={{
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  background: 'rgba(0,0,0,0.3)',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-[family-name:var(--font-terminal)] text-white/80">{item.name}</span>
+                  <span className="text-[10px] text-white/30">{used ? 'added' : '+ add'}</span>
+                </div>
+                {desc && <div className="text-[11px] text-white/40 mt-0.5 line-clamp-1">{desc}</div>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Step 6: Traits (Nectars + Thorns) ---
+function TraitsStep({
+  draft,
+  onChange,
+  campaignId,
+}: {
+  draft: EntityDraft;
+  onChange: (updates: Partial<EntityDraft>) => void;
+  campaignId: string;
+}) {
+  const [available, setAvailable] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown> }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'nectar' | 'thorn'>('nectar');
+
+  useEffect(() => {
+    async function fetchTraits() {
+      try {
+        const [necRes, thornRes] = await Promise.all([
+          fetch(`/api/campaigns/${campaignId}/forge?type=nectar&status=published`),
+          fetch(`/api/campaigns/${campaignId}/forge?type=thorn&status=published`),
+        ]);
+        const necData = necRes.ok ? await necRes.json() : { items: [] };
+        const thornData = thornRes.ok ? await thornRes.json() : { items: [] };
+        setAvailable([
+          ...(necData.items || []).map((i: Record<string, unknown>) => ({ ...i, type: 'nectar' as const })),
+          ...(thornData.items || []).map((i: Record<string, unknown>) => ({ ...i, type: 'thorn' as const })),
+        ]);
+      } catch { /* silent */ }
+      setLoading(false);
+    }
+    fetchTraits();
+  }, [campaignId]);
+
+  // Cap per design: total nectars + thorns combined ≤ Fate Die value
+  const fateDie = draft.seed?.baseFateDie ?? 'd6';
+  const cap = FATE_DIE_VALUE[fateDie] ?? 10;
+  const traitCount = draft.traits.length;
+
+  const selectedIds = new Set(draft.traits.map(t => t.forgeItemId).filter(Boolean));
+  const filtered = available.filter(a => a.type === tab);
+
+  const addTrait = (item: typeof available[number]) => {
+    if (traitCount >= cap) return;
+    const pillar = (item.data?.pillar as 'body' | 'spirit' | 'soul' | undefined);
+    const description = item.data?.description as string | undefined;
+    const mechanicalEffect = item.data?.mechanicalEffect as string | undefined;
+    onChange({
+      traits: [
+        ...draft.traits,
+        {
+          name: item.name,
+          type: item.type as 'nectar' | 'thorn',
+          description,
+          pillar,
+          mechanicalEffect,
+          forgeItemId: item.id,
+        },
+      ],
+    });
+  };
+
+  const removeTrait = (idx: number) => {
+    onChange({ traits: draft.traits.filter((_, i) => i !== idx) });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
+          Nectars + Thorns cap at Fate Die value: <span className="text-[#ffcc78]">{cap}</span> ({fateDie})
+        </div>
+        <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/50">
+          {traitCount} / {cap}
+        </div>
+      </div>
+
+      {/* Selected traits */}
+      {draft.traits.length > 0 && (
+        <div className="space-y-1.5">
+          {draft.traits.map((tr, idx) => {
+            const color = tr.type === 'nectar' ? '#3EB89A' : '#E8585A';
+            return (
+              <div key={idx} className="flex items-start gap-2 p-2 border"
+                style={{ borderColor: `${color}33`, background: `${color}0a` }}
+              >
+                <span className="text-[10px] px-1.5 py-0.5 uppercase font-[family-name:var(--font-terminal)] mt-0.5"
+                  style={{ background: `${color}22`, color }}
+                >
+                  {tr.type}
+                </span>
+                <div className="flex-1">
+                  <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/80">{tr.name}</div>
+                  {tr.mechanicalEffect && (
+                    <div className="text-[11px] text-white/50 mt-0.5">{tr.mechanicalEffect}</div>
+                  )}
+                </div>
+                {tr.pillar && (
+                  <span className="text-[9px] uppercase font-[family-name:var(--font-terminal)] text-white/40 mt-1">
+                    {tr.pillar}
+                  </span>
+                )}
+                <button
+                  onClick={() => removeTrait(idx)}
+                  className="w-6 h-6 text-[12px] text-white/30 hover:text-[#E8585A]"
+                >✕</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        {(['nectar', 'thorn'] as const).map(t => {
+          const color = t === 'nectar' ? '#3EB89A' : '#E8585A';
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="px-3 py-1.5 text-[11px] uppercase tracking-[0.12em] font-[family-name:var(--font-terminal)] transition-colors"
+              style={{
+                color: tab === t ? color : 'rgba(255,255,255,0.4)',
+                borderBottom: tab === t ? `2px solid ${color}` : '2px solid transparent',
+              }}
+            >
+              {t}s
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-6 text-[12px] text-white/20 font-[family-name:var(--font-terminal)]">Loading...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-6 border border-dashed text-[12px] text-white/25 font-[family-name:var(--font-terminal)]"
+          style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+        >
+          No published {tab}s.
+        </div>
+      ) : (
+        <div className="space-y-1 max-h-60 overflow-y-auto">
+          {filtered.map(item => {
+            const used = selectedIds.has(item.id);
+            const desc = item.data?.description as string | undefined;
+            const atCap = traitCount >= cap;
+            const disabled = used || atCap;
+            return (
+              <button
+                key={item.id}
+                onClick={() => !disabled && addTrait(item)}
+                disabled={disabled}
+                className="w-full text-left p-2 border transition-colors disabled:opacity-40"
+                style={{
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  background: 'rgba(0,0,0,0.3)',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-[family-name:var(--font-terminal)] text-white/80">{item.name}</span>
+                  <span className="text-[10px] text-white/30">
+                    {used ? 'added' : atCap ? 'cap' : '+ add'}
+                  </span>
+                </div>
+                {desc && <div className="text-[11px] text-white/40 mt-0.5 line-clamp-1">{desc}</div>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Step 7: Goals ---
+function GoalsStep({
+  draft,
+  onChange,
+}: {
+  draft: EntityDraft;
+  onChange: (updates: Partial<EntityDraft>) => void;
+}) {
+  const MAX_GOALS = 5;
+
+  const addGoal = () => {
+    if (draft.goals.length >= MAX_GOALS) return;
+    onChange({ goals: [...draft.goals, { description: '', priority: 3 }] });
+  };
+
+  const updateGoal = (idx: number, patch: Partial<DraftGoal>) => {
+    const next = [...draft.goals];
+    next[idx] = { ...next[idx], ...patch };
+    onChange({ goals: next });
+  };
+
+  const removeGoal = (idx: number) => {
+    onChange({ goals: draft.goals.filter((_, i) => i !== idx) });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
+        Up to {MAX_GOALS} initial goals. Each goal will be tracked through play. Custodian godhead assignment happens after crystallization.
+      </div>
+
+      {draft.goals.map((g, idx) => (
+        <div key={idx} className="border p-3 space-y-2" style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.1em] text-white/40 w-12">
+              GOAL {idx + 1}
+            </span>
+            <select
+              value={g.priority}
+              onChange={(e) => updateGoal(idx, { priority: Number(e.target.value) })}
+              className="px-2 py-1 text-[11px] font-[family-name:var(--font-terminal)] bg-black/40 border text-white/70"
+              style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <option value={1}>Priority 1 (highest)</option>
+              <option value={2}>Priority 2</option>
+              <option value={3}>Priority 3</option>
+              <option value={4}>Priority 4</option>
+              <option value={5}>Priority 5 (lowest)</option>
+            </select>
+            <button
+              onClick={() => removeGoal(idx)}
+              className="ml-auto text-[11px] text-white/30 hover:text-[#E8585A]"
+            >✕ remove</button>
+          </div>
+          <textarea
+            value={g.description}
+            onChange={(e) => updateGoal(idx, { description: e.target.value })}
+            placeholder="What does this entity want? (3-500 chars)"
+            rows={2}
+            maxLength={500}
+            className="w-full px-2 py-1.5 text-[12px] font-[family-name:var(--font-terminal)] bg-black/40 border text-white placeholder:text-white/25 resize-none"
+            style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+          />
+        </div>
+      ))}
+
+      {draft.goals.length < MAX_GOALS && (
+        <button
+          onClick={addGoal}
+          className="w-full py-2.5 text-[11px] uppercase tracking-[0.12em] font-[family-name:var(--font-terminal)] border border-dashed text-white/40 hover:text-white/70 hover:border-white/30 transition-colors"
+          style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+        >
+          + Add Goal ({draft.goals.length}/{MAX_GOALS})
+        </button>
+      )}
+    </div>
+  );
+}
+
+// --- Step 8: Review + Crystallize ---
+function ReviewStep({
+  draft,
+  totalKV,
+  crystallizing,
+  error,
+}: {
+  draft: EntityDraft;
+  totalKV: number;
+  crystallizing: boolean;
+  error: string | null;
+}) {
+  const attrSum = Object.values(draft.attributes).reduce((s, v) => s + v, 0);
+  const skillSum = draft.skills.reduce((s, sk) => s + sk.level, 0);
+  const fateDie = draft.seed?.baseFateDie ?? 'd6';
+  const fateKV = FATE_DIE_VALUE[fateDie] ?? 10;
+  const traitNectars = draft.traits.filter(t => t.type === 'nectar').length;
+  const traitThorns = draft.traits.filter(t => t.type === 'thorn').length;
+
+  return (
+    <div className="space-y-4">
+      <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
+        Review the entity. Crystallize to commit — status moves to APPROVED and the entity becomes available on the canvas.
+      </div>
+
+      <div className="border p-4 space-y-3" style={{ borderColor: '#3EB89A33', background: 'rgba(62,184,154,0.04)' }}>
+        <div className="flex items-baseline justify-between">
+          <span className="text-[16px] font-[family-name:var(--font-header)] tracking-[0.15em] text-white">{draft.name || '(unnamed)'}</span>
+          <span className="text-[11px] font-[family-name:var(--font-terminal)] text-white/40 uppercase">
+            {draft.seed?.name ?? 'no seed'} · {fateDie}
+          </span>
+        </div>
+        {draft.root && (
+          <div className="text-[11px] font-[family-name:var(--font-terminal)] text-white/50">
+            Root: <span className="text-[#3E78C0]">{draft.root.name}</span>
+            {draft.branches.length > 0 && (
+              <> · Branches: <span className="text-[#3E78C0]">{draft.branches.map(b => b.name).join(', ')}</span></>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* KV breakdown */}
+      <div className="border" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <table className="w-full text-[12px] font-[family-name:var(--font-terminal)]">
+          <tbody>
+            <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <td className="px-3 py-2 text-white/50 uppercase tracking-[0.1em]">Attributes</td>
+              <td className="px-3 py-2 text-right text-white/80">{attrSum} Ҝ</td>
+            </tr>
+            <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <td className="px-3 py-2 text-white/50 uppercase tracking-[0.1em]">Skills ({draft.skills.length})</td>
+              <td className="px-3 py-2 text-right text-white/80">{skillSum} Ҝ</td>
+            </tr>
+            <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <td className="px-3 py-2 text-white/50 uppercase tracking-[0.1em]">Fate Die</td>
+              <td className="px-3 py-2 text-right text-white/80">{fateKV} Ҝ <span className="text-white/30">({fateDie})</span></td>
+            </tr>
+            <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <td className="px-3 py-2 text-white/50 uppercase tracking-[0.1em]">Traits</td>
+              <td className="px-3 py-2 text-right text-white/50">
+                {traitNectars} <span className="text-[#3EB89A]">nec</span> · {traitThorns} <span className="text-[#E8585A]">thorn</span>
+              </td>
+            </tr>
+            <tr>
+              <td className="px-3 py-2 text-[#ffcc78] uppercase tracking-[0.12em] font-bold">TKV Total</td>
+              <td className="px-3 py-2 text-right text-[18px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+                {totalKV} Ҝ
+              </td>
+            </tr>
+            <tr className="border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <td className="px-3 py-1.5 text-[10px] text-white/30 uppercase tracking-[0.1em]">Target</td>
+              <td className="px-3 py-1.5 text-right text-[11px] text-white/30">
+                {draft.targetKV} Ҝ
+                {totalKV > draft.targetKV * 1.25 && <span className="ml-2 text-[#E8585A]">over</span>}
+                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[#3E78C0]">under</span>}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Goals preview */}
+      {draft.goals.length > 0 && (
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.12em] text-white/40 mb-2 font-[family-name:var(--font-terminal)]">
+            Goals ({draft.goals.length})
+          </div>
+          <div className="space-y-1">
+            {draft.goals.map((g, i) => (
+              <div key={i} className="text-[12px] text-white/60 font-[family-name:var(--font-terminal)]">
+                <span className="text-white/30">P{g.priority}</span> · {g.description || '(empty)'}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="border p-3 text-[12px] font-[family-name:var(--font-terminal)]"
+          style={{ borderColor: '#E8585A55', background: 'rgba(232,88,90,0.08)', color: '#E8585A' }}
+        >
+          ✗ {error}
+        </div>
+      )}
+
+      {crystallizing && (
+        <div className="text-center py-3 text-[12px] text-[#3EB89A] font-[family-name:var(--font-terminal)] uppercase tracking-[0.15em]">
+          Crystallizing...
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Main Wizard ---
 export default function EntityCreationWizard({ campaignId, entityId, onCancel, onComplete }: Props) {
   const [step, setStep] = useState(0);
@@ -634,8 +1406,11 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [crystallizing, setCrystallizing] = useState(false);
+  const [crystallizeError, setCrystallizeError] = useState<string | null>(null);
 
   const currentStep = STEPS[step];
+  const totalKV = useMemo(() => computeRunningKV(draft), [draft]);
 
   // Load existing draft on mount
   useEffect(() => {
@@ -653,6 +1428,11 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
           targetKV: wizardDraft?.targetKV || 500,
           seed: charData.creation?.seed?.name ? (getSeed(charData.creation.seed.name) || null) : null,
           root: charData.creation?.root || null,
+          branches: (wizardDraft?.branches as ForgeBlock[]) || [],
+          attributes: (wizardDraft?.attributes as Record<AttributeName, number>) || { ...DEFAULT_ATTRIBUTES },
+          skills: (wizardDraft?.skills as DraftSkill[]) || [],
+          traits: (wizardDraft?.traits as DraftTrait[]) || [],
+          goals: (wizardDraft?.goals as DraftGoal[]) || [],
         });
 
         if (typeof wizardDraft?.step === 'number') {
@@ -686,6 +1466,17 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
         };
       }
 
+      // Stash the rest of the wizard state inside _wizardDraft via the
+      // server's merge logic (which preserves unknown _wizardDraft keys).
+      // This lets the draft round-trip without polluting character.data.
+      const wizardExtra = {
+        branches: currentDraft.branches,
+        attributes: currentDraft.attributes,
+        skills: currentDraft.skills,
+        traits: currentDraft.traits,
+        goals: currentDraft.goals,
+      };
+
       await fetch(`/api/campaigns/${campaignId}/entities/${entityId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -695,6 +1486,7 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
           prompt: currentDraft.prompt,
           targetKV: currentDraft.targetKV,
           characterData,
+          wizardExtra,
         }),
       });
     } finally {
@@ -706,17 +1498,31 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
     if (step === 0) return draft.name.trim().length > 0;
     if (step === 1) return draft.seed !== null;
     if (step === 2) return draft.root !== null;
+    if (step === 6) {
+      // Goals optional but if present must have description
+      return draft.goals.every(g => g.description.trim().length >= 3);
+    }
     return true;
   };
 
   const handleGeneratePrompt = async () => {
     setGeneratingPrompt(true);
     try {
-      // TODO: Wire to endpoint that reads campaign context
-      await new Promise(r => setTimeout(r, 1500));
+      const res = await fetch(`/api/campaigns/${campaignId}/context`);
+      let contextLine = '';
+      if (res.ok) {
+        const data = await res.json();
+        const parts: string[] = [];
+        if (data.campaign?.name) parts.push(`Campaign: ${data.campaign.name}`);
+        if (data.campaign?.worldContext) parts.push(`World: ${data.campaign.worldContext}`);
+        if (data.entities?.length) {
+          parts.push(`Known entities: ${data.entities.slice(0, 6).map((e: { name: string }) => e.name).join(', ')}`);
+        }
+        contextLine = parts.join(' · ');
+      }
       updateDraft({
-        prompt: draft.prompt + (draft.prompt ? '\n\n' : '') +
-          '[Prompt generation will use campaign context — entities, setting, relationships — to help craft this description]',
+        prompt: (draft.prompt + (draft.prompt ? '\n\n' : '')
+          + `[Campaign context for entity prompt]\n${contextLine || '(no campaign context yet)'}\n\nDescribe this entity:`),
       });
     } finally {
       setGeneratingPrompt(false);
@@ -728,9 +1534,42 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
     setStep(newStep);
   };
 
+  const handleCrystallize = async () => {
+    setCrystallizing(true);
+    setCrystallizeError(null);
+    try {
+      await saveStep(draft, step);
+      const res = await fetch(`/api/campaigns/${campaignId}/entities/${entityId}/crystallize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seedName: draft.seed?.name ?? null,
+          rootForgeItemId: draft.root?.id ?? null,
+          branchForgeItemIds: draft.branches.map(b => b.id),
+          attributes: draft.attributes,
+          skills: draft.skills,
+          traits: draft.traits,
+          goals: draft.goals,
+          targetKV: draft.targetKV,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Crystallize failed' }));
+        setCrystallizeError(err.error || 'Crystallize failed');
+        return;
+      }
+      onComplete();
+    } catch (e) {
+      setCrystallizeError(e instanceof Error ? e.message : 'Network error');
+    } finally {
+      setCrystallizing(false);
+    }
+  };
+
   const handleNext = () => {
-    if (step === 0 && draft.prompt.trim()) {
-      // TODO: Generate builds out steps 2-8 from the prompt
+    if (step === STEPS.length - 1) {
+      handleCrystallize();
+      return;
     }
     handleStepChange(step + 1);
   };
@@ -846,12 +1685,30 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
           <SeedStep draft={draft} onChange={updateDraft} />
         )}
         {step === 2 && (
-          <RootStep draft={draft} onChange={updateDraft} campaignId={campaignId} />
+          <>
+            <RootStep draft={draft} onChange={updateDraft} campaignId={campaignId} />
+            <BranchesPanel draft={draft} onChange={updateDraft} campaignId={campaignId} />
+          </>
         )}
-        {step > 2 && (
-          <div className="text-center py-12 text-white/20 text-[13px] font-[family-name:var(--font-terminal)]">
-            Step {step + 1}: {currentStep.label} — coming next
-          </div>
+        {step === 3 && (
+          <AttributesStep draft={draft} onChange={updateDraft} />
+        )}
+        {step === 4 && (
+          <SkillsStep draft={draft} onChange={updateDraft} campaignId={campaignId} />
+        )}
+        {step === 5 && (
+          <TraitsStep draft={draft} onChange={updateDraft} campaignId={campaignId} />
+        )}
+        {step === 6 && (
+          <GoalsStep draft={draft} onChange={updateDraft} />
+        )}
+        {step === 7 && (
+          <ReviewStep
+            draft={draft}
+            totalKV={totalKV}
+            crystallizing={crystallizing}
+            error={crystallizeError}
+          />
         )}
       </div>
 
@@ -880,19 +1737,25 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
 
           <button
             onClick={handleNext}
-            disabled={!canAdvance() || step === STEPS.length - 1}
+            disabled={!canAdvance() || crystallizing}
             className="px-6 py-2.5 text-[11px] uppercase tracking-[0.12em] font-[family-name:var(--font-terminal)] font-bold disabled:opacity-30 disabled:cursor-default transition-all hover:brightness-110"
             style={{
-              background: canAdvance() && step < STEPS.length - 1
-                ? 'linear-gradient(135deg, #3EB89A, #2D9A7E)'
+              background: canAdvance() && !crystallizing
+                ? (step === STEPS.length - 1
+                    ? 'linear-gradient(135deg, #ffcc78, #d99a36)'
+                    : 'linear-gradient(135deg, #3EB89A, #2D9A7E)')
                 : 'rgba(62,184,154,0.3)',
               color: '#000',
-              boxShadow: canAdvance() && step < STEPS.length - 1
-                ? '0 0 20px rgba(62,184,154,0.25)'
+              boxShadow: canAdvance() && !crystallizing
+                ? (step === STEPS.length - 1
+                    ? '0 0 20px rgba(255,204,120,0.3)'
+                    : '0 0 20px rgba(62,184,154,0.25)')
                 : 'none',
             }}
           >
-            {step === 0 && draft.prompt.trim() ? 'Generate ›' : 'Next ›'}
+            {step === STEPS.length - 1
+              ? (crystallizing ? 'Crystallizing...' : 'Crystallize ›')
+              : 'Next ›'}
           </button>
         </div>
       </div>

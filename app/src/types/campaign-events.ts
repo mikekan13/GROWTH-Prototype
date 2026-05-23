@@ -66,6 +66,10 @@ export interface CheckResultEvent {
   fdDie: string;
   fdResult: number;
   effort: number;
+  /** Sum of Nectar/Blossom/Thorn rollModifiers that fired for this check. */
+  traitFlat?: number;
+  /** Per-trait breakdown for UI ("+2 from Sword's Edge"). */
+  traitSources?: Array<{ traitName: string; traitType: 'nectar' | 'blossom' | 'thorn'; flat: number; label?: string }>;
   total: number;
   dr: number;
   success: boolean;

@@ -21,6 +21,7 @@ import { getSkillDieType, parseDie } from '@/lib/dice-utils';
 import { getPendingCheck, removePendingCheck, storePendingCheck } from '@/lib/pending-checks';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { createCampaignEvent } from '@/services/campaign-event';
+import { gatherTraitModifiers, type TraitModifierContribution } from '@/services/trait-modifiers';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const dynamic = 'force-dynamic';
@@ -73,8 +74,34 @@ export async function POST(
     const fdSides = parseDie(pending.fateDie);
     const fdResult = rollDie(fdSides);
 
-    // Compute result: SD (already rolled) + FD + effort vs DR
-    const total = pending.sdResult + fdResult + totalEffort;
+    // ── Trait modifiers ──────────────────────────────────────────────────
+    // Sum any Nectar / Blossom / Thorn rollModifiers that apply to this
+    // skill/governor combo. Load character data here (it's also loaded
+    // below for effort deduction — could merge later if hot, but the
+    // second findUnique is microseconds against the same row in cache).
+    let traitFlat = 0;
+    let traitSources: TraitModifierContribution[] = [];
+    try {
+      const charForTraits = await prisma.character.findUnique({
+        where: { id: pending.characterId },
+        select: { data: true },
+      });
+      if (charForTraits) {
+        const cd = JSON.parse(charForTraits.data) as GrowthCharacter;
+        const primaryGov = input.wagers.find(w => w.amount > 0)?.governor
+          ?? pending.availableGovernors[0]?.name
+          ?? pending.attributeName;
+        const mods = gatherTraitModifiers(cd, {
+          skillName: pending.skillName,
+          governorAttribute: primaryGov,
+        });
+        traitFlat = mods.totalFlat;
+        traitSources = mods.sources;
+      }
+    } catch { /* ignore — no modifier applied on parse failure */ }
+
+    // Compute result: SD + FD + effort + trait modifiers vs DR
+    const total = pending.sdResult + fdResult + totalEffort + traitFlat;
     const success = total >= pending.dr;
     const margin = total - pending.dr;
 
@@ -117,6 +144,8 @@ export async function POST(
       fdDie: pending.fateDie,
       fdResult,
       effort: totalEffort,
+      traitFlat,
+      traitSources,
       total,
       dr: pending.dr,
       success,
@@ -234,6 +263,8 @@ export async function POST(
       fdResult,
       effort: totalEffort,
       effortAttribute: effortDesc || undefined,
+      traitFlat,
+      traitSources,
       total,
       dr: pending.dr,
       success,

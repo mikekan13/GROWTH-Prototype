@@ -29,7 +29,8 @@ import { createSubscription, runDripForUser } from '../src/services/subscription
 import { monthlyDrip, SUBSCRIBE_LUMP } from '../src/services/subscription-drip';
 import { issueToken, consumeToken } from '../src/lib/auth-tokens';
 import { calculateTKV, calculateDeathSplit } from '../src/services/krma/evaluator';
-import type { GrowthCharacter } from '../src/types/growth';
+import { gatherTraitModifiers } from '../src/services/trait-modifiers';
+import type { GrowthCharacter, GrowthTrait } from '../src/types/growth';
 import type { GrowthWorldItem } from '../src/types/item';
 
 let passed = 0;
@@ -325,6 +326,57 @@ async function testDeathEngine() {
     manifest.components.some(c => c.destination === 'kept'));
 }
 
+// ── 7. Trait roll-modifier pipeline ─────────────────────────────────────
+
+function testTraitModifiers() {
+  section('7. Trait roll-modifier pipeline (gatherTraitModifiers)');
+
+  const buildTrait = (
+    name: string,
+    type: 'nectar' | 'blossom' | 'thorn',
+    rollModifiers: GrowthTrait['rollModifiers'],
+  ): GrowthTrait => ({
+    name,
+    type,
+    category: 'utility',
+    description: '',
+    rollModifiers,
+  });
+
+  const char = {
+    traits: [
+      buildTrait("Sword's Edge", 'nectar', [{ flat: 2, skillNamePattern: 'sword', label: '+2 sword' }]),
+      buildTrait('Iron Will', 'nectar', [{ flat: 1, governorAttribute: 'willpower' }]),
+      buildTrait('Eternal Focus', 'blossom', [{ flat: 1 }]),
+      buildTrait('Crippling Doubt', 'thorn', [{ flat: -1, governorAttribute: 'willpower' }]),
+      buildTrait('No-op (no mods)', 'nectar', undefined),
+    ],
+  } as unknown as GrowthCharacter;
+
+  // Case A: sword check governed by clout — sword nectar (+2) + always-on Eternal Focus (+1) = +3
+  const a = gatherTraitModifiers(char, { skillName: 'Swordsmanship', governorAttribute: 'clout' });
+  assert('skill-name pattern + global modifier sum correctly', a.totalFlat === 3,
+    `expected 3, got ${a.totalFlat}; sources=${a.sources.map(s => `${s.traitName}:${s.flat}`).join(',')}`);
+
+  // Case B: willpower check — Iron Will (+1) + Eternal Focus (+1) + Crippling Doubt (-1) = +1
+  const b = gatherTraitModifiers(char, { skillName: 'Meditation', governorAttribute: 'willpower' });
+  assert('governor-matched nectar + thorn net out correctly', b.totalFlat === 1,
+    `expected 1, got ${b.totalFlat}`);
+
+  // Case C: unrelated check (no skill, no governor) — only the always-on blossom fires
+  const c = gatherTraitModifiers(char, {});
+  assert('global-only modifier applies when context empty', c.totalFlat === 1,
+    `expected 1, got ${c.totalFlat}`);
+
+  // Case D: trait with no rollModifiers contributes nothing
+  const charNone = { traits: [buildTrait('Pure flavor', 'nectar', undefined)] } as unknown as GrowthCharacter;
+  const d = gatherTraitModifiers(charNone, { skillName: 'Anything' });
+  assert('trait without rollModifiers contributes 0', d.totalFlat === 0 && d.sources.length === 0);
+
+  // Case E: contributor list carries trait type for UI styling
+  assert('sources track trait type', a.sources.every(s => s.traitType === 'nectar' || s.traitType === 'blossom'));
+}
+
 // ── Main ────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -338,6 +390,7 @@ async function main() {
     await testAuthTokens();
     await testStripeSignature();
     await testDeathEngine();
+    testTraitModifiers();
   } catch (err) {
     failed += 1;
     errors.push(`UNCAUGHT: ${err instanceof Error ? err.message : String(err)}`);

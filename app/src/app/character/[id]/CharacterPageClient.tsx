@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import CharacterTab from '@/components/character/CharacterTab';
 import CharacterSheet from '@/components/character/CharacterSheet';
 import type { GrowthCharacter } from '@/types/growth';
@@ -22,6 +23,7 @@ export default function CharacterPageClient({
   characterData,
   canEdit,
 }: CharacterPageClientProps) {
+  const router = useRouter();
   // Player viewing their own character (not GM): render the read-only sheet.
   // CharacterTab is the GM-editing surface and includes seed/identity pickers
   // that the player should never see — those decisions live with the GM.
@@ -40,7 +42,13 @@ export default function CharacterPageClient({
         </div>
       );
     }
-    return <CharacterSheet character={parsed} />;
+    return (
+      <CharacterSheet
+        character={parsed}
+        characterId={canEdit ? characterData.id : undefined}
+        onRefresh={() => router.refresh()}
+      />
+    );
   }
 
   return (

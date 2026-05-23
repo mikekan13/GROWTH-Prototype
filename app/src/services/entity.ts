@@ -1,8 +1,12 @@
 import 'server-only';
+import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isAdminRole, canManageCampaign } from '@/lib/permissions';
 import { createDefaultCharacter } from '@/lib/defaults';
+import type { GrowthCharacter, SkillGovernor } from '@/types/growth';
+import { assignMechanics } from './character';
+import { createGoal } from './goal';
 
 /**
  * Entity service — campaign entity listing and management.
@@ -133,6 +137,12 @@ export interface DraftStepData {
   prompt?: string;
   targetKV?: number;
   characterData?: Record<string, unknown>;
+  /**
+   * Per-step wizard state that doesn't belong in the canonical character
+   * JSON yet — branches/skills/traits/goals queued for crystallization.
+   * Persisted under `_wizardDraft.<key>` to round-trip cleanly.
+   */
+  wizardExtra?: Record<string, unknown>;
 }
 
 export async function saveDraftStep(
@@ -163,6 +173,7 @@ export async function saveDraftStep(
     step: stepData.step,
     prompt: stepData.prompt ?? (wizardDraft.prompt as string) ?? '',
     targetKV: stepData.targetKV ?? (wizardDraft.targetKV as number) ?? 500,
+    ...(stepData.wizardExtra || {}),
   };
   merged._wizardDraft = updatedWizard;
 
@@ -173,6 +184,172 @@ export async function saveDraftStep(
       data: JSON.stringify(merged),
     },
   });
+}
+
+// ── Crystallization ──────────────────────────────────────────────────────
+
+export const crystallizeSchema = z.object({
+  seedName: z.string().nullable().optional(),
+  rootForgeItemId: z.string().nullable().optional(),
+  branchForgeItemIds: z.array(z.string()).default([]),
+  attributes: z.record(z.string(), z.number().int().min(1).max(20)).default({}),
+  skills: z.array(z.object({
+    name: z.string().min(1),
+    level: z.number().int().min(1).max(20),
+    governors: z.array(z.string()).min(1),
+    description: z.string().optional(),
+    forgeItemId: z.string().optional(),
+  })).default([]),
+  traits: z.array(z.object({
+    name: z.string().min(1),
+    type: z.enum(['nectar', 'thorn']),
+    description: z.string().optional(),
+    pillar: z.enum(['body', 'spirit', 'soul']).optional(),
+    mechanicalEffect: z.string().optional(),
+    forgeItemId: z.string().optional(),
+  })).default([]),
+  goals: z.array(z.object({
+    description: z.string().min(3).max(500),
+    priority: z.number().int().min(1).max(5),
+  })).default([]),
+  targetKV: z.number().int().min(0).optional(),
+});
+
+export type CrystallizeInput = z.infer<typeof crystallizeSchema>;
+
+/**
+ * Convert a DRAFT entity into an APPROVED one by applying:
+ *   - Seed + Root + Branches via assignMechanics (initializes attributes/Fate Die/etc.)
+ *   - Wizard-tuned attribute levels (layered on top of seed augments)
+ *   - Selected skills + traits (Nectars/Thorns)
+ *   - Goals (created via goal service so godhead dispatch fires)
+ *
+ * Strips the `_wizardDraft` scratchpad off the character data on success.
+ */
+export async function crystallizeEntity(
+  entityId: string,
+  userId: string,
+  userRole: string,
+  input: CrystallizeInput,
+): Promise<{ id: string; status: string }> {
+  const validated = crystallizeSchema.parse(input);
+
+  const character = await prisma.character.findUnique({
+    where: { id: entityId },
+    select: { id: true, status: true, data: true, campaignId: true, campaign: { select: { gmUserId: true } } },
+  });
+  if (!character) throw new NotFoundError('Entity not found');
+  if (!character.campaign) throw new NotFoundError('Entity has no campaign');
+  if (!canManageCampaign(userId, userRole, character.campaign)) {
+    throw new ForbiddenError('Only the GM can crystallize entities');
+  }
+  if (character.status !== 'DRAFT') {
+    throw new ValidationError('Entity must be in DRAFT status to crystallize');
+  }
+
+  // Step 1: If seed + root provided, run assignMechanics. This resets
+  // attributes/Fate Die/Fated Age from the forge templates.
+  if (validated.rootForgeItemId) {
+    // Find the seed forge item id by name (assignMechanics expects an id).
+    let seedForgeItemId: string | undefined;
+    if (validated.seedName) {
+      const seedItem = await prisma.forgeItem.findFirst({
+        where: { campaignId: character.campaignId!, type: 'seed', name: validated.seedName, status: 'published' },
+        select: { id: true },
+      });
+      seedForgeItemId = seedItem?.id;
+    }
+    if (seedForgeItemId) {
+      await assignMechanics(entityId, userId, userRole, {
+        seedForgeItemId,
+        rootForgeItemIds: [validated.rootForgeItemId],
+        branchForgeItemIds: validated.branchForgeItemIds,
+      });
+    }
+  }
+
+  // Step 2: Re-read character (assignMechanics may have mutated data)
+  const post = await prisma.character.findUnique({
+    where: { id: entityId },
+    select: { data: true },
+  });
+  const charData = JSON.parse(post!.data) as GrowthCharacter & Record<string, unknown>;
+
+  // Step 3: Apply wizard-tuned attribute LEVELS on top of seed augments.
+  // The seed contributed augmentPositive via applyCreationGrants; we set
+  // `.level` from the wizard. `current` mirrors level + augments.
+  if (charData.attributes) {
+    const attrs = charData.attributes as unknown as Record<string, { level?: number; current?: number; augmentPositive?: number; augmentNegative?: number } | undefined>;
+    for (const [name, level] of Object.entries(validated.attributes)) {
+      const a = attrs[name];
+      if (a && typeof a === 'object') {
+        a.level = level;
+        // Reset current pool to full
+        const pos = a.augmentPositive ?? 0;
+        const neg = a.augmentNegative ?? 0;
+        a.current = level + pos - neg;
+      }
+    }
+  }
+
+  // Step 4: Append wizard-selected skills (de-dup by forgeItemId or name)
+  const existingSkills = charData.skills || [];
+  const skillKey = (s: { name: string; forgeItemId?: string }) => s.forgeItemId ?? `name:${s.name.toLowerCase()}`;
+  const existingKeys = new Set(existingSkills.map(s => skillKey(s)));
+  for (const sk of validated.skills) {
+    if (existingKeys.has(skillKey(sk))) continue;
+    existingSkills.push({
+      name: sk.name,
+      level: sk.level,
+      governors: sk.governors as SkillGovernor[],
+      description: sk.description,
+      forgeItemId: sk.forgeItemId,
+    });
+  }
+  charData.skills = existingSkills;
+
+  // Step 5: Append wizard-selected traits (Nectars + Thorns)
+  const existingTraits = charData.traits || [];
+  const traitNames = new Set(existingTraits.map(t => t.name.toLowerCase()));
+  for (const tr of validated.traits) {
+    if (traitNames.has(tr.name.toLowerCase())) continue;
+    existingTraits.push({
+      name: tr.name,
+      type: tr.type,
+      // Default category for wizard-selected traits; forge-authored traits
+      // will carry their own category in metadata and override at runtime.
+      category: 'utility',
+      description: tr.description ?? '',
+      pillar: tr.pillar,
+      mechanicalEffect: tr.mechanicalEffect,
+    });
+  }
+  charData.traits = existingTraits;
+
+  // Step 6: Strip the wizard scratchpad and persist character data + APPROVED
+  delete (charData as Record<string, unknown>)._wizardDraft;
+  await prisma.character.update({
+    where: { id: entityId },
+    data: {
+      data: JSON.stringify(charData),
+      status: 'APPROVED',
+    },
+  });
+
+  // Step 7: Create Goals (each call fires godhead dispatcher for triage).
+  // Failures here don't roll back crystallization — log and continue.
+  for (const g of validated.goals) {
+    try {
+      await createGoal(userId, userRole, {
+        characterId: entityId,
+        campaignId: character.campaignId!,
+        description: g.description,
+        priority: g.priority,
+      });
+    } catch { /* swallow — character is already crystallized */ }
+  }
+
+  return { id: entityId, status: 'APPROVED' };
 }
 
 export async function loadDraftEntity(
