@@ -1,8 +1,20 @@
 # GRO.WTH Canonical Rulebook
 
+**Status:** #validated (player-facing edition; full canon lives in [[GRO.WTH Repository]])
+**Source:** Compiled distillation of [[GRO.WTH Repository]] 01–07; revised continuously as new canon locks. The repo is authoritative — when this file disagrees with a `#validated` repo file, the repo wins.
+**Security:** PUBLIC
 **Version**: 0.2.0
-**Last updated**: 2026-04-22
 **Sections audited**: 01_CORE_RULES, 02_CHARACTER_CREATION
+**Last updated**: 2026-05-23
+
+---
+
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
+
+> **POST-2026-05-19 CANON UPDATES:** This player-facing edition will be re-synced after the 2026-05-19 resolution session locked: Burn formula ([[Frequency_Three_Operations]]), Death engine transformation model ([[Death_Engine_System]]), Body composition as items ([[Body_Composition_System]]), Creature size numeric footprint ([[Creature_Size_System]]), GM subscription drip ([[GM_Subscription_KRMA]]), and trait pillar tagging ([[Nectars_and_Thorns_System]]). Until this file is regenerated, treat the linked repo files as authoritative.
 
 ---
 

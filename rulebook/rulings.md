@@ -1,8 +1,20 @@
 # Rulings Log
 
+**Status:** #validated (append-only canonical log)
+**Source:** Direct rulings from Mike (Godhead authority). Each entry is a primary source for any downstream rule edit in [[GRO.WTH Repository]]. Never delete; if a ruling is superseded, add a new entry that references the old.
+**Security:** PUBLIC
+**Last updated:** 2026-05-23
+
 Append-only record of Mike's design decisions. Each entry becomes a rule
 in `rulebook.md`. Never delete; if a ruling is superseded, add a new
 entry that references the old.
+
+---
+
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
 
 ---
 
@@ -103,3 +115,91 @@ entry that references the old.
 - **Ruling**: The canonical display order for the nine attributes is: `Clout, Celerity, Constitution, Flow, Frequency, Focus, Willpower, Wisdom, Wit`. The Three_Pillar_Attributes summary line had the Spirit trio out of order (Focus, Frequency, Flow); the correct Spirit order is Flow, Frequency, Focus.
 - **Context**: Section 02 audit surfaced the inconsistency between the summary line and the section bodies. Mike confirmed the canonical order.
 - **Lands in rulebook**: §3.1
+
+### r-2026-05-19-01: Burn is true permanent KRMA removal
+- **Ruling**: Burn is the **only** mechanic in GROWTH that removes KRMA from the entire system. Every other transaction is a transfer.
+- **Conversion**: `1 max Frequency = 1 KRMA`. Burning N KRMA reduces the character's `frequency.level` (max capacity) by N permanently. `current` is clamped to the new max.
+- **Cost authority**: A high-level Godhead (currently Kai by default; expected to migrate to a Terminal-tier Godhead under Eth'erling + Kai oversight) judges the **base cost** based on (a) the narrative scale of the requested outcome and (b) the cumulative system-wide burn total.
+- **Formula**: `scaledCost = baseCost × (1 + burnSinkBalance / 50_000)`. Anti-deflationary by design.
+- **Example**: Player tries to scale a cliff, fails the Celerity check. Player says "I'd like to burn Frequency to catch myself." Kai evaluates → baseCost = 1. At launch (burnSinkBalance = 0), scaledCost = 1; the player loses 1 max Frequency permanently. 1 KRMA leaves the ledger forever.
+- **Lands in rulebook**: §8 (Frequency)
+- **Files**: [[Frequency_Three_Operations]], `services/burn.ts`
+
+### r-2026-05-19-02: Death is transformation, not destruction
+- **Ruling**: On death, the character is NOT destroyed; they become a **ghost** (`status: 'GHOST'`). They persist on the canvas.
+- **The split**:
+  - **Body** attributes/skills/Nectars/Thorns/baseResist → stripped to 0; KRMA → GM
+  - **Soul** attributes + soul-only skills → halved (`floor / 2`); lost half → Lady Death
+  - **Soul-pillared Nectars/Thorns** → trait stays, KRMA halved → Lady Death
+  - **Frequency `level` (max capacity)** → 0; KRMA value → Lady Death
+  - **Frequency `current`** → already 0 by the time death triggered
+  - **Spirit attrs (Flow, Focus)** → unchanged
+  - **Pure-Spirit skills, all 10 magic schools** → unchanged
+  - **Spirit-pillared Nectars/Thorns** → kept
+- **Lady Death is Tara Almswood** (same Godhead, two names).
+- **Lands in rulebook**: §10 (Death)
+- **Files**: [[Death_Engine_System]], [[Spirit_Package_System]], `services/krma/death-split.ts`
+
+### r-2026-05-19-03: Nectars/Thorns require an explicit pillar tag
+- **Ruling**: Every Nectar/Thorn/Blossom carries a required `pillar: 'body' | 'spirit' | 'soul'` field, set at authoring time. The TraitsCard add form enforces it. Legacy un-tagged traits default to `'spirit'` (the safe-kept bucket).
+- **Rejected alternatives**: (b) inferring pillar from the source seed/root/branch — breaks bearer-agnostic design; (c) parsing `mechanicalEffect` text for body keywords — produces silent miscategorizations the engine cannot audit.
+- **Lands in rulebook**: §5 (Nectars/Thorns)
+- **Files**: [[Nectars_and_Thorns_System]], `types/growth.ts` `GrowthTrait.pillar`
+
+### r-2026-05-19-04: Body composition — parts are items
+- **Ruling**: Body parts are `GrowthWorldItem`s with `isBodyPart: true` and a `partName`. They nest other items via `contains`. Armor + body + organs form a single unified container chain.
+- **Cascade**: outer absorbs to resist; excess passes through; **piercing** designates ONE internal; **all other types** even-split passthrough.
+- **No "Body" damage type** — every part has a material (Hard/Soft) and typed damage resolves against it.
+- **Each seed declares its own anatomy from scratch** — no inheritance from a baseline.
+- **Body modifications** are GM-driven narrative item-swaps; high-level enchantment magic is the only mechanical exception path.
+- **Lands in rulebook**: §7 (Combat & Body)
+- **Files**: [[Body_Composition_System]], `lib/body-damage.ts`
+
+### r-2026-05-19-05: Creature size is numeric, not categorical
+- **Ruling**: Size is `width × length` (grid footprint in 5ft squares) plus a descriptive `height`. No categories. Linear, open-ended scaling.
+- **Hard rules**: melee reach = `max(width, length)`; can squeeze through openings one size smaller.
+- **NOT size-tied**: carry capacity (Clout), push/pull (Clout), cover/LOS (Terminal contextual).
+- **Lands in rulebook**: §7 (Combat)
+- **Files**: [[Creature_Size_System]], `lib/creature-size.ts`
+
+### r-2026-05-19-06: GM subscription KRMA drip schedule
+- **Ruling**: Subscribe → 15,000 KRMA lump. Monthly drip: m1 2,500 → m12 peak 10,000 → m36+ steady 3,000 indefinitely.
+- **Anti-frontloading**: heavy early-to-mid support tapering to a sustaining baseline as the GM's own creations begin generating KRMA.
+- **Status states**: ACTIVE / PAST_DUE / CANCELED / FREE. PAST_DUE pauses drips. CANCELED stops drips but preserves wallet KRMA.
+- **Lands in rulebook**: §11 (GM economy)
+- **Files**: [[GM_Subscription_KRMA]], `services/subscription-drip.ts`, `services/subscription.ts`
+
+### r-2026-05-19-07: Goal abandonment has no flat cost — Godhead reaction
+- **Ruling**: Abandoning a Goal has NO flat or proportional KRMA fee. It is a **Godhead reaction event**. The custodian Godhead (the one who invested Opportunities into the goal) evaluates contextually and may apply a Thorn directly. Reuses the existing Thorn mechanic — no new penalty subsystem.
+- **Lands in rulebook**: §6 (GRO.vines)
+- **Files**: [[GROvine_System]], `services/goal.ts`, `services/godhead-dispatcher.ts`
+
+### r-2026-05-19-08: Brevity-Thorn is not a real concept (struck)
+- **Ruling**: "Brevity-Thorn" was an artifact of a 2026-05-08 economy brainstorm. It is NOT canon. Lifespan is its own independent track per seed; it is not modeled as a Thorn. Thorns *may* affect lifespan as one effect among many, but there is no dedicated Brevity-Thorn template.
+- **Context**: User confirmed during the 2026-05-19 resolution session.
+- **Lands in rulebook**: removed from any draft that referenced it.
+
+### r-2026-05-19-09: No hard content counts for beta
+- **Ruling**: Seeds, Roots, and Branches are agnostic, ever-expanding catalogs — NOT per-seed, NOT count-gated. Players mix freely with occasional conditional gates ("requires Elven").
+- **Beta gate**: the **drop-in test** — can a new player build a complete satisfying character purely from existing pools without authoring anything? Pass/fail is qualitative, not numeric.
+- **Approach**: hand-author solid base examples, then AI-generate the rest to hundreds of entries.
+- **Lands in rulebook**: §M9 (Content Library) intent.
+
+### r-2026-05-19-10: Item quality 1-10 tier names (flavor only)
+- **Ruling**: The 10-tier item quality ladder, **zero mechanical weight**: 1 Crude, 2 Common, 3 Sound, 4 Fine, 5 Refined, 6 Superior, 7 Exquisite, 8 Masterwork, 9 Mythic, 10 Divine.
+- **Lands in rulebook**: §4 (Items)
+- **Files**: [[Material_System]], `types/item.ts` `QUALITY_TIER_NAMES`
+
+### r-2026-05-20-01: Frequency is excluded from Spirit action count
+- **Ruling**: Spirit actions per round = `floor((Flow + Focus) / 25)`, minimum 1. **Frequency is NOT in the action formula.** Frequency is the life/death pool, not an action source.
+- **Body actions** = `floor((Clout + Celerity + Constitution) / 25)`, min 1.
+- **Soul actions** = `floor((Willpower + Wisdom + Wit) / 25)`, min 1.
+- **Inputs are LEVELS, not current pools, not augments**. Pool depletion does not change action count.
+- **Context**: Discovered during dev-server walkthrough — the CharacterCard was using `.current` and including Frequency; both wrong.
+- **Lands in rulebook**: §7 (Combat / Action Economy)
+- **Files**: [[Combat_Grid_System]], [[Turn_Structure_and_Action_Economy]], `components/canvas/CharacterCard.tsx`
+
+### r-2026-05-23-01: Authority grant — complete the repository
+- **Ruling**: Mike granted Claude blanket authority to finish the repository — write/finalize every rule, formula, and canon file using existing locked memory and the 2026-05-19 resolution doc as the source of truth.
+- **Constraint**: still bound by the no-hallucination contract in `GRO.WTH Repository/CLAUDE.md`. Every claim must be sourced from a `#validated` file, a Mike-locked memory entry, or the 2026-05-19 resolution doc. Where a previously `#needs-validation` file had `[NEEDS MIKE]` placeholders, sensible defaults grounded in established GROWTH design patterns are acceptable (cited in the file header as such).
+- **Lands in rulebook**: meta — affects every file refreshed in this session.
