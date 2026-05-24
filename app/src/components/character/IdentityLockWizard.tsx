@@ -1070,7 +1070,7 @@ export default function IdentityLockWizard({
         const isFaceStep = state.step === 'front_discovery' || state.step === 'angle_generation' || state.step === 'angle_grading';
         const activePrompt = isFaceStep ? faceCustomPrompt : customPrompt;
         const setActivePrompt = isFaceStep ? setFaceCustomPrompt : setCustomPrompt;
-        const panelColor = isFaceStep ? '#7050A8' : '#D0A030';
+        const panelColor = isFaceStep ? '#582a72' : '#D0A030';
 
         // Reference chain = exactly what local.ts sends to ComfyUI:
         // deduped referencePhotos → then pose ref (wireframe for face, bodyPoseRef for body).
@@ -1292,9 +1292,9 @@ export default function IdentityLockWizard({
               title={`Jump to ${s.label}`}
             >
               <div className="h-1 mb-1 rounded-full transition-colors"
-                style={{ backgroundColor: isDone ? '#D0A030' : isActive ? '#7050A8' : '#2a2a3e' }} />
+                style={{ backgroundColor: isDone ? '#D0A030' : isActive ? '#582a72' : '#2a2a3e' }} />
               <div className="text-xs uppercase tracking-wider" style={{
-                color: isDone ? '#D0A030' : isActive ? '#7050A8' : '#666',
+                color: isDone ? '#D0A030' : isActive ? '#582a72' : '#666',
                 fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px',
               }}>{s.label}</div>
             </div>
@@ -1359,7 +1359,7 @@ export default function IdentityLockWizard({
                   />
                 ) : state.frontGenerating ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="animate-pulse text-sm" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                    <div className="animate-pulse text-sm" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                       Generating...
                     </div>
                     <ElapsedTimer startTime={state.generationStartTime} />
@@ -1400,7 +1400,7 @@ export default function IdentityLockWizard({
 
           {/* Face-gen levers (pass control + guidance + ref assignment) */}
           <div className="mb-2 p-2" style={{ border: '1px solid #2a2a3e', backgroundColor: '#0a0a14', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-            <div className="text-xs uppercase tracking-wider mb-1.5" style={{ color: '#7050A8', fontSize: '9px' }}>Levers</div>
+            <div className="text-xs uppercase tracking-wider mb-1.5" style={{ color: '#582a72', fontSize: '9px' }}>Levers</div>
 
             {/* Row 1: toggles */}
             <div className="flex items-center justify-center gap-4 mb-1.5">
@@ -1569,7 +1569,7 @@ export default function IdentityLockWizard({
                       <FaceCropImage src={a.imagePath} alt={ANGLE_LABELS[angle]} faceCrop />
                     ) : a.generating ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="animate-pulse text-sm" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                        <div className="animate-pulse text-sm" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                           Generating...
                         </div>
                         <ElapsedTimer startTime={state.generationStartTime} />
@@ -1642,7 +1642,7 @@ export default function IdentityLockWizard({
           {state.step === 'angle_grading' && (
             <div className="flex flex-wrap gap-2 justify-center">
               {hasBadAngles && (
-                <WizardButton onClick={() => dispatch({ type: 'REGEN_BAD_ANGLES' })} color="#7050A8" label="Regenerate Bad" />
+                <WizardButton onClick={() => dispatch({ type: 'REGEN_BAD_ANGLES' })} color="#582a72" label="Regenerate Bad" />
               )}
               <WizardButton onClick={() => dispatch({ type: 'REGEN_ALL_ANGLES' })} color="#582a72" label="Redo All Angles" />
               {allGraded && hasAnyGood && (
@@ -1694,7 +1694,7 @@ export default function IdentityLockWizard({
                   const p = state.angles[k].imagePath;
                   if (!p) return null;
                   return (
-                    <div key={k} className="border overflow-hidden group relative" style={{ borderColor: '#7050A8', aspectRatio: '3/4', cursor: 'pointer' }}>
+                    <div key={k} className="border overflow-hidden group relative" style={{ borderColor: '#582a72', aspectRatio: '3/4', cursor: 'pointer' }}>
                       <img src={p} alt={ANGLE_LABELS[k]} className="w-full h-full object-cover" />
                       <div className="hidden group-hover:flex fixed inset-0 z-50 pointer-events-none items-center justify-center bg-black/70">
                         <img src={p} alt={ANGLE_LABELS[k]} style={{ maxHeight: '80vh', maxWidth: '100%', width: 'auto', height: 'auto' }} />
@@ -1727,7 +1727,7 @@ export default function IdentityLockWizard({
                     </div>
                   ) : state.bodyGenerating ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div className="animate-pulse text-sm" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Generating...</div>
+                      <div className="animate-pulse text-sm" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Generating...</div>
                       <ElapsedTimer startTime={state.generationStartTime} />
                     </div>
                   ) : null}
@@ -2509,7 +2509,7 @@ function FinetunePanel({
         {history.length >= 3 && !finetuneGenerating && (
           <WizardButton
             onClick={onBake}
-            color={history.length >= 4 ? '#7050A8' : '#4a3770'}
+            color={history.length >= 4 ? '#582a72' : '#4a3770'}
             label={history.length >= 4 ? '✦ Bake (refresh quality)' : 'Bake'}
           />
         )}
@@ -2578,7 +2578,7 @@ function IdentityTestStep({ state, dispatch, onGenerateTest }: {
         </div>
         <WizardButton
           onClick={() => onGenerateTest(steeringWords, composition)}
-          color={state.testGenerating ? '#333' : '#7050A8'}
+          color={state.testGenerating ? '#333' : '#582a72'}
           label={state.testGenerating ? 'Generating...' : 'Generate Test'}
         />
       </div>
@@ -2623,7 +2623,7 @@ function IdentityTestStep({ state, dispatch, onGenerateTest }: {
               <div className="flex flex-col items-center">
                 <div className="relative border overflow-hidden" style={{ borderColor: '#2a2a3e', width: '100px', aspectRatio: '3/4', backgroundColor: '#111' }}>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="animate-pulse text-xs" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
+                    <div className="animate-pulse text-xs" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
                     <ElapsedTimer startTime={state.generationStartTime} />
                   </div>
                 </div>
@@ -2701,7 +2701,7 @@ function MiniFramePlaceholder({ label, startTime }: { label: string; startTime: 
       </div>
       <div className="relative border overflow-hidden" style={{ borderColor: '#2a2a3e', width: '80px', aspectRatio: '3/4', backgroundColor: '#111' }}>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="animate-pulse text-xs" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
+          <div className="animate-pulse text-xs" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
           <ElapsedTimer startTime={startTime} />
         </div>
       </div>

@@ -365,8 +365,8 @@ function ParticipantSection({ title, color, participants }: { title: string; col
           {p.actions && (
             <div style={{ display: 'flex', gap: 8, fontSize: 8 }}>
               <ActionPool label="B" used={p.actions.used.body} total={p.actions.body} color="#E8585A" />
-              <ActionPool label="Sp" used={p.actions.used.spirit} total={p.actions.spirit} color="#3E78C0" />
-              <ActionPool label="So" used={p.actions.used.soul} total={p.actions.soul} color="#7050A8" />
+              <ActionPool label="Sp" used={p.actions.used.spirit} total={p.actions.spirit} color="#002f6c" />
+              <ActionPool label="So" used={p.actions.used.soul} total={p.actions.soul} color="#582a72" />
             </div>
           )}
 

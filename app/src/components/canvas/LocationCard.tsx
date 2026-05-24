@@ -228,7 +228,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             right: '-21px',
             width: 36,
             height: 36,
-            background: '#7050A8',
+            background: '#582a72',
             border: 'none',
             borderRadius: '50%',
             color: '#F5F4EF',
@@ -394,16 +394,16 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
           {data.leyLines?.present && (
             <div style={{
               padding: '6px 8px',
-              background: 'rgba(112,80,168,0.1)',
-              border: '1px solid rgba(112,80,168,0.2)',
+              background: 'rgba(88, 42, 114,0.1)',
+              border: '1px solid rgba(88, 42, 114,0.2)',
               borderRadius: 2,
               marginBottom: 10,
             }}>
-              <div style={{ fontSize: 9, color: '#7050A8', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+              <div style={{ fontSize: 9, color: '#582a72', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
                 Ley Lines Present {data.leyLines.strength ? `(Strength: ${data.leyLines.strength})` : ''}
               </div>
               {data.leyLines.schools && data.leyLines.schools.length > 0 && (
-                <div style={{ fontSize: 9, color: 'rgba(112,80,168,0.7)', marginTop: 2, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                <div style={{ fontSize: 9, color: 'rgba(88, 42, 114,0.7)', marginTop: 2, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                   Schools: {data.leyLines.schools.join(', ')}
                 </div>
               )}

@@ -221,7 +221,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             right: '-21px',
             width: 36,
             height: 36,
-            background: '#7050A8',
+            background: '#582a72',
             border: 'none',
             borderRadius: '50%',
             color: '#F5F4EF',
@@ -358,11 +358,11 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             <div style={{
               marginBottom: 10,
               padding: '6px 8px',
-              background: 'rgba(62,120,192,0.08)',
-              border: '1px solid rgba(62,120,192,0.15)',
+              background: 'rgba(0, 47, 108,0.08)',
+              border: '1px solid rgba(0, 47, 108,0.15)',
               borderRadius: 2,
             }}>
-              <SectionLabel color="#3E78C0">Armor</SectionLabel>
+              <SectionLabel color="#002f6c">Armor</SectionLabel>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Resistance: </span>
@@ -388,11 +388,11 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             <div style={{
               marginBottom: 10,
               padding: '6px 8px',
-              background: 'rgba(112,80,168,0.08)',
-              border: '1px solid rgba(112,80,168,0.15)',
+              background: 'rgba(88, 42, 114,0.08)',
+              border: '1px solid rgba(88, 42, 114,0.15)',
               borderRadius: 2,
             }}>
-              <SectionLabel color="#7050A8">Prima Materia — {data.primaMateria.school}</SectionLabel>
+              <SectionLabel color="#582a72">Prima Materia — {data.primaMateria.school}</SectionLabel>
               <div style={{ display: 'flex', gap: 16, fontSize: 10, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 <span style={{ color: '#fff' }}>Level: {data.primaMateria.level}</span>
                 <span style={{ color: data.primaMateria.stable ? '#4ade80' : '#f59e0b' }}>
@@ -467,7 +467,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             {node.holderName ? (
               <span>Held by: <span style={{ color: '#ffcc78' }}>{node.holderName}</span></span>
             ) : node.locationName ? (
-              <span>Located at: <span style={{ color: '#7050A8' }}>{node.locationName}</span></span>
+              <span>Located at: <span style={{ color: '#582a72' }}>{node.locationName}</span></span>
             ) : (
               <span>Unassigned — world item</span>
             )}

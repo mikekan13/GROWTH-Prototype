@@ -39,7 +39,7 @@ export interface AppliedResult {
 }
 
 const OP_COLOR: Record<Op, string> = {
-  spend:   '#3E78C0',   // blue — upgrade currency
+  spend:   '#002f6c',   // blue — upgrade currency
   deplete: '#ffcc78',   // gold — pool damage
   burn:    '#E8585A',   // coral — destruction
 };

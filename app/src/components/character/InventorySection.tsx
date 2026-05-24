@@ -144,9 +144,9 @@ function ItemRow({ item }: { item: HeldItemData }) {
                 <span
                   className="px-1.5 py-px text-[9px] uppercase tracking-wider"
                   style={{
-                    backgroundColor: 'rgba(62,120,192,0.12)',
-                    color: '#3E78C0',
-                    border: '1px solid rgba(62,120,192,0.25)',
+                    backgroundColor: 'rgba(0, 47, 108,0.12)',
+                    color: '#002f6c',
+                    border: '1px solid rgba(0, 47, 108,0.25)',
                     borderRadius: 2,
                   }}
                 >
@@ -165,7 +165,7 @@ function ItemRow({ item }: { item: HeldItemData }) {
                 <span className="text-[var(--surface-dark)]/40">+ {data.subordinateMaterials.join(', ')}</span>
               )}
               {effectiveResist != null && (
-                <span style={{ color: '#3E78C0' }}>Resist {effectiveResist}</span>
+                <span style={{ color: '#002f6c' }}>Resist {effectiveResist}</span>
               )}
               {data.quality != null && (
                 <span style={{ color: '#7a4faa' }}>Q{data.quality}</span>

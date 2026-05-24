@@ -14,7 +14,7 @@ interface TerminalEventRowProps {
 const ACTOR_COLORS: Record<string, string> = {
   player: '#22ab94',
   gm: '#ffcc78',
-  ai_copilot: '#7050A8',
+  ai_copilot: '#582a72',
   system: '#666',
 };
 
@@ -330,17 +330,17 @@ function CommandRow({ event: _event, payload }: { event: TerminalEvent; payload:
 
 function AIMessageRow({ event, payload }: { event: TerminalEvent; payload: AIMessagePayload }) {
   const severityColors: Record<string, string> = {
-    info: '#7050A8',
+    info: '#582a72',
     warning: '#ffcc78',
     action: '#22ab94',
     question: '#E8585A',
   };
-  const color = severityColors[payload.severity] || '#7050A8';
+  const color = severityColors[payload.severity] || '#582a72';
 
   return (
     <div style={{ borderLeft: `3px solid ${color}`, borderRadius: '2px' }}>
       <div className="flex items-start gap-2 px-2 py-1.5">
-        <ActorBadge actor="ai_copilot" color="#7050A8" />
+        <ActorBadge actor="ai_copilot" color="#582a72" />
         <span className="text-xs flex-shrink-0" style={{ color }}>{'\u25C6'}</span>
         <span className="text-[12px] flex-1 italic" style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',

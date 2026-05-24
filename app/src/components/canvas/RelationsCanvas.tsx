@@ -1512,7 +1512,7 @@ export default function RelationsCanvas({
     // Direction-aware backlight: Red = going up (crystallizing), Blue = going down (dissolving)
     const preDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
     const hasCrossed = preDragY !== undefined && ((preDragY > 0 && visualY <= 0) || (preDragY <= 0 && visualY > 0));
-    const glowColor = hasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#7050A8';
+    const glowColor = hasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#582a72';
     const showGlow = hasCrossed || isShimmering;
     const glowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
@@ -2214,7 +2214,7 @@ export default function RelationsCanvas({
             return (
               <>
                 {/* Outer field glow */}
-                <path d={pathData} fill="none" stroke="var(--pillar-soul, #7050A8)" strokeWidth="100" filter="url(#lightsaberGlow)" opacity="0.4" />
+                <path d={pathData} fill="none" stroke="var(--pillar-soul, #582a72)" strokeWidth="100" filter="url(#lightsaberGlow)" opacity="0.4" />
                 {/* Bright core glow */}
                 <path
                   d={pathData} fill="none" stroke="var(--pillar-soul, #9400D3)" strokeWidth="60"
@@ -2475,7 +2475,7 @@ export default function RelationsCanvas({
             const isShimmering = shimmeringNodes.has(node.id);
             const locPreDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
             const locHasCrossed = locPreDragY !== undefined && ((locPreDragY > 0 && visualY <= 0) || (locPreDragY <= 0 && visualY > 0));
-            const locGlowColor = locHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#7050A8';
+            const locGlowColor = locHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#582a72';
             const locShowGlow = locHasCrossed || isShimmering;
             const locGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
@@ -2576,7 +2576,7 @@ export default function RelationsCanvas({
             const isShimmering = shimmeringNodes.has(node.id);
             const itemPreDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
             const itemHasCrossed = itemPreDragY !== undefined && ((itemPreDragY > 0 && visualY <= 0) || (itemPreDragY <= 0 && visualY > 0));
-            const itemGlowColor = itemHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#7050A8';
+            const itemGlowColor = itemHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#582a72';
             const itemShowGlow = itemHasCrossed || isShimmering;
             const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
@@ -3180,7 +3180,7 @@ function CanvasToolbox({
             <ToolboxButton
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>}
               label="Location"
-              color="#7050A8"
+              color="#582a72"
               onClick={() => {
                 const name = window.prompt('Location name:');
                 if (name?.trim()) onCreateLocation?.(name.trim(), 'point_of_interest');

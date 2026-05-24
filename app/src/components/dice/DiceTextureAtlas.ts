@@ -14,7 +14,7 @@ import type { DieColor } from '@/types/dice';
 const DIE_COLORS: Record<DieColor, { bg: string; fg: string; glow: string }> = {
   red:    { bg: '#3A1518', fg: '#E8585A', glow: '#E8585A' },
   blue:   { bg: '#142838', fg: '#3EB89A', glow: '#3EB89A' },
-  purple: { bg: '#1E1530', fg: '#7050A8', glow: '#9070D0' },
+  purple: { bg: '#1E1530', fg: '#582a72', glow: '#9070D0' },
   teal:   { bg: '#0C2A28', fg: '#2DB8A0', glow: '#2DB8A0' },
   gold:   { bg: '#2A2010', fg: '#D0A030', glow: '#D0A030' },
   white:  { bg: '#1A1A20', fg: '#E8E4DC', glow: '#E8E4DC' },

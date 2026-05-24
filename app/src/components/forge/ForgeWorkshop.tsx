@@ -28,8 +28,8 @@ interface ForgeWorkshopProps {
 // ── Block Type Config ─────────────────────────────────────────────────────
 
 const BLOCK_TYPES = [
-  { key: 'seed', label: 'Seeds', icon: '🌱', color: '#7050A8', desc: 'Species & ancestry' },
-  { key: 'root', label: 'Roots', icon: '🌿', color: '#3E78C0', desc: 'Origin & background' },
+  { key: 'seed', label: 'Seeds', icon: '🌱', color: '#582a72', desc: 'Species & ancestry' },
+  { key: 'root', label: 'Roots', icon: '🌿', color: '#002f6c', desc: 'Origin & background' },
   { key: 'branch', label: 'Branches', icon: '🌳', color: '#22ab94', desc: 'Life paths' },
   { key: 'skill', label: 'Skills', icon: '⚔', color: '#ffcc78', desc: 'Abilities & training' },
   { key: 'item', label: 'Items', icon: '🗡', color: '#22ab94', desc: 'Equipment & objects' },
@@ -53,9 +53,9 @@ function SeedDetail({ data }: { data: Record<string, unknown> }) {
     { label: 'CLO', key: 'clout', color: '#E8585A' },
     { label: 'CEL', key: 'celerity', color: '#E8585A' },
     { label: 'CON', key: 'constitution', color: '#E8585A' },
-    { label: 'FLO', key: 'flow', color: '#7050A8' },
-    { label: 'FRQ', key: 'frequency', color: '#7050A8' },
-    { label: 'FOC', key: 'focus', color: '#7050A8' },
+    { label: 'FLO', key: 'flow', color: '#582a72' },
+    { label: 'FRQ', key: 'frequency', color: '#582a72' },
+    { label: 'FOC', key: 'focus', color: '#582a72' },
     { label: 'WIL', key: 'willpower', color: '#4080D0' },
     { label: 'WIS', key: 'wisdom', color: '#4080D0' },
     { label: 'WIT', key: 'wit', color: '#4080D0' },

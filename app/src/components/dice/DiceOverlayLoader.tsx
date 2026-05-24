@@ -103,7 +103,7 @@ export function DiceOverlayLoader() {
               width: '500px',
               height: '500px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(112,80,168,0.15) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(88, 42, 114,0.15) 0%, transparent 70%)',
               pointerEvents: 'none',
             }}
           />
@@ -120,9 +120,9 @@ export function DiceOverlayLoader() {
             <svg width="48" height="48" viewBox="0 0 100 100" fill="none">
               {/* D20-inspired icosahedron silhouette */}
               <polygon points="50,5 95,35 80,90 20,90 5,35" stroke="#D0A030" strokeWidth="2" fill="none" opacity="0.8" />
-              <polygon points="50,5 80,90 20,90" stroke="#7050A8" strokeWidth="1.5" fill="none" opacity="0.5" />
-              <line x1="5" y1="35" x2="80" y2="90" stroke="#7050A8" strokeWidth="1" opacity="0.3" />
-              <line x1="95" y1="35" x2="20" y2="90" stroke="#7050A8" strokeWidth="1" opacity="0.3" />
+              <polygon points="50,5 80,90 20,90" stroke="#582a72" strokeWidth="1.5" fill="none" opacity="0.5" />
+              <line x1="5" y1="35" x2="80" y2="90" stroke="#582a72" strokeWidth="1" opacity="0.3" />
+              <line x1="95" y1="35" x2="20" y2="90" stroke="#582a72" strokeWidth="1" opacity="0.3" />
               <line x1="5" y1="35" x2="95" y2="35" stroke="#D0A030" strokeWidth="1" opacity="0.4" />
             </svg>
           </div>
@@ -139,10 +139,10 @@ export function DiceOverlayLoader() {
             }}
           >
             <div style={{ marginBottom: '8px' }}>
-              <span style={{ color: '#7050A8' }}>{'[ '}</span>
+              <span style={{ color: '#582a72' }}>{'[ '}</span>
               {!chunkLoaded ? 'Downloading dice engine' : 'Initializing physics'}
               <span className="animate-pulse">...</span>
-              <span style={{ color: '#7050A8' }}>{' ]'}</span>
+              <span style={{ color: '#582a72' }}>{' ]'}</span>
             </div>
             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.3em' }}>
               THREE.js + CANNON-es
@@ -155,7 +155,7 @@ export function DiceOverlayLoader() {
               marginTop: '20px',
               width: '200px',
               height: '2px',
-              background: 'rgba(112,80,168,0.2)',
+              background: 'rgba(88, 42, 114,0.2)',
               borderRadius: '1px',
               overflow: 'hidden',
             }}
@@ -163,7 +163,7 @@ export function DiceOverlayLoader() {
             <div
               style={{
                 height: '100%',
-                background: 'linear-gradient(90deg, #7050A8, #D0A030)',
+                background: 'linear-gradient(90deg, #582a72, #D0A030)',
                 borderRadius: '1px',
                 animation: 'loading-bar 2s ease-in-out infinite',
               }}

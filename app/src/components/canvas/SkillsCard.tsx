@@ -66,7 +66,7 @@ function dieColor(level: number): string {
   if (level <= 3) return '#888';
   if (level <= 5) return '#D0A030';
   if (level <= 7) return '#3EB89A';
-  if (level <= 11) return '#7050A8';
+  if (level <= 11) return '#582a72';
   if (level <= 19) return '#E8585A';
   return '#ffcc78';
 }
@@ -81,8 +81,8 @@ const GOV_ABBREV: Record<string, string> = {
 // Pillar colors for governor badges
 const GOV_COLOR: Record<string, string> = {
   clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
-  flow: '#7050A8', focus: '#7050A8',
-  willpower: '#3E78C0', wisdom: '#3E78C0', wit: '#3E78C0',
+  flow: '#582a72', focus: '#582a72',
+  willpower: '#002f6c', wisdom: '#002f6c', wit: '#002f6c',
 };
 
 export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onRequestSkill }: SkillsCardProps) {

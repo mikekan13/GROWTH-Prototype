@@ -129,7 +129,7 @@ export default function BackstoryCard({ backstory, physicalDescription, onPhysic
               </div>
               <div className="space-y-2">
                 {prompts.map((p, i) => (
-                  <div key={i} className="p-2" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', borderLeft: '3px solid #7050A8' }}>
+                  <div key={i} className="p-2" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', borderLeft: '3px solid #582a72' }}>
                     <div className="text-[10px] mb-1" style={{ color: '#c4a0e8' }}>{p.question}</div>
                     <div className="text-xs" style={{ color: '#ccc' }}>{p.answer}</div>
                   </div>

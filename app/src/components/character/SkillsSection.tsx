@@ -13,8 +13,8 @@ const GOV_ABBREV: Record<string, string> = {
 
 const GOV_COLOR: Record<string, string> = {
   clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
-  flow: '#7050A8', focus: '#7050A8',
-  willpower: '#3E78C0', wisdom: '#3E78C0', wit: '#3E78C0',
+  flow: '#582a72', focus: '#582a72',
+  willpower: '#002f6c', wisdom: '#002f6c', wit: '#002f6c',
 };
 
 function SkillDieBadge({ level }: { level: number }) {
@@ -81,7 +81,7 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
                   width: '3px',
                   height: '12px',
                   backgroundColor: i < skill.level
-                    ? (i < 3 ? 'var(--surface-dark)' : i < 5 ? '#D0A030' : i < 7 ? '#3EB89A' : i < 11 ? '#7050A8' : i < 19 ? '#E8585A' : '#FFCC78')
+                    ? (i < 3 ? 'var(--surface-dark)' : i < 5 ? '#D0A030' : i < 7 ? '#3EB89A' : i < 11 ? '#582a72' : i < 19 ? '#E8585A' : '#FFCC78')
                     : 'rgba(30, 45, 64, 0.08)',
                 }}
               />

@@ -631,9 +631,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     className="px-4 py-2 text-xs uppercase tracking-wider transition-colors"
                     style={{
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
-                      backgroundColor: describing || !selectedSeed ? '#333' : '#7050A8',
+                      backgroundColor: describing || !selectedSeed ? '#333' : '#582a72',
                       color: describing || !selectedSeed ? '#666' : '#fff',
-                      border: '1px solid rgba(112, 80, 168, 0.4)',
+                      border: '1px solid rgba(88, 42, 114, 0.4)',
                       borderRadius: '2px', cursor: describing || !selectedSeed ? 'default' : 'pointer',
                     }}
                   >
@@ -955,7 +955,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
                       backgroundColor: selected ? '#582a72' : '#111',
                       color: selected ? '#ffcc78' : '#666',
-                      border: `1px solid ${selected ? '#7050A8' : '#2a2a3e'}`,
+                      border: `1px solid ${selected ? '#582a72' : '#2a2a3e'}`,
                       borderRadius: '2px',
                       cursor: isEditable ? 'pointer' : 'default',
                       opacity: !selected && styleAesthetics.length >= 2 ? 0.3 : 1,
@@ -992,7 +992,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 className="px-5 py-2 text-xs uppercase tracking-[0.12em] transition-colors"
                 style={{
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  backgroundColor: selectedSeed ? '#7050A8' : '#333',
+                  backgroundColor: selectedSeed ? '#582a72' : '#333',
                   color: selectedSeed ? '#fff' : '#555',
                   border: '1px solid #582a72', borderRadius: '2px',
                   cursor: !selectedSeed ? 'default' : 'pointer',
@@ -1133,9 +1133,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
-                backgroundColor: characterName && backstoryText ? '#7050A8' : '#333',
+                backgroundColor: characterName && backstoryText ? '#582a72' : '#333',
                 color: characterName && backstoryText ? '#fff' : '#555',
-                border: '1px solid rgba(112, 80, 168, 0.4)',
+                border: '1px solid rgba(88, 42, 114, 0.4)',
                 borderRadius: '2px', cursor: characterName && backstoryText ? 'pointer' : 'default',
               }}
             >
@@ -1167,11 +1167,11 @@ function PortraitFrame({ label, portrait, loading }: { label: string; portrait: 
             onError={e => { (e.target as HTMLImageElement).src = '/EmptyPortrait.png'; (e.target as HTMLImageElement).className = 'w-full h-full object-contain'; }} />
         ) : loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-sm animate-pulse" style={{ color: '#7050A8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+            <div className="text-sm animate-pulse" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
               Generating...
             </div>
             <div className="mt-2 w-16 h-1 rounded overflow-hidden" style={{ backgroundColor: '#1a1a2e' }}>
-              <div className="h-full animate-pulse" style={{ backgroundColor: '#7050A8', width: '60%' }} />
+              <div className="h-full animate-pulse" style={{ backgroundColor: '#582a72', width: '60%' }} />
             </div>
           </div>
         ) : (

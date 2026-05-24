@@ -76,7 +76,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
   };
 
   return (
-    <div className="border" style={{ backgroundColor: '#1a1a2e', borderColor: '#7050A8', borderRadius: '3px', width: '480px' }}>
+    <div className="border" style={{ backgroundColor: '#1a1a2e', borderColor: '#582a72', borderRadius: '3px', width: '480px' }}>
       <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #2a1a52 0%, #1a0d3a 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -101,7 +101,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                 borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em',
                 backgroundColor: filter === f ? '#2a1a52' : '#2a2a3e',
                 color: filter === f ? '#fff' : '#888',
-                border: `1px solid ${filter === f ? '#7050A8' : '#3a3a4e'}`,
+                border: `1px solid ${filter === f ? '#582a72' : '#3a3a4e'}`,
               }}>
               {f === 'ALL' ? 'ALL' : f === 'GODHEAD_TO_GM' ? '← FROM GODS' : '→ TO GODS'}
             </button>
@@ -114,14 +114,14 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
           ) : messages.length === 0 ? (
             <div className="text-center text-gray-400 py-4">No messages.</div>
           ) : messages.map(m => {
-            const color = PILLAR_COLOR[m.godHeadPillar] ?? '#7050A8';
+            const color = PILLAR_COLOR[m.godHeadPillar] ?? '#582a72';
             const isFromGod = m.direction === 'GODHEAD_TO_GM';
             return (
               <div key={m.id}
                 className="p-2 border"
                 style={{
                   borderRadius: '2px',
-                  backgroundColor: isFromGod ? 'rgba(112,80,168,0.08)' : '#2a2a3e',
+                  backgroundColor: isFromGod ? 'rgba(88, 42, 114,0.08)' : '#2a2a3e',
                   borderColor: '#3a3a4e',
                   borderLeftColor: color,
                   borderLeftWidth: '3px',
@@ -156,7 +156,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                   borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                   backgroundColor: godheadName === name ? '#2a1a52' : '#2a2a3e',
                   color: godheadName === name ? '#fff' : '#888',
-                  border: `1px solid ${godheadName === name ? '#7050A8' : '#3a3a4e'}`,
+                  border: `1px solid ${godheadName === name ? '#582a72' : '#3a3a4e'}`,
                 }}>{name}</button>
             ))}
           </div>
@@ -173,8 +173,8 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
             className="mt-1 px-3 py-1 text-[10px] uppercase float-right"
             style={{
               color: (draft.trim() && !sending) ? '#1a1a2e' : '#555',
-              backgroundColor: (draft.trim() && !sending) ? '#7050A8' : '#2a2a3e',
-              border: '1px solid #7050A8',
+              backgroundColor: (draft.trim() && !sending) ? '#582a72' : '#2a2a3e',
+              border: '1px solid #582a72',
               borderRadius: '2px',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
               letterSpacing: '0.05em',

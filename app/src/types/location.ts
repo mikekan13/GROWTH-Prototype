@@ -47,7 +47,7 @@ export const LOCATION_TYPE_ICONS: Record<LocationType, string> = {
 };
 
 export const LOCATION_TYPE_COLORS: Record<LocationType, string> = {
-  settlement: '#7050A8',       // Soul purple
+  settlement: '#582a72',       // Soul purple
   wilderness: '#4ade80',       // Green
   dungeon: '#E8585A',          // Body red
   building: '#60a5fa',         // Blue

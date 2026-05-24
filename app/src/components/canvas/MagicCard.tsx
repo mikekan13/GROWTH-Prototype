@@ -37,7 +37,7 @@ interface MagicCardProps {
 const PILLAR_STYLES: Record<string, { label: string; color: string; icon: string }> = {
   mercy: { label: 'MERCY', color: '#3EB89A', icon: '\u2661' },
   severity: { label: 'SEVERITY', color: '#E8585A', icon: '\u2694' },
-  balance: { label: 'BALANCE', color: '#7050A8', icon: '\u2696' },
+  balance: { label: 'BALANCE', color: '#582a72', icon: '\u2696' },
 };
 
 const SCHOOL_ICONS: Record<string, string> = {

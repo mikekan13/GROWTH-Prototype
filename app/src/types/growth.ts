@@ -434,24 +434,26 @@ export interface GrowthCharacter {
 // User roles
 export type UserRole = 'TRAILBLAZER' | 'WATCHER' | 'GODHEAD' | 'ADMIN';
 
-// Pillar constants for UI
+// Pillar constants for UI — CANONICAL per growth-color-palette memory (2026-05-02)
+// Confirmed by Mike 2026-05-24. Do NOT change without explicit canon update.
+// All UI surfaces should reference PILLARS.{pillar}.color, not literal hex.
 export const PILLARS = {
   body: {
     name: 'Body',
     alchemical: 'Salt',
-    color: '#E8585A',
+    color: '#f7525f',   // Red 1 — Binah
     attributes: ['clout', 'celerity', 'constitution'] as const,
   },
   spirit: {
     name: 'Spirit',
     alchemical: 'Sulfur',
-    color: '#7050A8',
+    color: '#582a72',   // Purple 1 — Daath  (post-Jan-2026 swap)
     attributes: ['flow', 'frequency', 'focus'] as const,
   },
   soul: {
     name: 'Soul',
     alchemical: 'Mercury',
-    color: '#3E78C0',
+    color: '#002f6c',   // Blue 1 — Chokmah  (post-Jan-2026 swap)
     attributes: ['willpower', 'wisdom', 'wit'] as const,
   },
 } as const;

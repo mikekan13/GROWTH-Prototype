@@ -42,8 +42,8 @@ interface ForgePanelProps {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
-  seed: '#7050A8',
-  root: '#3E78C0',
+  seed: '#582a72',
+  root: '#002f6c',
   branch: '#22ab94',
   skill: '#ffcc78',
   item: '#22ab94',
@@ -58,7 +58,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending: '#D0A030',
   approved: '#22ab94',
   denied: '#E8585A',
-  modified: '#7050A8',
+  modified: '#582a72',
 };
 
 const GOV_ABBREV: Record<string, string> = {
@@ -69,8 +69,8 @@ const GOV_ABBREV: Record<string, string> = {
 
 const GOV_COLOR: Record<string, string> = {
   clout: '#E8585A', celerity: '#E8585A', constitution: '#E8585A',
-  flow: '#7050A8', focus: '#7050A8',
-  willpower: '#3E78C0', wisdom: '#3E78C0', wit: '#3E78C0',
+  flow: '#582a72', focus: '#582a72',
+  willpower: '#002f6c', wisdom: '#002f6c', wit: '#002f6c',
 };
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -425,8 +425,8 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                         disabled={authoring}
                         className="text-[13px] px-3 py-1 uppercase tracking-wider"
                         style={{
-                          color: authoring ? '#666' : '#7050A8',
-                          border: `1px solid ${authoring ? '#3a3a4e' : 'rgba(112,80,168,0.4)'}`,
+                          color: authoring ? '#666' : '#582a72',
+                          border: `1px solid ${authoring ? '#3a3a4e' : 'rgba(88, 42, 114,0.4)'}`,
                           borderRadius: '2px',
                           fontFamily: 'var(--font-terminal), Consolas, monospace',
                         }}
@@ -451,8 +451,8 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   disabled={!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0}
                   className="text-[14px] px-3 py-1 uppercase tracking-wider"
                   style={{
-                    color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : '#7050A8',
-                    border: `1px solid ${(!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#3a3a4e' : 'rgba(112,80,168,0.5)'}`,
+                    color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : '#582a72',
+                    border: `1px solid ${(!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#3a3a4e' : 'rgba(88, 42, 114,0.5)'}`,
                     borderRadius: '2px',
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
                   }}
@@ -790,14 +790,14 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
 
   return (
     <div className="p-3 border space-y-3" style={{
-      borderColor: 'rgba(112,80,168,0.4)',
+      borderColor: 'rgba(88, 42, 114,0.4)',
       borderRadius: '3px',
-      backgroundColor: 'rgba(112,80,168,0.08)',
+      backgroundColor: 'rgba(88, 42, 114,0.08)',
     }}>
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[14px] uppercase tracking-wider" style={{
-            color: '#7050A8',
+            color: '#582a72',
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
           }}>God-head Blueprint</div>
           <div className="text-[15px] mt-1" style={{
@@ -875,10 +875,10 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
             <StatBadge label="Fate Die" value={String(result.data.baseFateDie)} color="#ffcc78" />
           ) : null}
           {result.data.frequency != null ? (
-            <StatBadge label="Freq" value={String(result.data.frequency)} color="#7050A8" />
+            <StatBadge label="Freq" value={String(result.data.frequency)} color="#582a72" />
           ) : null}
           {result.data.baseResist != null ? (
-            <StatBadge label="Resist" value={String(result.data.baseResist)} color="#3E78C0" />
+            <StatBadge label="Resist" value={String(result.data.baseResist)} color="#002f6c" />
           ) : null}
           {result.data.ageAdded != null ? (
             <StatBadge label="Age+" value={String(result.data.ageAdded)} color="#888" />

@@ -383,9 +383,9 @@ function InventoryItemRow({
                 )}
                 {item.type === 'armor' && data.armorCategory && (
                   <span className="px-1 flex-shrink-0" style={{
-                    backgroundColor: 'rgba(62,120,192,0.12)',
-                    color: '#3E78C0',
-                    border: '1px solid rgba(62,120,192,0.25)',
+                    backgroundColor: 'rgba(0, 47, 108,0.12)',
+                    color: '#002f6c',
+                    border: '1px solid rgba(0, 47, 108,0.25)',
                     borderRadius: '2px',
                     fontSize: '8px',
                     lineHeight: '14px',
@@ -397,7 +397,7 @@ function InventoryItemRow({
                 <span style={{ color: conditionColor }}>{conditionLabel}</span>
                 <span style={{ color: '#888' }}>{formatLbs(weightLbs)} lbs</span>
                 {primaryMaterial && <span style={{ color: '#666' }}>{primaryMaterial}</span>}
-                {data.baseResist != null && <span style={{ color: '#3E78C0' }}>R{data.baseResist}</span>}
+                {data.baseResist != null && <span style={{ color: '#002f6c' }}>R{data.baseResist}</span>}
                 {item.type === 'weapon' && data.damage && (
                   <span style={{ color: '#E8585A' }}>
                     {formatDamage(data.damage)}
@@ -466,7 +466,7 @@ function InventoryItemRow({
             <MiniStat label="Condition" value={conditionLabel} color={conditionColor} />
             <MiniStat label="Rarity" value={getRarityLabel(data.rarity)} color={rarityColor} />
             {data.quality != null && <MiniStat label="Quality" value={`${data.quality}/10`} color="#c4a0e8" />}
-            {data.baseResist != null && <MiniStat label="Resist" value={data.baseResist} color="#3E78C0" />}
+            {data.baseResist != null && <MiniStat label="Resist" value={data.baseResist} color="#002f6c" />}
             {data.value != null && <MiniStat label="Value" value={`${data.value} ҜV`} color="#ffcc78" />}
           </div>
 
@@ -505,8 +505,8 @@ function InventoryItemRow({
 
           {/* Armor detail */}
           {item.type === 'armor' && (data.baseResist != null || data.resistance != null || data.armorCategory || data.armorLayer) && (
-            <div className="mt-2 p-1.5" style={{ background: 'rgba(62,120,192,0.08)', border: '1px solid rgba(62,120,192,0.15)', borderRadius: 2 }}>
-              <div style={{ fontSize: '8px', color: '#3E78C0', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Armor</div>
+            <div className="mt-2 p-1.5" style={{ background: 'rgba(0, 47, 108,0.08)', border: '1px solid rgba(0, 47, 108,0.15)', borderRadius: 2 }}>
+              <div style={{ fontSize: '8px', color: '#002f6c', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Armor</div>
               <div className="flex flex-wrap gap-3" style={{ fontSize: '10px' }}>
                 {(data.baseResist ?? data.resistance) != null && (
                   <span style={{ color: '#fff' }}>Resist: <b>{data.baseResist ?? data.resistance}</b></span>

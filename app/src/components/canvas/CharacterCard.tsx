@@ -511,7 +511,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               <div className="grid grid-cols-3 gap-x-1">
                 {[
                   { label: 'BODY', color: '#E8585A', attrs: ['clout', 'celerity', 'constitution'] },
-                  { label: 'SPIRIT', color: '#7050A8', attrs: ['flow', 'focus'] },
+                  { label: 'SPIRIT', color: '#582a72', attrs: ['flow', 'focus'] },
                   { label: 'SOUL', color: '#4080D0', attrs: ['willpower', 'wisdom', 'wit'] },
                 ].map(p => (
                   <div key={p.label} className="flex flex-col">
@@ -594,7 +594,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 const impossible = skillCheckDR > fdMax;
                 const pillars = [
                   { label: 'BODY', color: '#E8585A', attrs: [{ key: 'clout', label: 'CLO' }, { key: 'celerity', label: 'CEL' }, { key: 'constitution', label: 'CON' }] },
-                  { label: 'SPIRIT', color: '#7050A8', attrs: [{ key: 'flow', label: 'FLO' }, { key: 'focus', label: 'FOC' }] },
+                  { label: 'SPIRIT', color: '#582a72', attrs: [{ key: 'flow', label: 'FLO' }, { key: 'focus', label: 'FOC' }] },
                   { label: 'SOUL', color: '#4080D0', attrs: [{ key: 'willpower', label: 'WIL' }, { key: 'wisdom', label: 'WIS' }, { key: 'wit', label: 'WIT' }] },
                 ];
                 return (
@@ -807,10 +807,19 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   // Vine data
   const vines = grovines.length > 0 ? grovines : [{ goal: '...', opportunity: '...', kv: undefined }];
 
-  // Action totals
-  const bodyAction = (attributes?.clout?.current || 0) + (attributes?.celerity?.current || 0) + (attributes?.constitution?.current || 0);
-  const spiritAction = (attributes?.flow?.current || 0) + (attributes?.frequency?.current || 0) + (attributes?.focus?.current || 0);
-  const soulAction = (attributes?.willpower?.current || 0) + (attributes?.wisdom?.current || 0) + (attributes?.wit?.current || 0);
+  // Action totals — canonical formula (Mike 2026-05-20):
+  //   actions = floor(sum of LEVELS of pillar attributes / 25), min 1
+  //
+  // Inputs are attribute LEVELS — NOT current pool, NOT augments. Pool depletion
+  // does not change action count. Augments are intentionally excluded.
+  //
+  // Spirit explicitly EXCLUDES Frequency (Mike 2026-05-20): Frequency is the
+  // life/death pool, not an action source. Spirit actions are Flow + Focus only.
+  const sumDiv25 = (parts: Array<number | undefined>) =>
+    Math.max(1, Math.floor(parts.reduce<number>((s, v) => s + (v ?? 0), 0) / 25));
+  const bodyAction = sumDiv25([attributes?.clout?.level, attributes?.celerity?.level, attributes?.constitution?.level]);
+  const spiritAction = sumDiv25([attributes?.flow?.level, attributes?.focus?.level]);
+  const soulAction = sumDiv25([attributes?.willpower?.level, attributes?.wisdom?.level, attributes?.wit?.level]);
 
   // Helper to check conditions for a given attribute
   const getConditionState = (attrName: AttributeName) => {
@@ -1055,9 +1064,10 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {/* ── Actions Column with ComplexTooltip ── */}
           <div className="relative flex flex-col gap-1" style={{ marginTop: '13px', width: '59px' }}>
             <ComplexTooltip title="Body Actions" baseValue={bodyAction} modifiers={[
-              { name: 'Clout', value: attributes?.clout?.current || 0 },
-              { name: 'Celerity', value: attributes?.celerity?.current || 0 },
-              { name: 'Constitution', value: attributes?.constitution?.current || 0 },
+              { name: 'Clout (level)', value: attributes?.clout?.level || 0 },
+              { name: 'Celerity (level)', value: attributes?.celerity?.level || 0 },
+              { name: 'Constitution (level)', value: attributes?.constitution?.level || 0 },
+              { name: '÷ 25, min 1', value: 0 },
             ]} totalValue={bodyAction}>
               <div className="border border-red-500/40 p-1 flex flex-col items-center justify-center cursor-help" style={{ backgroundColor: '#ea9999', height: '96px', marginBottom: '81px' }}>
                 <div className="text-lg mb-1 font-bold text-white">[&#8756;]</div>
@@ -1067,28 +1077,35 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               </div>
             </ComplexTooltip>
 
-            <ComplexTooltip title="Soul Actions" baseValue={soulAction} modifiers={[
-              { name: 'Willpower', value: attributes?.willpower?.current || 0 },
-              { name: 'Wisdom', value: attributes?.wisdom?.current || 0 },
-              { name: 'Wit', value: attributes?.wit?.current || 0 },
-            ]} totalValue={soulAction}>
+            {/* Pillar order must match the attribute-pillar columns above:
+                Body (red) → Spirit (purple) → Soul (blue). Mike 2026-05-20. */}
+
+            {/* Spirit = Purple (post-Jan-2026 canon). Frequency intentionally
+                EXCLUDED — it's the life/death pool, not an action source. */}
+            <ComplexTooltip title="Spirit Actions" baseValue={spiritAction} modifiers={[
+              { name: 'Flow (level)', value: attributes?.flow?.level || 0 },
+              { name: 'Focus (level)', value: attributes?.focus?.level || 0 },
+              { name: '÷ 25, min 1', value: 0 },
+            ]} totalValue={spiritAction}>
               <div className="border border-purple-500/40 p-1 flex flex-col items-center justify-center cursor-help" style={{ backgroundColor: '#8e7cc3', height: '96px', marginBottom: '81px' }}>
                 <div className="text-lg mb-1 font-bold text-white">[&#8756;]</div>
                 <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: '#ffcc78', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-                  <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{soulAction}</div>
+                  <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{spiritAction}</div>
                 </div>
               </div>
             </ComplexTooltip>
 
-            <ComplexTooltip title="Spirit Actions" baseValue={spiritAction} modifiers={[
-              { name: 'Flow', value: attributes?.flow?.current || 0 },
-              { name: 'Frequency', value: attributes?.frequency?.current || 0 },
-              { name: 'Focus', value: attributes?.focus?.current || 0 },
-            ]} totalValue={spiritAction}>
+            {/* Soul = Blue (post-Jan-2026 canon) */}
+            <ComplexTooltip title="Soul Actions" baseValue={soulAction} modifiers={[
+              { name: 'Willpower (level)', value: attributes?.willpower?.level || 0 },
+              { name: 'Wisdom (level)', value: attributes?.wisdom?.level || 0 },
+              { name: 'Wit (level)', value: attributes?.wit?.level || 0 },
+              { name: '÷ 25, min 1', value: 0 },
+            ]} totalValue={soulAction}>
               <div className="border border-blue-500/40 p-1 flex flex-col items-center justify-center cursor-help" style={{ backgroundColor: '#6fa8dc', height: '96px' }}>
                 <div className="text-lg mb-1 font-bold text-white">[&#8756;]</div>
                 <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: '#ffcc78', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-                  <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{spiritAction}</div>
+                  <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{soulAction}</div>
                 </div>
               </div>
             </ComplexTooltip>

@@ -27,7 +27,7 @@ const DIE_OPTIONS: { type: DieType; label: string; color: DieColor; hex: string;
   { type: 'd4', label: 'd4', color: 'red', hex: '#E8585A', glyph: '▲' },
   { type: 'd6', label: 'd6', color: 'teal', hex: '#2DB8A0', glyph: '■' },
   { type: 'd8', label: 'd8', color: 'blue', hex: '#4080D0', glyph: '◆' },
-  { type: 'd12', label: 'd12', color: 'purple', hex: '#7050A8', glyph: '⬟' },
+  { type: 'd12', label: 'd12', color: 'purple', hex: '#582a72', glyph: '⬟' },
   { type: 'd20', label: 'd20', color: 'gold', hex: '#D0A030', glyph: '⬢' },
 ];
 

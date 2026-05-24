@@ -103,7 +103,7 @@ function ApplicationsPanel({ campaignId }: { campaignId: string }) {
   const statusColor = (status: string) => {
     switch (status) {
       case 'INTERESTED': return 'var(--accent-gold)';
-      case 'BACKSTORY': return '#7050A8';
+      case 'BACKSTORY': return '#582a72';
       case 'CHARACTER_CREATION': return 'var(--accent-gold)';
       case 'ACTIVE': return 'var(--accent-teal)';
       case 'REJECTED': return '#888';
@@ -135,7 +135,7 @@ function ApplicationsPanel({ campaignId }: { campaignId: string }) {
           <button
             onClick={() => setViewingProfile(member)}
             className="shrink-0 w-14 h-14 flex items-center justify-center text-xl font-[family-name:var(--font-header)] border border-white/20 hover:border-[var(--accent-teal)] transition-colors"
-            style={{ background: 'rgba(112,80,168,0.2)', color: '#fff' }}
+            style={{ background: 'rgba(88, 42, 114,0.2)', color: '#fff' }}
           >
             {initial}
           </button>

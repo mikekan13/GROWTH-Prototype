@@ -52,11 +52,15 @@ export interface EncounterParticipant {
   type: 'pc' | 'npc' | 'creature' | 'environmental';
   side: 'ally' | 'enemy' | 'neutral';
 
-  // Action economy (per-pillar pools)
+  // Action economy (per-pillar pools). Per Mike 2026-05-20:
+  //   actions = floor(sum of pillar attribute LEVELS / 25), min 1.
+  //   Levels — not current pool, not augments.
+  //   Frequency is intentionally EXCLUDED from Spirit (it is the life/death
+  //   pool, not an action source).
   actions?: {
-    body: number;               // (Clout+Celerity+Constitution)/25, min 1
-    spirit: number;             // (Flow+Frequency+Focus)/25, min 1
-    soul: number;               // (Willpower+Wisdom+Wit)/25, min 1
+    body: number;               // (Clout + Celerity + Constitution) / 25, min 1
+    spirit: number;             // (Flow + Focus) / 25, min 1   ← Frequency NOT included
+    soul: number;               // (Willpower + Wisdom + Wit) / 25, min 1
     used: {
       body: number;
       spirit: number;
@@ -80,7 +84,7 @@ export type ActionType = 'offensive' | 'support' | 'defensive' | 'free' | 'joint
 export const ACTION_TYPE_COLORS: Record<ActionType, string> = {
   offensive: '#E8585A',         // Red
   support: '#808080',           // Grey
-  defensive: '#3E78C0',         // Blue
+  defensive: '#002f6c',         // Blue
   free: '#4ade80',              // Green
   joint: '#ffcc78',             // Gold
   reactive: '#c4a0e8',         // Purple

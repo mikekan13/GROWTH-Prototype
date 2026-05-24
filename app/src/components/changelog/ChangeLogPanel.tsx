@@ -12,7 +12,7 @@ interface ChangeLogPanelProps {
 const ACTOR_COLORS: Record<ChangeActor, string> = {
   player: '#22ab94',
   gm: '#ffcc78',
-  ai_copilot: '#7050A8',
+  ai_copilot: '#582a72',
   system: '#666',
 };
 
