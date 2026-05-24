@@ -319,3 +319,73 @@ export async function setResistanceNotes(goalId: string, notes: string) {
     data: { resistancePrompt: notes },
   });
 }
+
+// ── Opportunity Event ────────────────────────────────────────────────
+
+export const opportunitySchema = z.object({
+  goalId: z.string().min(1),
+  description: z.string().min(3).max(1000),
+  narrative: z.string().max(2000).optional(),
+});
+export type OpportunityInput = z.infer<typeof opportunitySchema>;
+
+/**
+ * GM (or character owner) declares that an opportunity has arisen for
+ * this goal. Per GRO.WTH canon: the **O** of GROwth — a moment of leverage
+ * where progress accelerates or derails. Recorded as a campaign event so
+ * the Terminal surfaces it, and emitted via godhead-dispatcher so custodian
+ * godheads (Eth'erling triage, Kai pricing) can react.
+ *
+ * Does NOT mutate Goal status. Use completeGoal/failGoal for that.
+ */
+export async function declareOpportunity(
+  userId: string,
+  userRole: string,
+  input: OpportunityInput,
+) {
+  const validated = opportunitySchema.parse(input);
+  const goal = await prisma.goal.findUnique({
+    where: { id: validated.goalId },
+    include: { character: { include: { campaign: { select: { id: true, gmUserId: true } } } } },
+  });
+  if (!goal) throw new NotFoundError('Goal not found');
+  const isOwner = goal.character.userId === userId;
+  const isGM = goal.character.campaign?.gmUserId === userId;
+  if (!isGM && !isOwner && !isAdminRole(userRole)) {
+    throw new ForbiddenError('Only the GM or the character owner may declare an opportunity');
+  }
+
+  const campaignId = goal.character.campaign?.id;
+  if (campaignId) {
+    const { createCampaignEvent } = await import('./campaign-event');
+    await createCampaignEvent({
+      campaignId,
+      type: 'game_event',
+      actor: isGM ? 'gm' : 'player',
+      actorUserId: userId,
+      actorName: isGM ? 'GM' : 'Player',
+      characterId: goal.characterId,
+      characterName: goal.character.name,
+      payload: {
+        kind: 'game_event',
+        eventType: 'opportunity_arose',
+        description: `Opportunity arose for goal "${goal.description}": ${validated.description}`,
+      },
+    }).catch(() => { /* event log is non-critical */ });
+  }
+
+  // Use 'goal.created' as the closest existing dispatcher event until the
+  // routing table is extended with 'goal.opportunity'. Payload carries the
+  // op marker so handlers can distinguish.
+  void emitGodHeadEvent('goal.created', {
+    opportunity: true,
+    goalId: validated.goalId,
+    goalDescription: goal.description,
+    characterId: goal.characterId,
+    custodianGodHeadId: goal.custodianId,
+    description: validated.description,
+    narrative: validated.narrative,
+  });
+
+  return { ok: true, goalId: validated.goalId };
+}

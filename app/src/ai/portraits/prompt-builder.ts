@@ -35,11 +35,19 @@ export interface PromptBuildOptions {
   /** Creation mode: pure physical identity, no equipment/wounds/conditions */
   creationMode?: boolean;
   /**
-   * True when the caller will supply FLUX.2 identity reference images. Currently
-   * accepted but not yet wired through main's prompt-builder logic (fork-side
-   * uses this to drop physical-identity text when refs are present). Accepted
-   * here so local.ts (FLUX.2) compiles. [NEEDS MIKE] — full FLUX.2 prompt
-   * reconciliation can come later if behaviour diverges.
+   * True when the caller is supplying FLUX.2 identity reference images
+   * (PuLID multi-ref, etc.). With references present, the *physical identity
+   * text* (seed lore, free-form physicalDescription) is dropped because the
+   * refs carry that signal — restating it via text tends to over-constrain
+   * the generator. Narrative/environment text is KEPT.
+   *
+   * If both `creationMode` and `hasReferences` are true, creationMode wins
+   * (creationMode already drops the same fields plus narrative/environment).
+   *
+   * Reference behaviour (Mike, please verify before tuning further):
+   *   creationMode=true   → drop seed.description, physicalDescription, narrative, env
+   *   hasReferences=true  → drop seed.description, physicalDescription (narrative + env kept)
+   *   both false          → full prompt
    */
   hasReferences?: boolean;
 }
@@ -53,11 +61,13 @@ export function buildPortraitPrompt(
   let campaignStyle: CampaignStyleConfig | undefined;
   let overrides: PortraitOverrides | undefined;
   let creationMode = false;
+  let hasReferences = false;
 
   if (campaignStyleOrOptions && 'creationMode' in campaignStyleOrOptions) {
     campaignStyle = campaignStyleOrOptions.campaignStyle;
     overrides = campaignStyleOrOptions.overrides;
     creationMode = campaignStyleOrOptions.creationMode || false;
+    hasReferences = campaignStyleOrOptions.hasReferences || false;
   } else {
     campaignStyle = campaignStyleOrOptions as CampaignStyleConfig | undefined;
     overrides = overridesArg;
@@ -66,11 +76,15 @@ export function buildPortraitPrompt(
   const baseConfig = getDefaultStyleConfig();
   const config = applyCampaignStyle(baseConfig, campaignStyle);
 
-  // T1: IDENTITY BLOCK (always included). creationMode trims narrative lore.
-  const identityBlock = buildIdentityBlock(char, creationMode);
+  // dropPhysicalText: text describing visual identity (seed lore, physical
+  // description). Dropped when refs carry that signal or in creationMode.
+  const dropPhysicalText = creationMode || hasReferences;
+
+  // T1: IDENTITY BLOCK (always included). dropPhysicalText trims species lore + physical desc.
+  const identityBlock = buildIdentityBlock(char, dropPhysicalText);
 
   // T1: BODY DESCRIPTION BLOCK
-  const bodyBlock = buildBodyDescriptionBlock(char, creationMode);
+  const bodyBlock = buildBodyDescriptionBlock(char, dropPhysicalText);
 
   // ── IDENTITY LOCK FACE MODE ──
   // When anglePreset is set, we're generating face-only images for identity lock.

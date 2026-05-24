@@ -1408,6 +1408,8 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
   const [loaded, setLoaded] = useState(false);
   const [crystallizing, setCrystallizing] = useState(false);
   const [crystallizeError, setCrystallizeError] = useState<string | null>(null);
+  const [quickGenError, setQuickGenError] = useState<string | null>(null);
+  const [quickGenerating, setQuickGenerating] = useState(false);
 
   const currentStep = STEPS[step];
   const totalKV = useMemo(() => computeRunningKV(draft), [draft]);
@@ -1566,9 +1568,83 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
     }
   };
 
+  const handleQuickGenerate = async () => {
+    setQuickGenError(null);
+    setQuickGenerating(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/entities/quick-generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: draft.name, prompt: draft.prompt }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Quick-generate failed' }));
+        setQuickGenError(err.error || 'Quick-generate failed');
+        return;
+      }
+      const out = await res.json() as {
+        seedName: string | null;
+        targetKV: number;
+        attributes: Record<AttributeName, number>;
+        skillHints: Array<{ name: string; level: number; governors: SkillGovernor[]; note?: string }>;
+        traitHints: Array<{ name: string; type: 'nectar' | 'thorn'; pillar?: 'body' | 'spirit' | 'soul'; note?: string }>;
+        goalHints: Array<{ description: string; priority: number }>;
+        notes?: string;
+      };
+
+      // Resolve the seed by name (best-effort — null if not in catalog)
+      const matchedSeed = out.seedName ? (getSeed(out.seedName) ?? null) : null;
+
+      // Hints become draft skills/traits with NO forgeItemId (since they're
+      // AI-suggested names, not bound to campaign forge items yet). The GM
+      // will pick real forge items in Steps 5/6 — these hints just pre-fill
+      // names and levels so the structure is concrete to start from.
+      const mappedSkills: DraftSkill[] = out.skillHints.map(h => ({
+        name: h.name,
+        level: h.level,
+        governors: h.governors,
+        description: h.note,
+      }));
+      const mappedTraits: DraftTrait[] = out.traitHints.map(h => ({
+        name: h.name,
+        type: h.type,
+        pillar: h.pillar,
+        description: h.note,
+      }));
+      const mappedGoals: DraftGoal[] = out.goalHints.map(h => ({
+        description: h.description,
+        priority: h.priority,
+      }));
+
+      const nextDraft: EntityDraft = {
+        ...draft,
+        targetKV: out.targetKV,
+        seed: matchedSeed ?? draft.seed,
+        attributes: out.attributes,
+        skills: mappedSkills,
+        traits: mappedTraits,
+        goals: mappedGoals,
+      };
+
+      setDraft(nextDraft);
+      // Persist immediately so the GM can refresh without losing state
+      await saveStep(nextDraft, 1);
+      setStep(1);
+    } catch (e) {
+      setQuickGenError(e instanceof Error ? e.message : 'Network error');
+    } finally {
+      setQuickGenerating(false);
+    }
+  };
+
   const handleNext = () => {
     if (step === STEPS.length - 1) {
       handleCrystallize();
+      return;
+    }
+    // Step 0 + prompt = quick-generate path (fans out into all subsequent steps)
+    if (step === 0 && draft.prompt.trim() && draft.name.trim()) {
+      handleQuickGenerate();
       return;
     }
     handleStepChange(step + 1);
@@ -1673,13 +1749,29 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
 
         {/* Render current step */}
         {step === 0 && (
-          <IntakeStep
-            draft={draft}
-            onChange={updateDraft}
-            campaignId={campaignId}
-            onGeneratePrompt={handleGeneratePrompt}
-            generatingPrompt={generatingPrompt}
-          />
+          <>
+            <IntakeStep
+              draft={draft}
+              onChange={updateDraft}
+              campaignId={campaignId}
+              onGeneratePrompt={handleGeneratePrompt}
+              generatingPrompt={generatingPrompt}
+            />
+            {quickGenerating && (
+              <div className="mt-4 text-center py-3 text-[12px] text-[#3EB89A] font-[family-name:var(--font-terminal)] uppercase tracking-[0.15em] border"
+                style={{ borderColor: 'rgba(62,184,154,0.3)', background: 'rgba(62,184,154,0.05)' }}
+              >
+                Generating draft from prompt (may take 5-10s)...
+              </div>
+            )}
+            {quickGenError && (
+              <div className="mt-4 border p-3 text-[12px] font-[family-name:var(--font-terminal)]"
+                style={{ borderColor: '#E8585A55', background: 'rgba(232,88,90,0.08)', color: '#E8585A' }}
+              >
+                ✗ {quickGenError}
+              </div>
+            )}
+          </>
         )}
         {step === 1 && (
           <SeedStep draft={draft} onChange={updateDraft} />
@@ -1737,16 +1829,16 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
 
           <button
             onClick={handleNext}
-            disabled={!canAdvance() || crystallizing}
+            disabled={!canAdvance() || crystallizing || quickGenerating}
             className="px-6 py-2.5 text-[11px] uppercase tracking-[0.12em] font-[family-name:var(--font-terminal)] font-bold disabled:opacity-30 disabled:cursor-default transition-all hover:brightness-110"
             style={{
-              background: canAdvance() && !crystallizing
+              background: canAdvance() && !crystallizing && !quickGenerating
                 ? (step === STEPS.length - 1
                     ? 'linear-gradient(135deg, #ffcc78, #d99a36)'
                     : 'linear-gradient(135deg, #3EB89A, #2D9A7E)')
                 : 'rgba(62,184,154,0.3)',
               color: '#000',
-              boxShadow: canAdvance() && !crystallizing
+              boxShadow: canAdvance() && !crystallizing && !quickGenerating
                 ? (step === STEPS.length - 1
                     ? '0 0 20px rgba(255,204,120,0.3)'
                     : '0 0 20px rgba(62,184,154,0.25)')
@@ -1755,7 +1847,9 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
           >
             {step === STEPS.length - 1
               ? (crystallizing ? 'Crystallizing...' : 'Crystallize ›')
-              : 'Next ›'}
+              : step === 0 && draft.prompt.trim()
+                ? (quickGenerating ? 'Generating...' : 'Generate ›')
+                : 'Next ›'}
           </button>
         </div>
       </div>

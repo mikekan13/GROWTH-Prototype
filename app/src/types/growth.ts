@@ -38,12 +38,14 @@ export interface GrowthAttributes {
   celerity: GrowthAttribute;     // Speed and agility
   constitution: GrowthAttribute; // Health and endurance
 
-  // Spirit Pillar (Sulfur) - Spiritual/Recognition - BLUE
+  // Spirit Pillar (Sulfur) - Spiritual/Recognition - PURPLE
+  // Post-Jan-2026 swap: Spirit owns Flow/Frequency/Focus; canonical color = purple.
   flow: GrowthAttribute;         // Mercy magic, receiving/acceptance
   frequency: GrowthFrequency;    // Special: experience/overflow target
   focus: GrowthAttribute;        // Severity magic, giving/manifestation
 
-  // Soul Pillar (Mercury) - Mental/Will - PURPLE
+  // Soul Pillar (Mercury) - Mental/Will - BLUE
+  // Post-Jan-2026 swap: Soul owns Willpower/Wisdom/Wit; canonical color = blue.
   willpower: GrowthAttribute;    // Mental and emotional resilience
   wisdom: GrowthAttribute;       // Intuition and creativity
   wit: GrowthAttribute;          // Logic and analytical thinking
