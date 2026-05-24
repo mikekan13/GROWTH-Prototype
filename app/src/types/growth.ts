@@ -436,26 +436,57 @@ export type UserRole = 'TRAILBLAZER' | 'WATCHER' | 'GODHEAD' | 'ADMIN';
 
 // Pillar constants for UI — CANONICAL per growth-color-palette memory (2026-05-02)
 // Confirmed by Mike 2026-05-24. Do NOT change without explicit canon update.
+//
+// Three Sephirot tiers per pillar:
+//   color     — Tier 1 (primary): use for borders, fills, accent backgrounds,
+//               and TEXT on LIGHT surfaces (rulebook-style powder blue / cream).
+//   colorMid  — Tier 2: lighter accent — safe for TEXT on dark surfaces.
+//   colorLight — Tier 3: lightest — for hover states, faint accents.
+//
+// Text policy on dark theme (per Mike's guidance, rulebook reference):
+//   - Body text: use whites (#F5F4EF default, #ffffff elevated)
+//   - Pillar-colored headers on black bars: tier-1 (matches rulebook signature)
+//   - Pillar-colored accent labels on dark surface without black bar: tier-2
+//
 // All UI surfaces should reference PILLARS.{pillar}.color, not literal hex.
 export const PILLARS = {
   body: {
     name: 'Body',
     alchemical: 'Salt',
-    color: '#f7525f',   // Red 1 — Binah
+    color: '#f7525f',       // Red 1 — Binah   (tier 1 — primary)
+    colorMid: '#ea9999',    // Red 2 — Geburah (tier 2 — text on dark)
+    colorLight: '#f4cccc',  // Red 3 — Hod     (tier 3 — faint)
     attributes: ['clout', 'celerity', 'constitution'] as const,
   },
   spirit: {
     name: 'Spirit',
     alchemical: 'Sulfur',
-    color: '#582a72',   // Purple 1 — Daath  (post-Jan-2026 swap)
+    color: '#582a72',       // Purple 1 — Daath     (tier 1)
+    colorMid: '#8e7cc3',    // Purple 2 — Tiphareth (tier 2 — text on dark)
+    colorLight: '#b4a7d6',  // Purple 3 — Yesod     (tier 3)
     attributes: ['flow', 'frequency', 'focus'] as const,
   },
   soul: {
     name: 'Soul',
     alchemical: 'Mercury',
-    color: '#002f6c',   // Blue 1 — Chokmah  (post-Jan-2026 swap)
+    color: '#002f6c',       // Blue 1 — Chokmah (tier 1)
+    colorMid: '#6fa8dc',    // Blue 2 — Chesed  (tier 2 — text on dark)
+    colorLight: '#9fc5e8',  // Blue 3 — Netzach (tier 3)
     attributes: ['willpower', 'wisdom', 'wit'] as const,
   },
+} as const;
+
+// Standard text colors for the dark theme (per growth-color-palette memory).
+// Use these for any text that sits directly on dark/black surfaces.
+export const TEXT_COLORS = {
+  /** Default body text — #F5F4EF (filtered Terminal Logic) */
+  body: '#F5F4EF',
+  /** Elevated/emphasized — #ffffff (pure Terminal Logic / Kether) */
+  elevated: '#ffffff',
+  /** Muted body text */
+  muted: 'rgba(255,255,255,0.55)',
+  /** Faint label */
+  faint: 'rgba(255,255,255,0.35)',
 } as const;
 
 // Magic school metadata for UI

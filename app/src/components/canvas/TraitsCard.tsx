@@ -135,8 +135,8 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
                   <span className="text-[9px]" style={{ color: '#888', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>Pillar:</span>
                   {([
                     { key: 'body' as const, color: '#f7525f', label: 'BODY' },
-                    { key: 'spirit' as const, color: '#582a72', label: 'SPIRIT' },
-                    { key: 'soul' as const, color: '#002f6c', label: 'SOUL' },
+                    { key: 'spirit' as const, color: '#8e7cc3', label: 'SPIRIT' },
+                    { key: 'soul' as const, color: '#6fa8dc', label: 'SOUL' },
                   ]).map(p => (
                     <button key={p.key} type="button" onClick={e => { e.stopPropagation(); setNewPillar(p.key); }} onMouseDown={e => e.stopPropagation()}
                       className="px-2 py-0.5 text-[9px] uppercase"

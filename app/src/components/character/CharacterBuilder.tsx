@@ -221,7 +221,7 @@ export default function CharacterBuilder({ campaigns }: { campaigns: Campaign[] 
           ))}
         </div>
         <div>
-          <div className="text-xs uppercase tracking-widest text-center mb-3" style={{ color: '#582a72' }}>Soul (Mercury)</div>
+          <div className="text-xs uppercase tracking-widest text-center mb-3" style={{ color: '#8e7cc3' }}>Soul (Mercury)</div>
           {(['willpower', 'wisdom', 'wit'] as const).map(key => (
             <div key={key} className="flex items-center justify-between mb-2">
               <span className="text-sm capitalize">{key}</span>

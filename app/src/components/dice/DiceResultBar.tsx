@@ -87,7 +87,7 @@ export function DiceResultBar({ result, visible }: DiceResultBarProps) {
         {request.flatModifiers !== undefined && request.flatModifiers !== 0 && (
           <>
             <span className="text-[#1a2a30]">{request.flatModifiers > 0 ? '+' : ''}</span>
-            <span className="text-[#582a72] font-bold">{request.flatModifiers}</span>
+            <span className="text-[#8e7cc3] font-bold">{request.flatModifiers}</span>
             <span className="text-[#6a7a88] text-xs">mod</span>
           </>
         )}

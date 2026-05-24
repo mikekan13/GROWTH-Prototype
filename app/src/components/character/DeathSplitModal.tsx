@@ -49,11 +49,13 @@ interface Props {
   onApplied: (manifest: DeathSplitManifest) => void;
 }
 
+// Destination accents use tier-2 (Sephirot lighter) shades so they read on
+// the dark modal background. Tier-1 (canon) would be too dark for text.
 const DESTINATION_META: Record<DeathSplitComponent['destination'], { label: string; color: string; hint: string }> = {
   campaign:   { label: 'GM',         color: '#ffcc78', hint: 'Body strips return to the campaign wallet' },
-  lady_death: { label: 'Lady Death', color: '#582a72', hint: 'Soul halves + Frequency capacity' },
+  lady_death: { label: 'Lady Death', color: '#8e7cc3', hint: 'Soul halves + Frequency capacity' },     // Spirit tier-2 Tiphareth
   kept:       { label: 'Ghost',      color: '#3EB89A', hint: 'Stays on the ghost — Spirit + Soul-kept' },
-  player:     { label: 'Player',     color: '#002f6c', hint: 'Legacy split (pre-2026-05-19)' },
+  player:     { label: 'Player',     color: '#6fa8dc', hint: 'Legacy split (pre-2026-05-19)' },         // Soul tier-2 Chesed
 };
 
 export default function DeathSplitModal({ characterId, characterName, onClose, onApplied }: Props) {
@@ -192,7 +194,7 @@ export default function DeathSplitModal({ characterId, characterName, onClose, o
 
             {preview.manifest.toPlayer > 0 && (
               <div className="border p-2 text-[11px] font-[family-name:var(--font-terminal)]"
-                style={{ borderColor: '#002f6c33', background: 'rgba(0, 47, 108,0.06)', color: '#002f6c' }}
+                style={{ borderColor: '#6fa8dc33', background: 'rgba(0, 47, 108,0.06)', color: '#6fa8dc' }}
               >
                 Legacy split detected: {preview.manifest.toPlayer} Ҝ routed to player wallet
                 (pre-2026-05-19 transformation manifest, honored for back-compat).

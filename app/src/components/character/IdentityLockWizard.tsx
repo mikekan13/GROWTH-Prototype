@@ -1359,7 +1359,7 @@ export default function IdentityLockWizard({
                   />
                 ) : state.frontGenerating ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="animate-pulse text-sm" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                    <div className="animate-pulse text-sm" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                       Generating...
                     </div>
                     <ElapsedTimer startTime={state.generationStartTime} />
@@ -1400,7 +1400,7 @@ export default function IdentityLockWizard({
 
           {/* Face-gen levers (pass control + guidance + ref assignment) */}
           <div className="mb-2 p-2" style={{ border: '1px solid #2a2a3e', backgroundColor: '#0a0a14', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-            <div className="text-xs uppercase tracking-wider mb-1.5" style={{ color: '#582a72', fontSize: '9px' }}>Levers</div>
+            <div className="text-xs uppercase tracking-wider mb-1.5" style={{ color: '#8e7cc3', fontSize: '9px' }}>Levers</div>
 
             {/* Row 1: toggles */}
             <div className="flex items-center justify-center gap-4 mb-1.5">
@@ -1569,7 +1569,7 @@ export default function IdentityLockWizard({
                       <FaceCropImage src={a.imagePath} alt={ANGLE_LABELS[angle]} faceCrop />
                     ) : a.generating ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="animate-pulse text-sm" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                        <div className="animate-pulse text-sm" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                           Generating...
                         </div>
                         <ElapsedTimer startTime={state.generationStartTime} />
@@ -1727,7 +1727,7 @@ export default function IdentityLockWizard({
                     </div>
                   ) : state.bodyGenerating ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div className="animate-pulse text-sm" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Generating...</div>
+                      <div className="animate-pulse text-sm" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Generating...</div>
                       <ElapsedTimer startTime={state.generationStartTime} />
                     </div>
                   ) : null}
@@ -2623,7 +2623,7 @@ function IdentityTestStep({ state, dispatch, onGenerateTest }: {
               <div className="flex flex-col items-center">
                 <div className="relative border overflow-hidden" style={{ borderColor: '#2a2a3e', width: '100px', aspectRatio: '3/4', backgroundColor: '#111' }}>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="animate-pulse text-xs" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
+                    <div className="animate-pulse text-xs" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
                     <ElapsedTimer startTime={state.generationStartTime} />
                   </div>
                 </div>
@@ -2701,7 +2701,7 @@ function MiniFramePlaceholder({ label, startTime }: { label: string; startTime: 
       </div>
       <div className="relative border overflow-hidden" style={{ borderColor: '#2a2a3e', width: '80px', aspectRatio: '3/4', backgroundColor: '#111' }}>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="animate-pulse text-xs" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
+          <div className="animate-pulse text-xs" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>...</div>
           <ElapsedTimer startTime={startTime} />
         </div>
       </div>

@@ -57,9 +57,9 @@ const BODY_PARTS: { key: keyof BodyPartDamage; label: string }[] = [
 
 const LAYER_META: Record<string, { label: string; color: string; mult: string }> = {
   body: { label: 'BODY', color: '#E8585A', mult: 'Varies' },
-  clothing: { label: 'CLOTHING', color: '#582a72', mult: '0.5x' },
+  clothing: { label: 'CLOTHING', color: '#8e7cc3', mult: '0.5x' },
   lightArmor: { label: 'LIGHT ARMOR', color: '#3EB89A', mult: '1x' },
-  heavyArmor: { label: 'HEAVY ARMOR', color: '#002f6c', mult: '1.5x' },
+  heavyArmor: { label: 'HEAVY ARMOR', color: '#6fa8dc', mult: '1.5x' },
 };
 
 const COND_LABELS: Record<number, { label: string; color: string }> = {

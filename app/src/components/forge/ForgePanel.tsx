@@ -797,7 +797,7 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[14px] uppercase tracking-wider" style={{
-            color: '#582a72',
+            color: '#8e7cc3',
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
           }}>God-head Blueprint</div>
           <div className="text-[15px] mt-1" style={{

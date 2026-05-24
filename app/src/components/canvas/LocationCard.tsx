@@ -399,7 +399,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
               borderRadius: 2,
               marginBottom: 10,
             }}>
-              <div style={{ fontSize: 9, color: '#582a72', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+              <div style={{ fontSize: 9, color: '#8e7cc3', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
                 Ley Lines Present {data.leyLines.strength ? `(Strength: ${data.leyLines.strength})` : ''}
               </div>
               {data.leyLines.schools && data.leyLines.schools.length > 0 && (

@@ -897,11 +897,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 >
                   <span
                     className="uppercase leading-none"
-                    style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: '#582a72', fontWeight: 'bold', letterSpacing: '-0.01em' }}
+                    style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '-0.01em' }}
                   >
                     {formatKrma(economy.total)}
                   </span>
-                  <span className="leading-none" style={{ fontSize: '28px', color: '#582a72', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                  <span className="leading-none" style={{ fontSize: '28px', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '0.02em' }}>
                     <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '22px', fontWeight: 900 }}>Ҝ</span>
                     <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
                   </span>

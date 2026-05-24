@@ -574,7 +574,7 @@ function RootStep({
         <div className="border p-4 space-y-3" style={{ borderColor: '#002f6c', background: 'rgba(0, 47, 108,0.08)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#002f6c' }}>
+              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#6fa8dc' }}>
                 {draft.root.name}
               </div>
               <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/40 mt-1">
@@ -594,7 +594,7 @@ function RootStep({
               {Object.entries(attrs).filter(([, v]) => v > 0).map(([attr, val]) => (
                 <span key={attr} className="text-[11px] px-1.5 py-0.5 uppercase" style={{
                   backgroundColor: 'rgba(0, 47, 108,0.15)',
-                  color: '#002f6c',
+                  color: '#6fa8dc',
                   borderRadius: '2px',
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 }}>{attr.slice(0, 3)} {val}</span>
@@ -664,11 +664,11 @@ function RootStep({
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#002f6c' }}>
+                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#6fa8dc' }}>
                     {item.name}
                   </span>
                   {freq != null && (
-                    <span className="text-[12px] font-[family-name:var(--font-terminal)]" style={{ color: '#582a72' }}>
+                    <span className="text-[12px] font-[family-name:var(--font-terminal)]" style={{ color: '#8e7cc3' }}>
                       Freq: {freq}
                     </span>
                   )}
@@ -1318,9 +1318,9 @@ function ReviewStep({
         </div>
         {draft.root && (
           <div className="text-[11px] font-[family-name:var(--font-terminal)] text-white/50">
-            Root: <span className="text-[#002f6c]">{draft.root.name}</span>
+            Root: <span className="text-[#6fa8dc]">{draft.root.name}</span>
             {draft.branches.length > 0 && (
-              <> · Branches: <span className="text-[#002f6c]">{draft.branches.map(b => b.name).join(', ')}</span></>
+              <> · Branches: <span className="text-[#6fa8dc]">{draft.branches.map(b => b.name).join(', ')}</span></>
             )}
           </div>
         )}
@@ -1359,7 +1359,7 @@ function ReviewStep({
               <td className="px-3 py-1.5 text-right text-[11px] text-white/30">
                 {draft.targetKV} Ҝ
                 {totalKV > draft.targetKV * 1.25 && <span className="ml-2 text-[#E8585A]">over</span>}
-                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[#002f6c]">under</span>}
+                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[#6fa8dc]">under</span>}
               </td>
             </tr>
           </tbody>

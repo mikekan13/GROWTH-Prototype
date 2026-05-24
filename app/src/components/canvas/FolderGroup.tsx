@@ -400,7 +400,7 @@ export function FolderGroupRect({
               <div style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: 40, textAlign: 'center', lineHeight: '1', padding: '10px 20px', letterSpacing: '0.08em' }}>
                 T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V
               </div>
-              <div style={{ backgroundColor: '#b4a7d6', color: '#582a72', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
+              <div style={{ backgroundColor: '#b4a7d6', color: '#8e7cc3', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
                 {totalTKV.toLocaleString()}
               </div>
             </div>

@@ -139,10 +139,10 @@ export function DiceOverlayLoader() {
             }}
           >
             <div style={{ marginBottom: '8px' }}>
-              <span style={{ color: '#582a72' }}>{'[ '}</span>
+              <span style={{ color: '#8e7cc3' }}>{'[ '}</span>
               {!chunkLoaded ? 'Downloading dice engine' : 'Initializing physics'}
               <span className="animate-pulse">...</span>
-              <span style={{ color: '#582a72' }}>{' ]'}</span>
+              <span style={{ color: '#8e7cc3' }}>{' ]'}</span>
             </div>
             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.3em' }}>
               THREE.js + CANNON-es

@@ -511,7 +511,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               <div className="grid grid-cols-3 gap-x-1">
                 {[
                   { label: 'BODY', color: '#E8585A', attrs: ['clout', 'celerity', 'constitution'] },
-                  { label: 'SPIRIT', color: '#582a72', attrs: ['flow', 'focus'] },
+                  { label: 'SPIRIT', color: '#8e7cc3', attrs: ['flow', 'focus'] },
                   { label: 'SOUL', color: '#4080D0', attrs: ['willpower', 'wisdom', 'wit'] },
                 ].map(p => (
                   <div key={p.label} className="flex flex-col">
@@ -594,7 +594,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 const impossible = skillCheckDR > fdMax;
                 const pillars = [
                   { label: 'BODY', color: '#E8585A', attrs: [{ key: 'clout', label: 'CLO' }, { key: 'celerity', label: 'CEL' }, { key: 'constitution', label: 'CON' }] },
-                  { label: 'SPIRIT', color: '#582a72', attrs: [{ key: 'flow', label: 'FLO' }, { key: 'focus', label: 'FOC' }] },
+                  { label: 'SPIRIT', color: '#8e7cc3', attrs: [{ key: 'flow', label: 'FLO' }, { key: 'focus', label: 'FOC' }] },
                   { label: 'SOUL', color: '#4080D0', attrs: [{ key: 'willpower', label: 'WIL' }, { key: 'wisdom', label: 'WIS' }, { key: 'wit', label: 'WIT' }] },
                 ];
                 return (
@@ -708,7 +708,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
               <div className="flex items-center justify-center" style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: '12px', lineHeight: '1', letterSpacing: '0.08em', padding: '3px 8px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
-              <div className="flex items-center justify-center" style={{ backgroundColor: '#b4a7d6', color: '#582a72', fontSize: '17px', lineHeight: '1.1', padding: '2px 8px' }}>{tkv}</div>
+              <div className="flex items-center justify-center" style={{ backgroundColor: '#b4a7d6', color: '#8e7cc3', fontSize: '17px', lineHeight: '1.1', padding: '2px 8px' }}>{tkv}</div>
             </div>
 
 
@@ -970,7 +970,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                       <div key={i} className="border border-white/20 px-2 py-1" style={{
                         backgroundColor: i % 2 === 0 ? '#8e7cc3' : '#b4a7d6', minHeight: '24px'
                       }}>
-                        <div className="text-[10px] leading-relaxed" style={{ color: '#002f6c', fontWeight: '500' }}>{item}</div>
+                        <div className="text-[10px] leading-relaxed" style={{ color: '#6fa8dc', fontWeight: '500' }}>{item}</div>
                       </div>
                     )) : (
                       <div className="text-[10px] text-white/50 italic">No possessions yet</div>
@@ -1032,7 +1032,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                           width: '20px', height: '20px', top: '-1px', left: '-2px',
                           backgroundColor: '#002f6c', color: '#ffffff', fontSize: '10px', fontWeight: 'bold'
                         }}>{i + 1}</div>
-                        <span className="px-2 py-2 pl-8 text-[10px]" style={{ color: '#582a72' }}>{vine.goal || '...'}</span>
+                        <span className="px-2 py-2 pl-8 text-[10px]" style={{ color: '#8e7cc3' }}>{vine.goal || '...'}</span>
                       </div>
                     ))}
                   </div>
@@ -1174,7 +1174,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {/* ── TKV Box (centered under portrait) ── */}
           <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '530px', border: '3px solid #ffcc78', zIndex: 10 }}>
             <div className="w-full flex items-center justify-center" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', height: '28px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
-            <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#582a72', height: '34px' }}>{tkv}</div>
+            <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#8e7cc3', height: '34px' }}>{tkv}</div>
           </div>
 
           {/* ── RIGHT COLUMN: Attributes — HORIZONTAL BAR DESIGN ── */}

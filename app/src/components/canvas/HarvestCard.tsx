@@ -20,7 +20,7 @@ const SEASON_STYLES: Record<string, { color: string; icon: string }> = {
   spring: { color: '#3EB89A', icon: '\u2618' },
   summer: { color: '#D0A030', icon: '\u2600' },
   autumn: { color: '#D07818', icon: '\u2741' },
-  winter: { color: '#582a72', icon: '\u2744' },
+  winter: { color: '#8e7cc3', icon: '\u2744' },
 };
 
 export default function HarvestCard({ harvests, onClose }: HarvestCardProps) {

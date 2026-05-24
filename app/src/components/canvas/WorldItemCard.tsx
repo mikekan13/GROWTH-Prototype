@@ -467,7 +467,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             {node.holderName ? (
               <span>Held by: <span style={{ color: '#ffcc78' }}>{node.holderName}</span></span>
             ) : node.locationName ? (
-              <span>Located at: <span style={{ color: '#582a72' }}>{node.locationName}</span></span>
+              <span>Located at: <span style={{ color: '#8e7cc3' }}>{node.locationName}</span></span>
             ) : (
               <span>Unassigned — world item</span>
             )}

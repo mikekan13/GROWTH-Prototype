@@ -27,7 +27,7 @@ const PILLAR_STYLES = {
   balance: {
     label: 'Balance',
     subtitle: 'Flow + Focus',
-    color: '#582a72',
+    color: '#8e7cc3',
     bg: 'rgba(88, 42, 114, 0.08)',
     borderColor: '#582a72',
     desc: 'Harmony of opposing forces',

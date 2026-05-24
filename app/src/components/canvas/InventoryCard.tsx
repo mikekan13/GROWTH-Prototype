@@ -384,7 +384,7 @@ function InventoryItemRow({
                 {item.type === 'armor' && data.armorCategory && (
                   <span className="px-1 flex-shrink-0" style={{
                     backgroundColor: 'rgba(0, 47, 108,0.12)',
-                    color: '#002f6c',
+                    color: '#6fa8dc',
                     border: '1px solid rgba(0, 47, 108,0.25)',
                     borderRadius: '2px',
                     fontSize: '8px',
@@ -397,7 +397,7 @@ function InventoryItemRow({
                 <span style={{ color: conditionColor }}>{conditionLabel}</span>
                 <span style={{ color: '#888' }}>{formatLbs(weightLbs)} lbs</span>
                 {primaryMaterial && <span style={{ color: '#666' }}>{primaryMaterial}</span>}
-                {data.baseResist != null && <span style={{ color: '#002f6c' }}>R{data.baseResist}</span>}
+                {data.baseResist != null && <span style={{ color: '#6fa8dc' }}>R{data.baseResist}</span>}
                 {item.type === 'weapon' && data.damage && (
                   <span style={{ color: '#E8585A' }}>
                     {formatDamage(data.damage)}
@@ -506,7 +506,7 @@ function InventoryItemRow({
           {/* Armor detail */}
           {item.type === 'armor' && (data.baseResist != null || data.resistance != null || data.armorCategory || data.armorLayer) && (
             <div className="mt-2 p-1.5" style={{ background: 'rgba(0, 47, 108,0.08)', border: '1px solid rgba(0, 47, 108,0.15)', borderRadius: 2 }}>
-              <div style={{ fontSize: '8px', color: '#002f6c', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Armor</div>
+              <div style={{ fontSize: '8px', color: '#6fa8dc', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Armor</div>
               <div className="flex flex-wrap gap-3" style={{ fontSize: '10px' }}>
                 {(data.baseResist ?? data.resistance) != null && (
                   <span style={{ color: '#fff' }}>Resist: <b>{data.baseResist ?? data.resistance}</b></span>

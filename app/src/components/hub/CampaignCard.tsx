@@ -107,7 +107,7 @@ function Portrait({ username, borderColor, labelColor, label, size = 'large', tk
             </div>
             <div
               className="text-center text-[10px] leading-none py-0.5"
-              style={{ background: '#b4a7d6', color: '#582a72', fontFamily: '"Bebas Neue", sans-serif' }}
+              style={{ background: '#b4a7d6', color: '#8e7cc3', fontFamily: '"Bebas Neue", sans-serif' }}
             >
               {formatTkv(tkv)}
             </div>
@@ -251,7 +251,7 @@ export default function CampaignCard({
                   </div>
                   <div
                     className="text-center text-[12px] leading-none py-1 px-2"
-                    style={{ background: '#b4a7d6', color: '#582a72', fontFamily: '"Bebas Neue", sans-serif' }}
+                    style={{ background: '#b4a7d6', color: '#8e7cc3', fontFamily: '"Bebas Neue", sans-serif' }}
                   >
                     {formatTkv(totalPartyTkv)}
                   </div>

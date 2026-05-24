@@ -38,10 +38,13 @@ export interface AppliedResult {
   krmaCreditTransactionId?: string | null;
 }
 
+// Accent colors for each op tab. Spend uses Soul tier-2 (Chesed) instead of
+// tier-1 Chokmah — tier-2 is the text-on-dark-safe variant from the canon
+// palette (memory: growth-color-palette).
 const OP_COLOR: Record<Op, string> = {
-  spend:   '#002f6c',   // blue — upgrade currency
-  deplete: '#ffcc78',   // gold — pool damage
-  burn:    '#E8585A',   // coral — destruction
+  spend:   '#6fa8dc',   // blue (Soul tier-2 Chesed) — upgrade currency
+  deplete: '#ffcc78',   // gold (KRMA) — pool damage
+  burn:    '#E8585A',   // coral (Body accent) — destruction
 };
 
 const OP_LABEL: Record<Op, string> = {

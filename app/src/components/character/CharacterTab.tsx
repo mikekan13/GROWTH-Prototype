@@ -688,8 +688,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             ))}
             {isEditable && referencePhotos.length === 0 && (
               <label className="border border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '100px', height: '125px', backgroundColor: '#111' }}>
-                <div className="text-2xl" style={{ color: '#582a72', opacity: 0.4 }}>+</div>
-                <div className="text-xs mt-1" style={{ color: '#582a72', opacity: 0.4, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                <div className="text-2xl" style={{ color: '#8e7cc3', opacity: 0.4 }}>+</div>
+                <div className="text-xs mt-1" style={{ color: '#8e7cc3', opacity: 0.4, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                   Add Photo
                 </div>
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
@@ -697,7 +697,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             )}
             {isEditable && referencePhotos.length > 0 && (
               <label className="border border-dashed flex items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '50px', height: '125px', backgroundColor: '#111' }}>
-                <div className="text-xl" style={{ color: '#582a72', opacity: 0.4 }}>+</div>
+                <div className="text-xl" style={{ color: '#8e7cc3', opacity: 0.4 }}>+</div>
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
               </label>
             )}
@@ -814,7 +814,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     <button onClick={togglePart} className="w-full flex items-center justify-between py-1.5 px-2 transition-colors"
                       style={{ backgroundColor: isExpanded ? '#1a1a2e' : 'transparent', borderRadius: '2px' }}>
                       <div className="flex items-center gap-2">
-                        <span style={{ color: '#582a72', fontSize: '10px' }}>{isExpanded ? '▾' : '▸'}</span>
+                        <span style={{ color: '#8e7cc3', fontSize: '10px' }}>{isExpanded ? '▾' : '▸'}</span>
                         <span className="text-xs uppercase tracking-wider" style={{
                           color: isVital ? '#E8585A' : '#8e7cc3',
                           fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -1025,8 +1025,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 </div>
                 <div className="relative border overflow-hidden flex items-center justify-center" style={{ borderColor: '#2a2a3e', backgroundColor: '#111', width: '200px', height: '275px' }}>
                   <div className="text-center">
-                    <div className="text-3xl mb-2" style={{ color: '#582a72', opacity: 0.2 }}>&#9649;</div>
-                    <div className="text-xs uppercase tracking-widest" style={{ color: '#582a72', opacity: 0.25, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                    <div className="text-3xl mb-2" style={{ color: '#8e7cc3', opacity: 0.2 }}>&#9649;</div>
+                    <div className="text-xs uppercase tracking-widest" style={{ color: '#8e7cc3', opacity: 0.25, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                       Coming Soon
                     </div>
                   </div>
@@ -1167,7 +1167,7 @@ function PortraitFrame({ label, portrait, loading }: { label: string; portrait: 
             onError={e => { (e.target as HTMLImageElement).src = '/EmptyPortrait.png'; (e.target as HTMLImageElement).className = 'w-full h-full object-contain'; }} />
         ) : loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-sm animate-pulse" style={{ color: '#582a72', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+            <div className="text-sm animate-pulse" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
               Generating...
             </div>
             <div className="mt-2 w-16 h-1 rounded overflow-hidden" style={{ backgroundColor: '#1a1a2e' }}>

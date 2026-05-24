@@ -18,9 +18,9 @@ const BODY_PARTS: { key: BodyPart; label: string; shortLabel: string }[] = [
 
 const LAYER_META: Record<ArmorLayer, { label: string; color: string; desc: string; maxLayers: number; resistMult: string }> = {
   body: { label: 'BODY', color: '#E8585A', desc: 'Natural armor, skin, tattoos', maxLayers: 1, resistMult: 'Varies' },
-  clothing: { label: 'CLOTHING', color: '#582a72', desc: 'Soft materials, up to 3 layers, half base resist', maxLayers: 3, resistMult: '0.5x' },
+  clothing: { label: 'CLOTHING', color: '#8e7cc3', desc: 'Soft materials, up to 3 layers, half base resist', maxLayers: 3, resistMult: '0.5x' },
   lightArmor: { label: 'LIGHT ARMOR', color: '#3EB89A', desc: '1 layer, full base resist, no mobility penalty', maxLayers: 1, resistMult: '1x' },
-  heavyArmor: { label: 'HEAVY ARMOR', color: '#002f6c', desc: '1 layer, 1.5x base resist, -1 Celerity', maxLayers: 1, resistMult: '1.5x' },
+  heavyArmor: { label: 'HEAVY ARMOR', color: '#6fa8dc', desc: '1 layer, 1.5x base resist, -1 Celerity', maxLayers: 1, resistMult: '1.5x' },
 };
 
 const CONDITION_LABELS: Record<number, { label: string; color: string }> = {
@@ -123,7 +123,7 @@ function EquipmentLayerRow({ layer, slots }: { layer: ArmorLayer; slots: Equipme
                   {slot.properties?.map((p, j) => (
                     <span key={j} className="px-1" style={{
                       backgroundColor: 'rgba(88, 42, 114, 0.15)',
-                      color: '#582a72',
+                      color: '#8e7cc3',
                       fontSize: '9px',
                     }}>{p}</span>
                   ))}

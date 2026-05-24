@@ -145,7 +145,7 @@ function ItemRow({ item }: { item: HeldItemData }) {
                   className="px-1.5 py-px text-[9px] uppercase tracking-wider"
                   style={{
                     backgroundColor: 'rgba(0, 47, 108,0.12)',
-                    color: '#002f6c',
+                    color: '#6fa8dc',
                     border: '1px solid rgba(0, 47, 108,0.25)',
                     borderRadius: 2,
                   }}
@@ -165,7 +165,7 @@ function ItemRow({ item }: { item: HeldItemData }) {
                 <span className="text-[var(--surface-dark)]/40">+ {data.subordinateMaterials.join(', ')}</span>
               )}
               {effectiveResist != null && (
-                <span style={{ color: '#002f6c' }}>Resist {effectiveResist}</span>
+                <span style={{ color: '#6fa8dc' }}>Resist {effectiveResist}</span>
               )}
               {data.quality != null && (
                 <span style={{ color: '#7a4faa' }}>Q{data.quality}</span>
@@ -236,7 +236,7 @@ function Tag({ label, tone }: { label: string; tone: 'neutral' | 'weapon' | 'tag
     tone === 'weapon'
       ? { background: 'rgba(232,88,90,0.08)', border: '1px solid rgba(232,88,90,0.2)', color: '#E8585A' }
       : tone === 'tag'
-      ? { background: 'rgba(88,42,114,0.1)', border: '1px solid rgba(88,42,114,0.25)', color: '#582a72' }
+      ? { background: 'rgba(88,42,114,0.1)', border: '1px solid rgba(88,42,114,0.25)', color: '#8e7cc3' }
       : { background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.08)', color: 'inherit' };
   return (
     <span
