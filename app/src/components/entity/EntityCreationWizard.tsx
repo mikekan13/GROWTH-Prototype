@@ -571,10 +571,10 @@ function RootStep({
       </div>
 
       {draft.root ? (
-        <div className="border p-4 space-y-3" style={{ borderColor: '#002f6c', background: 'rgba(0, 47, 108,0.08)' }}>
+        <div className="border p-4 space-y-3" style={{ borderColor: '#22ab94', background: 'rgba(34, 171, 148, 0.08)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#6fa8dc' }}>
+              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#22ab94' }}>
                 {draft.root.name}
               </div>
               <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/40 mt-1">
@@ -593,8 +593,8 @@ function RootStep({
             <div className="flex flex-wrap gap-1">
               {Object.entries(attrs).filter(([, v]) => v > 0).map(([attr, val]) => (
                 <span key={attr} className="text-[11px] px-1.5 py-0.5 uppercase" style={{
-                  backgroundColor: 'rgba(0, 47, 108,0.15)',
-                  color: '#6fa8dc',
+                  backgroundColor: 'rgba(34, 171, 148, 0.15)',
+                  color: '#22ab94',
                   borderRadius: '2px',
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 }}>{attr.slice(0, 3)} {val}</span>
@@ -656,7 +656,7 @@ function RootStep({
               <button
                 key={item.id}
                 onClick={() => selectRoot(item)}
-                className="w-full text-left p-3 border transition-colors hover:border-[#002f6c]"
+                className="w-full text-left p-3 border transition-colors hover:border-[#22ab94]"
                 style={{
                   borderColor: 'rgba(255,255,255,0.08)',
                   backgroundColor: '#1a1a2e',
@@ -664,7 +664,7 @@ function RootStep({
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#6fa8dc' }}>
+                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#22ab94' }}>
                     {item.name}
                   </span>
                   {freq != null && (
@@ -754,9 +754,9 @@ function BranchesPanel({
                 onClick={() => toggle(b)}
                 className="px-2.5 py-1 text-[11px] uppercase tracking-[0.08em] font-[family-name:var(--font-terminal)] border transition-colors"
                 style={{
-                  borderColor: sel ? '#002f6c' : 'rgba(255,255,255,0.12)',
-                  background: sel ? 'rgba(0, 47, 108,0.18)' : 'rgba(0,0,0,0.3)',
-                  color: sel ? '#002f6c' : 'rgba(255,255,255,0.5)',
+                  borderColor: sel ? '#22ab94' : 'rgba(255,255,255,0.12)',
+                  background: sel ? 'rgba(34, 171, 148, 0.18)' : 'rgba(0,0,0,0.3)',
+                  color: sel ? '#22ab94' : 'rgba(255,255,255,0.5)',
                 }}
               >
                 {b.name}
@@ -1318,9 +1318,9 @@ function ReviewStep({
         </div>
         {draft.root && (
           <div className="text-[11px] font-[family-name:var(--font-terminal)] text-white/50">
-            Root: <span className="text-[#6fa8dc]">{draft.root.name}</span>
+            Root: <span className="text-[#22ab94]">{draft.root.name}</span>
             {draft.branches.length > 0 && (
-              <> · Branches: <span className="text-[#6fa8dc]">{draft.branches.map(b => b.name).join(', ')}</span></>
+              <> · Branches: <span className="text-[#22ab94]">{draft.branches.map(b => b.name).join(', ')}</span></>
             )}
           </div>
         )}
@@ -1359,7 +1359,7 @@ function ReviewStep({
               <td className="px-3 py-1.5 text-right text-[11px] text-white/30">
                 {draft.targetKV} Ҝ
                 {totalKV > draft.targetKV * 1.25 && <span className="ml-2 text-[#E8585A]">over</span>}
-                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[#6fa8dc]">under</span>}
+                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[#22ab94]">under</span>}
               </td>
             </tr>
           </tbody>
