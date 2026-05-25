@@ -45,3 +45,19 @@ export async function isPrimeCampaignId(campaignId: string | null | undefined): 
   const c = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { name: true } });
   return isPrimeCampaign(c);
 }
+
+/**
+ * Prime Campaign's wallet IS the Terminal reserve (the big 75B KRMA pool).
+ * Per Mike 2026-05-25: "The prime campaign KRMA wallet is the terminal.
+ * It is the big reserve." Same wallet, unified concept — the cosmic
+ * control surface holds the cosmic pool.
+ *
+ * Implementation: the wallet stays `walletType: 'RESERVE'` + `label: 'Terminal'`
+ * so the subscription service's `getReserveWallet('Terminal')` and other
+ * legacy callers keep working unchanged. The migration also stamps the
+ * Terminal reserve with `campaignId = prime.id` so queries by campaign
+ * find it too.
+ */
+export async function getPrimeWallet() {
+  return prisma.wallet.findFirst({ where: { walletType: 'RESERVE', label: 'Terminal' } });
+}

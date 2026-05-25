@@ -211,3 +211,13 @@ export async function updateGodheadAdmin(
     data: validated,
   });
 }
+
+// Note (2026-05-25, per Mike): no separate godhead creation form. Godheads
+// use the same EntityCreationWizard as every other character. The GodHead
+// metadata row (system prompt, temperature, default model) is auto-created
+// on crystallization when entityType=GODHEAD, and editable via a Persona
+// sub-panel on the character sheet — admin-only, GODHEAD-only.
+//
+// The earlier `createGodheadAdmin` function was removed because it
+// duplicated the wizard path. If you need to seed godheads outside the
+// wizard (migrations, tests), use scripts/seed-godheads*.ts directly.

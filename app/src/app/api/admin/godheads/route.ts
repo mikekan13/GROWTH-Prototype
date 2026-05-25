@@ -5,6 +5,8 @@ import { listGodheadsAdmin } from '@/services/godhead-admin';
 
 export const dynamic = 'force-dynamic';
 
+// GET-only. Godheads are created via the regular EntityCreationWizard
+// in the Prime Campaign — there is no separate "create godhead" form.
 export async function GET() {
   try {
     const session = await requireAuth();
