@@ -5,6 +5,7 @@ import DashboardShell from '@/components/DashboardShell';
 import GlitchText from '@/components/GlitchText';
 import Link from 'next/link';
 import { getGlobalMetrics } from '@/services/krma/wallet';
+import { getPrimeCampaign, PRIME_CAMPAIGN_DISPLAY } from '@/lib/prime-campaign';
 
 function formatKrma(n: bigint): string {
   return Number(n).toLocaleString();
@@ -17,8 +18,9 @@ export default async function TerminalDashboard() {
     redirect('/trailblazer');
   }
 
-  const [campaigns, krmaMetrics] = await Promise.all([
+  const [campaigns, krmaMetrics, primeCampaign] = await Promise.all([
     prisma.campaign.findMany({
+      where: { name: { not: '__PRIME__' } },  // Hide Prime from the regular campaign list
       include: {
         gmUser: { select: { username: true } },
         _count: { select: { characters: true, members: true } },
@@ -26,7 +28,13 @@ export default async function TerminalDashboard() {
       orderBy: { createdAt: 'desc' },
     }),
     getGlobalMetrics().catch(() => null),
+    getPrimeCampaign(),
   ]);
+  const primeGodheadCount = primeCampaign
+    ? await prisma.character.count({
+        where: { campaignId: primeCampaign.id, entityType: 'GODHEAD' },
+      })
+    : 0;
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
@@ -52,6 +60,36 @@ export default async function TerminalDashboard() {
             FRAGMENT{'{'}{'}'}  TERMINAL_INTERFACE::SYSTEM_OVERVIEW]
           </p>
         </div>
+
+        {/* Prime Campaign entry — the cosmic control surface */}
+        {primeCampaign && (
+          <Link
+            href={`/campaign/${primeCampaign.id}`}
+            className="block border-2 transition-all hover:brightness-110"
+            style={{
+              borderColor: '#ffcc78',
+              background: 'linear-gradient(90deg, rgba(34,171,148,0.12) 0%, rgba(0,0,0,0.7) 60%, rgba(88,42,114,0.18) 100%)',
+              boxShadow: '0 0 32px rgba(255,204,120,0.15)',
+            }}
+          >
+            <div className="flex items-center justify-between px-5 py-4">
+              <div>
+                <div className="text-[11px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[#ffcc78]">
+                  ENTER  ·  {PRIME_CAMPAIGN_DISPLAY}
+                </div>
+                <div className="text-[20px] font-[family-name:var(--font-header)] tracking-[0.1em] text-white mt-1">
+                  The game is being played at every layer.
+                </div>
+                <div className="text-[11px] font-[family-name:var(--font-terminal)] text-white/55 mt-1.5 leading-relaxed">
+                  Cosmic control surface. {primeGodheadCount} god-head{primeGodheadCount === 1 ? '' : 's'} in the council. Campaign-cards forthcoming. ADMIN-only.
+                </div>
+              </div>
+              <div className="text-[#22ab94] text-[28px] font-[family-name:var(--font-bebas-neue)] tracking-wider">
+                ›
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* Main grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

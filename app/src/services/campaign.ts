@@ -92,6 +92,10 @@ export async function getCampaignDetail(campaignId: string, userId: string, user
   });
 
   if (!campaign) throw new NotFoundError('Campaign not found');
+  // Prime Campaign access guard — admin-only, regardless of gmUserId.
+  // (Lazy import to avoid pulling lib/prime-campaign into the cold path.)
+  const { assertPrimeCampaignAccess } = await import('@/lib/prime-campaign');
+  assertPrimeCampaignAccess(campaign, userRole);
   if (campaign.gmUserId !== userId && !isAdminRole(userRole)) {
     throw new ForbiddenError();
   }

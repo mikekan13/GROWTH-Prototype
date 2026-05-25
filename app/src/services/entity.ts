@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isAdminRole, canManageCampaign } from '@/lib/permissions';
 import { createDefaultCharacter } from '@/lib/defaults';
+import { isPrimeCampaign } from '@/lib/prime-campaign';
 import type { GrowthCharacter, SkillGovernor } from '@/types/growth';
 import { assignMechanics } from './character';
 import { createGoal } from './goal';
@@ -46,10 +47,18 @@ export async function listCampaignEntities(
     throw new ForbiddenError('Not a member of this campaign');
   }
 
+  // Prime Campaign override: godheads ARE the party here, so don't filter them out.
+  // For every other campaign, godheads remain hidden (they belong to Prime).
+  const campaignRow = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { name: true },
+  });
+  const includeGodheads = isPrimeCampaign(campaignRow);
+
   const characters = await prisma.character.findMany({
     where: {
       campaignId,
-      entityType: { not: 'GODHEAD' },
+      ...(includeGodheads ? {} : { entityType: { not: 'GODHEAD' } }),
     },
     select: {
       id: true,
