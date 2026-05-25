@@ -116,7 +116,7 @@ export async function createDraftEntity(
 ): Promise<{ id: string }> {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    select: { id: true, gmUserId: true },
+    select: { id: true, name: true, gmUserId: true },
   });
 
   if (!campaign) throw new NotFoundError('Campaign not found');
@@ -124,11 +124,18 @@ export async function createDraftEntity(
     throw new ForbiddenError('Only the GM can create entities');
   }
 
+  // In Prime, every new entity is a GODHEAD. Everywhere else, NPC default.
+  // (Mike's design: same wizard for everyone — Prime context decides the type.)
+  const entityType = isPrimeCampaign(campaign) ? 'GODHEAD' : 'NPC';
+
   const defaultData = createDefaultCharacter('New Entity');
+  if (entityType === 'GODHEAD') {
+    defaultData.fatedAge = 0; // eternal
+  }
   const character = await prisma.character.create({
     data: {
       name: 'New Entity',
-      entityType: 'NPC',
+      entityType,
       status: 'DRAFT',
       userId,
       campaignId,
@@ -245,7 +252,7 @@ export async function crystallizeEntity(
 
   const character = await prisma.character.findUnique({
     where: { id: entityId },
-    select: { id: true, status: true, data: true, campaignId: true, campaign: { select: { gmUserId: true } } },
+    select: { id: true, name: true, status: true, data: true, campaignId: true, entityType: true, campaign: { select: { gmUserId: true } } },
   });
   if (!character) throw new NotFoundError('Entity not found');
   if (!character.campaign) throw new NotFoundError('Entity has no campaign');
@@ -356,6 +363,37 @@ export async function crystallizeEntity(
         priority: g.priority,
       });
     } catch { /* swallow — character is already crystallized */ }
+  }
+
+  // Step 8: Godhead provisioning — when entityType=GODHEAD (which happens
+  // automatically in Prime Campaign), spin up the GodHead row + KRMA wallet
+  // so the AI agent has identity to run on. Persona placeholders here;
+  // admin edits them via the Persona sub-panel on the character sheet.
+  // Idempotent: skipped if a GodHead row already exists for this character.
+  if (character.entityType === 'GODHEAD') {
+    const existing = await prisma.godHead.findFirst({ where: { characterId: entityId } });
+    if (!existing) {
+      const wallet = await prisma.wallet.create({
+        data: {
+          walletType: 'GODHEAD',
+          ownerType: 'GODHEAD',
+          label: `${character.name} Wallet`,
+          balance: BigInt(0),
+        },
+      });
+      await prisma.godHead.create({
+        data: {
+          name: character.name,
+          domain: 'Placeholder domain — edit via the Persona panel on the character sheet.',
+          pillar: 'BALANCE',
+          characterId: entityId,
+          systemPrompt: `You are ${character.name}, a God-head of GRO.WTH.\n\n[Persona placeholder — the admin will replace this via the Persona panel on your character sheet. Until then, behave as a thoughtful, restrained agent who defers to the GM.]`,
+          temperature: 0.6,
+          defaultModel: 'claude-sonnet-4-6',
+          walletId: wallet.id,
+        },
+      });
+    }
   }
 
   return { id: entityId, status: 'APPROVED' };

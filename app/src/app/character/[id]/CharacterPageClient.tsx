@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import CharacterTab from '@/components/character/CharacterTab';
 import CharacterSheet from '@/components/character/CharacterSheet';
 import DeathSplitModal from '@/components/character/DeathSplitModal';
+import GodheadPersonaPanel from '@/components/character/GodheadPersonaPanel';
 import type { GrowthCharacter } from '@/types/growth';
 
 interface CharacterPageClientProps {
@@ -35,6 +36,8 @@ export default function CharacterPageClient({
     && characterData.status !== 'DEAD'
     && characterData.status !== 'DRAFT'
     && characterData.entityType !== 'GODHEAD';
+  // Godhead persona editor: admin-only, GODHEAD entityType only.
+  const showGodheadPersona = userRole === 'ADMIN' && characterData.entityType === 'GODHEAD';
 
   const parsed = useMemo<GrowthCharacter | null>(() => {
     if (!renderAsSheet) return null;
@@ -50,11 +53,16 @@ export default function CharacterPageClient({
       );
     }
     return (
-      <CharacterSheet
-        character={parsed}
-        characterId={canEdit ? characterData.id : undefined}
-        onRefresh={() => router.refresh()}
-      />
+      <>
+        <CharacterSheet
+          character={parsed}
+          characterId={canEdit ? characterData.id : undefined}
+          onRefresh={() => router.refresh()}
+        />
+        {showGodheadPersona && (
+          <GodheadPersonaPanel godheadName={characterData.name} />
+        )}
+      </>
     );
   }
 
@@ -84,6 +92,9 @@ export default function CharacterPageClient({
         userCharacter={characterData}
         canEdit={canEdit}
       />
+      {showGodheadPersona && (
+        <GodheadPersonaPanel godheadName={characterData.name} />
+      )}
       {deathModalOpen && (
         <DeathSplitModal
           characterId={characterData.id}
