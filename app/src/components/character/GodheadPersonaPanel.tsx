@@ -1,14 +1,21 @@
 'use client';
 
 /**
- * GodheadPersonaPanel — admin-only inline editor for the AI persona that
- * runs a Godhead character. Renders on the character page below the regular
- * CharacterSheet/CharacterTab when viewer is ADMIN and entityType=GODHEAD.
+ * GodheadPersonaPanel — inline editor for the AI persona attached to any
+ * character (godhead, NPC, or otherwise) that has a GodHead row. Renders on
+ * the character page below the regular CharacterSheet/CharacterTab whenever
+ * the character has an AI persona AND the viewer has edit rights (campaign
+ * GM, character owner, or admin).
  *
- * Reads + writes via the godhead-admin API (/api/admin/godheads/[name]).
- * Surfaces: system prompt, temperature, default model, domain, pillar.
+ * Originally godhead-only; now the universal AI-persona surface. The
+ * "Godhead" name is retained for now (rename is a follow-up) — the backing
+ * model is still the GodHead table, but it represents "this character has an
+ * AI agent driving it" regardless of entityType.
+ *
+ * Reads + writes via /api/admin/godheads/[name] (path also retained for
+ * now). Surfaces: system prompt, temperature, default model, domain, pillar.
  * Also shows live metrics (invocation count, last invocation, token totals)
- * so Mike can see the agent's activity at a glance from the character page.
+ * so the GM/admin can see the agent's activity at a glance.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -145,7 +152,7 @@ export default function GodheadPersonaPanel({ godheadName }: Props) {
       >
         <div>
           <div className="text-[11px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[#22ab94]">
-            ◈ Godhead Persona · ADMIN
+            ◈ AI Persona
           </div>
           <div className="text-[14px] font-[family-name:var(--font-header)] tracking-[0.1em] text-white mt-0.5">
             {data.name}

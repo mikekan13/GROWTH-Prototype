@@ -12,7 +12,7 @@ export async function GET(
   try {
     const session = await requireAuth();
     const { name } = await params;
-    const detail = await getGodheadAdmin(session.user.role, decodeURIComponent(name));
+    const detail = await getGodheadAdmin(session.user.id, session.user.role, decodeURIComponent(name));
     return NextResponse.json(detail);
   } catch (error) {
     return errorResponse(error);
@@ -27,7 +27,7 @@ export async function PATCH(
     const session = await requireAuth();
     const { name } = await params;
     const body = await request.json();
-    const result = await updateGodheadAdmin(session.user.role, decodeURIComponent(name), body);
+    const result = await updateGodheadAdmin(session.user.id, session.user.role, decodeURIComponent(name), body);
     return NextResponse.json({ ok: true, godhead: { name: result.name, updatedAt: result.updatedAt } });
   } catch (error) {
     return errorResponse(error);

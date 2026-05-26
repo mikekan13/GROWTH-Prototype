@@ -8,6 +8,7 @@ import { isPrimeCampaign } from '@/lib/prime-campaign';
 import type { GrowthCharacter, SkillGovernor } from '@/types/growth';
 import { assignMechanics } from './character';
 import { createGoal } from './goal';
+import { createPlaceholderGodHead } from './godhead-admin';
 
 /**
  * Entity service — campaign entity listing and management.
@@ -368,32 +369,13 @@ export async function crystallizeEntity(
   // Step 8: Godhead provisioning — when entityType=GODHEAD (which happens
   // automatically in Prime Campaign), spin up the GodHead row + KRMA wallet
   // so the AI agent has identity to run on. Persona placeholders here;
-  // admin edits them via the Persona sub-panel on the character sheet.
+  // admin edits them via the AI Persona sub-panel on the character sheet.
   // Idempotent: skipped if a GodHead row already exists for this character.
   if (character.entityType === 'GODHEAD') {
-    const existing = await prisma.godHead.findFirst({ where: { characterId: entityId } });
-    if (!existing) {
-      const wallet = await prisma.wallet.create({
-        data: {
-          walletType: 'GODHEAD',
-          ownerType: 'GODHEAD',
-          label: `${character.name} Wallet`,
-          balance: BigInt(0),
-        },
-      });
-      await prisma.godHead.create({
-        data: {
-          name: character.name,
-          domain: 'Placeholder domain — edit via the Persona panel on the character sheet.',
-          pillar: 'BALANCE',
-          characterId: entityId,
-          systemPrompt: `You are ${character.name}, a God-head of GRO.WTH.\n\n[Persona placeholder — the admin will replace this via the Persona panel on your character sheet. Until then, behave as a thoughtful, restrained agent who defers to the GM.]`,
-          temperature: 0.6,
-          defaultModel: 'claude-sonnet-4-6',
-          walletId: wallet.id,
-        },
-      });
-    }
+    await createPlaceholderGodHead({
+      characterId: entityId,
+      characterName: character.name,
+    });
   }
 
   return { id: entityId, status: 'APPROVED' };

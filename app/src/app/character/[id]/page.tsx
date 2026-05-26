@@ -14,7 +14,10 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
 
   const character = await prisma.character.findUnique({
     where: { id },
-    include: { campaign: { select: { id: true, name: true, gmUserId: true } } },
+    include: {
+      campaign: { select: { id: true, name: true, gmUserId: true } },
+      godHead: { select: { id: true } },
+    },
   });
 
   if (!character) {
@@ -30,6 +33,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
     (character.campaign?.gmUserId === session.user.id);
   const isOwner = character.userId === session.user.id;
   const canEdit = isGM || isOwner;
+  const hasAIPersona = character.godHead !== null;
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
@@ -54,6 +58,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
           status: character.status,
         }}
         canEdit={canEdit}
+        hasAIPersona={hasAIPersona}
       />
     </DashboardShell>
   );
