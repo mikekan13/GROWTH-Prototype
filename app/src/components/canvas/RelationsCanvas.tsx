@@ -36,6 +36,10 @@ interface CanvasNode {
   color?: string;
   portrait?: string | null;
   characterData?: Record<string, unknown> | null;
+  /** Character has a GodHead row (AI persona exists). */
+  hasAIPersona?: boolean;
+  /** AI is currently choosing this character's actions. */
+  aiActionMode?: boolean;
   // Location/item-specific data
   locationType?: string;
   locationData?: GrowthLocation | null;
@@ -1455,6 +1459,8 @@ export default function RelationsCanvas({
       status: node.status,
       portrait: node.portrait,
       characterData: node.characterData as CharacterNodeData['characterData'],
+      hasAIPersona: node.hasAIPersona,
+      aiActionMode: node.aiActionMode,
     };
 
     // Build held items for this character from item nodes with holderId matching this character

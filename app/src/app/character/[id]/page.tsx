@@ -16,7 +16,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
     where: { id },
     include: {
       campaign: { select: { id: true, name: true, gmUserId: true } },
-      godHead: { select: { id: true } },
+      godHead: { select: { id: true, aiActionMode: true } },
     },
   });
 
@@ -33,7 +33,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
     (character.campaign?.gmUserId === session.user.id);
   const isOwner = character.userId === session.user.id;
   const canEdit = isGM || isOwner;
-  const hasAIPersona = character.godHead !== null;
+  const aiActionMode = character.godHead?.aiActionMode ?? false;
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
@@ -58,7 +58,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
           status: character.status,
         }}
         canEdit={canEdit}
-        hasAIPersona={hasAIPersona}
+        aiActionMode={aiActionMode}
       />
     </DashboardShell>
   );

@@ -36,6 +36,10 @@ interface CanvasNode {
   color?: string;
   portrait?: string | null;
   characterData?: Record<string, unknown> | null;
+  /** Character has a GodHead row (AI persona exists). */
+  hasAIPersona?: boolean;
+  /** AI is currently choosing this character's actions. */
+  aiActionMode?: boolean;
   locationType?: string;
   locationData?: GrowthLocation | null;
   itemType?: string;

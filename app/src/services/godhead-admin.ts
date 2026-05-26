@@ -250,16 +250,22 @@ export async function updateGodheadAdmin(
 // use scripts/seed-godheads*.ts directly.
 
 /**
- * GM/owner-driven "Enable AI" action: promote a crystallized character
- * (NPC, etc.) into an AI-played one by minting a placeholder GodHead row.
+ * GM/owner-driven AI-action-mode toggle. Sets aiActionMode on the
+ * character's GodHead row. If enabling and no GodHead row exists yet,
+ * mints a placeholder persona first (so the user only takes one action).
+ * Disabling leaves the GodHead row + its memory intact — toggling AI off
+ * is purely a flag flip, not a destructive operation.
  *
  * Gating: viewer must have edit rights for the character (admin, campaign
- * GM, or character owner). Errors if the character already has a persona.
+ * GM, or character owner).
+ *
+ * Returns the resulting GodHead row, so callers can refresh the UI off it.
  */
-export async function enableAIForCharacter(
+export async function setAIActionMode(
   characterId: string,
   userId: string,
   userRole: string,
+  aiActionMode: boolean,
 ) {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
@@ -268,20 +274,32 @@ export async function enableAIForCharacter(
       name: true,
       userId: true,
       campaign: { select: { gmUserId: true } },
-      godHead: { select: { id: true } },
+      godHead: { select: { id: true, name: true } },
     },
   });
   if (!character) throw new NotFoundError('Character not found');
   if (!canEditCharacter(userId, userRole, character)) {
     throw new ForbiddenError('You do not have edit rights for this character');
   }
-  if (character.godHead) {
-    throw new ForbiddenError('This character already has an AI persona attached');
+
+  if (!character.godHead) {
+    if (!aiActionMode) {
+      throw new NotFoundError('No AI persona to disable — character has no GodHead row');
+    }
+    // Enabling for the first time: mint persona + flip flag on.
+    const created = await createPlaceholderGodHead({
+      characterId: character.id,
+      characterName: character.name,
+    });
+    return prisma.godHead.update({
+      where: { id: created.id },
+      data: { aiActionMode: true },
+    });
   }
 
-  return createPlaceholderGodHead({
-    characterId: character.id,
-    characterName: character.name,
+  return prisma.godHead.update({
+    where: { id: character.godHead.id },
+    data: { aiActionMode },
   });
 }
 

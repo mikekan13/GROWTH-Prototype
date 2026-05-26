@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { CtxMenuPanel, CtxMenuStreamLabel } from '@/components/ui/ContextMenu';
@@ -20,6 +21,11 @@ export interface CharacterNodeData {
   y: number;
   status?: string;
   portrait?: string | null;
+  /** True if the character has a GodHead row attached (persona + memory exists). */
+  hasAIPersona?: boolean;
+  /** True if AI is currently choosing actions for this character. Toggled from
+   *  the canvas card by GM/owner. Memory keeps capturing regardless. */
+  aiActionMode?: boolean;
   characterData?: {
     identity?: { name?: string };
     tkv?: number | string;
@@ -294,9 +300,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   onContestedDefenderSelect,
   isGM,
 }) => {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [isBarDragging, setIsBarDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [aiToggleSaving, setAiToggleSaving] = useState(false);
   const [showSkillCheckMenu, setShowSkillCheckMenu] = useState(false);
   const [showContestedMenu, setShowContestedMenu] = useState(false);
   const [showDefenderMenu, setShowDefenderMenu] = useState(false);
@@ -346,6 +354,31 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const handleBarDragState = useCallback((dragging: boolean) => {
     setIsBarDragging(dragging);
   }, []);
+
+  // Flip AI action mode on/off for this character. Mints a placeholder
+  // GodHead row on first enable. Refreshes the canvas server data on success
+  // so node.aiActionMode reflects the new state.
+  const handleAIToggle = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (aiToggleSaving) return;
+    setAiToggleSaving(true);
+    try {
+      const next = !(node.aiActionMode ?? false);
+      const res = await fetch(`/api/characters/${node.id}/ai-action-mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiActionMode: next }),
+      });
+      if (!res.ok) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to toggle AI action mode', await res.text());
+        return;
+      }
+      router.refresh();
+    } finally {
+      setAiToggleSaving(false);
+    }
+  }, [node.id, node.aiActionMode, aiToggleSaving, router]);
 
   if (!node?.id || !node?.name) return null;
 
@@ -653,6 +686,46 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     document.body
   );
 
+  // ── AI / GM control pill ─────────────────────────────────────────────────
+  // Tiny canvas-card affordance for flipping who controls this character's
+  // actions: AI agent vs human (GM or player). Visible only to GMs.
+  // Three visual states:
+  //   - No persona yet     → "+AI"      (gold border, teal text). Click mints
+  //                                       persona and flips to ON in one step.
+  //   - aiActionMode=true  → "AI"       (solid teal). Click flips OFF.
+  //   - aiActionMode=false → "GM"       (outlined teal). Click flips ON.
+  // Memory keeps capturing regardless; this only controls the action layer.
+  const aiActionOn = node.aiActionMode === true;
+  const aiPersonaExists = node.hasAIPersona === true;
+  const aiTogglePill = isGM ? (
+    <button
+      onClick={handleAIToggle}
+      onMouseDown={(e) => e.stopPropagation()}
+      disabled={aiToggleSaving}
+      title={
+        !aiPersonaExists
+          ? 'Enable AI: mint persona + start AI-driven actions'
+          : aiActionOn
+            ? 'AI is choosing actions. Click to hand control back to the GM.'
+            : 'GM is scripting actions. Click to let the AI choose.'
+      }
+      className="font-bold uppercase tracking-[0.15em] transition-all disabled:opacity-50"
+      style={{
+        fontFamily: 'var(--font-terminal), Consolas, monospace',
+        fontSize: '9px',
+        padding: '2px 6px',
+        borderRadius: '2px',
+        border: aiActionOn ? '1px solid #22ab94' : '1px solid #22ab9477',
+        background: aiActionOn ? '#22ab94' : 'transparent',
+        color: aiActionOn ? '#000' : '#22ab94',
+        cursor: aiToggleSaving ? 'wait' : 'pointer',
+        lineHeight: 1,
+      }}
+    >
+      {!aiPersonaExists ? '+AI' : aiActionOn ? 'AI' : 'GM'}
+    </button>
+  ) : null;
+
   // ── Compact View (500x220) ────────────────────────────────────────────────
 
   if (!isExpanded) {
@@ -694,10 +767,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {/* Main Content */}
           <div className="flex-1 flex flex-col" style={{ height: '220px' }}>
             {/* Name */}
-            <div className="flex items-center mb-1" style={{ height: '24px' }}>
+            <div className="flex items-center gap-2 mb-1" style={{ height: '24px' }}>
               <div className="font-bold truncate" style={{ fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '14px', color: '#ffcc78' }}>
                 {node.name}
               </div>
+              {aiTogglePill}
             </div>
             {/* TKV — top-right corner */}
             <div className="absolute flex flex-col overflow-hidden" style={{
@@ -852,7 +926,9 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         {/* ── Top Header Bar ── */}
         <div className="relative pr-1 flex items-stretch gap-0.5" style={{ height: '29px' }}>
           <div className="absolute bottom-0 left-0 border-b border-purple-500/40" style={{ width: 'calc(100% - 444px)' }} />
-          <div style={{ width: '128px' }} />
+          <div className="flex items-center justify-center" style={{ width: '128px' }}>
+            {aiTogglePill}
+          </div>
 
           {/* Character Name */}
           <div className="px-3 flex justify-center overflow-visible relative" style={{
@@ -1337,6 +1413,8 @@ export default React.memo(CharacterCard, (prev, next) => (
   prev.node.x === next.node.x &&
   prev.node.y === next.node.y &&
   prev.node.characterData === next.node.characterData &&
+  prev.node.aiActionMode === next.node.aiActionMode &&
+  prev.node.hasAIPersona === next.node.hasAIPersona &&
   prev.isExpanded === next.isExpanded &&
   prev.showInventory === next.showInventory &&
   prev.isDropTarget === next.isDropTarget &&

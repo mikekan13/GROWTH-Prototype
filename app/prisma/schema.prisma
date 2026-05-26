@@ -598,7 +598,13 @@ model GodHead {
   character     Character @relation(fields: [characterId], references: [id])
   characterId   String    @unique // Links to Character record (universal sheet)
 
-  // AI behavior — god-heads never sleep, no active flag
+  // AI behavior. aiActionMode = false means the GodHead row exists (persona +
+  // memory + identity) but a human (GM or player) is picking the character's
+  // actions. true means the AI picks actions. Memory is captured either way.
+  // Defaults to false so newly-minted personas don't immediately start acting
+  // until the GM flips the toggle on the canvas character card. Legacy
+  // godheads (Val, Thomas, etc.) are backfilled to true by the migration.
+  aiActionMode  Boolean   @default(false)
   systemPrompt  String    // Core personality + domain authority instructions
   temperature   Float     @default(0.7)
   defaultModel  String?   // Anthropic model id this god-head prefers (claude-sonnet-4-6, claude-haiku-4-5-20251001, claude-opus-4-7). NULL = runtime default.

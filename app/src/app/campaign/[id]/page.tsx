@@ -21,6 +21,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
           data: true,
           portrait: true,
           userId: true,
+          godHead: { select: { aiActionMode: true } },
         },
       },
       members: true,
@@ -95,6 +96,8 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       status: char.status,
       portrait: char.portrait,
       characterData: charData,
+      hasAIPersona: char.godHead !== null,
+      aiActionMode: char.godHead?.aiActionMode ?? false,
     };
   });
 
