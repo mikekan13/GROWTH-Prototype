@@ -1030,7 +1030,9 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       >
         {/* ── Top Header Bar ── */}
         <div className="relative pr-1 flex items-stretch gap-0.5" style={{ height: '29px' }}>
-          <div className="absolute bottom-0 left-0 border-b border-purple-500/40" style={{ width: 'calc(100% - 444px)' }} />
+          {/* Purple baseline — now runs the full width of the header so the
+              area right of the Fate Die can serve as a menu-options bar. */}
+          <div className="absolute bottom-0 left-0 border-b border-purple-500/40" style={{ width: '100%' }} />
           <div style={{ width: '128px' }} />
 
           {/* Character Name */}
@@ -1070,10 +1072,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             <div style={{ height: '15px', backgroundColor: '#582a72' }} />
           </div>
 
-          {/* Controller pill — sits to the right of the Fate Die, lifted to
-              align with the Name tile + Fate Die above-the-bar plane. */}
+          {/* Controller pill — first item in the menu-options bar that
+              extends across the area right of the Fate Die. Lifted above the
+              purple baseline so the line passes underneath. */}
           {aiTogglePill && (
-            <div className="flex items-center" style={{ marginTop: '-10px' }}>
+            <div className="flex items-center" style={{ marginTop: '-16px' }}>
               {aiTogglePill}
             </div>
           )}
