@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { CtxMenuPanel, CtxMenuStreamLabel } from '@/components/ui/ContextMenu';
+
+/** Inline copy of the campaign roster option — kept inline to avoid a
+ *  cross-file import cycle through CampaignCanvas/RelationsCanvas. */
+export interface TrailblazerOption {
+  userId: string;
+  username: string;
+}
 import type { HeldItemData } from '@/types/item';
 import { updateAttribute, type AttributeName } from '@/lib/character-actions';
 import { parseDie } from '@/lib/dice-utils';
@@ -24,8 +31,11 @@ export interface CharacterNodeData {
   /** True if the character has a GodHead row attached (persona + memory exists). */
   hasAIPersona?: boolean;
   /** True if AI is currently choosing actions for this character. Toggled from
-   *  the canvas card by GM/owner. Memory keeps capturing regardless. */
+   *  the canvas card by the GM. Memory keeps capturing regardless. */
   aiActionMode?: boolean;
+  /** Character.userId — the human currently assigned to control this character
+   *  (when aiActionMode is false). Either the GM or a campaign trailblazer. */
+  controllerUserId?: string;
   characterData?: {
     identity?: { name?: string };
     tkv?: number | string;
@@ -78,6 +88,8 @@ interface CharacterCardProps {
   onContestedDefenderSelect?: (characterId: string, characterName: string, skillName: string, governors: string[]) => void;
   /** Whether the current viewer is a GM */
   isGM?: boolean;
+  /** Campaign roster for the controller dropdown. GM-only feature. */
+  trailblazers?: TrailblazerOption[];
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -299,12 +311,16 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   contestedAttackerId,
   onContestedDefenderSelect,
   isGM,
+  trailblazers,
 }) => {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [isBarDragging, setIsBarDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const [aiToggleSaving, setAiToggleSaving] = useState(false);
+  const [controllerSaving, setControllerSaving] = useState(false);
+  const [controllerMenuOpen, setControllerMenuOpen] = useState(false);
+  const [controllerMenuPos, setControllerMenuPos] = useState({ x: 0, y: 0 });
+  const controllerMenuRef = useRef<HTMLDivElement | null>(null);
   const [showSkillCheckMenu, setShowSkillCheckMenu] = useState(false);
   const [showContestedMenu, setShowContestedMenu] = useState(false);
   const [showDefenderMenu, setShowDefenderMenu] = useState(false);
@@ -355,30 +371,50 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     setIsBarDragging(dragging);
   }, []);
 
-  // Flip AI action mode on/off for this character. Mints a placeholder
-  // GodHead row on first enable. Refreshes the canvas server data on success
-  // so node.aiActionMode reflects the new state.
-  const handleAIToggle = useCallback(async (e: React.MouseEvent) => {
+  // Open the terminal-styled controller menu anchored near the pill click.
+  const handleControllerClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (aiToggleSaving) return;
-    setAiToggleSaving(true);
+    if (controllerSaving) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setControllerMenuPos({ x: rect.left, y: rect.bottom + 4 });
+    setControllerMenuOpen(true);
+  }, [controllerSaving]);
+
+  // Apply a controller selection (AI / GM / specific trailblazer). PATCHes
+  // the controller endpoint, refreshes the canvas data on success.
+  const applyController = useCallback(async (
+    payload: { controller: 'AI' } | { controller: 'GM' } | { controller: 'PLAYER'; userId: string },
+  ) => {
+    setControllerSaving(true);
     try {
-      const next = !(node.aiActionMode ?? false);
-      const res = await fetch(`/api/characters/${node.id}/ai-action-mode`, {
+      const res = await fetch(`/api/characters/${node.id}/controller`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aiActionMode: next }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         // eslint-disable-next-line no-console
-        console.error('Failed to toggle AI action mode', await res.text());
+        console.error('Controller change failed', await res.text());
         return;
       }
       router.refresh();
     } finally {
-      setAiToggleSaving(false);
+      setControllerSaving(false);
+      setControllerMenuOpen(false);
     }
-  }, [node.id, node.aiActionMode, aiToggleSaving, router]);
+  }, [node.id, router]);
+
+  // Outside-click closes the controller menu.
+  useEffect(() => {
+    if (!controllerMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (controllerMenuRef.current && !controllerMenuRef.current.contains(e.target as Node)) {
+        setControllerMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [controllerMenuOpen]);
 
   if (!node?.id || !node?.name) return null;
 
@@ -686,45 +722,107 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     document.body
   );
 
-  // ── AI / GM control pill ─────────────────────────────────────────────────
-  // Tiny canvas-card affordance for flipping who controls this character's
-  // actions: AI agent vs human (GM or player). Visible only to GMs.
-  // Three visual states:
-  //   - No persona yet     → "+AI"      (gold border, teal text). Click mints
-  //                                       persona and flips to ON in one step.
-  //   - aiActionMode=true  → "AI"       (solid teal). Click flips OFF.
-  //   - aiActionMode=false → "GM"       (outlined teal). Click flips ON.
-  // Memory keeps capturing regardless; this only controls the action layer.
+  // ── Controller pill + dropdown ────────────────────────────────────────────
+  // Terminal-styled tiny indicator on the canvas card showing WHO is currently
+  // choosing this character's actions. GM-only: click opens a dropdown that
+  // lists AI, GM, and every active campaign trailblazer. Selecting one
+  // reassigns control (and ownership, for human picks) via the controller
+  // endpoint. Memory continues capturing regardless of selection — this only
+  // controls the action layer.
   const aiActionOn = node.aiActionMode === true;
-  const aiPersonaExists = node.hasAIPersona === true;
+  const assignedTrailblazer = trailblazers?.find(t => t.userId === node.controllerUserId) ?? null;
+  const controllerLabelRaw = aiActionOn
+    ? 'AI'
+    : assignedTrailblazer
+      ? assignedTrailblazer.username.toUpperCase().slice(0, 4)
+      : 'GM';
+  const controllerLabel = `[${controllerLabelRaw}]`;
+
   const aiTogglePill = isGM ? (
     <button
-      onClick={handleAIToggle}
+      onClick={handleControllerClick}
       onMouseDown={(e) => e.stopPropagation()}
-      disabled={aiToggleSaving}
+      disabled={controllerSaving}
       title={
-        !aiPersonaExists
-          ? 'Enable AI: mint persona + start AI-driven actions'
-          : aiActionOn
-            ? 'AI is choosing actions. Click to hand control back to the GM.'
-            : 'GM is scripting actions. Click to let the AI choose.'
+        aiActionOn
+          ? 'AI is choosing actions. Click to reassign.'
+          : assignedTrailblazer
+            ? `${assignedTrailblazer.username} controls this character. Click to reassign.`
+            : 'GM is scripting actions. Click to reassign.'
       }
-      className="font-bold uppercase tracking-[0.15em] transition-all disabled:opacity-50"
       style={{
-        fontFamily: 'var(--font-terminal), Consolas, monospace',
+        fontFamily: 'Consolas, monospace',
         fontSize: '9px',
-        padding: '2px 6px',
-        borderRadius: '2px',
-        border: aiActionOn ? '1px solid #22ab94' : '1px solid #22ab9477',
-        background: aiActionOn ? '#22ab94' : 'transparent',
-        color: aiActionOn ? '#000' : '#22ab94',
-        cursor: aiToggleSaving ? 'wait' : 'pointer',
         lineHeight: 1,
+        letterSpacing: '0.05em',
+        padding: '2px 5px',
+        borderRadius: '1px',
+        border: '1px solid #22ab9466',
+        background: aiActionOn ? '#22ab9433' : '#000',
+        color: '#22ab94',
+        cursor: controllerSaving ? 'wait' : 'pointer',
+        whiteSpace: 'nowrap',
+        textShadow: '0 0 4px rgba(34,171,148,0.5)',
+        opacity: controllerSaving ? 0.5 : 1,
       }}
     >
-      {!aiPersonaExists ? '+AI' : aiActionOn ? 'AI' : 'GM'}
+      {controllerLabel}
     </button>
   ) : null;
+
+  const controllerMenu = controllerMenuOpen && typeof window !== 'undefined' && createPortal(
+    <div
+      ref={controllerMenuRef}
+      style={{
+        position: 'fixed',
+        left: controllerMenuPos.x,
+        top: controllerMenuPos.y,
+        zIndex: 1000,
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <CtxMenuPanel title="Controller">
+        <CtxMenuStreamLabel />
+        <ControllerMenuItem
+          label="AI"
+          hint="Let the AI persona choose actions"
+          selected={aiActionOn}
+          disabled={controllerSaving}
+          onClick={() => applyController({ controller: 'AI' })}
+        />
+        <ControllerMenuItem
+          label="GM"
+          hint="You (the GM) script the actions"
+          selected={!aiActionOn && !assignedTrailblazer}
+          disabled={controllerSaving}
+          onClick={() => applyController({ controller: 'GM' })}
+        />
+        {trailblazers && trailblazers.length > 0 && (
+          <div style={{
+            fontFamily: 'Consolas, monospace',
+            fontSize: '8px',
+            color: 'rgba(255,255,255,0.35)',
+            letterSpacing: '0.1em',
+            padding: '6px 8px 2px',
+            textTransform: 'uppercase',
+          }}>
+            Trailblazers
+          </div>
+        )}
+        {trailblazers?.map(tb => (
+          <ControllerMenuItem
+            key={tb.userId}
+            label={tb.username}
+            hint={`Assign to ${tb.username}`}
+            selected={!aiActionOn && assignedTrailblazer?.userId === tb.userId}
+            disabled={controllerSaving}
+            onClick={() => applyController({ controller: 'PLAYER', userId: tb.userId })}
+          />
+        ))}
+      </CtxMenuPanel>
+    </div>,
+    document.body,
+  );
 
   // ── Compact View (500x220) ────────────────────────────────────────────────
 
@@ -868,6 +966,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           )}
         </div>
         {contextMenu}
+        {controllerMenu}
       </div>
     );
   }
@@ -1402,11 +1501,61 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         )}
       </div>
       {contextMenu}
+      {controllerMenu}
     </div>
   );
 };
 
 CharacterCard.displayName = 'CharacterCard';
+
+/** Single row in the controller dropdown menu. Terminal-styled — Consolas
+ *  mono, teal accents, selected state inverted to filled teal. */
+function ControllerMenuItem({
+  label,
+  hint,
+  selected,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  hint?: string;
+  selected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onMouseDown={(e) => e.stopPropagation()}
+      disabled={disabled}
+      title={hint}
+      style={{
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        fontFamily: 'Consolas, monospace',
+        fontSize: '11px',
+        lineHeight: 1.4,
+        padding: '4px 10px',
+        border: 'none',
+        background: selected ? '#22ab9444' : 'transparent',
+        color: selected ? '#22ab94' : 'rgba(255,255,255,0.85)',
+        letterSpacing: '0.05em',
+        cursor: disabled ? 'wait' : 'pointer',
+        position: 'relative',
+        textShadow: selected ? '0 0 4px rgba(34,171,148,0.6)' : 'none',
+      }}
+      onMouseEnter={(e) => {
+        if (!selected) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(34,171,148,0.15)';
+      }}
+      onMouseLeave={(e) => {
+        if (!selected) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+      }}
+    >
+      <span style={{ color: '#22ab94' }}>&gt;&nbsp;</span>{label}
+    </button>
+  );
+}
 
 export default React.memo(CharacterCard, (prev, next) => (
   prev.node.id === next.node.id &&
@@ -1415,6 +1564,8 @@ export default React.memo(CharacterCard, (prev, next) => (
   prev.node.characterData === next.node.characterData &&
   prev.node.aiActionMode === next.node.aiActionMode &&
   prev.node.hasAIPersona === next.node.hasAIPersona &&
+  prev.node.controllerUserId === next.node.controllerUserId &&
+  prev.trailblazers === next.trailblazers &&
   prev.isExpanded === next.isExpanded &&
   prev.showInventory === next.showInventory &&
   prev.isDropTarget === next.isDropTarget &&

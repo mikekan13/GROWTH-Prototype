@@ -40,6 +40,8 @@ interface CanvasNode {
   hasAIPersona?: boolean;
   /** AI is currently choosing this character's actions. */
   aiActionMode?: boolean;
+  /** Current human owner/controller. Either a player or the GM's userId. */
+  controllerUserId?: string;
   // Location/item-specific data
   locationType?: string;
   locationData?: GrowthLocation | null;
@@ -103,6 +105,14 @@ interface RelationsCanvasProps {
   contestedAttackerId?: string;
   onContestedDefenderSelect?: (characterId: string, characterName: string, skillName: string, governors: string[]) => void;
   isGM?: boolean;
+  /** Roster used by the canvas card controller dropdown. */
+  trailblazers?: TrailblazerOption[];
+}
+
+/** Inline copy of CampaignCanvas TrailblazerOption to avoid a cross-file import cycle. */
+export interface TrailblazerOption {
+  userId: string;
+  username: string;
 }
 
 // â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -136,6 +146,7 @@ export default function RelationsCanvas({
   contestedAttackerId,
   onContestedDefenderSelect,
   isGM,
+  trailblazers,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1461,6 +1472,7 @@ export default function RelationsCanvas({
       characterData: node.characterData as CharacterNodeData['characterData'],
       hasAIPersona: node.hasAIPersona,
       aiActionMode: node.aiActionMode,
+      controllerUserId: node.controllerUserId,
     };
 
     // Build held items for this character from item nodes with holderId matching this character
@@ -1689,6 +1701,7 @@ export default function RelationsCanvas({
             contestedAttackerId={contestedAttackerId}
             onContestedDefenderSelect={onContestedDefenderSelect}
             isGM={isGM}
+            trailblazers={trailblazers}
           />
           </div>
           </div>

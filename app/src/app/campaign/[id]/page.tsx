@@ -24,7 +24,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
           godHead: { select: { aiActionMode: true } },
         },
       },
-      members: true,
+      members: { include: { user: { select: { id: true, username: true } } } },
       locations: {
         select: {
           id: true,
@@ -56,6 +56,13 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED'].includes(m.status));
 
   if (!isAdmin && !isGM && !isMember) redirect('/terminal');
+
+  // Trailblazer roster for the canvas card's controller dropdown. Filter out
+  // people who haven't joined yet (INTERESTED/REJECTED). The GM is offered
+  // separately in the dropdown, so exclude them here.
+  const trailblazers = campaign.members
+    .filter(m => !['INTERESTED', 'REJECTED'].includes(m.status) && m.userId !== campaign.gmUserId)
+    .map(m => ({ userId: m.user.id, username: m.user.username }));
 
   // Build name lookups for item holder/location references
   const charNameMap = new Map(campaign.characters.map(c => [c.id, c.name]));
@@ -98,6 +105,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       characterData: charData,
       hasAIPersona: char.godHead !== null,
       aiActionMode: char.godHead?.aiActionMode ?? false,
+      controllerUserId: char.userId,
     };
   });
 
@@ -171,6 +179,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       username={session.user.username}
       userRole={session.user.role}
       userCharacter={userCharacterInfo}
+      trailblazers={trailblazers}
     />
   );
 }

@@ -20,8 +20,8 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { ForbiddenError, NotFoundError } from '@/lib/errors';
-import { isAdminRole, canEditCharacter } from '@/lib/permissions';
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { isAdminRole, canEditCharacter, canManageCampaign } from '@/lib/permissions';
 
 export interface GodheadListItem {
   id: string;
@@ -300,6 +300,89 @@ export async function setAIActionMode(
   return prisma.godHead.update({
     where: { id: character.godHead.id },
     data: { aiActionMode },
+  });
+}
+
+/**
+ * GM-driven controller assignment. Sets who is choosing actions for this
+ * character: the AI, the GM personally, or a specific Trailblazer in the
+ * campaign. Only the campaign GM or admin can call this — it can transfer
+ * ownership of a character to another user, so it is more powerful than
+ * the plain AI toggle.
+ *
+ * For mode='AI': mints a placeholder godhead (if needed) and turns
+ * aiActionMode on. Character.userId is left unchanged so the prior human
+ * controller stays as a fallback when AI is later turned off.
+ *
+ * For mode='GM': sets aiActionMode=false (if a godhead exists) and points
+ * character.userId at campaign.gmUserId — the GM is now scripting it.
+ *
+ * For mode='PLAYER': sets aiActionMode=false (if a godhead exists) and
+ * assigns character.userId to the chosen Trailblazer. The userId must
+ * belong to a campaign member whose status is not INTERESTED or REJECTED.
+ */
+const PLAYER_MEMBER_STATUSES = ['BACKSTORY', 'CHARACTER_CREATION', 'ACTIVE'];
+
+export async function setCharacterController(
+  characterId: string,
+  sessionUserId: string,
+  sessionUserRole: string,
+  mode: 'AI' | 'GM' | 'PLAYER',
+  assignedUserId?: string,
+) {
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: {
+      id: true,
+      name: true,
+      userId: true,
+      campaign: { select: { id: true, gmUserId: true } },
+      godHead: { select: { id: true } },
+    },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!character.campaign) throw new ValidationError('Character has no campaign');
+  if (!canManageCampaign(sessionUserId, sessionUserRole, character.campaign)) {
+    throw new ForbiddenError('Only the campaign GM can reassign character controllers');
+  }
+
+  if (mode === 'AI') {
+    return setAIActionMode(characterId, sessionUserId, sessionUserRole, true);
+  }
+
+  const targetUserId =
+    mode === 'GM'
+      ? character.campaign.gmUserId
+      : assignedUserId;
+  if (!targetUserId) {
+    throw new ValidationError('assignedUserId is required when controller is PLAYER');
+  }
+
+  if (mode === 'PLAYER') {
+    // Must be an active campaign member — block reassignment to randos.
+    const member = await prisma.campaignMember.findUnique({
+      where: { campaignId_userId: { campaignId: character.campaign.id, userId: targetUserId } },
+      select: { status: true },
+    });
+    if (!member || !PLAYER_MEMBER_STATUSES.includes(member.status)) {
+      throw new ValidationError('Target user is not an active member of this campaign');
+    }
+  }
+
+  // Run both writes in a transaction so character ownership + AI mode stay
+  // consistent if one fails.
+  return prisma.$transaction(async (tx) => {
+    if (character.godHead) {
+      await tx.godHead.update({
+        where: { id: character.godHead.id },
+        data: { aiActionMode: false },
+      });
+    }
+    return tx.character.update({
+      where: { id: characterId },
+      data: { userId: targetUserId },
+      select: { id: true, name: true, userId: true },
+    });
   });
 }
 

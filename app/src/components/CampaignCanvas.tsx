@@ -40,6 +40,8 @@ interface CanvasNode {
   hasAIPersona?: boolean;
   /** AI is currently choosing this character's actions. */
   aiActionMode?: boolean;
+  /** Current human owner/controller. Either a player or the GM's userId. */
+  controllerUserId?: string;
   locationType?: string;
   locationData?: GrowthLocation | null;
   itemType?: string;
@@ -56,6 +58,12 @@ interface Connection {
   strength: number;
 }
 
+/** A campaign trailblazer the GM can assign as a character's controller. */
+export interface TrailblazerOption {
+  userId: string;
+  username: string;
+}
+
 interface CampaignCanvasProps {
   campaign: {
     id: string;
@@ -69,6 +77,8 @@ interface CampaignCanvasProps {
   username?: string;
   userRole?: string;
   userCharacter?: { id: string; name: string; data: string } | null;
+  /** Roster used by the canvas card controller dropdown. */
+  trailblazers?: TrailblazerOption[];
 }
 
 type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry' | 'character';
@@ -83,7 +93,7 @@ interface CampaignEconomyData {
   total: string;
 }
 
-export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter }: CampaignCanvasProps) {
+export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
   // In-canvas character selection: when set, the Character tab loads THIS character
   // instead of the user's own PC. Cleared when navigating to a non-character tab so
@@ -976,6 +986,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             connections={connections}
             campaignId={campaign.id}
             crystallizedEntityIds={crystallizedEntityIds}
+            trailblazers={trailblazers}
             onCreateCharacter={handleCreateCharacter}
             onPlaceCharacter={handlePlaceCharacter}
             onDeleteCharacter={(nodeId) => setDeleteTarget(nodeId)}
