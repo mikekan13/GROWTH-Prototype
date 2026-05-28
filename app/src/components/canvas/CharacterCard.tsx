@@ -731,10 +731,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   // controls the action layer.
   const aiActionOn = node.aiActionMode === true;
   const assignedTrailblazer = trailblazers?.find(t => t.userId === node.controllerUserId) ?? null;
+  // Long usernames are truncated to keep the pill from sprawling across the
+  // header. Hover tooltip shows the full name.
+  const truncateName = (s: string, max: number) =>
+    s.length > max ? `${s.slice(0, max - 1)}…` : s;
   const controllerLabelRaw = aiActionOn
     ? 'AI'
     : assignedTrailblazer
-      ? assignedTrailblazer.username.toUpperCase().slice(0, 4)
+      ? truncateName(assignedTrailblazer.username.toUpperCase(), 10)
       : 'GM';
   const controllerLabel = `[${controllerLabelRaw}]`;
 
@@ -1027,9 +1031,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         {/* ── Top Header Bar ── */}
         <div className="relative pr-1 flex items-stretch gap-0.5" style={{ height: '29px' }}>
           <div className="absolute bottom-0 left-0 border-b border-purple-500/40" style={{ width: 'calc(100% - 444px)' }} />
-          <div className="flex items-center justify-center" style={{ width: '128px' }}>
-            {aiTogglePill}
-          </div>
+          <div style={{ width: '128px' }} />
 
           {/* Character Name */}
           <div className="px-3 flex justify-center overflow-visible relative" style={{
@@ -1068,7 +1070,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             <div style={{ height: '15px', backgroundColor: '#582a72' }} />
           </div>
 
-          <div style={{ width: '59px' }} />
+          {/* Controller pill — sits to the right of the Fate Die, lifted to
+              align with the Name tile + Fate Die above-the-bar plane. */}
+          {aiTogglePill && (
+            <div className="flex items-center" style={{ marginTop: '-10px' }}>
+              {aiTogglePill}
+            </div>
+          )}
+
           <div style={{ width: '13px' }} />
         </div>
 
