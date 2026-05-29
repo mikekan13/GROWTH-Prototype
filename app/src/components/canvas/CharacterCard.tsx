@@ -1030,10 +1030,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       >
         {/* ── Top Header Bar ── */}
         <div className="relative pr-1 flex items-stretch gap-0.5" style={{ height: '29px' }}>
-          {/* Purple baseline — runs from left edge to where the attributes
-              header starts (444px reserved on the right). The controller
-              pill sits above this line so it passes underneath uninterrupted. */}
-          <div className="absolute bottom-0 left-0 border-b border-purple-500/40" style={{ width: 'calc(100% - 444px)' }} />
+          {/* Teal + purple band — extends the vertical buffer-stripe pattern
+              (14px teal on top, 15px purple on bottom) horizontally across
+              the header. Runs from the left edge to where the attributes
+              header begins (444px reserved on the right). The controller
+              pill sits fully above this band so both stripes pass through
+              uninterrupted, forming a menu-options bar. */}
+          <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: '#22ab94' }} />
+          <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: '#582a72' }} />
           <div style={{ width: '128px' }} />
 
           {/* Character Name */}
@@ -1073,12 +1077,12 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             <div style={{ height: '15px', backgroundColor: '#582a72' }} />
           </div>
 
-          {/* Controller pill — first item in the menu-options bar that
-              spans the area right of the Fate Die up to the attributes
-              header. Lifted high enough that the pill sits fully above the
-              purple baseline (bottom of pill > 29px header height). */}
+          {/* Controller pill — first item in the menu-options bar. Lifted
+              enough that its bottom clears the 29px teal+purple band (pill
+              is ~50px tall, so marginTop -55 puts its bottom at -5px,
+              giving a 5px gap above the band). */}
           {aiTogglePill && (
-            <div className="flex items-center" style={{ marginTop: '-25px' }}>
+            <div className="flex items-center" style={{ marginTop: '-55px' }}>
               {aiTogglePill}
             </div>
           )}
