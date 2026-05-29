@@ -1036,14 +1036,15 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               header begins (444px reserved on the right). The controller
               pill sits fully above this band so both stripes pass through
               uninterrupted, forming a menu-options bar. */}
-          <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: '#22ab94' }} />
-          <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: '#582a72' }} />
+          <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: '#22ab94', zIndex: 0 }} />
+          <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: '#582a72', zIndex: 0 }} />
           <div style={{ width: '128px' }} />
 
           {/* Character Name */}
           <div className="px-3 flex justify-center overflow-visible relative" style={{
             backgroundColor: '#002f6c', width: '284px', height: '42px',
-            borderLeft: '13px solid #22ab94', marginTop: '-13px'
+            borderLeft: '13px solid #22ab94', marginTop: '-13px',
+            zIndex: 1,
           }}>
             {(() => {
               const fs = getNameFontSize(node.name);
@@ -1063,7 +1064,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           </div>
 
           {/* Fate Die */}
-          <div style={{ width: '154px', marginTop: '-10px' }}>
+          <div style={{ width: '154px', marginTop: '-10px', position: 'relative', zIndex: 1 }}>
             <div className="px-2 py-1 flex items-center justify-center" style={{ backgroundColor: '#ffcc78', borderRadius: '4px' }}>
               <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', fontFamily: 'Consolas, monospace' }}>
                 &#x2B22;{seed?.baseFateDie?.replace('d', '') || '6'}
@@ -1082,7 +1083,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               is ~50px tall, so marginTop -55 puts its bottom at -5px,
               giving a 5px gap above the band). */}
           {aiTogglePill && (
-            <div className="flex items-center" style={{ marginTop: '-55px' }}>
+            <div className="flex items-center" style={{ marginTop: '-55px', position: 'relative', zIndex: 1 }}>
               {aiTogglePill}
             </div>
           )}
