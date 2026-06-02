@@ -56,7 +56,7 @@ interface CanvasNode {
 interface CanvasConnection {
   from: string;
   to: string;
-  type: "alliance" | "conflict" | "goal" | "resistance" | "opportunity";
+  type: "alliance" | "conflict" | "goal" | "resistance" | "opportunity" | "owns" | "located_at";
   strength: number;
 }
 
@@ -976,6 +976,8 @@ export default function RelationsCanvas({
       case "opportunity": return "var(--accent-gold)";
       case "alliance":    return "var(--pillar-spirit)";
       case "conflict":    return "var(--pillar-soul)";
+      case "owns":        return "#ffcc78"; // KRMA gold — possession tether
+      case "located_at":  return "#582a72"; // Spirit purple — containment tether
       default:            return "#808080";
     }
   }, []);
@@ -1441,7 +1443,12 @@ export default function RelationsCanvas({
           stroke={color}
           strokeWidth={width}
           opacity={isHovered ? 1.0 : 0.7}
-          strokeDasharray={connection.type === "conflict" ? "8,4" : "none"}
+          strokeDasharray={
+            connection.type === "conflict" ? "8,4"
+            : connection.type === "owns" ? "12,6"
+            : connection.type === "located_at" ? "2,4"
+            : "none"
+          }
           filter={isHovered ? "url(#glow)" : "none"}
           className="cursor-pointer"
           onMouseEnter={() => setHoveredConnection(connectionId)}

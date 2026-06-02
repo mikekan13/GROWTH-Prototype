@@ -155,6 +155,27 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
 
   const nodes = [...characterNodes, ...locationNodes, ...itemNodes];
 
+  // Build canvas connections from EntityRelationship rows. Only include edges
+  // where both endpoints are renderable nodes on the canvas. owns = gold
+  // dashed tether from owner to possession; located_at = subtle purple tether
+  // from child to parent.
+  const nodeIdSet = new Set(nodes.map(n => n.id));
+  const relationshipRows = await prisma.entityRelationship.findMany({
+    where: {
+      campaignId: campaign.id,
+      relationshipType: { in: ['owns', 'located_at'] },
+    },
+    select: { sourceId: true, targetId: true, relationshipType: true, strength: true },
+  });
+  const connections = relationshipRows
+    .filter(r => nodeIdSet.has(r.sourceId) && nodeIdSet.has(r.targetId))
+    .map(r => ({
+      from: r.sourceId,
+      to: r.targetId,
+      type: r.relationshipType as 'owns' | 'located_at',
+      strength: r.strength,
+    }));
+
   const campaignData = {
     id: campaign.id,
     name: campaign.name,
@@ -174,7 +195,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     <CampaignCanvas
       campaign={campaignData}
       nodes={nodes}
-      connections={[]}
+      connections={connections}
       userId={session.user.id}
       username={session.user.username}
       userRole={session.user.role}

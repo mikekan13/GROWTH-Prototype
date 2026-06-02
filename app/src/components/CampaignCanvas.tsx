@@ -54,7 +54,7 @@ interface CanvasNode {
 interface Connection {
   from: string;
   to: string;
-  type: 'alliance' | 'conflict' | 'goal' | 'resistance' | 'opportunity';
+  type: 'alliance' | 'conflict' | 'goal' | 'resistance' | 'opportunity' | 'owns' | 'located_at';
   strength: number;
 }
 
