@@ -447,61 +447,46 @@ export function FolderGroupRect({
             </div>
           </foreignObject>
 
-          {/* AI Generate + Upload buttons (stubs — handlers TBD). */}
+          {/* AI Generate button (stub — pipeline TBD). The unified AI image
+              generation is the SOLE path for getting visuals onto entities.
+              No file upload — generation is the design constraint. */}
           <foreignObject
             x={bounds.x + 80}
             y={bounds.y + 8}
-            width={170}
+            width={120}
             height={30}
             style={{ pointerEvents: 'auto', overflow: 'visible' }}
           >
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // eslint-disable-next-line no-console
-                  console.log('[location] AI generate image — TODO', folder.locationInfo?.locationId);
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  padding: '5px 10px',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(34,171,148,0.6)',
-                  color: '#22ab94',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  textShadow: '0 0 4px rgba(34,171,148,0.4)',
-                }}
-                title="Generate location portrait via AI (TODO)"
-              >
-                ✨ GEN
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // eslint-disable-next-line no-console
-                  console.log('[location] upload image — TODO', folder.locationInfo?.locationId);
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  padding: '5px 10px',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  color: 'rgba(255,255,255,0.75)',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                }}
-                title="Upload an image for this location (TODO)"
-              >
-                ↑ UPLOAD
-              </button>
-            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.dispatchEvent(
+                  new CustomEvent('growth:ai-generate-image', {
+                    detail: {
+                      entityType: 'location',
+                      entityId: folder.locationInfo?.locationId,
+                      target: 'portrait',
+                    },
+                  }),
+                );
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                padding: '5px 10px',
+                background: 'rgba(0,0,0,0.6)',
+                border: '1px solid rgba(34,171,148,0.6)',
+                color: '#22ab94',
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+                borderRadius: 2,
+                textShadow: '0 0 4px rgba(34,171,148,0.4)',
+              }}
+              title="Generate location portrait via the AI image pipeline"
+            >
+              ✨ GENERATE
+            </button>
           </foreignObject>
 
           {/* Content-type count row */}
