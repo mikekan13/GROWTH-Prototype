@@ -1499,6 +1499,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               { key: 'magic', icon: '\u2728', label: 'MAGIC', isOpen: openPanels?.has('magic') || false, onClick: () => onPanelToggle(node.id, 'magic') },
               { key: 'backstory', icon: '\u270E', label: 'BACKSTORY', isOpen: openPanels?.has('backstory') || false, onClick: () => onPanelToggle(node.id, 'backstory') },
               { key: 'harvests', icon: '\u2618', label: 'HARVESTS', isOpen: openPanels?.has('harvests') || false, onClick: () => onPanelToggle(node.id, 'harvests') },
+              { key: 'possessions', icon: '\u2756', label: 'POSSESSIONS', isOpen: openPanels?.has('possessions') || false, onClick: () => onPanelToggle(node.id, 'possessions') },
             ] : []),
           ];
           return (

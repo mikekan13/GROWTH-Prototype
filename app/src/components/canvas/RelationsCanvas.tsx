@@ -14,6 +14,7 @@ import type { SkillItem } from "./SkillsCard";
 import MagicCard from "./MagicCard";
 import BackstoryCard from "./BackstoryCard";
 import HarvestCard from "./HarvestCard";
+import PossessionsCard from "./PossessionsCard";
 import LocationCard from "./LocationCard";
 import type { LocationNodeData } from "./LocationCard";
 import WorldItemCard from "./WorldItemCard";
@@ -2015,6 +2016,8 @@ export default function RelationsCanvas({
                 />;
               case 'harvests':
                 return <HarvestCard harvests={(charData.harvests as Array<{ season: string; turn: number; description?: string; rewards?: string[]; consequences?: string[]; krmaChange?: number }>) || []} onClose={() => togglePanel(node.id, panelKey)} />;
+              case 'possessions':
+                return <PossessionsCard characterId={node.id} characterName={node.name} onClose={() => togglePanel(node.id, panelKey)} />;
               default:
                 return null;
             }
