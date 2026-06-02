@@ -27,6 +27,43 @@ interface LocationCardProps {
 
 const DANGER_COLORS = ['#4ade80', '#4ade80', '#a3e635', '#facc15', '#facc15', '#f59e0b', '#f97316', '#ef4444', '#dc2626', '#991b1b'];
 
+/** Compact-suffixed KRMA magnitude. The location reserve scales freely
+ *  so we abbreviate aggressively past 1M. */
+function formatReserve(n: number | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  const abs = Math.abs(n);
+  if (abs >= 1e15) return `${(n / 1e15).toFixed(2)}P`; // peta — for galaxy-scale
+  if (abs >= 1e12) return `${(n / 1e12).toFixed(2)}T`; // tera — planets
+  if (abs >= 1e9)  return `${(n / 1e9).toFixed(2)}B`;  // billions — continents / armies
+  if (abs >= 1e6)  return `${(n / 1e6).toFixed(2)}M`;  // millions — cities / districts
+  if (abs >= 1e3)  return `${(n / 1e3).toFixed(1)}K`;  // thousands — buildings / villages
+  return n.toLocaleString();
+}
+
+/** Loose tier label hint based on reserve magnitude. Advisory only. */
+function reserveTier(n: number | undefined): string {
+  if (n == null) return '';
+  if (n >= 1e15) return 'galactic';
+  if (n >= 1e13) return 'star-system';
+  if (n >= 1e11) return 'planetary';
+  if (n >= 1e9)  return 'continental';
+  if (n >= 1e7)  return 'regional';
+  if (n >= 1e5)  return 'urban';
+  if (n >= 1e3)  return 'local';
+  return 'minor';
+}
+
+interface ContentsChildRow {
+  id: string;
+  childId: string;
+  childType: string;
+  childName: string;
+  childSubtype: string | null;
+  childStatus: string | null;
+  childContentsCount: number;
+}
+
 export default function LocationCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate: _onUpdate, onPositionChange, onDragOffsetChange }: LocationCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -35,9 +72,41 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
+  // Contents (children located_at this location). Lazy-loaded only when the
+  // card is expanded so compact-tiled locations don't fan out N requests.
+  const [contents, setContents] = useState<ContentsChildRow[] | null>(null);
+  const [contentsErr, setContentsErr] = useState<string | null>(null);
+
   const typeColor = LOCATION_TYPE_COLORS[node.type] || '#808080';
   const typeIcon = LOCATION_TYPE_ICONS[node.type] || '\u2B50';
   const data = node.data;
+  const reserve = data.krmaReserve;
+  const tier = reserveTier(reserve);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/entities/${node.id}/contents`);
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({ error: 'Failed to load contents' }));
+          if (!cancelled) setContentsErr(e.error || 'Failed to load contents');
+          return;
+        }
+        const j = await res.json();
+        if (!cancelled) setContents(j.contents ?? []);
+      } catch (e) {
+        if (!cancelled) setContentsErr(e instanceof Error ? e.message : 'Network error');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isExpanded, node.id]);
+
+  const focusEntity = (entityId: string) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('growth:focus-canvas-node', { detail: { entityId } }));
+  };
 
   // Close context menu on outside click
   useEffect(() => {
@@ -186,7 +255,24 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             )}
 
             {/* Stat pills */}
-            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {reserve != null && (
+                <span
+                  style={{
+                    padding: '2px 6px',
+                    background: 'rgba(255,204,120,0.12)',
+                    border: '1px solid rgba(255,204,120,0.4)',
+                    borderRadius: 3,
+                    fontSize: 10,
+                    color: '#ffcc78',
+                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                    letterSpacing: '0.04em',
+                  }}
+                  title={`KRMA Reserve: ${reserve.toLocaleString()} Ҝ${tier ? ` (${tier})` : ''}`}
+                >
+                  {formatReserve(reserve)} Ҝ
+                </span>
+              )}
               {data.dangerLevel != null && (
                 <StatPill label="DNG" value={data.dangerLevel} color={DANGER_COLORS[Math.min(data.dangerLevel - 1, 9)]} />
               )}
@@ -318,6 +404,65 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
 
         {/* Body */}
         <div style={{ padding: '12px 14px' }}>
+          {/* KRMA Reserve — first-class scale indicator. Empty state still
+              shown so GMs see the field and remember to fill it. */}
+          <div
+            style={{
+              marginBottom: 12,
+              padding: '8px 12px',
+              background: reserve != null
+                ? 'linear-gradient(135deg, rgba(255,204,120,0.08) 0%, rgba(0,0,0,0.2) 100%)'
+                : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${reserve != null ? 'rgba(255,204,120,0.35)' : 'rgba(255,255,255,0.08)'}`,
+              borderRadius: 3,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div>
+              <SectionLabel color={reserve != null ? '#ffcc78' : 'rgba(255,255,255,0.4)'}>KRMA Reserve</SectionLabel>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.4)',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  letterSpacing: '0.04em',
+                  textTransform: tier ? 'uppercase' : 'none',
+                }}
+              >
+                {tier ? `${tier} scale` : 'ambient mass · GM allocation'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                  fontSize: 24,
+                  color: reserve != null ? '#ffcc78' : 'rgba(255,255,255,0.25)',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1,
+                }}
+                title={reserve != null ? `${reserve.toLocaleString()} Ҝ` : 'Not set'}
+              >
+                {formatReserve(reserve)} <span style={{ fontSize: 14, opacity: 0.8 }}>Ҝ</span>
+              </div>
+              {reserve != null && (
+                <div
+                  style={{
+                    fontSize: 8,
+                    color: 'rgba(255,255,255,0.35)',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    marginTop: 2,
+                  }}
+                >
+                  {reserve.toLocaleString()}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Description */}
           <div style={{ marginBottom: 12 }}>
             <SectionLabel color={typeColor}>Description</SectionLabel>
@@ -430,6 +575,110 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
               ))}
             </div>
           )}
+
+          {/* Contents — entities located_at this location. Click a row to
+              focus the canvas on it. */}
+          <div style={{ marginTop: 10 }}>
+            <SectionLabel color={typeColor}>
+              Contents {contents && contents.length > 0 ? `(${contents.length})` : ''}
+            </SectionLabel>
+            {contentsErr && (
+              <div
+                style={{
+                  fontSize: 10,
+                  color: '#E8585A',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                }}
+              >
+                ✗ {contentsErr}
+              </div>
+            )}
+            {!contentsErr && contents === null && (
+              <div
+                style={{
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.3)',
+                  fontStyle: 'italic',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                }}
+              >
+                Loading…
+              </div>
+            )}
+            {!contentsErr && contents && contents.length === 0 && (
+              <div
+                style={{
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.3)',
+                  fontStyle: 'italic',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                }}
+              >
+                Empty
+              </div>
+            )}
+            {!contentsErr && contents && contents.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {contents.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={(e) => { e.stopPropagation(); focusEntity(c.childId); }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '4px 8px',
+                      background: 'rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                    title="Jump to on canvas"
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: '#fff',
+                          fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {c.childName}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 8,
+                          color: 'rgba(255,255,255,0.35)',
+                          fontFamily: 'var(--font-terminal), Consolas, monospace',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {c.childSubtype ?? c.childType.toLowerCase()}
+                        {c.childStatus && ` · ${c.childStatus.toLowerCase()}`}
+                        {c.childContentsCount > 0 && ` · contains ${c.childContentsCount}`}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontFamily: 'Consolas, monospace',
+                        color: '#22ab94',
+                        fontSize: 12,
+                      }}
+                    >
+                      ➤
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* GM Notes */}
           {data.notes && (

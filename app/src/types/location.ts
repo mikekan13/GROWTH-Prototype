@@ -21,6 +21,16 @@ export interface GrowthLocation {
     strength?: number;         // 1-10
     schools?: string[];        // Which magic schools are amplified
   };
+  /**
+   * Generalized "ambient mass" KRMA allocation for the area itself —
+   * what it costs to *be* this place at all, distinct from specific
+   * items/NPCs inside it (which carry their own KV). Scale-free magnitude:
+   * a room may be in the thousands, a city in the millions, a planet in
+   * the trillions+. "Slightly quantum" per Mike — not pinned to anything
+   * concrete, but commits against the GM's wallet capacity.
+   * See memory: location-krma-reserve-2026-06-02.
+   */
+  krmaReserve?: number;
 }
 
 export interface LocationConnection {
