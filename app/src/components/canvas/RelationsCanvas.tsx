@@ -680,6 +680,18 @@ export default function RelationsCanvas({
     [nodePositions]
   );
 
+  /** Same as getNodePosition but adds the live drag offset, so anything
+   *  reading this gets the EFFECTIVE rendered position during a drag
+   *  (otherwise it lags until mouseup commits the position). */
+  const getVisualPosition = useCallback(
+    (nodeId: string, fallbackX: number, fallbackY: number) => {
+      const base = nodePositions.get(nodeId) ?? { x: fallbackX, y: fallbackY };
+      const off = dragOffsets.get(nodeId) || { x: 0, y: 0 };
+      return { x: base.x + off.x, y: base.y + off.y };
+    },
+    [nodePositions, dragOffsets]
+  );
+
   const bringNodeToFront = useCallback((nodeId: string) => {
     setNodeZIndices((prev) => {
       let currentMax = 0;
@@ -1509,8 +1521,9 @@ export default function RelationsCanvas({
     // 1. Prefer measured: look up the row's absolute SVG center from DOM.
     const measured = possessionRowPosRef.current.get(`${charNode.id}__${targetId}`);
     if (measured) return measured;
-    // 2. Fallback approximation by layout formula.
-    const charPos = getNodePosition(charNode.id, charNode.x, charNode.y);
+    // 2. Fallback approximation by layout formula. Uses visual (drag-aware)
+    //    position so the fallback line follows the card during drag too.
+    const charPos = getVisualPosition(charNode.id, charNode.x, charNode.y);
     const expanded = expandedNodes.has(charNode.id);
     const cardWidth = expanded ? 1885 : 500;
     const cardHeight = expanded ? 670 : 240;
@@ -1571,8 +1584,10 @@ export default function RelationsCanvas({
       if (!openPanels || !openPanels.has('possessions')) return null;
     }
 
-    const fromPos = getNodePosition(fromNode.id, fromNode.x, fromNode.y);
-    const toPos = getNodePosition(toNode.id, toNode.x, toNode.y);
+    // Use visual (drag-aware) positions so tethers track cards live during
+    // drag instead of waiting for the drag-end commit.
+    const fromPos = getVisualPosition(fromNode.id, fromNode.x, fromNode.y);
+    const toPos = getVisualPosition(toNode.id, toNode.x, toNode.y);
     const color = getConnectionColor(connection.type);
     const connectionId = `${connection.from}-${connection.to}-${connection.type}`;
 
