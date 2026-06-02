@@ -1409,32 +1409,71 @@ export default function RelationsCanvas({
 
   // â”€â”€ Render connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  /** Approximate visual half-extent for a node, used to terminate edges
+   *  at the card boundary instead of the center. */
+  const nodeHalfExtent = (n: CanvasNode) => {
+    const expanded = expandedNodes.has(n.id);
+    if (n.type === 'character') return expanded ? 470 : 160; // 1885×670 vs 500×240
+    if (n.type === 'location')  return expanded ? 200 : 90;  // ~480×700 vs 320×180
+    if (n.type === 'item')      return expanded ? 110 : 80;  // ~420×600 vs 280×160
+    return 60;
+  };
+
+  /** Approximate y-offset from the character card's center down to where
+   *  the panel-button row sits, so ownership tethers can originate from
+   *  the panel area (not the card body) when the panel is open. */
+  const characterPanelAnchorOffset = (n: CanvasNode) => {
+    if (n.type !== 'character') return 0;
+    return expandedNodes.has(n.id) ? 380 : 130;
+  };
+
   const renderConnection = (connection: CanvasConnection) => {
     const fromNode = nodes.find((n) => n.id === connection.from);
     const toNode = nodes.find((n) => n.id === connection.to);
     if (!fromNode || !toNode) return null;
 
+    const isOwns = connection.type === 'owns';
+    const isLocatedAt = connection.type === 'located_at';
+    const isPossessionEdge = isOwns || isLocatedAt;
+
+    // Ownership tethers only render when the owning character has the
+    // possessions panel open — Mike's UX call. Containment edges always
+    // render so the canvas topology is visible.
+    if (isOwns) {
+      const openPanels = panelOpenNodes.get(connection.from);
+      if (!openPanels || !openPanels.has('possessions')) return null;
+    }
+
     const fromPos = getNodePosition(fromNode.id, fromNode.x, fromNode.y);
     const toPos = getNodePosition(toNode.id, toNode.x, toNode.y);
     const color = getConnectionColor(connection.type);
-    const connectionId = `${connection.from}-${connection.to}`;
+    const connectionId = `${connection.from}-${connection.to}-${connection.type}`;
 
-    const dx = toPos.x - fromPos.x;
-    const dy = toPos.y - fromPos.y;
+    // Origin shift: for owns, drop the source down to the panel area.
+    const fromX = fromPos.x;
+    const fromY = isOwns ? fromPos.y + characterPanelAnchorOffset(fromNode) : fromPos.y;
+
+    const dx = toPos.x - fromX;
+    const dy = toPos.y - fromY;
     const length = Math.sqrt(dx * dx + dy * dy);
     if (length === 0) return null;
     const ux = dx / length;
     const uy = dy / length;
 
-    const offset = fromNode.type === "character" || toNode.type === "character" ? 60 : 30;
-    const startX = fromPos.x + ux * offset;
-    const startY = fromPos.y + uy * offset;
-    const endX = toPos.x - ux * offset;
-    const endY = toPos.y - uy * offset;
+    // Per-node-type end offset so edges terminate at the card boundary.
+    const fromOffset = isPossessionEdge ? 8 : (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
+    const toOffset = isPossessionEdge ? nodeHalfExtent(toNode) : (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
 
+    const startX = fromX + ux * fromOffset;
+    const startY = fromY + uy * fromOffset;
+    const endX = toPos.x - ux * toOffset;
+    const endY = toPos.y - uy * toOffset;
+
+    // Thin tethers for possessions; existing fat strength-scaled edges otherwise.
     const baseWidth = 1.5;
-    const width = baseWidth + connection.strength * 1.5;
+    const width = isPossessionEdge ? (isOwns ? 1.5 : 1) : baseWidth + connection.strength * 1.5;
     const isHovered = hoveredConnection === connectionId;
+    const baseOpacity = isPossessionEdge ? (isOwns ? 0.85 : 0.55) : 0.7;
 
     return (
       <g key={connectionId}>
@@ -1442,10 +1481,10 @@ export default function RelationsCanvas({
           x1={startX} y1={startY} x2={endX} y2={endY}
           stroke={color}
           strokeWidth={width}
-          opacity={isHovered ? 1.0 : 0.7}
+          opacity={isHovered ? 1.0 : baseOpacity}
           strokeDasharray={
             connection.type === "conflict" ? "8,4"
-            : connection.type === "owns" ? "12,6"
+            : connection.type === "owns" ? "10,5"
             : connection.type === "located_at" ? "2,4"
             : "none"
           }
@@ -1454,13 +1493,15 @@ export default function RelationsCanvas({
           onMouseEnter={() => setHoveredConnection(connectionId)}
           onMouseLeave={() => setHoveredConnection(null)}
         />
-        {/* Arrowhead */}
-        <polygon
-          points={`${endX},${endY} ${endX - 8 * ux + 4 * uy},${endY - 8 * uy - 4 * ux} ${endX - 8 * ux - 4 * uy},${endY - 8 * uy + 4 * ux}`}
-          fill={color}
-          opacity={isHovered ? 1.0 : 0.7}
-          className="pointer-events-none"
-        />
+        {/* Arrowhead — only on non-possession edges; tethers stay clean. */}
+        {!isPossessionEdge && (
+          <polygon
+            points={`${endX},${endY} ${endX - 8 * ux + 4 * uy},${endY - 8 * uy - 4 * ux} ${endX - 8 * ux - 4 * uy},${endY - 8 * uy + 4 * ux}`}
+            fill={color}
+            opacity={isHovered ? 1.0 : baseOpacity}
+            className="pointer-events-none"
+          />
+        )}
         {/* Connection type label on hover */}
         {isHovered && (
           <text
