@@ -374,8 +374,8 @@ export function FolderGroupRect({
         </tspan>
       </text>
 
-      {/* TKV readout — standard red label over purple number, slides right if label is too close */}
-      {(() => {
+      {/* TKV readout (party folders only) — standard red label over purple number, slides right if label is too close */}
+      {folder.type === 'party' && (() => {
         const tkvW = 320;
         // Approximate label width: Consolas 36px + 0.12em letter-spacing ≈ 25px per char
         const charWidth = labelFontSize * 0.7;
@@ -402,6 +402,50 @@ export function FolderGroupRect({
               </div>
               <div style={{ backgroundColor: '#b4a7d6', color: '#8e7cc3', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
                 {totalTKV.toLocaleString()}
+              </div>
+            </div>
+          </foreignObject>
+        );
+      })()}
+
+      {/* KRMA Reserve readout — Location auto-folders ONLY. The folder IS
+          the Location, so its ambient KRMA mass shows where the party TKV
+          would. Same slide-right collision logic as TKV. */}
+      {folder.locationInfo && folder.locationInfo.krmaReserve != null && (() => {
+        const reserve = folder.locationInfo.krmaReserve!;
+        const formatReserve = (n: number): string => {
+          const abs = Math.abs(n);
+          if (abs >= 1e15) return `${(n / 1e15).toFixed(2)}P`;
+          if (abs >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
+          if (abs >= 1e9)  return `${(n / 1e9).toFixed(2)}B`;
+          if (abs >= 1e6)  return `${(n / 1e6).toFixed(2)}M`;
+          if (abs >= 1e3)  return `${(n / 1e3).toFixed(1)}K`;
+          return n.toLocaleString();
+        };
+        const kW = 320;
+        const charWidth = labelFontSize * 0.7;
+        const labelChars = folder.name.length + ` (${folder.nodeIds.length})`.length;
+        const labelRight = bounds.x + 8 + labelChars * charWidth + 16;
+        const centeredX = bounds.x + bounds.width / 2 - kW / 2;
+        const kX = Math.max(centeredX, labelRight);
+        return (
+          <foreignObject
+            x={kX}
+            y={bounds.y - 69}
+            width={kW}
+            height={144}
+            style={{ pointerEvents: 'none', overflow: 'visible' }}
+          >
+            <div style={{
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              border: '4px solid #ffcc78', borderRadius: 8,
+              fontFamily: "'Bebas Neue', var(--font-bebas-neue), sans-serif",
+            }}>
+              <div style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: 32, textAlign: 'center', lineHeight: '1', padding: '12px 20px', letterSpacing: '0.08em' }}>
+                KRMA RES
+              </div>
+              <div style={{ backgroundColor: '#ffcc7822', color: '#ffcc78', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
+                {formatReserve(reserve)} <span style={{ fontSize: 36, opacity: 0.85 }}>Ҝ</span>
               </div>
             </div>
           </foreignObject>

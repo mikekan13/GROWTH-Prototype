@@ -16,4 +16,15 @@ export interface CanvasFolder {
   posY?: number;
   /** When true, folder collapses to just the header bar */
   collapsed?: boolean;
+  /**
+   * Optional Location info, set by server-generated auto-folders so the
+   * folder IS the location (no separate Location card). Renders a KRMA
+   * reserve readout in the header in place of the party TKV box.
+   */
+  locationInfo?: {
+    locationId: string;
+    locationType?: string;
+    krmaReserve?: number;
+    description?: string;
+  };
 }

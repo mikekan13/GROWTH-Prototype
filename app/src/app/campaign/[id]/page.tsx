@@ -153,13 +153,13 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     };
   });
 
-  const nodes = [...characterNodes, ...locationNodes, ...itemNodes];
+  const allNodes = [...characterNodes, ...locationNodes, ...itemNodes];
 
   // Build canvas connections from EntityRelationship rows. Only include edges
   // where both endpoints are renderable nodes on the canvas. owns = gold
   // dashed tether from owner to possession; located_at = subtle purple tether
   // from child to parent.
-  const nodeIdSet = new Set(nodes.map(n => n.id));
+  const nodeIdSet = new Set(allNodes.map(n => n.id));
   const relationshipRows = await prisma.entityRelationship.findMany({
     where: {
       campaignId: campaign.id,
@@ -190,13 +190,41 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     arr.push(r.sourceId);
     childrenByParent.set(r.targetId, arr);
   }
-  const nodeNameById = new Map(nodes.map(n => [n.id, n.name]));
-  const autoFolders = Array.from(childrenByParent.entries()).map(([parentId, nodeIds]) => ({
-    id: `auto-${parentId}`,
-    name: nodeNameById.get(parentId) ?? 'Container',
-    type: 'group' as const,
-    nodeIds,
-  }));
+  const nodeNameById = new Map(allNodes.map(n => [n.id, n.name]));
+  // Look up parent Locations so the folder can carry their info — name,
+  // type, KRMA reserve, description — and BE the Location (no separate
+  // Location card). The filter below removes these Locations from `nodes`.
+  const parentLocationsById = new Map(
+    campaign.locations
+      .filter(l => childrenByParent.has(l.id))
+      .map(l => {
+        let parsed: Record<string, unknown> = {};
+        try { parsed = JSON.parse(l.data) as Record<string, unknown>; } catch { /* ignore */ }
+        return [l.id, { name: l.name, type: l.type, data: parsed }];
+      })
+  );
+  const autoFolders = Array.from(childrenByParent.entries()).map(([parentId, nodeIdsForParent]) => {
+    const loc = parentLocationsById.get(parentId);
+    return {
+      id: `auto-${parentId}`,
+      name: nodeNameById.get(parentId) ?? loc?.name ?? 'Container',
+      type: 'group' as const,
+      nodeIds: nodeIdsForParent,
+      locationInfo: loc
+        ? {
+            locationId: parentId,
+            locationType: loc.type,
+            krmaReserve: typeof loc.data.krmaReserve === 'number' ? loc.data.krmaReserve : undefined,
+            description: typeof loc.data.description === 'string' ? loc.data.description : undefined,
+          }
+        : undefined,
+    };
+  });
+  const filteredParentIds = new Set(autoFolders.map(f => f.locationInfo?.locationId).filter((id): id is string => !!id));
+
+  // Strip parent Locations from the rendered canvas nodes — they ARE their
+  // folders now, no separate Location card on top of the folder header.
+  const nodes = allNodes.filter(n => !(n.type === 'location' && filteredParentIds.has(n.id)));
 
   const campaignData = {
     id: campaign.id,
