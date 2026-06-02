@@ -1598,15 +1598,15 @@ export default function RelationsCanvas({
     const startX = fromX + ux * fromOffset;
     const startY = fromY + uy * fromOffset;
 
-    // End point: for possession edges, compute precise rectangle exit so the
-    // line lands on the card border instead of past it. Old relational edges
-    // keep their fixed offset.
+    // End point: for possession edges, land on the target's TOP-LEFT corner
+    // so each marker plugs into the same anchor point on its card. Relational
+    // edges keep the directional offset.
     let endX: number;
     let endY: number;
     if (isPossessionEdge) {
-      const exit = rectExitPoint(toNode, toPos.x, toPos.y, fromX, fromY);
-      endX = exit.x;
-      endY = exit.y;
+      const { w, h } = nodeRect(toNode);
+      endX = toPos.x - w / 2;
+      endY = toPos.y - h / 2;
     } else {
       const toOffset = (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
       endX = toPos.x - ux * toOffset;
