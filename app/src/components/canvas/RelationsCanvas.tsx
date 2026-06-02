@@ -316,6 +316,28 @@ export default function RelationsCanvas({
     persistState();
   }, [persistState]);
 
+  // ── Focus-on-entity event listener ────────────────────────────────────────
+  // PossessionsCard (and other surfaces) dispatch 'growth:focus-canvas-node'
+  // with { entityId }. We pan the camera so that entity centers in the
+  // viewport. The entity must be one of the canvas nodes; otherwise we no-op.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ entityId?: string }>).detail;
+      const entityId = detail?.entityId;
+      if (!entityId) return;
+      const node = nodes.find(n => n.id === entityId);
+      if (!node) return;
+      const dragged = nodePositions.get(entityId);
+      const targetX = dragged?.x ?? node.x;
+      const targetY = dragged?.y ?? node.y;
+      const vbW = BASE_WIDTH * zoom;
+      const vbH = BASE_HEIGHT * zoom;
+      setCamera({ x: targetX - vbW / 2, y: targetY - vbH / 2 });
+    };
+    window.addEventListener('growth:focus-canvas-node', handler);
+    return () => window.removeEventListener('growth:focus-canvas-node', handler);
+  }, [nodes, nodePositions, BASE_WIDTH, BASE_HEIGHT, zoom]);
+
   // Measure circle positions from DOM once after expand/panel changes settle.
   // Stored as offsets from the card wrapper's top-left in SVG units (cardWidth Ã— cardHeight),
   // so they don't change with zoom/pan/drag â€” just add cardLeft/cardTop at render time.
