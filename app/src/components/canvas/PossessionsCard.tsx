@@ -56,7 +56,6 @@ function formatKrma(n: number): string {
 export default function PossessionsCard({ characterId, characterName, onClose }: PossessionsCardProps) {
   const [rows, setRows] = useState<PossessionRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,7 +106,6 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
           background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)',
           borderRadius: '2px 2px 0 0',
         }}
-        onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -150,9 +148,9 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
         </div>
       </div>
 
-      {/* Body */}
-      {isExpanded && (
-        <div className="p-3" style={{ minHeight: '80px' }}>
+      {/* Body — always visible. The panel is either open (this card mounted)
+          or closed (X / panel-button toggle). No collapse-to-header state. */}
+      <div className="p-3" style={{ minHeight: '80px' }}>
           {err && (
             <div
               className="border p-2 text-xs"
@@ -267,8 +265,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
               ))}
             </div>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
