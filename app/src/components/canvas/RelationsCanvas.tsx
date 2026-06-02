@@ -323,13 +323,26 @@ export default function RelationsCanvas({
   }, [persistState]);
 
   // ── Measure possession-row positions ──────────────────────────────────────
-  // After the possessions panel renders, walk each row and store its SVG-space
-  // center so tethers anchor precisely. Re-runs when panels open/close, when
-  // panels are dragged, when expand state changes, or when camera/zoom changes.
+  // Walks `[data-possession-row]` elements each animation frame while a
+  // possessions panel is open and stores their SVG-space center so tethers
+  // anchor precisely. rAF-driven so panel drags stay smooth (no debounce lag).
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let raf = 0;
+    let stopped = false;
+
+    const anyOpen = Array.from(panelOpenNodes.values()).some((s) => s.has('possessions'));
+    if (!anyOpen) {
+      if (possessionRowPosRef.current.size > 0) {
+        possessionRowPosRef.current = new Map();
+        setPossessionRowVersion((v) => v + 1);
+      }
+      return;
+    }
+
+    const measure = () => {
+      if (stopped) return;
       const svg = svgRef.current;
-      if (!svg) return;
+      if (!svg) { raf = requestAnimationFrame(measure); return; }
       const rows = svg.querySelectorAll('[data-possession-row]') as NodeListOf<HTMLElement>;
       const newMap = new Map<string, { x: number; y: number }>();
       rows.forEach((el) => {
@@ -345,14 +358,12 @@ export default function RelationsCanvas({
         const foSvgX = parseFloat(fo.getAttribute('x') || '0');
         const foSvgY = parseFloat(fo.getAttribute('y') || '0');
         const elRect = el.getBoundingClientRect();
-        // Right edge of the row, vertically centered, in screen px relative to fo top-left
         const relScreenX = (elRect.left + elRect.width) - foRect.left;
         const relScreenY = (elRect.top + elRect.height / 2) - foRect.top;
         const dx = relScreenX * svgPerPx;
         const dy = relScreenY * svgPerPx;
         newMap.set(`${charId}__${targetId}`, { x: foSvgX + dx, y: foSvgY + dy });
       });
-      // Only update state if positions actually changed (cheap diff)
       let changed = newMap.size !== possessionRowPosRef.current.size;
       if (!changed) {
         for (const [k, v] of newMap) {
@@ -362,9 +373,11 @@ export default function RelationsCanvas({
       }
       possessionRowPosRef.current = newMap;
       if (changed) setPossessionRowVersion((v) => v + 1);
-    }, 60);
-    return () => clearTimeout(timer);
-  }, [panelOpenNodes, panelOffsets, expandedNodes, camera.x, camera.y, zoom, nodePositions]);
+      raf = requestAnimationFrame(measure);
+    };
+    raf = requestAnimationFrame(measure);
+    return () => { stopped = true; cancelAnimationFrame(raf); };
+  }, [panelOpenNodes]);
 
   // ── Focus-on-entity event listener ────────────────────────────────────────
   // PossessionsCard (and other surfaces) dispatch 'growth:focus-canvas-node'
@@ -1459,14 +1472,31 @@ export default function RelationsCanvas({
 
   // â”€â”€ Render connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  /** Approximate visual half-extent for a node, used to terminate edges
-   *  at the card boundary instead of the center. */
-  const nodeHalfExtent = (n: CanvasNode) => {
+  /** Node card dimensions in SVG units. Mirrors the toggleExpand sizes map. */
+  const nodeRect = (n: CanvasNode): { w: number; h: number } => {
     const expanded = expandedNodes.has(n.id);
-    if (n.type === 'character') return expanded ? 470 : 160; // 1885×670 vs 500×240
-    if (n.type === 'location')  return expanded ? 200 : 90;  // ~480×700 vs 320×180
-    if (n.type === 'item')      return expanded ? 110 : 80;  // ~420×600 vs 280×160
-    return 60;
+    if (n.type === 'character') return expanded ? { w: 1885, h: 670 } : { w: 500, h: 240 };
+    if (n.type === 'location')  return expanded ? { w: 480,  h: 700 } : { w: 320, h: 180 };
+    if (n.type === 'item')      return expanded ? { w: 420,  h: 600 } : { w: 280, h: 160 };
+    return { w: 120, h: 120 };
+  };
+
+  /** Compute where a line from (fromX, fromY) toward node `to`'s center
+   *  exits `to`'s rectangle. Used to terminate tethers at the card edge
+   *  instead of the center. Slight inset (4 px) so the line tip touches
+   *  the visible border, not floats just inside it. */
+  const rectExitPoint = (toNode: CanvasNode, toCx: number, toCy: number, fromX: number, fromY: number) => {
+    const { w, h } = nodeRect(toNode);
+    const dx = toCx - fromX;
+    const dy = toCy - fromY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) return { x: toCx, y: toCy };
+    const ux = dx / len;
+    const uy = dy / len;
+    const tX = Math.abs(ux) > 1e-4 ? (w / 2) / Math.abs(ux) : Infinity;
+    const tY = Math.abs(uy) > 1e-4 ? (h / 2) / Math.abs(uy) : Infinity;
+    const t = Math.min(tX, tY) - 4;
+    return { x: toCx - ux * t, y: toCy - uy * t };
   };
 
   /** Replicates the panel-render math from the panel-render block so that
@@ -1563,14 +1593,25 @@ export default function RelationsCanvas({
     const ux = dx / length;
     const uy = dy / length;
 
-    // Per-node-type end offset so edges terminate at the card boundary.
-    const fromOffset = isPossessionEdge ? 8 : (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
-    const toOffset = isPossessionEdge ? nodeHalfExtent(toNode) : (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
-
+    // Start point: tiny inset for owns (already at panel edge), generic offset for relational edges.
+    const fromOffset = isPossessionEdge ? 0 : (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
     const startX = fromX + ux * fromOffset;
     const startY = fromY + uy * fromOffset;
-    const endX = toPos.x - ux * toOffset;
-    const endY = toPos.y - uy * toOffset;
+
+    // End point: for possession edges, compute precise rectangle exit so the
+    // line lands on the card border instead of past it. Old relational edges
+    // keep their fixed offset.
+    let endX: number;
+    let endY: number;
+    if (isPossessionEdge) {
+      const exit = rectExitPoint(toNode, toPos.x, toPos.y, fromX, fromY);
+      endX = exit.x;
+      endY = exit.y;
+    } else {
+      const toOffset = (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
+      endX = toPos.x - ux * toOffset;
+      endY = toPos.y - uy * toOffset;
+    }
 
     // Thin tethers for possessions; existing fat strength-scaled edges otherwise.
     const baseWidth = 1.5;
