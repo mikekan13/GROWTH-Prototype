@@ -408,6 +408,165 @@ export function FolderGroupRect({
         );
       })()}
 
+      {/* Location header chrome — portrait + AI/Upload stubs + child-type
+          counts. Renders only for Location auto-folders (those with
+          locationInfo). Sits inside the 80 px header rectangle to the left
+          of the KRMA reserve. */}
+      {folder.locationInfo && (
+        <>
+          {/* Portrait box */}
+          <foreignObject
+            x={bounds.x + 8}
+            y={bounds.y + 8}
+            width={64}
+            height={64}
+            style={{ pointerEvents: 'none', overflow: 'visible' }}
+          >
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                border: '2px solid #ffcc78',
+                borderRadius: 4,
+                background: 'rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              {folder.locationInfo.imageUrl ? (
+                <img
+                  src={folder.locationInfo.imageUrl}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span style={{ color: 'rgba(255,204,120,0.4)', fontSize: 32, lineHeight: 1 }}>{'❖'}</span>
+              )}
+            </div>
+          </foreignObject>
+
+          {/* AI Generate + Upload buttons (stubs — handlers TBD). */}
+          <foreignObject
+            x={bounds.x + 80}
+            y={bounds.y + 8}
+            width={170}
+            height={30}
+            style={{ pointerEvents: 'auto', overflow: 'visible' }}
+          >
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // eslint-disable-next-line no-console
+                  console.log('[location] AI generate image — TODO', folder.locationInfo?.locationId);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '5px 10px',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(34,171,148,0.6)',
+                  color: '#22ab94',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  borderRadius: 2,
+                  textShadow: '0 0 4px rgba(34,171,148,0.4)',
+                }}
+                title="Generate location portrait via AI (TODO)"
+              >
+                ✨ GEN
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // eslint-disable-next-line no-console
+                  console.log('[location] upload image — TODO', folder.locationInfo?.locationId);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '5px 10px',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: 'rgba(255,255,255,0.75)',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  borderRadius: 2,
+                }}
+                title="Upload an image for this location (TODO)"
+              >
+                ↑ UPLOAD
+              </button>
+            </div>
+          </foreignObject>
+
+          {/* Content-type count row */}
+          {folder.locationInfo.contentCounts && (
+            <foreignObject
+              x={bounds.x + 80}
+              y={bounds.y + 44}
+              width={500}
+              height={28}
+              style={{ pointerEvents: 'none', overflow: 'visible' }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 14,
+                  alignItems: 'center',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,0.7)',
+                }}
+              >
+                {(folder.locationInfo.contentCounts.locations ?? 0) > 0 && (
+                  <span title="Sub-locations">
+                    <span style={{ color: '#22ab94', marginRight: 4 }}>⌂</span>
+                    {folder.locationInfo.contentCounts.locations}
+                  </span>
+                )}
+                {(folder.locationInfo.contentCounts.characters ?? 0) > 0 && (
+                  <span title="Characters / PCs">
+                    <span style={{ color: '#f7525f', marginRight: 4 }}>✴</span>
+                    {folder.locationInfo.contentCounts.characters}
+                  </span>
+                )}
+                {(folder.locationInfo.contentCounts.npcs ?? 0) > 0 && (
+                  <span title="NPCs">
+                    <span style={{ color: '#ffcc78', marginRight: 4 }}>✴</span>
+                    {folder.locationInfo.contentCounts.npcs}
+                  </span>
+                )}
+                {(folder.locationInfo.contentCounts.items ?? 0) > 0 && (
+                  <span title="Items">
+                    <span style={{ color: '#8e7cc3', marginRight: 4 }}>❖</span>
+                    {folder.locationInfo.contentCounts.items}
+                  </span>
+                )}
+                {folder.locationInfo.locationType && (
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: 10,
+                      color: 'rgba(255,255,255,0.4)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.12em',
+                    }}
+                    title="Location type"
+                  >
+                    {folder.locationInfo.locationType.replace(/_/g, ' ')}
+                  </span>
+                )}
+              </div>
+            </foreignObject>
+          )}
+        </>
+      )}
+
       {/* KRMA Reserve readout — Location auto-folders ONLY. The folder IS
           the Location, so its ambient KRMA mass shows where the party TKV
           would. Same slide-right collision logic as TKV. */}

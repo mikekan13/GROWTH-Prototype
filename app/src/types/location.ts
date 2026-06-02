@@ -31,6 +31,12 @@ export interface GrowthLocation {
    * See memory: location-krma-reserve-2026-06-02.
    */
   krmaReserve?: number;
+  /**
+   * Portrait-style image for the location. Either an uploaded URL or
+   * an AI-generated one (FLUX/PuLID pipeline). Renders in the folder
+   * header so the location reads visually at a glance.
+   */
+  imageUrl?: string;
 }
 
 export interface LocationConnection {

@@ -26,5 +26,16 @@ export interface CanvasFolder {
     locationType?: string;
     krmaReserve?: number;
     description?: string;
+    /** Optional portrait/banner image URL for the location. */
+    imageUrl?: string;
+    /** Per-entity-type child counts for the at-a-glance summary row. */
+    contentCounts?: {
+      locations?: number;
+      characters?: number;
+      npcs?: number;
+      items?: number;
+      godheads?: number;
+      goals?: number;
+    };
   };
 }

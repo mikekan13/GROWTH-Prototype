@@ -203,8 +203,26 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
         return [l.id, { name: l.name, type: l.type, data: parsed }];
       })
   );
+  // Build a type lookup so we can count children by type without re-querying.
+  const nodeTypeById = new Map<string, 'character' | 'location' | 'item'>();
+  for (const n of allNodes) nodeTypeById.set(n.id, n.type as 'character' | 'location' | 'item');
+  // For NPCs vs characters: NPCs are characters with entityType=NPC.
+  const npcIds = new Set(campaign.characters.filter(c => {
+    try { return (JSON.parse(c.data) as Record<string, unknown>).entityType === 'NPC'; } catch { return false; }
+  }).map(c => c.id));
+
   const autoFolders = Array.from(childrenByParent.entries()).map(([parentId, nodeIdsForParent]) => {
     const loc = parentLocationsById.get(parentId);
+    // Aggregate child counts by type
+    const counts = { locations: 0, characters: 0, npcs: 0, items: 0 };
+    for (const childId of nodeIdsForParent) {
+      const t = nodeTypeById.get(childId);
+      if (t === 'location') counts.locations += 1;
+      else if (t === 'character') {
+        if (npcIds.has(childId)) counts.npcs += 1;
+        else counts.characters += 1;
+      } else if (t === 'item') counts.items += 1;
+    }
     return {
       id: `auto-${parentId}`,
       name: nodeNameById.get(parentId) ?? loc?.name ?? 'Container',
@@ -216,6 +234,8 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
             locationType: loc.type,
             krmaReserve: typeof loc.data.krmaReserve === 'number' ? loc.data.krmaReserve : undefined,
             description: typeof loc.data.description === 'string' ? loc.data.description : undefined,
+            imageUrl: typeof loc.data.imageUrl === 'string' ? loc.data.imageUrl : undefined,
+            contentCounts: counts,
           }
         : undefined,
     };
