@@ -196,6 +196,9 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
                     cursor: 'pointer',
                   }}
                   title={r.note ? `${r.note}\n\nClick to jump to it on the canvas.` : 'Click to jump to it on the canvas.'}
+                  data-possession-row
+                  data-possession-character-id={characterId}
+                  data-possession-target-id={r.targetId}
                 >
                   <span
                     style={{

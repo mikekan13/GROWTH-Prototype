@@ -266,6 +266,12 @@ export default function RelationsCanvas({
   const circleOffsetsRef = useRef<Map<string, { dx: number; dy: number }>>(new Map());
   const circleOffsetVersion = useRef(0);
 
+  // Measured possession-row positions in absolute SVG coords. Key:
+  // `${characterId}__${targetId}`. Populated by a DOM walk after the
+  // possessions panel renders, so tether origins land precisely on each row.
+  const possessionRowPosRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const [possessionRowVersion, setPossessionRowVersion] = useState(0);
+
   // Panel z-order: each panel gets an incrementing z-index when dragged; higher = on top
   const [panelZOrder, setPanelZOrder] = useState<Map<string, number>>(new Map());
   const panelZCounterRef = useRef(1);
@@ -315,6 +321,50 @@ export default function RelationsCanvas({
   useEffect(() => {
     persistState();
   }, [persistState]);
+
+  // ── Measure possession-row positions ──────────────────────────────────────
+  // After the possessions panel renders, walk each row and store its SVG-space
+  // center so tethers anchor precisely. Re-runs when panels open/close, when
+  // panels are dragged, when expand state changes, or when camera/zoom changes.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rows = svg.querySelectorAll('[data-possession-row]') as NodeListOf<HTMLElement>;
+      const newMap = new Map<string, { x: number; y: number }>();
+      rows.forEach((el) => {
+        const charId = el.getAttribute('data-possession-character-id');
+        const targetId = el.getAttribute('data-possession-target-id');
+        if (!charId || !targetId) return;
+        const fo = el.closest('foreignObject');
+        if (!fo) return;
+        const foW = parseFloat(fo.getAttribute('width') || '1');
+        const foRect = fo.getBoundingClientRect();
+        if (foRect.width === 0) return;
+        const svgPerPx = foW / foRect.width;
+        const foSvgX = parseFloat(fo.getAttribute('x') || '0');
+        const foSvgY = parseFloat(fo.getAttribute('y') || '0');
+        const elRect = el.getBoundingClientRect();
+        // Right edge of the row, vertically centered, in screen px relative to fo top-left
+        const relScreenX = (elRect.left + elRect.width) - foRect.left;
+        const relScreenY = (elRect.top + elRect.height / 2) - foRect.top;
+        const dx = relScreenX * svgPerPx;
+        const dy = relScreenY * svgPerPx;
+        newMap.set(`${charId}__${targetId}`, { x: foSvgX + dx, y: foSvgY + dy });
+      });
+      // Only update state if positions actually changed (cheap diff)
+      let changed = newMap.size !== possessionRowPosRef.current.size;
+      if (!changed) {
+        for (const [k, v] of newMap) {
+          const prev = possessionRowPosRef.current.get(k);
+          if (!prev || prev.x !== v.x || prev.y !== v.y) { changed = true; break; }
+        }
+      }
+      possessionRowPosRef.current = newMap;
+      if (changed) setPossessionRowVersion((v) => v + 1);
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [panelOpenNodes, panelOffsets, expandedNodes, camera.x, camera.y, zoom, nodePositions]);
 
   // ── Focus-on-entity event listener ────────────────────────────────────────
   // PossessionsCard (and other surfaces) dispatch 'growth:focus-canvas-node'
@@ -1422,8 +1472,14 @@ export default function RelationsCanvas({
   /** Replicates the panel-render math from the panel-render block so that
    *  ownership tethers can originate from each ROW of the possessions panel
    *  (one tether per row, anchored at the row's right edge). Returns the
-   *  per-row origin point in SVG coords for a given owns-connection index. */
-  const possessionRowOrigin = (charNode: CanvasNode, rowIndex: number) => {
+   *  per-row origin point in SVG coords. Uses DOM-measured row positions
+   *  when available (set by the possessionRows effect below), and falls
+   *  back to a layout-formula approximation before measurement runs. */
+  const possessionRowOrigin = (charNode: CanvasNode, targetId: string, rowIndex: number) => {
+    // 1. Prefer measured: look up the row's absolute SVG center from DOM.
+    const measured = possessionRowPosRef.current.get(`${charNode.id}__${targetId}`);
+    if (measured) return measured;
+    // 2. Fallback approximation by layout formula.
     const charPos = getNodePosition(charNode.id, charNode.x, charNode.y);
     const expanded = expandedNodes.has(charNode.id);
     const cardWidth = expanded ? 1885 : 500;
@@ -1450,6 +1506,9 @@ export default function RelationsCanvas({
     const rowRightX = panelCenterX + panelW / 2 - 8; // tiny inset from the actual edge
     return { x: rowRightX, y: rowCenterY };
   };
+
+  // Read-once dependency on the version so render reacts to measurement updates.
+  void possessionRowVersion;
 
   /** Stable index map for owns connections so each row anchors to a
    *  deterministic position. Built from the connections array in render. */
@@ -1492,7 +1551,7 @@ export default function RelationsCanvas({
     let fromY = fromPos.y;
     if (isOwns) {
       const rowIdx = ownsRowIndexByEdge.get(connectionId) ?? 0;
-      const o = possessionRowOrigin(fromNode, rowIdx);
+      const o = possessionRowOrigin(fromNode, connection.to, rowIdx);
       fromX = o.x;
       fromY = o.y;
     }
