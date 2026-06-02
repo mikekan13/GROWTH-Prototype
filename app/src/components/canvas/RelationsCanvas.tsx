@@ -1569,8 +1569,40 @@ export default function RelationsCanvas({
 
   const renderConnection = (connection: CanvasConnection) => {
     const fromNode = nodes.find((n) => n.id === connection.from);
-    const toNode = nodes.find((n) => n.id === connection.to);
-    if (!fromNode || !toNode) return null;
+    let toNode = nodes.find((n) => n.id === connection.to);
+
+    // If the target became an auto-folder (parent Location turned into the
+    // folder), synthesize a "node" out of the folder's bounds so the tether
+    // can land on the folder's top-left corner.
+    let folderTargetRect: { x: number; y: number; w: number; h: number } | null = null;
+    if (!toNode) {
+      const folder = folders.find(f => f.id === `auto-${connection.to}`);
+      if (folder) {
+        // Top-left corner = min of (posX, content x). Fallback to posX/Y.
+        let minX = folder.posX ?? Infinity;
+        let minY = folder.posY ?? Infinity;
+        let maxX = (folder.posX != null && folder.userWidth) ? folder.posX + folder.userWidth : -Infinity;
+        let maxY = (folder.posY != null && folder.userHeight) ? folder.posY + folder.userHeight : -Infinity;
+        for (const nid of folder.nodeIds) {
+          const p = nodePositions.get(nid);
+          if (!p) continue;
+          const off = dragOffsets.get(nid) || { x: 0, y: 0 };
+          const cx = p.x + off.x;
+          const cy = p.y + off.y;
+          // Approximate each child as 320×180 (collapsed location) — good
+          // enough for an attachment point.
+          minX = Math.min(minX, cx - 160);
+          minY = Math.min(minY, cy - 90);
+          maxX = Math.max(maxX, cx + 160);
+          maxY = Math.max(maxY, cy + 90);
+        }
+        if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+          folderTargetRect = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+        }
+      }
+    }
+
+    if (!fromNode || (!toNode && !folderTargetRect)) return null;
 
     const isOwns = connection.type === 'owns';
     const isLocatedAt = connection.type === 'located_at';
@@ -1586,8 +1618,12 @@ export default function RelationsCanvas({
 
     // Use visual (drag-aware) positions so tethers track cards live during
     // drag instead of waiting for the drag-end commit.
-    const fromPos = getVisualPosition(fromNode.id, fromNode.x, fromNode.y);
-    const toPos = getVisualPosition(toNode.id, toNode.x, toNode.y);
+    const fromPos = getVisualPosition(fromNode!.id, fromNode!.x, fromNode!.y);
+    const toPos = toNode
+      ? getVisualPosition(toNode.id, toNode.x, toNode.y)
+      : folderTargetRect
+        ? { x: folderTargetRect.x + folderTargetRect.w / 2, y: folderTargetRect.y + folderTargetRect.h / 2 }
+        : { x: 0, y: 0 };
     const color = getConnectionColor(connection.type);
     const connectionId = `${connection.from}-${connection.to}-${connection.type}`;
 
@@ -1609,7 +1645,7 @@ export default function RelationsCanvas({
     const uy = dy / length;
 
     // Start point: tiny inset for owns (already at panel edge), generic offset for relational edges.
-    const fromOffset = isPossessionEdge ? 0 : (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
+    const fromOffset = isPossessionEdge ? 0 : (fromNode!.type === 'character' || (toNode && toNode.type === 'character') ? 60 : 30);
     const startX = fromX + ux * fromOffset;
     const startY = fromY + uy * fromOffset;
 
@@ -1619,11 +1655,20 @@ export default function RelationsCanvas({
     let endX: number;
     let endY: number;
     if (isPossessionEdge) {
-      const { w, h } = nodeRect(toNode);
+      let w: number;
+      let h: number;
+      if (toNode) {
+        ({ w, h } = nodeRect(toNode));
+      } else if (folderTargetRect) {
+        w = folderTargetRect.w;
+        h = folderTargetRect.h;
+      } else {
+        w = 320; h = 180;
+      }
       endX = toPos.x - w / 2;
       endY = toPos.y - h / 2;
     } else {
-      const toOffset = (fromNode.type === 'character' || toNode.type === 'character' ? 60 : 30);
+      const toOffset = (fromNode!.type === 'character' || (toNode && toNode.type === 'character') ? 60 : 30);
       endX = toPos.x - ux * toOffset;
       endY = toPos.y - uy * toOffset;
     }

@@ -168,8 +168,28 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     orderBy: { createdAt: 'asc' }, // matches the possessions panel ordering
     select: { sourceId: true, targetId: true, relationshipType: true, strength: true },
   });
+  // Owns connections survive even when the target became an auto-folder
+  // (parent Location removed from the canvas as a standalone node). The
+  // client connection renderer looks up the matching folder by id when
+  // the target isn't a node. Located-at edges still require both endpoints
+  // on-canvas since they're parent ↔ child relations of visible nodes.
+  // Build the set of parent IDs that became folders (filteredParentIds)
+  // up here so the connection filter can keep "owns → folder" edges.
+  // Note: filteredParentIds is computed below in autoFolders. We compute
+  // here to use it both for filtering and folder-attachment.
+  const parentIdSet = new Set<string>();
+  for (const r of relationshipRows) {
+    if (r.relationshipType === 'located_at' && nodeIdSet.has(r.sourceId)) {
+      parentIdSet.add(r.targetId);
+    }
+  }
   const connections = relationshipRows
-    .filter(r => nodeIdSet.has(r.sourceId) && nodeIdSet.has(r.targetId))
+    .filter(r => {
+      if (!nodeIdSet.has(r.sourceId)) return false;
+      if (nodeIdSet.has(r.targetId)) return true;
+      // Allow owns edges where the target is a parent-Location-turned-folder.
+      return r.relationshipType === 'owns' && parentIdSet.has(r.targetId);
+    })
     .map(r => ({
       from: r.sourceId,
       to: r.targetId,
