@@ -165,6 +165,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       campaignId: campaign.id,
       relationshipType: { in: ['owns', 'located_at'] },
     },
+    orderBy: { createdAt: 'asc' }, // matches the possessions panel ordering
     select: { sourceId: true, targetId: true, relationshipType: true, strength: true },
   });
   const connections = relationshipRows

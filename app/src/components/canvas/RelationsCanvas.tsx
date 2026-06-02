@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import CharacterCard from "./CharacterCard";
 import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
@@ -1419,13 +1419,51 @@ export default function RelationsCanvas({
     return 60;
   };
 
-  /** Approximate y-offset from the character card's center down to where
-   *  the panel-button row sits, so ownership tethers can originate from
-   *  the panel area (not the card body) when the panel is open. */
-  const characterPanelAnchorOffset = (n: CanvasNode) => {
-    if (n.type !== 'character') return 0;
-    return expandedNodes.has(n.id) ? 380 : 130;
+  /** Replicates the panel-render math from the panel-render block so that
+   *  ownership tethers can originate from each ROW of the possessions panel
+   *  (one tether per row, anchored at the row's right edge). Returns the
+   *  per-row origin point in SVG coords for a given owns-connection index. */
+  const possessionRowOrigin = (charNode: CanvasNode, rowIndex: number) => {
+    const charPos = getNodePosition(charNode.id, charNode.x, charNode.y);
+    const expanded = expandedNodes.has(charNode.id);
+    const cardWidth = expanded ? 1885 : 500;
+    const cardHeight = expanded ? 670 : 240;
+    const cardLeft = charPos.x - cardWidth / 2;
+    const cardTop = charPos.y - cardHeight / 2;
+    const cached = circleOffsetsRef.current.get('possessions');
+    // Same fallback positions as the panel render block.
+    const rawAnchorX = cached ? (cardLeft + cached.dx) : (cardLeft + 436 + 200);
+    const rawAnchorY = cached ? (cardTop + cached.dy) : (cardTop + 515 + 13);
+    const offset = panelOffsets.get(`${charNode.id}__possessions`) || { x: 0, y: 20 };
+    const panelCenterX = rawAnchorX + offset.x;
+    const panelTopY = rawAnchorY + offset.y;
+    const panelW = 440;
+    // Row layout from PossessionsCard:
+    //  - Header ~58 px (p-3 + content)
+    //  - Body p-3 → 12 px top padding
+    //  - Each row ~32 px tall with 6 px gap (space-y-1.5)
+    const headerH = 58;
+    const bodyPadTop = 12;
+    const rowH = 32;
+    const rowGap = 6;
+    const rowCenterY = panelTopY + headerH + bodyPadTop + rowIndex * (rowH + rowGap) + rowH / 2;
+    const rowRightX = panelCenterX + panelW / 2 - 8; // tiny inset from the actual edge
+    return { x: rowRightX, y: rowCenterY };
   };
+
+  /** Stable index map for owns connections so each row anchors to a
+   *  deterministic position. Built from the connections array in render. */
+  const ownsRowIndexByEdge = useMemo(() => {
+    const map = new Map<string, number>();
+    const counters = new Map<string, number>();
+    for (const c of connections) {
+      if (c.type !== 'owns') continue;
+      const idx = counters.get(c.from) ?? 0;
+      map.set(`${c.from}-${c.to}-owns`, idx);
+      counters.set(c.from, idx + 1);
+    }
+    return map;
+  }, [connections]);
 
   const renderConnection = (connection: CanvasConnection) => {
     const fromNode = nodes.find((n) => n.id === connection.from);
@@ -1449,9 +1487,15 @@ export default function RelationsCanvas({
     const color = getConnectionColor(connection.type);
     const connectionId = `${connection.from}-${connection.to}-${connection.type}`;
 
-    // Origin shift: for owns, drop the source down to the panel area.
-    const fromX = fromPos.x;
-    const fromY = isOwns ? fromPos.y + characterPanelAnchorOffset(fromNode) : fromPos.y;
+    // Origin: for owns, anchor at the specific possessions-panel row.
+    let fromX = fromPos.x;
+    let fromY = fromPos.y;
+    if (isOwns) {
+      const rowIdx = ownsRowIndexByEdge.get(connectionId) ?? 0;
+      const o = possessionRowOrigin(fromNode, rowIdx);
+      fromX = o.x;
+      fromY = o.y;
+    }
 
     const dx = toPos.x - fromX;
     const dy = toPos.y - fromY;
