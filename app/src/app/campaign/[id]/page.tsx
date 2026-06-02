@@ -177,6 +177,27 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       strength: r.strength,
     }));
 
+  // Auto-folders from located_at edges. For each parent that has children
+  // on the canvas, generate a CanvasFolder containing the children — same
+  // primitive as the party folder, just constructed from the relationship
+  // graph instead of user-authored. User-stored overrides (same id) win
+  // client-side so customizations persist.
+  const childrenByParent = new Map<string, string[]>();
+  for (const r of relationshipRows) {
+    if (r.relationshipType !== 'located_at') continue;
+    if (!nodeIdSet.has(r.sourceId) || !nodeIdSet.has(r.targetId)) continue;
+    const arr = childrenByParent.get(r.targetId) ?? [];
+    arr.push(r.sourceId);
+    childrenByParent.set(r.targetId, arr);
+  }
+  const nodeNameById = new Map(nodes.map(n => [n.id, n.name]));
+  const autoFolders = Array.from(childrenByParent.entries()).map(([parentId, nodeIds]) => ({
+    id: `auto-${parentId}`,
+    name: nodeNameById.get(parentId) ?? 'Container',
+    type: 'group' as const,
+    nodeIds,
+  }));
+
   const campaignData = {
     id: campaign.id,
     name: campaign.name,
@@ -197,6 +218,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       campaign={campaignData}
       nodes={nodes}
       connections={connections}
+      autoFolders={autoFolders}
       userId={session.user.id}
       username={session.user.username}
       userRole={session.user.role}

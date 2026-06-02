@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -79,6 +79,10 @@ interface CampaignCanvasProps {
   userCharacter?: { id: string; name: string; data: string } | null;
   /** Roster used by the canvas card controller dropdown. */
   trailblazers?: TrailblazerOption[];
+  /** Server-generated folders from located_at relationships (e.g. Tree of
+   *  Life containing its 10 Sephirot rooms). Merged with localStorage
+   *  user-customized folders — user version wins per-id. */
+  autoFolders?: CanvasFolder[];
 }
 
 type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry' | 'character';
@@ -93,7 +97,7 @@ interface CampaignEconomyData {
   total: string;
 }
 
-export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers }: CampaignCanvasProps) {
+export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers, autoFolders }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
   // In-canvas character selection: when set, the Character tab loads THIS character
   // instead of the user's own PC. Cleared when navigating to a non-character tab so
@@ -323,6 +327,19 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     const changed = cleaned.some((f, i) => f.nodeIds.length !== folders[i].nodeIds.length);
     if (changed) handleFoldersChange(cleaned);
   }, [nodes, folders, handleFoldersChange]);
+
+  // Effective folders = user-stored ∪ auto-generated (user wins per-id).
+  // Once the user drags / resizes / collapses an auto-folder, the modified
+  // version persists to localStorage and overrides the auto- entry forever.
+  const effectiveFolders = useMemo(() => {
+    if (!autoFolders || autoFolders.length === 0) return folders;
+    const storedIds = new Set(folders.map(f => f.id));
+    const merged = [...folders];
+    for (const af of autoFolders) {
+      if (!storedIds.has(af.id) && af.nodeIds.length > 0) merged.push(af);
+    }
+    return merged;
+  }, [folders, autoFolders]);
 
   // Forge items (published, for Canvas toolbox "Place from Forge")
   const [forgeItems, setForgeItems] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown> }>>([]);
@@ -1000,7 +1017,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onCreateItemFromForge={handleCreateItemFromForge}
             forgeItems={forgeItems}
             onEntityCrossLine={handleEntityCrossLine}
-            folders={folders}
+            folders={effectiveFolders}
             onFoldersChange={handleFoldersChange}
             onRestComplete={() => router.refresh()}
             isGM={isGM}
