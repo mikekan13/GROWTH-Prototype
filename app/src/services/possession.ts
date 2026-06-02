@@ -31,6 +31,8 @@ export interface PossessionRow {
   krmaValue: number;
   note: string | null;
   createdAt: string;
+  /** Direct children inside this possession (located_at edges). */
+  contentsCount: number;
 }
 
 function parsePossessionData(raw: string | null): PossessionData {
@@ -130,6 +132,16 @@ export async function listCharacterPossessions(
     for (const r of rows) targetsById.set(r.id, { name: r.name, subtype: r.entityType, status: r.status });
   }
 
+  // Per-possession contents count via single grouped query.
+  const targetIds = edges.map(e => e.targetId);
+  const grouped = await prisma.entityRelationship.groupBy({
+    by: ['targetId'],
+    where: { targetId: { in: targetIds }, relationshipType: 'located_at' },
+    _count: { _all: true },
+  });
+  const countByTargetId = new Map<string, number>();
+  for (const g of grouped) countByTargetId.set(g.targetId, g._count._all);
+
   return edges.map((e): PossessionRow => {
     const data = parsePossessionData(e.data);
     const target = targetsById.get(e.targetId) ?? { name: '(missing entity)', subtype: null, status: null };
@@ -143,6 +155,7 @@ export async function listCharacterPossessions(
       krmaValue: data.krmaValue ?? 0,
       note: data.note ?? null,
       createdAt: e.createdAt.toISOString(),
+      contentsCount: countByTargetId.get(e.targetId) ?? 0,
     };
   });
 }
