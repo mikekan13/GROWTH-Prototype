@@ -3,7 +3,20 @@
  * Locations are first-class campaign entities that appear on the Relations Canvas.
  */
 
-export type LocationType = 'settlement' | 'wilderness' | 'dungeon' | 'building' | 'point_of_interest' | 'region';
+export type LocationType =
+  | 'settlement'
+  | 'wilderness'
+  | 'dungeon'
+  | 'building'
+  | 'point_of_interest'
+  | 'region'
+  /** Meta-tier container — for Terminal-level / cosmological entities that
+   *  hold domains. Renders distinctly so it reads as out-of-world. */
+  | 'meta'
+  /** Cosmic-landmark — the seeded type for Tree of Life / River Styx etc. */
+  | 'cosmic_landmark'
+  /** A force/army/collective — Undead Army etc. */
+  | 'force';
 
 export interface GrowthLocation {
   description: string;
@@ -32,11 +45,26 @@ export interface GrowthLocation {
    */
   krmaReserve?: number;
   /**
-   * Portrait-style image for the location. Either an uploaded URL or
-   * an AI-generated one (FLUX/PuLID pipeline). Renders in the folder
-   * header so the location reads visually at a glance.
+   * Portrait-style image for the location. Always AI-generated via the
+   * unified pipeline (no uploads — see ai-image-generation-pipeline memory).
+   * Renders in the folder header so the location reads visually at a glance.
    */
   imageUrl?: string;
+  /**
+   * Battlemap is a PROPERTY of a leaf Location, not a child entity. When
+   * present, the leaf Location can be played on as a tactical grid.
+   * Per the world-as-recursive-locations design pillar, items + people
+   * at the leaf use `located_at` edges; the battlemap is the visible
+   * grid those entities stand on.
+   */
+  battlemap?: {
+    imageUrl?: string;       // AI-generated battlemap image
+    gridWidth?: number;      // In 5 ft squares
+    gridHeight?: number;
+    gridOriginX?: number;    // Image pixel coords of the grid's top-left
+    gridOriginY?: number;
+    gridCellPx?: number;     // Image pixels per grid square
+  };
 }
 
 export interface LocationConnection {
@@ -60,6 +88,9 @@ export const LOCATION_TYPE_ICONS: Record<LocationType, string> = {
   building: '\u{1F3DB}',       // classical building
   point_of_interest: '\u{2B50}', // star
   region: '\u{1F5FA}',         // map
+  meta: '\u{1F310}',           // globe with meridians — meta-tier
+  cosmic_landmark: '\u{2734}', // eight-pointed star
+  force: '\u{2694}️',     // crossed swords
 };
 
 export const LOCATION_TYPE_COLORS: Record<LocationType, string> = {
@@ -69,4 +100,7 @@ export const LOCATION_TYPE_COLORS: Record<LocationType, string> = {
   building: '#60a5fa',         // Blue
   point_of_interest: '#ffcc78', // Gold
   region: '#22ab94',           // Teal
+  meta: '#ffffff',             // White — Terminal / out-of-world
+  cosmic_landmark: '#ffcc78',  // KRMA gold
+  force: '#E8585A',            // Body red — armies/forces
 };

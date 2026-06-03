@@ -329,14 +329,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [nodes, folders, handleFoldersChange]);
 
   // Effective folders = user-stored ∪ auto-generated (user wins per-id).
-  // Once the user drags / resizes / collapses an auto-folder, the modified
-  // version persists to localStorage and overrides the auto- entry forever.
+  // Auto-folders default to collapsed so the canvas reads calm by default —
+  // GM expands when they want to look inside, per the world-design pillar.
   const effectiveFolders = useMemo(() => {
     if (!autoFolders || autoFolders.length === 0) return folders;
     const storedIds = new Set(folders.map(f => f.id));
     const merged = [...folders];
     for (const af of autoFolders) {
-      if (!storedIds.has(af.id) && af.nodeIds.length > 0) merged.push(af);
+      if (!storedIds.has(af.id) && af.nodeIds.length > 0) {
+        merged.push({ ...af, collapsed: af.collapsed ?? true });
+      }
     }
     return merged;
   }, [folders, autoFolders]);
