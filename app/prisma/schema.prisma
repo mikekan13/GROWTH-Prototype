@@ -120,7 +120,6 @@ model Campaign {
   playerRequests      PlayerRequest[]
   locations           Location[]
   campaignItems       CampaignItem[]
-  encounters          Encounter[]
   goals               Goal[]
   aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
   relationships       EntityRelationship[]
@@ -429,26 +428,6 @@ model CampaignItem {
   @@index([campaignId, type])
   @@index([holderId])
   @@index([locationId])
-}
-
-model Encounter {
-  id          String   @id @default(cuid())
-  campaign    Campaign @relation(fields: [campaignId], references: [id])
-  campaignId  String
-  name        String
-  type        String   @default("combat") // combat | social | exploration | puzzle | event
-  status      String   @default("PLANNED") // PLANNED, ACTIVE, PAUSED, RESOLVED
-  round       Int      @default(0)
-  phase       String   @default("intention") // intention | resolution | impact
-  data        String   // JSON<GrowthEncounter>
-  locationId  String?  // Where this encounter takes place
-  sessionId   String?  // Which game session
-  createdBy   String   // userId of creator (GM)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([campaignId])
-  @@index([campaignId, status])
 }
 
 model CopilotMessage {

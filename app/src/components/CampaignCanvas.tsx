@@ -92,7 +92,7 @@ interface CampaignCanvasProps {
   entityNames?: Record<string, string>;
 }
 
-type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry' | 'character';
+type Tab = 'canvas' | 'forge' | 'tapestry' | 'character';
 // Tab was renamed from 'relations' to 'canvas' (2026-03-11), 'essence' to 'tapestry' (2026-03-14)
 
 const MIN_TERMINAL_HEIGHT = 150;
@@ -960,9 +960,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [terminalHeight]);
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'canvas', label: 'Canvas' },
     { key: 'forge', label: 'Forge' },
-    { key: 'encounters', label: 'Encounters' },
+    { key: 'canvas', label: 'Canvas' },
     { key: 'tapestry', label: 'Tapestry' },
     ...(!isGM ? [{ key: 'character' as Tab, label: 'Character' }] : []),
   ];
@@ -1399,53 +1398,6 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           />
         )}
 
-        {activeTab === 'encounters' && (
-          <div className="h-full overflow-y-auto p-6" style={{ background: 'var(--surface-dark)' }}>
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="text-center mb-6">
-                <div className="text-[var(--pillar-body)] text-xs font-[family-name:var(--font-terminal)] tracking-[0.3em] uppercase mb-1">
-                  Encounter Manager
-                </div>
-                <div className="text-white/20 text-[9px] font-[family-name:var(--font-terminal)]">
-                  Combat &middot; Social &middot; Exploration &middot; Events
-                </div>
-              </div>
-
-              {/* Create encounter button */}
-              {(userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD') && (
-                <button
-                  onClick={async () => {
-                    const name = window.prompt('Encounter name:');
-                    if (!name?.trim()) return;
-                    try {
-                      await fetch(`/api/campaigns/${campaign.id}/encounters`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: name.trim(), type: 'combat' }),
-                      });
-                      router.refresh();
-                    } catch { alert('Failed to create encounter'); }
-                  }}
-                  className="w-full py-3 border border-dashed border-[var(--pillar-body)]/30 text-[var(--pillar-body)]/60 text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] hover:border-[var(--pillar-body)]/60 hover:text-[var(--pillar-body)] transition-colors"
-                  style={{ background: 'rgba(232,88,90,0.05)' }}
-                >
-                  + New Encounter
-                </button>
-              )}
-
-              {/* Encounter list placeholder */}
-              <div className="text-center py-12 text-white/20 text-[10px] font-[family-name:var(--font-terminal)]">
-                <div className="mb-2">Encounters will appear here once created.</div>
-                <div className="text-white/10">
-                  Three-phase combat: Intention &rarr; Resolution &rarr; Impact
-                </div>
-                <div className="text-white/10 mt-1">
-                  Action economy: Body / Spirit / Soul pools per participant
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeTab === 'tapestry' && (
           <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} onSelectCharacter={handleSelectCharacter} />

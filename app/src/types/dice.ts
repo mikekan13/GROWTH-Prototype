@@ -25,7 +25,6 @@ export type RollSource =
   | { type: 'death_save'; characterId: string }
   | { type: 'magic_resistance'; characterId: string }
   | { type: 'item_use'; itemId: string; characterId: string }
-  | { type: 'encounter'; encounterId: string }
   | { type: 'quick_roll'; context: string }
   | { type: 'contested'; attackerId: string; defenderId: string }
   | { type: 'custom'; context: string };

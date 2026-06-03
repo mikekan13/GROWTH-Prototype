@@ -2,7 +2,7 @@
  * Dice Service — The single entry point for all dice rolling in GRO.WTH.
  * SERVER-ONLY — all dice rolling happens on the server. Clients call API routes.
  *
- * Every game system (skills, items, encounters, combat, death saves, terminal)
+ * Every game system (skills, items, combat, death saves, terminal)
  * calls DiceService methods via API routes. Never import this from client code.
  *
  * Flow:
@@ -358,7 +358,7 @@ export class DiceService {
   }
 
   /**
-   * Generic roll for items, encounters, or custom sources.
+   * Generic roll for items or custom sources.
    */
   static customRoll(params: {
     source: RollSource;
