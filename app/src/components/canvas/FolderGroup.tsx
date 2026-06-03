@@ -494,6 +494,52 @@ export function FolderGroupRect({
             </button>
           </foreignObject>
 
+          {/* CRYSTALLIZE button — visible only when the location is in
+              PLANNING status. Fires a custom event the canvas catches
+              and turns into a confirmation modal. */}
+          {folder.locationInfo.status === 'PLANNING' && (
+            <foreignObject
+              x={bounds.x + 340}
+              y={bounds.y + 8}
+              width={170}
+              height={30}
+              style={{ pointerEvents: 'auto', overflow: 'visible' }}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.dispatchEvent(
+                    new CustomEvent('growth:crystallize-location', {
+                      detail: {
+                        locationId: folder.locationInfo?.locationId,
+                        locationName: folder.name,
+                        krmaReserve: folder.locationInfo?.krmaReserve,
+                        contentCounts: folder.locationInfo?.contentCounts,
+                      },
+                    }),
+                  );
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '5px 10px',
+                  background: 'linear-gradient(135deg, #ffcc78, #d09f55)',
+                  border: '1px solid #ffcc78',
+                  color: '#000',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  borderRadius: 2,
+                  boxShadow: '0 0 12px rgba(255,204,120,0.5)',
+                }}
+                title="Crystallize: commit this location and its subtree to the active world"
+              >
+                ✦ CRYSTALLIZE
+              </button>
+            </foreignObject>
+          )}
+
           {/* Drill-in button — re-focuses the canvas on this location's
               interior. The drilled-in view shows only this location's
               immediate children + a breadcrumb at the top of the canvas. */}

@@ -37,5 +37,8 @@ export interface CanvasFolder {
       godheads?: number;
       goals?: number;
     };
+    /** PLANNING vs ACTIVE etc. When PLANNING, the folder shows a
+     *  CRYSTALLIZE button in the header that flips status to ACTIVE. */
+    status?: string;
   };
 }

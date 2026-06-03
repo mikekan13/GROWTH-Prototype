@@ -24,6 +24,8 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
           godHead: { select: { aiActionMode: true } },
         },
       },
+      // status: ACTIVE | PLANNING | HIDDEN | DESTROYED. Planning entities
+      // render below the crystallization line per the world-design pillar.
       members: { include: { user: { select: { id: true, username: true } } } },
       locations: {
         select: {
@@ -116,12 +118,17 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       locData = JSON.parse(loc.data);
     } catch { /* use null */ }
 
+    // Planning locations sit below the crystallization line (y > 0),
+    // active ones float above (y < 0). The user can drag them anywhere
+    // but the default placement signals their layer.
+    const planningDefault = loc.status === 'PLANNING';
+    const baseY = planningDefault ? 400 + index * 120 : -300 - index * 80;
     return {
       id: loc.id,
       type: 'location' as const,
       name: loc.name,
       x: -400 + index * 350,
-      y: 200 + index * 100,
+      y: baseY,
       status: loc.status,
       locationType: loc.type,
       locationData: locData,
@@ -220,7 +227,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       .map(l => {
         let parsed: Record<string, unknown> = {};
         try { parsed = JSON.parse(l.data) as Record<string, unknown>; } catch { /* ignore */ }
-        return [l.id, { name: l.name, type: l.type, data: parsed }];
+        return [l.id, { name: l.name, type: l.type, status: l.status, data: parsed }];
       })
   );
   // Build a type lookup so we can count children by type without re-querying.
@@ -256,6 +263,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
             description: typeof loc.data.description === 'string' ? loc.data.description : undefined,
             imageUrl: typeof loc.data.imageUrl === 'string' ? loc.data.imageUrl : undefined,
             contentCounts: counts,
+            status: typeof loc.status === 'string' ? loc.status : undefined,
           }
         : undefined,
     };

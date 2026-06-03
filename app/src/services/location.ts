@@ -13,10 +13,19 @@ export const createLocationSchema = z.object({
 
 export const updateLocationSchema = z.object({
   name: z.string().min(1).max(200).optional(),
-  type: z.enum(['settlement', 'wilderness', 'dungeon', 'building', 'point_of_interest', 'region']).optional(),
+  type: z.enum(['settlement', 'wilderness', 'dungeon', 'building', 'point_of_interest', 'region', 'meta', 'cosmic_landmark', 'force']).optional(),
   data: z.record(z.string(), z.unknown()).optional(),
-  status: z.enum(['ACTIVE', 'HIDDEN', 'DESTROYED']).optional(),
+  status: z.enum(['ACTIVE', 'PLANNING', 'HIDDEN', 'DESTROYED']).optional(),
 });
+
+const statusOnlySchema = z.object({
+  status: z.enum(['ACTIVE', 'PLANNING', 'HIDDEN', 'DESTROYED']),
+  /** When true, also flips every descendant Location (via located_at edges)
+   *  to the same status. Used by the CRYSTALLIZE flow so a planning
+   *  subtree becomes active atomically. */
+  cascade: z.boolean().optional(),
+});
+export type UpdateLocationStatusInput = z.infer<typeof statusOnlySchema>;
 
 // --- Default Data ---
 
@@ -102,6 +111,76 @@ export async function updateLocation(
       ...(input.status !== undefined && { status: input.status }),
     },
   });
+}
+
+/**
+ * Walk located_at edges to find every descendant Location of the given
+ * root. Used by the crystallization cascade so committing a planning
+ * subtree flips all its parts to ACTIVE atomically.
+ */
+async function getDescendantLocationIds(rootId: string): Promise<string[]> {
+  const result: string[] = [];
+  const queue: string[] = [rootId];
+  const seen = new Set<string>([rootId]);
+  while (queue.length > 0) {
+    const parentId = queue.shift()!;
+    const childEdges = await prisma.entityRelationship.findMany({
+      where: { targetId: parentId, relationshipType: 'located_at', sourceType: 'LOCATION' },
+      select: { sourceId: true },
+    });
+    for (const e of childEdges) {
+      if (seen.has(e.sourceId)) continue;
+      seen.add(e.sourceId);
+      result.push(e.sourceId);
+      queue.push(e.sourceId);
+    }
+  }
+  return result;
+}
+
+/**
+ * Status-only update with optional cascade. PLANNING ↔ ACTIVE flips
+ * are crystallization gestures per the world-design pillar.
+ *
+ * NOTE: KRMA wallet integration is TBD — crystallization should debit
+ * the summed reserves of the subtree from the GM wallet on PLANNING →
+ * ACTIVE. Wallet hook lands in a follow-up; for now status flips are
+ * unmetered.
+ */
+export async function updateLocationStatus(
+  locationId: string,
+  sessionUserId: string,
+  sessionUserRole: string,
+  input: UpdateLocationStatusInput,
+) {
+  const parsed = statusOnlySchema.safeParse(input);
+  if (!parsed.success) throw new ForbiddenError('Invalid status payload');
+
+  const location = await prisma.location.findUnique({
+    where: { id: locationId },
+    select: {
+      id: true,
+      name: true,
+      campaign: { select: { gmUserId: true } },
+    },
+  });
+  if (!location) throw new NotFoundError('Location not found');
+  if (!canManageCampaign(sessionUserId, sessionUserRole, location.campaign)) {
+    throw new ForbiddenError('Only the campaign GM can change location status');
+  }
+
+  const ids = [locationId];
+  if (parsed.data.cascade) {
+    const descendants = await getDescendantLocationIds(locationId);
+    ids.push(...descendants);
+  }
+
+  await prisma.location.updateMany({
+    where: { id: { in: ids } },
+    data: { status: parsed.data.status },
+  });
+
+  return { locationId, status: parsed.data.status, affected: ids.length };
 }
 
 export async function deleteLocation(

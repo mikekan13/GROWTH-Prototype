@@ -286,6 +286,54 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => { cancelAnimationFrame(rafId); window.removeEventListener('mousemove', onMouseMove); };
   }, [contestedState]);
 
+  // ── Crystallization modal (planning → active) ────────────────────────────
+  // Listens for 'growth:crystallize-location' from any folder's CRYSTALLIZE
+  // button. Shows a confirmation modal with the subtree summary + KRMA cost.
+  // On commit, PATCHes the location status with cascade=true.
+  const [pendingLocationCommit, setPendingLocationCommit] = useState<{
+    locationId: string;
+    locationName: string;
+    krmaReserve?: number;
+    contentCounts?: { locations?: number; characters?: number; npcs?: number; items?: number };
+  } | null>(null);
+  const [crystallizing, setCrystallizing] = useState(false);
+  const [crystallizeErr, setCrystallizeErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.locationId) return;
+      setCrystallizeErr(null);
+      setPendingLocationCommit(detail);
+    };
+    window.addEventListener('growth:crystallize-location', handler);
+    return () => window.removeEventListener('growth:crystallize-location', handler);
+  }, []);
+
+  const commitCrystallize = useCallback(async () => {
+    if (!pendingLocationCommit) return;
+    setCrystallizing(true);
+    setCrystallizeErr(null);
+    try {
+      const res = await fetch(`/api/locations/${pendingLocationCommit.locationId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE', cascade: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed' }));
+        setCrystallizeErr(err.error || 'Failed to crystallize');
+        return;
+      }
+      setPendingLocationCommit(null);
+      router.refresh();
+    } catch (err) {
+      setCrystallizeErr(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setCrystallizing(false);
+    }
+  }, [pendingLocationCommit, router]);
+
   // ── Focal entity (drill-in navigation) ───────────────────────────────────
   // When set, the canvas shows only entities that are direct children of
   // this entity. null = campaign root (everything visible). Persisted per
@@ -1130,6 +1178,157 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 ))}
               </div>
             )}
+          {/* Crystallization confirmation modal — location subtree commit. */}
+          {pendingLocationCommit && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(0,0,0,0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 100,
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+              }}
+              onClick={() => !crystallizing && setPendingLocationCommit(null)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: '#1a1a2e',
+                  border: '2px solid #ffcc78',
+                  borderRadius: 6,
+                  padding: 28,
+                  maxWidth: 500,
+                  minWidth: 380,
+                  color: '#fff',
+                  boxShadow: '0 0 60px rgba(255,204,120,0.3)',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                    fontSize: 22,
+                    letterSpacing: '0.12em',
+                    color: '#ffcc78',
+                    marginBottom: 4,
+                  }}
+                >
+                  ✦ CRYSTALLIZE
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.1em', marginBottom: 18 }}>
+                  PLANNING → ACTIVE · cascade through subtree
+                </div>
+                <div style={{ fontSize: 16, marginBottom: 16, color: '#fff' }}>
+                  {pendingLocationCommit.locationName}
+                </div>
+                {pendingLocationCommit.contentCounts && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 14,
+                      marginBottom: 16,
+                      fontSize: 12,
+                      color: 'rgba(255,255,255,0.7)',
+                    }}
+                  >
+                    {(pendingLocationCommit.contentCounts.locations ?? 0) > 0 && (
+                      <span><span style={{ color: '#22ab94' }}>⌂</span> {pendingLocationCommit.contentCounts.locations} sub-locations</span>
+                    )}
+                    {(pendingLocationCommit.contentCounts.characters ?? 0) > 0 && (
+                      <span><span style={{ color: '#f7525f' }}>✴</span> {pendingLocationCommit.contentCounts.characters} characters</span>
+                    )}
+                    {(pendingLocationCommit.contentCounts.npcs ?? 0) > 0 && (
+                      <span><span style={{ color: '#ffcc78' }}>✴</span> {pendingLocationCommit.contentCounts.npcs} NPCs</span>
+                    )}
+                    {(pendingLocationCommit.contentCounts.items ?? 0) > 0 && (
+                      <span><span style={{ color: '#8e7cc3' }}>❖</span> {pendingLocationCommit.contentCounts.items} items</span>
+                    )}
+                  </div>
+                )}
+                {pendingLocationCommit.krmaReserve != null && (
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      border: '1px solid rgba(255,204,120,0.4)',
+                      borderRadius: 3,
+                      background: 'rgba(255,204,120,0.06)',
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: '#ffcc78', letterSpacing: '0.15em', marginBottom: 4 }}>
+                      KRMA TO DEBIT
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                        fontSize: 28,
+                        color: '#ffcc78',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      {pendingLocationCommit.krmaReserve.toLocaleString()} Ҝ
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+                      (wallet debit not yet wired — TBD)
+                    </div>
+                  </div>
+                )}
+                {crystallizeErr && (
+                  <div
+                    style={{
+                      padding: 8,
+                      border: '1px solid #E8585A55',
+                      background: 'rgba(232,88,90,0.08)',
+                      color: '#E8585A',
+                      fontSize: 12,
+                      marginBottom: 14,
+                    }}
+                  >
+                    ✗ {crystallizeErr}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setPendingLocationCommit(null)}
+                    disabled={crystallizing}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: 'rgba(255,255,255,0.7)',
+                      fontFamily: 'inherit',
+                      fontSize: 12,
+                      letterSpacing: '0.08em',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={commitCrystallize}
+                    disabled={crystallizing}
+                    style={{
+                      padding: '8px 20px',
+                      background: 'linear-gradient(135deg, #ffcc78, #d09f55)',
+                      border: '1px solid #ffcc78',
+                      color: '#000',
+                      fontFamily: 'inherit',
+                      fontSize: 12,
+                      letterSpacing: '0.12em',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 0 12px rgba(255,204,120,0.4)',
+                    }}
+                  >
+                    {crystallizing ? 'COMMITTING…' : 'COMMIT'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <RelationsCanvas
             connections={connections}
             campaignId={campaign.id}
