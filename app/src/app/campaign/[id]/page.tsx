@@ -287,6 +287,14 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       nodes={nodes}
       connections={connections}
       autoFolders={autoFolders}
+      locatedAtEdges={relationshipRows
+        .filter(r => r.relationshipType === 'located_at')
+        .map(r => ({ child: r.sourceId, parent: r.targetId }))}
+      entityNames={Object.fromEntries(
+        [...allNodes.map(n => [n.id, n.name] as const),
+         ...campaign.locations.filter(l => filteredParentIds.has(l.id)).map(l => [l.id, l.name] as const),
+        ]
+      )}
       userId={session.user.id}
       username={session.user.username}
       userRole={session.user.role}

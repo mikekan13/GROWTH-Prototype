@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -83,6 +83,13 @@ interface CampaignCanvasProps {
    *  Life containing its 10 Sephirot rooms). Merged with localStorage
    *  user-customized folders — user version wins per-id. */
   autoFolders?: CanvasFolder[];
+  /** Parent/child spatial graph. Used to compute the focal-entity filter
+   *  and the breadcrumb path during drill-in navigation. */
+  locatedAtEdges?: Array<{ child: string; parent: string }>;
+  /** Lookup of every entity's display name, INCLUDING parent Locations
+   *  that were filtered out of `nodes` (they live only as folder headers
+   *  now). Used by the breadcrumb. */
+  entityNames?: Record<string, string>;
 }
 
 type Tab = 'canvas' | 'forge' | 'encounters' | 'tapestry' | 'character';
@@ -97,7 +104,7 @@ interface CampaignEconomyData {
   total: string;
 }
 
-export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers, autoFolders }: CampaignCanvasProps) {
+export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers, autoFolders, locatedAtEdges = [], entityNames = {} }: CampaignCanvasProps) {
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
   // In-canvas character selection: when set, the Character tab loads THIS character
   // instead of the user's own PC. Cleared when navigating to a non-character tab so
@@ -279,6 +286,38 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => { cancelAnimationFrame(rafId); window.removeEventListener('mousemove', onMouseMove); };
   }, [contestedState]);
 
+  // ── Focal entity (drill-in navigation) ───────────────────────────────────
+  // When set, the canvas shows only entities that are direct children of
+  // this entity. null = campaign root (everything visible). Persisted per
+  // campaign so the GM resumes where they were.
+  const focalStorageKey = `canvas-${campaign.id}-focal`;
+  const [focalEntityId, setFocalEntityIdState] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(focalStorageKey);
+      return raw ? (raw === 'null' ? null : raw) : null;
+    } catch { return null; }
+  });
+  const setFocalEntityId = useCallback((id: string | null) => {
+    setFocalEntityIdState(id);
+    try { localStorage.setItem(focalStorageKey, id ?? 'null'); } catch { /* ignore */ }
+  }, [focalStorageKey]);
+
+  // Compute the breadcrumb path by walking located_at edges upward from focal.
+  const breadcrumb = useMemo(() => {
+    if (!focalEntityId) return [];
+    const childToParent = new Map(locatedAtEdges.map(e => [e.child, e.parent]));
+    const path: { id: string; name: string }[] = [];
+    const seen = new Set<string>();
+    let current: string | null = focalEntityId;
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      path.unshift({ id: current, name: entityNames[current] ?? '???' });
+      current = childToParent.get(current) ?? null;
+    }
+    return path;
+  }, [focalEntityId, locatedAtEdges, entityNames]);
+
   // ── Folder state (persisted to localStorage) ──
   const folderStorageKey = `canvas-${campaign.id}-folders`;
   const [folders, setFolders] = useState<CanvasFolder[]>(() => {
@@ -331,7 +370,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // Effective folders = user-stored ∪ auto-generated (user wins per-id).
   // Auto-folders default to collapsed so the canvas reads calm by default —
   // GM expands when they want to look inside, per the world-design pillar.
-  const effectiveFolders = useMemo(() => {
+  const allEffectiveFolders = useMemo(() => {
     if (!autoFolders || autoFolders.length === 0) return folders;
     const storedIds = new Set(folders.map(f => f.id));
     const merged = [...folders];
@@ -342,6 +381,30 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
     return merged;
   }, [folders, autoFolders]);
+
+  // ── Focal-filtered nodes + folders ─────────────────────────────────────────
+  // When focal is null: show everything (campaign root view).
+  // When focal is set: show entities that are DIRECT children of focal.
+  //   - A "child" = there exists a located_at edge from that entity to focal,
+  //     OR (for top-level Locations the folder represents) the auto-folder
+  //     id matches `auto-${focal}`.
+  const focalView = useMemo(() => {
+    if (!focalEntityId) {
+      return { nodes, folders: allEffectiveFolders };
+    }
+    const directChildIds = new Set<string>(
+      locatedAtEdges.filter(e => e.parent === focalEntityId).map(e => e.child),
+    );
+    const filteredNodes = nodes.filter(n => directChildIds.has(n.id));
+    // Folders whose parent (encoded in `auto-${parentId}`) is itself one of
+    // the visible children — i.e. children that are themselves containers.
+    const filteredFolders = allEffectiveFolders.filter(f => {
+      if (!f.id.startsWith('auto-')) return false; // hide manual folders while drilled in
+      const parentId = f.id.slice('auto-'.length);
+      return directChildIds.has(parentId);
+    });
+    return { nodes: filteredNodes, folders: filteredFolders };
+  }, [focalEntityId, nodes, allEffectiveFolders, locatedAtEdges]);
 
   // Forge items (published, for Canvas toolbox "Place from Forge")
   const [forgeItems, setForgeItems] = useState<Array<{ id: string; name: string; type: string; data: Record<string, unknown> }>>([]);
@@ -1000,8 +1063,74 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           </div>
         )}
         {activeTab === 'canvas' && (
+          <>
+            {/* Breadcrumb overlay — shows the focal-entity path. Click any
+                crumb to drill back up that far. Click "Campaign Root" to
+                clear focus and show the whole map. Only renders when
+                drilled in (focal is set). */}
+            {focalEntityId && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 30,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'rgba(0,0,0,0.75)',
+                  border: '1px solid rgba(255,204,120,0.4)',
+                  borderRadius: 3,
+                  padding: '6px 14px',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  fontSize: 12,
+                  pointerEvents: 'auto',
+                  boxShadow: '0 0 18px rgba(255,204,120,0.18)',
+                }}
+              >
+                <button
+                  onClick={() => setFocalEntityId(null)}
+                  style={{
+                    color: '#ffcc78',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontFamily: 'inherit',
+                    fontSize: 'inherit',
+                    letterSpacing: '0.06em',
+                  }}
+                  title="Back to campaign root"
+                >
+                  ◇ CAMPAIGN
+                </button>
+                {breadcrumb.map((crumb, i) => (
+                  <React.Fragment key={crumb.id}>
+                    <span style={{ color: 'rgba(255,255,255,0.35)' }}>▸</span>
+                    <button
+                      onClick={() => setFocalEntityId(crumb.id)}
+                      disabled={i === breadcrumb.length - 1}
+                      style={{
+                        color: i === breadcrumb.length - 1 ? '#fff' : '#ffcc78',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: i === breadcrumb.length - 1 ? 'default' : 'pointer',
+                        padding: 0,
+                        fontFamily: 'inherit',
+                        fontSize: 'inherit',
+                        fontWeight: i === breadcrumb.length - 1 ? 700 : 400,
+                        letterSpacing: '0.04em',
+                      }}
+                      title={i === breadcrumb.length - 1 ? 'You are here' : `Drill back to ${crumb.name}`}
+                    >
+                      {crumb.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           <RelationsCanvas
-            nodes={nodes}
             connections={connections}
             campaignId={campaign.id}
             crystallizedEntityIds={crystallizedEntityIds}
@@ -1019,7 +1148,10 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onCreateItemFromForge={handleCreateItemFromForge}
             forgeItems={forgeItems}
             onEntityCrossLine={handleEntityCrossLine}
-            folders={effectiveFolders}
+            folders={focalView.folders}
+            nodes={focalView.nodes}
+            focalEntityId={focalEntityId}
+            onDrillIn={setFocalEntityId}
             onFoldersChange={handleFoldersChange}
             onRestComplete={() => router.refresh()}
             isGM={isGM}
@@ -1057,6 +1189,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               }
             } : undefined}
           />
+          </>
         )}
 
         {activeTab === 'forge' && (

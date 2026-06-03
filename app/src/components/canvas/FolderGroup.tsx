@@ -55,6 +55,9 @@ interface FolderGroupProps {
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
   onRestComplete: () => void;
   isDropTarget?: boolean;
+  /** Drill-in callback for the focal-entity navigation. Receives the
+   *  entity id (the location backing this auto-folder) or null to clear. */
+  onDrillIn?: (entityId: string | null) => void;
 }
 
 const FOLDER_PADDING = 30;
@@ -140,6 +143,7 @@ export function FolderGroupRect({
   svgRef,
   viewBox,
   isDropTarget = false,
+  onDrillIn,
 }: {
   folder: CanvasFolder;
   nodePositions: Map<string, NodePosition>;
@@ -155,6 +159,7 @@ export function FolderGroupRect({
   svgRef?: React.RefObject<SVGSVGElement | null>;
   viewBox?: { x: number; y: number; width: number; height: number };
   isDropTarget?: boolean;
+  onDrillIn?: (entityId: string | null) => void;
 }) {
   const [resizing, setResizing] = useState<{
     edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner';
@@ -489,6 +494,42 @@ export function FolderGroupRect({
             </button>
           </foreignObject>
 
+          {/* Drill-in button — re-focuses the canvas on this location's
+              interior. The drilled-in view shows only this location's
+              immediate children + a breadcrumb at the top of the canvas. */}
+          {onDrillIn && folder.locationInfo.locationId && (
+            <foreignObject
+              x={bounds.x + 210}
+              y={bounds.y + 8}
+              width={120}
+              height={30}
+              style={{ pointerEvents: 'auto', overflow: 'visible' }}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDrillIn(folder.locationInfo!.locationId);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: '5px 10px',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,204,120,0.6)',
+                  color: '#ffcc78',
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  borderRadius: 2,
+                  textShadow: '0 0 4px rgba(255,204,120,0.4)',
+                }}
+                title="Drill in: focus the canvas on this location's interior"
+              >
+                ▸ ENTER
+              </button>
+            </foreignObject>
+          )}
+
           {/* Content-type count row */}
           {folder.locationInfo.contentCounts && (
             <foreignObject
@@ -754,6 +795,7 @@ export default function FolderGroup({
   onRemoveFromFolder: _onRemoveFromFolder,
   onRestComplete,
   isDropTarget = false,
+  onDrillIn: _onDrillIn,
 }: FolderGroupProps) {
   const [showRestPanel, setShowRestPanel] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);

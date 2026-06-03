@@ -108,6 +108,12 @@ interface RelationsCanvasProps {
   isGM?: boolean;
   /** Roster used by the canvas card controller dropdown. */
   trailblazers?: TrailblazerOption[];
+  /** Drill-in focal entity. When set, the parent already filtered the
+   *  nodes/folders to children of focal — we just pass the focal id
+   *  through to folder rendering so headers know to render their
+   *  drill-in affordance. */
+  focalEntityId?: string | null;
+  onDrillIn?: (entityId: string | null) => void;
 }
 
 /** Inline copy of CampaignCanvas TrailblazerOption to avoid a cross-file import cycle. */
@@ -148,6 +154,7 @@ export default function RelationsCanvas({
   onContestedDefenderSelect,
   isGM,
   trailblazers,
+  onDrillIn,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -2654,6 +2661,7 @@ export default function RelationsCanvas({
               svgRef={svgRef}
               viewBox={viewBox}
               showActionsMenu={false}
+              onDrillIn={onDrillIn}
               onFolderResize={(folderId, width, height, posX) => {
                 const updated = foldersRef.current.map(f =>
                   f.id === folderId ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}) } : f
@@ -3123,6 +3131,7 @@ export default function RelationsCanvas({
             campaignId={campaignId}
             viewBox={viewBox}
             zoom={zoom}
+            onDrillIn={onDrillIn}
             onFolderDragStart={(folderId, startSvg) => {
               setDragFolderId(folderId);
               setFolderDragStartSvg(startSvg);
