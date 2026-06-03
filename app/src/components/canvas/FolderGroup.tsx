@@ -639,9 +639,9 @@ export function FolderGroupRect({
         </>
       )}
 
-      {/* KRMA Reserve — when COLLAPSED, render as a compact inline pill
-          inside the header strip (right side) so it doesn't fight for space
-          with the portrait + buttons. */}
+      {/* KRMA Reserve — when COLLAPSED, render as a compact pill ABOVE
+          the folder (clear of the expand button which lives in the
+          header's bottom-right corner). */}
       {folder.collapsed && folder.locationInfo && folder.locationInfo.krmaReserve != null && (() => {
         const reserve = folder.locationInfo.krmaReserve!;
         const formatReserve = (n: number): string => {
@@ -656,7 +656,7 @@ export function FolderGroupRect({
         return (
           <foreignObject
             x={bounds.x + bounds.width - 188}
-            y={bounds.y + 8}
+            y={bounds.y - 40}
             width={180}
             height={30}
             style={{ pointerEvents: 'none', overflow: 'visible' }}

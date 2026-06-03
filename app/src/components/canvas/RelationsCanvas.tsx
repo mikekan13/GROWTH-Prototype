@@ -1560,6 +1560,17 @@ export default function RelationsCanvas({
   // Read-once dependency on the version so render reacts to measurement updates.
   void possessionRowVersion;
 
+  /** Set of node IDs that live inside a collapsed folder. Used by the
+   *  connection renderer to suppress located_at and owns lines whose
+   *  endpoints are visually hidden — the folder is the visual aggregate. */
+  const collapsedFolderNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of folders) {
+      if (f.collapsed) for (const id of f.nodeIds) set.add(id);
+    }
+    return set;
+  }, [folders]);
+
   /** Stable index map for owns connections so each row anchors to a
    *  deterministic position. Built from the connections array in render. */
   const ownsRowIndexByEdge = useMemo(() => {
@@ -1614,6 +1625,13 @@ export default function RelationsCanvas({
     const isOwns = connection.type === 'owns';
     const isLocatedAt = connection.type === 'located_at';
     const isPossessionEdge = isOwns || isLocatedAt;
+
+    // Hide located_at / owns tethers when either endpoint is collapsed
+    // inside a folder — the folder is the visual aggregate, lines fanning
+    // out from hidden positions just look like noise.
+    if (isPossessionEdge && (collapsedFolderNodeIds.has(connection.from) || collapsedFolderNodeIds.has(connection.to))) {
+      return null;
+    }
 
     // Ownership tethers only render when the owning character has the
     // possessions panel open — Mike's UX call. Containment edges always
