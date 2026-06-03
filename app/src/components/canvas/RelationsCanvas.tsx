@@ -1633,6 +1633,17 @@ export default function RelationsCanvas({
       return null;
     }
 
+    // Hide located_at tethers where the child is already visually
+    // contained by the target's auto-folder — the containment IS the
+    // relation, no need to also draw a line. Owns lines stay because
+    // they cross containment (e.g. Tara owns Tree of Life from outside).
+    if (isLocatedAt) {
+      const parentFolder = folders.find(f => f.id === `auto-${connection.to}`);
+      if (parentFolder && parentFolder.nodeIds.includes(connection.from)) {
+        return null;
+      }
+    }
+
     // Ownership tethers only render when the owning character has the
     // possessions panel open — Mike's UX call. Containment edges always
     // render so the canvas topology is visible.
