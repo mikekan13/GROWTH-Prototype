@@ -639,10 +639,56 @@ export function FolderGroupRect({
         </>
       )}
 
-      {/* KRMA Reserve readout — Location auto-folders ONLY. The folder IS
-          the Location, so its ambient KRMA mass shows where the party TKV
-          would. Same slide-right collision logic as TKV. */}
-      {folder.locationInfo && folder.locationInfo.krmaReserve != null && (() => {
+      {/* KRMA Reserve — when COLLAPSED, render as a compact inline pill
+          inside the header strip (right side) so it doesn't fight for space
+          with the portrait + buttons. */}
+      {folder.collapsed && folder.locationInfo && folder.locationInfo.krmaReserve != null && (() => {
+        const reserve = folder.locationInfo.krmaReserve!;
+        const formatReserve = (n: number): string => {
+          const abs = Math.abs(n);
+          if (abs >= 1e15) return `${(n / 1e15).toFixed(2)}P`;
+          if (abs >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
+          if (abs >= 1e9)  return `${(n / 1e9).toFixed(2)}B`;
+          if (abs >= 1e6)  return `${(n / 1e6).toFixed(2)}M`;
+          if (abs >= 1e3)  return `${(n / 1e3).toFixed(1)}K`;
+          return n.toLocaleString();
+        };
+        return (
+          <foreignObject
+            x={bounds.x + bounds.width - 188}
+            y={bounds.y + 8}
+            width={180}
+            height={30}
+            style={{ pointerEvents: 'none', overflow: 'visible' }}
+          >
+            <div
+              style={{
+                padding: '4px 12px',
+                background: 'rgba(0,0,0,0.6)',
+                border: '1px solid rgba(255,204,120,0.55)',
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 6,
+                fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                color: '#ffcc78',
+              }}
+              title={`${reserve.toLocaleString()} Ҝ — KRMA Reserve`}
+            >
+              <span style={{ fontSize: 10, letterSpacing: '0.15em', opacity: 0.75 }}>KRMA</span>
+              <span style={{ fontSize: 18, letterSpacing: '0.04em' }}>
+                {formatReserve(reserve)} <span style={{ fontSize: 12, opacity: 0.8 }}>Ҝ</span>
+              </span>
+            </div>
+          </foreignObject>
+        );
+      })()}
+
+      {/* KRMA Reserve readout — EXPANDED Location auto-folders. The folder
+          IS the Location, so its ambient KRMA mass shows where the party
+          TKV would. Same slide-right collision logic as TKV. */}
+      {!folder.collapsed && folder.locationInfo && folder.locationInfo.krmaReserve != null && (() => {
         const reserve = folder.locationInfo.krmaReserve!;
         const formatReserve = (n: number): string => {
           const abs = Math.abs(n);
