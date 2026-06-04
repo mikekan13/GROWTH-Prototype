@@ -81,9 +81,6 @@ async function main() {
     const campItems = await prisma.campaignItem.deleteMany({ where: { campaignId: { in: deleteCampaignIds } } });
     console.log(`  Deleted ${campItems.count} campaign items`);
 
-    const encounters = await prisma.encounter.deleteMany({ where: { campaignId: { in: deleteCampaignIds } } });
-    console.log(`  Deleted ${encounters.count} encounters`);
-
     // Campaign wallets
     const campWallets = await prisma.wallet.deleteMany({ where: { campaignId: { in: deleteCampaignIds } } });
     console.log(`  Deleted ${campWallets.count} campaign wallets`);

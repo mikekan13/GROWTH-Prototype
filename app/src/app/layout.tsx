@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Comfortaa, Inknut_Antiqua } from "next/font/google";
 import { DiceOverlayLoader } from "@/components/dice/DiceOverlayLoader";
+import { JewlChip } from "@/components/copilot/JewlChip";
 import "./globals.css";
 
 const bebasNeue = Bebas_Neue({
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body suppressHydrationWarning className={`${bebasNeue.variable} ${comfortaa.variable} ${inknutAntiqua.variable} antialiased min-h-screen`}>
         {children}
         <DiceOverlayLoader />
+        <JewlChip />
       </body>
     </html>
   );
