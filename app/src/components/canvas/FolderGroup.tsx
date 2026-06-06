@@ -195,26 +195,29 @@ export function FolderGroupRect({
       const display = getDisplayBounds(content, folder);
       return { ...display, width: COLLAPSED_WIDTH };
     }
-    // Folder is a declared territory, not auto-shrinkwrap. Once the GM sets a
-    // position/size via drag or resize, those values are authoritative — content
-    // may visually overflow the rect, that's fine. The rect marks the GM's
-    // chosen boundary. Content extent only drives bounds when the user hasn't
-    // opted into manual values yet.
+    // Folder always encompasses its members visually — membership = visual
+    // containment. The GM can shrink the empty whitespace between userWidth
+    // and content extent, but the folder will not shrink smaller than the
+    // content itself. Drag the folder → all members move with it.
     const folderOffset = dragOffsets.get(`__folder__${folder.id}`) || { x: 0, y: 0 };
-    const x = folder.posX != null ? folder.posX + folderOffset.x : content.x;
-    const y = folder.posY != null ? folder.posY + folderOffset.y : content.y;
-    const width = folder.userWidth != null
-      ? Math.max(MIN_FOLDER_W, folder.userWidth)
-      : Math.max(MIN_FOLDER_W, content.minWidth);
-    let height = folder.userHeight != null
-      ? Math.max(MIN_FOLDER_H, folder.userHeight)
-      : Math.max(MIN_FOLDER_H, content.minHeight);
+    const anchorX = (folder.posX != null ? Math.min(folder.posX + folderOffset.x, content.x) : content.x);
+    const anchorY = (folder.posY != null ? Math.min(folder.posY + folderOffset.y, content.y) : content.y);
+    const contentRight = content.x + content.minWidth;
+    const contentBottom = content.y + content.minHeight;
+    // Right edge: max of (user-padded right, content right, absolute minimum).
+    const basePosX = folder.posX != null ? folder.posX + folderOffset.x : content.x;
+    const rightEdge = Math.max(basePosX + MIN_FOLDER_W, basePosX + (folder.userWidth || 0), contentRight);
+    const width = rightEdge - anchorX;
+    // Bottom edge: same shape as right.
+    const basePosY = folder.posY != null ? folder.posY + folderOffset.y : content.y;
+    const bottomEdge = Math.max(basePosY + MIN_FOLDER_H, basePosY + (folder.userHeight || 0), contentBottom);
+    let height = bottomEdge - anchorY;
     // Party folders: clamp bottom edge above KRMA line (y=0)
     if (folder.type === 'party') {
-      const maxH = -y;
+      const maxH = -anchorY;
       if (maxH > 0 && height > maxH) height = maxH;
     }
-    return { x, y, width, height };
+    return { x: anchorX, y: anchorY, width, height };
   }, [content, folder, dragOffsets]);
 
   // Resize mouse handlers
@@ -225,18 +228,32 @@ export function FolderGroupRect({
     e.stopPropagation();
     e.preventDefault();
     if (!bounds) return;
-    setResizing({ edge, startX: e.clientX, startY: e.clientY, startW: bounds.width, startH: bounds.height, startPosX: bounds.x });
-  }, [bounds]);
+    // Capture the folder's TRUE origin and user-padded size — not the
+    // content-clamped display values. The resize math writes posX/userWidth
+    // directly, so the start values must match what we're modifying;
+    // otherwise drags silently no-op (when posX > content.x) and produce
+    // unexpected jumps on subsequent drags. Falls back to displayed bounds
+    // on first resize (no posX/userWidth stored yet).
+    setResizing({
+      edge,
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: folder.userWidth ?? bounds.width,
+      startH: folder.userHeight ?? bounds.height,
+      startPosX: folder.posX ?? bounds.x,
+    });
+  }, [bounds, folder.posX, folder.userWidth, folder.userHeight]);
 
   useEffect(() => {
     if (!resizing) return;
 
-    // Floor at MIN_FOLDER_W/H only — content extent is no longer a clamp
-    // (folder is a declared territory; content may overflow).
-    const minW = MIN_FOLDER_W;
-    const minH = MIN_FOLDER_H;
-    // Bottom-edge clamp for party folders uses folder's own top, not content's.
-    const boundsY = folder.posY != null ? folder.posY : (content ? content.y : (folder.type === 'party' ? -(MIN_FOLDER_H + 40) : 100));
+    // Min size enforces both the absolute floor (MIN_FOLDER_W/H) and the
+    // content extent — folder must always encompass its members. The GM can
+    // shrink whitespace (userWidth/userHeight beyond content) but not push
+    // the visual edges into the content itself.
+    const minW = Math.max(content ? content.minWidth : 0, MIN_FOLDER_W);
+    const minH = Math.max(content ? content.minHeight : 0, MIN_FOLDER_H);
+    const boundsY = content ? Math.min(folder.posY ?? content.y, content.y) : (folder.posY ?? (folder.type === 'party' ? -(MIN_FOLDER_H + 40) : 100));
 
     const handleMove = (e: MouseEvent) => {
       if (!svgRef?.current || !viewBox) return;
@@ -259,6 +276,15 @@ export function FolderGroupRect({
         const startRight = resizing.startPosX + resizing.startW;
         newW = Math.max(minW, resizing.startW - dx);
         newPosX = startRight - newW;
+        // Folder must encompass content — posX can't exceed content.x
+        // (visual left edge is anchored to leftmost member). Clamp the user
+        // intent to that limit so the drag stops where the visual stops,
+        // instead of silently writing an unreachable posX that breaks the
+        // next drag's start values.
+        if (content && newPosX > content.x) {
+          newPosX = content.x;
+          newW = startRight - newPosX;
+        }
       }
       if (resizing.edge === 'bottom' || resizing.edge === 'corner' || resizing.edge === 'left-corner') {
         newH = Math.max(minH, resizing.startH + dy);
