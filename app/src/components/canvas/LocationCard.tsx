@@ -24,9 +24,10 @@ interface LocationCardProps {
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
   /** GM gesture: right-click → "Create NPC here" spawns a new character wired
-   *  as a located_at child of this Location. Fired with the parent's id; the
-   *  parent surface handles the name prompt + API call + canvas refresh. */
-  onCreateChildCharacter?: (parentLocationId: string) => void;
+   *  as a located_at child of this Location. Fired with the parent's id plus
+   *  the right-click's world coords so the new entity card lands exactly
+   *  where the GM clicked (no auto-position guesswork, no off-screen burial). */
+  onCreateChildCharacter?: (parentLocationId: string, worldX: number, worldY: number) => void;
 }
 
 const DANGER_COLORS = ['#4ade80', '#4ade80', '#a3e635', '#facc15', '#facc15', '#f59e0b', '#f97316', '#ef4444', '#dc2626', '#991b1b'];
@@ -72,6 +73,9 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+  // World coords (SVG units) of the right-click — used so "Create NPC here"
+  // can stamp the new entity exactly where the GM clicked.
+  const contextMenuWorldRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -130,6 +134,20 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
     e.preventDefault();
     e.stopPropagation();
     setContextMenuPos({ x: e.pageX, y: e.pageY });
+    // Capture the right-click in SVG world coords so menu actions that spawn
+    // entities (Create NPC here) can place them at the click point.
+    const foreignObject = (e.target as Element).closest('foreignObject');
+    const svg = foreignObject?.closest('svg') as SVGSVGElement | null;
+    if (svg) {
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const ctm = svg.getScreenCTM();
+      if (ctm) {
+        const world = pt.matrixTransform(ctm.inverse());
+        contextMenuWorldRef.current = { x: world.x, y: world.y };
+      }
+    }
     setShowContextMenu(true);
   };
 
@@ -188,7 +206,12 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
     >
       {onCreateChildCharacter && (
         <button
-          onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onCreateChildCharacter(node.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowContextMenu(false);
+            const world = contextMenuWorldRef.current ?? { x: node.x, y: node.y };
+            onCreateChildCharacter(node.id, world.x, world.y);
+          }}
           className="w-full px-4 py-2 text-left text-teal-300 hover:bg-teal-500/20 transition-colors flex items-center gap-2"
         >
           <span className="text-base leading-none">✴</span>

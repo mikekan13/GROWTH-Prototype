@@ -739,14 +739,14 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // POSTs a new character wired as a located_at child of the parent. The
   // canvas folder system auto-nests the result, so River Styx / Undead Army
   // / any flat Location promotes to a folder the moment the first child lands.
-  const handleCreateChildCharacterAtLocation = useCallback(async (parentLocationId: string) => {
+  const handleCreateChildCharacterAtLocation = useCallback(async (parentLocationId: string, worldX: number, worldY: number) => {
     const name = typeof window !== 'undefined' ? window.prompt('Name the NPC:') : null;
     if (!name || !name.trim()) return;
     try {
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), campaignId: campaign.id, parentLocationId }),
+        body: JSON.stringify({ name: name.trim(), campaignId: campaign.id, parentLocationId, canvasX: worldX, canvasY: worldY }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

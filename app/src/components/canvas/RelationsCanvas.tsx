@@ -92,9 +92,9 @@ interface RelationsCanvasProps {
   onDeleteLocation?: (nodeId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
   /** Right-click → "Create NPC here" on a Location card. Wrapper prompts for
-   *  name + fires POST /api/characters with parentLocationId; the canvas
-   *  folder system auto-nests the result. */
-  onCreateChildCharacterAtLocation?: (parentLocationId: string) => void;
+   *  name + fires POST /api/characters with parentLocationId and world coords
+   *  so the new entity card stamps at the click point. */
+  onCreateChildCharacterAtLocation?: (parentLocationId: string, worldX: number, worldY: number) => void;
   onCreateItem?: (name: string, type: string) => void;
   onDeleteItem?: (nodeId: string) => void;
   onItemUpdate?: (nodeId: string, data: GrowthWorldItem) => void;

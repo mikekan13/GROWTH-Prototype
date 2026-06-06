@@ -14,9 +14,14 @@ export const createCharacterSchema = z.object({
   name: z.string().min(1, 'Character name required').max(100),
   campaignId: z.string().min(1, 'Campaign ID required'),
   /** When set, the new character is wired as a child of this Location via a
-   *  located_at relationship. The canvas folder system auto-nests the child
-   *  inside the parent. Used by the "Create NPC here" gesture on Location cards. */
+   *  located_at relationship. Used by the "Create NPC here" gesture on Location cards. */
   parentLocationId: z.string().optional(),
+  /** Canvas world coords (SVG units) to stamp on the new character so its
+   *  card renders exactly where the GM placed it. Supplied by the right-click
+   *  gesture; if omitted, no canvas position is stamped and the character
+   *  stays in Tapestry until placed via the Tools picker. */
+  canvasX: z.number().optional(),
+  canvasY: z.number().optional(),
 });
 
 export const updateCharacterSchema = z.object({
@@ -73,13 +78,15 @@ export async function createCharacter(userId: string, input: z.infer<typeof crea
 
   const defaultData = createDefaultCharacter(input.name);
 
-  // When the character is being authored as a child of a Location, stamp a
-  // canvas position into its data so the page's canvas-eligibility filter
-  // accepts it (it filters DRAFT chars without canvasX/Y into Tapestry).
-  // The exact position is incidental — once on-canvas, the auto-folder
-  // system folds the child inside the parent Location's folder visual
-  // via the located_at edge below. Using (0, 0) keeps it deterministic.
-  if (parentLocation) {
+  // Stamp the GM-supplied click coords (from the right-click gesture) onto
+  // the character's data so its card renders at the click point. Falls back
+  // to (0, 0) only when a parent Location is set but no coords were sent —
+  // keeps the canvas-eligibility filter happy in that legacy call path.
+  if (input.canvasX != null && input.canvasY != null) {
+    const d = defaultData as unknown as Record<string, unknown>;
+    d.canvasX = input.canvasX;
+    d.canvasY = input.canvasY;
+  } else if (parentLocation) {
     const d = defaultData as unknown as Record<string, unknown>;
     d.canvasX = 0;
     d.canvasY = 0;
