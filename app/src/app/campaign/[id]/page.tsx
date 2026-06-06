@@ -120,15 +120,21 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
 
     // Planning locations sit below the crystallization line (y > 0),
     // active ones float above (y < 0). The user can drag them anywhere
-    // but the default placement signals their layer.
+    // but the default placement signals their layer. GM-stamped canvas
+    // coords (canvasX/canvasY on the data JSON) win over the default.
     const planningDefault = loc.status === 'PLANNING';
-    const baseY = planningDefault ? 400 + index * 120 : -300 - index * 80;
+    const fallbackY = planningDefault ? 400 + index * 120 : -300 - index * 80;
+    const fallbackX = -400 + index * 350;
+    const rawX = (locData as { canvasX?: unknown } | null)?.canvasX;
+    const rawY = (locData as { canvasY?: unknown } | null)?.canvasY;
+    const storedX = typeof rawX === 'number' ? rawX : undefined;
+    const storedY = typeof rawY === 'number' ? rawY : undefined;
     return {
       id: loc.id,
       type: 'location' as const,
       name: loc.name,
-      x: -400 + index * 350,
-      y: baseY,
+      x: storedX ?? fallbackX,
+      y: storedY ?? fallbackY,
       status: loc.status,
       locationType: loc.type,
       locationData: locData,

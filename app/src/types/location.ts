@@ -65,6 +65,13 @@ export interface GrowthLocation {
     gridOriginY?: number;
     gridCellPx?: number;     // Image pixels per grid square
   };
+  /**
+   * GM-placed canvas coordinates (SVG world units). When set, the canvas
+   * renders this Location at the stored position; when null, it falls back
+   * to the deterministic index-based default in the page's canvas builder.
+   */
+  canvasX?: number;
+  canvasY?: number;
 }
 
 export interface LocationConnection {
