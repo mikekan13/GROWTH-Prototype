@@ -735,6 +735,42 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
   }, [campaign.id, router]);
 
+  // Right-click "Create NPC here" on a Location card. Prompts for a name,
+  // POSTs a new character wired as a located_at child of the parent. The
+  // canvas folder system auto-nests the result, so River Styx / Undead Army
+  // / any flat Location promotes to a folder the moment the first child lands.
+  const handleCreateChildCharacterAtLocation = useCallback(async (parentLocationId: string) => {
+    const name = typeof window !== 'undefined' ? window.prompt('Name the NPC:') : null;
+    if (!name || !name.trim()) return;
+    try {
+      const res = await fetch('/api/characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), campaignId: campaign.id, parentLocationId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to create NPC');
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+      const newId: string | undefined = json?.character?.id;
+      router.refresh();
+      // After the server-rendered page refreshes, pan the canvas camera to
+      // either the new NPC or its parent folder so the user sees what they
+      // just authored. RelationsCanvas listens for growth:focus-canvas-node
+      // and tweens the viewport to that entity (or its auto-folder).
+      if (typeof window !== 'undefined') {
+        const target = newId ?? parentLocationId;
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('growth:focus-canvas-node', { detail: { entityId: target } }));
+        }, 800);
+      }
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
   // Place (or reposition) an existing campaign character onto the canvas.
   // Optimistic: add/move the node locally so it appears instantly, then persist
   // canvas coordinates via the server (PATCH-equivalent) so it survives reloads.
@@ -1339,6 +1375,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onCharacterUpdate={handleCharacterUpdate}
             onCreateLocation={handleCreateLocation}
             onDeleteLocation={handleDeleteLocation}
+            onCreateChildCharacterAtLocation={handleCreateChildCharacterAtLocation}
             onCreateItem={handleCreateItem}
             onDeleteItem={handleDeleteItem}
             onItemUpdate={handleItemUpdate}

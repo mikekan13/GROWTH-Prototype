@@ -13,6 +13,10 @@ import type { GrowthCharacter } from '@/types/growth';
 export const createCharacterSchema = z.object({
   name: z.string().min(1, 'Character name required').max(100),
   campaignId: z.string().min(1, 'Campaign ID required'),
+  /** When set, the new character is wired as a child of this Location via a
+   *  located_at relationship. The canvas folder system auto-nests the child
+   *  inside the parent. Used by the "Create NPC here" gesture on Location cards. */
+  parentLocationId: z.string().optional(),
 });
 
 export const updateCharacterSchema = z.object({
@@ -54,15 +58,61 @@ export async function createCharacter(userId: string, input: z.infer<typeof crea
   const campaign = await prisma.campaign.findUnique({ where: { id: input.campaignId } });
   if (!campaign) throw new NotFoundError('Campaign not found');
 
+  // If a parent Location was specified, verify it belongs to this campaign
+  // before we commit anything. Reject early so we don't leave orphaned chars.
+  let parentLocation: { id: string } | null = null;
+  if (input.parentLocationId) {
+    parentLocation = await prisma.location.findFirst({
+      where: { id: input.parentLocationId, campaignId: input.campaignId },
+      select: { id: true },
+    });
+    if (!parentLocation) {
+      throw new NotFoundError('Parent location not found in this campaign');
+    }
+  }
+
   const defaultData = createDefaultCharacter(input.name);
 
-  return prisma.character.create({
-    data: {
-      name: input.name,
-      userId,
-      campaignId: input.campaignId,
-      data: JSON.stringify(defaultData),
-    },
+  // When the character is being authored as a child of a Location, stamp a
+  // canvas position into its data so the page's canvas-eligibility filter
+  // accepts it (it filters DRAFT chars without canvasX/Y into Tapestry).
+  // The exact position is incidental — once on-canvas, the auto-folder
+  // system folds the child inside the parent Location's folder visual
+  // via the located_at edge below. Using (0, 0) keeps it deterministic.
+  if (parentLocation) {
+    const d = defaultData as unknown as Record<string, unknown>;
+    d.canvasX = 0;
+    d.canvasY = 0;
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const character = await tx.character.create({
+      data: {
+        name: input.name,
+        userId,
+        campaignId: input.campaignId,
+        data: JSON.stringify(defaultData),
+      },
+    });
+
+    // Wire the located_at edge so the canvas folder system auto-nests the
+    // new character inside its parent location. Keeps the manual-first
+    // authoring path canon-aligned (no reassignment ever needed).
+    if (parentLocation) {
+      await tx.entityRelationship.create({
+        data: {
+          campaignId: input.campaignId,
+          sourceId: character.id,
+          sourceType: 'CHARACTER',
+          targetId: parentLocation.id,
+          targetType: 'LOCATION',
+          relationshipType: 'located_at',
+          strength: 5,
+        },
+      });
+    }
+
+    return character;
   });
 }
 

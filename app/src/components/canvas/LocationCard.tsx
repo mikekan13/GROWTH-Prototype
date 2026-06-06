@@ -23,6 +23,10 @@ interface LocationCardProps {
   onUpdate?: (nodeId: string, data: GrowthLocation) => void;
   onPositionChange?: (nodeId: string, x: number, y: number) => void;
   onDragOffsetChange?: (nodeId: string, offsetX: number, offsetY: number) => void;
+  /** GM gesture: right-click → "Create NPC here" spawns a new character wired
+   *  as a located_at child of this Location. Fired with the parent's id; the
+   *  parent surface handles the name prompt + API call + canvas refresh. */
+  onCreateChildCharacter?: (parentLocationId: string) => void;
 }
 
 const DANGER_COLORS = ['#4ade80', '#4ade80', '#a3e635', '#facc15', '#facc15', '#f59e0b', '#f97316', '#ef4444', '#dc2626', '#991b1b'];
@@ -64,7 +68,7 @@ interface ContentsChildRow {
   childContentsCount: number;
 }
 
-export default function LocationCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate: _onUpdate, onPositionChange, onDragOffsetChange }: LocationCardProps) {
+export default function LocationCard({ node, isExpanded, onToggleExpand, onDelete, onUpdate: _onUpdate, onPositionChange, onDragOffsetChange, onCreateChildCharacter }: LocationCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
@@ -122,7 +126,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
   }, [showContextMenu]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    if (!onDelete) return;
+    if (!onDelete && !onCreateChildCharacter) return;
     e.preventDefault();
     e.stopPropagation();
     setContextMenuPos({ x: e.pageX, y: e.pageY });
@@ -180,17 +184,28 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
     <div
       ref={contextMenuRef}
       className="fixed bg-gray-800 border border-gray-700 rounded-lg shadow-2xl py-1 z-50"
-      style={{ left: `${contextMenuPos.x}px`, top: `${contextMenuPos.y}px`, minWidth: '160px' }}
+      style={{ left: `${contextMenuPos.x}px`, top: `${contextMenuPos.y}px`, minWidth: '180px' }}
     >
-      <button
-        onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete?.(node.id); }}
-        className="w-full px-4 py-2 text-left text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-        Delete Location
-      </button>
+      {onCreateChildCharacter && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onCreateChildCharacter(node.id); }}
+          className="w-full px-4 py-2 text-left text-teal-300 hover:bg-teal-500/20 transition-colors flex items-center gap-2"
+        >
+          <span className="text-base leading-none">✴</span>
+          Create NPC here
+        </button>
+      )}
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete(node.id); }}
+          className="w-full px-4 py-2 text-left text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete Location
+        </button>
+      )}
     </div>,
     document.body
   );

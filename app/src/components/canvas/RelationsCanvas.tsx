@@ -91,6 +91,10 @@ interface RelationsCanvasProps {
   onCreateLocation?: (name: string, type: string) => void;
   onDeleteLocation?: (nodeId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
+  /** Right-click → "Create NPC here" on a Location card. Wrapper prompts for
+   *  name + fires POST /api/characters with parentLocationId; the canvas
+   *  folder system auto-nests the result. */
+  onCreateChildCharacterAtLocation?: (parentLocationId: string) => void;
   onCreateItem?: (name: string, type: string) => void;
   onDeleteItem?: (nodeId: string) => void;
   onItemUpdate?: (nodeId: string, data: GrowthWorldItem) => void;
@@ -139,6 +143,7 @@ export default function RelationsCanvas({
   onCreateLocation,
   onDeleteLocation,
   onLocationUpdate: _onLocationUpdate,
+  onCreateChildCharacterAtLocation,
   onCreateItem,
   onDeleteItem,
   onItemUpdate,
@@ -2872,6 +2877,7 @@ export default function RelationsCanvas({
                       });
                       checkFolderDropTarget(nodeId, offsetX, clampedY);
                     }}
+                    onCreateChildCharacter={onCreateChildCharacterAtLocation}
                   />
                 </div>
                 </div>
