@@ -88,7 +88,10 @@ interface RelationsCanvasProps {
   onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
   onDeleteCharacter?: (nodeId: string) => void;
   onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
-  onCreateLocation?: (name: string, type: string) => void;
+  /** Create a new Location. Optional coords stamp canvasX/canvasY on the
+   *  new Location so its card lands at a specific point (used by the
+   *  empty-canvas right-click gesture). Omit for default placement. */
+  onCreateLocation?: (name: string, type: string, canvasX?: number, canvasY?: number) => void;
   onDeleteLocation?: (nodeId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
   /** Right-click → "Create NPC here" on a Location card. Wrapper prompts for
@@ -238,6 +241,11 @@ export default function RelationsCanvas({
   const [panStart, setPanStart] = useState({ x: 0, y: 0, viewBoxX: 0, viewBoxY: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [animationTime, setAnimationTime] = useState(0);
+
+  // Right-click on empty canvas opens a create menu at the cursor. Stores
+  // screen coords (for menu placement) + world coords (to stamp on the new
+  // entity). null when closed.
+  const [canvasMenu, setCanvasMenu] = useState<{ screenX: number; screenY: number; worldX: number; worldY: number } | null>(null);
 
   // â”€â”€ Node position & layering state â”€â”€
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => {
@@ -2432,6 +2440,21 @@ export default function RelationsCanvas({
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
         onMouseDown={handleMouseDown}
         onWheel={handleWheel}
+        onContextMenu={(e) => {
+          // Only fire for clicks on the empty canvas — let cards keep their
+          // own right-click menus (die roll, delete, create-here).
+          if (e.target !== svgRef.current && (e.target as Element).tagName !== 'rect') return;
+          e.preventDefault();
+          const svg = svgRef.current;
+          if (!svg) return;
+          const pt = svg.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          const ctm = svg.getScreenCTM();
+          if (!ctm) return;
+          const world = pt.matrixTransform(ctm.inverse());
+          setCanvasMenu({ screenX: e.clientX, screenY: e.clientY, worldX: world.x, worldY: world.y });
+        }}
         style={{ cursor: isPanning ? "grabbing" : "grab" }}
       >
         {/* â”€â”€ Definitions â”€â”€ */}
@@ -3101,6 +3124,24 @@ export default function RelationsCanvas({
           })}
       </svg>
 
+      {/* ── Right-click "create here" menu on empty canvas ──
+          Closes on outside-click or Escape. Each item invokes onCreateLocation
+          with a specific type and the world coords of the original right-click,
+          so the new Location's card lands exactly where the GM clicked. */}
+      {canvasMenu && onCreateLocation && (
+        <CanvasCreateMenu
+          screenX={canvasMenu.screenX}
+          screenY={canvasMenu.screenY}
+          onPick={(type) => {
+            const name = typeof window !== 'undefined' ? window.prompt(`Name the ${type.replace(/_/g, ' ')}:`) : null;
+            setCanvasMenu(null);
+            if (!name?.trim()) return;
+            onCreateLocation(name.trim(), type, canvasMenu.worldX, canvasMenu.worldY);
+          }}
+          onClose={() => setCanvasMenu(null)}
+        />
+      )}
+
       {/* â”€â”€ Canvas Toolbox (follows camera on the KRMA line) â”€â”€ */}
       <CanvasToolbox
         viewBox={viewBox}
@@ -3373,7 +3414,10 @@ function CanvasToolbox({
   nodes?: CanvasNode[];
   onCreateCharacter?: (name: string) => void;
   onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
-  onCreateLocation?: (name: string, type: string) => void;
+  /** Create a new Location. Optional coords stamp canvasX/canvasY on the
+   *  new Location so its card lands at a specific point (used by the
+   *  empty-canvas right-click gesture). Omit for default placement. */
+  onCreateLocation?: (name: string, type: string, canvasX?: number, canvasY?: number) => void;
   onCreateItem?: (name: string, type: string) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
   onCreateParty?: (nodeIds: string[]) => void;
@@ -3710,5 +3754,97 @@ function ToolboxButton({ icon, label, color, onClick }: { icon: React.ReactNode;
       {icon}
       {label.toUpperCase()}
     </button>
+  );
+}
+
+// ── Canvas right-click "create here" menu ──────────────────────────────────
+// Lightweight positioned menu. Closes on outside-click or Escape. Each item
+// represents a Location type; clicking it surfaces a name prompt and calls
+// back with the chosen type.
+
+const CANVAS_CREATE_TYPES: { type: string; label: string; glyph: string }[] = [
+  { type: 'cosmic_landmark',   label: 'Cosmic Landmark',  glyph: '✦' },
+  { type: 'region',            label: 'Region',           glyph: '◆' },
+  { type: 'settlement',        label: 'Settlement',       glyph: '▣' },
+  { type: 'building',          label: 'Building',         glyph: '▢' },
+  { type: 'wilderness',        label: 'Wilderness',       glyph: '✿' },
+  { type: 'dungeon',           label: 'Dungeon',          glyph: '◬' },
+  { type: 'force',             label: 'Force / Army',     glyph: '⚔' },
+  { type: 'meta',              label: 'Meta Container',   glyph: '◯' },
+  { type: 'point_of_interest', label: 'Point of Interest', glyph: '★' },
+];
+
+function CanvasCreateMenu({
+  screenX, screenY, onPick, onClose,
+}: {
+  screenX: number;
+  screenY: number;
+  onPick: (type: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        left: screenX,
+        top: screenY,
+        zIndex: 100,
+        background: '#1a1e2e',
+        border: '1px solid #ffcc7855',
+        borderRadius: 6,
+        padding: 4,
+        minWidth: 200,
+        boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+      }}
+    >
+      <div style={{
+        padding: '4px 10px 6px',
+        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+        fontSize: 11,
+        letterSpacing: '0.15em',
+        color: '#ffcc78',
+        borderBottom: '1px solid #ffcc7822',
+        marginBottom: 4,
+      }}>CREATE LOCATION HERE</div>
+      {CANVAS_CREATE_TYPES.map((opt) => (
+        <button
+          key={opt.type}
+          onClick={(e) => { e.stopPropagation(); onPick(opt.type); }}
+          style={{
+            width: '100%',
+            padding: '6px 10px',
+            background: 'transparent',
+            border: 'none',
+            color: '#fdfdfd',
+            fontSize: 13,
+            fontFamily: 'var(--font-consolas), Consolas, monospace',
+            textAlign: 'left',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+          onMouseEnter={(e) => { (e.currentTarget.style.background = '#22ab9422'); }}
+          onMouseLeave={(e) => { (e.currentTarget.style.background = 'transparent'); }}
+        >
+          <span style={{ color: '#22ab94', width: 16, textAlign: 'center' }}>{opt.glyph}</span>
+          {opt.label}
+        </button>
+      ))}
+    </div>
   );
 }

@@ -7,8 +7,12 @@ import { canManageCampaign } from '@/lib/permissions';
 
 export const createLocationSchema = z.object({
   name: z.string().min(1, 'Location name required').max(200),
-  type: z.enum(['settlement', 'wilderness', 'dungeon', 'building', 'point_of_interest', 'region']).default('point_of_interest'),
+  type: z.enum(['settlement', 'wilderness', 'dungeon', 'building', 'point_of_interest', 'region', 'meta', 'cosmic_landmark', 'force']).default('point_of_interest'),
   data: z.record(z.string(), z.unknown()).optional(),
+  /** Canvas world coords to stamp on the new Location's data JSON so its
+   *  card renders where the GM right-clicked. */
+  canvasX: z.number().optional(),
+  canvasY: z.number().optional(),
 });
 
 export const updateLocationSchema = z.object({
@@ -72,6 +76,10 @@ export async function createLocation(
   }
 
   const data = input.data ?? createDefaultLocation(input.name);
+  if (input.canvasX != null && input.canvasY != null) {
+    (data as Record<string, unknown>).canvasX = input.canvasX;
+    (data as Record<string, unknown>).canvasY = input.canvasY;
+  }
 
   return prisma.location.create({
     data: {
