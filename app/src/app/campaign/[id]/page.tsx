@@ -281,6 +281,12 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
             imageUrl: typeof loc.data.imageUrl === 'string' ? loc.data.imageUrl : undefined,
             contentCounts: counts,
             status: typeof loc.status === 'string' ? loc.status : undefined,
+            environment: typeof loc.data.environment === 'string' ? loc.data.environment : undefined,
+            population: typeof loc.data.population === 'string' ? loc.data.population : undefined,
+            dangerLevel: typeof loc.data.dangerLevel === 'number' ? loc.data.dangerLevel : undefined,
+            controlledBy: typeof loc.data.controlledBy === 'string' ? loc.data.controlledBy : undefined,
+            notes: typeof loc.data.notes === 'string' ? loc.data.notes : undefined,
+            tags: Array.isArray(loc.data.tags) ? (loc.data.tags as unknown[]).filter((t): t is string => typeof t === 'string') : undefined,
           }
         : undefined,
     };

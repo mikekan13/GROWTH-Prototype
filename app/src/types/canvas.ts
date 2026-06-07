@@ -40,5 +40,14 @@ export interface CanvasFolder {
     /** PLANNING vs ACTIVE etc. When PLANNING, the folder shows a
      *  CRYSTALLIZE button in the header that flips status to ACTIVE. */
     status?: string;
+    /** Full Location detail fields surfaced so the folder can display
+     *  everything JEWL generated (and what the GM edits later) without a
+     *  separate Location sheet panel. */
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
   };
 }
