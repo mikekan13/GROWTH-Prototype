@@ -62,8 +62,21 @@ interface FolderGroupProps {
 
 const FOLDER_PADDING = 30;
 const HEADER_HEIGHT = 80;
+const LOCATION_HEADER_HEIGHT = 360; // chrome strip (80) + details panel (~280)
 const SOUL_BLUE = '#002f6c';
 const HANDLE_SIZE = 36;
+
+/** Effective header height. Location folders get the expanded header (with
+ *  description/environment/etc. baked in) whenever they have any detail
+ *  fields. Plain folders + empty Locations keep the compact 80px chrome. */
+function locationHeaderHeight(folder: CanvasFolder): number {
+  const li = folder.locationInfo;
+  if (!li) return HEADER_HEIGHT;
+  const hasAnyDetail = !!(li.description || li.environment || li.population
+    || li.dangerLevel != null || li.controlledBy || li.notes
+    || (li.tags && li.tags.length > 0));
+  return hasAnyDetail ? LOCATION_HEADER_HEIGHT : HEADER_HEIGHT;
+}
 
 // ── Shared bounds calculation ──
 
@@ -106,11 +119,12 @@ export function calcContentBounds(
     maxY = 0;
   }
 
+  const hh = locationHeaderHeight(folder);
   return {
     x: minX - FOLDER_PADDING,
-    y: minY - FOLDER_PADDING - HEADER_HEIGHT,
+    y: minY - FOLDER_PADDING - hh,
     minWidth: (maxX - minX) + FOLDER_PADDING * 2,
-    minHeight: (maxY - minY) + FOLDER_PADDING * 2 + HEADER_HEIGHT,
+    minHeight: (maxY - minY) + FOLDER_PADDING * 2 + hh,
   };
 }
 
@@ -357,12 +371,12 @@ export function FolderGroupRect({
           style={{ pointerEvents: 'none', ...(isDropTarget ? { filter: 'drop-shadow(0 0 16px rgba(34,171,148,0.6))' } : undefined) }}
         />
       )}
-      {/* Header background */}
+      {/* Header background — expanded when the Location has detail fields */}
       <rect
         x={bounds.x}
         y={bounds.y}
         width={bounds.width}
-        height={HEADER_HEIGHT}
+        height={collapsed ? HEADER_HEIGHT : locationHeaderHeight(folder)}
         rx={8}
         ry={8}
         fill={isDropTarget ? '#22ab94' : color}
@@ -376,7 +390,7 @@ export function FolderGroupRect({
       {!collapsed && (
         <rect
           x={bounds.x}
-          y={bounds.y + HEADER_HEIGHT - 8}
+          y={bounds.y + locationHeaderHeight(folder) - 8}
           width={bounds.width}
           height={8}
           fill="#19191930"
