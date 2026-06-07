@@ -7,12 +7,25 @@ import { canManageCampaign } from '@/lib/permissions';
 
 export const createLocationSchema = z.object({
   name: z.string().min(1, 'Location name required').max(200),
+  // Type kept for backward compat; the design now treats Location as a single
+  // primitive (description does the "what is this" work). Defaults to a
+  // neutral value; UI no longer surfaces a type picker.
   type: z.enum(['settlement', 'wilderness', 'dungeon', 'building', 'point_of_interest', 'region', 'meta', 'cosmic_landmark', 'force']).default('point_of_interest'),
   data: z.record(z.string(), z.unknown()).optional(),
   /** Canvas world coords to stamp on the new Location's data JSON so its
    *  card renders where the GM right-clicked. */
   canvasX: z.number().optional(),
   canvasY: z.number().optional(),
+  /** Short narrative — the WHAT of this place. Feeds the AI cascade
+   *  downward to children for lore generation. */
+  description: z.string().optional(),
+  /** Ambient KRMA mass — drives wallet commitment + visual prominence.
+   *  See [[location-krma-reserve-2026-06-02]]. */
+  krmaReserve: z.number().optional(),
+  /** PLANNING = below the crystallization line (draft, no KRMA debit);
+   *  ACTIVE = above the line (committed, debits wallet). Defaults to
+   *  PLANNING because authoring should start in the planning layer. */
+  status: z.enum(['ACTIVE', 'PLANNING', 'HIDDEN', 'DESTROYED']).optional(),
 });
 
 export const updateLocationSchema = z.object({
@@ -76,10 +89,13 @@ export async function createLocation(
   }
 
   const data = input.data ?? createDefaultLocation(input.name);
+  const d = data as Record<string, unknown>;
   if (input.canvasX != null && input.canvasY != null) {
-    (data as Record<string, unknown>).canvasX = input.canvasX;
-    (data as Record<string, unknown>).canvasY = input.canvasY;
+    d.canvasX = input.canvasX;
+    d.canvasY = input.canvasY;
   }
+  if (input.description) d.description = input.description;
+  if (input.krmaReserve != null) d.krmaReserve = input.krmaReserve;
 
   return prisma.location.create({
     data: {
@@ -88,6 +104,7 @@ export async function createLocation(
       campaignId,
       data: JSON.stringify(data),
       createdBy: userId,
+      ...(input.status ? { status: input.status } : {}),
     },
   });
 }

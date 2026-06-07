@@ -827,12 +827,20 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
   }, [nodes, stampTKV]);
 
-  const handleCreateLocation = useCallback(async (name: string, type: string, canvasX?: number, canvasY?: number) => {
+  const handleCreateLocation = useCallback(async (input: {
+    name: string;
+    type?: string;
+    canvasX?: number;
+    canvasY?: number;
+    description?: string;
+    krmaReserve?: number;
+    status?: 'ACTIVE' | 'PLANNING';
+  }) => {
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}/locations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type, ...(canvasX != null && canvasY != null ? { canvasX, canvasY } : {}) }),
+        body: JSON.stringify(input),
       });
       if (!res.ok) {
         const data = await res.json();

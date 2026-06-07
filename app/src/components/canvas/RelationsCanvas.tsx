@@ -88,10 +88,18 @@ interface RelationsCanvasProps {
   onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
   onDeleteCharacter?: (nodeId: string) => void;
   onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
-  /** Create a new Location. Optional coords stamp canvasX/canvasY on the
-   *  new Location so its card lands at a specific point (used by the
-   *  empty-canvas right-click gesture). Omit for default placement. */
-  onCreateLocation?: (name: string, type: string, canvasX?: number, canvasY?: number) => void;
+  /** Create a new Location. Input is a flat object so the create form can
+   *  pass name + description + KRMA reserve + status + click coords in one
+   *  shot. The parent surface (CampaignCanvas) wires this to the API. */
+  onCreateLocation?: (input: {
+    name: string;
+    type?: string;
+    canvasX?: number;
+    canvasY?: number;
+    description?: string;
+    krmaReserve?: number;
+    status?: 'ACTIVE' | 'PLANNING';
+  }) => void;
   onDeleteLocation?: (nodeId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
   /** Right-click → "Create NPC here" on a Location card. Wrapper prompts for
@@ -3124,21 +3132,23 @@ export default function RelationsCanvas({
           })}
       </svg>
 
-      {/* ── Right-click "create here" menu on empty canvas ──
-          Closes on outside-click or Escape. Each item invokes onCreateLocation
-          with a specific type and the world coords of the original right-click,
-          so the new Location's card lands exactly where the GM clicked. */}
+      {/* ── Right-click create form on empty canvas ──
+          Inline form (name + description + KRMA reserve + status) anchored
+          at the click point. Submits a full Location input including the
+          world coords so the new card lands where the GM clicked. */}
       {canvasMenu && onCreateLocation && (
-        <CanvasCreateMenu
+        <CanvasCreateLocationForm
           screenX={canvasMenu.screenX}
           screenY={canvasMenu.screenY}
-          onPick={(type) => {
-            const name = typeof window !== 'undefined' ? window.prompt(`Name the ${type.replace(/_/g, ' ')}:`) : null;
+          onCancel={() => setCanvasMenu(null)}
+          onSubmit={(input) => {
+            onCreateLocation({
+              ...input,
+              canvasX: canvasMenu.worldX,
+              canvasY: canvasMenu.worldY,
+            });
             setCanvasMenu(null);
-            if (!name?.trim()) return;
-            onCreateLocation(name.trim(), type, canvasMenu.worldX, canvasMenu.worldY);
           }}
-          onClose={() => setCanvasMenu(null)}
         />
       )}
 
@@ -3414,10 +3424,18 @@ function CanvasToolbox({
   nodes?: CanvasNode[];
   onCreateCharacter?: (name: string) => void;
   onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
-  /** Create a new Location. Optional coords stamp canvasX/canvasY on the
-   *  new Location so its card lands at a specific point (used by the
-   *  empty-canvas right-click gesture). Omit for default placement. */
-  onCreateLocation?: (name: string, type: string, canvasX?: number, canvasY?: number) => void;
+  /** Create a new Location. Input is a flat object so the create form can
+   *  pass name + description + KRMA reserve + status + click coords in one
+   *  shot. The parent surface (CampaignCanvas) wires this to the API. */
+  onCreateLocation?: (input: {
+    name: string;
+    type?: string;
+    canvasX?: number;
+    canvasY?: number;
+    description?: string;
+    krmaReserve?: number;
+    status?: 'ACTIVE' | 'PLANNING';
+  }) => void;
   onCreateItem?: (name: string, type: string) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
   onCreateParty?: (nodeIds: string[]) => void;
@@ -3567,7 +3585,7 @@ function CanvasToolbox({
               color="#582a72"
               onClick={() => {
                 const name = window.prompt('Location name:');
-                if (name?.trim()) onCreateLocation?.(name.trim(), 'point_of_interest');
+                if (name?.trim()) onCreateLocation?.({ name: name.trim() });
               }}
             />
             <ToolboxButton
@@ -3757,94 +3775,210 @@ function ToolboxButton({ icon, label, color, onClick }: { icon: React.ReactNode;
   );
 }
 
-// ── Canvas right-click "create here" menu ──────────────────────────────────
-// Lightweight positioned menu. Closes on outside-click or Escape. Each item
-// represents a Location type; clicking it surfaces a name prompt and calls
-// back with the chosen type.
+// ── Canvas right-click create form ─────────────────────────────────────────
+// Inline Location create form anchored at the click point. Matches the die
+// menu chrome (#22ab94 accents, Consolas, dark teal). Single Location type —
+// description does the work the type enum used to do, with AI cascade later.
 
-const CANVAS_CREATE_TYPES: { type: string; label: string; glyph: string }[] = [
-  { type: 'cosmic_landmark',   label: 'Cosmic Landmark',  glyph: '✦' },
-  { type: 'region',            label: 'Region',           glyph: '◆' },
-  { type: 'settlement',        label: 'Settlement',       glyph: '▣' },
-  { type: 'building',          label: 'Building',         glyph: '▢' },
-  { type: 'wilderness',        label: 'Wilderness',       glyph: '✿' },
-  { type: 'dungeon',           label: 'Dungeon',          glyph: '◬' },
-  { type: 'force',             label: 'Force / Army',     glyph: '⚔' },
-  { type: 'meta',              label: 'Meta Container',   glyph: '◯' },
-  { type: 'point_of_interest', label: 'Point of Interest', glyph: '★' },
-];
+interface LocationCreateInput {
+  name: string;
+  description?: string;
+  krmaReserve?: number;
+  status?: 'ACTIVE' | 'PLANNING';
+}
 
-function CanvasCreateMenu({
-  screenX, screenY, onPick, onClose,
+function CanvasCreateLocationForm({
+  screenX, screenY, onSubmit, onCancel,
 }: {
   screenX: number;
   screenY: number;
-  onPick: (type: string) => void;
-  onClose: () => void;
+  onSubmit: (input: LocationCreateInput) => void;
+  onCancel: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [krmaReserve, setKrmaReserve] = useState('');
+  const [status, setStatus] = useState<'ACTIVE' | 'PLANNING'>('PLANNING');
+
   useEffect(() => {
+    nameRef.current?.focus();
     const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
+      if (!ref.current?.contains(e.target as Node)) onCancel();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
     document.addEventListener('mousedown', onDown, true);
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', onDown, true);
       document.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, [onCancel]);
+
+  const commit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const parsed = krmaReserve.trim() ? Number(krmaReserve.trim()) : undefined;
+    onSubmit({
+      name: trimmed,
+      description: description.trim() || undefined,
+      krmaReserve: parsed != null && Number.isFinite(parsed) ? parsed : undefined,
+      status,
+    });
+  };
+
+  // Clamp position so the form doesn't render off-screen
+  const FORM_W = 320;
+  const FORM_H = 360;
+  const left = Math.min(screenX, (typeof window !== 'undefined' ? window.innerWidth : 1000) - FORM_W - 8);
+  const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - FORM_H - 8);
+
   return (
     <div
       ref={ref}
+      onMouseDown={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
-        left: screenX,
-        top: screenY,
+        left,
+        top,
         zIndex: 100,
+        width: FORM_W,
         background: '#1a1e2e',
-        border: '1px solid #ffcc7855',
-        borderRadius: 6,
-        padding: 4,
-        minWidth: 200,
-        boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+        border: '1px solid #22ab9466',
+        borderRadius: 4,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        fontFamily: 'var(--font-consolas), Consolas, monospace',
+        color: '#fdfdfd',
       }}
     >
       <div style={{
-        padding: '4px 10px 6px',
         fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-        fontSize: 11,
-        letterSpacing: '0.15em',
-        color: '#ffcc78',
-        borderBottom: '1px solid #ffcc7822',
-        marginBottom: 4,
+        fontSize: 13,
+        letterSpacing: '0.18em',
+        color: '#22ab94',
+        marginBottom: 10,
+        borderBottom: '1px solid #22ab9433',
+        paddingBottom: 6,
       }}>CREATE LOCATION HERE</div>
-      {CANVAS_CREATE_TYPES.map((opt) => (
+
+      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>NAME</label>
+      <input
+        ref={nameRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); } }}
+        placeholder="e.g. Garlo"
+        style={{
+          width: '100%',
+          padding: '6px 8px',
+          background: '#0a0e1a',
+          border: '1px solid #22ab9440',
+          color: '#fdfdfd',
+          fontSize: 13,
+          fontFamily: 'inherit',
+          outline: 'none',
+          marginBottom: 10,
+        }}
+      />
+
+      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>DESCRIPTION</label>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="What is this place? Lore flows down to children."
+        rows={3}
+        style={{
+          width: '100%',
+          padding: '6px 8px',
+          background: '#0a0e1a',
+          border: '1px solid #22ab9440',
+          color: '#fdfdfd',
+          fontSize: 12,
+          fontFamily: 'inherit',
+          outline: 'none',
+          marginBottom: 10,
+          resize: 'vertical',
+          minHeight: 60,
+        }}
+      />
+
+      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>
+        KRMA RESERVE <span style={{ color: '#22ab9466', fontSize: 9 }}>(scale dial — e.g. 1000 / 1000000 / 1e12)</span>
+      </label>
+      <input
+        value={krmaReserve}
+        onChange={(e) => setKrmaReserve(e.target.value)}
+        placeholder="0"
+        inputMode="numeric"
+        style={{
+          width: '100%',
+          padding: '6px 8px',
+          background: '#0a0e1a',
+          border: '1px solid #22ab9440',
+          color: '#ffcc78',
+          fontSize: 13,
+          fontFamily: 'inherit',
+          outline: 'none',
+          marginBottom: 10,
+        }}
+      />
+
+      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>STATUS</label>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {(['PLANNING', 'ACTIVE'] as const).map((s) => {
+          const active = status === s;
+          return (
+            <button
+              key={s}
+              onClick={() => setStatus(s)}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                background: active ? '#22ab9433' : 'transparent',
+                border: `1px solid ${active ? '#22ab94' : '#22ab9440'}`,
+                color: active ? '#22ab94' : '#fdfdfdaa',
+                fontSize: 11,
+                fontFamily: 'inherit',
+                letterSpacing: '0.12em',
+                cursor: 'pointer',
+              }}
+            >{s}</button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
         <button
-          key={opt.type}
-          onClick={(e) => { e.stopPropagation(); onPick(opt.type); }}
+          onClick={onCancel}
           style={{
-            width: '100%',
-            padding: '6px 10px',
+            padding: '6px 14px',
             background: 'transparent',
-            border: 'none',
-            color: '#fdfdfd',
-            fontSize: 13,
-            fontFamily: 'var(--font-consolas), Consolas, monospace',
-            textAlign: 'left',
+            border: '1px solid #fdfdfd33',
+            color: '#fdfdfdaa',
+            fontSize: 11,
+            fontFamily: 'inherit',
+            letterSpacing: '0.12em',
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
           }}
-          onMouseEnter={(e) => { (e.currentTarget.style.background = '#22ab9422'); }}
-          onMouseLeave={(e) => { (e.currentTarget.style.background = 'transparent'); }}
-        >
-          <span style={{ color: '#22ab94', width: 16, textAlign: 'center' }}>{opt.glyph}</span>
-          {opt.label}
-        </button>
-      ))}
+        >CANCEL</button>
+        <button
+          onClick={commit}
+          disabled={!name.trim()}
+          style={{
+            padding: '6px 14px',
+            background: name.trim() ? '#22ab94' : '#22ab9433',
+            border: '1px solid #22ab94',
+            color: name.trim() ? '#0a0e1a' : '#22ab9477',
+            fontSize: 11,
+            fontFamily: 'inherit',
+            letterSpacing: '0.12em',
+            fontWeight: 700,
+            cursor: name.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >CREATE</button>
+      </div>
     </div>
   );
 }
