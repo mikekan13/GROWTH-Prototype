@@ -66,16 +66,12 @@ const LOCATION_HEADER_HEIGHT = 360; // chrome strip (80) + details panel (~280)
 const SOUL_BLUE = '#002f6c';
 const HANDLE_SIZE = 36;
 
-/** Effective header height. Location folders get the expanded header (with
- *  description/environment/etc. baked in) whenever they have any detail
- *  fields. Plain folders + empty Locations keep the compact 80px chrome. */
+/** Effective header height. Location folders ALWAYS get the expanded header
+ *  (with the details panel surfacing what's set + placeholders for what's
+ *  empty) — the GM needs to see the field structure to know what JEWL filled
+ *  vs what needs filling. Plain folders (party/etc.) keep the compact 80px. */
 function locationHeaderHeight(folder: CanvasFolder): number {
-  const li = folder.locationInfo;
-  if (!li) return HEADER_HEIGHT;
-  const hasAnyDetail = !!(li.description || li.environment || li.population
-    || li.dangerLevel != null || li.controlledBy || li.notes
-    || (li.tags && li.tags.length > 0));
-  return hasAnyDetail ? LOCATION_HEADER_HEIGHT : HEADER_HEIGHT;
+  return folder.locationInfo ? LOCATION_HEADER_HEIGHT : HEADER_HEIGHT;
 }
 
 // ── Shared bounds calculation ──
@@ -677,17 +673,16 @@ export function FolderGroupRect({
             </foreignObject>
           )}
 
-          {/* Details panel — surfaces every Location field JEWL stamped
-              (description, environment, population, danger, controlledBy,
-              tags, notes). Renders below the 80px header when the folder is
-              expanded. Read-only for now; editing routes through the JEWL
-              dialog (right-click on the folder, eventually). */}
+          {/* Details panel — surfaces every Location field. Always renders
+              for Location folders so the GM sees the field structure;
+              missing fields show "(empty)" placeholders inviting fill.
+              Read-only for now; editing routes through the JEWL dialog
+              (right-click → edit, tracked separately). */}
           {!folder.collapsed && (() => {
             const li = folder.locationInfo!;
-            const hasAnyDetail = li.description || li.environment || li.population
-              || li.dangerLevel != null || li.controlledBy || li.notes
-              || (li.tags && li.tags.length > 0);
-            if (!hasAnyDetail) return null;
+            const emptyPlaceholder = (
+              <span style={{ color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>(empty)</span>
+            );
             return (
               <foreignObject
                 x={bounds.x + 8}
@@ -711,68 +706,57 @@ export function FolderGroupRect({
                     overflowY: 'auto',
                   }}
                 >
-                  {li.description && (
-                    <div style={{ lineHeight: 1.45, color: '#fdfdfd', whiteSpace: 'pre-wrap' }}>
-                      {li.description}
+                  <div style={{ lineHeight: 1.45, color: '#fdfdfd', whiteSpace: 'pre-wrap' }}>
+                    {li.description || emptyPlaceholder}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginTop: 2 }}>
+                    <div>
+                      <div style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>ENVIRONMENT</div>
+                      <div style={{ color: '#fdfdfd' }}>{li.environment || emptyPlaceholder}</div>
                     </div>
-                  )}
-                  {(li.environment || li.population || li.dangerLevel != null || li.controlledBy) && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginTop: 2 }}>
-                      {li.environment && (
-                        <div>
-                          <span style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>ENVIRONMENT</span>
-                          <div style={{ color: '#fdfdfd' }}>{li.environment}</div>
-                        </div>
-                      )}
-                      {li.population && (
-                        <div>
-                          <span style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>POPULATION</span>
-                          <div style={{ color: '#fdfdfd' }}>{li.population}</div>
-                        </div>
-                      )}
-                      {li.dangerLevel != null && (
-                        <div>
-                          <span style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>DANGER</span>
-                          <div style={{ color: li.dangerLevel >= 7 ? '#f7525f' : li.dangerLevel >= 4 ? '#ffcc78' : '#22ab94' }}>
-                            {li.dangerLevel} / 10
-                          </div>
-                        </div>
-                      )}
-                      {li.controlledBy && (
-                        <div>
-                          <span style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>CONTROLLED BY</span>
-                          <div style={{ color: '#fdfdfd' }}>{li.controlledBy}</div>
-                        </div>
-                      )}
+                    <div>
+                      <div style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>POPULATION</div>
+                      <div style={{ color: '#fdfdfd' }}>{li.population || emptyPlaceholder}</div>
                     </div>
-                  )}
-                  {li.tags && li.tags.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
-                      {li.tags.map((tag, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            fontSize: 9,
-                            padding: '1px 6px',
-                            background: 'rgba(34,171,148,0.15)',
-                            border: '1px solid rgba(34,171,148,0.4)',
-                            color: '#22ab94',
-                            letterSpacing: '0.08em',
-                          }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {li.notes && (
-                    <div style={{ marginTop: 4, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6 }}>
-                      <span style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(255,204,120,0.7)' }}>GM NOTES</span>
-                      <div style={{ color: 'rgba(253,253,253,0.75)', whiteSpace: 'pre-wrap', lineHeight: 1.4, fontStyle: 'italic' }}>
-                        {li.notes}
+                    <div>
+                      <div style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>DANGER</div>
+                      <div style={{ color: li.dangerLevel == null ? undefined : li.dangerLevel >= 7 ? '#f7525f' : li.dangerLevel >= 4 ? '#ffcc78' : '#22ab94' }}>
+                        {li.dangerLevel != null ? `${li.dangerLevel} / 10` : emptyPlaceholder}
                       </div>
                     </div>
-                  )}
+                    <div>
+                      <div style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)' }}>CONTROLLED BY</div>
+                      <div style={{ color: '#fdfdfd' }}>{li.controlledBy || emptyPlaceholder}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 2 }}>
+                    <div style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.7)', marginBottom: 2 }}>TAGS</div>
+                    {li.tags && li.tags.length > 0 ? (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {li.tags.map((tag, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: 9,
+                              padding: '1px 6px',
+                              background: 'rgba(34,171,148,0.15)',
+                              border: '1px solid rgba(34,171,148,0.4)',
+                              color: '#22ab94',
+                              letterSpacing: '0.08em',
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : emptyPlaceholder}
+                  </div>
+                  <div style={{ marginTop: 4, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6 }}>
+                    <div style={{ fontSize: 9, letterSpacing: '0.15em', color: 'rgba(255,204,120,0.7)' }}>GM NOTES</div>
+                    <div style={{ color: 'rgba(253,253,253,0.75)', whiteSpace: 'pre-wrap', lineHeight: 1.4, fontStyle: 'italic' }}>
+                      {li.notes || emptyPlaceholder}
+                    </div>
+                  </div>
                 </div>
               </foreignObject>
             );
