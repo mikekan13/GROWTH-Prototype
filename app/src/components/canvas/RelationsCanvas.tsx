@@ -3137,7 +3137,7 @@ export default function RelationsCanvas({
           at the click point. Submits a full Location input including the
           world coords so the new card lands where the GM clicked. */}
       {canvasMenu && onCreateLocation && (
-        <CanvasCreateLocationForm
+        <CanvasCreateDialog
           screenX={canvasMenu.screenX}
           screenY={canvasMenu.screenY}
           campaignId={campaignId}
@@ -3776,10 +3776,12 @@ function ToolboxButton({ icon, label, color, onClick }: { icon: React.ReactNode;
   );
 }
 
-// ── Canvas right-click create form ─────────────────────────────────────────
-// Inline Location create form anchored at the click point. Matches the die
-// menu chrome (#22ab94 accents, Consolas, dark teal). Single Location type —
-// description does the work the type enum used to do, with AI cascade later.
+// ── AI-forward create dialog ───────────────────────────────────────────────
+// Anchored at the click point. JEWL runs a focused dialogue to lock the
+// vision, then proposes a structured entity. GM edits the preview fields
+// inline and commits. Replaces the manual-first form — JEWL fills, GM
+// tweaks. Per Mike: "anything you could do manually, you could just as
+// easily ask JEWL to do."
 
 interface LocationCreateInput {
   name: string;
@@ -3787,13 +3789,10 @@ interface LocationCreateInput {
   krmaReserve?: number;
 }
 
-type JewlSuggestion = {
-  field: 'name' | 'description' | 'krmaReserve' | 'note';
-  value: string | number;
-  rationale: string;
-};
+type DialogTurn = { role: 'jewl' | 'gm'; content: string };
+type ProposedLocation = { name: string; description: string; krmaReserve?: number };
 
-function CanvasCreateLocationForm({
+function CanvasCreateDialog({
   screenX, screenY, campaignId, parentLocationId, onSubmit, onCancel,
 }: {
   screenX: number;
@@ -3804,22 +3803,54 @@ function CanvasCreateLocationForm({
   onCancel: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const nameRef = useRef<HTMLInputElement | null>(null);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [krmaReserve, setKrmaReserve] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [conversation, setConversation] = useState<DialogTurn[]>([]);
+  const [proposal, setProposal] = useState<ProposedLocation | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editKrma, setEditKrma] = useState('');
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // JEWL — ambient suggestion. Watches form state; whenever it changes,
-  // debounces ~700ms then calls the form-suggest endpoint. Suggestion is
-  // null when JEWL has nothing to say (silent state). Dismissed suggestions
-  // are remembered for the current value so we don't re-suggest the same
-  // thing the GM already ignored.
-  const [suggestion, setSuggestion] = useState<JewlSuggestion | null>(null);
-  const [suggestionLoading, setSuggestionLoading] = useState(false);
-  const dismissedRef = useRef<string | null>(null); // serialized suggestion the GM dismissed
+  const runTurn = async (history: DialogTurn[]) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/copilot/create-dialog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId,
+          formType: 'location',
+          conversation: history,
+          parentLocationId,
+        }),
+      });
+      const json = await res.json() as { response: { message: string; proposal: ProposedLocation | null } | null };
+      const r = json.response;
+      if (!r) return;
+      setConversation([...history, { role: 'jewl', content: r.message }]);
+      if (r.proposal) {
+        setProposal(r.proposal);
+        setEditName(r.proposal.name);
+        setEditDescription(r.proposal.description);
+        setEditKrma(r.proposal.krmaReserve != null ? String(r.proposal.krmaReserve) : '');
+      }
+    } catch (err) {
+      console.error('[create-dialog] turn failed', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Open turn — JEWL speaks first.
   useEffect(() => {
-    nameRef.current?.focus();
+    void runTurn([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Click-outside + Escape to dismiss.
+  useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) onCancel();
     };
@@ -3832,73 +3863,48 @@ function CanvasCreateLocationForm({
     };
   }, [onCancel]);
 
-  // JEWL ambient suggestion: debounced fetch whenever form state changes.
+  // Auto-scroll chat as messages arrive.
   useEffect(() => {
-    const krmaNum = krmaReserve.trim() ? Number(krmaReserve.trim()) : undefined;
-    const handle = setTimeout(() => {
-      let cancelled = false;
-      setSuggestionLoading(true);
-      fetch('/api/copilot/form-suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          campaignId,
-          formType: 'location-create',
-          formState: {
-            name: name.trim() || undefined,
-            description: description.trim() || undefined,
-            krmaReserve: krmaNum != null && Number.isFinite(krmaNum) ? krmaNum : undefined,
-          },
-          parentLocationId,
-        }),
-      })
-        .then((r) => r.json())
-        .then((json: { suggestion: JewlSuggestion | null }) => {
-          if (cancelled) return;
-          const s = json.suggestion;
-          // Don't re-show a suggestion the GM already dismissed for this value.
-          if (s && dismissedRef.current === JSON.stringify(s)) {
-            setSuggestion(null);
-          } else {
-            setSuggestion(s);
-          }
-        })
-        .catch(() => { if (!cancelled) setSuggestion(null); })
-        .finally(() => { if (!cancelled) setSuggestionLoading(false); });
-      return () => { cancelled = true; };
-    }, 700);
-    return () => clearTimeout(handle);
-  }, [name, description, krmaReserve, campaignId, parentLocationId]);
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [conversation, loading]);
 
-  const acceptSuggestion = () => {
-    if (!suggestion) return;
-    if (suggestion.field === 'name') setName(String(suggestion.value));
-    else if (suggestion.field === 'description') setDescription(String(suggestion.value));
-    else if (suggestion.field === 'krmaReserve') setKrmaReserve(String(suggestion.value));
-    // 'note' is informational only — accept just dismisses.
-    setSuggestion(null);
+  // Focus input when there's no proposal yet and we're not loading.
+  useEffect(() => {
+    if (!proposal && !loading) inputRef.current?.focus();
+  }, [proposal, loading]);
+
+  const send = () => {
+    const trimmed = input.trim();
+    if (!trimmed || loading) return;
+    const next: DialogTurn[] = [...conversation, { role: 'gm', content: trimmed }];
+    setConversation(next);
+    setInput('');
+    void runTurn(next);
   };
-  const dismissSuggestion = () => {
-    if (suggestion) dismissedRef.current = JSON.stringify(suggestion);
-    setSuggestion(null);
+
+  const regenerate = () => {
+    if (loading) return;
+    setProposal(null);
+    const next: DialogTurn[] = [...conversation, { role: 'gm', content: 'Different angle — re-propose.' }];
+    setConversation(next);
+    void runTurn(next);
   };
 
   const commit = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const parsed = krmaReserve.trim() ? Number(krmaReserve.trim()) : undefined;
+    const trimmedName = editName.trim();
+    if (!trimmedName) return;
+    const krmaNum = editKrma.trim() ? Number(editKrma.trim()) : undefined;
     onSubmit({
-      name: trimmed,
-      description: description.trim() || undefined,
-      krmaReserve: parsed != null && Number.isFinite(parsed) ? parsed : undefined,
+      name: trimmedName,
+      description: editDescription.trim() || undefined,
+      krmaReserve: krmaNum != null && Number.isFinite(krmaNum) ? krmaNum : undefined,
     });
   };
 
-  // Clamp position so the form doesn't render off-screen
-  const FORM_W = 320;
-  const FORM_H = 300;
+  const FORM_W = 380;
+  const FORM_H_MAX = 540;
   const left = Math.min(screenX, (typeof window !== 'undefined' ? window.innerWidth : 1000) - FORM_W - 8);
-  const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - FORM_H - 8);
+  const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - FORM_H_MAX - 8);
 
   return (
     <div
@@ -3910,198 +3916,239 @@ function CanvasCreateLocationForm({
         top,
         zIndex: 100,
         width: FORM_W,
+        maxHeight: FORM_H_MAX,
         background: '#1a1e2e',
         border: '1px solid #22ab9466',
         borderRadius: 4,
-        padding: 12,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         fontFamily: 'var(--font-consolas), Consolas, monospace',
         color: '#fdfdfd',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
+      {/* Header */}
       <div style={{
-        fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-        fontSize: 13,
-        letterSpacing: '0.18em',
-        color: '#22ab94',
-        marginBottom: 10,
+        padding: '10px 12px 8px',
         borderBottom: '1px solid #22ab9433',
-        paddingBottom: 6,
-      }}>CREATE LOCATION HERE</div>
-
-      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>NAME</label>
-      <input
-        ref={nameRef}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); } }}
-        placeholder="e.g. Garlo"
-        style={{
-          width: '100%',
-          padding: '6px 8px',
-          background: '#0a0e1a',
-          border: '1px solid #22ab9440',
-          color: '#fdfdfd',
-          fontSize: 13,
-          fontFamily: 'inherit',
-          outline: 'none',
-          marginBottom: 10,
-        }}
-      />
-
-      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>DESCRIPTION</label>
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="What is this place? Lore flows down to children."
-        rows={3}
-        style={{
-          width: '100%',
-          padding: '6px 8px',
-          background: '#0a0e1a',
-          border: '1px solid #22ab9440',
-          color: '#fdfdfd',
-          fontSize: 12,
-          fontFamily: 'inherit',
-          outline: 'none',
-          marginBottom: 10,
-          resize: 'vertical',
-          minHeight: 60,
-        }}
-      />
-
-      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>
-        KRMA RESERVE <span style={{ color: '#22ab9466', fontSize: 9 }}>(scale dial — e.g. 1000 / 1000000 / 1e12)</span>
-      </label>
-      <input
-        value={krmaReserve}
-        onChange={(e) => setKrmaReserve(e.target.value)}
-        placeholder="0"
-        inputMode="numeric"
-        style={{
-          width: '100%',
-          padding: '6px 8px',
-          background: '#0a0e1a',
-          border: '1px solid #22ab9440',
-          color: '#ffcc78',
-          fontSize: 13,
-          fontFamily: 'inherit',
-          outline: 'none',
-          marginBottom: 10,
-        }}
-      />
-
-      <div style={{
-        fontSize: 9,
-        letterSpacing: '0.1em',
-        color: '#fdfdfd55',
-        marginBottom: 8,
-        marginTop: 2,
-        fontStyle: 'italic',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
       }}>
-        Spawns in PLANNING — drag above the line + commit to crystallize.
+        <span style={{
+          color: '#22ab94',
+          fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+          fontSize: 13,
+          letterSpacing: '0.18em',
+        }}>✦ JEWL — CREATE LOCATION</span>
       </div>
 
-      {/* JEWL slot: empty when he has nothing to say, populated when he does.
-          He's ambient — the GM doesn't ask, he just appears. */}
+      {/* Conversation scroll */}
+      <div
+        ref={scrollRef}
+        style={{
+          flex: '1 1 auto',
+          overflowY: 'auto',
+          padding: '10px 12px',
+          minHeight: 80,
+          maxHeight: proposal ? 140 : 280,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        {conversation.length === 0 && loading && (
+          <div style={{ color: '#22ab9477', fontSize: 11, fontStyle: 'italic' }}>✦ JEWL is thinking…</div>
+        )}
+        {conversation.map((t, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{
+              fontSize: 9,
+              letterSpacing: '0.15em',
+              color: t.role === 'jewl' ? '#22ab94' : '#ffcc78aa',
+            }}>{t.role === 'jewl' ? '✦ JEWL' : 'YOU'}</div>
+            <div style={{
+              fontSize: 12,
+              color: t.role === 'jewl' ? '#fdfdfd' : '#fdfdfdcc',
+              whiteSpace: 'pre-wrap',
+              lineHeight: 1.4,
+            }}>{t.content}</div>
+          </div>
+        ))}
+        {loading && conversation.length > 0 && (
+          <div style={{ color: '#22ab9477', fontSize: 11, fontStyle: 'italic' }}>✦ JEWL is thinking…</div>
+        )}
+      </div>
+
+      {/* Editable preview — appears when JEWL proposes */}
+      {proposal && (
+        <div style={{
+          borderTop: '1px solid #22ab9433',
+          padding: '10px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          maxHeight: 280,
+          overflowY: 'auto',
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.15em', color: '#ffcc78', marginBottom: 2 }}>
+            PROPOSAL — EDIT BEFORE COMMIT
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 2 }}>NAME</label>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '5px 7px',
+                background: '#0a0e1a',
+                border: '1px solid #22ab9440',
+                color: '#fdfdfd',
+                fontSize: 12,
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 2 }}>DESCRIPTION</label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '5px 7px',
+                background: '#0a0e1a',
+                border: '1px solid #22ab9440',
+                color: '#fdfdfd',
+                fontSize: 11,
+                fontFamily: 'inherit',
+                outline: 'none',
+                resize: 'vertical',
+                minHeight: 50,
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 2 }}>KRMA RESERVE</label>
+            <input
+              value={editKrma}
+              onChange={(e) => setEditKrma(e.target.value)}
+              inputMode="numeric"
+              style={{
+                width: '100%',
+                padding: '5px 7px',
+                background: '#0a0e1a',
+                border: '1px solid #22ab9440',
+                color: '#ffcc78',
+                fontSize: 12,
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Footer: input + actions */}
       <div style={{
         borderTop: '1px solid #22ab9433',
-        marginBottom: 10,
-        paddingTop: 8,
-        minHeight: suggestion || suggestionLoading ? 'auto' : 0,
+        padding: '8px 12px 10px',
       }}>
-        {suggestionLoading && !suggestion && (
-          <div style={{ fontSize: 10, color: '#22ab9477', letterSpacing: '0.1em', fontStyle: 'italic' }}>
-            ✦ JEWL is thinking…
-          </div>
-        )}
-        {suggestion && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-              <span style={{ color: '#22ab94', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}>✦ JEWL</span>
-              <span style={{ color: '#fdfdfdaa', fontSize: 11, fontStyle: 'italic', flex: 1 }}>
-                {suggestion.rationale || ' '}
-              </span>
-            </div>
-            <div style={{
-              padding: '5px 8px',
-              background: '#22ab9415',
-              border: '1px solid #22ab9433',
-              borderRadius: 2,
-              fontSize: 12,
+        {!proposal && (
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="Tell JEWL what you're making…"
+            rows={2}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              background: '#0a0e1a',
+              border: '1px solid #22ab9440',
               color: '#fdfdfd',
+              fontSize: 12,
               fontFamily: 'inherit',
-              wordBreak: 'break-word',
-            }}>
-              <span style={{ color: '#22ab9499', fontSize: 9, letterSpacing: '0.15em', marginRight: 6 }}>
-                {suggestion.field === 'krmaReserve' ? 'KRMA' : suggestion.field === 'note' ? 'NOTE' : suggestion.field.toUpperCase()}
-              </span>
-              {suggestion.field === 'krmaReserve' ? Number(suggestion.value).toLocaleString() : String(suggestion.value)}
-            </div>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              outline: 'none',
+              resize: 'none',
+              marginBottom: 6,
+            }}
+          />
+        )}
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '5px 12px',
+              background: 'transparent',
+              border: '1px solid #fdfdfd33',
+              color: '#fdfdfdaa',
+              fontSize: 11,
+              fontFamily: 'inherit',
+              letterSpacing: '0.12em',
+              cursor: 'pointer',
+            }}
+          >CANCEL</button>
+          {proposal ? (
+            <>
               <button
-                onClick={dismissSuggestion}
+                onClick={regenerate}
+                disabled={loading}
                 style={{
-                  padding: '3px 10px',
+                  padding: '5px 12px',
                   background: 'transparent',
-                  border: '1px solid #fdfdfd22',
-                  color: '#fdfdfd55',
-                  fontSize: 10,
+                  border: '1px solid #ffcc7866',
+                  color: '#ffcc78aa',
+                  fontSize: 11,
                   fontFamily: 'inherit',
                   letterSpacing: '0.12em',
-                  cursor: 'pointer',
+                  cursor: loading ? 'not-allowed' : 'pointer',
                 }}
-              >IGNORE</button>
-              {suggestion.field !== 'note' && (
-                <button
-                  onClick={acceptSuggestion}
-                  style={{
-                    padding: '3px 10px',
-                    background: '#22ab9433',
-                    border: '1px solid #22ab94',
-                    color: '#22ab94',
-                    fontSize: 10,
-                    fontFamily: 'inherit',
-                    letterSpacing: '0.12em',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >ACCEPT</button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: '6px 14px',
-            background: 'transparent',
-            border: '1px solid #fdfdfd33',
-            color: '#fdfdfdaa',
-            fontSize: 11,
-            fontFamily: 'inherit',
-            letterSpacing: '0.12em',
-            cursor: 'pointer',
-          }}
-        >CANCEL</button>
-        <button
-          onClick={commit}
-          disabled={!name.trim()}
-          style={{
-            padding: '6px 14px',
-            background: name.trim() ? '#22ab94' : '#22ab9433',
-            border: '1px solid #22ab94',
-            color: name.trim() ? '#0a0e1a' : '#22ab9477',
-            fontSize: 11,
-            fontFamily: 'inherit',
-            letterSpacing: '0.12em',
-            fontWeight: 700,
-            cursor: name.trim() ? 'pointer' : 'not-allowed',
-          }}
-        >CREATE</button>
+              >REGENERATE</button>
+              <button
+                onClick={commit}
+                disabled={!editName.trim()}
+                style={{
+                  padding: '5px 14px',
+                  background: editName.trim() ? '#22ab94' : '#22ab9433',
+                  border: '1px solid #22ab94',
+                  color: editName.trim() ? '#0a0e1a' : '#22ab9477',
+                  fontSize: 11,
+                  fontFamily: 'inherit',
+                  letterSpacing: '0.12em',
+                  fontWeight: 700,
+                  cursor: editName.trim() ? 'pointer' : 'not-allowed',
+                }}
+              >COMMIT</button>
+            </>
+          ) : (
+            <button
+              onClick={send}
+              disabled={!input.trim() || loading}
+              style={{
+                padding: '5px 14px',
+                background: input.trim() && !loading ? '#22ab94' : '#22ab9433',
+                border: '1px solid #22ab94',
+                color: input.trim() && !loading ? '#0a0e1a' : '#22ab9477',
+                fontSize: 11,
+                fontFamily: 'inherit',
+                letterSpacing: '0.12em',
+                fontWeight: 700,
+                cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+              }}
+            >SEND</button>
+          )}
+        </div>
       </div>
     </div>
   );
