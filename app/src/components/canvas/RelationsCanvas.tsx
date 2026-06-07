@@ -22,7 +22,7 @@ import type { WorldItemNodeData } from "./WorldItemCard";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
-import { CtxMenuPanel, CtxMenuStreamLabel } from "@/components/ui/ContextMenu";
+import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions } from "./FolderGroup";
 import FolderGroup from "./FolderGroup";
 
@@ -3985,10 +3985,10 @@ function CanvasCreateDialog({
         {conversation.map((t, i) => (
           <div key={i} className="space-y-0.5">
             <div className={`text-[8px] tracking-[0.18em] uppercase font-[Consolas,monospace] ${t.role === 'jewl' ? 'text-[#22ab94]' : 'text-[#D0A030]/70'}`}>
-              {t.role === 'jewl' ? '✦ JEWL' : 'YOU'}
+              {t.role === 'jewl' ? '✦ jEWL' : 'yOU'}
             </div>
             <div className={`text-[11px] font-[Consolas,monospace] whitespace-pre-wrap leading-snug ${t.role === 'jewl' ? 'text-white' : 'text-white/70'}`}>
-              {t.content}
+              {t.role === 'jewl' ? ctxMenuStyle(t.content) : t.content}
             </div>
           </div>
         ))}

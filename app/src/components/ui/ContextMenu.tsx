@@ -32,6 +32,22 @@ export function ctxMenuText(text: string) {
   );
 }
 
+// ── Case convention — "Skill Check" → "sKILL cHECK" ───────────────────────
+// Each word: first char lowercase, the rest uppercase. Signature aesthetic
+// of the right-click menus. Apply to text BEFORE ctxMenuText to also gold
+// the n's.
+
+export function ctxMenuCase(text: string): string {
+  return text.replace(/\b([A-Za-z])([A-Za-z]*)/g, (_m, first: string, rest: string) =>
+    first.toLowerCase() + rest.toUpperCase()
+  );
+}
+
+// Combined: case-convert + gold-n. Returns React nodes ready to render.
+export function ctxMenuStyle(text: string) {
+  return ctxMenuText(ctxMenuCase(text));
+}
+
 // ── ^v^v undulating border ────────────────────────────────────────────────
 
 export function CtxMenuBorder() {
@@ -212,7 +228,7 @@ export function CtxMenuPanel({ title, children }: CtxMenuPanelProps) {
       <CtxMenuScanlines />
       {title && (
         <div className="px-3 py-1 text-xs text-white" style={{ borderBottom: '1px solid #333', fontFamily: "'Inknut Antiqua', serif" }}>
-          {ctxMenuText(title)}
+          {ctxMenuStyle(title)}
         </div>
       )}
       {children}
