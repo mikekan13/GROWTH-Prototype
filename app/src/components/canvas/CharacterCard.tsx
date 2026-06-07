@@ -590,7 +590,12 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         {/* Main menu buttons — hidden when a sub-picker is open */}
         {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && (
           <>
-            {onSkillCheck && (
+            {/* Die menu retired 2026-06-07 — dice rolling is moving to its
+                canonical surface (TBD). The trigger is disabled but the menu
+                rendering code below (showSkillCheckMenu block) is kept as
+                the styling reference for the JEWL dialog and for future
+                revival. Set onSkillCheck && condition to true to bring it back. */}
+            {false && onSkillCheck && (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowSkillCheckMenu(true); }}
                 className="w-full px-3 py-1.5 text-left text-sm text-[#22ab94] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"

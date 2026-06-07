@@ -834,6 +834,12 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     canvasY?: number;
     description?: string;
     krmaReserve?: number;
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
   }) => {
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}/locations`, {

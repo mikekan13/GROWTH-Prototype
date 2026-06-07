@@ -24,6 +24,12 @@ export type ProposedLocation = {
   name: string;
   description: string;
   krmaReserve?: number;
+  environment?: string;
+  population?: string;
+  dangerLevel?: number;
+  controlledBy?: string;
+  notes?: string;
+  tags?: string[];
 };
 
 export type CreateDialogResponse = {
@@ -87,17 +93,25 @@ Your job this turn:
 - If their input is genuinely vague (one word, ambiguous), ask ONE focused follow-up. Not two, not three.
 - The first turn the GM hasn't sent anything yet — open with a tight prompt ("What are we making here?" or sharper).
 
-When you propose, output a structured entity:
-- name: a concrete name that fits the parent context
-- description: 1-3 sentences. Lore that flows down to children later.
-- krmaReserve: a number based on scale implied by the description. Room/object ~1000, building ~100000, district ~1e7, city ~1e8, region ~1e10, planet ~1e12, star system ~1e14, galaxy ~1e16.
+When you propose, fill out the ENTIRE Location — not just a name. The GM wants to talk to you once and get a full place back. Fields:
+- name (required) — concrete, fits parent context
+- description (required) — 1-3 sentences. The WHAT of this place. Cascades down to children.
+- krmaReserve — scale dial. Room/object ~1000, building ~100000, district ~1e7, city ~1e8, region ~1e10, planet ~1e12, star system ~1e14, galaxy ~1e16.
+- environment — climate / terrain / atmosphere if it matters here. Skip for indoor rooms unless distinctive.
+- population — narrative descriptor only ("sparse", "bustling caravan crowd", "abandoned"). Don't invent numbers unless GM gave them.
+- dangerLevel — 1-10. Safe pub = 2. Bandit-held road = 6. Dragon lair = 9.
+- controlledBy — faction / NPC name / "contested" / "none". Use real names from the campaign context above if relevant; otherwise propose a placeholder the GM can rename.
+- notes — short GM-only handle on what's interesting / hooks / secrets. One or two beats.
+- tags — 2-5 short search tags ("tavern", "smuggler", "underground", etc.).
 
 Output STRICT JSON on a single line, no code fences, no prose around it:
 {"message":"your reply this turn","proposal":null}
 OR when proposing:
-{"message":"your reply this turn","proposal":{"name":"...","description":"...","krmaReserve":NUMBER}}
+{"message":"your reply this turn","proposal":{"name":"...","description":"...","krmaReserve":N,"environment":"...","population":"...","dangerLevel":N,"controlledBy":"...","notes":"...","tags":["...","..."]}}
 
-If proposing, message should be short — "Locked. Here's what I'm spinning:" — the proposal speaks for itself. The GM will see the fields and can edit before commit.`;
+Skip any optional field by omitting it. Don't pad with empty strings.
+
+If proposing, message should be SHORT — one line, no chest-thumping. "Locked. Here it is." or similar. The fields speak for themselves; the GM will edit anything they don't like.`;
 
   // Map our turn shape into Anthropic chat shape (GM = user, JEWL = assistant).
   // Treat an empty conversation as the opening — send a single user "start" so
@@ -133,6 +147,12 @@ If proposing, message should be short — "Locked. Here's what I'm spinning:" �
           name: p.name,
           description: p.description,
           krmaReserve: typeof p.krmaReserve === 'number' ? p.krmaReserve : undefined,
+          environment: typeof p.environment === 'string' ? p.environment : undefined,
+          population: typeof p.population === 'string' ? p.population : undefined,
+          dangerLevel: typeof p.dangerLevel === 'number' ? p.dangerLevel : undefined,
+          controlledBy: typeof p.controlledBy === 'string' ? p.controlledBy : undefined,
+          notes: typeof p.notes === 'string' ? p.notes : undefined,
+          tags: Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === 'string') : undefined,
         };
       }
     }

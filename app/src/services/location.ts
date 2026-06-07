@@ -22,6 +22,19 @@ export const createLocationSchema = z.object({
   /** Ambient KRMA mass — drives wallet commitment + visual prominence.
    *  See [[location-krma-reserve-2026-06-02]]. */
   krmaReserve: z.number().optional(),
+  /** Climate / terrain / atmosphere — short narrative slice that cascades
+   *  down to children for AI lore generation. */
+  environment: z.string().optional(),
+  /** Narrative population descriptor — "sparse", "bustling docks", etc. */
+  population: z.string().optional(),
+  /** 1-10 general threat level. */
+  dangerLevel: z.number().min(1).max(10).optional(),
+  /** Faction / NPC name / "contested" — who runs this place. */
+  controlledBy: z.string().optional(),
+  /** Free-form GM-only notes. */
+  notes: z.string().optional(),
+  /** Searchable tags — type hints, themes. */
+  tags: z.array(z.string()).optional(),
 });
 
 export const updateLocationSchema = z.object({
@@ -92,6 +105,12 @@ export async function createLocation(
   }
   if (input.description) d.description = input.description;
   if (input.krmaReserve != null) d.krmaReserve = input.krmaReserve;
+  if (input.environment) d.environment = input.environment;
+  if (input.population) d.population = input.population;
+  if (input.dangerLevel != null) d.dangerLevel = input.dangerLevel;
+  if (input.controlledBy) d.controlledBy = input.controlledBy;
+  if (input.notes) d.notes = input.notes;
+  if (input.tags && input.tags.length) d.tags = input.tags;
 
   return prisma.location.create({
     data: {

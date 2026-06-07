@@ -98,6 +98,12 @@ interface RelationsCanvasProps {
     canvasY?: number;
     description?: string;
     krmaReserve?: number;
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
   }) => void;
   onDeleteLocation?: (nodeId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
@@ -3436,6 +3442,12 @@ function CanvasToolbox({
     canvasY?: number;
     description?: string;
     krmaReserve?: number;
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
   }) => void;
   onCreateItem?: (name: string, type: string) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
@@ -3799,21 +3811,49 @@ function CanvasCreateDialog({
   screenY: number;
   campaignId: string;
   parentLocationId?: string;
-  onSubmit: (input: LocationCreateInput) => void;
+  onSubmit: (input: {
+    name: string;
+    description?: string;
+    krmaReserve?: number;
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
+  }) => void;
   onCancel: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [conversation, setConversation] = useState<DialogTurn[]>([]);
-  const [proposal, setProposal] = useState<ProposedLocation | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editKrma, setEditKrma] = useState('');
+  const [conversation, setConversation] = useState<{ role: 'jewl' | 'gm'; content: string }[]>([]);
+  const [proposal, setProposal] = useState<{
+    name: string;
+    description: string;
+    krmaReserve?: number;
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
+  } | null>(null);
+  const [edit, setEdit] = useState({
+    name: '',
+    description: '',
+    krmaReserve: '',
+    environment: '',
+    population: '',
+    dangerLevel: '',
+    controlledBy: '',
+    notes: '',
+    tags: '',
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const runTurn = async (history: DialogTurn[]) => {
+  const runTurn = async (history: { role: 'jewl' | 'gm'; content: string }[]) => {
     setLoading(true);
     try {
       const res = await fetch('/api/copilot/create-dialog', {
@@ -3826,15 +3866,23 @@ function CanvasCreateDialog({
           parentLocationId,
         }),
       });
-      const json = await res.json() as { response: { message: string; proposal: ProposedLocation | null } | null };
+      const json = await res.json() as { response: { message: string; proposal: typeof proposal } | null };
       const r = json.response;
       if (!r) return;
       setConversation([...history, { role: 'jewl', content: r.message }]);
       if (r.proposal) {
         setProposal(r.proposal);
-        setEditName(r.proposal.name);
-        setEditDescription(r.proposal.description);
-        setEditKrma(r.proposal.krmaReserve != null ? String(r.proposal.krmaReserve) : '');
+        setEdit({
+          name: r.proposal.name,
+          description: r.proposal.description,
+          krmaReserve: r.proposal.krmaReserve != null ? String(r.proposal.krmaReserve) : '',
+          environment: r.proposal.environment ?? '',
+          population: r.proposal.population ?? '',
+          dangerLevel: r.proposal.dangerLevel != null ? String(r.proposal.dangerLevel) : '',
+          controlledBy: r.proposal.controlledBy ?? '',
+          notes: r.proposal.notes ?? '',
+          tags: r.proposal.tags?.join(', ') ?? '',
+        });
       }
     } catch (err) {
       console.error('[create-dialog] turn failed', err);
@@ -3843,13 +3891,11 @@ function CanvasCreateDialog({
     }
   };
 
-  // Open turn — JEWL speaks first.
   useEffect(() => {
     void runTurn([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Click-outside + Escape to dismiss.
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) onCancel();
@@ -3863,12 +3909,10 @@ function CanvasCreateDialog({
     };
   }, [onCancel]);
 
-  // Auto-scroll chat as messages arrive.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [conversation, loading]);
 
-  // Focus input when there's no proposal yet and we're not loading.
   useEffect(() => {
     if (!proposal && !loading) inputRef.current?.focus();
   }, [proposal, loading]);
@@ -3876,7 +3920,7 @@ function CanvasCreateDialog({
   const send = () => {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
-    const next: DialogTurn[] = [...conversation, { role: 'gm', content: trimmed }];
+    const next: { role: 'jewl' | 'gm'; content: string }[] = [...conversation, { role: 'gm', content: trimmed }];
     setConversation(next);
     setInput('');
     void runTurn(next);
@@ -3885,178 +3929,128 @@ function CanvasCreateDialog({
   const regenerate = () => {
     if (loading) return;
     setProposal(null);
-    const next: DialogTurn[] = [...conversation, { role: 'gm', content: 'Different angle — re-propose.' }];
+    const next: { role: 'jewl' | 'gm'; content: string }[] = [...conversation, { role: 'gm', content: 'Different angle — re-propose.' }];
     setConversation(next);
     void runTurn(next);
   };
 
   const commit = () => {
-    const trimmedName = editName.trim();
+    const trimmedName = edit.name.trim();
     if (!trimmedName) return;
-    const krmaNum = editKrma.trim() ? Number(editKrma.trim()) : undefined;
+    const krmaNum = edit.krmaReserve.trim() ? Number(edit.krmaReserve.trim()) : undefined;
+    const dangerNum = edit.dangerLevel.trim() ? Number(edit.dangerLevel.trim()) : undefined;
+    const tagsArr = edit.tags.trim() ? edit.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined;
     onSubmit({
       name: trimmedName,
-      description: editDescription.trim() || undefined,
+      description: edit.description.trim() || undefined,
       krmaReserve: krmaNum != null && Number.isFinite(krmaNum) ? krmaNum : undefined,
+      environment: edit.environment.trim() || undefined,
+      population: edit.population.trim() || undefined,
+      dangerLevel: dangerNum != null && Number.isFinite(dangerNum) ? dangerNum : undefined,
+      controlledBy: edit.controlledBy.trim() || undefined,
+      notes: edit.notes.trim() || undefined,
+      tags: tagsArr && tagsArr.length ? tagsArr : undefined,
     });
   };
 
-  const FORM_W = 380;
-  const FORM_H_MAX = 540;
+  const FORM_W = 340;
   const left = Math.min(screenX, (typeof window !== 'undefined' ? window.innerWidth : 1000) - FORM_W - 8);
-  const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - FORM_H_MAX - 8);
+  const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - 540 - 8);
+
+  const fieldClass = 'w-full px-1.5 py-0.5 text-xs text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/60 rounded-none outline-none focus:border-[#22ab94]';
+  const labelClass = 'text-[9px] tracking-[0.15em] uppercase text-[#22ab94]/70 font-[Consolas,monospace]';
 
   return (
     <div
       ref={ref}
       onMouseDown={(e) => e.stopPropagation()}
-      style={{
-        position: 'fixed',
-        left,
-        top,
-        zIndex: 100,
-        width: FORM_W,
-        maxHeight: FORM_H_MAX,
-        background: '#1a1e2e',
-        border: '1px solid #22ab9466',
-        borderRadius: 4,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-        fontFamily: 'var(--font-consolas), Consolas, monospace',
-        color: '#fdfdfd',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      className="fixed z-[100] bg-gray-800 border border-gray-700 shadow-2xl flex flex-col"
+      style={{ left, top, width: FORM_W, maxHeight: 540 }}
     >
       {/* Header */}
-      <div style={{
-        padding: '10px 12px 8px',
-        borderBottom: '1px solid #22ab9433',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-      }}>
-        <span style={{
-          color: '#22ab94',
-          fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-          fontSize: 13,
-          letterSpacing: '0.18em',
-        }}>✦ JEWL — CREATE LOCATION</span>
+      <div className="px-3 py-1.5 border-b border-white/10 flex items-center gap-2">
+        <span className="text-[10px] tracking-[0.18em] uppercase text-[#22ab94] font-[Consolas,monospace]">
+          ✦ JEWL — Create Location
+        </span>
       </div>
 
       {/* Conversation scroll */}
       <div
         ref={scrollRef}
-        style={{
-          flex: '1 1 auto',
-          overflowY: 'auto',
-          padding: '10px 12px',
-          minHeight: 80,
-          maxHeight: proposal ? 140 : 280,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
+        className="overflow-y-auto px-3 py-2 space-y-2 flex-shrink-0"
+        style={{ maxHeight: proposal ? 110 : 240, minHeight: 70 }}
       >
         {conversation.length === 0 && loading && (
-          <div style={{ color: '#22ab9477', fontSize: 11, fontStyle: 'italic' }}>✦ JEWL is thinking…</div>
+          <div className="text-[10px] text-[#22ab94]/60 font-[Consolas,monospace] italic">
+            ✦ JEWL is thinking…
+          </div>
         )}
         {conversation.map((t, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div style={{
-              fontSize: 9,
-              letterSpacing: '0.15em',
-              color: t.role === 'jewl' ? '#22ab94' : '#ffcc78aa',
-            }}>{t.role === 'jewl' ? '✦ JEWL' : 'YOU'}</div>
-            <div style={{
-              fontSize: 12,
-              color: t.role === 'jewl' ? '#fdfdfd' : '#fdfdfdcc',
-              whiteSpace: 'pre-wrap',
-              lineHeight: 1.4,
-            }}>{t.content}</div>
+          <div key={i} className="space-y-0.5">
+            <div className={`text-[8px] tracking-[0.18em] uppercase font-[Consolas,monospace] ${t.role === 'jewl' ? 'text-[#22ab94]' : 'text-[#D0A030]/70'}`}>
+              {t.role === 'jewl' ? '✦ JEWL' : 'YOU'}
+            </div>
+            <div className={`text-[11px] font-[Consolas,monospace] whitespace-pre-wrap leading-snug ${t.role === 'jewl' ? 'text-white' : 'text-white/70'}`}>
+              {t.content}
+            </div>
           </div>
         ))}
         {loading && conversation.length > 0 && (
-          <div style={{ color: '#22ab9477', fontSize: 11, fontStyle: 'italic' }}>✦ JEWL is thinking…</div>
+          <div className="text-[10px] text-[#22ab94]/60 font-[Consolas,monospace] italic">
+            ✦ JEWL is thinking…
+          </div>
         )}
       </div>
 
       {/* Editable preview — appears when JEWL proposes */}
       {proposal && (
-        <div style={{
-          borderTop: '1px solid #22ab9433',
-          padding: '10px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          maxHeight: 280,
-          overflowY: 'auto',
-        }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.15em', color: '#ffcc78', marginBottom: 2 }}>
-            PROPOSAL — EDIT BEFORE COMMIT
+        <div className="border-t border-white/10 px-3 py-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: 320 }}>
+          <div className="text-[9px] tracking-[0.18em] uppercase text-[#D0A030] font-[Consolas,monospace] mb-1">
+            Proposal — edit before commit
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 2 }}>NAME</label>
-            <input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '5px 7px',
-                background: '#0a0e1a',
-                border: '1px solid #22ab9440',
-                color: '#fdfdfd',
-                fontSize: 12,
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            />
+          <div className="space-y-0.5">
+            <div className={labelClass}>NAME</div>
+            <input value={edit.name} onChange={(e) => setEdit(s => ({ ...s, name: e.target.value }))} className={fieldClass} />
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 2 }}>DESCRIPTION</label>
-            <textarea
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '5px 7px',
-                background: '#0a0e1a',
-                border: '1px solid #22ab9440',
-                color: '#fdfdfd',
-                fontSize: 11,
-                fontFamily: 'inherit',
-                outline: 'none',
-                resize: 'vertical',
-                minHeight: 50,
-              }}
-            />
+          <div className="space-y-0.5">
+            <div className={labelClass}>DESCRIPTION</div>
+            <textarea value={edit.description} onChange={(e) => setEdit(s => ({ ...s, description: e.target.value }))} rows={3} className={`${fieldClass} resize-y`} />
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 2 }}>KRMA RESERVE</label>
-            <input
-              value={editKrma}
-              onChange={(e) => setEditKrma(e.target.value)}
-              inputMode="numeric"
-              style={{
-                width: '100%',
-                padding: '5px 7px',
-                background: '#0a0e1a',
-                border: '1px solid #22ab9440',
-                color: '#ffcc78',
-                fontSize: 12,
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-0.5">
+              <div className={labelClass}>KRMA RESERVE</div>
+              <input value={edit.krmaReserve} onChange={(e) => setEdit(s => ({ ...s, krmaReserve: e.target.value }))} inputMode="numeric" className={`${fieldClass} text-[#D0A030]`} />
+            </div>
+            <div className="space-y-0.5">
+              <div className={labelClass}>DANGER 1-10</div>
+              <input value={edit.dangerLevel} onChange={(e) => setEdit(s => ({ ...s, dangerLevel: e.target.value }))} inputMode="numeric" className={fieldClass} />
+            </div>
+          </div>
+          <div className="space-y-0.5">
+            <div className={labelClass}>ENVIRONMENT</div>
+            <input value={edit.environment} onChange={(e) => setEdit(s => ({ ...s, environment: e.target.value }))} className={fieldClass} />
+          </div>
+          <div className="space-y-0.5">
+            <div className={labelClass}>POPULATION</div>
+            <input value={edit.population} onChange={(e) => setEdit(s => ({ ...s, population: e.target.value }))} className={fieldClass} />
+          </div>
+          <div className="space-y-0.5">
+            <div className={labelClass}>CONTROLLED BY</div>
+            <input value={edit.controlledBy} onChange={(e) => setEdit(s => ({ ...s, controlledBy: e.target.value }))} className={fieldClass} />
+          </div>
+          <div className="space-y-0.5">
+            <div className={labelClass}>TAGS <span className="text-[8px] text-white/30 normal-case tracking-normal">(comma-separated)</span></div>
+            <input value={edit.tags} onChange={(e) => setEdit(s => ({ ...s, tags: e.target.value }))} className={fieldClass} />
+          </div>
+          <div className="space-y-0.5">
+            <div className={labelClass}>NOTES <span className="text-[8px] text-white/30 normal-case tracking-normal">GM-only</span></div>
+            <textarea value={edit.notes} onChange={(e) => setEdit(s => ({ ...s, notes: e.target.value }))} rows={2} className={`${fieldClass} resize-y`} />
           </div>
         </div>
       )}
 
       {/* Footer: input + actions */}
-      <div style={{
-        borderTop: '1px solid #22ab9433',
-        padding: '8px 12px 10px',
-      }}>
+      <div className="border-t border-white/10 px-3 py-2">
         {!proposal && (
           <textarea
             ref={inputRef}
@@ -4071,81 +4065,32 @@ function CanvasCreateDialog({
             placeholder="Tell JEWL what you're making…"
             rows={2}
             disabled={loading}
-            style={{
-              width: '100%',
-              padding: '6px 8px',
-              background: '#0a0e1a',
-              border: '1px solid #22ab9440',
-              color: '#fdfdfd',
-              fontSize: 12,
-              fontFamily: 'inherit',
-              outline: 'none',
-              resize: 'none',
-              marginBottom: 6,
-            }}
+            className={`${fieldClass} resize-none mb-1.5`}
           />
         )}
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <div className="flex gap-1.5 justify-end">
           <button
             onClick={onCancel}
-            style={{
-              padding: '5px 12px',
-              background: 'transparent',
-              border: '1px solid #fdfdfd33',
-              color: '#fdfdfdaa',
-              fontSize: 11,
-              fontFamily: 'inherit',
-              letterSpacing: '0.12em',
-              cursor: 'pointer',
-            }}
+            className="px-2.5 py-0.5 text-[10px] tracking-[0.12em] font-[Consolas,monospace] text-white/60 border border-white/20 hover:bg-white/10"
           >CANCEL</button>
           {proposal ? (
             <>
               <button
                 onClick={regenerate}
                 disabled={loading}
-                style={{
-                  padding: '5px 12px',
-                  background: 'transparent',
-                  border: '1px solid #ffcc7866',
-                  color: '#ffcc78aa',
-                  fontSize: 11,
-                  fontFamily: 'inherit',
-                  letterSpacing: '0.12em',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                }}
+                className="px-2.5 py-0.5 text-[10px] tracking-[0.12em] font-[Consolas,monospace] text-[#D0A030]/70 border border-[#D0A030]/40 hover:bg-[#D0A030]/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >REGENERATE</button>
               <button
                 onClick={commit}
-                disabled={!editName.trim()}
-                style={{
-                  padding: '5px 14px',
-                  background: editName.trim() ? '#22ab94' : '#22ab9433',
-                  border: '1px solid #22ab94',
-                  color: editName.trim() ? '#0a0e1a' : '#22ab9477',
-                  fontSize: 11,
-                  fontFamily: 'inherit',
-                  letterSpacing: '0.12em',
-                  fontWeight: 700,
-                  cursor: editName.trim() ? 'pointer' : 'not-allowed',
-                }}
+                disabled={!edit.name.trim()}
+                className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[#22ab94] border border-[#22ab94] hover:bg-[#22ab94]/90 disabled:bg-[#22ab94]/30 disabled:text-[#22ab94]/50 disabled:cursor-not-allowed"
               >COMMIT</button>
             </>
           ) : (
             <button
               onClick={send}
               disabled={!input.trim() || loading}
-              style={{
-                padding: '5px 14px',
-                background: input.trim() && !loading ? '#22ab94' : '#22ab9433',
-                border: '1px solid #22ab94',
-                color: input.trim() && !loading ? '#0a0e1a' : '#22ab9477',
-                fontSize: 11,
-                fontFamily: 'inherit',
-                letterSpacing: '0.12em',
-                fontWeight: 700,
-                cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
-              }}
+              className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[#22ab94] border border-[#22ab94] hover:bg-[#22ab94]/90 disabled:bg-[#22ab94]/30 disabled:text-[#22ab94]/50 disabled:cursor-not-allowed"
             >SEND</button>
           )}
         </div>
