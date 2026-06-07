@@ -277,10 +277,10 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
         ) : messages.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-[var(--accent-teal)]/40 text-[10px] tracking-[0.2em] uppercase mb-2">
-              Campaign Co-pilot
+              ✦ JEWL
             </div>
             <div className="text-white/20 text-[9px] max-w-xs mx-auto">
-              Ask about characters, rules, the world — or ask me to create items, skills, locations. I know your campaign.
+              Ask. I&apos;ve been watching.
             </div>
           </div>
         ) : (
@@ -300,7 +300,7 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
                   )}
                   {msg.role === 'assistant' && (
                     <div className="text-[8px] text-[var(--accent-gold)]/60 uppercase tracking-wider mb-0.5">
-                      Co-pilot
+                      JEWL
                     </div>
                   )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>

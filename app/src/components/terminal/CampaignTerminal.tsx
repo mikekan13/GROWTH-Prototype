@@ -831,7 +831,7 @@ export default function CampaignTerminal({
                   borderLeft: '1px solid rgba(34,171,148,0.4)',
                 }}
               >
-                Co-pilot
+                JEWL
               </button>
             </div>
             {terminalMode === 'terminal' && (

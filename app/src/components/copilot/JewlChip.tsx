@@ -190,8 +190,8 @@ export function JewlChip() {
       {/* Floating chip — always-visible presence */}
       <button
         onClick={() => setOpen(o => !o)}
-        aria-label={open ? 'Close co-pilot' : 'Open co-pilot'}
-        title="Co-pilot  ( / or Ctrl-K )"
+        aria-label={open ? 'Close JEWL' : 'Open JEWL'}
+        title="JEWL  ( / or Ctrl-K )"
         style={{
           position: 'fixed',
           bottom: 20,
@@ -270,7 +270,7 @@ export function JewlChip() {
                 textTransform: 'uppercase',
               }}
             >
-              Co-pilot
+              ✦ JEWL
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -328,9 +328,9 @@ export function JewlChip() {
                     marginBottom: 10,
                   }}
                 >
-                  Campaign Co-pilot
+                  ✦ JEWL
                 </div>
-                Ask about characters, rules, the world.<br />I know your campaign.
+                Ask. I&apos;ve been watching.
               </div>
             ) : (
               messages.map(m => (
@@ -365,7 +365,7 @@ export function JewlChip() {
                         marginBottom: 2,
                       }}
                     >
-                      Co-pilot
+                      JEWL
                     </div>
                   )}
                   {m.role === 'user' && m.username && (
