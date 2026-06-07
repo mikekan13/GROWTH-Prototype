@@ -834,7 +834,6 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     canvasY?: number;
     description?: string;
     krmaReserve?: number;
-    status?: 'ACTIVE' | 'PLANNING';
   }) => {
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}/locations`, {

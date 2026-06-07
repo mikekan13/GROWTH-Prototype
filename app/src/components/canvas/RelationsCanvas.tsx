@@ -89,8 +89,8 @@ interface RelationsCanvasProps {
   onDeleteCharacter?: (nodeId: string) => void;
   onCharacterUpdate?: (nodeId: string, character: GrowthCharacter, changes: string[]) => void;
   /** Create a new Location. Input is a flat object so the create form can
-   *  pass name + description + KRMA reserve + status + click coords in one
-   *  shot. The parent surface (CampaignCanvas) wires this to the API. */
+   *  pass name + description + KRMA reserve + click coords in one shot.
+   *  Status is always PLANNING — set by the service, not the caller. */
   onCreateLocation?: (input: {
     name: string;
     type?: string;
@@ -98,7 +98,6 @@ interface RelationsCanvasProps {
     canvasY?: number;
     description?: string;
     krmaReserve?: number;
-    status?: 'ACTIVE' | 'PLANNING';
   }) => void;
   onDeleteLocation?: (nodeId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
@@ -3425,8 +3424,8 @@ function CanvasToolbox({
   onCreateCharacter?: (name: string) => void;
   onPlaceCharacter?: (characterId: string, x: number, y: number) => void;
   /** Create a new Location. Input is a flat object so the create form can
-   *  pass name + description + KRMA reserve + status + click coords in one
-   *  shot. The parent surface (CampaignCanvas) wires this to the API. */
+   *  pass name + description + KRMA reserve + click coords in one shot.
+   *  Status is always PLANNING — set by the service, not the caller. */
   onCreateLocation?: (input: {
     name: string;
     type?: string;
@@ -3434,7 +3433,6 @@ function CanvasToolbox({
     canvasY?: number;
     description?: string;
     krmaReserve?: number;
-    status?: 'ACTIVE' | 'PLANNING';
   }) => void;
   onCreateItem?: (name: string, type: string) => void;
   onCreateItemFromForge?: (name: string, type: string, data: Record<string, unknown>) => void;
@@ -3784,7 +3782,6 @@ interface LocationCreateInput {
   name: string;
   description?: string;
   krmaReserve?: number;
-  status?: 'ACTIVE' | 'PLANNING';
 }
 
 function CanvasCreateLocationForm({
@@ -3800,7 +3797,6 @@ function CanvasCreateLocationForm({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [krmaReserve, setKrmaReserve] = useState('');
-  const [status, setStatus] = useState<'ACTIVE' | 'PLANNING'>('PLANNING');
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -3824,13 +3820,12 @@ function CanvasCreateLocationForm({
       name: trimmed,
       description: description.trim() || undefined,
       krmaReserve: parsed != null && Number.isFinite(parsed) ? parsed : undefined,
-      status,
     });
   };
 
   // Clamp position so the form doesn't render off-screen
   const FORM_W = 320;
-  const FORM_H = 360;
+  const FORM_H = 300;
   const left = Math.min(screenX, (typeof window !== 'undefined' ? window.innerWidth : 1000) - FORM_W - 8);
   const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - FORM_H - 8);
 
@@ -3925,28 +3920,15 @@ function CanvasCreateLocationForm({
         }}
       />
 
-      <label style={{ display: 'block', fontSize: 10, letterSpacing: '0.15em', color: '#22ab94aa', marginBottom: 3 }}>STATUS</label>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-        {(['PLANNING', 'ACTIVE'] as const).map((s) => {
-          const active = status === s;
-          return (
-            <button
-              key={s}
-              onClick={() => setStatus(s)}
-              style={{
-                flex: 1,
-                padding: '5px 8px',
-                background: active ? '#22ab9433' : 'transparent',
-                border: `1px solid ${active ? '#22ab94' : '#22ab9440'}`,
-                color: active ? '#22ab94' : '#fdfdfdaa',
-                fontSize: 11,
-                fontFamily: 'inherit',
-                letterSpacing: '0.12em',
-                cursor: 'pointer',
-              }}
-            >{s}</button>
-          );
-        })}
+      <div style={{
+        fontSize: 9,
+        letterSpacing: '0.1em',
+        color: '#fdfdfd55',
+        marginBottom: 12,
+        marginTop: 2,
+        fontStyle: 'italic',
+      }}>
+        Spawns in PLANNING — drag above the line + commit to crystallize.
       </div>
 
       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>

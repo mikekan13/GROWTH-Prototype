@@ -22,10 +22,6 @@ export const createLocationSchema = z.object({
   /** Ambient KRMA mass — drives wallet commitment + visual prominence.
    *  See [[location-krma-reserve-2026-06-02]]. */
   krmaReserve: z.number().optional(),
-  /** PLANNING = below the crystallization line (draft, no KRMA debit);
-   *  ACTIVE = above the line (committed, debits wallet). Defaults to
-   *  PLANNING because authoring should start in the planning layer. */
-  status: z.enum(['ACTIVE', 'PLANNING', 'HIDDEN', 'DESTROYED']).optional(),
 });
 
 export const updateLocationSchema = z.object({
@@ -104,7 +100,10 @@ export async function createLocation(
       campaignId,
       data: JSON.stringify(data),
       createdBy: userId,
-      ...(input.status ? { status: input.status } : {}),
+      // Creation is always PLANNING — the GM authors below the
+      // crystallization line, then explicitly commits to ACTIVE via the
+      // crystallize gesture. Even mid-session authoring drops in draft.
+      status: 'PLANNING',
     },
   });
 }
