@@ -169,6 +169,7 @@ export default function RelationsCanvas({
   onContestedDefenderSelect,
   isGM,
   trailblazers,
+  focalEntityId,
   onDrillIn,
 }: RelationsCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -3139,6 +3140,8 @@ export default function RelationsCanvas({
         <CanvasCreateLocationForm
           screenX={canvasMenu.screenX}
           screenY={canvasMenu.screenY}
+          campaignId={campaignId}
+          parentLocationId={focalEntityId ?? undefined}
           onCancel={() => setCanvasMenu(null)}
           onSubmit={(input) => {
             onCreateLocation({
@@ -3784,11 +3787,19 @@ interface LocationCreateInput {
   krmaReserve?: number;
 }
 
+type JewlSuggestion = {
+  field: 'name' | 'description' | 'krmaReserve' | 'note';
+  value: string | number;
+  rationale: string;
+};
+
 function CanvasCreateLocationForm({
-  screenX, screenY, onSubmit, onCancel,
+  screenX, screenY, campaignId, parentLocationId, onSubmit, onCancel,
 }: {
   screenX: number;
   screenY: number;
+  campaignId: string;
+  parentLocationId?: string;
   onSubmit: (input: LocationCreateInput) => void;
   onCancel: () => void;
 }) {
@@ -3797,6 +3808,15 @@ function CanvasCreateLocationForm({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [krmaReserve, setKrmaReserve] = useState('');
+
+  // JEWL — ambient suggestion. Watches form state; whenever it changes,
+  // debounces ~700ms then calls the form-suggest endpoint. Suggestion is
+  // null when JEWL has nothing to say (silent state). Dismissed suggestions
+  // are remembered for the current value so we don't re-suggest the same
+  // thing the GM already ignored.
+  const [suggestion, setSuggestion] = useState<JewlSuggestion | null>(null);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const dismissedRef = useRef<string | null>(null); // serialized suggestion the GM dismissed
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -3811,6 +3831,57 @@ function CanvasCreateLocationForm({
       document.removeEventListener('keydown', onKey);
     };
   }, [onCancel]);
+
+  // JEWL ambient suggestion: debounced fetch whenever form state changes.
+  useEffect(() => {
+    const krmaNum = krmaReserve.trim() ? Number(krmaReserve.trim()) : undefined;
+    const handle = setTimeout(() => {
+      let cancelled = false;
+      setSuggestionLoading(true);
+      fetch('/api/copilot/form-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId,
+          formType: 'location-create',
+          formState: {
+            name: name.trim() || undefined,
+            description: description.trim() || undefined,
+            krmaReserve: krmaNum != null && Number.isFinite(krmaNum) ? krmaNum : undefined,
+          },
+          parentLocationId,
+        }),
+      })
+        .then((r) => r.json())
+        .then((json: { suggestion: JewlSuggestion | null }) => {
+          if (cancelled) return;
+          const s = json.suggestion;
+          // Don't re-show a suggestion the GM already dismissed for this value.
+          if (s && dismissedRef.current === JSON.stringify(s)) {
+            setSuggestion(null);
+          } else {
+            setSuggestion(s);
+          }
+        })
+        .catch(() => { if (!cancelled) setSuggestion(null); })
+        .finally(() => { if (!cancelled) setSuggestionLoading(false); });
+      return () => { cancelled = true; };
+    }, 700);
+    return () => clearTimeout(handle);
+  }, [name, description, krmaReserve, campaignId, parentLocationId]);
+
+  const acceptSuggestion = () => {
+    if (!suggestion) return;
+    if (suggestion.field === 'name') setName(String(suggestion.value));
+    else if (suggestion.field === 'description') setDescription(String(suggestion.value));
+    else if (suggestion.field === 'krmaReserve') setKrmaReserve(String(suggestion.value));
+    // 'note' is informational only — accept just dismisses.
+    setSuggestion(null);
+  };
+  const dismissSuggestion = () => {
+    if (suggestion) dismissedRef.current = JSON.stringify(suggestion);
+    setSuggestion(null);
+  };
 
   const commit = () => {
     const trimmed = name.trim();
@@ -3924,11 +3995,82 @@ function CanvasCreateLocationForm({
         fontSize: 9,
         letterSpacing: '0.1em',
         color: '#fdfdfd55',
-        marginBottom: 12,
+        marginBottom: 8,
         marginTop: 2,
         fontStyle: 'italic',
       }}>
         Spawns in PLANNING — drag above the line + commit to crystallize.
+      </div>
+
+      {/* JEWL slot: empty when he has nothing to say, populated when he does.
+          He's ambient — the GM doesn't ask, he just appears. */}
+      <div style={{
+        borderTop: '1px solid #22ab9433',
+        marginBottom: 10,
+        paddingTop: 8,
+        minHeight: suggestion || suggestionLoading ? 'auto' : 0,
+      }}>
+        {suggestionLoading && !suggestion && (
+          <div style={{ fontSize: 10, color: '#22ab9477', letterSpacing: '0.1em', fontStyle: 'italic' }}>
+            ✦ JEWL is thinking…
+          </div>
+        )}
+        {suggestion && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+              <span style={{ color: '#22ab94', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}>✦ JEWL</span>
+              <span style={{ color: '#fdfdfdaa', fontSize: 11, fontStyle: 'italic', flex: 1 }}>
+                {suggestion.rationale || ' '}
+              </span>
+            </div>
+            <div style={{
+              padding: '5px 8px',
+              background: '#22ab9415',
+              border: '1px solid #22ab9433',
+              borderRadius: 2,
+              fontSize: 12,
+              color: '#fdfdfd',
+              fontFamily: 'inherit',
+              wordBreak: 'break-word',
+            }}>
+              <span style={{ color: '#22ab9499', fontSize: 9, letterSpacing: '0.15em', marginRight: 6 }}>
+                {suggestion.field === 'krmaReserve' ? 'KRMA' : suggestion.field === 'note' ? 'NOTE' : suggestion.field.toUpperCase()}
+              </span>
+              {suggestion.field === 'krmaReserve' ? Number(suggestion.value).toLocaleString() : String(suggestion.value)}
+            </div>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              <button
+                onClick={dismissSuggestion}
+                style={{
+                  padding: '3px 10px',
+                  background: 'transparent',
+                  border: '1px solid #fdfdfd22',
+                  color: '#fdfdfd55',
+                  fontSize: 10,
+                  fontFamily: 'inherit',
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                }}
+              >IGNORE</button>
+              {suggestion.field !== 'note' && (
+                <button
+                  onClick={acceptSuggestion}
+                  style={{
+                    padding: '3px 10px',
+                    background: '#22ab9433',
+                    border: '1px solid #22ab94',
+                    color: '#22ab94',
+                    fontSize: 10,
+                    fontFamily: 'inherit',
+                    letterSpacing: '0.12em',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >ACCEPT</button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
