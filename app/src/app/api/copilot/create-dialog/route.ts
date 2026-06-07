@@ -12,6 +12,9 @@ const inputSchema = z.object({
   conversation: z.array(z.object({
     role: z.enum(['jewl', 'gm']),
     content: z.string(),
+    // Optional base64 data URLs (data:image/...;base64,...) attached to the
+    // turn. Multimodal call when present.
+    images: z.array(z.string()).optional(),
   })),
   parentLocationId: z.string().optional(),
 });

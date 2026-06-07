@@ -18,6 +18,11 @@ import { getGodheadProvider } from '../providers';
 export type CreateDialogTurn = {
   role: 'jewl' | 'gm';
   content: string;
+  /** Optional images attached to a GM turn. Each is a data URL
+   *  (data:image/jpeg;base64,...). JEWL sees these via Claude's multimodal
+   *  content blocks. Worth a million words: a GM can drop a planet map
+   *  and JEWL extracts geography/regions/features to help structure. */
+  images?: string[];
 };
 
 export type ProposedLocation = {
@@ -38,6 +43,71 @@ export type CreateDialogResponse = {
 };
 
 const MAX_ANCESTORS = 6;
+
+/**
+ * Direct Anthropic call with multimodal content. Used when any GM turn
+ * has images attached — the existing provider abstraction is text-only.
+ * Parses data URLs into Anthropic image blocks.
+ */
+async function callAnthropicMultimodal(
+  systemPrompt: string,
+  conversation: CreateDialogTurn[],
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY || '';
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+  const baseUrl = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com';
+  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+
+  // If conversation is empty, send the same opener stub used in the
+  // text-only path (just won't have images attached anyway).
+  const turns = conversation.length === 0
+    ? [{ role: 'gm' as const, content: '(start the dialogue — GM just opened the create form, hasn\'t typed anything yet)', images: undefined }]
+    : conversation;
+
+  type ContentBlock =
+    | { type: 'text'; text: string }
+    | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+
+  const messages = turns.map(t => {
+    const blocks: ContentBlock[] = [];
+    if (t.images && t.images.length > 0) {
+      for (const url of t.images) {
+        // Expected format: data:image/jpeg;base64,<payload>
+        const match = /^data:([^;]+);base64,(.+)$/.exec(url);
+        if (!match) continue;
+        blocks.push({ type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } });
+      }
+    }
+    if (t.content) blocks.push({ type: 'text', text: t.content });
+    if (blocks.length === 0) blocks.push({ type: 'text', text: '(no content)' });
+    return { role: t.role === 'gm' ? 'user' : 'assistant', content: blocks };
+  });
+
+  const response = await fetch(`${baseUrl}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 800,
+      temperature: 0.8,
+      system: systemPrompt,
+      messages,
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`Anthropic API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as { content: Array<{ type: string; text?: string }> };
+  return data.content.filter(b => b.type === 'text').map(b => b.text || '').join('');
+}
 
 async function fetchAncestors(parentLocationId: string): Promise<{ name: string; description: string }[]> {
   const ancestors: { name: string; description: string }[] = [];
@@ -113,23 +183,28 @@ Skip any optional field by omitting it. Don't pad with empty strings.
 
 If proposing, message should be SHORT — one line, no chest-thumping. "Locked. Here it is." or similar. The fields speak for themselves; the GM will edit anything they don't like.`;
 
-  // Map our turn shape into Anthropic chat shape (GM = user, JEWL = assistant).
-  // Treat an empty conversation as the opening — send a single user "start" so
-  // the assistant produces the opening prompt.
-  const chatMessages = conversation.length === 0
-    ? [{ role: 'user' as const, content: '(start the dialogue — GM just opened the create form, hasn\'t typed anything yet)' }]
-    : conversation.map(t => ({ role: t.role === 'gm' ? 'user' as const : 'assistant' as const, content: t.content }));
+  // Check if any turn has images — if so, we go multimodal and bypass the
+  // text-only provider abstraction with a direct Anthropic call. Otherwise
+  // we use the existing provider.
+  const anyImages = conversation.some(t => t.images && t.images.length > 0);
 
   let raw: string;
   try {
-    const provider = getGodheadProvider();
-    raw = await provider.chat(
-      [
-        { role: 'system', content: systemPrompt },
-        ...chatMessages,
-      ],
-      { temperature: 0.8, maxTokens: 600 },
-    );
+    if (anyImages) {
+      raw = await callAnthropicMultimodal(systemPrompt, conversation);
+    } else {
+      const chatMessages = conversation.length === 0
+        ? [{ role: 'user' as const, content: '(start the dialogue — GM just opened the create form, hasn\'t typed anything yet)' }]
+        : conversation.map(t => ({ role: t.role === 'gm' ? 'user' as const : 'assistant' as const, content: t.content }));
+      const provider = getGodheadProvider();
+      raw = await provider.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          ...chatMessages,
+        ],
+        { temperature: 0.8, maxTokens: 600 },
+      );
+    }
   } catch (err) {
     console.error('[create-dialog] provider call failed', err);
     return null;

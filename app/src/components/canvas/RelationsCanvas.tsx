@@ -3828,7 +3828,9 @@ function CanvasCreateDialog({
   const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [conversation, setConversation] = useState<{ role: 'jewl' | 'gm'; content: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [conversation, setConversation] = useState<{ role: 'jewl' | 'gm'; content: string; images?: string[] }[]>([]);
+  const [pendingImages, setPendingImages] = useState<string[]>([]); // data URLs for the next send
   const [proposal, setProposal] = useState<{
     name: string;
     description: string;
@@ -3920,11 +3922,33 @@ function CanvasCreateDialog({
 
   const send = () => {
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
-    const next: { role: 'jewl' | 'gm'; content: string }[] = [...conversation, { role: 'gm', content: trimmed }];
+    if ((!trimmed && pendingImages.length === 0) || loading) return;
+    const next: { role: 'jewl' | 'gm'; content: string; images?: string[] }[] = [
+      ...conversation,
+      { role: 'gm', content: trimmed, images: pendingImages.length > 0 ? pendingImages : undefined },
+    ];
     setConversation(next);
     setInput('');
+    setPendingImages([]);
     void runTurn(next);
+  };
+
+  const onPickImages = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const newUrls: string[] = [];
+    for (const f of Array.from(files)) {
+      if (!f.type.startsWith('image/')) continue;
+      if (f.size > 5 * 1024 * 1024) continue; // 5MB cap per image
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(f);
+      }).catch(() => null);
+      if (dataUrl) newUrls.push(dataUrl);
+    }
+    if (newUrls.length > 0) setPendingImages(prev => [...prev, ...newUrls].slice(0, 5)); // 5 max
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const regenerate = () => {
@@ -3987,9 +4011,19 @@ function CanvasCreateDialog({
             <div className={`text-[8px] tracking-[0.18em] uppercase font-[Consolas,monospace] ${t.role === 'jewl' ? 'text-[#22ab94]' : 'text-[#D0A030]/70'}`}>
               {t.role === 'jewl' ? '✦ jEWL' : 'yOU'}
             </div>
-            <div className={`text-[11px] font-[Consolas,monospace] whitespace-pre-wrap leading-snug ${t.role === 'jewl' ? 'text-white' : 'text-white/70'}`}>
-              {t.role === 'jewl' ? ctxMenuStyle(t.content) : t.content}
-            </div>
+            {t.images && t.images.length > 0 && (
+              <div className="flex gap-1 flex-wrap mb-0.5">
+                {t.images.map((url, j) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={j} src={url} alt="" className="border border-[#22ab94]/40" style={{ maxHeight: 72, maxWidth: 96, objectFit: 'cover' }} />
+                ))}
+              </div>
+            )}
+            {t.content && (
+              <div className={`text-[11px] font-[Consolas,monospace] whitespace-pre-wrap leading-snug ${t.role === 'jewl' ? 'text-white' : 'text-white/70'}`}>
+                {t.role === 'jewl' ? ctxMenuStyle(t.content) : t.content}
+              </div>
+            )}
           </div>
         ))}
         {loading && conversation.length > 0 && (
@@ -4049,23 +4083,56 @@ function CanvasCreateDialog({
       {/* Footer: input + actions */}
       <div className="border-t border-white/10 px-3 py-2">
         {!proposal && (
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Tell JEWL what you're making…"
-            rows={2}
-            disabled={loading}
-            className={`${fieldClass} resize-none mb-1.5`}
-          />
+          <>
+            {pendingImages.length > 0 && (
+              <div className="flex gap-1 flex-wrap mb-1">
+                {pendingImages.map((url, i) => (
+                  <div key={i} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="border border-[#22ab94]/40" style={{ height: 48, width: 64, objectFit: 'cover' }} />
+                    <button
+                      onClick={() => setPendingImages(prev => prev.filter((_, j) => j !== i))}
+                      className="absolute -top-1 -right-1 w-4 h-4 text-[9px] bg-black border border-[#22ab94] text-[#22ab94] hover:bg-[#22ab94]/20"
+                      title="Remove"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Tell JEWL what you're making… (attach images with the clip)"
+              rows={2}
+              disabled={loading}
+              className={`${fieldClass} resize-none mb-1.5`}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => void onPickImages(e.target.files)}
+              className="hidden"
+            />
+          </>
         )}
-        <div className="flex gap-1.5 justify-end">
+        <div className="flex gap-1.5 justify-end items-center">
+          {!proposal && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || pendingImages.length >= 5}
+              className="px-2 py-0.5 text-[11px] font-[Consolas,monospace] text-[#22ab94]/80 border border-[#22ab94]/40 hover:bg-[#22ab94]/10 disabled:opacity-40 disabled:cursor-not-allowed mr-auto"
+              title="Attach images (up to 5, 5MB each)"
+            >📎 IMG</button>
+          )}
           <button
             onClick={onCancel}
             className="px-2.5 py-0.5 text-[10px] tracking-[0.12em] font-[Consolas,monospace] text-white/60 border border-white/20 hover:bg-white/10"
@@ -4086,7 +4153,7 @@ function CanvasCreateDialog({
           ) : (
             <button
               onClick={send}
-              disabled={!input.trim() || loading}
+              disabled={(!input.trim() && pendingImages.length === 0) || loading}
               className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[#22ab94] border border-[#22ab94] hover:bg-[#22ab94]/90 disabled:bg-[#22ab94]/30 disabled:text-[#22ab94]/50 disabled:cursor-not-allowed"
             >SEND</button>
           )}
