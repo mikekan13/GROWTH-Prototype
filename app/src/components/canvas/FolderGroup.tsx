@@ -371,7 +371,10 @@ export function FolderGroupRect({
           style={{ pointerEvents: 'none', ...(isDropTarget ? { filter: 'drop-shadow(0 0 16px rgba(34,171,148,0.6))' } : undefined) }}
         />
       )}
-      {/* Header background — expanded when the Location has detail fields */}
+      {/* Header background — expanded when the Location has detail fields.
+          data-folder-location-id lets right-click on the folder surface the
+          parent context to the JEWL dialog (so "create inside this place"
+          works without drilling in). */}
       <rect
         x={bounds.x}
         y={bounds.y}
@@ -383,6 +386,7 @@ export function FolderGroupRect({
         fillOpacity={1}
         stroke={isDropTarget ? '#22ab94' : 'none'}
         strokeWidth={isDropTarget ? 3 : 0}
+        data-folder-location-id={folder.locationInfo?.locationId || undefined}
         style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
         onMouseDown={handleHeaderDrag}
       />

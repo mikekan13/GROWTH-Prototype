@@ -257,10 +257,12 @@ export default function RelationsCanvas({
   const [isDragging, setIsDragging] = useState(false);
   const [animationTime, setAnimationTime] = useState(0);
 
-  // Right-click on empty canvas opens a create menu at the cursor. Stores
-  // screen coords (for menu placement) + world coords (to stamp on the new
-  // entity). null when closed.
-  const [canvasMenu, setCanvasMenu] = useState<{ screenX: number; screenY: number; worldX: number; worldY: number } | null>(null);
+  // Right-click on empty canvas (or on a folder background) opens a create
+  // dialog at the cursor. Stores screen coords (for dialog placement),
+  // world coords (to stamp on the new entity), and the parent Location id
+  // when the click landed on a Location folder — so JEWL knows the new
+  // entity is being created INSIDE that place.
+  const [canvasMenu, setCanvasMenu] = useState<{ screenX: number; screenY: number; worldX: number; worldY: number; parentLocationId?: string } | null>(null);
 
   // â”€â”€ Node position & layering state â”€â”€
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => {
@@ -2456,8 +2458,8 @@ export default function RelationsCanvas({
         onMouseDown={handleMouseDown}
         onWheel={handleWheel}
         onContextMenu={(e) => {
-          // Only fire for clicks on the empty canvas — let cards keep their
-          // own right-click menus (die roll, delete, create-here).
+          // Only fire for clicks on the empty canvas or a folder background
+          // — let cards keep their own right-click menus.
           if (e.target !== svgRef.current && (e.target as Element).tagName !== 'rect') return;
           e.preventDefault();
           const svg = svgRef.current;
@@ -2468,7 +2470,17 @@ export default function RelationsCanvas({
           const ctm = svg.getScreenCTM();
           if (!ctm) return;
           const world = pt.matrixTransform(ctm.inverse());
-          setCanvasMenu({ screenX: e.clientX, screenY: e.clientY, worldX: world.x, worldY: world.y });
+          // If the click landed on a Location folder's header rect, pull
+          // its parent id so JEWL knows we're creating inside that place.
+          const folderEl = (e.target as Element).closest?.('[data-folder-location-id]') as Element | null;
+          const folderParentId = folderEl?.getAttribute('data-folder-location-id') || undefined;
+          setCanvasMenu({
+            screenX: e.clientX,
+            screenY: e.clientY,
+            worldX: world.x,
+            worldY: world.y,
+            parentLocationId: folderParentId,
+          });
         }}
         style={{ cursor: isPanning ? "grabbing" : "grab" }}
       >
@@ -3148,7 +3160,7 @@ export default function RelationsCanvas({
           screenX={canvasMenu.screenX}
           screenY={canvasMenu.screenY}
           campaignId={campaignId}
-          parentLocationId={focalEntityId ?? undefined}
+          parentLocationId={canvasMenu.parentLocationId ?? focalEntityId ?? undefined}
           onCancel={() => setCanvasMenu(null)}
           onSubmit={(input) => {
             onCreateLocation({
