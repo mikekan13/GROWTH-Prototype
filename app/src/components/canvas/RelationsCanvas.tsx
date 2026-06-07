@@ -22,6 +22,7 @@ import type { WorldItemNodeData } from "./WorldItemCard";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
+import { CtxMenuPanel, CtxMenuStreamLabel } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions } from "./FolderGroup";
 import FolderGroup from "./FolderGroup";
 
@@ -3957,28 +3958,24 @@ function CanvasCreateDialog({
   const left = Math.min(screenX, (typeof window !== 'undefined' ? window.innerWidth : 1000) - FORM_W - 8);
   const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - 540 - 8);
 
-  const fieldClass = 'w-full px-1.5 py-0.5 text-xs text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/60 rounded-none outline-none focus:border-[#22ab94]';
+  const fieldClass = 'w-full px-1.5 py-0.5 text-xs text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/80 rounded-none outline-none focus:border-[#22ab94]';
   const labelClass = 'text-[9px] tracking-[0.15em] uppercase text-[#22ab94]/70 font-[Consolas,monospace]';
 
   return (
     <div
       ref={ref}
       onMouseDown={(e) => e.stopPropagation()}
-      className="fixed z-[100] bg-gray-800 border border-gray-700 shadow-2xl flex flex-col"
-      style={{ left, top, width: FORM_W, maxHeight: 540 }}
+      className="fixed z-[100]"
+      style={{ left, top, width: FORM_W }}
     >
-      {/* Header */}
-      <div className="px-3 py-1.5 border-b border-white/10 flex items-center gap-2">
-        <span className="text-[10px] tracking-[0.18em] uppercase text-[#22ab94] font-[Consolas,monospace]">
-          ✦ JEWL — Create Location
-        </span>
-      </div>
-
+      <CtxMenuStreamLabel />
+      <CtxMenuPanel title="Jewl — Create Location">
+      <div className="flex flex-col" style={{ maxHeight: 480 }}>
       {/* Conversation scroll */}
       <div
         ref={scrollRef}
-        className="overflow-y-auto px-3 py-2 space-y-2 flex-shrink-0"
-        style={{ maxHeight: proposal ? 110 : 240, minHeight: 70 }}
+        className="overflow-y-auto px-2 py-2 space-y-2"
+        style={{ maxHeight: proposal ? 100 : 220, minHeight: 60 }}
       >
         {conversation.length === 0 && loading && (
           <div className="text-[10px] text-[#22ab94]/60 font-[Consolas,monospace] italic">
@@ -4095,6 +4092,8 @@ function CanvasCreateDialog({
           )}
         </div>
       </div>
+      </div>
+      </CtxMenuPanel>
     </div>
   );
 }
