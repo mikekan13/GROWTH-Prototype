@@ -224,16 +224,16 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     childrenByParent.set(r.targetId, arr);
   }
   const nodeNameById = new Map(allNodes.map(n => [n.id, n.name]));
-  // Look up parent Locations so the folder can carry their info — name,
-  // type, KRMA reserve, description — and BE the Location (no separate
-  // Location card). The filter below removes these Locations from `nodes`.
+  // Every Location is a folder per the world-recursive design — even when
+  // empty. Build the lookup over ALL Locations, not just ones with children.
+  // The filter below strips ALL Locations from rendered nodes (they ARE
+  // folders, no separate LocationCard).
   const parentLocationsById = new Map(
     campaign.locations
-      .filter(l => childrenByParent.has(l.id))
       .map(l => {
         let parsed: Record<string, unknown> = {};
         try { parsed = JSON.parse(l.data) as Record<string, unknown>; } catch { /* ignore */ }
-        return [l.id, { name: l.name, type: l.type, status: l.status, data: parsed }];
+        return [l.id, { name: l.name, type: l.type, status: l.status, data: parsed }] as const;
       })
   );
   // Build a type lookup so we can count children by type without re-querying.
@@ -244,7 +244,12 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     try { return (JSON.parse(c.data) as Record<string, unknown>).entityType === 'NPC'; } catch { return false; }
   }).map(c => c.id));
 
-  const autoFolders = Array.from(childrenByParent.entries()).map(([parentId, nodeIdsForParent]) => {
+  // Build one folder per Location — even those with no children. Empty
+  // folders still render with their header (name, KRMA, portrait, child
+  // counts at 0). New Locations land as empty folders, not as cards.
+  const autoFolders = campaign.locations.map(l => {
+    const parentId = l.id;
+    const nodeIdsForParent = childrenByParent.get(parentId) ?? [];
     const loc = parentLocationsById.get(parentId);
     // Aggregate child counts by type
     const counts = { locations: 0, characters: 0, npcs: 0, items: 0 };
@@ -256,11 +261,17 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
         else counts.characters += 1;
       } else if (t === 'item') counts.items += 1;
     }
+    // Folder anchors at the Location's stored canvas position (so empty
+    // folders land where the GM clicked instead of at the origin).
+    const locX = typeof loc?.data?.canvasX === 'number' ? loc.data.canvasX as number : undefined;
+    const locY = typeof loc?.data?.canvasY === 'number' ? loc.data.canvasY as number : undefined;
     return {
       id: `auto-${parentId}`,
       name: nodeNameById.get(parentId) ?? loc?.name ?? 'Container',
       type: 'group' as const,
       nodeIds: nodeIdsForParent,
+      posX: locX,
+      posY: locY,
       locationInfo: loc
         ? {
             locationId: parentId,

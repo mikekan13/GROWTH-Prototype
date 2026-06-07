@@ -423,7 +423,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     const storedIds = new Set(folders.map(f => f.id));
     const merged = [...folders];
     for (const af of autoFolders) {
-      if (!storedIds.has(af.id) && af.nodeIds.length > 0) {
+      if (!storedIds.has(af.id)) {
+        // Empty folders are still folders — every Location renders as a
+        // container per the world-recursive design.
         merged.push({ ...af, collapsed: af.collapsed ?? true });
       }
     }
