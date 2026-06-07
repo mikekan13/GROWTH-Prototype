@@ -1404,6 +1404,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onDrillIn={setFocalEntityId}
             onFoldersChange={handleFoldersChange}
             onRestComplete={() => router.refresh()}
+            onLocationReparented={() => router.refresh()}
             isGM={isGM}
             contestedAttackerId={contestedState?.phase === 'selecting_defender' ? contestedState.attackerId : undefined}
             onContestedCheck={isGM ? (characterId, characterName, skillName, governors, revealDR) => {

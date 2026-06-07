@@ -127,6 +127,70 @@ export async function createLocation(
   });
 }
 
+/**
+ * Set or clear the parent of a Location via the located_at edge. A Location
+ * has AT MOST one parent (single physical containment). When parentId is
+ * null, the Location becomes a top-level entity. When non-null, the old
+ * parent edge is removed and a new one written in a transaction.
+ *
+ * Used by the canvas's drag-folder-into-folder gesture and (eventually) by
+ * JEWL when the GM asks to move a place. Note: this is strict containment;
+ * the partial-containment primitive (intersects / roots_in) is unbuilt.
+ */
+export async function setLocationParent(
+  campaignId: string,
+  userId: string,
+  userRole: string,
+  locationId: string,
+  parentId: string | null,
+) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (!canManageCampaign(userId, userRole, campaign)) {
+    throw new ForbiddenError('Only the GM can re-parent locations');
+  }
+
+  const location = await prisma.location.findUnique({ where: { id: locationId } });
+  if (!location || location.campaignId !== campaignId) {
+    throw new NotFoundError('Location not found in this campaign');
+  }
+
+  if (parentId) {
+    if (parentId === locationId) {
+      throw new Error('A Location cannot be its own parent');
+    }
+    const parent = await prisma.location.findUnique({ where: { id: parentId } });
+    if (!parent || parent.campaignId !== campaignId) {
+      throw new NotFoundError('Parent location not found in this campaign');
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // Drop any existing located_at edges from this Location.
+    await tx.entityRelationship.deleteMany({
+      where: {
+        sourceId: locationId,
+        sourceType: 'LOCATION',
+        relationshipType: 'located_at',
+      },
+    });
+    if (parentId) {
+      await tx.entityRelationship.create({
+        data: {
+          campaignId,
+          sourceId: locationId,
+          sourceType: 'LOCATION',
+          targetId: parentId,
+          targetType: 'LOCATION',
+          relationshipType: 'located_at',
+          strength: 5,
+        },
+      });
+    }
+    return { locationId, parentId };
+  });
+}
+
 export async function updateLocation(
   locationId: string,
   campaignId: string,

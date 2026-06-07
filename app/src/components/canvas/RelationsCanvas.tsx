@@ -121,6 +121,10 @@ interface RelationsCanvasProps {
   folders?: CanvasFolder[];
   onFoldersChange?: (folders: CanvasFolder[]) => void;
   onRestComplete?: () => void;
+  /** Called when a Location folder is dragged INTO another Location folder
+   *  — the canvas writes the located_at edge server-side and the parent
+   *  surface should refresh so the new hierarchy renders. */
+  onLocationReparented?: (locationId: string, parentId: string | null) => void;
   onSkillCheck?: (characterId: string, skillName: string | undefined, attributeName: string | undefined, dr: number, revealDR: boolean) => void;
   onContestedCheck?: (characterId: string, characterName: string, skillName: string, governors: string[], revealDR: boolean) => void;
   /** When set, canvas is in contested check mode â€” waiting for defender click */
@@ -170,6 +174,7 @@ export default function RelationsCanvas({
   folders = [],
   onFoldersChange,
   onRestComplete,
+  onLocationReparented,
   onSkillCheck,
   onContestedCheck,
   contestedAttackerId,
@@ -778,6 +783,43 @@ export default function RelationsCanvas({
   }, [expandedNodes]);
 
   // Check if a dragged node overlaps a folder and update drop target highlight
+  /**
+   * Find which Location folder (if any) contains a world-coord point.
+   * Used for drag-folder-into-folder re-parenting. Excludes the dragged
+   * folder itself + any of its descendants would be the right behavior but
+   * we'll accept the simple "not itself" check for tonight; same-tree
+   * cycles are guarded server-side.
+   */
+  const findContainingLocationFolder = useCallback((px: number, py: number, excludeFolderId: string | null): string | null => {
+    const curFolders = foldersRef.current;
+    const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+    const MIN_FW = 720, MIN_FH = 200;
+    for (const f of curFolders) {
+      if (f.id === excludeFolderId) continue;
+      if (!f.locationInfo?.locationId) continue;
+      const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
+      let bx: number, by: number, bw: number, bh: number;
+      if (content) {
+        const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
+        const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
+        const bpX = f.posX ?? content.x;
+        const bpY = f.posY ?? content.y;
+        const rEdge = Math.max(bpX + MIN_FW, bpX + (f.userWidth || 0), content.x + content.minWidth);
+        const bEdge = Math.max(bpY + MIN_FH, bpY + (f.userHeight || 0), content.y + content.minHeight);
+        bx = anchorX; by = anchorY; bw = rEdge - anchorX; bh = bEdge - anchorY;
+      } else {
+        bw = Math.max(MIN_FW, f.userWidth || 0);
+        bh = Math.max(MIN_FH, f.userHeight || 0);
+        bx = f.posX ?? -bw / 2;
+        by = f.posY ?? 100;
+      }
+      if (px >= bx && px <= bx + bw && py >= by && py <= by + bh) {
+        return f.locationInfo.locationId;
+      }
+    }
+    return null;
+  }, [nodes]);
+
   const checkFolderDropTarget = useCallback((nodeId: string, offsetX: number, offsetY: number) => {
     const basePos = nodePositionsRef.current.get(nodeId);
     if (!basePos) { setDropTargetFolderId(null); dropTargetRef.current = null; return; }
@@ -1394,6 +1436,34 @@ export default function RelationsCanvas({
             next.delete(pseudoKey);
             return next;
           });
+        }
+
+        // Folder-into-folder re-parenting. If the dragged folder represents
+        // a Location and was dropped inside ANOTHER Location folder, write
+        // the located_at edge server-side and tell the parent to refresh.
+        const myLocId = folder.locationInfo?.locationId;
+        if (myLocId) {
+          // Pick a point near the folder's NEW header center for the
+          // containment check. Use the most recent offset to compute the
+          // updated anchor; fall back to current posX/posY if no offset.
+          const lastNodeOffset = folder.nodeIds.length > 0 ? dragOffsets.get(folder.nodeIds[0]) : dragOffsets.get(`__folder__${folder.id}`);
+          const baseX = folder.posX ?? 0;
+          const baseY = folder.posY ?? 0;
+          const checkX = baseX + (lastNodeOffset?.x ?? 0) + 200; // ~middle of a typical header
+          const checkY = baseY + (lastNodeOffset?.y ?? 0) + 40;  // ~middle of the chrome strip
+          const newParentId = findContainingLocationFolder(checkX, checkY, folder.id);
+          if (newParentId && newParentId !== myLocId) {
+            void fetch(`/api/campaigns/${campaignId}/locations/${myLocId}/parent`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ parentId: newParentId }),
+            })
+              .then(res => {
+                if (res.ok) onLocationReparented?.(myLocId, newParentId);
+                else console.error('[reparent] POST failed', res.status);
+              })
+              .catch(err => console.error('[reparent] fetch failed', err));
+          }
         }
       }
       setDragFolderId(null);
