@@ -62,16 +62,35 @@ interface FolderGroupProps {
 
 const FOLDER_PADDING = 30;
 const HEADER_HEIGHT = 80;
-const LOCATION_HEADER_HEIGHT = 440; // chrome strip (80) + details panel (~360, larger fonts)
+const CHROME_HEIGHT = 80; // top chrome strip with portrait/name/KRMA/counts
+const PANEL_GAP = 6; // gap between chrome and panel
+const PANEL_PADDING = 24; // panel padding top+bottom combined
+
+/** Rough vertical estimate for the details panel content. Used to size the
+ *  expanded Location-folder header so everything fits without scrolling. */
+function locationDetailsPanelHeight(li: NonNullable<CanvasFolder['locationInfo']>): number {
+  const CHARS_PER_LINE = 38;
+  const descText = li.description || '(empty)';
+  const descLines = Math.max(1, Math.ceil(descText.length / CHARS_PER_LINE));
+  const descH = descLines * 30;
+  const gridH = 2 * (24 + 30) + 8;
+  const tagCount = li.tags?.length ?? 0;
+  const tagsH = 24 + (tagCount > 8 ? 2 * 30 : 30);
+  const notesText = li.notes || '(empty)';
+  const notesLines = Math.max(1, Math.ceil(notesText.length / CHARS_PER_LINE));
+  const notesH = 24 + notesLines * 28 + 14;
+  const gaps = 4 * 10;
+  return descH + gridH + tagsH + notesH + gaps + PANEL_PADDING;
+}
 const SOUL_BLUE = '#002f6c';
 const HANDLE_SIZE = 36;
 
-/** Effective header height. Location folders ALWAYS get the expanded header
- *  (with the details panel surfacing what's set + placeholders for what's
- *  empty) — the GM needs to see the field structure to know what JEWL filled
- *  vs what needs filling. Plain folders (party/etc.) keep the compact 80px. */
+/** Effective header height. Location folders fit their full details panel
+ *  (no scroll). Estimated dynamically from content so sparse Locations
+ *  stay compact and rich ones grow naturally. Plain folders keep 80px. */
 function locationHeaderHeight(folder: CanvasFolder): number {
-  return folder.locationInfo ? LOCATION_HEADER_HEIGHT : HEADER_HEIGHT;
+  if (!folder.locationInfo) return HEADER_HEIGHT;
+  return CHROME_HEIGHT + PANEL_GAP + locationDetailsPanelHeight(folder.locationInfo) + 12;
 }
 
 // ── Shared bounds calculation ──
@@ -688,7 +707,7 @@ export function FolderGroupRect({
                 x={bounds.x + 12}
                 y={bounds.y + 86}
                 width={Math.max(bounds.width - 24, 200)}
-                height={340}
+                height={locationDetailsPanelHeight(li) + 8}
                 style={{ pointerEvents: 'auto', overflow: 'visible' }}
               >
                 <div
@@ -702,8 +721,6 @@ export function FolderGroupRect({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 10,
-                    maxHeight: 340,
-                    overflowY: 'auto',
                   }}
                 >
                   <div style={{ fontSize: 22, lineHeight: 1.4, color: '#fdfdfd', whiteSpace: 'pre-wrap' }}>
