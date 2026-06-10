@@ -422,18 +422,38 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // Auto-folders default to collapsed so the canvas reads calm by default —
   // GM expands when they want to look inside, per the world-design pillar.
   const allEffectiveFolders = useMemo(() => {
-    if (!autoFolders || autoFolders.length === 0) return folders;
     const storedIds = new Set(folders.map(f => f.id));
     const merged = [...folders];
-    for (const af of autoFolders) {
+    for (const af of autoFolders ?? []) {
       if (!storedIds.has(af.id)) {
         // Empty folders are still folders — every Location renders as a
         // container per the world-recursive design.
         merged.push({ ...af, collapsed: af.collapsed ?? true });
       }
     }
+    // Deterministic fan-out for Location folders without stored coords.
+    // Seeded/imported children often have no canvasX/Y — without this they
+    // all land on the same default point and stack into an unreadable pile
+    // (the 10 Sephirot folders all rendered at one spot).
+    const parentByChild = new Map(locatedAtEdges.map(e => [e.child, e.parent]));
+    const folderIndexById = new Map(merged.map((f, i) => [f.id, i]));
+    const siblingCounter = new Map<string, number>();
+    for (let i = 0; i < merged.length; i++) {
+      const f = merged[i];
+      if (!f.id.startsWith('auto-') || typeof f.posX === 'number') continue;
+      const locId = f.id.slice('auto-'.length);
+      const parentId = parentByChild.get(locId);
+      const parentIdx = parentId ? folderIndexById.get(`auto-${parentId}`) : undefined;
+      const parent = parentIdx !== undefined ? merged[parentIdx] : undefined;
+      const key = parentId ?? '__root__';
+      const idx = siblingCounter.get(key) ?? 0;
+      siblingCounter.set(key, idx + 1);
+      const baseX = (typeof parent?.posX === 'number' ? parent.posX : 0) + 80;
+      const baseY = (typeof parent?.posY === 'number' ? parent.posY : 0) + 180;
+      merged[i] = { ...f, posX: baseX + (idx % 4) * 560, posY: baseY + Math.floor(idx / 4) * 240 };
+    }
     return merged;
-  }, [folders, autoFolders]);
+  }, [folders, autoFolders, locatedAtEdges]);
 
   // ── Focal-filtered nodes + folders ─────────────────────────────────────────
   // When focal is null: show everything (campaign root view).
@@ -443,7 +463,32 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   //     id matches `auto-${focal}`.
   const focalView = useMemo(() => {
     if (!focalEntityId) {
-      return { nodes, folders: allEffectiveFolders };
+      // Campaign root: an entity stays HIDDEN while any ancestor Location's
+      // folder is collapsed — contents live "inside" the closed folder.
+      // Expanding a folder reveals its children (recursively, until the next
+      // collapsed level). Without this, child Location folders rendered at
+      // root alongside their parents.
+      const collapsedByLoc = new Map<string, boolean>();
+      for (const f of allEffectiveFolders) {
+        if (f.id.startsWith('auto-')) collapsedByLoc.set(f.id.slice('auto-'.length), !!f.collapsed);
+      }
+      const parentByChild = new Map(locatedAtEdges.map(e => [e.child, e.parent]));
+      const hiddenByAncestorCollapse = (id: string): boolean => {
+        let cur = parentByChild.get(id);
+        const seen = new Set<string>();
+        while (cur && !seen.has(cur)) {
+          if (collapsedByLoc.get(cur)) return true;
+          seen.add(cur);
+          cur = parentByChild.get(cur);
+        }
+        return false;
+      };
+      return {
+        nodes: nodes.filter(n => !hiddenByAncestorCollapse(n.id)),
+        folders: allEffectiveFolders.filter(f =>
+          !f.id.startsWith('auto-') || !hiddenByAncestorCollapse(f.id.slice('auto-'.length)),
+        ),
+      };
     }
     const directChildIds = new Set<string>(
       locatedAtEdges.filter(e => e.parent === focalEntityId).map(e => e.child),
