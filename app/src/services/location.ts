@@ -5,6 +5,13 @@ import { canManageCampaign } from '@/lib/permissions';
 
 // --- Schemas ---
 
+/** Hard ceiling on any single KRMA quantity: the total supply (100B).
+ *  KRMA conservation means no reserve, wallet, or commitment can ever
+ *  exceed it — seeded data had Location reserves at 10^18. Real
+ *  enforcement (debit vs GM wallet capacity at crystallization) is a
+ *  separate build; this is the physics floor. */
+export const KRMA_TOTAL_SUPPLY = 100_000_000_000;
+
 export const createLocationSchema = z.object({
   name: z.string().min(1, 'Location name required').max(200),
   // Type kept for backward compat; the design now treats Location as a single
@@ -20,8 +27,9 @@ export const createLocationSchema = z.object({
    *  downward to children for lore generation. */
   description: z.string().optional(),
   /** Ambient KRMA mass — drives wallet commitment + visual prominence.
-   *  See [[location-krma-reserve-2026-06-02]]. */
-  krmaReserve: z.number().optional(),
+   *  See [[location-krma-reserve-2026-06-02]]. Bounded by total supply:
+   *  nothing in the economy can exceed 100B KRMA. */
+  krmaReserve: z.number().min(0).max(KRMA_TOTAL_SUPPLY).optional(),
   /** Climate / terrain / atmosphere — short narrative slice that cascades
    *  down to children for AI lore generation. */
   environment: z.string().optional(),
