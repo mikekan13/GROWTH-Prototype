@@ -153,7 +153,9 @@ function renderGlitchTexture(char: string): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
+  // willReadFrequently: the glitch-tear effect below does looped getImageData
+  // readbacks; without the flag Chrome logs a warning per texture (76+ at boot)
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
   ctx.clearRect(0, 0, size, size);
 

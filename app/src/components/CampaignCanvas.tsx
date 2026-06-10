@@ -339,13 +339,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // this entity. null = campaign root (everything visible). Persisted per
   // campaign so the GM resumes where they were.
   const focalStorageKey = `canvas-${campaign.id}-focal`;
-  const [focalEntityId, setFocalEntityIdState] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
+  // Initialize to null and restore from localStorage AFTER mount — reading
+  // localStorage in the useState initializer makes the first client render
+  // differ from the server render (React hydration mismatch).
+  const [focalEntityId, setFocalEntityIdState] = useState<string | null>(null);
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(focalStorageKey);
-      return raw ? (raw === 'null' ? null : raw) : null;
-    } catch { return null; }
-  });
+      if (raw && raw !== 'null') setFocalEntityIdState(raw);
+    } catch { /* ignore */ }
+  }, [focalStorageKey]);
   const setFocalEntityId = useCallback((id: string | null) => {
     setFocalEntityIdState(id);
     try { localStorage.setItem(focalStorageKey, id ?? 'null'); } catch { /* ignore */ }
