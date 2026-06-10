@@ -250,7 +250,7 @@ async function seedGodheads() {
         userId: adminUser.id,
         campaignId: null,
         entityType: 'GODHEAD',
-        status: 'active',
+        status: 'ACTIVE',
         data: JSON.stringify(charData),
       },
     });

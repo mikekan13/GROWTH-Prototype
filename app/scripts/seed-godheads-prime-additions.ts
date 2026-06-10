@@ -138,7 +138,7 @@ async function main() {
         userId: admin.id,
         campaignId: prime.id,
         entityType: 'GODHEAD',
-        status: 'active',
+        status: 'ACTIVE',
         data: JSON.stringify(charData),
       },
     });
