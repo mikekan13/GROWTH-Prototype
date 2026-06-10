@@ -107,6 +107,12 @@ interface RelationsCanvasProps {
     tags?: string[];
   }) => void;
   onDeleteLocation?: (nodeId: string) => void;
+  /** EDIT commit from the JEWL dialog — PATCHes the existing Location's
+   *  name + detail fields (merging into its data JSON). */
+  onEditLocation?: (locationId: string, input: LocationDialogFields) => void;
+  /** Dissolve an ACTIVE Location back to PLANNING (the weightier path —
+   *  active world-pieces are never hard-deleted, ruling r-2026-06-09-09). */
+  onDissolveLocation?: (locationId: string) => void;
   onLocationUpdate?: (nodeId: string, data: GrowthLocation) => void;
   /** Right-click → "Create NPC here" on a Location card. Wrapper prompts for
    *  name + fires POST /api/characters with parentLocationId and world coords
@@ -163,6 +169,8 @@ export default function RelationsCanvas({
   onCharacterUpdate,
   onCreateLocation,
   onDeleteLocation,
+  onEditLocation,
+  onDissolveLocation,
   onLocationUpdate: _onLocationUpdate,
   onCreateChildCharacterAtLocation,
   onCreateItem,
@@ -267,7 +275,14 @@ export default function RelationsCanvas({
   // world coords (to stamp on the new entity), and the parent Location id
   // when the click landed on a Location folder — so JEWL knows the new
   // entity is being created INSIDE that place.
-  const [canvasMenu, setCanvasMenu] = useState<{ screenX: number; screenY: number; worldX: number; worldY: number; parentLocationId?: string } | null>(null);
+  const [canvasMenu, setCanvasMenu] = useState<{
+    screenX: number; screenY: number; worldX: number; worldY: number;
+    parentLocationId?: string;
+    /** chooser = right-clicked a Location folder (pick edit / create-inside /
+     *  delete); create = JEWL create dialog; edit = JEWL edit dialog. */
+    mode: 'chooser' | 'create' | 'edit';
+    editLocationId?: string;
+  } | null>(null);
 
   // â”€â”€ Node position & layering state â”€â”€
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => {
@@ -2543,13 +2558,18 @@ export default function RelationsCanvas({
           // If the click landed on a Location folder's header rect, pull
           // its parent id so JEWL knows we're creating inside that place.
           const folderEl = (e.target as Element).closest?.('[data-folder-location-id]') as Element | null;
-          const folderParentId = folderEl?.getAttribute('data-folder-location-id') || undefined;
+          const folderLocationId = folderEl?.getAttribute('data-folder-location-id') || undefined;
           setCanvasMenu({
             screenX: e.clientX,
             screenY: e.clientY,
             worldX: world.x,
             worldY: world.y,
-            parentLocationId: folderParentId,
+            parentLocationId: folderLocationId,
+            // Right-click ON a place → chooser (edit it / create inside /
+            // delete-or-dissolve). Right-click empty canvas → straight to
+            // the JEWL create dialogue.
+            mode: folderLocationId ? 'chooser' : 'create',
+            editLocationId: folderLocationId,
           });
         }}
         style={{ cursor: isPanning ? "grabbing" : "grab" }}
@@ -3221,11 +3241,68 @@ export default function RelationsCanvas({
           })}
       </svg>
 
-      {/* ── Right-click create form on empty canvas ──
-          Inline form (name + description + KRMA reserve + status) anchored
-          at the click point. Submits a full Location input including the
-          world coords so the new card lands where the GM clicked. */}
-      {canvasMenu && onCreateLocation && (
+      {/* ── Right-click on a Location folder → chooser (edit / create
+          inside / delete-or-dissolve). One JEWL dialog underneath either
+          path — contextual payload decides create vs edit. */}
+      {canvasMenu?.mode === 'chooser' && canvasMenu.editLocationId && (() => {
+        const f = folders.find(fl => fl.locationInfo?.locationId === canvasMenu.editLocationId);
+        const li = f?.locationInfo;
+        const isActive = li?.status === 'ACTIVE';
+        const item = 'w-full px-3 py-1.5 text-left text-xs hover:bg-[#22ab94]/20 font-[Consolas,monospace] cursor-pointer';
+        return (
+          <div
+            className="fixed z-[100]"
+            style={{ left: canvasMenu.screenX, top: canvasMenu.screenY, width: 220 }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <CtxMenuPanel title={f?.name ?? 'Location'}>
+              <button
+                className={item}
+                style={{ color: '#fff' }}
+                onClick={() => setCanvasMenu({ ...canvasMenu, mode: 'edit' })}
+              >
+                {ctxMenuStyle('Edit this place')}
+              </button>
+              <button
+                className={item}
+                style={{ color: '#fff' }}
+                onClick={() => setCanvasMenu({ ...canvasMenu, mode: 'create' })}
+              >
+                {ctxMenuStyle('Create inside')}
+              </button>
+              {isActive ? (
+                onDissolveLocation && (
+                  <button
+                    className={item}
+                    style={{ color: '#8e7cc3' }}
+                    title="Active world-pieces are never hard-deleted — dissolve returns this place below the line"
+                    onClick={() => { onDissolveLocation(canvasMenu.editLocationId!); setCanvasMenu(null); }}
+                  >
+                    {ctxMenuStyle('Dissolve to planning')}
+                  </button>
+                )
+              ) : (
+                onDeleteLocation && (
+                  <button
+                    className={item}
+                    style={{ color: '#ff6666' }}
+                    onClick={() => { onDeleteLocation(canvasMenu.editLocationId!); setCanvasMenu(null); }}
+                  >
+                    {ctxMenuStyle('Delete draft')}
+                  </button>
+                )
+              )}
+              <button className={item} style={{ color: 'rgba(255,255,255,0.4)' }} onClick={() => setCanvasMenu(null)}>
+                {ctxMenuStyle('Cancel')}
+              </button>
+            </CtxMenuPanel>
+          </div>
+        );
+      })()}
+
+      {/* ── JEWL create dialogue (empty canvas, or "create inside" from the
+          chooser). Anchored at the click point. */}
+      {canvasMenu?.mode === 'create' && onCreateLocation && (
         <CanvasCreateDialog
           screenX={canvasMenu.screenX}
           screenY={canvasMenu.screenY}
@@ -3242,6 +3319,36 @@ export default function RelationsCanvas({
           }}
         />
       )}
+
+      {/* ── JEWL edit dialogue — same dialog, edit context (#34). */}
+      {canvasMenu?.mode === 'edit' && canvasMenu.editLocationId && onEditLocation && (() => {
+        const f = folders.find(fl => fl.locationInfo?.locationId === canvasMenu.editLocationId);
+        const li = f?.locationInfo;
+        return (
+          <CanvasCreateDialog
+            screenX={canvasMenu.screenX}
+            screenY={canvasMenu.screenY}
+            campaignId={campaignId}
+            existing={{
+              locationId: canvasMenu.editLocationId,
+              name: f?.name ?? 'Unknown place',
+              description: li?.description,
+              krmaReserve: li?.krmaReserve,
+              environment: li?.environment,
+              population: li?.population,
+              dangerLevel: li?.dangerLevel,
+              controlledBy: li?.controlledBy,
+              notes: li?.notes,
+              tags: li?.tags,
+            }}
+            onCancel={() => setCanvasMenu(null)}
+            onSubmit={(input) => {
+              onEditLocation(canvasMenu.editLocationId!, input);
+              setCanvasMenu(null);
+            }}
+          />
+        );
+      })()}
 
       {/* â”€â”€ Canvas Toolbox (follows camera on the KRMA line) â”€â”€ */}
       <CanvasToolbox
@@ -3887,24 +3994,31 @@ interface LocationCreateInput {
 type DialogTurn = { role: 'jewl' | 'gm'; content: string };
 type ProposedLocation = { name: string; description: string; krmaReserve?: number };
 
+export interface LocationDialogFields {
+  name: string;
+  description?: string;
+  krmaReserve?: number;
+  environment?: string;
+  population?: string;
+  dangerLevel?: number;
+  controlledBy?: string;
+  notes?: string;
+  tags?: string[];
+}
+
 function CanvasCreateDialog({
-  screenX, screenY, campaignId, parentLocationId, onSubmit, onCancel,
+  screenX, screenY, campaignId, parentLocationId, existing, onSubmit, onCancel,
 }: {
   screenX: number;
   screenY: number;
   campaignId: string;
   parentLocationId?: string;
-  onSubmit: (input: {
-    name: string;
-    description?: string;
-    krmaReserve?: number;
-    environment?: string;
-    population?: string;
-    dangerLevel?: number;
-    controlledBy?: string;
-    notes?: string;
-    tags?: string[];
-  }) => void;
+  /** EDIT mode: the existing Location being revised. The dialog opens with
+   *  the current fields as the editable preview and JEWL runs an
+   *  edit-aware dialogue. One dialog, contextual payload — per
+   *  [[one-contextual-jewl-dialog-2026-06-07]]. */
+  existing?: LocationDialogFields & { locationId: string };
+  onSubmit: (input: LocationDialogFields) => void;
   onCancel: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -3923,17 +4037,17 @@ function CanvasCreateDialog({
     controlledBy?: string;
     notes?: string;
     tags?: string[];
-  } | null>(null);
+  } | null>(existing ? { name: existing.name, description: existing.description ?? '' } : null);
   const [edit, setEdit] = useState({
-    name: '',
-    description: '',
-    krmaReserve: '',
-    environment: '',
-    population: '',
-    dangerLevel: '',
-    controlledBy: '',
-    notes: '',
-    tags: '',
+    name: existing?.name ?? '',
+    description: existing?.description ?? '',
+    krmaReserve: existing?.krmaReserve != null ? String(existing.krmaReserve) : '',
+    environment: existing?.environment ?? '',
+    population: existing?.population ?? '',
+    dangerLevel: existing?.dangerLevel != null ? String(existing.dangerLevel) : '',
+    controlledBy: existing?.controlledBy ?? '',
+    notes: existing?.notes ?? '',
+    tags: existing?.tags?.join(', ') ?? '',
   });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -3949,6 +4063,7 @@ function CanvasCreateDialog({
           formType: 'location',
           conversation: history,
           parentLocationId,
+          editLocationId: existing?.locationId,
         }),
       });
       const json = await res.json() as { response: { message: string; proposal: typeof proposal } | null };
@@ -3977,7 +4092,9 @@ function CanvasCreateDialog({
   };
 
   useEffect(() => {
-    void runTurn([]);
+    // Edit mode opens with the current fields already in the preview; the
+    // GM may type to ask JEWL for changes — no auto-opening turn needed.
+    if (!existing) void runTurn([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -4075,7 +4192,7 @@ function CanvasCreateDialog({
       style={{ left, top, width: FORM_W }}
     >
       <CtxMenuStreamLabel />
-      <CtxMenuPanel title="Jewl — Create Location">
+      <CtxMenuPanel title={existing ? `Jewl — Edit ${existing.name}` : 'Jewl — Create Location'}>
       <div className="flex flex-col" style={{ maxHeight: 480 }}>
       {/* Conversation scroll */}
       <div

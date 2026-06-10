@@ -278,7 +278,7 @@ export async function updateLocation(
     throw new NotFoundError('Location not found');
   }
 
-  return prisma.location.update({
+  const updated = await prisma.location.update({
     where: { id: locationId },
     data: {
       ...(input.name !== undefined && { name: input.name }),
@@ -287,6 +287,23 @@ export async function updateLocation(
       ...(input.status !== undefined && { status: input.status }),
     },
   });
+
+  // Perspective history (r-2026-06-09-07). Status-only flips log through
+  // updateLocationStatus; field edits log here.
+  if (input.name !== undefined || input.data !== undefined) {
+    const cycle = await currentCycleOf(campaignId);
+    await writeHistory(campaignId, cycle, [{
+      subjectType: 'location',
+      subjectId: locationId,
+      type: 'edited',
+      summary: input.name !== undefined && input.name !== location.name
+        ? `${location.name} is now known as ${input.name}`
+        : `${updated.name} was revised`,
+      actorId: userId,
+    }]);
+  }
+
+  return updated;
 }
 
 /**

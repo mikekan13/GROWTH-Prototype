@@ -928,9 +928,85 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [campaign.id, router]);
 
   const handleDeleteLocation = useCallback(async (nodeId: string) => {
-    if (!confirm('Delete this location?')) return;
+    if (!confirm('Delete this draft location?')) return;
     try {
-      await fetch(`/api/campaigns/${campaign.id}/locations/${nodeId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/campaigns/${campaign.id}/locations/${nodeId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || 'Failed to delete location');
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
+  /** EDIT commit from the JEWL dialog: merge the revised fields into the
+   *  Location's existing data JSON (preserving canvas coords, timescale
+   *  override, etc.) and PATCH. */
+  const handleEditLocation = useCallback(async (locationId: string, input: {
+    name: string;
+    description?: string;
+    krmaReserve?: number;
+    environment?: string;
+    population?: string;
+    dangerLevel?: number;
+    controlledBy?: string;
+    notes?: string;
+    tags?: string[];
+  }) => {
+    try {
+      const getRes = await fetch(`/api/campaigns/${campaign.id}/locations/${locationId}`);
+      if (!getRes.ok) { alert('Failed to load location for edit'); return; }
+      const payload = await getRes.json();
+      const current = payload.location ?? payload; // route may wrap
+      const currentData = (typeof current.data === 'string'
+        ? JSON.parse(current.data) : current.data) ?? {};
+      const mergedData = {
+        ...currentData,
+        description: input.description ?? '',
+        krmaReserve: input.krmaReserve,
+        environment: input.environment,
+        population: input.population,
+        dangerLevel: input.dangerLevel,
+        controlledBy: input.controlledBy,
+        notes: input.notes,
+        tags: input.tags ?? [],
+      };
+      const res = await fetch(`/api/campaigns/${campaign.id}/locations/${locationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: input.name, data: mergedData }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || 'Failed to update location');
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert('Connection failed');
+    }
+  }, [campaign.id, router]);
+
+  /** Dissolve an ACTIVE Location back to PLANNING — the weightier
+   *  alternative to deletion for crystallized world-pieces
+   *  (ruling r-2026-06-09-09). KRMA settlement hook lands with the
+   *  crystallize-debit build. */
+  const handleDissolveLocation = useCallback(async (locationId: string) => {
+    if (!confirm('Dissolve this place back to the planning layer? It leaves the active world.')) return;
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}/locations/${locationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PLANNING' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || 'Failed to dissolve location');
+        return;
+      }
       router.refresh();
     } catch {
       alert('Connection failed');
@@ -1440,6 +1516,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onCharacterUpdate={handleCharacterUpdate}
             onCreateLocation={handleCreateLocation}
             onDeleteLocation={handleDeleteLocation}
+            onEditLocation={handleEditLocation}
+            onDissolveLocation={handleDissolveLocation}
             onCreateChildCharacterAtLocation={handleCreateChildCharacterAtLocation}
             onCreateItem={handleCreateItem}
             onDeleteItem={handleDeleteItem}

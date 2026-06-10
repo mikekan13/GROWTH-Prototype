@@ -17,6 +17,9 @@ const inputSchema = z.object({
     images: z.array(z.string()).optional(),
   })),
   parentLocationId: z.string().optional(),
+  /** When present, the dialog edits this existing Location instead of
+   *  creating — JEWL sees its current state and proposes a revision. */
+  editLocationId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -28,6 +31,7 @@ export async function POST(request: NextRequest) {
       input.campaignId,
       input.conversation,
       input.parentLocationId,
+      input.editLocationId,
     );
     return NextResponse.json({ response });
   } catch (error) {

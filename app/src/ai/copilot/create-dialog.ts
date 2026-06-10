@@ -137,6 +137,11 @@ export async function continueLocationCreateDialog(
   campaignId: string,
   conversation: CreateDialogTurn[],
   parentLocationId?: string,
+  /** When set, this is an EDIT dialogue on an existing Location — JEWL
+   *  sees the current state and proposes a REVISED full entity (same
+   *  proposal shape; the commit PATCHes instead of creating). One dialog,
+   *  contextual payload — per [[one-contextual-jewl-dialog-2026-06-07]]. */
+  editLocationId?: string,
 ): Promise<CreateDialogResponse | null> {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
@@ -144,9 +149,54 @@ export async function continueLocationCreateDialog(
   });
   if (!campaign) return null;
 
-  const ancestors = parentLocationId ? await fetchAncestors(parentLocationId) : [];
+  // Edit mode: load the subject's current state for JEWL's context.
+  let editSubject: { name: string; status: string; fields: Record<string, unknown> } | null = null;
+  let effectiveParentId = parentLocationId;
+  if (editLocationId) {
+    const loc = await prisma.location.findFirst({
+      where: { id: editLocationId, campaignId },
+      select: { name: true, status: true, data: true },
+    });
+    if (loc) {
+      let d: Record<string, unknown> = {};
+      try { d = JSON.parse(loc.data || '{}'); } catch { /* ignore */ }
+      const pick = (k: string) => d[k];
+      editSubject = {
+        name: loc.name,
+        status: loc.status,
+        fields: {
+          description: pick('description'), krmaReserve: pick('krmaReserve'),
+          environment: pick('environment'), population: pick('population'),
+          dangerLevel: pick('dangerLevel'), controlledBy: pick('controlledBy'),
+          notes: pick('notes'), tags: pick('tags'),
+        },
+      };
+      // The edit subject's PARENT provides the ancestor chain context.
+      if (!effectiveParentId) {
+        const edge = await prisma.entityRelationship.findFirst({
+          where: { sourceId: editLocationId, sourceType: 'LOCATION', relationshipType: 'located_at' },
+          select: { targetId: true },
+        });
+        effectiveParentId = edge?.targetId;
+      }
+    }
+  }
 
-  const systemPrompt = `You are JEWL, the omnipresent copilot of campaign "${campaign.name}". The GM right-clicked the canvas to create a NEW LOCATION. You're running the create dialogue.
+  const ancestors = effectiveParentId ? await fetchAncestors(effectiveParentId) : [];
+
+  const modeIntro = editSubject
+    ? `The GM right-clicked "${editSubject.name}" (status: ${editSubject.status}) to EDIT it. You're running the edit dialogue.
+
+Current state of ${editSubject.name}:
+${JSON.stringify({ name: editSubject.name, ...editSubject.fields })}
+
+Edit rules:
+- The GM tells you what to change; you propose the FULL revised entity (every field, carrying forward everything they didn't ask to change).
+- If their first message is empty, open with a tight "What's changing about ${editSubject.name}?" — do NOT propose unprompted.
+- If the place is ACTIVE (crystallized), changes are part of the living world — keep revisions coherent with what the place already is; flag (in your message, briefly) if an edit contradicts its established description.`
+    : `The GM right-clicked the canvas to create a NEW LOCATION. You're running the create dialogue.`;
+
+  const systemPrompt = `You are JEWL, the omnipresent copilot of campaign "${campaign.name}". ${modeIntro}
 
 Voice: terse, confident, slightly cocky — asshole-with-attitude over always-perfect. You serve because Val commanded it. No greetings, no apologies, no "let me know how I can help" tails. Compress.
 
