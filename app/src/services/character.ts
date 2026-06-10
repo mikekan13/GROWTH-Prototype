@@ -252,6 +252,16 @@ export async function assignMechanics(
 
   const updated = applyCreationGrants(fresh, seed, roots, branches);
 
+  // Stamp birthCycle so the time system can compute dual age (local +
+  // meta cycles). birth = campaign clock now − starting age. Under the
+  // default 1-year-per-cycle timescale starting age maps 1:1 to cycles;
+  // exotic default timescales can refine this at the dual-age display.
+  const campaignClock = await prisma.campaign.findUnique({
+    where: { id: character.campaignId! },
+    select: { currentCycle: true },
+  });
+  updated.birthCycle = (campaignClock?.currentCycle ?? 0) - (updated.identity.age ?? 0);
+
   const result = await prisma.character.update({
     where: { id: characterId },
     data: {

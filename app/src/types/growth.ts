@@ -405,7 +405,11 @@ export interface GrowthBackstory {
 // Complete Character Interface
 export interface GrowthCharacter {
   identity: GrowthIdentity;
-  fatedAge: number;            // Natural lifespan from seed (years)
+  fatedAge: number;            // Natural lifespan from seed — META CYCLES (≈ years; humans 80)
+  /** Campaign clock (meta cycles) at birth. age = currentCycle − birthCycle.
+   *  Stamped at assignMechanics; legacy characters without it fall back to
+   *  the static identity.age for display. See services/time.characterDualAge. */
+  birthCycle?: number;
   tkv?: number;               // Total KRMA Value
   conditions: GrowthConditions;
   attributes: GrowthAttributes;
