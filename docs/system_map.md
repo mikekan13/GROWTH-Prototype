@@ -1,6 +1,56 @@
 # GRO.WTH System Map
 
-Last updated: 2026-04-05 (WTH removal, KV pricing confirmed)
+Last updated: 2026-06-10 (Time system + per-object history + Location edit mode)
+
+> NOTE: sections below lag the codebase in places (canvas folders, JEWL
+> dialog, godhead runtime, subscriptions). The code wins; this doc catches
+> up incrementally.
+
+## Time System (added 2026-06-10)
+
+Each campaign is a pocket universe with its own clock, stored in META CYCLES
+(`Campaign.currentCycle`, 1 cycle ≈ 1 standard year) and PRESENTED through
+fully customizable calendars (`Timescale` + JSON CalendarSpec — months, week
+days, hours/day, epoch, holidays; ruling r-2026-06-09-06 requires GM control
+of presentation at release).
+
+- Math + types: `types/time.ts` (cycleToLocalDate, localUnitsToCycles incl.
+  6 s combat rounds, dualAge, STANDARD_CALENDAR, SECONDS_PER_META_CYCLE)
+- Service: `services/time.ts` (timescale CRUD, getClock/advanceClock/setClock,
+  ensureDefaultTimescale, resolveTimescaleForLocation — inheritance walks
+  located_at upward, characterDualAge)
+- Routes: `/api/campaigns/[id]/timescales` (+ `[timescaleId]`),
+  `/api/campaigns/[id]/clock`, `/api/campaigns/[id]/history`
+- UI: `components/time/CampaignClock.tsx` — clock chip in the canvas header
+  (presented date + holiday + cycle count), GM advance popover (quick +1h…+1yr,
+  custom amount/unit), full Calendar & Timescale editor (CtxMenuPanel chrome)
+- Characters: `birthCycle` stamped at assignMechanics; `fatedAge` top-level in
+  meta cycles. Fated-age death per ruling r-2026-06-09-01 (FD only vs Tara,
+  escalating age-Thorns, 3rd fail = death).
+
+## Per-Object History (added 2026-06-10)
+
+Perspective-based history per ruling r-2026-06-09-07: events log INTO the
+canvas objects involved — Locations log what happens in them; every PC/NPC
+carries an experiential log. One event → N perspective entries (shared
+eventGroupId), timestamped in meta cycles.
+
+- Service: `services/history.ts` (writeHistory, queryHistory, currentCycleOf)
+- Wired into: location create / re-parent (3 perspectives) / field edits /
+  status flips (crystallize/dissolve), clock changes
+- Route: `/api/campaigns/[id]/history` — players see only `public` entries
+- Future writers: JEWL session engine (r-2026-06-09-08), combat, harvests
+
+## Location Edit Mode (added 2026-06-10)
+
+Right-click a Location folder → chooser (canonical CtxMenu chrome):
+eDIT tHIS pLACE / cREATE inSIDE / dELETE dRAFT (PLANNING) or
+dISSOLVE tO pLAnnInG (ACTIVE — active world-pieces are never hard-deleted,
+ruling r-2026-06-09-09; enforced in `services/location.deleteLocation`).
+Edit reuses the ONE JEWL dialog (`CanvasCreateDialog` with `existing`
+payload): fields prefilled as the editable preview; JEWL runs an edit-aware
+dialogue (`editLocationId` through `/api/copilot/create-dialog`). Commit
+merges into the existing data JSON, preserving canvas coords etc.
 
 ## Architecture Overview
 

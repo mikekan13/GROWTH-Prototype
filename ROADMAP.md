@@ -1,10 +1,30 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-05-02
+Last updated: 2026-06-10
 
-## Status (2026-05-02)
+## Status (2026-06-10)
 
-Project is mid-Phase 5 (Entity Creation + Forge Authoring). Core Character Sheet, Campaign Flow, Canvas, KRMA ledger, dice engine, and God-Head Phase 1 (3 seeded agents + Goal CRUD) are landed. Active critical path is the Entity Creation Wizard (Sessions A-G) backed by Kai blueprint authoring; portrait pipeline has pivoted to cloud-only on H100 + FLUX.2 Dev FP16.
+Canvas-as-OS arc is live: Locations are recursive folders with drill-down +
+ancestor-collapse visibility, the ONE JEWL dialog covers create AND edit
+(multimodal), and the **Time System Phase 1 shipped** — campaign clocks in
+meta cycles, fully customizable calendars (months/weeks/holidays, GM editor),
+clock chip + advance controls on the canvas header, per-object perspective
+history (r-2026-06-09-07), birthCycle stamping. Nine new canon rulings landed
+2026-06-09 (rulebook/rulings.md r-2026-06-09-01..09): fated-age death (FD
+only + escalating age-Thorns), 3/1/3 damage map, multi-attacks via Nectars,
+decline tax 10%, harvest budget = floor, active≠draft deletion, JEWL as live
+session engine. An app audit fixed: status-casing data bug (16 chars),
+canvas hydration error, fatedAge duplication, stacked coordinate-less
+folders, unbounded location KRMA reserves.
+
+**Next up:** Time Phase 2 (JEWL narration inference, combat→clock, harvest
+dialog — needs the session-engine umbrella per r-2026-06-09-08), per-Location
+timescale override UI, dual-age render on cards, multi-entity generation
+(#28), crystallize-time KRMA debit, then back to the M1 live-sheet gate
+(Frequency three-op UI, paperdoll-on-anatomy-tree, damage auto-conditions,
+trait effects).
+
+Earlier status (2026-05-02): mid-Phase 5 (Entity Creation + Forge Authoring). Core Character Sheet, Campaign Flow, Canvas, KRMA ledger, dice engine, and God-Head Phase 1 (3 seeded agents + Goal CRUD) landed. Entity Creation Wizard (Sessions A-G) backed by Kai blueprint authoring; portrait pipeline cloud-only on H100 + FLUX.2 Dev FP16.
 
 ## Beta Scope (locked 2026-05-04)
 

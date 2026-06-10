@@ -1,7 +1,34 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-04-04 (God-head architecture foundation)
+Last updated: 2026-06-10 (Time system foundation — Timescale, HistoryEntry, Campaign clock)
 Source of truth: `app/prisma/schema.prisma`
+
+> NOTE: this doc lags the schema in places (it predates the GodHeadMemory /
+> GodHeadInvocation / GodHeadActionLog / GodHeadMessage / Subscription /
+> EmailVerificationToken / PasswordResetToken models). The schema file wins.
+
+### Campaign — time fields (added 2026-06-10)
+- `currentCycle`: Float, default 0 — the campaign's pocket-universe clock in META CYCLES (1 cycle ≈ 1 standard year). Rendered through the default timescale's calendar at display.
+- `defaultTimescaleId`: String? — the campaign's primary calendar.
+
+### Timescale (added 2026-06-10)
+Campaign-local calendar converting meta cycles ↔ presented time. Carries the FULL customizable calendar per ruling r-2026-06-09-06.
+- `name` ("Tiberoak Reckoning"), `unitName` ("year"), `unitsPerMetaCycle` (Float — local base-units per meta cycle)
+- `calendar`: JSON<CalendarSpec> — months[{name,days}], dayNames[], hoursPerDay, epochYear/epochLabel, holidays[], seasons[], moons[] (`types/time.ts`)
+- Every campaign auto-gets a "Standard Reckoning" (1 yr = 1 cycle, Earth-like) on first touch (`services/time.ensureDefaultTimescale`)
+- Locations override via `data.timescaleId`; resolution walks located_at upward (`resolveTimescaleForLocation`)
+
+### HistoryEntry (added 2026-06-10)
+Per-canvas-object PERSPECTIVE history (ruling r-2026-06-09-07): one in-fiction event writes one entry per involved object, from that object's perspective, sharing an `eventGroupId`.
+- `subjectType` ('location'|'character'|'item'|'campaign') + `subjectId`
+- `timestampCycle`: Float — campaign clock at the event
+- `type`: created|edited|arrival|departure|item_added|item_removed|status_change|clock_advance|harvest|narrative_event|combat
+- `summary` (subject-perspective one-liner), `details?`, `actorId?`, `visibility` ('gm' default | 'public'), `realTime`
+- Indexes: (campaignId, subjectType, subjectId, timestampCycle), (campaignId, eventGroupId)
+
+### GrowthCharacter JSON — time fields
+- `fatedAge` (top-level): META CYCLES (humans 80). `identity.fatedAge` REMOVED 2026-06-09 (was a drifting duplicate).
+- `birthCycle?`: campaign clock at birth, stamped at assignMechanics. age = currentCycle − birthCycle.
 
 ## Models
 

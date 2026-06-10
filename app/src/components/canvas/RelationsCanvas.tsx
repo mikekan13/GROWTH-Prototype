@@ -15,6 +15,10 @@ import MagicCard from "./MagicCard";
 import BackstoryCard from "./BackstoryCard";
 import HarvestCard from "./HarvestCard";
 import PossessionsCard from "./PossessionsCard";
+// DEAD PATH (2026-06-10): every Location renders as a folder (FolderGroup);
+// the server strips all location nodes in campaign/[id]/page.tsx, so the
+// LocationCard branch below never executes. Kept as a styling reference,
+// same as the retired die menu. Excise in a dedicated cleanup PR.
 import LocationCard from "./LocationCard";
 import type { LocationNodeData } from "./LocationCard";
 import WorldItemCard from "./WorldItemCard";
