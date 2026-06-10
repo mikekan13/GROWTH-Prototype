@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
+import { writeHistory, currentCycleOf } from '@/services/history';
 
 // --- Schemas ---
 
@@ -120,7 +121,7 @@ export async function createLocation(
   if (input.notes) d.notes = input.notes;
   if (input.tags && input.tags.length) d.tags = input.tags;
 
-  return prisma.location.create({
+  const created = await prisma.location.create({
     data: {
       name: input.name,
       type: input.type ?? 'point_of_interest',
@@ -133,6 +134,19 @@ export async function createLocation(
       status: 'PLANNING',
     },
   });
+
+  // Per-object perspective history (r-2026-06-09-07): the place logs its
+  // own genesis.
+  const cycle = await currentCycleOf(campaignId);
+  await writeHistory(campaignId, cycle, [{
+    subjectType: 'location',
+    subjectId: created.id,
+    type: 'created',
+    summary: `${created.name} was drafted into the world (planning layer)`,
+    actorId: userId,
+  }]);
+
+  return created;
 }
 
 /**
@@ -173,7 +187,13 @@ export async function setLocationParent(
     }
   }
 
-  return prisma.$transaction(async (tx) => {
+  // Capture the old parent for the perspective log before the swap.
+  const oldEdge = await prisma.entityRelationship.findFirst({
+    where: { sourceId: locationId, sourceType: 'LOCATION', relationshipType: 'located_at' },
+    select: { targetId: true },
+  });
+
+  const result = await prisma.$transaction(async (tx) => {
     // Drop any existing located_at edges from this Location.
     await tx.entityRelationship.deleteMany({
       where: {
@@ -197,6 +217,47 @@ export async function setLocationParent(
     }
     return { locationId, parentId };
   });
+
+  // One event, three perspectives (r-2026-06-09-07): the moved place, the
+  // place it left, the place it joined.
+  const ids = [locationId, oldEdge?.targetId, parentId].filter((x): x is string => !!x);
+  const names = new Map(
+    (await prisma.location.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }))
+      .map(l => [l.id, l.name]),
+  );
+  const childName = names.get(locationId) ?? 'A place';
+  const cycle = await currentCycleOf(campaignId);
+  const perspectives = [];
+  perspectives.push({
+    subjectType: 'location' as const,
+    subjectId: locationId,
+    type: 'edited',
+    summary: parentId
+      ? `${childName} now lies within ${names.get(parentId) ?? 'another place'}`
+      : `${childName} stands on its own (no parent)`,
+    actorId: userId,
+  });
+  if (oldEdge?.targetId && oldEdge.targetId !== parentId) {
+    perspectives.push({
+      subjectType: 'location' as const,
+      subjectId: oldEdge.targetId,
+      type: 'departure',
+      summary: `${childName} is no longer within ${names.get(oldEdge.targetId) ?? 'this place'}`,
+      actorId: userId,
+    });
+  }
+  if (parentId) {
+    perspectives.push({
+      subjectType: 'location' as const,
+      subjectId: parentId,
+      type: 'arrival',
+      summary: `${childName} now lies within ${names.get(parentId) ?? 'this place'}`,
+      actorId: userId,
+    });
+  }
+  await writeHistory(campaignId, cycle, perspectives);
+
+  return result;
 }
 
 export async function updateLocation(
@@ -295,6 +356,25 @@ export async function updateLocationStatus(
     data: { status: parsed.data.status },
   });
 
+  // Perspective history: each affected place logs its own status flip —
+  // crystallization is a moment in a place's life (r-2026-06-09-07).
+  const campaignRow = await prisma.location.findUnique({ where: { id: locationId }, select: { campaignId: true } });
+  if (campaignRow) {
+    const cycle = await currentCycleOf(campaignRow.campaignId);
+    const affected = await prisma.location.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+    const verb = parsed.data.status === 'ACTIVE' ? 'crystallized into the active world'
+      : parsed.data.status === 'PLANNING' ? 'dissolved back to the planning layer'
+      : parsed.data.status === 'DESTROYED' ? 'was destroyed'
+      : 'was hidden';
+    await writeHistory(campaignRow.campaignId, cycle, affected.map(l => ({
+      subjectType: 'location' as const,
+      subjectId: l.id,
+      type: 'status_change',
+      summary: `${l.name} ${verb}`,
+      actorId: sessionUserId,
+    })));
+  }
+
   return { locationId, status: parsed.data.status, affected: ids.length };
 }
 
@@ -313,6 +393,16 @@ export async function deleteLocation(
   const location = await prisma.location.findUnique({ where: { id: locationId } });
   if (!location || location.campaignId !== campaignId) {
     throw new NotFoundError('Location not found');
+  }
+
+  // Active ≠ draft (ruling r-2026-06-09-09): drafts delete freely, but a
+  // crystallized place is part of the in-fiction world — it must be
+  // dissolved (returned below the line, with its KRMA settlement) before
+  // it can be removed.
+  if (location.status === 'ACTIVE') {
+    throw new ValidationError(
+      'This place is crystallized. Dissolve it back to the planning layer first — active world-pieces cannot be deleted outright.',
+    );
   }
 
   return prisma.location.delete({ where: { id: locationId } });

@@ -124,7 +124,65 @@ model Campaign {
   aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
   relationships       EntityRelationship[]
   godHeadMessages     GodHeadMessage[]
+  // ── Time system (rulings 2026-06-08/-09) ──
+  // Each campaign is a pocket universe with its own clock. The clock is
+  // stored in META CYCLES (the universal abstract scale; 1 cycle ≈ 1
+  // standard year) and rendered through Timescales/calendars at display.
+  currentCycle        Float                @default(0)
+  defaultTimescaleId  String?              // FK into Timescale (campaign's primary calendar)
+  timescales          Timescale[]
+  historyEntries      HistoryEntry[]
   createdAt           DateTime             @default(now())
+}
+
+// ── Timescale: a campaign-local calendar that converts between meta
+// cycles and the GM's presented time. Carries the FULL customizable
+// calendar (months/weeks/holidays — required at initial release per
+// ruling r-2026-06-09-06) as a JSON spec. Locations may override the
+// campaign default via data.timescaleId (inherits up the located_at
+// chain otherwise).
+model Timescale {
+  id                String   @id @default(cuid())
+  campaign          Campaign @relation(fields: [campaignId], references: [id])
+  campaignId        String
+  name              String   // "Tiberoak Reckoning"
+  unitName          String   @default("year") // base local unit (singular)
+  // Local base-units per ONE meta cycle. 2.0 = two Tiberoak years pass
+  // per meta cycle (local time runs fast relative to meta).
+  unitsPerMetaCycle Float    @default(1)
+  // JSON<CalendarSpec> — months[{name,days}], dayNames[], hoursPerDay,
+  // epoch{year,label}, holidays[{name,month,day,description}], seasons,
+  // moons. See types/time.ts.
+  calendar          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([campaignId])
+}
+
+// ── HistoryEntry: per-canvas-object, perspective-based history
+// (ruling r-2026-06-09-07). One in-fiction event produces one entry PER
+// INVOLVED OBJECT, written from that object's perspective — Locations
+// log what happens in them; every PC and NPC carries a running
+// experiential log. Entries created by the same event share an
+// eventGroupId. Timestamped in meta cycles.
+model HistoryEntry {
+  id             String   @id @default(cuid())
+  campaign       Campaign @relation(fields: [campaignId], references: [id])
+  campaignId     String
+  subjectType    String   // 'location' | 'character' | 'item' | 'campaign'
+  subjectId      String   // the canvas object whose perspective this is
+  timestampCycle Float    // campaign clock (meta cycles) when it happened
+  type           String   // created|edited|arrival|departure|item_added|item_removed|status_change|clock_advance|harvest|narrative_event|combat
+  summary        String   // one-liner from the subject's perspective
+  details        String?
+  actorId        String?  // who caused it (userId or characterId)
+  visibility     String   @default("gm") // 'gm' | 'public'
+  eventGroupId   String?  // links sibling perspective entries from one event
+  realTime       DateTime @default(now())
+
+  @@index([campaignId, subjectType, subjectId, timestampCycle])
+  @@index([campaignId, eventGroupId])
 }
 
 model CampaignMember {
