@@ -12,6 +12,7 @@ import { calculateCharacterTKV, calculateItemKV, calculateLocationKV, type HeldI
 import { recomputeAugments } from '@/lib/character-actions';
 import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
+import CampaignClock from '@/components/time/CampaignClock';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
 import type { TerminalEvent } from '@/types/terminal';
 
@@ -1128,8 +1129,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             ))}
           </div>
 
-          {/* Right: KRMA readout + invite code */}
+          {/* Right: clock + KRMA readout + invite code */}
           <div className="text-right flex items-center gap-4">
+            <CampaignClock campaignId={campaign.id} isGM={isGM} />
             {isGM && economy && (
               <div className="flex items-center gap-0">
                 {/* Gold KRMA bar — purple text */}
