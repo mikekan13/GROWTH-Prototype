@@ -203,3 +203,59 @@ entry that references the old.
 - **Ruling**: Mike granted Claude blanket authority to finish the repository — write/finalize every rule, formula, and canon file using existing locked memory and the 2026-05-19 resolution doc as the source of truth.
 - **Constraint**: still bound by the no-hallucination contract in `GRO.WTH Repository/CLAUDE.md`. Every claim must be sourced from a `#validated` file, a Mike-locked memory entry, or the 2026-05-19 resolution doc. Where a previously `#needs-validation` file had `[NEEDS MIKE]` placeholders, sensible defaults grounded in established GROWTH design patterns are acceptable (cited in the file header as such).
 - **Lands in rulebook**: meta — affects every file refreshed in this session.
+
+---
+
+## 2026-06-09
+
+### r-2026-06-09-01: Fated-Age death = Fate Die only, with escalating age-Thorns
+- **Ruling**: At and past `fatedAge`, the character rolls **Fate Die only** vs Lady Death's (Tara's) Death Roll each year. Nectars/Thorns can augment or change the roll. On a **fail**, Tara bestows a **Thorn representing their escalating age** (this is what "escalating" means — no formula escalation, the consequence escalates via accumulated Thorns). The **third failed roll after fated age = death** (the Death Engine fires).
+- **Supersedes**: `Lady_Death_Protocols.md` "bodyResist + mods (no FD)" formula and the `GROWTH-DESIGN-TRUTH §7.5` "Health Level + mods" legacy text. bodyResist plays NO role in Fated-Age death (it is combat-damage resist only, per [[Seed_KV_Formulas]]).
+- **Open**: whether Combat Death (Frequency current = 0 → save vs Lady Death) also allows multiple failed saves before death, and what the intermediate-fail consequence is. The "3-strike rule" phrasing in older docs is unverified legacy language — flagged to Mike, pending.
+- **Lands in rulebook**: §10 (Death)
+- **Files**: [[Death_Engine_System]], [[Lady_Death_Protocols]], [[Three_Pillar_Attributes]]
+
+### r-2026-06-09-02: Multiple attacks per action come from Nectars/items, not skill level
+- **Ruling**: There is NO universal skill-level → attacks-per-action multiplier. Extra attacks are granted by **Nectars and items** (and similar exploits). The old 1-5/6-10/11-15/16-20 → 1/2/3/4 table in `Attack_Resolution_Mechanics.md` is retired as a universal rule but stands as a good example of what a strong multi-attack Nectar could grant.
+- **Confirms**: `Skill_Level_Progression.md` (#validated) "Multiple Actions ... granted through specific Nectars."
+- **Lands in rulebook**: §7 (Combat)
+- **Files**: [[Attack_Resolution_Mechanics]], [[Skill_Level_Progression]]
+
+### r-2026-06-09-03: Damage-type → attribute map is structural (3/1/3)
+- **Ruling**: The damage string `P:S:H/D\C:B:E` maps **directly and positionally** to the nine-attribute layout:
+  - `P:S:H` → **Clout : Celerity : Constitution** (Body)
+  - `D` → **SPIRIT** (the Spirit pillar)
+  - `C:B:E` → **Willpower : Wisdom : Wit** (Soul)
+- The damage format mirrors the GRO•WTH 3/1/3 structure itself. Weapons CAN target attributes outside their natural alignment — it just **costs more KRMA the more unaligned** the targeting gets.
+- **Supersedes**: the pre-swap affinity table in `Damage_Type_Interactions.md` (Decay→Focus, Cold→Willpower, Bashing→Wisdom, Energy→Wit) — close but now formalized positionally; the `[NEEDS MIKE]` flag there is resolved.
+- **Open detail**: which Spirit attribute Decay damage lands on by default (Frequency? attacker's choice? weapon-declared?) — ask when wiring damage routing.
+- **Lands in rulebook**: §7 (Combat / Damage)
+- **Files**: [[Damage_Type_Interactions]], [[Weapon_System]]
+
+### r-2026-06-09-04: Decline-a-Nectar tax locked at ~10%, paid to the GM
+- **Ruling**: Confirms the GROvine-file value. Player declines a Nectar → converts to raw KRMA into max Frequency minus ~10% tax; the tax goes to the GM's wallet.
+- **Lands in rulebook**: §7.6
+- **Files**: [[GROvine_System]], [[Nectars_and_Thorns_System]], [[Godheads_System]]
+
+### r-2026-06-09-05: Harvest time-budget is a MINIMUM, not a cap
+- **Ruling**: `years aged × age-KV rate` is the **base/minimum** reward budget for a Harvest. The GM can reward additional things beyond it.
+- **Lands in rulebook**: §8.2
+- **Files**: [[Harvests_System]]
+
+### r-2026-06-09-06: Full customizable calendar required at initial release
+- **Ruling**: The time system ships with a **fully functioning customizable calendar** — months, days, week structure, custom names, holidays, etc. GMs need control over how they present their time even in initial release. The "v1 = name + tick rate only" deferral is rejected.
+- **Files**: app time-system build (Timescale model carries full calendar structure from the start)
+
+### r-2026-06-09-07: History is per-canvas-object, perspective-based
+- **Ruling**: History is packaged directly into the canvas. When something happens in a Location, it is logged **in that Location**. Every character — PC and NPC, including offscreen ones — carries a **running history of their own experience from their perspective**. A central campaign log will probably also exist, but the canonical structure is per-object perspective logs: one event can produce multiple entries, one per involved canvas object.
+- **Aligns with**: memory `ai-two-layers-and-universal-character-log` (universal character log regardless of AI mode).
+- **Files**: app history-log build
+
+### r-2026-06-09-08: JEWL during play = live session engine
+- **Ruling**: JEWL's in-session role is much more than time inference: he **knows every voice at the table**, knows what they are doing, **logs everything as it happens** during play, and **controls the canvas during play** — taking care of all the numbers etc. Narrative time-advance proposals are one facet of this live loop.
+- **Aligns with**: memory `jewl-copilot-2026-06-03` (voice destination, autonomy model: above-the-line administrative autonomy).
+- **Files**: app session-engine architecture
+
+### r-2026-06-09-09: Deleting ACTIVE ≠ deleting a PLANNING draft
+- **Ruling**: Deleting a crystallized/active entity is different from deleting a below-the-line draft. Drafts delete freely. Active entities must go through a weightier dissolution/destruction flow (KRMA settlement back across the line, not a silent row delete).
+- **Files**: canvas delete/edit gestures, [[KRMA_System]] crystallization

@@ -93,9 +93,10 @@
 ## 3. Attributes & Depletion
 
 ### 3.1 Attribute Layout (9 attributes, 3 pillars)
-- **Body (Salt, RED)**: Clout, Celerity, Constitution
-- **Spirit (Sulfur, BLUE)**: Flow, Frequency, Focus
-- **Soul (Mercury, PURPLE)**: Willpower, Wisdom, Wit
+- **Body (Salt, RED `#f7525f`)**: Clout, Celerity, Constitution
+- **Spirit (Sulfur, PURPLE `#582a72`)**: Flow, Frequency, Focus
+- **Soul (Mercury, BLUE `#002f6c`)**: Willpower, Wisdom, Wit
+- *(Colors per the canonical 2026-05-02 palette — Spirit=Purple, Soul=Blue is settled; see VISUAL-DESIGN-SPEC.md. An earlier revision of this line had them swapped.)*
 - **Canonical display order** *(ruling r-2026-04-22-09)*: `Clout, Celerity, Constitution, Flow, Frequency, Focus, Willpower, Wisdom, Wit`
 - **Note**: Jan 2026 swap applied — old "Soul" labels are now Spirit, and vice versa.
 - **Source**: `GROWTH-DESIGN-TRUTH.md §2` + ruling 2026-04-22
@@ -274,9 +275,9 @@ See §2.3 (ruling r-2026-04-22-02). Short version: per-skill soft cap ≈ 10 at 
 - **Confidence**: solid
 
 ### 7.6 Decline-a-Nectar Option
-- **Rule**: a player may decline a Nectar and cash it in for raw KRMA transferred to Frequency (max Frequency). A tax applies — the player gets less than the Nectar's full karmic value.
-- **Source**: ibid. (see also §4.3)
-- **Confidence**: probable — tax rate not yet specified (candidate for a future ruling)
+- **Rule**: a player may decline a Nectar and cash it in for raw KRMA transferred to Frequency (max Frequency). A **~10% tax** applies, **paid to the GM's wallet** — the player gets less than the Nectar's full karmic value.
+- **Source**: ruling r-2026-06-09-04 (locks the GROvine-file value)
+- **Confidence**: solid
 
 ---
 
@@ -380,7 +381,7 @@ See §2.3 (ruling r-2026-04-22-02). Short version: per-skill soft cap ≈ 10 at 
 ## Open items for empirical validation
 
 1. ~~Human-seed-at-18 reference character~~ — **CLOSED 2026-04-22**. Rate locked at 5 KRMA/year; Plain 18 Human reference = 325 TKV.
-2. **Decline-a-Nectar tax rate** (§7.6) — currently unspecified.
+2. ~~**Decline-a-Nectar tax rate** (§7.6)~~ — **CLOSED 2026-06-09** (r-2026-06-09-04): ~10%, paid to GM.
 3. **Contested check sequence** (§1.6) — hole. Code has it; rulebook doesn't.
 4. **GRO.vine Opportunity Cycle depth** (§4.4) — repo file has rich mechanics (gift types, Liens model, Proxy Wars) pending Mike's walkthrough.
 5. ~~**Fated Age KV contribution to Seed total**~~ — **RESOLVED 2026-05-08**. Locked formula: `fatedAgeKV = ceil(fatedAge × 0.5)` (Approach 2, absolute / every-cycle / positive-only, no refunds for short-lived seeds). Human 80yr = +40 KRMA; Elven 1000yr = +500 KRMA; Celestial 1500yr = +750 KRMA. Short-lived seeds pay a smaller positive bill (Goblinoid 45yr = +23) — they are NOT refunded for short lifespans; if a seed wants further KRMA discount it must encode it as a Thorn lien (per `memory/negatives-only-in-thorns-liens`). See `02_CHARACTER_CREATION/Seed_KV_Formulas.md`.
