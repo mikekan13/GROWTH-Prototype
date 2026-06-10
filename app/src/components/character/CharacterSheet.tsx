@@ -66,7 +66,7 @@ export default function CharacterSheet({ character, characterId, onRefresh }: Ch
         {identity.age && (
           <div className="flex gap-4 mt-2 text-xs text-white/40">
             <span>Age: {identity.age}</span>
-            {identity.fatedAge && <span>Fated Age: {identity.fatedAge}</span>}
+            {character.fatedAge > 0 && <span>Fated Age: {character.fatedAge}</span>}
           </div>
         )}
       </div>

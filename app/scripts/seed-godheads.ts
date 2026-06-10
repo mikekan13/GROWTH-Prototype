@@ -240,7 +240,7 @@ async function seedGodheads() {
     const charData = createDefaultCharacter(seed.name);
     charData.identity.background = seed.characterOverrides.background;
     if (seed.characterOverrides.fatedAge !== undefined) {
-      charData.identity.fatedAge = seed.characterOverrides.fatedAge;
+      charData.fatedAge = seed.characterOverrides.fatedAge;
     }
 
     // Create Character record (no campaign — God-heads are global)

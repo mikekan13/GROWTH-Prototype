@@ -366,7 +366,9 @@ export interface BodyPartDescription {
 export interface GrowthIdentity {
   name: string;
   age?: number;
-  fatedAge?: number;      // When death saves begin
+  // fatedAge removed 2026-06-09 — it was a drifting duplicate of the canonical
+  // top-level GrowthCharacter.fatedAge. Old character JSON may still carry the
+  // key; it is ignored everywhere.
   background?: string;
   description?: string;
   image?: string;

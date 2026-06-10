@@ -63,7 +63,7 @@ export async function buildEntityContext(entityId: string): Promise<string> {
   if (character.godHead) {
     lines.push(`God-Head: ${character.godHead.name} | Domain: ${character.godHead.domain} | Pillar: ${character.godHead.pillar}`);
   }
-  if (data.identity.age) lines.push(`Age: ${data.identity.age}${data.identity.fatedAge ? ` (fated: ${data.identity.fatedAge})` : ''}`);
+  if (data.identity.age) lines.push(`Age: ${data.identity.age}${data.fatedAge ? ` (fated: ${data.fatedAge})` : ''}`);
   if (data.identity.background) lines.push(`Background: ${data.identity.background}`);
 
   // ── Creation / Seed ──

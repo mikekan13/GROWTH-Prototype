@@ -117,7 +117,7 @@ const grovines: GROvine[] = [
     goal: 'I will find what is causing the anomalies in the Weave',
     resistance: 'The Demiurge-era hardcoded contracts the party could never rewrite',
     opportunity: 'Inspect the frozen domains',
-    status: 'ACTIVE',
+    status: 'active',
     reward: { type: 'krma', description: '~50,000 Ҝ [directional]' },
   },
   {
@@ -125,7 +125,7 @@ const grovines: GROvine[] = [
     goal: 'I will find a safe way out of The Terminal',
     resistance: 'The library restrictions hide what she needs to know to escape',
     opportunity: 'Research the door',
-    status: 'ACTIVE',
+    status: 'active',
     reward: { type: 'krma', description: '~100,000 Ҝ [directional]' },
   },
   {
@@ -133,7 +133,7 @@ const grovines: GROvine[] = [
     goal: 'I will always be compassionate for the ones I reap',
     resistance: 'The Soul Shepherd\'s Burden makes every reaping cost her',
     opportunity: 'Grant a dying wish',
-    status: 'ACTIVE',
+    status: 'active',
     reward: { type: 'krma', description: '~10,000 Ҝ recurring per session [directional]' },
   },
   {
@@ -141,7 +141,7 @@ const grovines: GROvine[] = [
     goal: 'I will find a way to make death obsolete',
     resistance: 'The Lady Death mantle is hardcoded — eliminating death may unravel her own loop',
     opportunity: 'Talk to Selva about The Terminal\'s backend',
-    status: 'ACTIVE',
+    status: 'active',
     reward: { type: 'krma', description: '~500,000 Ҝ cosmic-tier [directional]' },
   },
 ];
@@ -160,7 +160,7 @@ function buildTara(
     identity: {
       name: TARA_NAME,
       age: undefined, // Cosmic — left blank
-      fatedAge: 0,    // Eternal
+      // fatedAge removed from GrowthIdentity 2026-06-09 — top-level field is canonical
       background:
         'Tara Almswood — Lady Death, Maiden of the Library, the Ouroboros. ' +
         'Born in Garlo on Tiberoak as the JEWL-engineered DNA hybrid of original-Tara, Val, and Edmund Duvai\'in, ' +

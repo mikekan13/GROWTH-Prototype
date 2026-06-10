@@ -76,8 +76,10 @@ export function applyCreationGrants(
   // Persist seed aug contributions so they survive recomputeAugments on canvas load.
   next.creation.seed.augments = { ...seed.data.attributes };
 
+  // Canonical home is the top-level field; identity.fatedAge was a legacy
+  // duplicate that drifted (e.g. 0 on seeded godheads) and is no longer written.
   next.fatedAge = seed.data.fatedAge;
-  next.identity.fatedAge = seed.data.fatedAge;
+  delete (next.identity as unknown as Record<string, unknown>).fatedAge;
 
   // Frequency starting level + current pool from seed
   next.attributes.frequency = {

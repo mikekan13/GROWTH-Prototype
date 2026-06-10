@@ -223,7 +223,7 @@ async function main() {
 
     const charData = createDefaultCharacter(seed.name);
     charData.identity.background = `${seed.name}, secondary God-head of GRO.WTH. Custodian of the ${seed.school} school of magic (${seed.primaMateria} prima materia, governed by ${seed.governingAttribute}). ${seed.temperament}`;
-    charData.identity.fatedAge = 0;
+    charData.fatedAge = 0;
 
     const character = await prisma.character.create({
       data: {
