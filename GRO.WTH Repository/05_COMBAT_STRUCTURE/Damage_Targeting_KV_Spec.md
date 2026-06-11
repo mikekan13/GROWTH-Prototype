@@ -127,8 +127,10 @@ interface DamageEntry {
 ### 7.2 Per-entry vs. per-weapon targeting — RESOLVED (r-2026-06-10-04): ATTACKS are the unit
 **Weapons carry multiple named ATTACKS, each with its own damage string** — a sword might have a Slash attack `0:45:0/0\0:0:0` and a Stab attack `30:0:0/0\0:0:0`. This matches the original item artifact schema (`attacks: { Stab: {...}, Slash: {...} }` in `X_ARCHIVE_ORIGINS/GROWTH Material and Item Creation Artifact…`). Targeting is declared per damage entry within each attack. **Nectars can bestow additional attacks onto weapons or onto unarmed combat** — attacks are grantable blocks. Item KV's Damage Value sums across all attacks' entries, each × its targeting multiplier.
 
-### 7.3 Known repo discrepancy — Weapon_System.md examples contradict affinity canon
-`Weapon_System.md` examples violate the table: Club/Mace/Warhammer (Bashing) "targets Constitution" — Bashing's natural target is **Wisdom** and Constitution is 3 steps (10×), implausible for a basic club. Revolvers/bows (Piercing) "target Celerity" — adjacent (2×), also suspect as a default. Either the examples predate the cycle or intentionally carry off-alignment pricing. **Resolve before the weapon catalog is seeded.**
+### 7.3 Weapon_System.md example discrepancy — RESOLVED (r-2026-06-11-01): examples were old
+Mike: the example targets predated the cycle. `Weapon_System.md` examples have been corrected to natural targets (Bashing → Wisdom, Piercing → Clout; multi-damage weapons declare per-entry natural targets). The old listed targets are NOT canonical defaults.
+
+**Pricing caveat (same ruling):** the launch multiplier VALUES (1×/2×/5×/10×, 20×) are not confirmed-correct pricing — starting points to be validated and tuned via the meta levers (§7.4). The ring structure and distance function are canon; the price points are provisional.
 
 ## 7.4 Multipliers are META LEVERS (Mike, 2026-06-10 — design intent, recorded r-2026-06-10-03)
 

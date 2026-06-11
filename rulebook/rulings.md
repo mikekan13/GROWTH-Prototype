@@ -293,3 +293,10 @@ entry that references the old.
 - **Ruling (Mike)**: "We can always make the amounts cheaper for damage types that misalign. These could actually act as meta levers. Having the cost multipliers for each be steered by the meta." The §3 values (1×/2×/5×/10×, Frequency 20×) are launch defaults — the Terminal / KV Authority may tune misalignment costs globally, per ring distance, or per damage type to steer the live meta.
 - **Implementation**: multiplier table is configuration, not constants — `TargetingConfig` with `perTypeOverride` in `app/src/lib/damage-targeting.ts`; future meta-tuning source plugs in there.
 - **Lands in rulebook**: §7 / §9.2 (via [[Damage_Targeting_KV_Spec]] §7.4)
+
+### r-2026-06-11-01: Weapon_System example targets are OLD (closes spec §7.3); multiplier values unvalidated
+- **Ruling (Mike)**: "Those weapon examples are old I suppose. Also we don't know for sure if our multipliers are right as far as pricing goes."
+- **§7.3 closed**: the `Weapon_System.md` example targets (Club/Mace/Warhammer → Constitution, revolvers/bows → Celerity) **predate the Affinity Cycle** and are not canonical defaults. Basic example weapons retarget to their natural attributes (Bashing → Wisdom, Piercing → Clout); multi-damage weapons declare per-entry natural targets.
+- **Pricing caveat**: the launch multiplier VALUES (1×/2×/5×/10×, Frequency 20×) are not confirmed-correct pricing — they are starting points to be validated/tuned via the meta levers (r-2026-06-10-03). The RING STRUCTURE and distance function are canon; the price points are provisional.
+- **Lands in rulebook**: §7 / §9.2 (via [[Damage_Targeting_KV_Spec]])
+- **Files**: [[Damage_Targeting_KV_Spec]], [[Weapon_System]]

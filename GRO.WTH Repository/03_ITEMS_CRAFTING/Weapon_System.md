@@ -29,9 +29,12 @@ Weapons use the **standard damage string format:** `P:S:H/D\C:B:E`
 
 ### Weapon Properties
 - **Fixed Damage:** Weapons deal set damage amounts (no dice rolls)
-- **Target Attribute:** Weapons specify which [[Three_Pillar_Attributes|attribute]] they target
+- **Target Attribute:** Each damage entry declares which [[Three_Pillar_Attributes|attribute]] it targets — ANY is legal; the **Affinity Cycle prices the drift** per [[Damage_Targeting_KV_Spec]] (ring distance 1×/2×/5×/10× on the damage KV component; Frequency flat 20×; Flow prices as Focus, r-2026-06-10-04). Identical 15-piercing spears: →Clout 1×, →Constitution 5×.
+- **Attacks (r-2026-06-10-04):** Weapons can carry multiple named ATTACKS, each with its own damage string — a sword might have a Slash attack `0:45:0/0\0:0:0` and a Stab attack `30:0:0/0\0:0:0`. [[Nectar]]s can bestow additional attacks onto weapons or onto unarmed combat.
 - **Material Modifiers:** Can add special damage types or properties
 - **Scaling:** Some weapons add wielder's current attribute level to damage
+
+> **Note (r-2026-06-11-01):** the example targets below were corrected to natural-alignment defaults — the old listed targets (Bashing → Constitution, Piercing → Celerity) predated the Affinity Cycle and are not canon. Examples show the 1× baseline; off-alignment variants are legal at priced KV.
 
 See [[Damage_Type_Interactions]] for complete damage mechanics
 
@@ -42,28 +45,28 @@ See [[Damage_Type_Interactions]] for complete damage mechanics
 #### Swords
 - **Arming Sword:** `0:15:0/0\0:0:0` - 15 Slashing damage, targets Celerity
 - **Long Sword:** `0:18:0/0\0:0:0` - 18 Slashing damage, targets Celerity
-- **Rapier:** `12:3:0/0\0:0:0` - 12 Piercing + 3 Slashing, targets Celerity
+- **Rapier:** `12:3:0/0\0:0:0` - 12 Piercing (targets Clout) + 3 Slashing (targets Celerity)
 
 #### Blunt Weapons
-- **Club:** `0:0:0/0\0:8:0` - 8 Bashing damage, targets Constitution
-- **Mace:** `0:0:0/0\0:12:0` - 12 Bashing damage, targets Constitution
-- **Warhammer:** `0:0:0/0\0:15:0` - 15 Bashing damage, targets Constitution
+- **Club:** `0:0:0/0\0:8:0` - 8 Bashing damage, targets Wisdom
+- **Mace:** `0:0:0/0\0:12:0` - 12 Bashing damage, targets Wisdom
+- **Warhammer:** `0:0:0/0\0:15:0` - 15 Bashing damage, targets Wisdom
 
 #### Polearms
 - **Spear:** `15:0:0/0\0:0:0` - 15 Piercing damage, reach, targets Clout
-- **Halberd:** `8:10:0/0\0:0:0` - 8 Piercing + 10 Slashing, reach, targets Clout
-- **Quarterstaff:** `0:0:0/0\0:6:0` - 6 Bashing damage, defensive, targets Constitution
+- **Halberd:** `8:10:0/0\0:0:0` - 8 Piercing (targets Clout) + 10 Slashing (targets Celerity), reach
+- **Quarterstaff:** `0:0:0/0\0:6:0` - 6 Bashing damage, defensive, targets Wisdom
 
 ### Ranged Weapons
 
 #### Firearms
-- **.38 Revolver:** `18:0:0/0\0:0:0` - 18 Piercing damage, 6 shots, 50ft range, targets Celerity
-- **.45 Revolver:** `22:0:0/0\0:0:0` - 22 Piercing damage, 6 shots, 50ft range, targets Celerity
+- **.38 Revolver:** `18:0:0/0\0:0:0` - 18 Piercing damage, 6 shots, 50ft range, targets Clout
+- **.45 Revolver:** `22:0:0/0\0:0:0` - 22 Piercing damage, 6 shots, 50ft range, targets Clout
 
 #### Bows and Crossbows
-- **Shortbow:** `10:0:0/0\0:0:0` - 10 Piercing damage, quick draw, targets Celerity
-- **Longbow:** `15:0:0/0\0:0:0` - 15 Piercing damage, long range, targets Celerity
-- **Crossbow:** `18:0:0/0\0:0:0` - 18 Piercing damage, slow reload, targets Celerity
+- **Shortbow:** `10:0:0/0\0:0:0` - 10 Piercing damage, quick draw, targets Clout
+- **Longbow:** `15:0:0/0\0:0:0` - 15 Piercing damage, long range, targets Clout
+- **Crossbow:** `18:0:0/0\0:0:0` - 18 Piercing damage, slow reload, targets Clout
 
 ## Weapon Properties
 
