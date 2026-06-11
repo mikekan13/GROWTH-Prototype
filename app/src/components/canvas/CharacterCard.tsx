@@ -13,7 +13,7 @@ export interface TrailblazerOption {
   username: string;
 }
 import type { HeldItemData } from '@/types/item';
-import { updateAttribute, setAttributeLevel, type AttributeName } from '@/lib/character-actions';
+import { updateAttribute, setAttributeLevel, spendAttribute, type AttributeName } from '@/lib/character-actions';
 import { parseDie } from '@/lib/dice-utils';
 import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
@@ -443,6 +443,37 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     setIsBarDragging(dragging);
   }, []);
 
+  // ── GM damage gesture (M1d) ────────────────────────────────────────────────
+  // Weapon damage targets an ATTRIBUTE pool (structural 3/1/3 map, ruling
+  // r-2026-06-09-03). spendAttribute handles the canon overflow rule
+  // (pool past 0 spills into Frequency) and auto depletion conditions; the
+  // mutation persists through the normal onCharacterUpdate → changelog rails.
+  const [showDamageMenu, setShowDamageMenu] = useState(false);
+  const [damageAmount, setDamageAmount] = useState('5');
+  const [damageType, setDamageType] = useState<'piercing' | 'slashing' | 'heat' | 'decay' | 'cold' | 'bashing' | 'energy'>('slashing');
+  const [damageResult, setDamageResult] = useState<string[] | null>(null);
+  // P:S:H / D \ C:B:E → Clout:Celerity:Constitution / SPIRIT \ Will:Wis:Wit.
+  // Decay's default Spirit attribute is Frequency PENDING Mike's ruling
+  // (could become attacker's choice or weapon-declared).
+  const DAMAGE_TARGETS: Record<typeof damageType, AttributeName> = {
+    piercing: 'clout', slashing: 'celerity', heat: 'constitution',
+    decay: 'frequency', cold: 'willpower', bashing: 'wisdom', energy: 'wit',
+  };
+  const handleApplyDamage = useCallback((targetAttr: AttributeName) => {
+    if (!onCharacterUpdate || !node?.characterData) return;
+    const amount = Math.max(0, parseInt(damageAmount, 10) || 0);
+    if (amount <= 0) return;
+    const charData = node.characterData as unknown as GrowthCharacter;
+    const result = spendAttribute(charData, targetAttr, amount);
+    if (result.changes.length > 0) {
+      onCharacterUpdate(node.id, result.character, [`${damageType} damage ${amount} → ${targetAttr}`, ...result.changes]);
+    }
+    const freqNow = result.character.attributes?.frequency?.current ?? 1;
+    const lines = result.changes.slice();
+    if (freqNow <= 0) lines.push("⚠ DEATH'S DOOR — Lady Death save required");
+    setDamageResult(lines.length ? lines : ['No effect']);
+  }, [onCharacterUpdate, node, damageAmount, damageType]);
+
   // Open the terminal-styled controller menu anchored near the pill click.
   const handleControllerClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -588,7 +619,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       <CtxMenuStreamLabel />
       <CtxMenuPanel>
         {/* Main menu buttons — hidden when a sub-picker is open */}
-        {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && (
+        {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
           <>
             {/* Die menu retired 2026-06-07 — dice rolling is moving to its
                 canonical surface (TBD). The trigger is disabled but the menu
@@ -617,7 +648,101 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 cONTESTED
               </button>
             )}
+            {onCharacterUpdate && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setDamageResult(null); setShowDamageMenu(true); }}
+                className="w-full px-3 py-1.5 text-left text-sm text-[#E8585A] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                aPPLY dAMAGE
+              </button>
+            )}
           </>
+        )}
+        {/* Damage picker — amount + typed damage with the structural 3/1/3
+            attribute mapping (override by clicking any attribute). */}
+        {isGM && onCharacterUpdate && showDamageMenu && (
+          <div className="px-3 py-2 space-y-1.5" style={{ width: '230px' }} onClick={e => e.stopPropagation()}>
+            <div className="text-[10px] tracking-[0.15em] uppercase text-[#E8585A] font-[Consolas,monospace] mb-1">
+              DAMAGE — {node.name}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-white/50 font-[Consolas,monospace]">AMT</span>
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                value={damageAmount}
+                onChange={e => setDamageAmount(e.target.value)}
+                className="w-14 text-xs px-1 py-0.5 text-white font-[Consolas,monospace] border border-[#E8585A]/40 bg-black/60 rounded-none outline-none focus:border-[#E8585A]"
+              />
+              <span className="text-[9px] text-white/40 font-[Consolas,monospace]">→ {DAMAGE_TARGETS[damageType].slice(0, 3).toUpperCase()}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {(['piercing', 'slashing', 'heat', 'decay', 'cold', 'bashing', 'energy'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setDamageType(t)}
+                  className="px-1 py-0.5 text-[9px] font-[Consolas,monospace] border"
+                  style={{
+                    color: damageType === t ? '#000' : '#E8585A',
+                    background: damageType === t ? '#E8585A' : 'transparent',
+                    borderColor: '#E8585A66',
+                  }}
+                  title={`targets ${DAMAGE_TARGETS[t]}`}
+                >
+                  {t.slice(0, 1).toUpperCase()}{t === 'bashing' ? 'SH' : t.slice(1, 3)}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => handleApplyDamage(DAMAGE_TARGETS[damageType])}
+              className="w-full px-2 py-1 text-xs font-[Consolas,monospace] font-bold"
+              style={{ background: 'linear-gradient(135deg, #E8585A, #b03a3c)', color: '#fff', border: '1px solid #E8585A' }}
+            >
+              APPLY → {DAMAGE_TARGETS[damageType].toUpperCase()}
+            </button>
+            {/* Override target — unaligned targeting is allowed at higher
+                KRMA cost (weapon-side; the gesture itself doesn't meter). */}
+            <div className="border-t border-white/10 pt-1">
+              <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">OVERRIDE TARGET (unaligned)</div>
+              <div className="grid grid-cols-3 gap-x-1">
+                {([
+                  { color: '#E8585A', attrs: ['clout', 'celerity', 'constitution'] },
+                  { color: '#8e7cc3', attrs: ['flow', 'frequency', 'focus'] },
+                  { color: '#4080D0', attrs: ['willpower', 'wisdom', 'wit'] },
+                ] as const).map((p, i) => (
+                  <div key={i} className="flex flex-col">
+                    {p.attrs.map(attr => (
+                      <button
+                        key={attr}
+                        onClick={() => handleApplyDamage(attr as AttributeName)}
+                        className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace]"
+                        style={{ color: p.color }}
+                      >
+                        {attr.slice(0, 3).toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {damageResult && (
+              <div className="border-t border-white/10 pt-1 space-y-0.5">
+                {damageResult.map((line, i) => (
+                  <div
+                    key={i}
+                    className="text-[10px] font-[Consolas,monospace]"
+                    style={{ color: line.startsWith('⚠') ? '#E8585A' : 'rgba(255,255,255,0.7)' }}
+                  >
+                    {line}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         {/* Contested skill picker — attacker picks skill, no DR */}
         {isGM && onContestedCheck && showContestedMenu && (
