@@ -14,6 +14,7 @@ export interface TrailblazerOption {
 }
 import type { HeldItemData } from '@/types/item';
 import { updateAttribute, setAttributeLevel, spendAttribute, type AttributeName } from '@/lib/character-actions';
+import { NATURAL_TARGET, targetingHint, type TargetAttribute } from '@/lib/damage-targeting';
 import { parseDie } from '@/lib/dice-utils';
 import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
@@ -452,15 +453,12 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const [damageAmount, setDamageAmount] = useState('5');
   const [damageType, setDamageType] = useState<'piercing' | 'slashing' | 'heat' | 'decay' | 'cold' | 'bashing' | 'energy'>('slashing');
   const [damageResult, setDamageResult] = useState<string[] | null>(null);
-  // The weapon declares its target attribute — ANY of the nine (the KV cost
-  // of unaligned targeting is priced at weapon-authoring as a graded
-  // guidepost, not a formula — r-2026-06-10-01 + the original archive map).
-  // This map is only the most-aligned DEFAULT per damage type:
-  // P→Clout, S→Celerity, H→Constitution, D→Focus, C→Will, B→Wisdom, E→Wit.
-  const DAMAGE_TARGETS: Record<typeof damageType, AttributeName> = {
-    piercing: 'clout', slashing: 'celerity', heat: 'constitution',
-    decay: 'focus', cold: 'willpower', bashing: 'wisdom', energy: 'wit',
-  };
+  // The weapon declares its target attribute — the Affinity Cycle prices the
+  // drift at authoring time (Damage_Targeting_KV_Spec, r-2026-06-10-02:
+  // ring distance 1×/2×/5×/10×, Frequency 20×, Flow blocked until ruled).
+  // In play the GM applies whatever the weapon declared; the hints here
+  // surface the guidepost.
+  const DAMAGE_TARGETS = NATURAL_TARGET;
   const handleApplyDamage = useCallback((targetAttr: AttributeName) => {
     if (!onCharacterUpdate || !node?.characterData) return;
     const amount = Math.max(0, parseInt(damageAmount, 10) || 0);
@@ -706,9 +704,9 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             >
               APPLY → {DAMAGE_TARGETS[damageType].toUpperCase()}
             </button>
-            {/* Weapon-declared target — any attribute is a legal target;
-                the weapon's KV already priced its alignment distance
-                (r-2026-06-10-01). Use whatever the weapon says. */}
+            {/* Weapon-declared target — the Affinity Cycle prices the drift
+                at authoring (hover any attribute for its multiplier hint).
+                Flow is blocked until canon prices it (spec §7.1). */}
             <div className="border-t border-white/10 pt-1">
               <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">TARGET ATTRIBUTE (per weapon)</div>
               <div className="grid grid-cols-3 gap-x-1">
@@ -718,16 +716,21 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   { color: '#4080D0', attrs: ['willpower', 'wisdom', 'wit'] },
                 ] as const).map((p, i) => (
                   <div key={i} className="flex flex-col">
-                    {p.attrs.map(attr => (
-                      <button
-                        key={attr}
-                        onClick={() => handleApplyDamage(attr as AttributeName)}
-                        className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace]"
-                        style={{ color: p.color }}
-                      >
-                        {attr.slice(0, 3).toUpperCase()}
-                      </button>
-                    ))}
+                    {p.attrs.map(attr => {
+                      const blocked = attr === 'flow';
+                      return (
+                        <button
+                          key={attr}
+                          disabled={blocked}
+                          onClick={() => handleApplyDamage(attr as AttributeName)}
+                          className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace] disabled:cursor-not-allowed"
+                          style={{ color: p.color, opacity: blocked ? 0.35 : 1, textDecoration: blocked ? 'line-through' : 'none' }}
+                          title={targetingHint(damageType, attr as TargetAttribute)}
+                        >
+                          {attr.slice(0, 3).toUpperCase()}
+                        </button>
+                      );
+                    })}
                   </div>
                 ))}
               </div>

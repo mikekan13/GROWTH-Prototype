@@ -268,6 +268,19 @@ entry that references the old.
 - **Ruling (clarifies r-2026-06-09-03)**: A damage type does NOT force its target — **the weapon declares which attribute it targets**, and any of the nine is legal. The structural map (`P:S:H/D\C:B:E` → Clout:Celerity:Constitution / SPIRIT \ Will:Wisdom:Wit) defines each type's **most-aligned** attribute. **The farther the declared target sits from that alignment, the more KRMA the weapon costs.**
 - **Mike's example**: identical spears, both 38 piercing. Spear A targets Clout (natural) — cheaper. Spear B targets Constitution — **higher KV**, same numbers.
 - **Implication for Kai's grading**: target-attribute distance from natural alignment is a priced dimension of weapon/item KV (graded, not formulaic, per r-2026-04-22-15). Cross-pillar targeting presumably prices above same-pillar drift.
-- **RESOLVED from the archive** (Mike pointed back to the record; `X_ARCHIVE_ORIGINS/Claude Damage Knowledge dump.md` §"Damage-to-Attribute Relationship"): **Decay's natural alignment is Focus** (attribute names were untouched by the pillar-label swap), and **there is no closed distance formula by design** — the map "acts as a guidepost rather than hard restriction"; Kai grades the drift case-by-case like all item KV.
+- **RESOLVED from the archive** (Mike pointed back to the record; `X_ARCHIVE_ORIGINS/Claude Damage Knowledge dump.md` §"Damage-to-Attribute Relationship"): **Decay's natural alignment is Focus** (attribute names were untouched by the pillar-label swap). ~~"no closed distance formula by design"~~ — WRONG, superseded by r-2026-06-10-02 below: the formula exists.
 - **Lands in rulebook**: §7 (Combat / Damage), §9.2 (Weapons)
 - **Files**: [[Damage_Type_Interactions]], [[Weapon_System]], [[Block_Grading_Principles]]
+
+### r-2026-06-10-02: The Affinity Cycle + targeting cost multipliers (Mike-provided spec)
+- **Ruling**: Mike delivered the full implementation-ready spec (now canonical at [[Damage_Targeting_KV_Spec]]). The 7 damage types and 7 cycle attributes form a **closed ring**: P→Clout, S→Celerity, H→Constitution, D→Focus, C→Willpower, B→Wisdom, E→Wit, wrapping back. Targeting multiplier on the item's **Damage Value KV component only**, by ring distance `min(|i−j|, 7−|i−j|)`: **0 = 1×, 1 = 2×, 2 = 5×, 3 = 10×; Frequency (off-ring) always 20×**. Wraparound matters: Energy→Clout is adjacent (2×). Guidepost, never a gate — off-alignment is legal advanced strategy, priced.
+- **Canonical example**: identical 15-piercing spears — →Clout 1×, →Constitution 5× on the damage component.
+- **Open (flagged by Mike in the spec)**: §7.1 Flow multiplier undefined (block Flow targeting at authoring until ruled); §7.2 per-entry vs per-weapon targeting; §7.3 Weapon_System.md examples contradict the cycle (Club "targets Constitution" = 10× from Bashing/Wisdom) — resolve before seeding the weapon catalog.
+- **Meta-lesson (Mike)**: "Everything for GROWTH has been planned — it is just chaotic getting all the truth in one place." When canon looks incomplete, ASK; don't infer or declare gaps.
+- **Lands in rulebook**: §7 / §9.2
+- **Files**: [[Damage_Targeting_KV_Spec]] (authoritative), [[Damage_Type_Interactions]], [[Weapon_System]], `app/src/lib/damage-targeting.ts`
+
+### r-2026-06-10-03: Targeting multipliers are META LEVERS
+- **Ruling (Mike)**: "We can always make the amounts cheaper for damage types that misalign. These could actually act as meta levers. Having the cost multipliers for each be steered by the meta." The §3 values (1×/2×/5×/10×, Frequency 20×) are launch defaults — the Terminal / KV Authority may tune misalignment costs globally, per ring distance, or per damage type to steer the live meta.
+- **Implementation**: multiplier table is configuration, not constants — `TargetingConfig` with `perTypeOverride` in `app/src/lib/damage-targeting.ts`; future meta-tuning source plugs in there.
+- **Lands in rulebook**: §7 / §9.2 (via [[Damage_Targeting_KV_Spec]] §7.4)
