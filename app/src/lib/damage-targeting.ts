@@ -7,8 +7,9 @@
  * The 7 damage types and 7 cycle attributes form a closed ring. Targeting
  * the natural attribute = baseline KV; every step of ring distance
  * multiplies the item's Damage Value KV component (1×/2×/5×/10×).
- * Frequency is off-ring and always 20×. Flow is UNDEFINED in canon
- * (spec §7.1) — blocked at authoring until Mike rules.
+ * Frequency is off-ring and always 20×. Flow prices identically to Focus
+ * (it mirrors Focus's ring position — r-2026-06-10-04), so Decay→Flow is
+ * natural-priced.
  *
  * Guidepost, never a gate: off-alignment targeting is legal advanced
  * strategy, priced. Deviation from base mechanics always costs more KRMA.
@@ -75,19 +76,12 @@ export function ringDistance(a: CycleAttribute, b: CycleAttribute): number {
   return Math.min(raw, 7 - raw);
 }
 
-export class FlowTargetingUndefinedError extends Error {
-  constructor() {
-    super('Flow targeting multiplier is undefined in canon (Damage_Targeting_KV_Spec §7.1) — blocked until Mike rules');
-    this.name = 'FlowTargetingUndefinedError';
-  }
-}
-
 /**
  * KV multiplier for a damage entry's declared target (spec §3).
  * Applies to the Damage Value component of item KV only (spec §5).
- * Throws FlowTargetingUndefinedError for 'flow' per spec §6 rule 4.
- * `config` defaults to the launch values; the meta-tuning source can
- * supply overrides (spec §7.4 — multipliers are meta levers).
+ * Flow prices as Focus (r-2026-06-10-04). `config` defaults to the launch
+ * values; the meta-tuning source can supply overrides (spec §7.4 —
+ * multipliers are meta levers).
  */
 export function targetingMultiplier(
   dmg: DamageTypeName,
@@ -97,18 +91,8 @@ export function targetingMultiplier(
   const override = config.perTypeOverride?.[dmg]?.[target];
   if (override !== undefined) return override;
   if (target === 'frequency') return config.frequencyMultiplier;
-  if (target === 'flow') throw new FlowTargetingUndefinedError();
-  return config.distanceMultiplier[ringDistance(NATURAL_TARGET[dmg], target)];
-}
-
-/** Non-throwing variant for UI hints: returns null where canon is silent. */
-export function targetingMultiplierOrNull(
-  dmg: DamageTypeName,
-  target: TargetAttribute,
-  config: TargetingConfig = DEFAULT_TARGETING_CONFIG,
-): number | null {
-  if (target === 'flow' && config.perTypeOverride?.[dmg]?.flow === undefined) return null;
-  return targetingMultiplier(dmg, target, config);
+  const effective: CycleAttribute = target === 'flow' ? 'focus' : target;
+  return config.distanceMultiplier[ringDistance(NATURAL_TARGET[dmg], effective)];
 }
 
 /**
@@ -117,7 +101,6 @@ export function targetingMultiplierOrNull(
  */
 export function targetingHint(dmg: DamageTypeName, target: TargetAttribute): string {
   const natural = NATURAL_TARGET[dmg];
-  if (target === 'flow') return `Flow targeting is not yet priced (canon §7.1) — natural target for ${cap(dmg)} is ${cap(natural)}`;
   const m = targetingMultiplier(dmg, target);
   if (m === 1) return `Natural target (1×)`;
   return `This targeting costs ${m}× — natural target for ${cap(dmg)} is ${cap(natural)}`;

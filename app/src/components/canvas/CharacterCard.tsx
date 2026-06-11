@@ -455,7 +455,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const [damageResult, setDamageResult] = useState<string[] | null>(null);
   // The weapon declares its target attribute — the Affinity Cycle prices the
   // drift at authoring time (Damage_Targeting_KV_Spec, r-2026-06-10-02:
-  // ring distance 1×/2×/5×/10×, Frequency 20×, Flow blocked until ruled).
+  // ring distance 1×/2×/5×/10×, Frequency 20×, Flow prices as Focus).
   // In play the GM applies whatever the weapon declared; the hints here
   // surface the guidepost.
   const DAMAGE_TARGETS = NATURAL_TARGET;
@@ -706,7 +706,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             </button>
             {/* Weapon-declared target — the Affinity Cycle prices the drift
                 at authoring (hover any attribute for its multiplier hint).
-                Flow is blocked until canon prices it (spec §7.1). */}
+                Flow prices as Focus (r-2026-06-10-04). */}
             <div className="border-t border-white/10 pt-1">
               <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">TARGET ATTRIBUTE (per weapon)</div>
               <div className="grid grid-cols-3 gap-x-1">
@@ -716,21 +716,17 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   { color: '#4080D0', attrs: ['willpower', 'wisdom', 'wit'] },
                 ] as const).map((p, i) => (
                   <div key={i} className="flex flex-col">
-                    {p.attrs.map(attr => {
-                      const blocked = attr === 'flow';
-                      return (
-                        <button
-                          key={attr}
-                          disabled={blocked}
-                          onClick={() => handleApplyDamage(attr as AttributeName)}
-                          className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace] disabled:cursor-not-allowed"
-                          style={{ color: p.color, opacity: blocked ? 0.35 : 1, textDecoration: blocked ? 'line-through' : 'none' }}
-                          title={targetingHint(damageType, attr as TargetAttribute)}
-                        >
-                          {attr.slice(0, 3).toUpperCase()}
-                        </button>
-                      );
-                    })}
+                    {p.attrs.map(attr => (
+                      <button
+                        key={attr}
+                        onClick={() => handleApplyDamage(attr as AttributeName)}
+                        className="px-0.5 py-0 text-left text-[10px] hover:bg-white/10 font-[Consolas,monospace]"
+                        style={{ color: p.color }}
+                        title={targetingHint(damageType, attr as TargetAttribute)}
+                      >
+                        {attr.slice(0, 3).toUpperCase()}
+                      </button>
+                    ))}
                   </div>
                 ))}
               </div>

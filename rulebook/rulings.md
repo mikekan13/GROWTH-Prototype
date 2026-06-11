@@ -280,6 +280,15 @@ entry that references the old.
 - **Lands in rulebook**: §7 / §9.2
 - **Files**: [[Damage_Targeting_KV_Spec]] (authoritative), [[Damage_Type_Interactions]], [[Weapon_System]], `app/src/lib/damage-targeting.ts`
 
+### r-2026-06-10-04: Flow prices as Focus; weapons have multiple ATTACKS; Nectars can bestow attacks
+- **Ruling (Mike)**: "Flow and Focus would be same multiplier. Weapons can have different attacks. Nectars can even bestow attacks to weapons or unarmed. So a sword might have a `0:45:0/0\0:0:0` attack and a `30:0:0/0\0:0:0`."
+- **Flow (closes spec §7.1)**: targeting Flow costs the same as targeting Focus for every damage type — Flow mirrors Focus's ring position. So Decay→Flow = 1× (matching the old "Decay sometimes targets Flow" note), Heat/Cold→Flow = 2×, Slashing/Bashing→Flow = 5×, Piercing/Energy→Flow = 10×. Frequency stays the lone 20× special case.
+- **Attacks (closes spec §7.2)**: the ATTACK is the unit — a weapon carries multiple named attacks, each with its own damage string (sword: Slash `0:45:0/0\0:0:0` + Stab `30:0:0/0\0:0:0`). Matches the original item artifact schema (`attacks: { Stab: {...}, Slash: {...} }` in `X_ARCHIVE_ORIGINS/GROWTH Material and Item Creation Artifact…`). Targeting is declared per damage entry within each attack.
+- **Nectar-bestowed attacks**: Nectars can grant additional attacks to weapons or to unarmed combat — attacks are grantable blocks.
+- **Still open**: spec §7.3 (Weapon_System example targets contradicting the cycle).
+- **Lands in rulebook**: §7 / §9.2 (via [[Damage_Targeting_KV_Spec]])
+- **Files**: [[Damage_Targeting_KV_Spec]], `app/src/lib/damage-targeting.ts`
+
 ### r-2026-06-10-03: Targeting multipliers are META LEVERS
 - **Ruling (Mike)**: "We can always make the amounts cheaper for damage types that misalign. These could actually act as meta levers. Having the cost multipliers for each be steered by the meta." The §3 values (1×/2×/5×/10×, Frequency 20×) are launch defaults — the Terminal / KV Authority may tune misalignment costs globally, per ring distance, or per damage type to steer the live meta.
 - **Implementation**: multiplier table is configuration, not constants — `TargetingConfig` with `perTypeOverride` in `app/src/lib/damage-targeting.ts`; future meta-tuning source plugs in there.
