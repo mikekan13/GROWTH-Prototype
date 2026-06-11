@@ -268,6 +268,6 @@ entry that references the old.
 - **Ruling (clarifies r-2026-06-09-03)**: A damage type does NOT force its target — **the weapon declares which attribute it targets**, and any of the nine is legal. The structural map (`P:S:H/D\C:B:E` → Clout:Celerity:Constitution / SPIRIT \ Will:Wisdom:Wit) defines each type's **most-aligned** attribute. **The farther the declared target sits from that alignment, the more KRMA the weapon costs.**
 - **Mike's example**: identical spears, both 38 piercing. Spear A targets Clout (natural) — cheaper. Spear B targets Constitution — **higher KV**, same numbers.
 - **Implication for Kai's grading**: target-attribute distance from natural alignment is a priced dimension of weapon/item KV (graded, not formulaic, per r-2026-04-22-15). Cross-pillar targeting presumably prices above same-pillar drift.
-- **Open**: the exact distance metric / rate, and Decay's distance-zero point within the Spirit pillar (one attribute, or the whole pillar at zero?).
+- **RESOLVED from the archive** (Mike pointed back to the record; `X_ARCHIVE_ORIGINS/Claude Damage Knowledge dump.md` §"Damage-to-Attribute Relationship"): **Decay's natural alignment is Focus** (attribute names were untouched by the pillar-label swap), and **there is no closed distance formula by design** — the map "acts as a guidepost rather than hard restriction"; Kai grades the drift case-by-case like all item KV.
 - **Lands in rulebook**: §7 (Combat / Damage), §9.2 (Weapons)
 - **Files**: [[Damage_Type_Interactions]], [[Weapon_System]], [[Block_Grading_Principles]]

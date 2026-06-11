@@ -453,14 +453,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const [damageType, setDamageType] = useState<'piercing' | 'slashing' | 'heat' | 'decay' | 'cold' | 'bashing' | 'energy'>('slashing');
   const [damageResult, setDamageResult] = useState<string[] | null>(null);
   // The weapon declares its target attribute — ANY of the nine (the KV cost
-  // of unaligned targeting is priced at weapon-authoring, r-2026-06-10-01).
-  // This map is only the most-aligned DEFAULT per damage type
-  // (P:S:H/D\C:B:E → Clout:Celerity:Constitution/Spirit\Will:Wis:Wit).
-  // Decay's distance-zero point within Spirit is pending Mike's ruling;
-  // Frequency is the placeholder default.
+  // of unaligned targeting is priced at weapon-authoring as a graded
+  // guidepost, not a formula — r-2026-06-10-01 + the original archive map).
+  // This map is only the most-aligned DEFAULT per damage type:
+  // P→Clout, S→Celerity, H→Constitution, D→Focus, C→Will, B→Wisdom, E→Wit.
   const DAMAGE_TARGETS: Record<typeof damageType, AttributeName> = {
     piercing: 'clout', slashing: 'celerity', heat: 'constitution',
-    decay: 'frequency', cold: 'willpower', bashing: 'wisdom', energy: 'wit',
+    decay: 'focus', cold: 'willpower', bashing: 'wisdom', energy: 'wit',
   };
   const handleApplyDamage = useCallback((targetAttr: AttributeName) => {
     if (!onCharacterUpdate || !node?.characterData) return;
