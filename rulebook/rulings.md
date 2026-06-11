@@ -300,3 +300,32 @@ entry that references the old.
 - **Pricing caveat**: the launch multiplier VALUES (1×/2×/5×/10×, Frequency 20×) are not confirmed-correct pricing — they are starting points to be validated/tuned via the meta levers (r-2026-06-10-03). The RING STRUCTURE and distance function are canon; the price points are provisional.
 - **Lands in rulebook**: §7 / §9.2 (via [[Damage_Targeting_KV_Spec]])
 - **Files**: [[Damage_Targeting_KV_Spec]], [[Weapon_System]]
+
+### r-2026-06-11-02: Combat death = ONE roll against Death; success restores 1 Frequency
+- **Ruling (Mike)**: "Combat death doesn't use fated age. Death in combat is one roll against death. If you succeed, 1 frequency is restored. If you fail you die."
+- **Closes the open combat-death question** (no fail count, no 3-strike anything): when combat drops a character to death's door, they make **a single roll against Death**. Success → survive with **1 Frequency restored**. Failure → death (the death engine / GHOST transformation fires, [[Lady_Death_Protocols]]).
+- **Contrast with fated-age death**: fated-age is the slow clock (FD vs Tara each year past fatedAge, escalating age-Thorns, 3rd fail = death, r-2026-06-09-01). Combat death is the sharp edge — one roll, binary.
+- **Lands in rulebook**: §7 (Combat), §11 (Death)
+- **Files**: [[Lady_Death_Protocols]], [[Death_Engine]], [[Spirit_Package_System]]
+
+### r-2026-06-11-03: The 10 Sephirot live in the TERMINAL; Tree of Life is the only portal
+- **Ruling (Mike)**: the 10 Sephirot are in the Terminal, not the Tree of Life. "The tree of life is just the only portal to Terminal tower."
+- **Canvas implication**: Sephirot entities re-parent `located_at` → The Terminal; Tree of Life contains no Sephirot. Matches the Tiberoak etymology note (Sephirot inside the Terminal; Tree of Life = the portal Tara guards).
+- **Lands in rulebook**: §13 (Cosmology / Prime)
+- **Files**: Prime campaign canvas data; [[Terminal_System]] lore notes
+
+### r-2026-06-11-04: One Prime campaign only
+- **Ruling (Mike)**: keep the single Prime campaign "that will run everything"; the duplicate is retired. Operational decision authorizing the cleanup.
+
+### r-2026-06-11-05: Facing Death — full spec (triggers, once-per-event, restoration, Tara's rider)
+- **Ruling (Mike)**: There are exactly **two Facing Death triggers** plus the separate Fated Age clock:
+  1. **Frequency current pool ≤ 0**
+  2. **A VITAL body part is destroyed** (body-composition system: parts are items with condition tracks; vitals per Seed)
+  (Fated Age is NOT a Facing Death roll — it stays its own yearly FD-vs-Tara mechanic with escalating age-Thorns, r-2026-06-09-01.)
+- **One roll, once**: Facing Death triggers **only once even if both conditions happen at the same time**.
+- **On success**: the character survives and the trigger is partially mended — a destroyed vital part **restores one condition** (it is no longer at destroyed); if Frequency was at 0, **1 Frequency pool is restored** too. Both apply if both triggered.
+- **On failure**: death — the [[Death_Engine_System]] fires.
+- **Tara's rider (even on success)**: Lady Tara may place a **Thorn or NEGATIVE BLOSSOM** on the character, **directly related to what triggered the death**. Mike's example (self-described rough): heart was destroyed → Thorn: "whenever this character's Constitution pool hits 0 they must immediately make a Death Save for heart failure — fail = die, succeed = nothing."
+- **New canon surfaced**: (a) body parts have **condition tracks** the death system reads/writes; (b) **Negative Blossoms exist** — Blossoms are not only boons (lighter bar than Nectars/Thorns applies in both directions).
+- **Lands in rulebook**: §7 (Combat), §11 (Death)
+- **Files**: [[Lady_Death_Protocols]], [[Death_Engine_System]], [[Body_Composition]] (when written), Blossom docs

@@ -52,7 +52,7 @@ Even though server-side AI tracks all state, **the player still needs to know wh
 **Function:** Reflect inherent qualities, training, and growth milestones
 **Decline Option:** A player may decline a Nectar and cash it in for raw [[KRMA_System|KRMA]] (transferred to [[Three_Pillar_Attributes|Frequency]]), but a tax applies
 
-> **Not to be confused with [[Blossoms]]:** Blossoms are **temporary** buffs bestowed by Godheads during play, whereas Nectars are **permanent**.
+> **Not to be confused with [[Blossoms]]:** Blossoms are **temporary** effects bestowed by Godheads during play, whereas Nectars are **permanent**. **Blossoms can be NEGATIVE** (locked Mike 2026-06-11, ruling r-2026-06-11-05) — e.g., Lady Tara may attach a trigger-related Thorn *or Negative Blossom* to a character who survives Facing Death.
 
 ### Blossoms — Lighter Design Standard
 

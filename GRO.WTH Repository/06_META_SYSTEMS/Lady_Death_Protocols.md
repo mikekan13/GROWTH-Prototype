@@ -1,9 +1,9 @@
 # Lady_Death_Protocols.md
 
 **Status:** #needs-review
-**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05, GROWTH-DESIGN-TRUTH §7.5 / §13 / §15
+**Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05, GROWTH-DESIGN-TRUTH §7.5 / §13 / §15; Fated-Age death formula locked Mike 2026-06-09 (ruling r-2026-06-09-01)
 **Security:** PUBLIC
-**Last Updated:** 2026-05-03
+**Last Updated:** 2026-06-09
 
 ---
 
@@ -53,12 +53,14 @@ Lady Death's choice is driven by her own contracts, emblems, personality, econom
 
 ### Death Trigger
 
-There are **two independent death systems** (per GROWTH-DESIGN-TRUTH §7.5):
+There are **two independent death systems**:
 
-- **Combat Death:** Frequency current pool reaches zero (typically after all attribute pools have been depleted and overflow has consumed Frequency). Roll = **FD + bodyResist** vs Lady Death's roll. 3-strike rule.
-- **Fated Age Death:** character reaches their `fatedAge` (Seed-defined). Roll = **bodyResist + mods** vs Lady Death's roll (no FD). 3-strike rule, independent of combat strikes.
+- **Facing Death (locked Mike 2026-06-11, rulings r-2026-06-11-02 + r-2026-06-11-05):** triggered by either of two conditions — **(1) Frequency current pool ≤ 0** (typically after all attribute pools have been depleted and overflow has consumed Frequency), or **(2) a VITAL body part is destroyed** (parts are items with condition tracks; vitals defined per Seed). The character makes **ONE roll against Lady Death** (FD + bodyResist vs Lady Death's roll). Facing Death fires **only once even if both triggers happen simultaneously**.
+  - **Success →** survive; a destroyed vital part **restores one condition** (no longer destroyed), and if Frequency was at 0, **1 Frequency is restored**. Both apply if both triggered. **Even on success, Lady Tara may place a Thorn or Negative Blossom directly related to the trigger** (e.g., destroyed heart → Thorn: "whenever Constitution pool hits 0, immediately make a Death Save for heart failure — fail = die").
+  - **Failure →** death (the [[Death_Engine_System]] fires). One roll, binary — no strikes, no retries. Fated age plays no role here.
+- **Fated Age Death (locked Mike 2026-06-09, ruling r-2026-06-09-01):** at and past `fatedAge` (Seed-defined, in cycles), the character rolls **Fate Die only** vs Tara's Death Roll **each year**. Nectars/Thorns can augment or change the roll. FD ≥ Tara's roll → nothing happens that year. On a **fail**, Tara bestows a **Thorn representing their escalating age**. The **third fail after fated age = death** (the [[Death_Engine_System]] fires). `bodyResist` plays NO role here — it is combat-damage resist only.
 
-*(Per WTH retirement 2026-04-05: per-character "Health Level" no longer exists. Death resistance is `bodyResist` (2:1 KRMA ratio) plus the Fate Die — 5/10/20/40/80 for d4/d6/d8/d12/d20.)*
+*(Per WTH retirement 2026-04-05: per-character "Health Level" no longer exists.)*
 
 ### Death Split
 
