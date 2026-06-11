@@ -287,6 +287,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
             controlledBy: typeof loc.data.controlledBy === 'string' ? loc.data.controlledBy : undefined,
             notes: typeof loc.data.notes === 'string' ? loc.data.notes : undefined,
             tags: Array.isArray(loc.data.tags) ? (loc.data.tags as unknown[]).filter((t): t is string => typeof t === 'string') : undefined,
+            timescaleId: typeof loc.data.timescaleId === 'string' ? loc.data.timescaleId : undefined,
           }
         : undefined,
     };

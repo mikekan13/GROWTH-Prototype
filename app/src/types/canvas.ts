@@ -49,5 +49,8 @@ export interface CanvasFolder {
     controlledBy?: string;
     notes?: string;
     tags?: string[];
+    /** Per-Location timescale override (slow-time realms etc.). Absent =
+     *  inherit up the located_at chain to the campaign default. */
+    timescaleId?: string;
   };
 }

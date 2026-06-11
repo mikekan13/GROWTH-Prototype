@@ -955,6 +955,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     controlledBy?: string;
     notes?: string;
     tags?: string[];
+    timescaleId?: string;
   }) => {
     try {
       const getRes = await fetch(`/api/campaigns/${campaign.id}/locations/${locationId}`);
@@ -973,6 +974,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         controlledBy: input.controlledBy,
         notes: input.notes,
         tags: input.tags ?? [],
+        timescaleId: input.timescaleId, // undefined = inherit (key dropped by stringify)
       };
       const res = await fetch(`/api/campaigns/${campaign.id}/locations/${locationId}`, {
         method: 'PATCH',

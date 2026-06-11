@@ -3344,6 +3344,7 @@ export default function RelationsCanvas({
               controlledBy: li?.controlledBy,
               notes: li?.notes,
               tags: li?.tags,
+              timescaleId: li?.timescaleId,
             }}
             onCancel={() => setCanvasMenu(null)}
             onSubmit={(input) => {
@@ -4008,6 +4009,8 @@ export interface LocationDialogFields {
   controlledBy?: string;
   notes?: string;
   tags?: string[];
+  /** Per-Location timescale override; undefined = inherit up located_at. */
+  timescaleId?: string;
 }
 
 function CanvasCreateDialog({
@@ -4055,6 +4058,23 @@ function CanvasCreateDialog({
   });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  // Per-Location timescale override (edit mode only) — '' = inherit.
+  const [timescaleId, setTimescaleId] = useState(existing?.timescaleId ?? '');
+  const [timescales, setTimescales] = useState<{ id: string; name: string; unitName: string }[]>([]);
+  useEffect(() => {
+    if (!existing) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/timescales`);
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        setTimescales((json.timescales ?? []).map((t: { id: string; name: string; unitName: string }) => ({ id: t.id, name: t.name, unitName: t.unitName })));
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runTurn = async (history: { role: 'jewl' | 'gm'; content: string }[]) => {
     setLoading(true);
@@ -4178,6 +4198,7 @@ function CanvasCreateDialog({
       controlledBy: edit.controlledBy.trim() || undefined,
       notes: edit.notes.trim() || undefined,
       tags: tagsArr && tagsArr.length ? tagsArr : undefined,
+      timescaleId: timescaleId || undefined,
     });
   };
 
@@ -4280,6 +4301,23 @@ function CanvasCreateDialog({
             <div className={labelClass}>NOTES <span className="text-[8px] text-white/30 normal-case tracking-normal">GM-only</span></div>
             <textarea value={edit.notes} onChange={(e) => setEdit(s => ({ ...s, notes: e.target.value }))} rows={2} className={`${fieldClass} resize-y`} />
           </div>
+          {/* Per-Location timescale override (edit mode) — slow-time realms
+              etc. Inherit = walk located_at up to the campaign default. */}
+          {existing && timescales.length > 0 && (
+            <div className="space-y-0.5">
+              <div className={labelClass}>TIMESCALE <span className="text-[8px] text-white/30 normal-case tracking-normal">time flows here at…</span></div>
+              <select
+                value={timescaleId}
+                onChange={(e) => setTimescaleId(e.target.value)}
+                className={`${fieldClass} bg-black`}
+              >
+                <option value="">(inherit from parent)</option>
+                {timescales.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.unitName}s)</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
