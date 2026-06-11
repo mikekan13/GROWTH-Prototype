@@ -452,9 +452,12 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const [damageAmount, setDamageAmount] = useState('5');
   const [damageType, setDamageType] = useState<'piercing' | 'slashing' | 'heat' | 'decay' | 'cold' | 'bashing' | 'energy'>('slashing');
   const [damageResult, setDamageResult] = useState<string[] | null>(null);
-  // P:S:H / D \ C:B:E → Clout:Celerity:Constitution / SPIRIT \ Will:Wis:Wit.
-  // Decay's default Spirit attribute is Frequency PENDING Mike's ruling
-  // (could become attacker's choice or weapon-declared).
+  // The weapon declares its target attribute — ANY of the nine (the KV cost
+  // of unaligned targeting is priced at weapon-authoring, r-2026-06-10-01).
+  // This map is only the most-aligned DEFAULT per damage type
+  // (P:S:H/D\C:B:E → Clout:Celerity:Constitution/Spirit\Will:Wis:Wit).
+  // Decay's distance-zero point within Spirit is pending Mike's ruling;
+  // Frequency is the placeholder default.
   const DAMAGE_TARGETS: Record<typeof damageType, AttributeName> = {
     piercing: 'clout', slashing: 'celerity', heat: 'constitution',
     decay: 'frequency', cold: 'willpower', bashing: 'wisdom', energy: 'wit',
@@ -704,10 +707,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             >
               APPLY → {DAMAGE_TARGETS[damageType].toUpperCase()}
             </button>
-            {/* Override target — unaligned targeting is allowed at higher
-                KRMA cost (weapon-side; the gesture itself doesn't meter). */}
+            {/* Weapon-declared target — any attribute is a legal target;
+                the weapon's KV already priced its alignment distance
+                (r-2026-06-10-01). Use whatever the weapon says. */}
             <div className="border-t border-white/10 pt-1">
-              <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">OVERRIDE TARGET (unaligned)</div>
+              <div className="text-[8px] text-white/30 font-[Consolas,monospace] mb-0.5">TARGET ATTRIBUTE (per weapon)</div>
               <div className="grid grid-cols-3 gap-x-1">
                 {([
                   { color: '#E8585A', attrs: ['clout', 'celerity', 'constitution'] },

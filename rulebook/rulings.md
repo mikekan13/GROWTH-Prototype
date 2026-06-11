@@ -259,3 +259,15 @@ entry that references the old.
 ### r-2026-06-09-09: Deleting ACTIVE ≠ deleting a PLANNING draft
 - **Ruling**: Deleting a crystallized/active entity is different from deleting a below-the-line draft. Drafts delete freely. Active entities must go through a weightier dissolution/destruction flow (KRMA settlement back across the line, not a silent row delete).
 - **Files**: canvas delete/edit gestures, [[KRMA_System]] crystallization
+
+---
+
+## 2026-06-10
+
+### r-2026-06-10-01: Damage targeting is weapon-declared; the 3/1/3 map prices DISTANCE
+- **Ruling (clarifies r-2026-06-09-03)**: A damage type does NOT force its target — **the weapon declares which attribute it targets**, and any of the nine is legal. The structural map (`P:S:H/D\C:B:E` → Clout:Celerity:Constitution / SPIRIT \ Will:Wisdom:Wit) defines each type's **most-aligned** attribute. **The farther the declared target sits from that alignment, the more KRMA the weapon costs.**
+- **Mike's example**: identical spears, both 38 piercing. Spear A targets Clout (natural) — cheaper. Spear B targets Constitution — **higher KV**, same numbers.
+- **Implication for Kai's grading**: target-attribute distance from natural alignment is a priced dimension of weapon/item KV (graded, not formulaic, per r-2026-04-22-15). Cross-pillar targeting presumably prices above same-pillar drift.
+- **Open**: the exact distance metric / rate, and Decay's distance-zero point within the Spirit pillar (one attribute, or the whole pillar at zero?).
+- **Lands in rulebook**: §7 (Combat / Damage), §9.2 (Weapons)
+- **Files**: [[Damage_Type_Interactions]], [[Weapon_System]], [[Block_Grading_Principles]]
