@@ -26,9 +26,11 @@ export interface JewlToolContext {
   promptMessageId?: string;
 }
 
-/** Side-effect summary returned by a tool — used by the UI for refresh hints. */
+/** Side-effect summary returned by a tool — used by the UI for refresh hints.
+ *  `data` is optional: some tools mutate relationships or auxiliary state and
+ *  don't have an updated character payload to return. */
 export interface JewlToolAffectedObjects {
-  characters?: Array<{ id: string; data: GrowthCharacter; changes: string[] }>;
+  characters?: Array<{ id: string; data?: GrowthCharacter; changes: string[] }>;
   locations?: Array<{ id: string }>;
   items?: Array<{ id: string }>;
 }

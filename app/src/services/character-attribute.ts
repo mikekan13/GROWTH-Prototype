@@ -20,8 +20,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
-import { spendAttribute, type AttributeName } from '@/lib/character-actions';
-import type { GrowthCharacter } from '@/types/growth';
+import { spendAttribute, updateAttribute, type AttributeName } from '@/lib/character-actions';
+import type { GrowthCharacter, GrowthConditions } from '@/types/growth';
 
 export const ATTRIBUTE_NAMES = [
   'clout', 'celerity', 'constitution',
@@ -114,5 +114,133 @@ export async function applyAttributeDamage(
     characterData: result.character,
     changes: result.changes,
     frequencyDepleted: freqCurrent <= 0,
+  };
+}
+
+// ── Heal / set attribute pool ─────────────────────────────────────────────
+
+export const setAttributeCurrentSchema = z.object({
+  characterId: z.string().min(1),
+  attribute: z.enum(ATTRIBUTE_NAMES),
+  /** Absolute new value. Clamped to [0, max] where max is the attribute's
+   *  level + augments. Use to heal, drain, or set; this is NOT the damage
+   *  path (that's applyAttributeDamage and respects overflow rules). */
+  current: z.number().int().min(0),
+  note: z.string().max(500).optional(),
+});
+
+export async function setAttributeCurrent(
+  actorUserId: string,
+  actorRole: string,
+  input: z.infer<typeof setAttributeCurrentSchema>,
+): Promise<{ characterId: string; characterData: GrowthCharacter; changes: string[] }> {
+  const character = await prisma.character.findUnique({
+    where: { id: input.characterId },
+    include: { campaign: { select: { gmUserId: true } } },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!canEditCharacter(actorUserId, actorRole, character)) {
+    throw new ForbiddenError('Only the GM (or admin) can set attribute values');
+  }
+
+  let charData: GrowthCharacter;
+  try {
+    charData = JSON.parse(character.data) as GrowthCharacter;
+  } catch {
+    throw new ValidationError('Invalid character data');
+  }
+
+  const attr = charData.attributes?.[input.attribute as AttributeName];
+  if (!attr) {
+    throw new ValidationError(`Attribute ${input.attribute} not present on character`);
+  }
+  // Frequency has no augments — its max is just `level`. The other eight
+  // attributes track augments separately.
+  const augPos = 'augmentPositive' in attr ? attr.augmentPositive : 0;
+  const augNeg = 'augmentNegative' in attr ? attr.augmentNegative : 0;
+  const max = attr.level + (augPos || 0) - (augNeg || 0);
+  const clamped = Math.min(Math.max(0, input.current), Math.max(0, max));
+  const result = updateAttribute(charData, input.attribute as AttributeName, clamped);
+
+  await prisma.character.update({
+    where: { id: input.characterId },
+    data: { data: JSON.stringify(result.character) },
+  });
+
+  return {
+    characterId: input.characterId,
+    characterData: result.character,
+    changes: [
+      `${input.attribute} current → ${clamped}${clamped !== input.current ? ` (clamped from ${input.current})` : ''}`,
+      ...result.changes,
+    ],
+  };
+}
+
+// ── Condition toggle ──────────────────────────────────────────────────────
+
+export const CONDITION_NAMES = [
+  'weak', 'clumsy', 'exhausted',
+  'deafened', 'deathsDoor', 'muted',
+  'overwhelmed', 'confused', 'incoherent',
+] as const;
+
+export const setCharacterConditionSchema = z.object({
+  characterId: z.string().min(1),
+  condition: z.enum(CONDITION_NAMES),
+  active: z.boolean(),
+  note: z.string().max(500).optional(),
+});
+
+function defaultConditions(): GrowthConditions {
+  return {
+    weak: false, clumsy: false, exhausted: false,
+    deafened: false, deathsDoor: false, muted: false,
+    overwhelmed: false, confused: false, incoherent: false,
+  };
+}
+
+export async function setCharacterCondition(
+  actorUserId: string,
+  actorRole: string,
+  input: z.infer<typeof setCharacterConditionSchema>,
+): Promise<{ characterId: string; characterData: GrowthCharacter; changes: string[] }> {
+  const character = await prisma.character.findUnique({
+    where: { id: input.characterId },
+    include: { campaign: { select: { gmUserId: true } } },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!canEditCharacter(actorUserId, actorRole, character)) {
+    throw new ForbiddenError('Only the GM (or admin) can toggle conditions');
+  }
+
+  let charData: GrowthCharacter;
+  try {
+    charData = JSON.parse(character.data) as GrowthCharacter;
+  } catch {
+    throw new ValidationError('Invalid character data');
+  }
+
+  const conditions = { ...defaultConditions(), ...(charData.conditions ?? {}) };
+  const was = conditions[input.condition];
+  if (was === input.active) {
+    return {
+      characterId: input.characterId,
+      characterData: charData,
+      changes: [`${input.condition} already ${input.active ? 'active' : 'inactive'} — no change`],
+    };
+  }
+  conditions[input.condition] = input.active;
+  const next: GrowthCharacter = { ...charData, conditions };
+
+  await prisma.character.update({
+    where: { id: input.characterId },
+    data: { data: JSON.stringify(next) },
+  });
+
+  return {
+    characterId: input.characterId,
+    characterData: next,
+    changes: [`${input.condition} → ${input.active ? 'ACTIVE' : 'cleared'}`],
   };
 }

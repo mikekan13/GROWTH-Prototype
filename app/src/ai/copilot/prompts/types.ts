@@ -71,7 +71,7 @@ export interface JewlToolCallResult {
   error?: string;
   /** Side-effect summary the UI can use to refresh affected objects. */
   affected?: {
-    characters?: Array<{ id: string; data: GrowthCharacter; changes: string[] }>;
+    characters?: Array<{ id: string; data?: GrowthCharacter; changes: string[] }>;
     locations?: Array<{ id: string }>;
     items?: Array<{ id: string }>;
   };
