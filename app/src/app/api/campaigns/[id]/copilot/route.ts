@@ -6,13 +6,13 @@ import { prisma } from '@/lib/db';
 import type { JewlPrompt, CanvasActionPayload, JewlPromptSource, JewlMedia } from '@/ai/copilot/prompts/types';
 
 /**
- * JEWL prompt entry point. Accepts either:
- *   { message: string }                            — legacy text chat
- *   { prompt: { source, text, canvasAction?, media? } } — canvas / voice / etc.
+ * JEWL prompt entry point. Single shape:
+ *   { prompt: { source, text, canvasAction?, media? } }
  *
- * Both shapes converge into a `JewlPrompt` and route through `dispatchPrompt`,
- * which calls Claude with tools, executes any tool calls, and writes the
- * (prompt, thought, tool_call, result) triple to the campaign log.
+ * Routes through `dispatchPrompt`, which calls Claude with tools, executes any
+ * tool calls, and writes the (prompt, thought, tool_call, result) triple to
+ * the campaign log. Source-pluggable from day one
+ * ([[jewl-full-vision-2026-06-14]]).
  */
 export async function POST(
   request: NextRequest,
@@ -23,7 +23,6 @@ export async function POST(
     const { id } = await params;
 
     const body = await request.json() as {
-      message?: string;
       prompt?: {
         source?: JewlPromptSource;
         text?: string;
@@ -31,6 +30,13 @@ export async function POST(
         media?: JewlMedia[];
       };
     };
+
+    if (!body.prompt) {
+      return NextResponse.json(
+        { error: 'Request must include a `prompt` envelope' },
+        { status: 400 },
+      );
+    }
 
     // Verify access: must be GM or campaign member.
     const campaign = await prisma.campaign.findUnique({ where: { id } });
@@ -47,46 +53,28 @@ export async function POST(
       }
     }
 
-    let jewlPrompt: JewlPrompt;
-    if (body.prompt) {
-      const source: JewlPromptSource = body.prompt.source ?? 'GM_TEXT';
-      const text = String(body.prompt.text ?? '').trim();
-      if (!text && !body.prompt.canvasAction) {
-        return NextResponse.json(
-          { error: 'Prompt must include text or canvasAction' },
-          { status: 400 },
-        );
-      }
-      if (text.length > 4000) {
-        return NextResponse.json({ error: 'Prompt text too long (max 4000)' }, { status: 400 });
-      }
-      jewlPrompt = {
-        source,
-        campaignId: id,
-        actorId: session.user.id,
-        actorName: session.user.username,
-        actorRole: session.user.role,
-        text,
-        canvasAction: body.prompt.canvasAction,
-        media: body.prompt.media,
-      };
-    } else {
-      const text = String(body.message ?? '').trim();
-      if (!text) {
-        return NextResponse.json({ error: 'Message required' }, { status: 400 });
-      }
-      if (text.length > 2000) {
-        return NextResponse.json({ error: 'Message too long (max 2000 chars)' }, { status: 400 });
-      }
-      jewlPrompt = {
-        source: 'GM_TEXT',
-        campaignId: id,
-        actorId: session.user.id,
-        actorName: session.user.username,
-        actorRole: session.user.role,
-        text,
-      };
+    const source: JewlPromptSource = body.prompt.source ?? 'GM_TEXT';
+    const text = String(body.prompt.text ?? '').trim();
+    if (!text && !body.prompt.canvasAction) {
+      return NextResponse.json(
+        { error: 'Prompt must include text or canvasAction' },
+        { status: 400 },
+      );
     }
+    if (text.length > 4000) {
+      return NextResponse.json({ error: 'Prompt text too long (max 4000)' }, { status: 400 });
+    }
+
+    const jewlPrompt: JewlPrompt = {
+      source,
+      campaignId: id,
+      actorId: session.user.id,
+      actorName: session.user.username,
+      actorRole: session.user.role,
+      text,
+      canvasAction: body.prompt.canvasAction,
+      media: body.prompt.media,
+    };
 
     const response = await dispatchPrompt(jewlPrompt);
     return NextResponse.json(response);

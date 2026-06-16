@@ -151,6 +151,30 @@ export function JewlChip() {
     return () => clearTimeout(t);
   }, [open, campaignId, session]);
 
+  // Live poll for JEWL reactions to observation events. While the chip is
+  // open, refetch history every 5s and append any new messages by id. Only
+  // additive — never removes local optimistic messages mid-flight.
+  // See [[jewl-is-the-interface-2026-06-15]] (async observation path).
+  useEffect(() => {
+    if (!open || !campaignId) return;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/campaigns/${campaignId}/copilot/history`);
+        if (!r.ok) return;
+        const d = await r.json();
+        const fetched = (d.messages || []) as CopilotMessage[];
+        setMessages(prev => {
+          const seen = new Set(prev.map(m => m.id));
+          const additions = fetched.filter(m => !seen.has(m.id));
+          if (additions.length === 0) return prev;
+          return [...prev, ...additions];
+        });
+      } catch {}
+    };
+    const interval = setInterval(tick, 5000);
+    return () => clearInterval(interval);
+  }, [open, campaignId]);
+
   // Auto-scroll on new messages
   useEffect(() => {
     if (scrollRef.current) {
@@ -182,7 +206,7 @@ export function JewlChip() {
       const res = await fetch(`/api/campaigns/${campaignId}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({ prompt: { source: 'GM_TEXT', text: msg } }),
       });
 
       if (res.ok) {

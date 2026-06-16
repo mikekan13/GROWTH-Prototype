@@ -92,6 +92,9 @@ interface CharacterCardProps {
   isGM?: boolean;
   /** Campaign roster for the controller dropdown. GM-only feature. */
   trailblazers?: TrailblazerOption[];
+  /** Campaign id — required for firing JEWL observation events after direct mutations.
+   *  Optional only because some legacy callsites haven't been wired yet. */
+  campaignId?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -355,6 +358,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   onContestedDefenderSelect,
   isGM,
   trailblazers,
+  campaignId,
 }) => {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
@@ -453,6 +457,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const [damageAmount, setDamageAmount] = useState('5');
   const [damageType, setDamageType] = useState<'piercing' | 'slashing' | 'heat' | 'decay' | 'cold' | 'bashing' | 'energy'>('slashing');
   const [damageResult, setDamageResult] = useState<string[] | null>(null);
+  // Optional GM note. Threads into the JEWL observation event so JEWL has the
+  // GM's framing when he reacts (silent / acknowledge / challenge). Pattern:
+  // any direct-mutation panel may include a `noteOnMutation` text field that
+  // gets attached to the corresponding observation POST as `note`.
+  const [damageNote, setDamageNote] = useState('');
   // The weapon declares its target attribute — the Affinity Cycle prices the
   // drift at authoring time (Damage_Targeting_KV_Spec, r-2026-06-10-02:
   // ring distance 1×/2×/5×/10×, Frequency 20×, Flow prices as Focus).
@@ -472,7 +481,27 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     const lines = result.changes.slice();
     if (freqNow <= 0) lines.push("⚠ DEATH'S DOOR — Lady Death save required");
     setDamageResult(lines.length ? lines : ['No effect']);
-  }, [onCharacterUpdate, node, damageAmount, damageType]);
+    // Fire-and-forget observation event so JEWL witnesses the manual damage
+    // and writes a reaction to the campaign log. The chip surfaces it on
+    // next open. See [[jewl-is-the-interface-2026-06-15]].
+    if (campaignId && result.changes.length > 0) {
+      const summary = `GM applied ${amount} ${damageType} damage to ${node.name} → ${targetAttr}` +
+        (freqNow <= 0 ? " (Frequency hit zero — Death's Door)" : '');
+      const note = damageNote.trim() || undefined;
+      void fetch(`/api/campaigns/${campaignId}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'damage',
+          targetType: 'character',
+          targetId: node.id,
+          summary,
+          note,
+        }),
+      }).catch(() => { /* JEWL observation is best-effort */ });
+      setDamageNote('');
+    }
+  }, [onCharacterUpdate, node, damageAmount, damageType, campaignId, damageNote]);
 
   // Open the terminal-styled controller menu anchored near the pill click.
   const handleControllerClick = useCallback((e: React.MouseEvent) => {
@@ -650,7 +679,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             )}
             {onCharacterUpdate && (
               <button
-                onClick={(e) => { e.stopPropagation(); setDamageResult(null); setShowDamageMenu(true); }}
+                onClick={(e) => { e.stopPropagation(); setDamageResult(null); setDamageNote(''); setShowDamageMenu(true); }}
                 className="w-full px-3 py-1.5 text-left text-sm text-[#E8585A] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -697,6 +726,19 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 </button>
               ))}
             </div>
+            {/* Optional GM note — threads to JEWL's view of this damage event.
+                Generic noteOnMutation slot pattern: any direct-mutation panel
+                may include this field; the value is attached to the observation
+                POST as `note`. See [[jewl-is-the-interface-2026-06-15]]. */}
+            <input
+              type="text"
+              value={damageNote}
+              onChange={e => setDamageNote(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleApplyDamage(DAMAGE_TARGETS[damageType]); } }}
+              maxLength={500}
+              placeholder="note (optional) — why?"
+              className="w-full text-[10px] px-1 py-0.5 text-white/80 font-[Consolas,monospace] border border-[#E8585A]/30 bg-black/60 rounded-none outline-none focus:border-[#E8585A] placeholder:text-white/25"
+            />
             <button
               onClick={() => handleApplyDamage(DAMAGE_TARGETS[damageType])}
               className="w-full px-2 py-1 text-xs font-[Consolas,monospace] font-bold"

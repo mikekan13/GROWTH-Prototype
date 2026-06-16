@@ -2032,6 +2032,7 @@ export default function RelationsCanvas({
           <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto" }}>
           <CharacterCard
             node={charNode}
+            campaignId={campaignId}
             isExpanded={isNodeExpanded}
             showInventory={isInventoryOpen}
             isDropTarget={isDropTarget}
