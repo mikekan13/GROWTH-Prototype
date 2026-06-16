@@ -56,7 +56,7 @@ async function callAnthropicMultimodal(
   const apiKey = process.env.ANTHROPIC_API_KEY || '';
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
   const baseUrl = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com';
-  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
   // If conversation is empty, send the same opener stub used in the
   // text-only path (just won't have images attached anyway).

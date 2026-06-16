@@ -24,7 +24,47 @@ interface CopilotMessage {
   role: 'user' | 'assistant';
   content: string;
   username?: string;
+  /** JSON of either { toolCalls, reasoning } (assistant) or
+   *  { source, canvasAction } (user, when prompt came from a canvas gesture). */
+  actions?: string | null;
   createdAt: string;
+}
+
+interface ToolCallView {
+  name: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown> | null;
+  error?: string;
+}
+
+interface UserActionView {
+  source?: string;
+  canvasAction?: {
+    kind?: string;
+    targetType?: string;
+    targetId?: string;
+    intent?: string;
+  };
+}
+
+function parseAssistantActions(actions?: string | null): ToolCallView[] | null {
+  if (!actions) return null;
+  try {
+    const parsed = JSON.parse(actions) as { toolCalls?: ToolCallView[] };
+    if (Array.isArray(parsed?.toolCalls) && parsed.toolCalls.length > 0) {
+      return parsed.toolCalls;
+    }
+  } catch { /* malformed — skip */ }
+  return null;
+}
+
+function parseUserAction(actions?: string | null): UserActionView | null {
+  if (!actions) return null;
+  try {
+    const parsed = JSON.parse(actions) as UserActionView;
+    if (parsed?.canvasAction || parsed?.source) return parsed;
+  } catch { /* malformed — skip */ }
+  return null;
 }
 
 interface SessionUser {
@@ -333,57 +373,97 @@ export function JewlChip() {
                 Ask. I&apos;ve been watching.
               </div>
             ) : (
-              messages.map(m => (
-                <div
-                  key={m.id}
-                  style={{
-                    alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                    maxWidth: '88%',
-                    padding: '6px 10px',
-                    fontSize: 11,
-                    lineHeight: 1.5,
-                    background:
-                      m.role === 'user'
-                        ? 'rgba(34, 171, 148, 0.12)'
-                        : 'rgba(255,255,255,0.05)',
-                    border:
-                      m.role === 'user'
-                        ? '1px solid rgba(34, 171, 148, 0.25)'
-                        : '1px solid rgba(255,255,255,0.1)',
-                    color:
-                      m.role === 'user' ? '#22ab94' : 'rgba(255,255,255,0.88)',
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {m.role === 'assistant' && (
-                    <div
-                      style={{
-                        fontSize: 8,
-                        color: 'rgba(208, 160, 48, 0.65)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.18em',
-                        marginBottom: 2,
-                      }}
-                    >
-                      JEWL
-                    </div>
-                  )}
-                  {m.role === 'user' && m.username && (
-                    <div
-                      style={{
-                        fontSize: 8,
-                        color: 'rgba(34, 171, 148, 0.65)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.18em',
-                        marginBottom: 2,
-                      }}
-                    >
-                      {m.username}
-                    </div>
-                  )}
-                  {m.content}
-                </div>
-              ))
+              messages.map(m => {
+                const toolCalls = m.role === 'assistant' ? parseAssistantActions(m.actions) : null;
+                const userAction = m.role === 'user' ? parseUserAction(m.actions) : null;
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                      maxWidth: '88%',
+                      padding: '6px 10px',
+                      fontSize: 11,
+                      lineHeight: 1.5,
+                      background:
+                        m.role === 'user'
+                          ? 'rgba(34, 171, 148, 0.12)'
+                          : 'rgba(255,255,255,0.05)',
+                      border:
+                        m.role === 'user'
+                          ? '1px solid rgba(34, 171, 148, 0.25)'
+                          : '1px solid rgba(255,255,255,0.1)',
+                      color:
+                        m.role === 'user' ? '#22ab94' : 'rgba(255,255,255,0.88)',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {m.role === 'assistant' && (
+                      <div
+                        style={{
+                          fontSize: 8,
+                          color: 'rgba(208, 160, 48, 0.65)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.18em',
+                          marginBottom: 2,
+                        }}
+                      >
+                        JEWL
+                      </div>
+                    )}
+                    {m.role === 'user' && m.username && (
+                      <div
+                        style={{
+                          fontSize: 8,
+                          color: 'rgba(34, 171, 148, 0.65)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.18em',
+                          marginBottom: 2,
+                        }}
+                      >
+                        {m.username}
+                        {userAction?.source === 'GM_CANVAS_ACTION' && userAction.canvasAction?.kind ? (
+                          <span style={{ marginLeft: 6, color: 'rgba(208, 160, 48, 0.7)' }}>
+                            · {userAction.canvasAction.kind}
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+                    {m.content}
+                    {toolCalls && toolCalls.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          paddingTop: 6,
+                          borderTop: '1px dashed rgba(208, 160, 48, 0.2)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 3,
+                        }}
+                      >
+                        {toolCalls.map((tc, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              fontSize: 9,
+                              color: tc.error
+                                ? 'rgba(231, 76, 60, 0.85)'
+                                : 'rgba(208, 160, 48, 0.75)',
+                              fontFamily: 'Consolas, monospace',
+                            }}
+                          >
+                            {tc.error ? '✗' : '→'} {tc.name}
+                            {tc.input ? `(${Object.entries(tc.input)
+                              .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+                              .join(', ')})` : '()'}
+                            {tc.error ? ` — ${tc.error}` : ''}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
             {loading && (
               <div

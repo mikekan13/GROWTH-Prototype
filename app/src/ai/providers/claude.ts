@@ -14,7 +14,7 @@ export class ClaudeProvider implements AIProvider {
   constructor() {
     this.apiKey = process.env.ANTHROPIC_API_KEY || '';
     this.baseUrl = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com';
-    this.defaultModel = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+    this.defaultModel = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
     if (!this.apiKey) {
       console.warn('ANTHROPIC_API_KEY not set — Claude provider will fail on requests');
