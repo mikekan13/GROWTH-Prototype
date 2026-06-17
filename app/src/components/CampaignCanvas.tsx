@@ -801,6 +801,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         return;
       }
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'create-character',
+          targetType: 'campaign',
+          targetId: campaign.id,
+          summary: `GM created character "${name}"`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     }
@@ -924,6 +934,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         return;
       }
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'create-location',
+          targetType: 'campaign',
+          targetId: campaign.id,
+          summary: `GM created location "${input.name}"${input.description ? ` — ${input.description.slice(0, 120)}` : ''}`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     }
@@ -942,6 +962,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         return;
       }
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'create-item',
+          targetType: 'campaign',
+          targetId: campaign.id,
+          summary: `GM created ${type} "${name}"`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     }
@@ -1007,6 +1037,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         return;
       }
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'edit-location',
+          targetType: 'location',
+          targetId: locationId,
+          summary: `GM edited location "${input.name}"${input.description ? ` — ${input.description.slice(0, 120)}` : ''}`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     }
