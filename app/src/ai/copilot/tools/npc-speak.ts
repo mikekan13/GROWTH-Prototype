@@ -73,6 +73,26 @@ export const npcSpeakTool: JewlTool = {
       throw new ValidationError(`NPC is not ACTIVE (status=${npc.status})`);
     }
 
+    // aiActionMode gate per [[ai-two-layers-and-universal-character-log]] —
+    // an NPC must have AI mode flipped on by the GM for JEWL to puppet it.
+    // Memory is captured either way (background log); ACTION requires opt-in.
+    // The flag lives on the linked GodHead row if any; NPCs without a
+    // GodHead row are NEVER auto-AI (GM must promote them first).
+    const godhead = await prisma.godHead.findFirst({
+      where: { characterId: npc.id },
+      select: { aiActionMode: true, name: true },
+    });
+    if (!godhead) {
+      throw new ValidationError(
+        `NPC "${npc.name}" has no GodHead persona; flip AI mode on the canvas card before puppeting`,
+      );
+    }
+    if (!godhead.aiActionMode) {
+      throw new ValidationError(
+        `NPC "${npc.name}" has AI mode OFF; the GM is currently driving them`,
+      );
+    }
+
     // JEWL's GodHead row supplies the actorUserId so the event stream knows
     // it was the universal copilot doing the puppeting, not an anonymous AI.
     const jewl = await getJewlGodHead();

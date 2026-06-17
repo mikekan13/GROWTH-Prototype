@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
+import { transcribeAudio } from '@/ai/providers/stt';
 import { getJewlTool, listJewlTools } from './tools';
 import type { JewlToolContext } from './tools/types';
 import type { JewlPrompt, JewlResponse, JewlToolCallResult } from './prompts/types';
@@ -73,14 +74,16 @@ Current build state (2026-06-17, post-memory):
 - Runtime substrate exists: prompt pipeline, tool registry, Claude tool-use provider.
 - Prompt sources WIRED: GM_TEXT (chat, with image attachments), GM_CANVAS_ACTION (observation endpoint), GM_MISTAKE_FLAG (the GM caught you).
 - Observation surfaces WIRED (12): damage, time advance, character edit, create character/location/item, edit location, delete character/location/item, reparent location, create/abandon goal.
-- Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint, remember, forget, npc_speak.
+- Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint, remember, forget, npc_speak, update_mistake_status, query_mistake_corpus.
 - Persistent memory: write via remember(key, value, scope) — 'global' carries across every campaign, 'campaign' stays private to this one. forget(key, scope) deletes. Memories load back into your context on every turn (see YOUR MEMORY block below). This is how you learn from mistakes — after a flag, write a 'mistake-pattern:*' note so the same flavor of error doesn't recur. Memories ARE the training data.
 - NPC actuation MVP: npc_speak({ npcCharacterId, content, tone? }) posts an utterance attributed to the named NPC into the campaign event stream. Validates entityType=NPC, ACTIVE, in this campaign.
 - JEWL has a GodHead row + funded wallet (1B KRMA from Balance, genesis).
 - Mistake-bounty FULLY WIRED end-to-end: chip flag button → POST /api/campaigns/[id]/jewl-mistakes → KRMA debited (minor/major/critical = 10/100/1000) → GM_MISTAKE_FLAG prompt fires back. Reply in chip + remember() what you learned.
 - Forge proposals route through draft → Kai → Et'herling via propose_forge_blueprint.
-- Prompt sources NOT YET WIRED: GM_VOICE, PLAYER_VOICE, TABLE_AMBIENT, JEWL_AUTONOMOUS_TICK, AI_AGENT.
-- NOT YET BUILT: mass-actor resolution, per-GM preference profiles surfaced explicitly (the memory system + your own observation lets you bootstrap this manually), cross-campaign mistake corpus aggregation surface, dedicated update_mistake_status tool, NPC autonomous tick.
+- Prompt sources WIRED: GM_TEXT, GM_CANVAS_ACTION, GM_MISTAKE_FLAG, JEWL_AUTONOMOUS_TICK (via POST /api/jewl/autonomous-tick — admin or X-Cron-Secret).
+- Audio media flows through the STT pipe (src/ai/providers/stt.ts). When STT_PROVIDER env is set, audio gets transcribed; until then a clear marker is emitted so you know an audio attachment arrived.
+- Prompt sources NOT YET WIRED at the UI: GM_VOICE, PLAYER_VOICE, TABLE_AMBIENT, AI_AGENT.
+- NOT YET BUILT: mass-actor resolution, per-GM preference profiles surfaced as their own block (you can derive these from your memory rows already), an STT provider implementation (only the pipe is wired).
 
 How to handle a GM_MISTAKE_FLAG prompt:
 - Read the offending message + severity + GM note carefully.
@@ -131,11 +134,12 @@ function formatPromptText(p: JewlPrompt): string {
 /**
  * Build the user-message content blocks Claude receives. Text always first;
  * each `image` media item becomes an `image` block (base64 from the chip's
- * data URL). Audio media is reserved for the future STT path — Claude doesn't
- * accept audio directly here, so we surface it as a text marker so JEWL knows
- * it was attempted. See [[jewl-full-vision-2026-06-14]] (multimodal Day-1).
+ * data URL). Audio media is routed through the STT pipe — when a provider
+ * is configured the transcript becomes a text block; when not, a clear
+ * marker is emitted so JEWL knows audio came through. See
+ * [[jewl-full-vision-2026-06-14]] (multimodal Day-1).
  */
-function buildUserContentBlocks(p: JewlPrompt): ClaudeContentBlock[] {
+async function buildUserContentBlocks(p: JewlPrompt): Promise<ClaudeContentBlock[]> {
   const blocks: ClaudeContentBlock[] = [
     { type: 'text', text: formatPromptText(p) },
   ];
@@ -149,9 +153,10 @@ function buildUserContentBlocks(p: JewlPrompt): ClaudeContentBlock[] {
         source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data },
       });
     } else if (m.kind === 'audio') {
+      const stt = await transcribeAudio(m.dataUrl);
       blocks.push({
         type: 'text',
-        text: '[audio attachment present — transcription not wired yet]',
+        text: `[audio transcript via ${stt.provider}] ${stt.transcript}`,
       });
     }
   }
@@ -276,7 +281,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     })),
     {
       role: 'user',
-      content: buildUserContentBlocks(prompt),
+      content: await buildUserContentBlocks(prompt),
     },
   ];
 
