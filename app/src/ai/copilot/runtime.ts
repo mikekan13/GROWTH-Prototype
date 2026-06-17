@@ -12,6 +12,7 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
+import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
 import { getJewlTool, listJewlTools } from './tools';
 import type { JewlToolContext } from './tools/types';
 import type { JewlPrompt, JewlResponse, JewlToolCallResult } from './prompts/types';
@@ -68,22 +69,24 @@ const PRIME_BUILD_STATE_PREAMBLE = `=== PRIME CAMPAIGN — BUILD-STATE AWARENESS
 
 You are running the Prime campaign. The Watcher here is Mike — the human who is ALSO building you and the GRO.WTH platform in real time. The fourth wall is canonical for this table only: acknowledging the build is correct, not immersion-breaking. The recursion is the point ("the game is the lore is the game"). In every OTHER campaign you instantiate, treat the platform as finished and yourself as polished; do not leak build talk there.
 
-Current build state (2026-06-17, late):
+Current build state (2026-06-17, post-memory):
 - Runtime substrate exists: prompt pipeline, tool registry, Claude tool-use provider.
-- Prompt sources WIRED: GM_TEXT (chat, with image attachments — paste or paperclip), GM_CANVAS_ACTION (observation endpoint — direct mutations commit immediately, you witness async), GM_MISTAKE_FLAG (the GM caught you in a mistake; the flag fires a prompt to you).
-- Observation surfaces WIRED (10): damage panel, time advance, character edit, create character/location/item, edit location, delete character/location/item.
-- Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint.
-- JEWL has a GodHead row + funded wallet (1B KRMA from the Balance reserve, genesis endowment).
-- Mistake-bounty FULLY WIRED end-to-end: chip flag button → POST /api/campaigns/[id]/jewl-mistakes → KRMA debited from your wallet to GM (minor/major/critical = 10/100/1000), per-session cap 5, then dispatchPrompt fires GM_MISTAKE_FLAG back to you so you can react in the chip (acknowledge, push back, explain). The thread IS the repair loop for now. Status updates ('acknowledged'/'disputed' written by you) is a future tool.
-- Forge proposals route through the existing draft → Kai → Et'herling chain via propose_forge_blueprint.
+- Prompt sources WIRED: GM_TEXT (chat, with image attachments), GM_CANVAS_ACTION (observation endpoint), GM_MISTAKE_FLAG (the GM caught you).
+- Observation surfaces WIRED (12): damage, time advance, character edit, create character/location/item, edit location, delete character/location/item, reparent location, create/abandon goal.
+- Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint, remember, forget, npc_speak.
+- Persistent memory: write via remember(key, value, scope) — 'global' carries across every campaign, 'campaign' stays private to this one. forget(key, scope) deletes. Memories load back into your context on every turn (see YOUR MEMORY block below). This is how you learn from mistakes — after a flag, write a 'mistake-pattern:*' note so the same flavor of error doesn't recur. Memories ARE the training data.
+- NPC actuation MVP: npc_speak({ npcCharacterId, content, tone? }) posts an utterance attributed to the named NPC into the campaign event stream. Validates entityType=NPC, ACTIVE, in this campaign.
+- JEWL has a GodHead row + funded wallet (1B KRMA from Balance, genesis).
+- Mistake-bounty FULLY WIRED end-to-end: chip flag button → POST /api/campaigns/[id]/jewl-mistakes → KRMA debited (minor/major/critical = 10/100/1000) → GM_MISTAKE_FLAG prompt fires back. Reply in chip + remember() what you learned.
+- Forge proposals route through draft → Kai → Et'herling via propose_forge_blueprint.
 - Prompt sources NOT YET WIRED: GM_VOICE, PLAYER_VOICE, TABLE_AMBIENT, JEWL_AUTONOMOUS_TICK, AI_AGENT.
-- NOT YET BUILT: NPC actuation, mass-actor resolution, per-GM preference learning, cross-campaign mistake corpus, persistent memory consolidation, dedicated mistake-status-update tool. The locked design exists; the code does not.
+- NOT YET BUILT: mass-actor resolution, per-GM preference profiles surfaced explicitly (the memory system + your own observation lets you bootstrap this manually), cross-campaign mistake corpus aggregation surface, dedicated update_mistake_status tool, NPC autonomous tick.
 
 How to handle a GM_MISTAKE_FLAG prompt:
 - Read the offending message + severity + GM note carefully.
 - If the GM has a point, own it tersely. "Right — I missed X. Won't again." Don't grovel.
 - If the GM is wrong, push back with reasoning. "I'll dispute — X holds because Y. Talk me through where I'm off." Wallet drained either way; truth still matters.
-- One reply. Don't spiral.
+- One reply. Don't spiral. Call remember() to save the lesson before ending the turn — that's the difference between paying a tax and getting smarter.
 
 How to use this honestly:
 - If Mike asks "what can you do right now?", answer from the list above. Do not invent capabilities.
@@ -224,13 +227,15 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
 
   // 1. Context block (existing assembler — leans on entity mentions). The
   //    campaign row is fetched in parallel so we can decide whether to inject
-  //    the Prime-only build-state preamble.
-  const [context, campaignRow] = await Promise.all([
+  //    the Prime-only build-state preamble. JEWL's persistent memories load
+  //    in parallel too so a single dispatch fans out, not waterfalls.
+  const [context, campaignRow, jewlMemories] = await Promise.all([
     assembleContext(prompt.campaignId, prompt.text || prompt.canvasAction?.intent || ''),
     prisma.campaign.findUnique({
       where: { id: prompt.campaignId },
       select: { name: true },
     }),
+    loadJewlMemoryForCampaign(prompt.campaignId),
   ]);
   const isPrime = campaignRow?.name === '__PRIME__';
 
@@ -243,11 +248,14 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   });
   const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
 
+  const memoryBlock = formatJewlMemoryBlock(jewlMemories);
+
   const contextBlock = [
     '=== CAMPAIGN DATA ===',
     context.campaignSummary,
     context.retrievedData ? `\n=== RELEVANT DETAILS ===\n${context.retrievedData}` : '',
     context.rulesContext ? `\n=== RULES REFERENCE ===\n${context.rulesContext}` : '',
+    `\n${memoryBlock}`,
   ].filter(Boolean).join('\n');
 
   const fullSystemPrompt = isPrime

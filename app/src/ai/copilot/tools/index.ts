@@ -14,6 +14,8 @@ import './attribute-set';
 import './condition';
 import './move-character';
 import './forge-blueprint';
+import './memory';
+import './npc-speak';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';

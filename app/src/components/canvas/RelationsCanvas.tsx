@@ -1478,8 +1478,21 @@ export default function RelationsCanvas({
               body: JSON.stringify({ parentId: newParentId }),
             })
               .then(res => {
-                if (res.ok) onLocationReparented?.(myLocId, newParentId);
-                else console.error('[reparent] POST failed', res.status);
+                if (res.ok) {
+                  onLocationReparented?.(myLocId, newParentId);
+                  // Fire-and-forget observation — JEWL witnesses the
+                  // located_at edge change. See [[jewl-is-the-interface-2026-06-15]].
+                  void fetch(`/api/campaigns/${campaignId}/observation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      mutationKind: 'reparent-location',
+                      targetType: 'location',
+                      targetId: myLocId,
+                      summary: `GM moved location ${myLocId} under location ${newParentId}`,
+                    }),
+                  }).catch(() => { /* best-effort */ });
+                } else console.error('[reparent] POST failed', res.status);
               })
               .catch(err => console.error('[reparent] fetch failed', err));
           }

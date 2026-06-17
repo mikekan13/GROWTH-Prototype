@@ -106,19 +106,51 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
         }),
       });
       if (res.ok) {
+        const created = await res.json().catch(() => null) as { id?: string } | null;
+        const goalId = created?.id;
+        const descSnapshot = newGoalDesc.trim();
         setNewGoalDesc('');
         setNewGoalPriority(3);
         setShowCreate(false);
         await fetchGoals();
+        // Observation: JEWL witnesses new goal creation. Skip when there's
+        // no campaign context (character-only goals predate this surface).
+        if (campaignId) {
+          void fetch(`/api/campaigns/${campaignId}/observation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mutationKind: 'create-goal',
+              targetType: 'character',
+              targetId: characterId,
+              summary: `GM added goal: "${descSnapshot.slice(0, 200)}"${goalId ? ` (id ${goalId})` : ''}`,
+            }),
+          }).catch(() => { /* best-effort */ });
+        }
       }
     } catch { /* silent */ }
     setCreating(false);
   };
 
   const handleAbandon = async (goalId: string) => {
+    const snapshotDesc = goals.find(g => g.id === goalId)?.description ?? 'goal';
     try {
       const res = await fetch(`/api/goals/${goalId}`, { method: 'DELETE' });
-      if (res.ok) await fetchGoals();
+      if (res.ok) {
+        await fetchGoals();
+        if (campaignId) {
+          void fetch(`/api/campaigns/${campaignId}/observation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mutationKind: 'abandon-goal',
+              targetType: 'character',
+              targetId: characterId,
+              summary: `GM abandoned goal: "${snapshotDesc.slice(0, 200)}"`,
+            }),
+          }).catch(() => { /* best-effort */ });
+        }
+      }
     } catch { /* silent */ }
   };
 
