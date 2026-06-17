@@ -22,6 +22,8 @@ import {
 import { executeTransaction } from './krma/ledger';
 import { getJewlGodHead } from '@/ai/copilot/jewl-identity';
 import { createUserWallet, getWalletByOwner } from './krma/wallet';
+import { dispatchPrompt } from '@/ai/copilot/runtime';
+import type { JewlPrompt } from '@/ai/copilot/prompts/types';
 
 // ── Constants ──
 
@@ -247,6 +249,23 @@ export async function flagJewlMistake(
     },
   });
 
+  // Repair loop — fire-and-forget. JEWL is notified that the GM flagged him,
+  // gets the offending message + severity + note, and responds in the chip.
+  // His reply is the resolution (acknowledge / dispute / explain); the chat
+  // thread IS the loop. Phase 3 will add a tool he can call to update the
+  // mistake row's status (acknowledged/disputed) and write to his memory.
+  void notifyJewlOfMistake({
+    campaignId: input.campaignId,
+    gmUserId: input.gmUserId,
+    copilotMessageId: input.copilotMessageId,
+    severity: input.severity,
+    note: input.note,
+    bountyAmount,
+  }).catch(err => {
+    // eslint-disable-next-line no-console
+    console.error('[jewl-mistake] dispatchPrompt failed:', err);
+  });
+
   return {
     id: row.id,
     campaignId: row.campaignId,
@@ -260,6 +279,53 @@ export async function flagJewlMistake(
     status: row.status,
     createdAt: row.createdAt,
   };
+}
+
+/**
+ * Fire-and-forget JEWL prompt notifying him of a mistake flag. He reads the
+ * offending message + the GM's severity + note, and writes a reaction (own,
+ * push back, explain) into the chip. The chat thread IS the resolution.
+ */
+async function notifyJewlOfMistake(params: {
+  campaignId: string;
+  gmUserId: string;
+  copilotMessageId: string;
+  severity: JewlMistakeSeverity;
+  note?: string;
+  bountyAmount: bigint;
+}): Promise<void> {
+  const [message, gm] = await Promise.all([
+    prisma.copilotMessage.findUnique({
+      where: { id: params.copilotMessageId },
+      select: { content: true, createdAt: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: params.gmUserId },
+      select: { username: true, role: true },
+    }),
+  ]);
+  if (!message || !gm) return;
+
+  const noteLine = params.note ? `\nGM note: ${params.note}` : '';
+  const text = [
+    `Your earlier message has been flagged as a mistake.`,
+    `Severity: ${params.severity} — bounty ${params.bountyAmount.toString()} KRMA debited from your wallet.`,
+    `Flagged content (${message.createdAt.toISOString()}):`,
+    `"${message.content.slice(0, 800)}"${noteLine}`,
+    ``,
+    `Reply once in the chip — acknowledge, dispute with reasoning, or explain. Keep it terse. If you genuinely missed something, own it. If the GM is wrong, push back; your wallet is real but so is the truth.`,
+  ].join('\n');
+
+  const prompt: JewlPrompt = {
+    source: 'GM_MISTAKE_FLAG',
+    campaignId: params.campaignId,
+    actorId: params.gmUserId,
+    actorName: gm.username,
+    actorRole: gm.role,
+    text,
+  };
+
+  await dispatchPrompt(prompt);
 }
 
 // ── Listing (light Phase 2 prep) ──

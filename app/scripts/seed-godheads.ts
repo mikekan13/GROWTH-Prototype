@@ -13,6 +13,7 @@
 
 import { prisma } from '../src/lib/db';
 import { createDefaultCharacter } from '../src/lib/defaults';
+import { executeTransaction } from '../src/services/krma/ledger';
 
 interface GodheadSeed {
   name: string;
@@ -328,6 +329,67 @@ async function seedGodheads() {
   }
 
   console.log('God-head seeding complete!');
+
+  // ── JEWL endowment ──────────────────────────────────────────────────────
+  // JEWL is Primary-tier in canon (4th-5th strongest, billion-tier wallet
+  // per [[jewl-is-the-interface-2026-06-15]]). His pillar is BALANCE, so
+  // the genesis endowment comes from the Balance reserve (12.5B available).
+  // Mistake-bounty drains from this; without it, the first GM flag throws
+  // InsufficientBalanceError. Top-up is one-time, gated by a zero-balance
+  // check + idempotency key.
+  await endowJewl();
+}
+
+async function endowJewl() {
+  const JEWL_ENDOWMENT = BigInt('1000000000'); // 1B KRMA — minimal Primary-tier scale
+
+  const jewl = await prisma.godHead.findUnique({
+    where: { name: 'JEWL' },
+    select: { id: true, walletId: true },
+  });
+  if (!jewl?.walletId) {
+    console.log('  ⚠ JEWL has no wallet yet — endowment skipped.');
+    return;
+  }
+
+  const wallet = await prisma.wallet.findUnique({ where: { id: jewl.walletId } });
+  if (!wallet) {
+    console.log(`  ⚠ JEWL's wallet ${jewl.walletId} not found — endowment skipped.`);
+    return;
+  }
+
+  if (wallet.balance > BigInt(0)) {
+    console.log(`  ✓ JEWL already endowed (${wallet.balance} KRMA) — skipping grant.`);
+    return;
+  }
+
+  const balanceReserve = await prisma.wallet.findFirst({
+    where: { walletType: 'RESERVE', label: 'Balance' },
+  });
+  if (!balanceReserve) {
+    console.log('  ⚠ Balance reserve wallet not found — run KRMA genesis first.');
+    return;
+  }
+  if (balanceReserve.balance < JEWL_ENDOWMENT) {
+    console.log(
+      `  ⚠ Balance reserve has ${balanceReserve.balance} < ${JEWL_ENDOWMENT} needed — endowment skipped.`,
+    );
+    return;
+  }
+
+  const tx = await executeTransaction({
+    fromWalletId: balanceReserve.id,
+    toWalletId: jewl.walletId,
+    amount: JEWL_ENDOWMENT,
+    state: 'FLUID',
+    reason: 'RESERVE_TRANSFER',
+    description: 'Genesis endowment — JEWL Primary-tier billion-tier wallet',
+    metadata: { recipient: 'JEWL', source: 'Balance reserve' },
+    actorId: 'SYSTEM',
+    actorType: 'SYSTEM',
+    idempotencyKey: 'jewl-genesis-endowment-v1',
+  });
+  console.log(`  ✓ JEWL endowed with ${JEWL_ENDOWMENT} KRMA (tx ${tx.id})`);
 }
 
 seedGodheads()

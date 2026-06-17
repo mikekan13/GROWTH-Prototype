@@ -94,6 +94,15 @@ export function JewlChip() {
   // images into the input. Cleared after each successful send.
   // See [[jewl-full-vision-2026-06-14]] (multimodal Day-1).
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  // Mistake-bounty (Phase 2). When a GM clicks the flag, the message id goes
+  // here; only one flag picker can be open at a time. Submitted message ids
+  // land in `flaggedIds` so we can show the badge and lock the affordance.
+  // See [[jewl-is-the-interface-2026-06-15]] (mistake-bounty canonical design).
+  const [flagTarget, setFlagTarget] = useState<string | null>(null);
+  const [flagSeverity, setFlagSeverity] = useState<'minor' | 'major' | 'critical'>('minor');
+  const [flagNote, setFlagNote] = useState('');
+  const [flagSubmitting, setFlagSubmitting] = useState(false);
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -152,6 +161,23 @@ export function JewlChip() {
       .then(d => setMessages(d.messages || []))
       .catch(() => {});
 
+    // Load this campaign's mistake flags. The endpoint returns all GMs' flags;
+    // we filter to the current GM by id so the badge only locks messages THIS
+    // GM has already flagged. Per-message unique constraint enforces the rule
+    // server-side either way.
+    fetch(`/api/campaigns/${campaignId}/jewl-mistakes`)
+      .then(r => (r.ok ? r.json() : { mistakes: [] }))
+      .then(d => {
+        const myId = session?.id;
+        const mine: Set<string> = new Set(
+          (d.mistakes || [])
+            .filter((m: { gmUserId: string }) => !myId || m.gmUserId === myId)
+            .map((m: { copilotMessageId: string }) => m.copilotMessageId),
+        );
+        setFlaggedIds(mine);
+      })
+      .catch(() => {});
+
     const t = setTimeout(() => inputRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, [open, campaignId, session]);
@@ -186,6 +212,51 @@ export function JewlChip() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  const openFlagPicker = useCallback((messageId: string) => {
+    setFlagTarget(messageId);
+    setFlagSeverity('minor');
+    setFlagNote('');
+  }, []);
+
+  const cancelFlag = useCallback(() => {
+    setFlagTarget(null);
+    setFlagSeverity('minor');
+    setFlagNote('');
+  }, []);
+
+  const submitFlag = useCallback(async () => {
+    if (!campaignId || !flagTarget || flagSubmitting) return;
+    setFlagSubmitting(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/jewl-mistakes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          copilotMessageId: flagTarget,
+          severity: flagSeverity,
+          note: flagNote.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setFlaggedIds(prev => {
+          const next = new Set(prev);
+          next.add(flagTarget);
+          return next;
+        });
+        setFlagTarget(null);
+        setFlagSeverity('minor');
+        setFlagNote('');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || 'Failed to flag mistake');
+      }
+    } catch {
+      alert('Connection failed');
+    } finally {
+      setFlagSubmitting(false);
+    }
+  }, [campaignId, flagTarget, flagSeverity, flagNote, flagSubmitting]);
 
   // Convert a File (from paste or file picker) into a data: URL the chip can
   // hand straight to the /copilot endpoint. Bound by MAX_IMAGE_BYTES below
@@ -553,6 +624,169 @@ export function JewlChip() {
                             {tc.error ? ` — ${tc.error}` : ''}
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {/* Mistake-bounty: flag affordance on persisted assistant
+                        messages. Temp ids (temp-/resp-/err-) get skipped — they
+                        aren't in the DB yet so a flag would 404. */}
+                    {m.role === 'assistant' &&
+                      !m.id.startsWith('temp-') &&
+                      !m.id.startsWith('resp-') &&
+                      !m.id.startsWith('err-') && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            paddingTop: 4,
+                            borderTop: '1px dashed rgba(255,255,255,0.06)',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          {flaggedIds.has(m.id) ? (
+                            <span
+                              style={{
+                                fontSize: 8,
+                                color: 'rgba(231, 76, 60, 0.75)',
+                                letterSpacing: '0.15em',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              ⚐ flagged
+                            </span>
+                          ) : flagTarget === m.id ? null : (
+                            <button
+                              onClick={() => openFlagPicker(m.id)}
+                              title="Flag JEWL mistake — KRMA bounty"
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'rgba(255,255,255,0.3)',
+                                fontSize: 9,
+                                cursor: 'pointer',
+                                letterSpacing: '0.1em',
+                                padding: '0 2px',
+                                fontFamily: 'Consolas, monospace',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.color = 'rgba(231, 76, 60, 0.85)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+                              }}
+                            >
+                              ⚐ flag
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    {flagTarget === m.id && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          padding: 6,
+                          background: 'rgba(231, 76, 60, 0.06)',
+                          border: '1px solid rgba(231, 76, 60, 0.25)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 5,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 4,
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          {(['minor', 'major', 'critical'] as const).map(sev => {
+                            const selected = flagSeverity === sev;
+                            const bounty = { minor: 10, major: 100, critical: 1000 }[sev];
+                            return (
+                              <button
+                                key={sev}
+                                onClick={() => setFlagSeverity(sev)}
+                                style={{
+                                  flex: 1,
+                                  background: selected
+                                    ? 'rgba(231, 76, 60, 0.2)'
+                                    : 'rgba(255,255,255,0.04)',
+                                  border: selected
+                                    ? '1px solid rgba(231, 76, 60, 0.6)'
+                                    : '1px solid rgba(255,255,255,0.1)',
+                                  color: selected
+                                    ? 'rgba(231, 76, 60, 0.95)'
+                                    : 'rgba(255,255,255,0.55)',
+                                  fontSize: 9,
+                                  letterSpacing: '0.1em',
+                                  textTransform: 'uppercase',
+                                  padding: '4px 4px',
+                                  cursor: 'pointer',
+                                  fontFamily: 'Consolas, monospace',
+                                }}
+                              >
+                                {sev}
+                                <div style={{ fontSize: 7, opacity: 0.7, marginTop: 1 }}>
+                                  {bounty} K
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <textarea
+                          value={flagNote}
+                          onChange={e => setFlagNote(e.target.value.slice(0, 1000))}
+                          placeholder="Why? (optional — helps JEWL learn)"
+                          rows={2}
+                          style={{
+                            background: 'rgba(0,0,0,0.5)',
+                            border: '1px solid rgba(231, 76, 60, 0.2)',
+                            color: 'rgba(255,255,255,0.85)',
+                            fontSize: 10,
+                            padding: 4,
+                            fontFamily: 'Consolas, monospace',
+                            resize: 'none',
+                            outline: 'none',
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={cancelFlag}
+                            disabled={flagSubmitting}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              color: 'rgba(255,255,255,0.55)',
+                              fontSize: 9,
+                              letterSpacing: '0.1em',
+                              textTransform: 'uppercase',
+                              padding: '3px 8px',
+                              cursor: 'pointer',
+                              fontFamily: 'Consolas, monospace',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={submitFlag}
+                            disabled={flagSubmitting}
+                            style={{
+                              background: 'rgba(231, 76, 60, 0.2)',
+                              border: '1px solid rgba(231, 76, 60, 0.5)',
+                              color: 'rgba(231, 76, 60, 0.95)',
+                              fontSize: 9,
+                              letterSpacing: '0.1em',
+                              textTransform: 'uppercase',
+                              padding: '3px 8px',
+                              cursor: flagSubmitting ? 'wait' : 'pointer',
+                              fontFamily: 'Consolas, monospace',
+                              opacity: flagSubmitting ? 0.5 : 1,
+                            }}
+                          >
+                            {flagSubmitting ? 'Submitting…' : 'Submit flag'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

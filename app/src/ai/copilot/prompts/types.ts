@@ -17,6 +17,7 @@ import type { GrowthCharacter } from '@/types/growth';
 export type JewlPromptSource =
   | 'GM_TEXT'              // GM typed into JewlChip
   | 'GM_CANVAS_ACTION'     // GM clicked / dragged / dropped on the canvas
+  | 'GM_MISTAKE_FLAG'      // GM flagged a JEWL message as a mistake (bounty paid)
   | 'GM_VOICE'             // GM spoke (STT) — not wired yet
   | 'PLAYER_VOICE'         // Player spoke (STT) — not wired yet
   | 'TABLE_AMBIENT'        // ambient audio capture — not wired yet
