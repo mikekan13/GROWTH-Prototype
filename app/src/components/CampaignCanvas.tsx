@@ -733,7 +733,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // Debounced save: collect rapid changes and persist once after settling
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, _changes: string[]) => {
+  const handleCharacterUpdate = useCallback((nodeId: string, character: GrowthCharacter, changes: string[]) => {
     // Recompute augments from equipped items + traits before saving
     const { character: augmented } = recomputeAugments(character);
 
@@ -756,17 +756,37 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
     saveTimersRef.current.set(nodeId, setTimeout(async () => {
       saveTimersRef.current.delete(nodeId);
+      let saved = false;
       try {
-        await fetch(`/api/characters/${nodeId}`, {
+        const res = await fetch(`/api/characters/${nodeId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: augmented }),
         });
+        saved = res.ok;
       } catch {
         // Silent fail — next interaction will retry
       }
+      // Fire-and-forget observation event so JEWL witnesses manual character
+      // edits. Debounced save collapses rapid edits into one observation;
+      // that's fine — the change list reflects whatever landed.
+      // See [[jewl-is-the-interface-2026-06-15]].
+      if (saved && changes.length > 0) {
+        const changeStr = changes.join(', ');
+        const compact = changeStr.length > 300 ? `${changeStr.slice(0, 300)}…` : changeStr;
+        void fetch(`/api/campaigns/${campaign.id}/observation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mutationKind: 'character-edit',
+            targetType: 'character',
+            targetId: nodeId,
+            summary: `GM edited character ${nodeId}: ${compact}`,
+          }),
+        }).catch(() => { /* best-effort */ });
+      }
     }, 300));
-  }, []);
+  }, [campaign.id]);
 
   const handleCreateCharacter = useCallback(async (name: string) => {
     try {

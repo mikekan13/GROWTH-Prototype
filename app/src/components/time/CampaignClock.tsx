@@ -46,12 +46,35 @@ export default function CampaignClock({ campaignId, isGM }: { campaignId: string
     if (busy) return;
     setBusy(true);
     try {
-      await fetch(`/api/campaigns/${campaignId}/clock`, {
+      const res = await fetch(`/api/campaigns/${campaignId}/clock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount, unit }),
       });
+      let newDateLabel: string | null = null;
+      if (res.ok) {
+        try {
+          const data = await res.json();
+          newDateLabel = data?.localDate?.formatted ?? null;
+        } catch { /* swallow */ }
+      }
       await refresh();
+      // Fire-and-forget observation event so JEWL witnesses manual time
+      // advances. See [[jewl-is-the-interface-2026-06-15]].
+      if (res.ok) {
+        const summary = `GM advanced clock by ${amount} ${unit}${amount === 1 ? '' : 's'}` +
+          (newDateLabel ? ` → ${newDateLabel}` : '');
+        void fetch(`/api/campaigns/${campaignId}/observation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mutationKind: 'advance-clock',
+            targetType: 'campaign',
+            targetId: campaignId,
+            summary,
+          }),
+        }).catch(() => { /* best-effort */ });
+      }
     } finally { setBusy(false); }
   };
 
