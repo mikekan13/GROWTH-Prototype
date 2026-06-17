@@ -13,6 +13,7 @@ import './time';
 import './attribute-set';
 import './condition';
 import './move-character';
+import './forge-blueprint';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';
