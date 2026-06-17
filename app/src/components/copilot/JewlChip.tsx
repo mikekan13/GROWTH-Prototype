@@ -275,16 +275,21 @@ export function JewlChip() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `resp-${Date.now()}`,
-            role: 'assistant',
-            content: data.message,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
+        // Don't append an optimistic assistant message — the persisted ones
+        // come back from history with their real CUIDs. Replacing messages
+        // wholesale with the canonical fetch drops the temp- user row and
+        // shows the real (user, assistant) pair. Anything that arrived in
+        // parallel (observation reactions) stays included.
+        try {
+          const h = await fetch(`/api/campaigns/${campaignId}/copilot/history`);
+          if (h.ok) {
+            const d = await h.json();
+            setMessages(d.messages || []);
+          }
+        } catch {
+          // history refresh failed — leave temp items in place; the 5s poll
+          // will eventually reconcile (with possible transient duplicates).
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         setMessages(prev => [
