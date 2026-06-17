@@ -55,7 +55,11 @@ export type TransactionReason =
   | 'THORN_NECTAR_REPLACE'
   // Harvest
   | 'HARVEST_REWARD'
-  | 'HARVEST_WEALTH';
+  | 'HARVEST_WEALTH'
+  // JEWL Mistake Bounty
+  // GM catches JEWL making a mistake → JEWL's wallet → GM's wallet.
+  // See [[jewl-is-the-interface-2026-06-15]].
+  | 'JEWL_MISTAKE_BOUNTY';
 
 // ── Genesis Constants ──
 

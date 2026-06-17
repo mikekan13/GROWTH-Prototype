@@ -124,6 +124,7 @@ model Campaign {
   aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
   relationships       EntityRelationship[]
   godHeadMessages     GodHeadMessage[]
+  jewlMistakes        JewlMistake[]
   // ── Time system (rulings 2026-06-08/-09) ──
   // Each campaign is a pocket universe with its own clock. The clock is
   // stored in META CYCLES (the universal abstract scale; 1 cycle ≈ 1
@@ -744,6 +745,44 @@ model GodHeadMessage {
   @@index([campaignId, godHeadId, createdAt])
   @@index([godHeadId, readAt])
   @@index([invocationId])
+}
+
+// ── JEWL Mistake Bounty ──────────────────────────────────────────────────
+//
+// When a GM catches JEWL making a mistake (bad challenge, wrong reaction,
+// missed context, factual error in an observation), they flag the offending
+// CopilotMessage. The flag debits JEWL's GodHead wallet and credits the
+// GM's user wallet via a JEWL_MISTAKE_BOUNTY KrmaTransaction.
+//
+// One row per (campaignId, copilotMessageId, gmUserId) — same GM can't
+// double-flag the same message. Cross-campaign aggregation is intentional
+// (this table is the corpus JEWL eventually trains on per
+// [[jewl-is-the-interface-2026-06-15]]).
+model JewlMistake {
+  id               String   @id @default(cuid())
+  campaign         Campaign @relation(fields: [campaignId], references: [id])
+  campaignId       String
+  // The assistant message JEWL produced that the GM is flagging.
+  copilotMessageId String
+  // The GM doing the flagging — they receive the bounty.
+  gmUserId         String
+  // The active GameSession at flag time (nullable — flag can happen outside a session).
+  sessionId        String?
+  severity         String   // minor | major | critical
+  note             String   @default("")
+  // KRMA paid out by this flag (cached for convenience; KrmaTransaction is source of truth).
+  bountyAmount     BigInt
+  // Pointer to the KrmaTransaction row that moved the KRMA.
+  transactionId    String
+  // Resolution lifecycle — flagged immediately on creation; Phase 2 adds
+  // 'acknowledged' / 'disputed' / 'resolved' once JEWL writes back.
+  status           String   @default("flagged")
+  createdAt        DateTime @default(now())
+
+  @@unique([copilotMessageId, gmUserId])
+  @@index([campaignId, createdAt])
+  @@index([gmUserId, createdAt])
+  @@index([sessionId])
 }
 
 model AccessCode {

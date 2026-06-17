@@ -979,6 +979,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
   const handleDeleteLocation = useCallback(async (nodeId: string) => {
     if (!confirm('Delete this draft location?')) return;
+    // Snapshot the name before delete so JEWL's observation has a usable label.
+    const snapshotName = nodes.find(n => n.id === nodeId)?.name ?? 'location';
     try {
       const res = await fetch(`/api/campaigns/${campaign.id}/locations/${nodeId}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -987,10 +989,20 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         return;
       }
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'delete-location',
+          targetType: 'location',
+          targetId: nodeId,
+          summary: `GM deleted location "${snapshotName}"`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id, nodes, router]);
 
   /** EDIT commit from the JEWL dialog: merge the revised fields into the
    *  Location's existing data JSON (preserving canvas coords, timescale
@@ -1077,13 +1089,24 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
   const handleDeleteItem = useCallback(async (nodeId: string) => {
     if (!confirm('Delete this item?')) return;
+    const snapshotName = nodes.find(n => n.id === nodeId)?.name ?? 'item';
     try {
       await fetch(`/api/campaigns/${campaign.id}/items/${nodeId}`, { method: 'DELETE' });
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'delete-item',
+          targetType: 'item',
+          targetId: nodeId,
+          summary: `GM deleted item "${snapshotName}"`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     }
-  }, [campaign.id, router]);
+  }, [campaign.id, nodes, router]);
 
   const handleItemUpdate = useCallback(async (itemId: string, data: GrowthWorldItem) => {
     try {
@@ -1149,21 +1172,33 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const handleDeleteCharacter = useCallback(async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
+    const snapshotName = nodes.find(n => n.id === deleteTarget)?.name ?? 'character';
+    const targetId = deleteTarget;
     try {
-      const res = await fetch(`/api/characters/${deleteTarget}`, { method: 'DELETE' });
+      const res = await fetch(`/api/characters/${targetId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         alert(data.error || 'Failed to delete character');
         return;
       }
       router.refresh();
+      void fetch(`/api/campaigns/${campaign.id}/observation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mutationKind: 'delete-character',
+          targetType: 'character',
+          targetId,
+          summary: `GM deleted character "${snapshotName}"`,
+        }),
+      }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);
     }
-  }, [deleteTarget, router]);
+  }, [campaign.id, deleteTarget, nodes, router]);
 
   // ── Resize handler ──────────────────────────────────────────────────────
 

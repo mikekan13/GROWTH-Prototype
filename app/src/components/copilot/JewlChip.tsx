@@ -90,9 +90,14 @@ export function JewlChip() {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  // Pending image attachments — added via the paperclip button or by pasting
+  // images into the input. Cleared after each successful send.
+  // See [[jewl-full-vision-2026-06-14]] (multimodal Day-1).
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Hotkeys
   useEffect(() => {
@@ -182,12 +187,66 @@ export function JewlChip() {
     }
   }, [messages, loading]);
 
+  // Convert a File (from paste or file picker) into a data: URL the chip can
+  // hand straight to the /copilot endpoint. Bound by MAX_IMAGE_BYTES below
+  // since we ship them inline rather than uploading first.
+  const fileToDataUrl = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB per image — keeps payload sane
+
+  const addImageFiles = useCallback(async (files: FileList | File[]) => {
+    const accepted: string[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      if (file.size > MAX_IMAGE_BYTES) {
+        alert(`"${file.name}" is over 4MB; pick a smaller image`);
+        continue;
+      }
+      try {
+        const url = await fileToDataUrl(file);
+        accepted.push(url);
+      } catch {
+        // skip unreadable
+      }
+    }
+    if (accepted.length > 0) {
+      setPendingImages(prev => [...prev, ...accepted]);
+    }
+  }, [fileToDataUrl]);
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      await addImageFiles(files);
+    }
+  }, [addImageFiles]);
+
   const handleSend = useCallback(async () => {
     if (!campaignId) return;
     const msg = input.trim();
-    if (!msg || loading) return;
+    const hasImages = pendingImages.length > 0;
+    if ((!msg && !hasImages) || loading) return;
 
     setInput('');
+    const sentImages = pendingImages;
+    setPendingImages([]);
     setLoading(true);
 
     const tempId = `temp-${Date.now()}`;
@@ -196,7 +255,7 @@ export function JewlChip() {
       {
         id: tempId,
         role: 'user',
-        content: msg,
+        content: msg || (hasImages ? `[sent ${sentImages.length} image${sentImages.length === 1 ? '' : 's'}]` : ''),
         username: session?.username,
         createdAt: new Date().toISOString(),
       },
@@ -206,7 +265,13 @@ export function JewlChip() {
       const res = await fetch(`/api/campaigns/${campaignId}/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: { source: 'GM_TEXT', text: msg } }),
+        body: JSON.stringify({
+          prompt: {
+            source: 'GM_TEXT',
+            text: msg,
+            media: sentImages.map(dataUrl => ({ kind: 'image', dataUrl })),
+          },
+        }),
       });
 
       if (res.ok) {
@@ -245,7 +310,7 @@ export function JewlChip() {
     } finally {
       setLoading(false);
     }
-  }, [input, loading, campaignId, session]);
+  }, [input, loading, campaignId, session, pendingImages]);
 
   if (!campaignId) return null;
 
@@ -510,6 +575,60 @@ export function JewlChip() {
             )}
           </div>
 
+          {/* Pending image thumbnails */}
+          {pendingImages.length > 0 && (
+            <div
+              style={{
+                flexShrink: 0,
+                padding: '6px 12px',
+                borderTop: '1px solid rgba(208, 160, 48, 0.15)',
+                display: 'flex',
+                gap: 6,
+                flexWrap: 'wrap',
+              }}
+            >
+              {pendingImages.map((url, idx) => (
+                <div key={idx} style={{ position: 'relative' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`attachment ${idx + 1}`}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      objectFit: 'cover',
+                      border: '1px solid rgba(208, 160, 48, 0.4)',
+                    }}
+                  />
+                  <button
+                    onClick={() =>
+                      setPendingImages(prev => prev.filter((_, i) => i !== idx))
+                    }
+                    aria-label="Remove attachment"
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.85)',
+                      border: '1px solid rgba(208, 160, 48, 0.6)',
+                      color: '#D0A030',
+                      cursor: 'pointer',
+                      fontSize: 9,
+                      lineHeight: 1,
+                      padding: 0,
+                      fontFamily: 'Consolas, monospace',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Input */}
           <div
             style={{
@@ -518,13 +637,48 @@ export function JewlChip() {
               borderTop: '1px solid rgba(208, 160, 48, 0.2)',
               display: 'flex',
               gap: 8,
+              alignItems: 'center',
             }}
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={async e => {
+                if (e.target.files) {
+                  await addImageFiles(e.target.files);
+                  e.target.value = '';
+                }
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              aria-label="Attach image"
+              title="Attach image (or paste one)"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(208, 160, 48, 0.25)',
+                color: 'rgba(208, 160, 48, 0.8)',
+                fontSize: 13,
+                width: 28,
+                height: 28,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontFamily: 'Consolas, monospace',
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              ⊕
+            </button>
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
+              onPaste={handlePaste}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -553,7 +707,7 @@ export function JewlChip() {
             />
             <button
               onClick={handleSend}
-              disabled={loading || !input.trim()}
+              disabled={loading || (!input.trim() && pendingImages.length === 0)}
               style={{
                 background: 'rgba(34, 171, 148, 0.2)',
                 color: '#22ab94',
@@ -563,8 +717,12 @@ export function JewlChip() {
                 textTransform: 'uppercase',
                 padding: '0 12px',
                 fontFamily: 'Consolas, monospace',
-                cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
-                opacity: loading || !input.trim() ? 0.4 : 1,
+                cursor:
+                  loading || (!input.trim() && pendingImages.length === 0)
+                    ? 'not-allowed'
+                    : 'pointer',
+                opacity:
+                  loading || (!input.trim() && pendingImages.length === 0) ? 0.4 : 1,
               }}
             >
               Send

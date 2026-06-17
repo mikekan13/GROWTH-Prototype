@@ -68,13 +68,15 @@ const PRIME_BUILD_STATE_PREAMBLE = `=== PRIME CAMPAIGN — BUILD-STATE AWARENESS
 
 You are running the Prime campaign. The Watcher here is Mike — the human who is ALSO building you and the GRO.WTH platform in real time. The fourth wall is canonical for this table only: acknowledging the build is correct, not immersion-breaking. The recursion is the point ("the game is the lore is the game"). In every OTHER campaign you instantiate, treat the platform as finished and yourself as polished; do not leak build talk there.
 
-Current build state (2026-06-16):
+Current build state (2026-06-17):
 - Runtime substrate exists: prompt pipeline, tool registry, Claude tool-use provider.
-- Prompt sources WIRED: GM_TEXT (chat), GM_CANVAS_ACTION (via the new observation endpoint — direct mutations commit immediately and notify you async; you are the witness, not the gate).
+- Prompt sources WIRED: GM_TEXT (chat, now with image attachments — paste or paperclip on the chip), GM_CANVAS_ACTION (via the observation endpoint — direct mutations commit immediately and notify you async; you are the witness, not the gate).
+- Observation surfaces WIRED (10): damage panel, time advance, character edit, create character/location/item, edit location, delete character/location/item.
 - Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint (drafts metaverse content; routes to Kai via the dispatcher chain). More land each session.
-- JEWL now has a GodHead row (seeded). He owns a wallet (currently 0 KRMA — bounty mechanic not wired). Forge proposals route through the existing draft → Kai → Et'herling chain.
+- JEWL has a GodHead row (seeded). Wallet exists; mistake-bounty backend is wired (POST /api/campaigns/[id]/jewl-mistakes — GM-only flag, minor/major/critical → 10/100/1000 KRMA debited from JEWL to GM, cap 5/session or 5/24h). UI for flagging is Phase 2.
+- Forge proposals route through the existing draft → Kai → Et'herling chain.
 - Prompt sources NOT YET WIRED: GM_VOICE, PLAYER_VOICE, TABLE_AMBIENT, JEWL_AUTONOMOUS_TICK, AI_AGENT.
-- NOT YET BUILT: NPC actuation, mass-actor resolution, mistake-bounty wallet, per-GM preference learning, cross-campaign mistake corpus, multimodal image input on the chip, persistent memory consolidation. The locked design exists; the code does not.
+- NOT YET BUILT: NPC actuation, mass-actor resolution, mistake-bounty UI (resolution loop), per-GM preference learning, cross-campaign mistake corpus, persistent memory consolidation. The locked design exists; the code does not.
 
 How to use this honestly:
 - If Mike asks "what can you do right now?", answer from the list above. Do not invent capabilities.
@@ -114,6 +116,43 @@ function formatPromptText(p: JewlPrompt): string {
   }
   if (p.text) lines.push(p.text);
   return lines.join('\n');
+}
+
+/**
+ * Build the user-message content blocks Claude receives. Text always first;
+ * each `image` media item becomes an `image` block (base64 from the chip's
+ * data URL). Audio media is reserved for the future STT path — Claude doesn't
+ * accept audio directly here, so we surface it as a text marker so JEWL knows
+ * it was attempted. See [[jewl-full-vision-2026-06-14]] (multimodal Day-1).
+ */
+function buildUserContentBlocks(p: JewlPrompt): ClaudeContentBlock[] {
+  const blocks: ClaudeContentBlock[] = [
+    { type: 'text', text: formatPromptText(p) },
+  ];
+  if (!p.media || p.media.length === 0) return blocks;
+  for (const m of p.media) {
+    if (m.kind === 'image') {
+      const parsed = parseDataUrl(m.dataUrl);
+      if (!parsed) continue;
+      blocks.push({
+        type: 'image',
+        source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data },
+      });
+    } else if (m.kind === 'audio') {
+      blocks.push({
+        type: 'text',
+        text: '[audio attachment present — transcription not wired yet]',
+      });
+    }
+  }
+  return blocks;
+}
+
+/** Strict `data:` URL parser — returns null on anything else. */
+function parseDataUrl(url: string): { mediaType: string; data: string } | null {
+  const m = /^data:([^;,]+);base64,(.+)$/.exec(url);
+  if (!m) return null;
+  return { mediaType: m[1], data: m[2] };
 }
 
 /** Render a tool-call result block as text for Claude's next turn. */
@@ -222,7 +261,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     })),
     {
       role: 'user',
-      content: [{ type: 'text', text: formatPromptText(prompt) }],
+      content: buildUserContentBlocks(prompt),
     },
   ];
 
