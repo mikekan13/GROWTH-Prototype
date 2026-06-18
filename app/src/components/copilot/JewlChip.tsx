@@ -441,9 +441,16 @@ export function JewlChip() {
   // captures it without re-binding on every state change.
   useEffect(() => { audioMutedRef.current = audioMuted; }, [audioMuted]);
 
-  // Send a single audio chunk to the copilot endpoint as a TABLE_AMBIENT
-  // prompt. Empty / muted / unauthed chunks short-circuit. Errors swallow —
-  // a single bad chunk should not stop the recorder.
+  // Track whether the last chunk produced a transcript — pulses the chip
+  // dot briefly so the GM can see audio IS flowing even when JEWL stays
+  // silent (his default for ambient).
+  const [chunkPulse, setChunkPulse] = useState(0);
+
+  // Send a single audio chunk to the audio-chunk endpoint. Empty / muted /
+  // unauthed chunks short-circuit. This is intentionally separate from the
+  // /copilot endpoint: ambient chunks transcribe + log only; they do NOT
+  // invoke Claude per chunk (6 round-trips/min would burn cost and noise).
+  // Per [[jewl-always-on-audio-when-active]].
   const sendAudioChunk = useCallback(async (blob: Blob) => {
     if (audioMutedRef.current) return;
     if (!campaignId) return;
@@ -455,17 +462,20 @@ export function JewlChip() {
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(blob);
       });
-      await fetch(`/api/campaigns/${campaignId}/copilot`, {
+      const res = await fetch(`/api/campaigns/${campaignId}/audio-chunk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: {
-            source: 'TABLE_AMBIENT',
-            text: '',
-            media: [{ kind: 'audio', dataUrl }],
-          },
-        }),
+        body: JSON.stringify({ dataUrl }),
       });
+      if (res.ok) {
+        const ts = Date.now();
+        setChunkPulse(ts);
+        // Schedule a re-render after the pulse window so the dot transitions
+        // back to its calm glow even if no further chunks arrive.
+        setTimeout(() => {
+          setChunkPulse(prev => (prev === ts ? 0 : prev));
+        }, 1600);
+      }
     } catch {
       // best-effort — one dropped chunk is fine
     }
@@ -595,7 +605,10 @@ export function JewlChip() {
       >
         <span style={{ letterSpacing: '1px' }}>{'>_'}</span>
         {/* Audio status dot — bottom-right of the pill. Color-coded so the
-            GM can glance at JEWL and know if he's listening, muted, or off. */}
+            GM can glance at JEWL and know if he's listening, muted, or off.
+            Pulses brighter for ~1s when a chunk successfully transcribes —
+            visual confirmation the pipeline is alive even when JEWL stays
+            silent (his default for ambient context). */}
         <span
           aria-hidden
           style={{
@@ -611,10 +624,12 @@ export function JewlChip() {
               : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#e74c3c'
               : '#444',
             boxShadow:
-              audioStatus === 'listening'
+              audioStatus === 'listening' && Date.now() - chunkPulse < 1500
+                ? '0 0 14px rgba(34, 171, 148, 1)'
+                : audioStatus === 'listening'
                 ? '0 0 6px rgba(34, 171, 148, 0.7)'
                 : 'none',
-            transition: 'background 0.2s ease, box-shadow 0.2s ease',
+            transition: 'box-shadow 0.4s ease',
           }}
         />
       </button>
