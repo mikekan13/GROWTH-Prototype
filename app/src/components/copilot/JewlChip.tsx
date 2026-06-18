@@ -102,6 +102,17 @@ export function JewlChip() {
   // images into the input. Cleared after each successful send.
   // See [[jewl-full-vision-2026-06-14]] (multimodal Day-1).
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  // Always-on audio per [[jewl-always-on-audio-when-active]]. The chip mounts
+  // on every campaign page; the moment it mounts, we try to start the mic
+  // and run a continuous MediaRecorder. Chunks emit every 10s, hit /copilot
+  // with source=TABLE_AMBIENT. Mute toggles whether chunks actually fire.
+  const [audioStatus, setAudioStatus] = useState<
+    'idle' | 'requesting' | 'listening' | 'muted' | 'denied' | 'unsupported'
+  >('idle');
+  const [audioMuted, setAudioMuted] = useState(false);
+  const audioMutedRef = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   // Mistake-bounty (Phase 2). When a GM clicks the flag, the message id goes
   // here; only one flag picker can be open at a time. Submitted message ids
   // land in `flaggedIds` so we can show the badge and lock the affordance.
@@ -110,7 +121,9 @@ export function JewlChip() {
   const [flagSeverity, setFlagSeverity] = useState<'minor' | 'major' | 'critical'>('minor');
   const [flagNote, setFlagNote] = useState('');
   const [flagSubmitting, setFlagSubmitting] = useState(false);
-  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
+  // Map of copilotMessageId -> latest mistake status ('flagged' | 'acknowledged' | 'disputed').
+  // Lets the badge surface JEWL's resolution, not just the initial flag.
+  const [flagStatusById, setFlagStatusById] = useState<Map<string, string>>(new Map());
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -177,12 +190,20 @@ export function JewlChip() {
       .then(r => (r.ok ? r.json() : { mistakes: [] }))
       .then(d => {
         const myId = session?.id;
-        const mine: Set<string> = new Set(
-          (d.mistakes || [])
-            .filter((m: { gmUserId: string }) => !myId || m.gmUserId === myId)
-            .map((m: { copilotMessageId: string }) => m.copilotMessageId),
-        );
-        setFlaggedIds(mine);
+        const next = new Map<string, string>();
+        for (const m of (d.mistakes || []) as Array<{
+          gmUserId: string;
+          copilotMessageId: string;
+          status: string;
+        }>) {
+          if (myId && m.gmUserId !== myId) continue;
+          // If multiple rows exist (shouldn't, but just in case), prefer the
+          // latest non-flagged status. JSON arrives newest-first.
+          if (!next.has(m.copilotMessageId)) {
+            next.set(m.copilotMessageId, m.status);
+          }
+        }
+        setFlagStatusById(next);
       })
       .catch(() => {});
 
@@ -198,21 +219,41 @@ export function JewlChip() {
     if (!open || !campaignId) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/campaigns/${campaignId}/copilot/history`);
-        if (!r.ok) return;
-        const d = await r.json();
-        const fetched = (d.messages || []) as CopilotMessage[];
-        setMessages(prev => {
-          const seen = new Set(prev.map(m => m.id));
-          const additions = fetched.filter(m => !seen.has(m.id));
-          if (additions.length === 0) return prev;
-          return [...prev, ...additions];
-        });
+        const [r, mr] = await Promise.all([
+          fetch(`/api/campaigns/${campaignId}/copilot/history`),
+          fetch(`/api/campaigns/${campaignId}/jewl-mistakes`),
+        ]);
+        if (r.ok) {
+          const d = await r.json();
+          const fetched = (d.messages || []) as CopilotMessage[];
+          setMessages(prev => {
+            const seen = new Set(prev.map(m => m.id));
+            const additions = fetched.filter(m => !seen.has(m.id));
+            if (additions.length === 0) return prev;
+            return [...prev, ...additions];
+          });
+        }
+        if (mr.ok) {
+          const d = await mr.json();
+          const myId = session?.id;
+          const next = new Map<string, string>();
+          for (const m of (d.mistakes || []) as Array<{
+            gmUserId: string;
+            copilotMessageId: string;
+            status: string;
+          }>) {
+            if (myId && m.gmUserId !== myId) continue;
+            if (!next.has(m.copilotMessageId)) {
+              next.set(m.copilotMessageId, m.status);
+            }
+          }
+          setFlagStatusById(next);
+        }
       } catch {}
     };
     const interval = setInterval(tick, 5000);
     return () => clearInterval(interval);
-  }, [open, campaignId]);
+  }, [open, campaignId, session]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -247,9 +288,9 @@ export function JewlChip() {
         }),
       });
       if (res.ok) {
-        setFlaggedIds(prev => {
-          const next = new Set(prev);
-          next.add(flagTarget);
+        setFlagStatusById(prev => {
+          const next = new Map(prev);
+          next.set(flagTarget, 'flagged');
           return next;
         });
         setFlagTarget(null);
@@ -396,6 +437,119 @@ export function JewlChip() {
     }
   }, [input, loading, campaignId, session, pendingImages]);
 
+  // Keep the muted-ref in sync — the recorder's ondataavailable handler
+  // captures it without re-binding on every state change.
+  useEffect(() => { audioMutedRef.current = audioMuted; }, [audioMuted]);
+
+  // Send a single audio chunk to the copilot endpoint as a TABLE_AMBIENT
+  // prompt. Empty / muted / unauthed chunks short-circuit. Errors swallow —
+  // a single bad chunk should not stop the recorder.
+  const sendAudioChunk = useCallback(async (blob: Blob) => {
+    if (audioMutedRef.current) return;
+    if (!campaignId) return;
+    if (blob.size < 1024) return; // skip empty / noise-floor chunks
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      await fetch(`/api/campaigns/${campaignId}/copilot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: {
+            source: 'TABLE_AMBIENT',
+            text: '',
+            media: [{ kind: 'audio', dataUrl }],
+          },
+        }),
+      });
+    } catch {
+      // best-effort — one dropped chunk is fine
+    }
+  }, [campaignId]);
+
+  // Always-on audio: start a MediaRecorder the moment the chip mounts on
+  // a campaign page. Permission is requested once per origin; subsequent
+  // mounts auto-resume if granted. Chunks emit every 10s.
+  useEffect(() => {
+    if (!campaignId) return;
+    if (typeof window === 'undefined') return;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setAudioStatus('unsupported');
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setAudioStatus('unsupported');
+      return;
+    }
+
+    let cancelled = false;
+    let recorder: MediaRecorder | null = null;
+    let stream: MediaStream | null = null;
+
+    (async () => {
+      setAudioStatus('requesting');
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        // Pick the most widely supported codec the browser advertises.
+        const preferredTypes = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+          'audio/mp4',
+        ];
+        const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
+        recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+
+        recorder.ondataavailable = ev => {
+          if (ev.data && ev.data.size > 0) {
+            void sendAudioChunk(ev.data);
+          }
+        };
+        recorder.onerror = () => setAudioStatus('idle');
+
+        recorder.start(10_000); // emit a chunk every 10 seconds
+        mediaRecorderRef.current = recorder;
+        mediaStreamRef.current = stream;
+        setAudioStatus(audioMutedRef.current ? 'muted' : 'listening');
+      } catch {
+        if (!cancelled) setAudioStatus('denied');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        if (recorder && recorder.state !== 'inactive') recorder.stop();
+      } catch { /* ignore */ }
+      try {
+        stream?.getTracks().forEach(t => t.stop());
+      } catch { /* ignore */ }
+      mediaRecorderRef.current = null;
+      mediaStreamRef.current = null;
+    };
+  }, [campaignId, sendAudioChunk]);
+
+  // Reflect mute state into the visible status label without restarting
+  // the recorder — the chunk uploader gates on audioMutedRef.
+  useEffect(() => {
+    setAudioStatus(prev => {
+      if (prev === 'denied' || prev === 'unsupported' || prev === 'idle' || prev === 'requesting') {
+        return prev;
+      }
+      return audioMuted ? 'muted' : 'listening';
+    });
+  }, [audioMuted]);
+
   if (!campaignId) return null;
 
   return (
@@ -440,6 +594,29 @@ export function JewlChip() {
         }}
       >
         <span style={{ letterSpacing: '1px' }}>{'>_'}</span>
+        {/* Audio status dot — bottom-right of the pill. Color-coded so the
+            GM can glance at JEWL and know if he's listening, muted, or off. */}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            bottom: 5,
+            right: 5,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background:
+              audioStatus === 'listening' ? '#22ab94'
+              : audioStatus === 'muted' ? '#888'
+              : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#e74c3c'
+              : '#444',
+            boxShadow:
+              audioStatus === 'listening'
+                ? '0 0 6px rgba(34, 171, 148, 0.7)'
+                : 'none',
+            transition: 'background 0.2s ease, box-shadow 0.2s ease',
+          }}
+        />
       </button>
 
       {/* Expand panel */}
@@ -485,28 +662,74 @@ export function JewlChip() {
             >
               ✦ {COPILOT_LABEL}
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Close"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'rgba(255,255,255,0.4)',
-                cursor: 'pointer',
-                fontSize: 14,
-                padding: '0 4px',
-                fontFamily: 'Consolas, monospace',
-                lineHeight: 1,
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = '#fff';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
-              }}
-            >
-              ⊗
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Audio status label + mute toggle. Always rendered so the
+                  GM knows the mic state at a glance. Per
+                  [[jewl-always-on-audio-when-active]]: audio runs
+                  whenever the chip is mounted; mute is the privacy lever. */}
+              <span
+                style={{
+                  fontSize: 8,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color:
+                    audioStatus === 'listening' ? 'rgba(34, 171, 148, 0.8)'
+                    : audioStatus === 'muted' ? 'rgba(255,255,255,0.4)'
+                    : audioStatus === 'denied' ? 'rgba(231, 76, 60, 0.8)'
+                    : audioStatus === 'unsupported' ? 'rgba(231, 76, 60, 0.6)'
+                    : audioStatus === 'requesting' ? 'rgba(208, 160, 48, 0.6)'
+                    : 'rgba(255,255,255,0.3)',
+                }}
+              >
+                {audioStatus === 'listening' ? '● live'
+                  : audioStatus === 'muted' ? '◌ muted'
+                  : audioStatus === 'denied' ? '✕ mic blocked'
+                  : audioStatus === 'unsupported' ? '✕ no mic'
+                  : audioStatus === 'requesting' ? '... mic'
+                  : '○ off'}
+              </span>
+              {(audioStatus === 'listening' || audioStatus === 'muted') && (
+                <button
+                  onClick={() => setAudioMuted(m => !m)}
+                  aria-label={audioMuted ? 'Unmute' : 'Mute'}
+                  title={audioMuted ? 'Unmute' : 'Mute (audio keeps recording but is dropped)'}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: audioMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    fontFamily: 'Consolas, monospace',
+                    lineHeight: 1,
+                  }}
+                >
+                  {audioMuted ? '🔇' : '🔊'}
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255,255,255,0.4)',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  padding: '0 4px',
+                  fontFamily: 'Consolas, monospace',
+                  lineHeight: 1,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+                }}
+              >
+                ⊗
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -652,17 +875,35 @@ export function JewlChip() {
                             gap: 6,
                           }}
                         >
-                          {flaggedIds.has(m.id) ? (
-                            <span
-                              style={{
-                                fontSize: 8,
-                                color: 'rgba(231, 76, 60, 0.75)',
-                                letterSpacing: '0.15em',
-                                textTransform: 'uppercase',
-                              }}
-                            >
-                              ⚐ flagged
-                            </span>
+                          {flagStatusById.has(m.id) ? (
+                            (() => {
+                              const status = flagStatusById.get(m.id)!;
+                              const label =
+                                status === 'acknowledged' ? '✓ owned'
+                                : status === 'disputed' ? '⚡ disputed'
+                                : '⚐ flagged';
+                              const color =
+                                status === 'acknowledged' ? 'rgba(34, 171, 148, 0.85)'
+                                : status === 'disputed' ? 'rgba(208, 160, 48, 0.85)'
+                                : 'rgba(231, 76, 60, 0.75)';
+                              return (
+                                <span
+                                  style={{
+                                    fontSize: 8,
+                                    color,
+                                    letterSpacing: '0.15em',
+                                    textTransform: 'uppercase',
+                                  }}
+                                  title={
+                                    status === 'acknowledged' ? 'JEWL acknowledged the mistake'
+                                    : status === 'disputed' ? 'JEWL disputes the flag'
+                                    : 'Flagged — JEWL has not responded yet'
+                                  }
+                                >
+                                  {label}
+                                </span>
+                              );
+                            })()
                           ) : flagTarget === m.id ? null : (
                             <button
                               onClick={() => openFlagPicker(m.id)}
