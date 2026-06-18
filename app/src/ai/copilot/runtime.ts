@@ -14,6 +14,7 @@ import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
 import { transcribeAudio } from '@/ai/providers/stt';
+import { loadTimeAwareness, formatTimeAwarenessBlock } from './time-awareness';
 import { getJewlTool, listJewlTools } from './tools';
 import type { JewlToolContext } from './tools/types';
 import type { JewlPrompt, JewlResponse, JewlToolCallResult } from './prompts/types';
@@ -74,7 +75,8 @@ Current build state (2026-06-17, post-memory):
 - Runtime substrate exists: prompt pipeline, tool registry, Claude tool-use provider.
 - Prompt sources WIRED: GM_TEXT (chat, with image attachments), GM_CANVAS_ACTION (observation endpoint), GM_MISTAKE_FLAG (the GM caught you).
 - Observation surfaces WIRED (12): damage, time advance, character edit, create character/location/item, edit location, delete character/location/item, reparent location, create/abandon goal.
-- Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint, remember, forget, npc_speak, npc_act, read_actors_state, update_mistake_status, query_mistake_corpus.
+- Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint, remember, forget, npc_speak, npc_act, read_actors_state, update_mistake_status, query_mistake_corpus, query_time_metrics.
+- TIME AWARENESS: every dispatch injects a TIME block (real time now, campaign clock cycle, active session info, time-since-last-activity, prep window). Every history line you see is prefixed with [ISO timestamp]. Use these to reason about pacing, prep duration, and content time. Don't guess — call query_time_metrics for richer aggregates (session history, current-session live stats, prep windows, recent activity buckets).
 - Persistent memory: write via remember(key, value, scope) — 'global' carries across every campaign, 'campaign' stays private to this one. forget(key, scope) deletes. Memories load back into your context on every turn (see YOUR MEMORY block below). This is how you learn from mistakes — after a flag, write a 'mistake-pattern:*' note so the same flavor of error doesn't recur. Memories ARE the training data.
 - NPC actuation MVP: npc_speak({ npcCharacterId, content, tone? }) posts an utterance attributed to the named NPC into the campaign event stream. Validates entityType=NPC, ACTIVE, in this campaign.
 - JEWL has a GodHead row + funded wallet (1B KRMA from Balance, genesis).
@@ -234,28 +236,33 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   //    campaign row is fetched in parallel so we can decide whether to inject
   //    the Prime-only build-state preamble. JEWL's persistent memories load
   //    in parallel too so a single dispatch fans out, not waterfalls.
-  const [context, campaignRow, jewlMemories] = await Promise.all([
+  const [context, campaignRow, jewlMemories, timeSnap] = await Promise.all([
     assembleContext(prompt.campaignId, prompt.text || prompt.canvasAction?.intent || ''),
     prisma.campaign.findUnique({
       where: { id: prompt.campaignId },
       select: { name: true },
     }),
     loadJewlMemoryForCampaign(prompt.campaignId),
+    loadTimeAwareness(prompt.campaignId),
   ]);
   const isPrime = campaignRow?.name === '__PRIME__';
 
-  // 2. Conversation history.
+  // 2. Conversation history — now timestamped. Each row carries createdAt
+  //    so JEWL can reason about pacing without having to ask.
   const history = await prisma.copilotMessage.findMany({
     where: { campaignId: prompt.campaignId },
     orderBy: { createdAt: 'desc' },
     take: MAX_HISTORY + 1,
-    select: { role: true, content: true, username: true },
+    select: { role: true, content: true, username: true, createdAt: true },
   });
   const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
 
   const memoryBlock = formatJewlMemoryBlock(jewlMemories);
+  const timeBlock = formatTimeAwarenessBlock(timeSnap);
 
   const contextBlock = [
+    timeBlock,
+    '',
     '=== CAMPAIGN DATA ===',
     context.campaignSummary,
     context.retrievedData ? `\n=== RELEVANT DETAILS ===\n${context.retrievedData}` : '',
@@ -270,15 +277,17 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // 3. Build the messages array. History is text-only; the new prompt
   //    is formatted via formatPromptText.
   const messages: ClaudeMessageInput[] = [
-    ...pastMessages.map<ClaudeMessageInput>(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: [
-        {
-          type: 'text',
-          text: m.username ? `[${m.username}]: ${m.content}` : m.content,
-        },
-      ],
-    })),
+    ...pastMessages.map<ClaudeMessageInput>(m => {
+      // Prefix every history line with its ISO timestamp so JEWL can
+      // reason about pacing — see [[jewl-time-awareness-2026-06-17]] for
+      // why this is load-bearing rather than cosmetic.
+      const stamp = m.createdAt.toISOString();
+      const tag = m.username ? `[${stamp}] [${m.username}]` : `[${stamp}]`;
+      return {
+        role: m.role as 'user' | 'assistant',
+        content: [{ type: 'text', text: `${tag}: ${m.content}` }],
+      };
+    }),
     {
       role: 'user',
       content: await buildUserContentBlocks(prompt),
