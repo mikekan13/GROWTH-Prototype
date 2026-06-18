@@ -1,19 +1,23 @@
 /**
  * Speech-to-text provider — pluggable.
  *
- * Per [[jewl-full-vision-2026-06-14]] audio capture is Day-1 in design but
- * the provider choice is deferred (Whisper local vs Deepgram vs Anthropic
- * when they ship STT). This module is the pipe: callers pass a base64
- * audio data URL, get back text or a clear "not configured" marker.
+ * Two production providers share one OpenAI-compatible HTTP/multipart
+ * code path:
  *
- * To wire a real provider:
- *   1. Set STT_PROVIDER=whisper|deepgram|... in env.
- *   2. Add a case below that calls the provider's API.
- *   3. Return the transcribed text.
+ *   STT_PROVIDER=openai
+ *     → cloud Whisper at api.openai.com, needs OPENAI_API_KEY.
  *
- * The runtime treats the unwired path as an explicit text marker so JEWL
- * sees the audio came through but no transcription is available, instead
- * of a silent failure.
+ *   STT_PROVIDER=whisper-local
+ *     → any locally hosted server that speaks the OpenAI Audio API spec.
+ *       Tested with faster-whisper-server (recommended) and
+ *       whisper.cpp's bundled server. Set WHISPER_LOCAL_URL to override
+ *       the default `http://localhost:9000/v1/audio/transcriptions`.
+ *
+ * Whisper is MIT-licensed (model + weights + popular implementations),
+ * so both paths are commercially safe.
+ *
+ * Adding another provider is a single `case` below — keep the
+ * interface a single base64 dataUrl in, an SttResult out.
  */
 
 import 'server-only';
@@ -72,13 +76,28 @@ export async function transcribeAudio(dataUrl: string): Promise<SttResult> {
     };
   }
 
-  // Real providers plug in here. The dispatch returns a clear "configured
-  // but unknown" marker so misconfigurations are loud rather than silent.
   switch (provider) {
     case 'openai':
-      return openAiWhisperTranscribe(parsed);
-    // case 'deepgram': return deepgramTranscribe(parsed);
-    // case 'whisper-local': return whisperLocalTranscribe(parsed);
+      return openAiCompatibleTranscribe(parsed, {
+        provider: 'openai',
+        url: 'https://api.openai.com/v1/audio/transcriptions',
+        apiKey: process.env.OPENAI_API_KEY,
+        model: process.env.OPENAI_STT_MODEL || 'whisper-1',
+        missingKeyMessage: '[STT_PROVIDER=openai but OPENAI_API_KEY not set]',
+      });
+    case 'whisper-local':
+      return openAiCompatibleTranscribe(parsed, {
+        provider: 'whisper-local',
+        url:
+          process.env.WHISPER_LOCAL_URL ||
+          'http://localhost:9000/v1/audio/transcriptions',
+        // Local servers usually don't auth; if WHISPER_LOCAL_API_KEY is set we
+        // pass it through (some self-hosted setups do require a key).
+        apiKey: process.env.WHISPER_LOCAL_API_KEY,
+        model: process.env.WHISPER_LOCAL_MODEL || 'Systran/faster-whisper-base.en',
+        // No "missing key" marker — local servers are valid without one.
+        missingKeyMessage: null,
+      });
     default:
       return {
         transcript: `[STT_PROVIDER="${provider}" not implemented yet — pipe is wired, plug the API in]`,
@@ -87,54 +106,67 @@ export async function transcribeAudio(dataUrl: string): Promise<SttResult> {
   }
 }
 
-/**
- * OpenAI Whisper API path. Uses the platform-native FormData + Blob (Node
- * 18+) to upload the audio multipart — no additional SDK dependency. Set
- *
- *   STT_PROVIDER=openai
- *   OPENAI_API_KEY=sk-...
- *   OPENAI_STT_MODEL=whisper-1   (optional; whisper-1 is the default)
- */
-async function openAiWhisperTranscribe(
-  parsed: { mediaType: string; base64: string },
-): Promise<SttResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return {
-      transcript: '[STT_PROVIDER=openai but OPENAI_API_KEY not set]',
-      provider: 'openai',
-    };
-  }
-  const model = process.env.OPENAI_STT_MODEL || 'whisper-1';
+interface OpenAiCompatibleConfig {
+  provider: string;
+  url: string;
+  apiKey: string | undefined;
+  model: string;
+  /** If set and apiKey is missing, return this marker instead of calling. */
+  missingKeyMessage: string | null;
+}
 
-  // Decode base64 → bytes → Blob. The filename is required by Whisper;
-  // the extension matters less than the content-type header inside the
-  // multipart, but we pick a sensible default from the media type.
+/**
+ * Single transcription codepath that targets any server speaking the
+ * OpenAI Audio API spec — cloud Whisper, self-hosted faster-whisper-server,
+ * whisper.cpp's server, LiteLLM proxies, etc. All differences (URL, auth,
+ * model name, error messages) are config knobs on top of one HTTP call.
+ *
+ * Why this shape: keeping a single multipart pathway means future provider
+ * swaps are 3 lines of config, not a parallel client.
+ */
+async function openAiCompatibleTranscribe(
+  parsed: { mediaType: string; base64: string },
+  cfg: OpenAiCompatibleConfig,
+): Promise<SttResult> {
+  if (!cfg.apiKey && cfg.missingKeyMessage) {
+    return { transcript: cfg.missingKeyMessage, provider: cfg.provider };
+  }
+
+  // Decode base64 → bytes → Blob, then upload as multipart. Required by both
+  // OpenAI's spec and the popular local server implementations.
   const bytes = Uint8Array.from(Buffer.from(parsed.base64, 'base64'));
   const blob = new Blob([bytes], { type: parsed.mediaType });
   const ext = mediaTypeToExt(parsed.mediaType);
 
   const form = new FormData();
   form.append('file', blob, `audio.${ext}`);
-  form.append('model', model);
+  form.append('model', cfg.model);
   form.append('response_format', 'json');
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  const headers: Record<string, string> = {};
+  if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`;
+
+  let res: Response;
+  try {
+    res = await fetch(cfg.url, { method: 'POST', headers, body: form });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      transcript: `[STT_PROVIDER=${cfg.provider} unreachable at ${cfg.url}: ${msg.slice(0, 150)}]`,
+      provider: cfg.provider,
+    };
+  }
   if (!res.ok) {
     const errText = await res.text().catch(() => '<no body>');
     return {
-      transcript: `[OpenAI Whisper HTTP ${res.status}: ${errText.slice(0, 200)}]`,
-      provider: 'openai',
+      transcript: `[STT_PROVIDER=${cfg.provider} HTTP ${res.status}: ${errText.slice(0, 200)}]`,
+      provider: cfg.provider,
     };
   }
   const data = (await res.json()) as { text?: string };
   return {
     transcript: (data.text ?? '').trim() || '[empty transcript]',
-    provider: 'openai',
+    provider: cfg.provider,
   };
 }
 
