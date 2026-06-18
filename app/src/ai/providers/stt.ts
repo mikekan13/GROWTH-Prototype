@@ -24,11 +24,28 @@ export interface SttResult {
   confidence?: number;
 }
 
-/** Parse a `data:audio/...;base64,...` URL into media type + base64 payload. */
+/**
+ * Parse a `data:audio/...;base64,...` URL into media type + base64 payload.
+ *
+ * Browsers emit URLs like `data:audio/webm;codecs=opus;base64,<...>` from
+ * MediaRecorder, so the parser has to tolerate optional codec/parameter
+ * segments between the MIME type and `;base64,`. We split on `;base64,`
+ * (the only stable anchor) and treat anything before it as media-type
+ * metadata. The leading `data:` prefix is required.
+ */
 function parseAudioDataUrl(url: string): { mediaType: string; base64: string } | null {
-  const m = /^data:(audio\/[^;,]+);base64,(.+)$/.exec(url);
-  if (!m) return null;
-  return { mediaType: m[1], base64: m[2] };
+  if (!url.startsWith('data:')) return null;
+  const marker = ';base64,';
+  const splitAt = url.indexOf(marker);
+  if (splitAt < 0) return null;
+  const header = url.slice('data:'.length, splitAt); // e.g. "audio/webm;codecs=opus"
+  const base64 = url.slice(splitAt + marker.length);
+  if (!base64) return null;
+  // The first segment is the MIME type; everything after is parameters
+  // (codecs, charset, etc.) — we only care about the type for routing.
+  const mediaType = header.split(';')[0] || '';
+  if (!mediaType.startsWith('audio/')) return null;
+  return { mediaType, base64 };
 }
 
 /**
@@ -47,8 +64,10 @@ export async function transcribeAudio(dataUrl: string): Promise<SttResult> {
 
   const provider = (process.env.STT_PROVIDER || '').toLowerCase().trim();
   if (!provider || provider === 'none') {
+    // Constant marker (no chunk-varying fields) so the audio-chunk endpoint
+    // can dedup it. Otherwise the chat log fills with one warning per chunk.
     return {
-      transcript: `[audio attachment present — STT_PROVIDER not configured (${parsed.mediaType}, ${Math.round((parsed.base64.length * 3) / 4)} bytes)]`,
+      transcript: '[audio attachment present — STT_PROVIDER not configured]',
       provider: 'none',
     };
   }

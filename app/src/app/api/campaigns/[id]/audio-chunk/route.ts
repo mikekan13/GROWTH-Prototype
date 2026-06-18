@@ -20,6 +20,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { prisma } from '@/lib/db';
 import { transcribeAudio } from '@/ai/providers/stt';
+import { maybeFireClassifier } from '@/ai/copilot/classifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,23 @@ export async function POST(
         }),
       },
     });
+
+    // Per [[jewl-always-on-audio-when-active]] there is no wake word — JEWL
+    // is supposed to decide moment-by-moment whether to react. We delegate
+    // that decision to a cheap Haiku classifier (see classifier.ts). Skip
+    // the classifier when the transcript was a config marker (no real audio
+    // was processed). Fire-and-forget so the audio-chunk POST stays fast.
+    if (!looksLikeMarker) {
+      void maybeFireClassifier({
+        campaignId,
+        actorId: session.user.id,
+        actorName: session.user.username,
+        actorRole: session.user.role,
+      }).catch(err => {
+        // eslint-disable-next-line no-console
+        console.error('[audio-chunk] classifier failed:', err);
+      });
+    }
 
     return NextResponse.json({
       accepted: true,
