@@ -17,6 +17,7 @@ import './forge-blueprint';
 import './memory';
 import './npc-speak';
 import './mistake-corpus';
+import './actors';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';

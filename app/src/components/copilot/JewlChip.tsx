@@ -19,6 +19,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 
+/**
+ * JEWL's name is private canon ([[jewl-identity-and-wallet-private]]). All
+ * player-facing builds say "Copilot"; only dev/Prime builds with the env
+ * flag set show "JEWL". The hotkey hint stays identity-neutral either way.
+ */
+const REVEAL_JEWL = process.env.NEXT_PUBLIC_REVEAL_JEWL === 'true';
+const COPILOT_LABEL = REVEAL_JEWL ? 'JEWL' : 'Copilot';
+
 interface CopilotMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -395,8 +403,8 @@ export function JewlChip() {
       {/* Floating chip — always-visible presence */}
       <button
         onClick={() => setOpen(o => !o)}
-        aria-label={open ? 'Close JEWL' : 'Open JEWL'}
-        title="JEWL  ( / or Ctrl-K )"
+        aria-label={open ? `Close ${COPILOT_LABEL}` : `Open ${COPILOT_LABEL}`}
+        title={`${COPILOT_LABEL}  ( / or Ctrl-K )`}
         style={{
           position: 'fixed',
           bottom: 20,
@@ -475,7 +483,7 @@ export function JewlChip() {
                 textTransform: 'uppercase',
               }}
             >
-              ✦ JEWL
+              ✦ {COPILOT_LABEL}
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -533,7 +541,7 @@ export function JewlChip() {
                     marginBottom: 10,
                   }}
                 >
-                  ✦ JEWL
+                  ✦ {COPILOT_LABEL}
                 </div>
                 Ask. I&apos;ve been watching.
               </div>
@@ -573,7 +581,7 @@ export function JewlChip() {
                           marginBottom: 2,
                         }}
                       >
-                        JEWL
+                        {COPILOT_LABEL}
                       </div>
                     )}
                     {m.role === 'user' && m.username && (
@@ -658,7 +666,7 @@ export function JewlChip() {
                           ) : flagTarget === m.id ? null : (
                             <button
                               onClick={() => openFlagPicker(m.id)}
-                              title="Flag JEWL mistake — KRMA bounty"
+                              title="Flag a copilot mistake — KRMA bounty"
                               style={{
                                 background: 'transparent',
                                 border: 'none',
@@ -737,7 +745,7 @@ export function JewlChip() {
                         <textarea
                           value={flagNote}
                           onChange={e => setFlagNote(e.target.value.slice(0, 1000))}
-                          placeholder="Why? (optional — helps JEWL learn)"
+                          placeholder="Why? (optional — helps the copilot learn)"
                           rows={2}
                           style={{
                             background: 'rgba(0,0,0,0.5)',
