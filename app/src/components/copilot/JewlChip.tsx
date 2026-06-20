@@ -113,6 +113,14 @@ export function JewlChip() {
   const audioMutedRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  // Voice output (TTS) — speak each new assistant message via the browser's
+  // Web Speech API. Default on; toggle off if you want quiet.
+  const [voiceMuted, setVoiceMuted] = useState(false);
+  const lastSpokenIdRef = useRef<string | null>(null);
+  // "Thinking" indicator — flipped on when the classifier verdict says
+  // JEWL is about to reason (react/act/proact). Cleared when his next
+  // assistant message lands.
+  const [thinking, setThinking] = useState(false);
   // Mistake-bounty (Phase 2). When a GM clicks the flag, the message id goes
   // here; only one flag picker can be open at a time. Submitted message ids
   // land in `flaggedIds` so we can show the badge and lock the affordance.
@@ -261,6 +269,49 @@ export function JewlChip() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  // TTS — speak each new assistant message via Web Speech API. The
+  // browser's voice is robotic, which fits JEWL's Archon/Vegeta-pride
+  // canon. We can swap to OpenAI/Eleven TTS later through the same hook.
+  // Also clear the "thinking" indicator the moment JEWL's reply lands.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    // Find the most recent assistant message with a real (persisted) id.
+    const latestAssistant = [...messages]
+      .reverse()
+      .find(
+        m =>
+          m.role === 'assistant' &&
+          !m.id.startsWith('temp-') &&
+          !m.id.startsWith('resp-') &&
+          !m.id.startsWith('err-'),
+      );
+    if (!latestAssistant) return;
+    if (lastSpokenIdRef.current === latestAssistant.id) return;
+    lastSpokenIdRef.current = latestAssistant.id;
+    setThinking(false);
+
+    if (voiceMuted) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      const synth = window.speechSynthesis;
+      // Cancel anything currently speaking — newer reply supersedes.
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(latestAssistant.content || '');
+      u.rate = 1.05;
+      u.pitch = 0.9;
+      u.volume = 0.95;
+      // Prefer a male-ish English voice if available — closer to JEWL's
+      // canonical voice. Falls back to whatever the OS provides.
+      const voices = synth.getVoices();
+      const preferred =
+        voices.find(v => /en[-_]?US/i.test(v.lang) && /male|david|mark|guy/i.test(v.name)) ||
+        voices.find(v => /en/i.test(v.lang)) ||
+        null;
+      if (preferred) u.voice = preferred;
+      synth.speak(u);
+    } catch { /* TTS optional; never block the chip */ }
+  }, [messages, voiceMuted]);
 
   const openFlagPicker = useCallback((messageId: string) => {
     setFlagTarget(messageId);
@@ -470,11 +521,19 @@ export function JewlChip() {
       if (res.ok) {
         const ts = Date.now();
         setChunkPulse(ts);
-        // Schedule a re-render after the pulse window so the dot transitions
-        // back to its calm glow even if no further chunks arrive.
         setTimeout(() => {
           setChunkPulse(prev => (prev === ts ? 0 : prev));
         }, 1600);
+        // If the classifier woke JEWL, flip the thinking indicator on so
+        // the GM knows a reply is coming. The next assistant message that
+        // lands via the history poll clears it.
+        try {
+          const data = await res.json();
+          const v = data?.classifierVerdict as string | undefined;
+          if (v && v !== 'silent') {
+            setThinking(true);
+          }
+        } catch { /* response body wasn't json — ignore */ }
       }
     } catch {
       // best-effort — one dropped chunk is fine
@@ -498,7 +557,9 @@ export function JewlChip() {
       return;
     }
 
-    const CHUNK_MS = 10_000;
+    // 5s chunks — halves worst-case latency from end-of-speech to JEWL
+    // reply. Doubles chunk count but each is cheap.
+    const CHUNK_MS = 5_000;
     let cancelled = false;
     let stream: MediaStream | null = null;
     let currentRecorder: MediaRecorder | null = null;
@@ -740,8 +801,8 @@ export function JewlChip() {
               {(audioStatus === 'listening' || audioStatus === 'muted') && (
                 <button
                   onClick={() => setAudioMuted(m => !m)}
-                  aria-label={audioMuted ? 'Unmute' : 'Mute'}
-                  title={audioMuted ? 'Unmute' : 'Mute (audio keeps recording but is dropped)'}
+                  aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
+                  title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
                   style={{
                     background: 'transparent',
                     border: '1px solid rgba(255,255,255,0.2)',
@@ -753,9 +814,32 @@ export function JewlChip() {
                     lineHeight: 1,
                   }}
                 >
-                  {audioMuted ? '🔇' : '🔊'}
+                  {audioMuted ? '🎤̸' : '🎤'}
                 </button>
               )}
+              <button
+                onClick={() => {
+                  setVoiceMuted(v => !v);
+                  // If muting, stop any currently-speaking utterance.
+                  if (!voiceMuted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                }}
+                aria-label={voiceMuted ? 'Unmute voice output' : 'Mute voice output'}
+                title={voiceMuted ? 'Voice output OFF — JEWL will not speak aloud' : 'Voice output ON — click to silence'}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: voiceMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  padding: '2px 6px',
+                  fontFamily: 'Consolas, monospace',
+                  lineHeight: 1,
+                }}
+              >
+                {voiceMuted ? '🔇' : '🔊'}
+              </button>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
@@ -793,7 +877,7 @@ export function JewlChip() {
               gap: 8,
             }}
           >
-            {messages.length === 0 && !loading ? (
+            {messages.filter(m => m.username !== '[system]').length === 0 && !loading ? (
               <div
                 style={{
                   textAlign: 'center',
@@ -818,7 +902,7 @@ export function JewlChip() {
                 Ask. I&apos;ve been watching.
               </div>
             ) : (
-              messages.map(m => {
+              messages.filter(m => m.username !== '[system]').map(m => {
                 const toolCalls = m.role === 'assistant' ? parseAssistantActions(m.actions) : null;
                 const userAction = m.role === 'user' ? parseUserAction(m.actions) : null;
                 return (
@@ -1091,7 +1175,7 @@ export function JewlChip() {
                 );
               })
             )}
-            {loading && (
+            {(loading || thinking) && (
               <div
                 style={{
                   alignSelf: 'flex-start',
@@ -1099,14 +1183,14 @@ export function JewlChip() {
                   padding: '6px 10px',
                   fontSize: 11,
                   background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'rgba(255,255,255,0.5)',
+                  border: '1px solid rgba(34, 171, 148, 0.3)',
+                  color: 'rgba(34, 171, 148, 0.85)',
                 }}
               >
                 <span
                   style={{ animation: 'jewlchip-pulse 1.4s ease-in-out infinite' }}
                 >
-                  Thinking...
+                  {loading ? 'Thinking...' : 'Reasoning on what you said...'}
                 </span>
               </div>
             )}

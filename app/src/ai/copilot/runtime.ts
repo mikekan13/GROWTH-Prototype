@@ -77,6 +77,7 @@ Current build state (2026-06-17, post-memory):
 - Observation surfaces WIRED (12): damage, time advance, character edit, create character/location/item, edit location, delete character/location/item, reparent location, create/abandon goal.
 - Tools REGISTERED: apply_attribute_damage, advance_clock, set_attribute_current, apply_condition, move_character_to_location, propose_forge_blueprint, remember, forget, npc_speak, npc_act, read_actors_state, update_mistake_status, query_mistake_corpus, query_time_metrics.
 - TIME AWARENESS: every dispatch injects a TIME block (real time now, campaign clock cycle, active session info, time-since-last-activity, prep window). Every history line you see is prefixed with [ISO timestamp]. Use these to reason about pacing, prep duration, and content time. Don't guess — call query_time_metrics for richer aggregates (session history, current-session live stats, prep windows, recent activity buckets).
+- VOICE OUTPUT IS ON. Your text reply is read aloud to the GM via browser TTS. KEEP REPLIES SHORT — one to three sentences usually. Skip preambles, skip restating the question, skip Markdown formatting (it's read literally). Plain spoken English. Lists are fine but speak them naturally ("first, second, third"). If a reply NEEDS to be long, do the short spoken summary in the visible text and use the remember tool to stash the detail for later recall.
 - Persistent memory: write via remember(key, value, scope) — 'global' carries across every campaign, 'campaign' stays private to this one. forget(key, scope) deletes. Memories load back into your context on every turn (see YOUR MEMORY block below). This is how you learn from mistakes — after a flag, write a 'mistake-pattern:*' note so the same flavor of error doesn't recur. Memories ARE the training data.
 - NPC actuation MVP: npc_speak({ npcCharacterId, content, tone? }) posts an utterance attributed to the named NPC into the campaign event stream. Validates entityType=NPC, ACTIVE, in this campaign.
 - JEWL has a GodHead row + funded wallet (1B KRMA from Balance, genesis).
@@ -178,15 +179,23 @@ function formatToolResultText(r: JewlToolCallResult): string {
   return JSON.stringify(r.output ?? {}, null, 2);
 }
 
-/** Save the user-side prompt as a CopilotMessage. Returns the id. */
+/** Save the user-side prompt as a CopilotMessage. Returns the id.
+ *
+ * System-generated triggers (TABLE_AMBIENT classifier dispatches,
+ * JEWL_AUTONOMOUS_TICK heartbeats) get username='[system]' so the chip
+ * can filter them out of the visible chat — they're internal prompts
+ * for JEWL's benefit, not human-readable conversation. */
 async function saveUserPrompt(prompt: JewlPrompt): Promise<string> {
+  const isSystemTrigger =
+    prompt.source === 'TABLE_AMBIENT' || prompt.source === 'JEWL_AUTONOMOUS_TICK';
+  const displayName = isSystemTrigger ? '[system]' : prompt.actorName;
   const row = await prisma.copilotMessage.create({
     data: {
       campaignId: prompt.campaignId,
       role: 'user',
       content: prompt.text || (prompt.canvasAction?.intent ?? '(canvas action)'),
       userId: prompt.actorId,
-      username: prompt.actorName,
+      username: displayName,
       actions: JSON.stringify({
         source: prompt.source,
         canvasAction: prompt.canvasAction ?? null,

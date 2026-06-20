@@ -101,19 +101,25 @@ export async function POST(
 
     // Per [[jewl-always-on-audio-when-active]] there is no wake word — JEWL
     // is supposed to decide moment-by-moment whether to react. We delegate
-    // that decision to a cheap Haiku classifier (see classifier.ts). Skip
-    // the classifier when the transcript was a config marker (no real audio
-    // was processed). Fire-and-forget so the audio-chunk POST stays fast.
+    // that decision to a cheap Haiku classifier (see classifier.ts). The
+    // classifier verdict is AWAITED (~500ms Haiku call) so the chip can
+    // show a "thinking" state immediately when JEWL wakes Sonnet. The
+    // Sonnet dispatch (the slow part) is still fire-and-forget inside
+    // maybeFireClassifier — the chip picks the reply up via the 5s poll.
+    let classifierVerdict: string | undefined;
     if (!looksLikeMarker) {
-      void maybeFireClassifier({
-        campaignId,
-        actorId: session.user.id,
-        actorName: session.user.username,
-        actorRole: session.user.role,
-      }).catch(err => {
+      try {
+        const result = await maybeFireClassifier({
+          campaignId,
+          actorId: session.user.id,
+          actorName: session.user.username,
+          actorRole: session.user.role,
+        });
+        classifierVerdict = result?.verdict;
+      } catch (err) {
         // eslint-disable-next-line no-console
         console.error('[audio-chunk] classifier failed:', err);
-      });
+      }
     }
 
     return NextResponse.json({
@@ -121,6 +127,7 @@ export async function POST(
       transcribed: true,
       provider: stt.provider,
       length: transcript.length,
+      classifierVerdict,
     });
   } catch (error) {
     return errorResponse(error);

@@ -67,10 +67,14 @@ type Verdict = 'silent' | 'react' | 'act' | 'proact';
  * Safe to call from a fire-and-forget context — all errors land in the
  * console and never throw to the caller.
  */
-export async function maybeFireClassifier(ctx: ClassifierActorContext): Promise<void> {
+export async function maybeFireClassifier(
+  ctx: ClassifierActorContext,
+): Promise<{ verdict: Verdict; throttled: boolean } | undefined> {
   const now = Date.now();
   const last = lastFireByCampaign.get(ctx.campaignId) ?? 0;
-  if (now - last < CLASSIFIER_MIN_INTERVAL_MS) return;
+  if (now - last < CLASSIFIER_MIN_INTERVAL_MS) {
+    return { verdict: 'silent', throttled: true };
+  }
   lastFireByCampaign.set(ctx.campaignId, now);
 
   let verdict: Verdict = 'silent';
@@ -82,7 +86,7 @@ export async function maybeFireClassifier(ctx: ClassifierActorContext): Promise<
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[classifier] failed:', err);
-    return;
+    return { verdict: 'silent', throttled: false };
   }
 
   // eslint-disable-next-line no-console
@@ -118,7 +122,7 @@ export async function maybeFireClassifier(ctx: ClassifierActorContext): Promise<
     // best-effort diagnostic — don't let it block dispatch
   }
 
-  if (verdict === 'silent') return;
+  if (verdict === 'silent') return { verdict, throttled: false };
 
   const prompt: JewlPrompt = {
     source: 'TABLE_AMBIENT',
@@ -127,11 +131,17 @@ export async function maybeFireClassifier(ctx: ClassifierActorContext): Promise<
     actorName: ctx.actorName,
     actorRole: ctx.actorRole,
     text:
-      `Ambient classifier verdict: ${verdict.toUpperCase()}. ` +
-      `Review the last ~90s of [ambient] transcripts and recent activity in your conversation history. ` +
-      `Decide what to do (reply, run a tool, voice an NPC, log a memory, or — if the classifier was overeager — produce empty output to stay silent).`,
+      `Classifier verdict: ${verdict.toUpperCase()}. ` +
+      `Review the last ~90s of [ambient] transcripts. Reply, run a tool, voice an NPC, or stay silent (empty output) if the classifier was overeager.`,
   };
-  await dispatchPrompt(prompt);
+  // Fire-and-forget the Sonnet dispatch so the audio-chunk POST can return
+  // the verdict immediately. The chip uses the verdict to flip a "thinking"
+  // indicator on; the actual reply lands via the 5s history poll.
+  void dispatchPrompt(prompt).catch(err => {
+    // eslint-disable-next-line no-console
+    console.error('[classifier] dispatch failed:', err);
+  });
+  return { verdict, throttled: false };
 }
 
 async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoning: string }> {
