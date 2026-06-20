@@ -35,6 +35,15 @@ DEVICE = os.environ.get("WHISPER_DEVICE", "cuda")
 COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE", "float16")
 PORT = int(os.environ.get("WHISPER_PORT", "9000"))
 HOST = os.environ.get("WHISPER_HOST", "127.0.0.1")
+# VAD trims silence before transcription. Helps on long files; HURTS on
+# short 10s ambient chunks (often eats the whole window). Default OFF.
+# Set WHISPER_VAD=1 to re-enable if hallucination on silence becomes
+# a problem.
+USE_VAD = os.environ.get("WHISPER_VAD", "0") == "1"
+# Confidence threshold for filtering out hallucinated transcripts on
+# silence. Whisper sometimes emits common phrases ("Thank you.", "Bye.")
+# when fed silence. We drop segments with no_speech_prob above this.
+NO_SPEECH_THRESHOLD = float(os.environ.get("WHISPER_NO_SPEECH_THRESHOLD", "0.6"))
 
 
 # Loaded once at startup; the WhisperModel object is thread-safe for
@@ -102,15 +111,26 @@ async def transcribe(
             data = await file.read()
             tmp.write(data)
 
-        # vad_filter trims silence — saves a lot of compute on 10s ambient
-        # chunks that are 80% silence. beam_size=5 is the upstream default.
-        segments, info = _model.transcribe(
+        # VAD off by default — on 10s ambient chunks it tends to trim
+        # everything as silence (see USE_VAD env var to re-enable).
+        # no_speech_threshold filters Whisper's silence-hallucinations
+        # ("Thank you.", "Bye.") which it loves to emit on quiet input.
+        segments_iter, info = _model.transcribe(
             tmp_path,
-            vad_filter=True,
+            vad_filter=USE_VAD,
             beam_size=5,
             language=language,
+            no_speech_threshold=NO_SPEECH_THRESHOLD,
+            condition_on_previous_text=False,
         )
-        text = "".join(seg.text for seg in segments).strip()
+        kept = []
+        for seg in segments_iter:
+            # Skip segments the model is confident are silence.
+            no_speech = getattr(seg, "no_speech_prob", 0.0)
+            if no_speech is not None and no_speech >= NO_SPEECH_THRESHOLD:
+                continue
+            kept.append(seg.text)
+        text = "".join(kept).strip()
         return JSONResponse({"text": text, "language": info.language})
     finally:
         if tmp_path and os.path.exists(tmp_path):
