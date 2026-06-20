@@ -24,42 +24,23 @@ interface CachedVocab {
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, CachedVocab>();
 
-// Canon names + GROWTH mechanics terms that should ALWAYS prime Whisper.
-// Pulled from memory/MEMORY.md ⚡ READ FIRST. If you add a name here,
-// remember it counts against Whisper's prompt budget — keep it tight.
+// Canon names that should ALWAYS prime Whisper. Kept TIGHT — every word
+// here biases Whisper toward emitting it on silence (Whisper "hears" what
+// it was primed on). Only add names that are routinely spoken aloud.
+// Lore-deep cosmology terms (Sephirot names, Yaldabaoth, etc.) were
+// removed after they started showing up as hallucinations on silence.
 const CANON_GLOBAL = [
-  // Prime Party
+  // Prime Party — actively named in conversation
   'Val Pendragon',
   'Tara Almswood',
   'Kai',
   "Et'herling",
-  'Triu',
-  'Thomas',
-  // The copilot itself
+  // JEWL himself
   'JEWL',
-  'Yaldabaoth',
-  // Other Prime cosmology
-  'Ma\'lo',
-  'Selva',
-  'Trayman',
-  'Vincent',
-  'Bart',
-  // GROWTH mechanics terms
+  // Core mechanics terms — said in nearly every session
   'KRMA',
-  'Frequency',
-  'Nectar',
-  'Thorn',
-  'GRO.vine',
-  'Sephirot',
-  'Tiberoak',
-  'Wretched',
-  'Eutropian',
-  'Alkahest',
-  // App roles
-  'Watcher',
-  'Trailblazer',
+  'GROWTH',
   'Godhead',
-  'Sephirot',
 ];
 
 export async function buildSttVocabulary(campaignId: string): Promise<string> {

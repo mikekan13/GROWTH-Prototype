@@ -139,7 +139,38 @@ _HALLUCINATION_PHRASES = {
     "silence",
     "yeah",
     "right",
+    # YouTube-style content hallucinations (observed 2026-06-20):
+    "do you guys have questions",
+    "support the channel",
+    "in our comments",
+    "if you re interested in the channel",
+    "starting this video now",
+    "comments",
 }
+
+
+def _is_repetition_hallucination(text: str) -> bool:
+    """Drop transcripts that are just the same word repeated."""
+    tokens = [t for t in text.lower().split() if t.isalpha()]
+    if len(tokens) < 3:
+        return False
+    # If the most common token is ≥60% of all tokens, it's a loop.
+    counts: dict = {}
+    for t in tokens:
+        counts[t] = counts.get(t, 0) + 1
+    top = max(counts.values())
+    return top / len(tokens) >= 0.6
+
+
+def _is_letter_noise(text: str) -> bool:
+    """Drop transcripts that are mostly single-letter tokens — Whisper's
+    classic 'garbled noise' output looks like 'A-B-C-D-E-Z-X-T-Q-...'."""
+    cleaned = text.replace("-", " ").replace(",", " ")
+    tokens = [t for t in cleaned.split() if t]
+    if len(tokens) < 5:
+        return False
+    short = sum(1 for t in tokens if len(t) <= 2)
+    return short / len(tokens) >= 0.6
 
 
 def _looks_like_hallucination(
@@ -162,6 +193,15 @@ def _looks_like_hallucination(
         return True
     if norm in _HALLUCINATION_PHRASES:
         return True
+    # Substring match against the phrase list — catches longer hallucinations
+    # that wrap a known phrase ("do you guys have questions if so we'd...").
+    for phrase in _HALLUCINATION_PHRASES:
+        if len(phrase) >= 12 and phrase in norm:
+            return True
+    if _is_repetition_hallucination(text):
+        return True
+    if _is_letter_noise(text):
+        return True
     if compression_ratio and compression_ratio > 2.4:
         return True
     if avg_logprob and avg_logprob < -1.0 and len(norm) < 12:
@@ -180,9 +220,14 @@ HOST = os.environ.get("WHISPER_HOST", "127.0.0.1")
 # a problem.
 USE_VAD = os.environ.get("WHISPER_VAD", "0") == "1"
 # Confidence threshold for filtering out hallucinated transcripts on
-# silence. Whisper sometimes emits common phrases ("Thank you.", "Bye.")
-# when fed silence. We drop segments with no_speech_prob above this.
-NO_SPEECH_THRESHOLD = float(os.environ.get("WHISPER_NO_SPEECH_THRESHOLD", "0.6"))
+# silence. Tuned UP from 0.6 → 0.7 since we now also bias with an
+# initial_prompt which made hallucinations more frequent.
+NO_SPEECH_THRESHOLD = float(os.environ.get("WHISPER_NO_SPEECH_THRESHOLD", "0.7"))
+# RMS amplitude floor — chunks quieter than this are skipped entirely
+# (Whisper isn't even called). Stops the YouTube-style content
+# hallucinations on pure room-tone + keyboard clicks. Tune via env.
+# Typical speech RMS is 0.01-0.1; ambient room noise is 0.001-0.005.
+SILENCE_RMS_THRESHOLD = float(os.environ.get("WHISPER_SILENCE_RMS", "0.008"))
 
 
 # Loaded once at startup; the WhisperModel object is thread-safe for
@@ -251,15 +296,43 @@ async def transcribe(
             data = await file.read()
             tmp.write(data)
 
+        # AMPLITUDE PRE-CHECK — decode the audio once and bail out
+        # cheaply if the chunk is below the silence floor. Whisper's
+        # YouTube-derived training causes it to hallucinate "Thank you"
+        # / "Subscribe" / random text on pure silence; the only reliable
+        # fix is not calling it on silent audio in the first place.
+        try:
+            from faster_whisper.audio import decode_audio
+            import numpy as np
+
+            audio_array = decode_audio(tmp_path, sampling_rate=16000)
+            if audio_array is not None and len(audio_array) > 0:
+                rms = float(np.sqrt(np.mean(np.square(audio_array))))
+                if rms < SILENCE_RMS_THRESHOLD:
+                    return JSONResponse({
+                        "text": "",
+                        "language": "en",
+                        "skipped": "below_silence_floor",
+                        "rms": rms,
+                    })
+            else:
+                # Couldn't decode — fall through and let whisper try.
+                audio_array = None
+        except Exception as _e:
+            # Decoder hiccup — fall through to whisper rather than fail
+            # closed. Whisper will redo its own decode internally.
+            audio_array = None
+
         # VAD off by default — on short ambient chunks it tends to trim
         # everything as silence (see USE_VAD env var to re-enable).
         # `initial_prompt` is the lever for proper-noun recognition:
         # the caller passes a short string of names that exist in the
-        # campaign (PCs, NPCs, locations, cosmology terms) and Whisper
-        # biases toward them instead of substituting phonetic
-        # neighbors ("Valmir" → "found me" without it).
+        # campaign (PCs, NPCs, locations) and Whisper biases toward
+        # them instead of substituting phonetic neighbors.
+        # Pass the pre-decoded array when we have it to avoid re-decoding.
+        whisper_input = audio_array if audio_array is not None else tmp_path
         segments_iter, info = _model.transcribe(
-            tmp_path,
+            whisper_input,
             vad_filter=USE_VAD,
             beam_size=5,
             language=language,
