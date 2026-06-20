@@ -2,3 +2,8 @@ faster-whisper>=1.0.3
 fastapi>=0.110
 uvicorn[standard]>=0.27
 python-multipart>=0.0.9
+# CUDA libraries — ctranslate2's wheels don't bundle cuBLAS/cuDNN on
+# Windows, so install the official Nvidia pip packages. server.py adds
+# their bin/ directories to the Windows DLL search path at startup.
+nvidia-cublas-cu12
+nvidia-cudnn-cu12

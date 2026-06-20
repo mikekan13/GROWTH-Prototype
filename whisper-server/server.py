@@ -22,9 +22,88 @@ Commercially safe to ship.
 """
 
 import os
+import sys
 import tempfile
 from contextlib import asynccontextmanager
 from typing import Optional
+
+
+def _register_cuda_dll_dirs() -> None:
+    """On Windows, ctranslate2 doesn't always find the cuBLAS / cuDNN DLLs
+    shipped by the `nvidia-cublas-cu12` / `nvidia-cudnn-cu12` pip packages.
+    Walk every site-packages-style location we can find and register any
+    `nvidia/.../bin` directory with the DLL search path."""
+    if sys.platform != "win32":
+        return
+    add = getattr(os, "add_dll_directory", None)
+    if add is None:
+        return
+
+    bases: list[str] = []
+    try:
+        import sysconfig
+
+        for key in ("purelib", "platlib"):
+            p = sysconfig.get_paths().get(key)
+            if p and p not in bases:
+                bases.append(p)
+    except Exception:
+        pass
+    try:
+        import site
+
+        for p in site.getsitepackages():
+            if p not in bases:
+                bases.append(p)
+        usp = site.getusersitepackages()
+        if usp and usp not in bases:
+            bases.append(usp)
+    except Exception:
+        pass
+
+    registered: list[str] = []
+    for base in bases:
+        nvidia_root = os.path.join(base, "nvidia")
+        if not os.path.isdir(nvidia_root):
+            continue
+        # nvidia/* package layout puts DLLs in nvidia/<pkg>/bin
+        for pkg in os.listdir(nvidia_root):
+            bin_dir = os.path.join(nvidia_root, pkg, "bin")
+            if os.path.isdir(bin_dir):
+                try:
+                    add(bin_dir)
+                except OSError:
+                    pass
+                registered.append(bin_dir)
+    # Also prepend to PATH — ctranslate2 calls LoadLibrary from C++ and
+    # add_dll_directory isn't always honored on that codepath. PATH is.
+    if registered:
+        existing = os.environ.get("PATH", "")
+        os.environ["PATH"] = os.pathsep.join(registered) + os.pathsep + existing
+    # And preload the critical DLLs explicitly via ctypes — once loaded
+    # into the process, ctranslate2 will find them by handle. Belt and
+    # suspenders; nothing breaks if a particular file isn't present.
+    try:
+        import ctypes
+
+        for bin_dir in registered:
+            for fname in os.listdir(bin_dir):
+                if not fname.lower().endswith(".dll"):
+                    continue
+                full = os.path.join(bin_dir, fname)
+                try:
+                    ctypes.WinDLL(full)
+                except OSError:
+                    pass
+    except Exception:
+        pass
+    print(
+        f"[whisper-server] registered {len(registered)} CUDA DLL director{'y' if len(registered) == 1 else 'ies'}: {registered}",
+        flush=True,
+    )
+
+
+_register_cuda_dll_dirs()
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
