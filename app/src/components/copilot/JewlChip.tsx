@@ -481,9 +481,11 @@ export function JewlChip() {
     }
   }, [campaignId]);
 
-  // Always-on audio: start a MediaRecorder the moment the chip mounts on
-  // a campaign page. Permission is requested once per origin; subsequent
-  // mounts auto-resume if granted. Chunks emit every 10s.
+  // Always-on audio: every CHUNK_MS we stop and restart the MediaRecorder
+  // so each emitted blob is a complete, standalone container (valid webm
+  // header etc.) that the server can decode in isolation. Using
+  // `MediaRecorder.start(timeslice)` produces header-less fragment chunks
+  // that ffmpeg/pyav reject — that's the trap we hit in the first wiring.
   useEffect(() => {
     if (!campaignId) return;
     if (typeof window === 'undefined') return;
@@ -496,9 +498,49 @@ export function JewlChip() {
       return;
     }
 
+    const CHUNK_MS = 10_000;
     let cancelled = false;
-    let recorder: MediaRecorder | null = null;
     let stream: MediaStream | null = null;
+    let currentRecorder: MediaRecorder | null = null;
+    let cycleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const startCycle = (mimeType: string) => {
+      if (cancelled || !stream) return;
+      // Pick parts collected during this cycle. ondataavailable usually
+      // fires once on stop(), but we accumulate just in case.
+      const parts: Blob[] = [];
+      let recorder: MediaRecorder;
+      try {
+        recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+      } catch {
+        setAudioStatus('idle');
+        return;
+      }
+      currentRecorder = recorder;
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = ev => {
+        if (ev.data && ev.data.size > 0) parts.push(ev.data);
+      };
+      recorder.onerror = () => setAudioStatus('idle');
+      recorder.onstop = () => {
+        if (parts.length > 0) {
+          const finalBlob = new Blob(parts, { type: recorder.mimeType || mimeType });
+          void sendAudioChunk(finalBlob);
+        }
+        // Chain the next cycle immediately — micro-gap (~ms) is acceptable.
+        if (!cancelled) startCycle(mimeType);
+      };
+
+      recorder.start();
+      cycleTimer = setTimeout(() => {
+        try {
+          if (recorder.state === 'recording') recorder.stop();
+        } catch { /* ignore */ }
+      }, CHUNK_MS);
+    };
 
     (async () => {
       setAudioStatus('requesting');
@@ -508,7 +550,6 @@ export function JewlChip() {
           stream.getTracks().forEach(t => t.stop());
           return;
         }
-        // Pick the most widely supported codec the browser advertises.
         const preferredTypes = [
           'audio/webm;codecs=opus',
           'audio/webm',
@@ -516,21 +557,9 @@ export function JewlChip() {
           'audio/mp4',
         ];
         const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) || '';
-        recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
-
-        recorder.ondataavailable = ev => {
-          if (ev.data && ev.data.size > 0) {
-            void sendAudioChunk(ev.data);
-          }
-        };
-        recorder.onerror = () => setAudioStatus('idle');
-
-        recorder.start(10_000); // emit a chunk every 10 seconds
-        mediaRecorderRef.current = recorder;
         mediaStreamRef.current = stream;
         setAudioStatus(audioMutedRef.current ? 'muted' : 'listening');
+        startCycle(mimeType);
       } catch {
         if (!cancelled) setAudioStatus('denied');
       }
@@ -538,8 +567,13 @@ export function JewlChip() {
 
     return () => {
       cancelled = true;
+      if (cycleTimer) clearTimeout(cycleTimer);
       try {
-        if (recorder && recorder.state !== 'inactive') recorder.stop();
+        if (currentRecorder && currentRecorder.state !== 'inactive') {
+          // Detach onstop so it doesn't restart a new cycle after cleanup.
+          currentRecorder.onstop = null;
+          currentRecorder.stop();
+        }
       } catch { /* ignore */ }
       try {
         stream?.getTracks().forEach(t => t.stop());
