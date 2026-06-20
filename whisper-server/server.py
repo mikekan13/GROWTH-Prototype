@@ -109,6 +109,66 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 
+# Common Whisper silence-hallucinations. When the audio is mostly quiet,
+# Whisper emits one of these with high confidence. Trim trailing
+# punctuation / whitespace / case for matching.
+_HALLUCINATION_PHRASES = {
+    "thank you",
+    "thanks",
+    "thank you for watching",
+    "thanks for watching",
+    "thank you for watching this video",
+    "bye",
+    "goodbye",
+    "see you",
+    "see you next time",
+    "see you later",
+    "you",
+    "i",
+    "okay",
+    "ok",
+    "hmm",
+    "uh",
+    "um",
+    "subscribe",
+    "like and subscribe",
+    "please subscribe",
+    "music",
+    "applause",
+    "laughter",
+    "silence",
+    "yeah",
+    "right",
+}
+
+
+def _looks_like_hallucination(
+    text: str,
+    avg_logprob: float = 0.0,
+    compression_ratio: float = 0.0,
+) -> bool:
+    """Heuristic: is this segment a Whisper silence-hallucination?
+
+    - Strip punctuation/whitespace; lowercase. If the normalized form is
+      in the known-phrase blocklist, drop it.
+    - High compression_ratio (>2.4) = repeated tokens = hallucination loop.
+    - Very low avg_logprob (<-1.0) = model is guessing; on a short segment
+      that's almost certainly noise.
+    - Segments shorter than 3 chars on a 10s chunk are noise."""
+    norm = "".join(c for c in text.lower() if c.isalpha() or c.isspace()).strip()
+    if not norm:
+        return True
+    if len(norm) < 3:
+        return True
+    if norm in _HALLUCINATION_PHRASES:
+        return True
+    if compression_ratio and compression_ratio > 2.4:
+        return True
+    if avg_logprob and avg_logprob < -1.0 and len(norm) < 12:
+        return True
+    return False
+
+
 MODEL_NAME = os.environ.get("WHISPER_MODEL", "small.en")
 DEVICE = os.environ.get("WHISPER_DEVICE", "cuda")
 COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE", "float16")
@@ -192,8 +252,6 @@ async def transcribe(
 
         # VAD off by default — on 10s ambient chunks it tends to trim
         # everything as silence (see USE_VAD env var to re-enable).
-        # no_speech_threshold filters Whisper's silence-hallucinations
-        # ("Thank you.", "Bye.") which it loves to emit on quiet input.
         segments_iter, info = _model.transcribe(
             tmp_path,
             vad_filter=USE_VAD,
@@ -204,9 +262,17 @@ async def transcribe(
         )
         kept = []
         for seg in segments_iter:
-            # Skip segments the model is confident are silence.
             no_speech = getattr(seg, "no_speech_prob", 0.0)
             if no_speech is not None and no_speech >= NO_SPEECH_THRESHOLD:
+                continue
+            # Whisper's classic silence-hallucinations ("Thank you.", "Bye.",
+            # "you", "Thanks for watching") have LOW no_speech_prob because
+            # the model genuinely thinks it heard them. Filter by phrase.
+            avg_logprob = getattr(seg, "avg_logprob", 0.0)
+            compression_ratio = getattr(seg, "compression_ratio", 0.0)
+            if _looks_like_hallucination(
+                seg.text, avg_logprob=avg_logprob, compression_ratio=compression_ratio,
+            ):
                 continue
             kept.append(seg.text)
         text = "".join(kept).strip()

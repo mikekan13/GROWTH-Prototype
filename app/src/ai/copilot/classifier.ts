@@ -74,12 +74,48 @@ export async function maybeFireClassifier(ctx: ClassifierActorContext): Promise<
   lastFireByCampaign.set(ctx.campaignId, now);
 
   let verdict: Verdict = 'silent';
+  let reasoning = '';
   try {
-    verdict = await classify(ctx.campaignId);
+    const out = await classify(ctx.campaignId);
+    verdict = out.verdict;
+    reasoning = out.reasoning;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[classifier] failed:', err);
     return;
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`[classifier] campaign=${ctx.campaignId} verdict=${verdict}${reasoning ? ` (${reasoning})` : ''}`);
+
+  // Stamp the verdict onto the most recent ambient message so the chip
+  // can show why JEWL stayed silent (or fired). Lightweight diagnostic
+  // surface — no UI yet, but the data is queryable.
+  try {
+    const latest = await prisma.copilotMessage.findFirst({
+      where: { campaignId: ctx.campaignId, username: '[ambient]' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, actions: true },
+    });
+    if (latest) {
+      let existing: Record<string, unknown> = {};
+      try {
+        existing = latest.actions ? JSON.parse(latest.actions) : {};
+      } catch { /* ignore */ }
+      await prisma.copilotMessage.update({
+        where: { id: latest.id },
+        data: {
+          actions: JSON.stringify({
+            ...existing,
+            classifierVerdict: verdict,
+            classifierReasoning: reasoning || undefined,
+            classifierAt: new Date().toISOString(),
+          }),
+        },
+      });
+    }
+  } catch {
+    // best-effort diagnostic — don't let it block dispatch
   }
 
   if (verdict === 'silent') return;
@@ -98,7 +134,7 @@ export async function maybeFireClassifier(ctx: ClassifierActorContext): Promise<
   await dispatchPrompt(prompt);
 }
 
-async function classify(campaignId: string): Promise<Verdict> {
+async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoning: string }> {
   const cutoff = new Date(Date.now() - CONTEXT_WINDOW_MS);
   const recent = await prisma.copilotMessage.findMany({
     where: { campaignId, createdAt: { gte: cutoff } },
@@ -111,7 +147,7 @@ async function classify(campaignId: string): Promise<Verdict> {
       createdAt: true,
     },
   });
-  if (recent.length === 0) return 'silent';
+  if (recent.length === 0) return { verdict: 'silent', reasoning: 'no recent activity' };
 
   const lines = recent
     .reverse()
@@ -127,17 +163,24 @@ async function classify(campaignId: string): Promise<Verdict> {
     'to the table continuously and decides moment-by-moment whether to engage.',
     'Your only job is to classify the most recent activity into ONE of:',
     '',
-    '  silent  - nothing meaningful; nobody addressed JEWL; no tool fits; nothing to log.',
-    '  react   - the GM or a player said something JEWL should respond to or comment on.',
-    '  act     - a tool call is clearly warranted (apply damage, advance clock, create entity, voice an NPC, etc.).',
-    '  proact  - the GM hasn\'t asked but JEWL should initiate (continuity gap, missed clock, NPC reaction overdue).',
+    '  silent  - genuine silence, table noise, hallucinated transcripts ("Thank you.", "Bye.", "you"), or content JEWL has already responded to in the most recent assistant turn.',
+    '  react   - someone (GM or player) said something that wants an answer, a comment, or a confirmation. Default to react when in doubt — JEWL can choose to stay quiet at the Sonnet layer.',
+    '  act     - a tool call is clearly warranted (apply damage, advance clock, create an entity, voice an NPC, move a character, etc.).',
+    '  proact  - the GM has not asked but a real continuity beat is overdue (missed clock advance, an NPC was addressed and has not replied, time-since-last-activity is long enough that JEWL should check in).',
     '',
-    'BE STRICT. Default to silent. JEWL\'s pride depends on not being noisy.',
-    '"react" only when someone is asking a question or making a statement that wants a reply.',
-    '"act" only when a tool would obviously trigger.',
-    '"proact" only when there\'s a real continuity beat the GM forgot.',
+    'Rules:',
+    '- DROP silence-hallucinations: "Thank you.", "Thanks for watching.", "Bye.", standalone "you", "I", "music", "applause" → silent.',
+    '- If recent transcripts look like real speech with content (>~5 words OR a clear question/command), prefer react over silent.',
+    '- If JEWL already replied to the same content in his last assistant turn, do NOT fire again → silent.',
+    '- If the audio is just background or one-off noise → silent.',
     '',
-    'OUTPUT EXACTLY ONE WORD on a single line: silent, react, act, or proact. Nothing else.',
+    'OUTPUT FORMAT: a single line with the verdict, then optionally a colon and a short reason (under 80 chars). Examples:',
+    '  silent: hallucinated "Thank you."',
+    '  react: GM asked about Tara\'s status',
+    '  act: GM said "advance the clock by an hour"',
+    '  proact: 4 min of silence after combat ended',
+    '',
+    'Verdict word MUST be the first token. Reason is optional but encouraged.',
   ].join('\n');
 
   const user = [
@@ -151,7 +194,7 @@ async function classify(campaignId: string): Promise<Verdict> {
   const client = getClient();
   const res = await client.messages.create({
     model: CLASSIFIER_MODEL,
-    max_tokens: 8,
+    max_tokens: 96,
     temperature: 0,
     system,
     messages: [{ role: 'user', content: user }],
@@ -160,10 +203,16 @@ async function classify(campaignId: string): Promise<Verdict> {
     .filter(b => b.type === 'text')
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('')
-    .toLowerCase()
     .trim();
-  if (text.startsWith('react')) return 'react';
-  if (text.startsWith('act')) return 'act';
-  if (text.startsWith('proact')) return 'proact';
-  return 'silent';
+  const lower = text.toLowerCase();
+  // Capture the optional reason — everything after the first colon.
+  const reasonMatch = text.match(/:\s*(.+)$/);
+  const reasoning = reasonMatch ? reasonMatch[1].trim() : '';
+  let verdict: Verdict = 'silent';
+  // Order matters: check 'proact' before 'react' since 'proactive' contains 'react'.
+  if (lower.startsWith('proact')) verdict = 'proact';
+  else if (lower.startsWith('react')) verdict = 'react';
+  else if (lower.startsWith('act')) verdict = 'act';
+  else verdict = 'silent';
+  return { verdict, reasoning };
 }
