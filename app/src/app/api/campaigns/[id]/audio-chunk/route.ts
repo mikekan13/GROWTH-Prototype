@@ -21,6 +21,7 @@ import { errorResponse } from '@/lib/api';
 import { prisma } from '@/lib/db';
 import { transcribeAudio } from '@/ai/providers/stt';
 import { maybeFireClassifier } from '@/ai/copilot/classifier';
+import { buildSttVocabulary } from '@/services/stt-vocabulary';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,11 +54,16 @@ export async function POST(
       }
     }
 
+    // Build campaign-specific Whisper vocab (PCs + NPCs + locations +
+    // canon names) to bias against phonetic-neighbor substitutions like
+    // "Valmir" → "found me". Cached per-campaign for 60s.
+    const initialPrompt = await buildSttVocabulary(campaignId);
+
     // Transcribe. The pipe handles "no provider configured" gracefully — it
     // returns a marker transcript; we log it once per session so the GM
     // sees the system is wired but the API key isn't set, instead of
     // wondering why JEWL stays silent.
-    const stt = await transcribeAudio(dataUrl);
+    const stt = await transcribeAudio(dataUrl, { initialPrompt });
     const transcript = stt.transcript.trim();
 
     if (!transcript) {

@@ -56,8 +56,17 @@ function parseAudioDataUrl(url: string): { mediaType: string; base64: string } |
  * Transcribe a single audio data URL. Returns a result with `provider` set
  * to 'none' when no provider is configured — callers should treat that as
  * a soft failure (route as text marker, don't throw).
+ *
+ * `initialPrompt` is forwarded to providers that support it (OpenAI's
+ * Whisper API does; faster-whisper does). Use it for proper-noun
+ * biasing — pass a short string of names the speaker is likely to
+ * use (PCs, NPCs, locations, cosmology terms) and Whisper will
+ * stop substituting phonetic neighbors.
  */
-export async function transcribeAudio(dataUrl: string): Promise<SttResult> {
+export async function transcribeAudio(
+  dataUrl: string,
+  options: { initialPrompt?: string } = {},
+): Promise<SttResult> {
   const parsed = parseAudioDataUrl(dataUrl);
   if (!parsed) {
     return {
@@ -84,6 +93,7 @@ export async function transcribeAudio(dataUrl: string): Promise<SttResult> {
         apiKey: process.env.OPENAI_API_KEY,
         model: process.env.OPENAI_STT_MODEL || 'whisper-1',
         missingKeyMessage: '[STT_PROVIDER=openai but OPENAI_API_KEY not set]',
+        initialPrompt: options.initialPrompt,
       });
     case 'whisper-local':
       return openAiCompatibleTranscribe(parsed, {
@@ -97,6 +107,7 @@ export async function transcribeAudio(dataUrl: string): Promise<SttResult> {
         model: process.env.WHISPER_LOCAL_MODEL || 'Systran/faster-whisper-base.en',
         // No "missing key" marker — local servers are valid without one.
         missingKeyMessage: null,
+        initialPrompt: options.initialPrompt,
       });
     default:
       return {
@@ -113,6 +124,8 @@ interface OpenAiCompatibleConfig {
   model: string;
   /** If set and apiKey is missing, return this marker instead of calling. */
   missingKeyMessage: string | null;
+  /** Whisper initial-prompt for proper-noun biasing. */
+  initialPrompt?: string;
 }
 
 /**
@@ -142,6 +155,9 @@ async function openAiCompatibleTranscribe(
   form.append('file', blob, `audio.${ext}`);
   form.append('model', cfg.model);
   form.append('response_format', 'json');
+  if (cfg.initialPrompt && cfg.initialPrompt.trim()) {
+    form.append('prompt', cfg.initialPrompt.trim());
+  }
 
   const headers: Record<string, string> = {};
   if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`;

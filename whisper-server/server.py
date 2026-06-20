@@ -233,6 +233,7 @@ async def transcribe(
     model: Optional[str] = Form(None),
     language: Optional[str] = Form(None),
     response_format: Optional[str] = Form("json"),
+    prompt: Optional[str] = Form(None),
 ):
     """OpenAI Audio API-compatible endpoint. We ignore the `model` form
     field — the server runs whatever model was loaded at startup. JEWL
@@ -250,8 +251,13 @@ async def transcribe(
             data = await file.read()
             tmp.write(data)
 
-        # VAD off by default — on 10s ambient chunks it tends to trim
+        # VAD off by default — on short ambient chunks it tends to trim
         # everything as silence (see USE_VAD env var to re-enable).
+        # `initial_prompt` is the lever for proper-noun recognition:
+        # the caller passes a short string of names that exist in the
+        # campaign (PCs, NPCs, locations, cosmology terms) and Whisper
+        # biases toward them instead of substituting phonetic
+        # neighbors ("Valmir" → "found me" without it).
         segments_iter, info = _model.transcribe(
             tmp_path,
             vad_filter=USE_VAD,
@@ -259,6 +265,7 @@ async def transcribe(
             language=language,
             no_speech_threshold=NO_SPEECH_THRESHOLD,
             condition_on_previous_text=False,
+            initial_prompt=prompt or None,
         )
         kept = []
         for seg in segments_iter:
