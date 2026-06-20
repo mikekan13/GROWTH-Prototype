@@ -117,6 +117,10 @@ export function JewlChip() {
   // Web Speech API. Default on; toggle off if you want quiet.
   const [voiceMuted, setVoiceMuted] = useState(false);
   const lastSpokenIdRef = useRef<string | null>(null);
+  // True until the chip has done its FIRST history load. Anything already in
+  // history when the chip mounts is treated as "already spoken" so we don't
+  // replay yesterday's reply every page refresh.
+  const initialHistoryLoadedRef = useRef(false);
   // "Thinking" indicator — flipped on when the classifier verdict says
   // JEWL is about to reason (react/act/proact). Cleared when his next
   // assistant message lands.
@@ -187,7 +191,23 @@ export function JewlChip() {
 
     fetch(`/api/campaigns/${campaignId}/copilot/history`)
       .then(r => (r.ok ? r.json() : { messages: [] }))
-      .then(d => setMessages(d.messages || []))
+      .then(d => {
+        const loaded = (d.messages || []) as CopilotMessage[];
+        // Mark the most recent assistant message as "already spoken" so
+        // TTS doesn't read history out loud on first mount.
+        const latestAssistantId = [...loaded]
+          .reverse()
+          .find(m => m.role === 'assistant')?.id;
+        if (latestAssistantId) {
+          lastSpokenIdRef.current = latestAssistantId;
+        } else {
+          // No assistant yet — still mark as initialized so the next
+          // message (which IS new) will speak.
+          lastSpokenIdRef.current = '__none__';
+        }
+        initialHistoryLoadedRef.current = true;
+        setMessages(loaded);
+      })
       .catch(() => {});
 
     // Load this campaign's mistake flags. The endpoint returns all GMs' flags;
@@ -276,6 +296,10 @@ export function JewlChip() {
   // Also clear the "thinking" indicator the moment JEWL's reply lands.
   useEffect(() => {
     if (messages.length === 0) return;
+    // Defer until first history fetch has completed — otherwise the very
+    // first render would mark the latest historical assistant message as
+    // "new" and read it aloud.
+    if (!initialHistoryLoadedRef.current) return;
     // Find the most recent assistant message with a real (persisted) id.
     const latestAssistant = [...messages]
       .reverse()
@@ -526,12 +550,14 @@ export function JewlChip() {
         }, 1600);
         // If the classifier woke JEWL, flip the thinking indicator on so
         // the GM knows a reply is coming. The next assistant message that
-        // lands via the history poll clears it.
+        // lands via the history poll clears it. Safety timeout at 45s so
+        // a silently-failed dispatch can't lock the indicator on forever.
         try {
           const data = await res.json();
           const v = data?.classifierVerdict as string | undefined;
           if (v && v !== 'silent') {
             setThinking(true);
+            setTimeout(() => setThinking(false), 45_000);
           }
         } catch { /* response body wasn't json — ignore */ }
       }
