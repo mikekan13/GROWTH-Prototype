@@ -16,6 +16,13 @@ node_modules/
 # Beta codebase (reference only, not part of the build)
 GRO.WTH Beta/
 
+# Dev launcher logs (boot.ps1 writes here — OUTSIDE app/ so webpack doesn't watch them)
+logs/
+
+# Local-only Claude settings (project settings.json IS committed)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
 # Secrets — never commit env files at any depth
 .env
 .env.*
