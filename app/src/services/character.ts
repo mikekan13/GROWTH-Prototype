@@ -6,6 +6,7 @@ import { createDefaultCharacter } from '@/lib/defaults';
 import { createChangeLogEntry } from '@/services/changelog';
 import { applyCreationGrants, loadMechanicsForgeItems, type AssignMechanicsInput } from '@/services/character-grants';
 import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
+import { broadcastEvent } from '@/lib/campaign-stream';
 import type { GrowthCharacter } from '@/types/growth';
 
 // --- Schemas ---
@@ -343,14 +344,97 @@ export async function setCanvasPosition(
     throw new ForbiddenError('Only the GM can place characters on the canvas');
   }
 
-  const existing = JSON.parse(character.data) as GrowthCharacter & { canvasX?: number; canvasY?: number };
+  const existing = JSON.parse(character.data) as GrowthCharacter & {
+    canvasX?: number;
+    canvasY?: number;
+    hiddenFromCanvas?: boolean;
+  };
   existing.canvasX = input.x;
   existing.canvasY = input.y;
+  // Placing always overrides any prior hide — `place_character_on_canvas`
+  // and the GM's drag gesture both mean "make this visible".
+  if (existing.hiddenFromCanvas) delete existing.hiddenFromCanvas;
 
-  return prisma.character.update({
+  const updated = await prisma.character.update({
     where: { id: characterId },
     data: { data: JSON.stringify(existing) },
   });
+
+  // Tell the live canvas to re-fetch — without this the placement lands in the
+  // DB but the already-mounted canvas never shows the card (the 2026-06-20 bug).
+  if (character.campaignId) {
+    broadcastEvent(character.campaignId, {
+      kind: 'character_update',
+      characterId,
+      characterName: character.name,
+      fields: ['canvasX', 'canvasY'],
+    });
+  }
+
+  return updated;
+}
+
+/**
+ * GM removes a character card from the campaign canvas — the character
+ * itself is untouched (status stays ACTIVE, all sheet data preserved).
+ *
+ * Two layers of "on canvas" exist:
+ *   1. Explicit placement — canvasX/canvasY set via setCanvasPosition.
+ *   2. Auto-show — APPROVED/ACTIVE characters land on the canvas with
+ *      a fallback position even without canvasX/Y (see page.tsx).
+ *
+ * To hide an auto-show character we have to set `hiddenFromCanvas: true`
+ * since stripping canvasX/Y alone wouldn't be enough. To hide an explicit
+ * placement we also strip the coords so a future place call starts fresh.
+ *
+ * `setCanvasPosition` clears `hiddenFromCanvas`, so re-placing the
+ * character (manually or via the JEWL tool) brings it back.
+ */
+export async function removeCanvasPosition(
+  characterId: string,
+  gmUserId: string,
+  gmRole: string,
+) {
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: { campaign: { select: { gmUserId: true } } },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!canEditCharacter(gmUserId, gmRole, character)) {
+    throw new ForbiddenError('Only the GM can remove characters from the canvas');
+  }
+
+  const existing = JSON.parse(character.data) as GrowthCharacter & {
+    canvasX?: number;
+    canvasY?: number;
+    hiddenFromCanvas?: boolean;
+  };
+  const wasOnCanvas =
+    !existing.hiddenFromCanvas &&
+    (typeof existing.canvasX === 'number' ||
+      character.status === 'ACTIVE' ||
+      character.status === 'APPROVED');
+  delete existing.canvasX;
+  delete existing.canvasY;
+  existing.hiddenFromCanvas = true;
+
+  const updated = await prisma.character.update({
+    where: { id: characterId },
+    data: { data: JSON.stringify(existing) },
+  });
+
+  // Same reactivity fix as setCanvasPosition — the canvas must re-fetch so the
+  // removed card actually disappears instead of lingering until a manual reload.
+  if (character.campaignId) {
+    broadcastEvent(character.campaignId, {
+      kind: 'character_update',
+      characterId,
+      characterName: character.name,
+      fields: ['canvasX', 'canvasY', 'hiddenFromCanvas'],
+    });
+  }
+
+  return { character: updated, wasOnCanvas };
 }
 
 /**
