@@ -10,14 +10,14 @@ async function main() {
   });
   console.log(`__PRIME__ LOCATIONS (${locs.length}):`);
   for (const l of locs) {
-    const d = l.data as Record<string, unknown> | null;
+    const d = l.data ? (JSON.parse(l.data) as Record<string, unknown>) : null;
     console.log(`  ${l.id} | ${l.name} | status=${d?.status} xy=(${d?.canvasX},${d?.canvasY})`);
   }
 
   const rels = await prisma.entityRelationship.findMany({ where: { campaignId: PRIME } });
   console.log(`\n__PRIME__ RELATIONSHIPS (${rels.length}):`);
   for (const r of rels) {
-    console.log(`  ${r.id} | ${r.fromType}:${r.fromId} -[${r.relationshipType}]-> ${r.toType}:${r.toId}`);
+    console.log(`  ${r.id} | ${r.sourceType}:${r.sourceId} -[${r.relationshipType}]-> ${r.targetType}:${r.targetId}`);
   }
 
   const dupeChars = await prisma.character.findMany({

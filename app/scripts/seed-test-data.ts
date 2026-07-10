@@ -17,7 +17,7 @@ const WATCHER_GRANT = BigInt(100_000);
 const CAMPAIGN_GRANT = BigInt(50_000);
 
 /** Top a wallet up to `target` from the Terminal reserve. Idempotent. */
-async function fundFromTerminal(walletId: string, target: bigint, idempotencyKey: string, label: string) {
+async function fundFromTerminal(walletId: string, target: bigint, idempotencyKey: string, label: string, reason: 'GM_ALLOCATION' | 'CAMPAIGN_FUND' = 'CAMPAIGN_FUND') {
   const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
   if (!wallet) return;
   const need = target > wallet.balance ? target - wallet.balance : BigInt(0);
@@ -35,7 +35,7 @@ async function fundFromTerminal(walletId: string, target: bigint, idempotencyKey
     toWalletId: walletId,
     amount: need,
     state: 'FLUID',
-    reason: 'DEV_GRANT',
+    reason,
     description: `Dev grant for ${label}`,
     metadata: { source: 'seed-test-data.ts' },
     actorId: 'SYSTEM',
@@ -373,7 +373,7 @@ async function main() {
     if (!userId) continue;
     const wallet = await prisma.wallet.findFirst({ where: { ownerId: userId, ownerType: 'USER' } });
     if (!wallet) continue;
-    await fundFromTerminal(wallet.id, WATCHER_GRANT, `seed-test-data:user:${u.username}`, `watcher ${u.username}`);
+    await fundFromTerminal(wallet.id, WATCHER_GRANT, `seed-test-data:user:${u.username}`, `watcher ${u.username}`, 'GM_ALLOCATION');
   }
 
   // Create campaigns
