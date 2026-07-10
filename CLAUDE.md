@@ -60,7 +60,7 @@ Types              →  types/growth.ts (GrowthCharacter, game mechanics)
 
 ## Project Structure
 
-> **Active codebase = `app/`.** A temporary fork at `C:\Projects\GROWTH Character Creator\` (port 3001) exists for in-progress character creation work and will be merged back into `app/` after the current cleanup pass. Do NOT start new work in the fork.
+> **Active codebase = `app/`.** The character-creator fork at `C:\Projects\GROWTH Character Creator\` was RETIRED 2026-07-10 (T10/T11: portrait pipeline fully merged into `app/`). It remains on disk as a read-only reference archive only — never edit or run it.
 
 ```
 C:\Projects\GRO.WTH\
