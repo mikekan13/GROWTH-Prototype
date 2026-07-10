@@ -28,7 +28,7 @@ async function main() {
     });
 
     await tx.wallet.create({
-      data: { ownerId: newUser.id, ownerType: 'USER', balance: 0 },
+      data: { ownerId: newUser.id, ownerType: 'USER', balance: BigInt(0) },
     });
 
     return newUser;

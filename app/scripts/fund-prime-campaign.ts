@@ -11,13 +11,12 @@ config();
 
 import { prisma } from '../src/lib/db';
 import { executeTransaction } from '../src/services/krma/ledger';
+import { getPrimeCampaign } from '../src/lib/prime-campaign';
 
 const TARGET = process.argv[2] ? BigInt(process.argv[2]) : BigInt(100_000);
 
 async function main() {
-  const campaign = await prisma.campaign.findFirst({
-    where: { name: 'The Prime Campaign' },
-  });
+  const campaign = await getPrimeCampaign();
   if (!campaign) throw new Error('Prime Campaign not found. Run seed-campaign.ts first.');
 
   const campaignWallet = await prisma.wallet.findFirst({

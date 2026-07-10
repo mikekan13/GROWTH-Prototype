@@ -12,14 +12,17 @@ import { config } from 'dotenv';
 config();
 
 import { prisma } from '../src/lib/db';
+import { PRIME_CAMPAIGN_NAME } from '../src/lib/prime-campaign';
 
 async function main() {
+  const campaignName = process.env.SEED_CAMPAIGN_NAME;
   const campaign = await prisma.campaign.findFirst({
+    where: campaignName ? { name: campaignName } : { name: { not: PRIME_CAMPAIGN_NAME } },
     orderBy: { createdAt: 'asc' },
     include: { gmUser: true },
   });
   if (!campaign) {
-    console.log('No campaigns found. Create a campaign first.');
+    console.log('No non-Prime campaigns found. Run seed-test-data.ts first.');
     return;
   }
 

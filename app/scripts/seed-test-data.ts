@@ -5,10 +5,45 @@
  * All test users have password: "password"
  */
 import { prisma } from '../src/lib/db';
+import { executeTransaction } from '../src/services/krma/ledger';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 const PASSWORD = 'password';
+
+// Dev-only KRMA grants. Funded from the Terminal reserve through the
+// ledger — never minted directly on the wallet (INV-13/INV-14).
+const WATCHER_GRANT = BigInt(100_000);
+const CAMPAIGN_GRANT = BigInt(50_000);
+
+/** Top a wallet up to `target` from the Terminal reserve. Idempotent. */
+async function fundFromTerminal(walletId: string, target: bigint, idempotencyKey: string, label: string) {
+  const wallet = await prisma.wallet.findUnique({ where: { id: walletId } });
+  if (!wallet) return;
+  const need = target > wallet.balance ? target - wallet.balance : BigInt(0);
+  if (need === BigInt(0)) return;
+
+  const terminalReserve = await prisma.wallet.findFirst({
+    where: { walletType: 'RESERVE', label: 'Terminal' },
+  });
+  if (!terminalReserve) {
+    throw new Error('Terminal reserve wallet not found. Run seed-genesis.ts first.');
+  }
+
+  await executeTransaction({
+    fromWalletId: terminalReserve.id,
+    toWalletId: walletId,
+    amount: need,
+    state: 'FLUID',
+    reason: 'DEV_GRANT',
+    description: `Dev grant for ${label}`,
+    metadata: { source: 'seed-test-data.ts' },
+    actorId: 'SYSTEM',
+    actorType: 'SYSTEM',
+    idempotencyKey,
+  });
+  console.log(`  [funded] ${label}: +${need.toString()} KRMA`);
+}
 
 interface TestUser {
   username: string;
@@ -302,9 +337,9 @@ async function main() {
   const userMap = new Map<string, string>(); // username -> id
 
   for (const u of [...WATCHERS, ...TRAILBLAZERS]) {
-    const existing = await prisma.user.findUnique({ where: { username: u.username } });
+    const existing = await prisma.user.findFirst({ where: { OR: [{ username: u.username }, { email: u.email }] } });
     if (existing) {
-      console.log(`  [skip] ${u.username} already exists`);
+      console.log(`= ${u.username} exists`);
       userMap.set(u.username, existing.id);
       continue;
     }
@@ -322,7 +357,7 @@ async function main() {
       });
 
       await tx.wallet.create({
-        data: { ownerId: newUser.id, walletType: 'USER', ownerType: 'USER', balance: u.role === 'WATCHER' ? 100000 : 0 },
+        data: { ownerId: newUser.id, walletType: 'USER', ownerType: 'USER', balance: BigInt(0) },
       });
 
       return newUser;
@@ -330,6 +365,15 @@ async function main() {
 
     console.log(`  [created] ${user.username} (${user.role})`);
     userMap.set(user.username, user.id);
+  }
+
+  // Fund watcher wallets from the Terminal reserve (ledger-tracked)
+  for (const u of WATCHERS) {
+    const userId = userMap.get(u.username);
+    if (!userId) continue;
+    const wallet = await prisma.wallet.findFirst({ where: { ownerId: userId, ownerType: 'USER' } });
+    if (!wallet) continue;
+    await fundFromTerminal(wallet.id, WATCHER_GRANT, `seed-test-data:user:${u.username}`, `watcher ${u.username}`);
   }
 
   // Create campaigns
@@ -365,13 +409,13 @@ async function main() {
         },
       });
 
-      // Create campaign wallet
+      // Create campaign wallet (funded below through the ledger)
       await tx.wallet.create({
         data: {
           walletType: 'CAMPAIGN',
           ownerType: 'CAMPAIGN',
           campaignId: newCampaign.id,
-          balance: 50000,
+          balance: BigInt(0),
         },
       });
 
@@ -380,6 +424,15 @@ async function main() {
 
     console.log(`  [created] Campaign "${campaign.name}" (${c.listingStatus}) by ${c.gmUsername} — invite: ${inviteCode}`);
     campaignMap.set(c.name, campaign.id);
+  }
+
+  // Fund campaign wallets from the Terminal reserve (ledger-tracked)
+  for (const c of CAMPAIGNS) {
+    const campaignId = campaignMap.get(c.name);
+    if (!campaignId) continue;
+    const wallet = await prisma.wallet.findFirst({ where: { campaignId, ownerType: 'CAMPAIGN' } });
+    if (!wallet) continue;
+    await fundFromTerminal(wallet.id, CAMPAIGN_GRANT, `seed-test-data:campaign:${c.name}`, `campaign "${c.name}"`);
   }
 
   // Create memberships + applications

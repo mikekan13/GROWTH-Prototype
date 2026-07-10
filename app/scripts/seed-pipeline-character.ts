@@ -21,6 +21,7 @@ import { config } from 'dotenv';
 config();
 
 import { prisma } from '../src/lib/db';
+import { PRIME_CAMPAIGN_NAME } from '../src/lib/prime-campaign';
 import { createDefaultCharacter } from '../src/lib/defaults';
 import { applyCreationGrants } from '../src/services/character-grants';
 import { calculateCharacterTKV } from '../src/lib/kv-calculator';
@@ -45,8 +46,12 @@ async function findForge(campaignId: string, type: 'seed' | 'root' | 'branch', n
 }
 
 async function main() {
-  const campaign = await prisma.campaign.findFirst({ orderBy: { createdAt: 'asc' } });
-  if (!campaign) throw new Error('No campaigns found.');
+  const campaignName = process.env.SEED_CAMPAIGN_NAME;
+  const campaign = await prisma.campaign.findFirst({
+    where: campaignName ? { name: campaignName } : { name: { not: PRIME_CAMPAIGN_NAME } },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (!campaign) throw new Error('No non-Prime campaigns found. Run seed-test-data.ts first.');
   console.log(`Campaign: ${campaign.name} (${campaign.id})`);
 
   // Use the GM as the test owner (any user works for this seed).

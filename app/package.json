@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:all": "tsx scripts/seed-all.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
