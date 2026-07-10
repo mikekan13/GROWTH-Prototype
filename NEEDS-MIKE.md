@@ -73,10 +73,16 @@ Not a real concept. Lifespan is its own track, authored per seed. Removed from d
 
 Nothing currently blocks coding work on the resolved items.
 
+### Security (added 2026-07-10, T11):
+- **Leaked ANTHROPIC_API_KEY — confirm revoked.** Old local-only commits (May, `standalone/.env:6` in commits `a40fba4`/`9b00024`/`44710c8`) contain a real Anthropic key. GitHub push protection blocked the T11 master merge because of it; I abandoned that merge, so the key NEVER reached GitHub. It lives only in the local branch `archive/master-local-may-DO-NOT-PUSH` (never push it). Master's own May notes flagged this — if the key wasn't revoked back then, revoke it at console.anthropic.com now.
+
+### Dev environment (added 2026-07-10, T08):
+- **whisper-server won't start via /boot** — `start.bat` not found (`logs/whisper.err.log`). Pre-existing; dev server itself fine. Say the word and I'll fix the launcher path.
+
 ### Production-side (not engineering blockers, but required for beta launch):
 - **Hosting platform** decision (Vercel / Fly / Railway).
 - **Stripe** account + product/price IDs.
-- **Schema drift fix** — pre-existing prisma migrations need to be applied to dev.db; running `prisma migrate dev` would reset. Decide when to migrate (will wipe dev data; re-seed via existing scripts after).
+- ~~**Schema drift fix**~~ ✅ 2026-07-10 T08 — migrations/schema/db reconcile clean; `npm run seed:all` rebuilds everything incl. `__PRIME__`.
 - **Legal docs** — ToS / Privacy / Refund / Acceptable Use (needs lawyer).
 - **Support contact channel** — email, ticket system, Discord?
 
