@@ -796,3 +796,78 @@ model AccessCode {
   createdAt   DateTime  @default(now())
   expiresAt   DateTime? // Optional expiration
 }
+
+// ============================================================
+// Contract System (T13, INV-115) — Terminal-enforced obligations
+// ============================================================
+
+model Contract {
+  id          String    @id @default(cuid())
+  name        String
+  description String    @default("")
+  // null = Terminal-level (global). Contracts authored on the Prime canvas
+  // carry the __PRIME__ campaign id.
+  campaignId  String?
+  // JSON: ContractParty[] — {type, id, role?}
+  parties     String
+  // JSON: ContractPredicate DSL — the invariant that must HOLD.
+  predicate   String
+  // JSON: ContractPenalty — typed; destructive kinds require ADMIN confirmation.
+  penalty     String
+  deadline    DateTime?
+  // Immutable contracts sit below the vote layer (INV-101 succession tier).
+  // All mutation paths except seeding reject edits to their terms.
+  immutable   Boolean   @default(false)
+  // Deferred in-game vote/Triu-verification mechanism (ruling 2026-07-10 #2).
+  voteRef     String?
+  // ACTIVE | VIOLATED | FULFILLED | REVOKED (validated in service layer)
+  status      String    @default("ACTIVE")
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  evaluations ContractEvaluation[]
+  penaltyActions PenaltyAction[]
+
+  @@index([status])
+  @@index([campaignId])
+}
+
+// Append-only audit log — every evaluation is recorded (INV-14 spirit:
+// the evaluator reads the ledger, never mutates it outside penalty
+// transactions, and leaves a verifiable trail).
+model ContractEvaluation {
+  id          String   @id @default(cuid())
+  contract    Contract @relation(fields: [contractId], references: [id])
+  contractId  String
+  // Did the predicate hold?
+  holds       Boolean
+  // JSON: EvaluationDetail — computed leaf values at evaluation time.
+  detail      String
+  // LEDGER_COMMIT | SWEEP | MANUAL
+  trigger     String
+  evaluatedAt DateTime @default(now())
+
+  @@index([contractId, evaluatedAt])
+}
+
+model PenaltyAction {
+  id          String    @id @default(cuid())
+  contract    Contract  @relation(fields: [contractId], references: [id])
+  contractId  String
+  // ContractPenalty.kind at creation time
+  kind        String
+  // JSON: the full ContractPenalty payload frozen at violation time
+  payload     String
+  // PENDING_CONFIRMATION | EXECUTED | REJECTED
+  status      String    @default("PENDING_CONFIRMATION")
+  // ADMIN user id that confirmed/rejected
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  // Pointer to the KrmaTransaction if the execution moved KRMA
+  transactionId String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([contractId])
+}

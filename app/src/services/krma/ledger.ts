@@ -72,7 +72,7 @@ export async function executeTransaction(input: CreateTransactionInput): Promise
   const validated = createTransactionSchema.parse(input);
   const isGenesis = validated.reason === 'GENESIS_SEED' && validated.fromWalletId === VOID_WALLET_ID;
 
-  return await prisma.$transaction(async (tx) => {
+  const record = await prisma.$transaction(async (tx) => {
     // 1. Idempotency check
     if (validated.idempotencyKey) {
       const existing = await tx.krmaTransaction.findUnique({
@@ -165,6 +165,16 @@ export async function executeTransaction(input: CreateTransactionInput): Promise
 
     return toTransactionRecord(txRecord);
   });
+
+  // Contract evaluation hook (T13) — fire-and-forget AFTER the ledger
+  // transaction commits. Dynamic import avoids a static cycle (contracts
+  // executes penalty transfers through this function). Never throws into
+  // the ledger path.
+  void import('@/services/contracts')
+    .then((contracts) => contracts.onLedgerCommit())
+    .catch((err) => console.error('[ledger] contract hook failed:', err));
+
+  return record;
 }
 
 /**

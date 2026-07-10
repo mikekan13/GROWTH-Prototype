@@ -14,13 +14,14 @@
  *     6. secondary godheads  → 10 magic-school custodians
  *     7. migrate godheads    → attach all godheads to __PRIME__
  *     8. fund Prime wallet   → Terminal reserve → Prime campaign wallet
+ *     9. contracts           → Tara's cap + immutable succession (T13)
  *   Content:
- *     9. canonical seeds     → Human + Altered Human (global catalog)
- *    10. beta content        → seeds/roots/nectars/thorns/items (global)
- *    11. test data           → test watchers, trailblazers, campaigns
- *    12. test SRB            → Human + roots + branches (test campaign)
- *    13. example forge item  → Iron Sword (test campaign)
- *    14. pipeline character  → Test Pilgrim (test campaign)
+ *    10. canonical seeds     → Human + Altered Human (global catalog)
+ *    11. beta content        → seeds/roots/nectars/thorns/items (global)
+ *    12. test data           → test watchers, trailblazers, campaigns
+ *    13. test SRB            → Human + roots + branches (test campaign)
+ *    14. example forge item  → Iron Sword (test campaign)
+ *    15. pipeline character  → Test Pilgrim (test campaign)
  *
  * Ends with a ledger audit (fullAudit) + __PRIME__ existence check, so a
  * green run IS the T08 acceptance test.
@@ -51,6 +52,7 @@ const STEPS: Step[] = [
   { name: 'secondary godheads (10 custodians)', script: 'seed-godheads-secondary.ts', required: false },
   { name: 'attach godheads to __PRIME__', script: 'migrate-godheads-to-prime.ts', required: false },
   { name: 'fund Prime campaign wallet', script: 'fund-prime-campaign.ts', required: false },
+  { name: 'Terminal contracts (Tara cap + succession)', script: 'seed-contracts.ts', required: false },
   { name: 'canonical seeds (global catalog)', script: 'seed-canonical-seeds.ts', required: false },
   { name: 'beta content library (global catalog)', script: 'seed-beta-content.ts', required: false },
   { name: 'test users + campaigns', script: 'seed-test-data.ts', required: false },

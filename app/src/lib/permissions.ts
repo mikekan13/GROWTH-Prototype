@@ -8,6 +8,13 @@ export function isWatcherOrAbove(role: string): boolean {
   return role === 'WATCHER' || isAdminRole(role);
 }
 
+// Contracts (T13) are Terminal-level instruments — ADMIN only (Mike), not
+// the GODHEAD app role. Authoring is an unrestricted-variant canvas gesture
+// on __PRIME__ (INV-116).
+export function canManageContracts(role: string): boolean {
+  return role === 'ADMIN';
+}
+
 export function canManageCampaign(userId: string, userRole: string, campaign: { gmUserId: string }): boolean {
   return campaign.gmUserId === userId || isAdminRole(userRole);
 }

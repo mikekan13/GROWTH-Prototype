@@ -59,7 +59,10 @@ export type TransactionReason =
   // JEWL Mistake Bounty
   // GM catches JEWL making a mistake → JEWL's wallet → GM's wallet.
   // See [[jewl-is-the-interface-2026-06-15]].
-  | 'JEWL_MISTAKE_BOUNTY';
+  | 'JEWL_MISTAKE_BOUNTY'
+  // Contract System (T13, INV-115)
+  // ADMIN-confirmed KRMA_TRANSFER penalty execution.
+  | 'CONTRACT_PENALTY';
 
 // ── Genesis Constants ──
 
