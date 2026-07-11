@@ -231,9 +231,11 @@ export async function unequipItem(
 }
 
 /**
- * Assemble worn layers for damage routing: every ACTIVE equipped item on
- * this character, grouped by region key, ordered outermost first
- * (Heavy → Light → Clothing; ties keep equip order).
+ * Assemble worn layers for damage routing: equipped ARMOR on this
+ * character, grouped by region key, ordered outermost first
+ * (Heavy → Light → Clothing per the canon layered-armor structure).
+ * Non-armor equipment (weapons, tools) is equipped but is NOT a damage
+ * layer — the layered system is armor-only (Damage_Type_Interactions.md).
  */
 export async function buildWornLayers(characterId: string): Promise<Record<string, WornLayer[]>> {
   const rows = await prisma.campaignItem.findMany({
@@ -244,12 +246,21 @@ export async function buildWornLayers(characterId: string): Promise<Record<strin
   for (const row of rows) {
     const item = parseItem(row);
     if (!item.equippedTo) continue;
-    const d = item.data as { baseResist?: number; armorCategory?: 'Clothing' | 'Light' | 'Heavy'; condition?: number };
+    const d = item.data as {
+      baseResist?: number;
+      armorCategory?: 'Clothing' | 'Light' | 'Heavy';
+      materialClass?: 'Soft' | 'Hard';
+      condition?: number;
+    };
+    if (!d.armorCategory) continue; // only armor absorbs
     (byPart[item.equippedTo] ??= []).push({
       itemId: item.id,
       name: item.name,
       baseResist: d.baseResist ?? 0,
       armorCategory: d.armorCategory,
+      // Data-default when the item lacks a materialClass: clothing is Soft,
+      // Light/Heavy armor is Hard. Forge-authored items should set it.
+      materialClass: d.materialClass ?? (d.armorCategory === 'Clothing' ? 'Soft' : 'Hard'),
       condition: d.condition ?? 3,
     });
   }

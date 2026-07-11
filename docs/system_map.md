@@ -43,10 +43,17 @@ non-humanoid body produces its own regions with zero code changes.
   (single source of truth). Carried = held, not equipped. Possessions =
   `owns` EntityRelationship links (INV-62).
 - **Damage integration**: `routeDamage` gained `wornLayers` — equipped
-  items absorb before the part they cover, resist × armor-category
+  ARMOR absorbs before the part it covers, resist × armor-category
   multiplier (Clothing 0.5 / Light 1.0 / Heavy 1.5; layer caps Soft≤3,
-  Light≤1, Heavy≤1 per region, INV-52). Armor condition changes persist
-  back to the item rows (DESTROYED at 0).
+  Light≤1, Heavy≤1 per region, INV-52). Condition loss follows the
+  VALIDATED damage-type × material matrix (`Damage_Type_Interactions.md`):
+  piercing never degrades materials; bashing dents Hard / slashing cuts
+  Soft at threshold; heat auto-degrades Soft (and passes through it
+  unreduced); cold auto-degrades Hard; decay degrades both; energy
+  bypasses all armor entirely. Overwhelming damage (≥3× resist) destroys
+  the item instantly; Broken items give half resist; condition changes
+  persist to the item rows (DESTROYED at 0). Non-armor equipment is not
+  a damage layer.
 - Encumbrance: total held lbs vs Clout×10 (INV-48) with
   Fine/Near Limit/Encumbered/Overloaded thresholds.
 - Surfaces: `components/character/Paperdoll.tsx` on the character sheet;

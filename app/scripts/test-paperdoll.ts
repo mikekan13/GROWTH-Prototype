@@ -50,6 +50,7 @@ async function main() {
     baseResist: 4,
     condition: 3,
     weightLbs: 20,
+    materialClass: 'Hard',
     armorCategory: 'Heavy', // effective resist 4 × 1.5 = 6
   } as unknown as GrowthWorldItem & { armorCategory: string };
 
@@ -69,27 +70,75 @@ async function main() {
     const inv1 = await listInventory(character.id, admin.id, admin.role);
     check('equip: armor lands in the equipped tier', inv1.equipped.some(i => i.id === armorRow.id));
 
-    // Piercing 16 targeted at the torso. Cascade:
-    //   Body envelope (resist 4)      absorbs 4 → 12 continue
-    //   Breastplate (eff. resist 6)   absorbs 6 → 6 reach the torso   ← OUTER LAYER for its region
-    //   Torso (resist 5)              absorbs 5 → 1 dealt, tier drops
-    // Without the armor the torso would have seen 12, not 6.
-    const dmg = await applyDamageToCharacter(admin.id, admin.role, {
+    // Reset body + armor between damage scenarios (keeps armor equipped).
+    async function resetState() {
+      await prisma.character.update({ where: { id: character!.id }, data: { data: characterDataBackup } });
+      const row = await prisma.campaignItem.findUnique({ where: { id: armorRow.id } });
+      const d = JSON.parse(row!.data) as Record<string, unknown>;
+      d.condition = 3;
+      await prisma.campaignItem.update({
+        where: { id: armorRow.id },
+        data: { data: JSON.stringify(d), status: 'ACTIVE' },
+      });
+    }
+
+    // Damage-type × material matrix (Damage_Type_Interactions.md, #validated).
+    // The breastplate is Heavy (eff. resist 4×1.5 = 6) + Hard material.
+
+    // (a) PIERCING vs Hard: absorbs, NO condition loss — a spear thrust
+    //     doesn't degrade a steel plate. 16 piercing → Body 4 → plate
+    //     absorbs 6 (12 in, not overwhelming) → torso sees 6, dealt 1.
+    const pierce = await applyDamageToCharacter(admin.id, admin.role, {
       characterId: character.id,
       damageType: 'piercing',
       amount: 16,
       piercingTargetPath: ['Torso'],
     });
-    const armorHit = dmg.wornDamage.find(w => w.itemId === armorRow.id);
-    check('damage: armor absorbed FIRST (outer layer for its region)', !!armorHit, JSON.stringify(armorHit));
-    check('damage: armor effective resist = base×1.5 (Heavy)', armorHit?.effectiveResist === 6, String(armorHit?.effectiveResist));
-    check('damage: armor passed 6 through (12 in − 6 resist)', armorHit?.damageDealt === 6, String(armorHit?.damageDealt));
-    const torsoEvent = dmg.events.find(e => e.partName === 'Torso');
-    check('damage: torso saw 6 (armored), dealt 1 past its resist 5', !!torsoEvent && torsoEvent.damageDealt === 1, JSON.stringify(torsoEvent));
-    check('damage: armor condition tier dropped', armorHit?.conditionAfter === 2);
-    const armorAfter = await prisma.campaignItem.findUnique({ where: { id: armorRow.id } });
-    const armorAfterData = JSON.parse(armorAfter!.data) as { condition?: number };
-    check('damage: armor condition PERSISTED to item row', armorAfterData.condition === 2, String(armorAfterData.condition));
+    const pierceHit = pierce.wornDamage.find(w => w.itemId === armorRow.id);
+    check('piercing: armor absorbed FIRST (outer layer)', !!pierceHit && pierceHit.effectiveResist === 6, JSON.stringify(pierceHit));
+    check('piercing: passed 6 through (12 in − 6 resist)', pierceHit?.damageDealt === 6, String(pierceHit?.damageDealt));
+    check('piercing: NO condition loss vs Hard material', pierceHit?.brokeTier === false && pierceHit?.conditionAfter === 3, String(pierceHit?.conditionAfter));
+    const torsoEvent = pierce.events.find(e => e.partName === 'Torso');
+    check('piercing: torso saw 6 (armored), dealt 1 past its resist 5', !!torsoEvent && torsoEvent.damageDealt === 1, JSON.stringify(torsoEvent));
+    await resetState();
+
+    // (b) BASHING vs Hard: condition −1 when dmg ≥ resist — the plate dents.
+    //     16 bashing → Body 4 → even-split Head/Torso 6 each → plate: 6 ≥ 6.
+    const bash = await applyDamageToCharacter(admin.id, admin.role, {
+      characterId: character.id,
+      damageType: 'bashing',
+      amount: 16,
+    });
+    const bashHit = bash.wornDamage.find(w => w.itemId === armorRow.id);
+    check('bashing: dents Hard armor at threshold (tier 3→2)', bashHit?.brokeTier === true && bashHit?.conditionAfter === 2, JSON.stringify(bashHit));
+    const armorAfterBash = JSON.parse((await prisma.campaignItem.findUnique({ where: { id: armorRow.id } }))!.data) as { condition?: number };
+    check('bashing: armor condition PERSISTED to item row', armorAfterBash.condition === 2, String(armorAfterBash.condition));
+    await resetState();
+
+    // (c) ENERGY: bypasses ALL materials — the plate is transparent,
+    //     no absorption, no condition loss, no worn event.
+    const zap = await applyDamageToCharacter(admin.id, admin.role, {
+      characterId: character.id,
+      damageType: 'energy',
+      amount: 16,
+    });
+    check('energy: armor is transparent (no worn interaction)', zap.wornDamage.length === 0, JSON.stringify(zap.wornDamage));
+    await resetState();
+
+    // (d) OVERWHELMING: dmg ≥ 3× resist destroys the item instantly.
+    //     40 bashing → Body 4 → split 18 each → plate: 18 ≥ 3×6 → destroyed,
+    //     12 continues (18 − 6).
+    const smash = await applyDamageToCharacter(admin.id, admin.role, {
+      characterId: character.id,
+      damageType: 'bashing',
+      amount: 40,
+    });
+    const smashHit = smash.wornDamage.find(w => w.itemId === armorRow.id);
+    check('overwhelming: 3× resist destroys the plate outright', smashHit?.destroyed === true && smashHit?.conditionAfter === 0, JSON.stringify(smashHit));
+    check('overwhelming: resist-reduced remainder continued (12)', smashHit?.damageDealt === 12, String(smashHit?.damageDealt));
+    const armorAfterSmash = await prisma.campaignItem.findUnique({ where: { id: armorRow.id } });
+    check('overwhelming: item row marked DESTROYED', armorAfterSmash?.status === 'DESTROYED', armorAfterSmash?.status);
+    await resetState();
 
     // ── 3. Encumbrance threshold at Clout×10 ──────────────────────────
     const charData = JSON.parse(characterDataBackup) as { attributes?: { clout?: { level?: number } } };

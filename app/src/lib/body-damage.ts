@@ -67,6 +67,9 @@ export interface WornLayer {
   baseResist: number;
   /** Armor category — resolves the resist multiplier (ARMOR_LAYER_RULES). */
   armorCategory?: 'Clothing' | 'Light' | 'Heavy';
+  /** Soft/Hard material class — selects the damage-type interaction row
+   *  (Damage_Type_Interactions.md, #validated). */
+  materialClass?: 'Soft' | 'Hard';
   condition: number;
 }
 
@@ -166,36 +169,95 @@ const WORN_RESIST_MULTIPLIER: Record<string, number> = {
 
 /**
  * Run incoming damage through the worn stack covering a part (outermost
- * first). Each layer absorbs like a part: effective resist = baseResist ×
- * category multiplier; if the incoming amount meets its resist the layer
- * drops a condition tier. Returns the amount that reaches the part.
+ * first), per the VALIDATED damage-type × material matrix
+ * (Repository/05_COMBAT_STRUCTURE/Damage_Type_Interactions.md):
+ *
+ *              Soft                          Hard
+ *   piercing   absorb, no condition loss     absorb, no condition loss
+ *   slashing   absorb, −1 if dmg ≥ resist    absorb, no loss
+ *   heat       NO absorption, auto −1        absorb, no loss
+ *   decay      absorb, auto −1               absorb, auto −1
+ *   cold       absorb, no loss               absorb, auto −1
+ *   bashing    absorb, no loss               absorb, −1 if dmg ≥ resist
+ *   energy     bypasses entirely — no absorption, no condition loss
+ *
+ * Universal rules: damage ≥ 3× effective resist = OVERWHELMING (item
+ * destroyed instantly, resist-reduced remainder continues); Broken items
+ * (condition 1) give HALF resist; Indestructible (condition 4) never
+ * degrades. Body parts keep their own locked rule in applyToPart —
+ * "vs Body" is its own matrix row.
+ *
+ * Returns the amount that reaches the part.
  */
 function absorbThroughWorn(
   layers: WornLayer[],
   partKey: string,
+  damageType: DamageType,
   amount: number,
   worn: WornDamageResult[],
 ): number {
   let remaining = amount;
+
+  // Energy bypasses ALL materials — worn layers are transparent to it.
+  if (damageType === 'energy') return remaining;
+
   for (const layer of layers) {
     if (remaining <= 0) break;
     if (layer.condition <= 0) continue; // destroyed gear stops nothing
+    const material: 'Soft' | 'Hard' = layer.materialClass ?? 'Hard';
+    const indestructible = layer.condition >= 4;
+
     const mult = WORN_RESIST_MULTIPLIER[layer.armorCategory ?? ''] ?? 1.0;
-    const effectiveResist = Math.floor(layer.baseResist * mult);
-    const dealt = Math.max(0, remaining - effectiveResist);
+    let effectiveResist = Math.floor(layer.baseResist * mult);
+    if (layer.condition === 1) effectiveResist = Math.floor(effectiveResist / 2); // Broken = half resist
+
     const conditionBefore = layer.condition;
-    let brokeTier = false;
-    if (remaining >= effectiveResist && layer.condition > 0) {
-      layer.condition -= 1;
-      brokeTier = true;
+
+    // Overwhelming: 3× effective resist destroys the item instantly;
+    // remainder continues after normal absorption.
+    if (!indestructible && effectiveResist > 0 && remaining >= effectiveResist * 3) {
+      layer.condition = 0;
+      const dealt = remaining - effectiveResist;
+      worn.push({
+        itemId: layer.itemId,
+        name: layer.name,
+        partKey,
+        damageDealt: dealt,
+        effectiveResist,
+        brokeTier: true,
+        conditionBefore,
+        conditionAfter: 0,
+        destroyed: true,
+      });
+      remaining = dealt;
+      continue;
     }
+
+    // Absorption: heat passes through Soft materials untouched; everything
+    // else absorbs up to effective resist.
+    const heatVsSoft = damageType === 'heat' && material === 'Soft';
+    const dealt = heatVsSoft ? remaining : Math.max(0, remaining - effectiveResist);
+
+    // Condition loss per the matrix.
+    let losesCondition = false;
+    if (!indestructible) {
+      if (damageType === 'decay') losesCondition = true;
+      else if (damageType === 'heat' && material === 'Soft') losesCondition = true;
+      else if (damageType === 'cold' && material === 'Hard') losesCondition = true;
+      else if (damageType === 'slashing' && material === 'Soft') losesCondition = remaining >= effectiveResist;
+      else if (damageType === 'bashing' && material === 'Hard') losesCondition = remaining >= effectiveResist;
+      // piercing never degrades materials; cold-vs-Soft, heat-vs-Hard,
+      // slashing-vs-Hard, bashing-vs-Soft absorb without degrading.
+    }
+    if (losesCondition) layer.condition -= 1;
+
     worn.push({
       itemId: layer.itemId,
       name: layer.name,
       partKey,
       damageDealt: dealt,
-      effectiveResist,
-      brokeTier,
+      effectiveResist: heatVsSoft ? 0 : effectiveResist,
+      brokeTier: losesCondition,
       conditionBefore,
       conditionAfter: layer.condition,
       destroyed: layer.condition === 0,
@@ -219,7 +281,7 @@ function routeDownward(
   // T26: equipped layers covering this part absorb BEFORE the part itself.
   const layers = options.wornLayers?.[myPath.join('/')];
   if (layers && layers.length > 0) {
-    amount = absorbThroughWorn(layers, myPath.join('/'), amount, worn);
+    amount = absorbThroughWorn(layers, myPath.join('/'), damageType, amount, worn);
     if (amount <= 0) return { destroyedAny: false };
   }
 
