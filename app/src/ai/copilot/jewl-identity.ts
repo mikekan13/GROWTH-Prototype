@@ -20,6 +20,19 @@ import { NotFoundError } from '@/lib/errors';
 
 export const JEWL_GODHEAD_NAME = 'JEWL';
 
+/** The only label non-ADMIN users ever see (INV-69 — the mask is the point). */
+export const JEWL_PUBLIC_LABEL = 'Copilot';
+
+/**
+ * Mask JEWL's name at serialization boundaries (INV-69/70). Every API
+ * response that can carry a godhead name to a non-ADMIN viewer must pass
+ * it through here. Other godhead names pass through untouched.
+ */
+export function maskJewlName(name: string, viewerRole: string): string {
+  if (viewerRole === 'ADMIN') return name;
+  return name === JEWL_GODHEAD_NAME ? JEWL_PUBLIC_LABEL : name;
+}
+
 export interface JewlGodHeadHandle {
   godHeadId: string;
   godHeadName: string;

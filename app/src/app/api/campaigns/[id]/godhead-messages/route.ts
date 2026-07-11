@@ -5,6 +5,7 @@ import { errorResponse } from '@/lib/api';
 import { prisma } from '@/lib/db';
 import { canManageCampaign, isAdminRole } from '@/lib/permissions';
 import { NotFoundError, ForbiddenError } from '@/lib/errors';
+import { maskJewlName } from '@/ai/copilot/jewl-identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,8 @@ export async function GET(
       messages: messages.map(m => ({
         id: m.id,
         godHeadId: m.godHeadId,
-        godHeadName: m.godHead.name,
+        // INV-69: non-ADMIN viewers (Watchers included) see 'Copilot', never 'JEWL'
+        godHeadName: maskJewlName(m.godHead.name, session.user.role),
         godHeadPillar: m.godHead.pillar,
         direction: m.direction,
         content: m.content,

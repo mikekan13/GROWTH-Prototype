@@ -14,6 +14,7 @@
 import { prisma } from '../src/lib/db';
 import { createDefaultCharacter } from '../src/lib/defaults';
 import { executeTransaction } from '../src/services/krma/ledger';
+import { JEWL_GENESIS_ENDOWMENT } from '../src/lib/economy-config';
 
 interface GodheadSeed {
   name: string;
@@ -341,7 +342,7 @@ async function seedGodheads() {
 }
 
 async function endowJewl() {
-  const JEWL_ENDOWMENT = BigInt('1000000000'); // 1B KRMA — minimal Primary-tier scale
+  const JEWL_ENDOWMENT = JEWL_GENESIS_ENDOWMENT; // tunable — src/lib/economy-config.ts
 
   const jewl = await prisma.godHead.findUnique({
     where: { name: 'JEWL' },
