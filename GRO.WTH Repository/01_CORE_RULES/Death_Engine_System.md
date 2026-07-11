@@ -4,7 +4,7 @@
 **Source:** Mike resolution session 2026-05-19 ([[NEEDS-MIKE_RESOLUTIONS_2026-05-19]]); implemented in `app/src/services/krma/death-split.ts` (`executeDeathSplit`, `transformCharacterToGhost`) and `app/src/services/krma/evaluator.ts` (`calculateDeathSplit`).
 **Security:** PUBLIC
 **Rulebook:** `rulebook/rulebook.md` §10 (Death) — needs sync to this file
-**Last Updated:** 2026-05-23
+**Last Updated:** 2026-07-11
 
 ---
 
@@ -20,8 +20,8 @@ Death is also a **transfer**, not a removal. Every KRMA value involved still exi
 
 There are exactly two paths:
 
-1. **Facing Death (locked Mike 2026-06-11, rulings r-2026-06-11-02 + r-2026-06-11-05)** — triggered by **Frequency `current` ≤ 0** (with no Effort/spend rescue) OR **a vital body part destroyed**. **ONE roll against Lady Death** fires (Fate Die + bodyResist vs Lady Death's DR) — only once even if both triggers land simultaneously. Success → survive: destroyed vital part restores one condition, and 1 Frequency is restored if it was at 0; **Tara may still attach a trigger-related Thorn or Negative Blossom**. Failure → the engine fires. One roll, binary; fated age plays no role here.
-2. **Fated Age death (locked Mike 2026-06-09, ruling r-2026-06-09-01)** — at and past the seed's `fatedAge`, the character rolls **Fate Die only** vs Tara's Death Roll each year (Nectars/Thorns can augment). On each fail, Tara bestows a **Thorn representing their escalating age**. The **third fail after fated age** fires the engine. bodyResist plays no role in this path.
+1. **Facing Death (locked Mike 2026-06-11, rulings r-2026-06-11-02 + r-2026-06-11-05)** — triggered by **Frequency `current` ≤ 0** (with no Effort/spend rescue) OR **a vital body part destroyed**. **ONE roll against Lady Death** fires (character's **Fate Die vs Tara's chosen die** — `bodyResist` plays no role, r-2026-07-11-01) — only once even if both triggers land simultaneously. Success → survive: destroyed vital part restores one condition, and 1 Frequency is restored if it was at 0; **Tara may still attach a trigger-related Thorn or Negative Blossom**. Failure → the engine fires. One roll, binary; fated age plays no role here.
+2. **Fated Age death (locked Mike 2026-06-09, ruling r-2026-06-09-01)** — at and past the seed's `fatedAge`, the character rolls **Fate Die vs Tara's chosen die** each year (Nectars/Thorns can augment) (r-2026-07-11-01). On each fail, Tara bestows a **Thorn representing their escalating age**. The **third fail after fated age** fires the engine. bodyResist plays no role in this path.
 
 Both paths converge into the same engine. They differ only in narrative framing and which Godhead leads the post-death conversation (Lady Death herself for Fated Age; Kai often weighs in for combat).
 

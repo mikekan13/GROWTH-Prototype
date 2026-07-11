@@ -4,7 +4,7 @@
 **Source:** Core Rulebook v0.4.4.md, GROWTH_System_Archive_Complete_Content_Extraction.md, ruling 2026-04-22, GROWTH-DESIGN-TRUTH §2 (Soul/Spirit swap Jan 2026)  
 **Security:** PUBLIC  
 **Rulebook:** `rulebook/rulebook.md` §3 (Attributes & Depletion)  
-**Last Updated:** 2026-05-03
+**Last Updated:** 2026-07-11
 
 ---
 
@@ -118,8 +118,8 @@ Total attribute pool = base (from Roots/Branches levels) + Seed augs + equipment
 
 ### Death Save System
 **Trigger:** Frequency current pool reaches zero from any source.  
-**Resolution:** FD + bodyResist vs Lady Death's roll (Combat Death). *(Survivable-fail count for combat saves pending Mike's ruling.)*  
-**Fated Age Death (ruling r-2026-06-09-01):** independent system — **Fate Die only** vs Tara's Death Roll, each year at/past `fatedAge` (set by Seed; Nectars/Thorns can augment). Each fail → Tara bestows an escalating-age **Thorn**. Third fail after fated age = death.  
+**Resolution:** character's **Fate Die vs Tara's chosen die** — `bodyResist` plays no role in any death save (combat damage absorption only) (r-2026-07-11-01).  
+**Fated Age Death (ruling r-2026-06-09-01):** independent system — **Fate Die vs Tara's chosen die**, each year at/past `fatedAge` (set by Seed; Nectars/Thorns can augment) (r-2026-07-11-01). Each fail → Tara bestows an escalating-age **Thorn**. Third fail after fated age = death.  
 **No Effort:** Cannot wager attributes on death saves.  
 **Success:** Recover 1 Frequency point (combat save) / nothing happens that year (fated-age roll).  
 **Failure:** Character death (Spirit Package falls — see [[Spirit_Package_System]]).

@@ -4,7 +4,7 @@
 **Source:** User clarification session 2025-08-22 via X_ARCHIVE_ORIGINS/GROvines.md, Economy Design Session 2026-04-05, ruling 2026-04-22  
 **Security:** PUBLIC  
 **Rulebook:** `rulebook/rulebook.md` §4 (GRO.vines)  
-**Last Updated:** 2026-04-22
+**Last Updated:** 2026-07-11
 
 > **Audit flag (2026-04-22):** rich mechanics in this file (Godhead Opportunity Cycle, gift types, Liens model, Proxy Wars) were not independently confirmed in `GROWTH-DESIGN-TRUTH.md`. Capacity numbers were clarified by ruling 2026-04-22 (see below). Other sections need Mike's walkthrough before flipping back to `#validated`.
 
@@ -12,7 +12,7 @@
 
 ## System Overview
 
-GROWTH stands for Goals, Resistance, Opportunity, Wealth, Tech, and Health — the six ways that characters grow. Wealth, Tech, and Health (WTH) remain as campaign-level narrative descriptors. (Per-character WTH levels were retired 2026-04-05; lifespan is now `fatedAge` from each Seed, and death resistance is `bodyResist` + Fate Die.) The GRO.vine system specifically handles the Goals component, creating a dynamic narrative structure where character objectives become focal points for cosmic conflict.
+GROWTH stands for Goals, Resistance, Opportunity, Wealth, Tech, and Health — the six ways that characters grow. Wealth, Tech, and Health (WTH) remain as campaign-level narrative descriptors. (Per-character WTH levels were retired 2026-04-05; lifespan is now `fatedAge` from each Seed, and death saves use the character's **Fate Die vs Tara's chosen die** (`bodyResist` is combat damage absorption only — r-2026-07-11-01).) The GRO.vine system specifically handles the Goals component, creating a dynamic narrative structure where character objectives become focal points for cosmic conflict.
 
 GRO.vines are the **primary engine of KRMA circulation**. They are how new KRMA enters campaigns from [[Godheads_System|God-head]] wallets, making players the main source of campaign growth.
 

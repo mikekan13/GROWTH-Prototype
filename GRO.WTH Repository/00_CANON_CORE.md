@@ -85,8 +85,9 @@ Canonical 9-attribute display order (r-2026-04-22-09):
   **R**esistance (concrete *entities* pointed at the goal, not abstract obstacles),
   **O**pportunity (leverage moments).
 - **WTH per-character levels were REMOVED 2026-04-05** (r-2026-04-22-03). W/T/H are
-  now campaign-level narrative context only. Lifespan = `fatedAge` from Seed; death
-  resistance = `bodyResist` (combat only) + Fate Die.
+  now campaign-level narrative context only. Lifespan = `fatedAge` from Seed; the
+  death save = **Fate Die vs Tara's chosen die** (r-2026-07-11-01 — `bodyResist` is
+  combat damage absorption only, no role in death saves).
 
 **GRO.vine capacity** (r-2026-04-22-01): hard cap **5** active per entity; Seeds cap
 at 3; players reach 4–5 via Nectars/items.
@@ -171,6 +172,19 @@ non-transferable.
 skill-level multiplier (r-2026-06-09-02).
 
 ### Death — three distinct mechanics
+
+**The death save (BOTH doors, r-2026-07-11-01/-02):** character's **Fate Die vs
+Tara's chosen die**. Tara picks from the full ladder like skills — **1, 2, 3, d4,
+d6, d8, d12, d20** (1/2/3 = static values) — by **her own reasoning**; she may
+**choose not to reap at all** (no roll, the character survives the trigger).
+Nectars/Thorns/Blossoms augment the character's roll (same modifier engine as
+skill checks). `bodyResist` plays NO role in any death save (combat damage
+absorption only; supersedes the old "bodyResist + FD" combat formula from
+r-2026-04-22-03). **Ties go to Lady Death** (survive only on STRICTLY greater,
+unless something overrides the tie). **Her post-roll authority is one-way
+mercy** (r-2026-07-11-02): after a failed roll she may still decline to reap
+("fudge it"); after a survived roll she CANNOT reap — survival is final.
+
 1. **Facing Death** (r-2026-06-11-05, the combat/sharp-edge path). Two triggers:
    (a) Frequency current ≤ 0, or (b) a **vital body part destroyed**. **One roll vs
    Lady Death (Tara), fires once** even if both triggers hit together.
@@ -180,8 +194,8 @@ skill-level multiplier (r-2026-06-09-02).
    - **Failure:** the Death Engine fires.
    - (r-2026-06-11-02 phrasing: combat death = ONE roll, binary — no 3-strike.)
 2. **Fated-Age Death** (r-2026-06-09-01, the slow clock). At/past `fatedAge`, roll
-   **Fate Die only** vs Tara each year. Fail → Tara bestows an **escalating-age
-   Thorn**. **Third fail after fated age = death.** `bodyResist` plays NO role here.
+   the death save each year. Fail → Tara bestows an **escalating-age Thorn**.
+   **Third fail after fated age = death.**
 3. **Death = transformation, not destruction** (r-2026-05-19-02). Character becomes a
    **GHOST**, persists on canvas. Split:
    - Body attrs/skills/Nectars/Thorns/baseResist → 0; KRMA → GM.

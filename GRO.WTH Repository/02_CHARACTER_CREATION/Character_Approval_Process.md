@@ -4,7 +4,7 @@
 **Source:** Core Rulebook v0.4.4.md, User clarification 2025-10-03
 **Security:** PUBLIC
 **Rulebook:** `rulebook/rulebook.md` §6.6 (Approval Workflow)
-**Last Updated:** 2026-04-22
+**Last Updated:** 2026-07-11
 
 ---
 
@@ -79,7 +79,7 @@ Once a character sheet is drafted through the Seeds, Roots, and Branches selecti
 ### Age Accumulation
 - Each Root and Branch adds age to the character
 - Older characters generally have more capabilities through more Roots/Branches
-- Age does NOT affect starting `bodyResist` or `fatedAge` — both are determined by Seed. *(Per-character Health Level was retired 2026-04-05; lifespan is now `fatedAge` from each Seed and death resistance is `bodyResist` + Fate Die.)*
+- Age does NOT affect starting `bodyResist` or `fatedAge` — both are determined by Seed. *(Per-character Health Level was retired 2026-04-05; lifespan is now `fatedAge` from each Seed and death saves use the character's **Fate Die vs Tara's chosen die** — `bodyResist` is combat damage absorption only, r-2026-07-11-01.)*
 - Natural limiting factor for character power (costs remaining lifespan from `fatedAge`)
 
 ## Integration Guidelines

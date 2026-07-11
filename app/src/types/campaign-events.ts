@@ -108,6 +108,33 @@ export interface PortraitUpdateEvent {
   portraitUrl: string;
 }
 
+// ── Death Save (T27, r-2026-07-11-01) ─────────────────────────────────────
+
+/**
+ * Death-save lifecycle on the GM surface. TRIGGERED fires when a character
+ * hits a death door (Frequency 0 / vital part destroyed); RESOLVED carries
+ * the roll outcome; SPLIT_EXECUTED announces the ghost transformation.
+ */
+export interface DeathSaveEvent {
+  kind: 'death_save';
+  phase: 'TRIGGERED' | 'RESOLVED' | 'SPLIT_EXECUTED';
+  characterId: string;
+  characterName: string;
+  door: 'COMBAT' | 'FATED_AGE';
+  /** TRIGGERED: what tripped the door (e.g. 'frequency_zero', 'vital_destroyed:Heart'). */
+  trigger?: string;
+  /** RESOLVED fields. Tara's choice: 1|2|3 static, 'd4'…'d20', or 'NO_REAP'. */
+  taraChoice?: string;
+  fateRoll?: number;
+  /** Trait-modifier total applied to the fate roll + source labels
+   *  (exploits must be easy to track — show "+2 from Grave-Warded"). */
+  modifierTotal?: number;
+  modifierSources?: string[];
+  characterTotal?: number;
+  taraResult?: number;
+  survived?: boolean;
+}
+
 // ── Terminal Event Relay ──────────────────────────────────────────────────
 
 /** A persisted terminal event relayed in real-time */
@@ -133,6 +160,7 @@ export type StreamEventData =
   | StateSyncEvent
   | CharacterUpdateEvent
   | PortraitUpdateEvent
+  | DeathSaveEvent
   | TerminalEventRelay
   | HeartbeatEvent;
 

@@ -348,3 +348,19 @@ entry that references the old.
 - **Canon-core consequence**: the condensed canon (00_CANON_CORE.md) is a RUNTIME component — the rules-mastery layer every character agent loads at live, not just a dev-session artifact.
 - **Lands in rulebook**: §12 (Godheads), §14 (Platform/Release)
 - **Files**: ai_systems.md, Godheads_System
+
+### r-2026-07-11-01: Death save = Fate Die vs Tara's CHOSEN die — bodyResist plays no role in any death save
+- **Ruling (Mike, verbal, mid-T27 build)**: The death save (both doors — combat Frequency-0/vital-destroyed AND fated-age) is the character's **Fate Die vs Tara's (Lady Death's) chosen die**. Tara chooses from the full die ladder **like skills: 1, 2, 3, d4, d6, d8, d12, d20** (1/2/3 are static values, not rolled). She chooses based on **her own reasoning** — she is Death, and she can even **choose not to reap at all** (no roll; the character simply survives the trigger).
+- **bodyResist is OUT of death saves entirely** — it remains combat DAMAGE absorption only (body-part resist, 2:1 KV). Caught live when the T27 build surfaced the old formula.
+- **Supersedes**: r-2026-04-22-03's "bodyResist + Fate Die" death-resistance formula, and the combat half of the r-2026-06-09-01 two-formula split (both doors now roll the same way; the DOORS still differ in trigger and consequence).
+- **Survives unchanged**: r-2026-06-11-05 success restorations (1 Frequency back / vital part +1 condition step; optional trigger-related Thorn), r-2026-06-11-02 one-roll-binary combat door, r-2026-06-09-01 fated-age structure (yearly at Harvest past fatedAge, escalating age-Thorns, third fail = death).
+- **Implementation defaults pending Mike confirm**: (a) ties — character's FD >= Tara's result = survive, per the dice engine's existing `total >= DR` convention; (b) at ordinary tables Tara's choice is enacted by the GM as her proxy until the Lady Death agent handles it (Godhead agent system is day-1 release scope per r-2026-06-11-06, so agent-chosen dies come with that).
+- **Lands in rulebook**: §6 (Death)
+- **Files**: 00_CANON_CORE.md §6, Lady_Death_Protocols, Death_Engine_System, app services/death-save (T27)
+
+### r-2026-07-11-02: Death-save ties go to Lady Death; her post-roll authority is one-way mercy
+- **Ruling (Mike, verbal)**: A TIE on the death save goes to **Lady Death** (the character dies) — unless something overrides it (trait/buff-level tie overrides are possible content). After a FAILED roll, Tara may still **change her mind and not reap** — she can "fudge the roll" in the mercy direction at any point in the process. **The reverse is forbidden**: if the roll says the character lives, she CANNOT reap them. One-way authority: always free to spare, never free to overrule survival.
+- **Resolves**: the "ties pending confirm" item in r-2026-07-11-01. Character survives only on **FD (+ modifiers) STRICTLY GREATER than Tara's result**.
+- **Implementation shape**: failure marks a pending death-split; the GM-confirmed split dialog IS Tara's mercy window (confirm = reap, spare = clear the pending split, character lives at wherever the trigger left them). A successful save clears any pending split and is final.
+- **Lands in rulebook**: §6 (Death)
+- **Files**: 00_CANON_CORE.md §6, Lady_Death_Protocols, app services/death-save

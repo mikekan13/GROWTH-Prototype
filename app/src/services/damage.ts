@@ -26,6 +26,18 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { routeDamage, HUMAN_BASELINE_ANATOMY, type DamageType, type DamageEvent, type WornDamageResult } from '@/lib/body-damage';
 import { buildWornLayers } from '@/services/inventory';
+import { broadcastDeathSave } from '@/services/death-save';
+
+/** Walk the anatomy to the node at `path` (partName segments from root). */
+function findByPath(root: GrowthWorldItem, path: string[]): GrowthWorldItem | null {
+  let node: GrowthWorldItem | undefined = root;
+  if (!node.partName || node.partName !== path[0]) return null;
+  for (const seg of path.slice(1)) {
+    node = (node.contains ?? []).find(c => c.partName === seg);
+    if (!node) return null;
+  }
+  return node ?? null;
+}
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
 
@@ -90,6 +102,26 @@ export async function applyDamageToCharacter(
     where: { id: input.characterId },
     data: { data: JSON.stringify(next) },
   });
+
+  // T27: a VITAL part destroyed by this hit opens the Facing Death door
+  // (r-2026-06-11-05). Surface the trigger on the GM screen — the roll
+  // itself stays GM-enacted (Tara's choice).
+  if (character.campaignId) {
+    for (const ev of result.events) {
+      if (ev.conditionAfter !== 0 || ev.conditionBefore === 0) continue;
+      const part = findByPath(result.next, ev.partPath);
+      if (part?.isVital) {
+        broadcastDeathSave(character.campaignId, {
+          kind: 'death_save',
+          phase: 'TRIGGERED',
+          characterId: character.id,
+          characterName: character.name,
+          door: 'COMBAT',
+          trigger: `vital_destroyed:${ev.partName}`,
+        });
+      }
+    }
+  }
 
   // Persist armor condition changes back to the item instances.
   for (const wd of result.wornDamage) {

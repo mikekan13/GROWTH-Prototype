@@ -38,6 +38,7 @@ export type GodHeadEvent =
   // Character lifecycle
   | 'character.locked'           // Player locked their character; crystallization fired
   | 'character.died'             // Frequency=0 in combat or Fated Age expired
+  | 'death_save.resolved'        // T27: a Facing Death roll resolved (survive/fail/spared) — Tara's fiction beat + Thorn authorship
   // Session / play
   | 'session.started'
   | 'session.ended'
@@ -63,20 +64,26 @@ const ROUTING_TABLE: Record<GodHeadEvent, ReadonlyArray<string>> = {
   'goal.abandoned': ['Eth\'erling'],
 
   // Blueprint chain: Kai prices, Eth'erling synthesizes.
+  // NOTE: routing keys are GodHead.name DB values. Lady Death's row is named
+  // 'Tara Almswood' (same entity, two names — canon). The old 'Lady Death'
+  // key silently skipped EVERY death event (T27 e2e caught it 2026-07-11).
   'blueprint.submitted': ['Kai'],
   'blueprint.priced': ['Kai'],
   'blueprint.evaluated': ['Eth\'erling'],
-  'blueprint.unused_for_90d': ['Lady Death'],
+  'blueprint.unused_for_90d': ['Tara Almswood'],
 
-  // Death routes to Lady Death first; her process_death tool handles the
-  // ledger split and Spirit Package composition.
+  // Death routes to Lady Death (Tara) first; her process_death tool handles
+  // the ledger split and Spirit Package composition.
   'character.locked': [],   // Currently a no-op route — reserved for future welcome ritual.
-  'character.died': ['Lady Death'],
+  'character.died': ['Tara Almswood'],
+  // T27: every resolved death save is Tara's beat — survivals she may Thorn,
+  // fated-age fails she authors the escalating age-Thorn for, spares she narrates.
+  'death_save.resolved': ['Tara Almswood'],
 
   // Session events broadcast to all three godheads so they can refresh
   // their working memory at session boundaries.
-  'session.started': ['Kai', 'Lady Death', 'Eth\'erling'],
-  'session.ended': ['Kai', 'Lady Death', 'Eth\'erling'],
+  'session.started': ['Kai', 'Tara Almswood', 'Eth\'erling'],
+  'session.ended': ['Kai', 'Tara Almswood', 'Eth\'erling'],
 
   // Direct GM ask — Eth'erling triages.
   'gm.request': ['Eth\'erling'],

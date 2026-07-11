@@ -21,6 +21,7 @@ import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { executeTransaction } from './krma/ledger';
 import { getWalletByCharacter, getReserveWallet } from './krma/wallet';
+import { broadcastDeathSave } from './death-save';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const frequencyOpSchema = z.object({
@@ -111,8 +112,7 @@ export async function executeFrequencyOp(
       // still happens, ledger waits until the character has a wallet.
     }
   } else {
-    // Deplete reduces CURRENT pool only. Floor at 0 (death triggers handled
-    // elsewhere via spendAttribute overflow).
+    // Deplete reduces CURRENT pool only. Floor at 0.
     currentAfter = Math.max(0, currentBefore - validated.amount);
     freq.current = currentAfter;
   }
@@ -121,6 +121,20 @@ export async function executeFrequencyOp(
     where: { id: validated.characterId },
     data: { data: JSON.stringify(next) },
   });
+
+  // T27: crossing into Frequency 0 = Death's Door — surface the Facing
+  // Death trigger on the GM screen. The ROLL stays GM-enacted (Tara's
+  // choice); this only announces the door opening.
+  if (currentBefore > 0 && currentAfter <= 0 && character.campaignId) {
+    broadcastDeathSave(character.campaignId, {
+      kind: 'death_save',
+      phase: 'TRIGGERED',
+      characterId: character.id,
+      characterName: character.name,
+      door: 'COMBAT',
+      trigger: 'frequency_zero',
+    });
+  }
 
   return {
     op: validated.op,

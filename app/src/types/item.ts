@@ -99,6 +99,10 @@ export interface GrowthWorldItem {
   partName?: string;
   /** Nested items this part/container holds. Standard cascade: outer absorbs up to resist, excess passes through to internals. */
   contains?: GrowthWorldItem[];
+  /** Vital part: its destruction (condition 0) trips the Facing Death door
+   *  (r-2026-06-11-05). Seeds mark their own vitals; Human baseline marks
+   *  Brain and Heart. */
+  isVital?: boolean;
 }
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';

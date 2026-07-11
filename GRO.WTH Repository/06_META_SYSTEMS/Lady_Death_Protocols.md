@@ -3,7 +3,7 @@
 **Status:** #needs-review
 **Source:** GROWTH_Rule_Synthesis.md, ChatGPT_Project_Memory.md, Economy Design Session 2026-04-05, GROWTH-DESIGN-TRUTH §7.5 / §13 / §15; Fated-Age death formula locked Mike 2026-06-09 (ruling r-2026-06-09-01)
 **Security:** PUBLIC
-**Last Updated:** 2026-06-09
+**Last Updated:** 2026-07-11
 
 ---
 
@@ -55,10 +55,12 @@ Lady Death's choice is driven by her own contracts, emblems, personality, econom
 
 There are **two independent death systems**:
 
-- **Facing Death (locked Mike 2026-06-11, rulings r-2026-06-11-02 + r-2026-06-11-05):** triggered by either of two conditions — **(1) Frequency current pool ≤ 0** (typically after all attribute pools have been depleted and overflow has consumed Frequency), or **(2) a VITAL body part is destroyed** (parts are items with condition tracks; vitals defined per Seed). The character makes **ONE roll against Lady Death** (FD + bodyResist vs Lady Death's roll). Facing Death fires **only once even if both triggers happen simultaneously**.
+- **Facing Death (locked Mike 2026-06-11, rulings r-2026-06-11-02 + r-2026-06-11-05):** triggered by either of two conditions — **(1) Frequency current pool ≤ 0** (typically after all attribute pools have been depleted and overflow has consumed Frequency), or **(2) a VITAL body part is destroyed** (parts are items with condition tracks; vitals defined per Seed). The character makes **ONE roll against Lady Death**: character's **Fate Die vs Tara's chosen die** — `bodyResist` plays no role (r-2026-07-11-01). Tara picks her die from the full ladder — **1, 2, 3, d4, d6, d8, d12, d20** (1/2/3 = static values, not rolled) — by her own reasoning. Tara may also **choose not to reap at all**: no roll fires and the character survives the trigger automatically. Facing Death fires **only once even if both triggers happen simultaneously**.
   - **Success →** survive; a destroyed vital part **restores one condition** (no longer destroyed), and if Frequency was at 0, **1 Frequency is restored**. Both apply if both triggered. **Even on success, Lady Tara may place a Thorn or Negative Blossom directly related to the trigger** (e.g., destroyed heart → Thorn: "whenever Constitution pool hits 0, immediately make a Death Save for heart failure — fail = die").
   - **Failure →** death (the [[Death_Engine_System]] fires). One roll, binary — no strikes, no retries. Fated age plays no role here.
-- **Fated Age Death (locked Mike 2026-06-09, ruling r-2026-06-09-01):** at and past `fatedAge` (Seed-defined, in cycles), the character rolls **Fate Die only** vs Tara's Death Roll **each year**. Nectars/Thorns can augment or change the roll. FD ≥ Tara's roll → nothing happens that year. On a **fail**, Tara bestows a **Thorn representing their escalating age**. The **third fail after fated age = death** (the [[Death_Engine_System]] fires). `bodyResist` plays NO role here — it is combat-damage resist only.
+  - **Ties go to Lady Death** (r-2026-07-11-02): the character survives only on a STRICTLY greater total, unless something (trait/buff content) overrides the tie.
+  - **One-way mercy (r-2026-07-11-02):** after a FAILED roll Tara may still change her mind and not reap — she can "fudge the roll" in the mercy direction at any point before the Death Engine fires. The reverse is forbidden: **if the roll says they live, she cannot reap them.** Survival is final.
+- **Fated Age Death (locked Mike 2026-06-09, ruling r-2026-06-09-01):** at and past `fatedAge` (Seed-defined, in cycles), the character rolls **Fate Die vs Tara's chosen die** **each year** (r-2026-07-11-01). Tara picks her die from the same full ladder (1, 2, 3, d4, d6, d8, d12, d20) and may also decline to reap (no roll, character survives that year). Nectars/Thorns can augment or change the character's roll. FD (+ modifiers) STRICTLY GREATER than Tara's result → nothing happens that year (ties go to Lady Death, r-2026-07-11-02; her one-way mercy applies here too). On a **fail**, Tara bestows a **Thorn representing their escalating age**. The **third fail after fated age = death** (the [[Death_Engine_System]] fires). `bodyResist` plays no role in any death save — it is combat damage absorption only (r-2026-07-11-01).
 
 *(Per WTH retirement 2026-04-05: per-character "Health Level" no longer exists.)*
 
