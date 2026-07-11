@@ -1,12 +1,14 @@
 # Combat_Hit_Locations.md
 
-**Status:** #needs-validation
-**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Status:** #validated
+**Source:** GROWTH_System_Archive_Complete_Content_Extraction.md, User clarification 2025-10-03; superseded for general damage routing by [[Body_Composition_System]] (locked Mike 2026-05-19); preserved here as the called-shot DR-modifier table and as the coarse-zone fallback for narrative play.
+**Last Updated:** 2026-05-23
 
 ---
 
 # Combat Hit Locations
+
+> **Per the 2026-05-19 body composition rewrite, body parts are now items in a nested container tree** ([[Body_Composition_System]]). The cascade engine in `lib/body-damage.ts` handles damage routing automatically. This file is now the canonical reference for **called-shot DR modifiers** (the +2/+0/−1 modifiers the attacker accepts when targeting a specific zone) and for **coarse-zone narrative shorthand**. Detailed sub-part targeting (e.g., "left eye") happens through the full anatomy tree, not through this table.
 
 GROWTH uses **targeted hit locations** with specific **DR modifiers** and **condition effects** for realistic combat resolution.
 

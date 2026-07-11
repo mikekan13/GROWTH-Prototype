@@ -1,11 +1,19 @@
 # Combat_Example_Tavern_Brawl.md
 
-**Status:** #needs-validation
-**Source:** Rewritten to match current combat mechanics 2025-10-03
+**Status:** #needs-review
+**Source:** Rewritten to match current combat mechanics 2025-10-03; staleness audit 2026-06-09
 **Security:** PUBLIC
-**Last Updated:** 2025-10-03
+**Last Updated:** 2026-06-09
 
 ---
+
+> **STALENESS WARNING (2026-06-09 audit):** This example predates several locked rulings and contains errors. Treat the *structure* (three phases, per-pillar actions, defended vs undefended) as illustrative, NOT the specifics:
+> - Pillar groupings use pre-swap labels ("Soul: FLW/FRQ/FOC" / "Spirit: WIL/WIS/WIT" — backwards; Spirit = Flow/Frequency/Focus, Soul = Willpower/Wisdom/Wit).
+> - Action counts include Frequency in the Spirit pool — wrong per ruling r-2026-05-20-01 (Frequency is excluded).
+> - "Celerity 0 = Paralyzed" is not a real depletion state — Celerity 0 = **Clumsy** ([[Attribute_Depletion_Effects]]).
+> - Defenders adding their raw attribute LEVEL to defense rolls is not a documented rule (unskilled = FD + Effort).
+> - Marcus's "Dual Wielding grants 2 attacks per action" at level 10 reflects the retired skill-multiplier table; multi-attacks come from Nectars/items (ruling r-2026-06-09-02).
+> Full rewrite pending.
 
 # Combat Example: Tavern Brawl
 

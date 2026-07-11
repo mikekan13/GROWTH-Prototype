@@ -6,6 +6,11 @@
 
 ---
 
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
+
 # Starting Skills Module
 
 This module provides **skill name examples** to inspire character creation. These are **suggestions only** - players can create any skill names that fit their character concept. Skills use freeform naming with no required categories.

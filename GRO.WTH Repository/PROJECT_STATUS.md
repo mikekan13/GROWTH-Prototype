@@ -1,8 +1,77 @@
 # PROJECT_STATUS.md
 
-**Last Updated:** 2026-05-03
-**Current Phase:** Phase 3c canon-cleanup pass complete — Soul/Spirit swap propagated, WTH/Values/Fears/Soul-Package legacy refs scrubbed, missing-system docs added
-**Overall Progress:** Repository now reflects May 2026 canon for the load-bearing systems; ~12 P-flagged items remain for Mike
+**Last Updated:** 2026-06-09
+**Current Phase:** Post-completion maintenance — 2026-06-09 ruling sync (Fable 5 deep-ingest session).
+**Overall Progress:** Repository is **canonically complete** for beta and synced to the 2026-06-09 rulings. Outstanding items are production/legal/Stripe (not engineering) plus two open combat details (combat-death fail count; Decay's default Spirit target).
+
+---
+
+## 2026-06-09 — Ruling sync after full-canon ingest (Claude/Fable 5)
+
+Mike answered the consolidated question round from the deep-ingest session. Nine new rulings appended to `rulebook/rulings.md` (r-2026-06-09-01 … -09) and synced into the repo:
+
+### Rulings landed
+- **Fated-Age death** = Fate Die ONLY vs Tara's roll, annually at/past fatedAge; each fail → escalating-age Thorn from Tara; **third fail = death**. bodyResist plays no role. (Death_Engine, Lady_Death_Protocols, Three_Pillar_Attributes updated.)
+- **Multi-attacks** come from Nectars/items, never a universal skill-level table. Old table preserved in Attack_Resolution_Mechanics as a strong-Nectar example only.
+- **Damage map is structural 3/1/3**: `P:S:H/D\C:B:E` → Clout:Celerity:Constitution / SPIRIT pillar \ Willpower:Wisdom:Wit. Unaligned targeting allowed at higher KRMA. (Damage_Type_Interactions [NEEDS MIKE] resolved.)
+- **Decline-a-Nectar tax** locked ~10%, paid to GM. (rulebook §7.6 closed.)
+- **Harvest time-budget is a MINIMUM** — GM can reward beyond it. (Harvests_System.)
+- **Full customizable calendar** (months/days/holidays/names) required at app initial release.
+- **History is per-canvas-object, perspective-based** — Locations log what happens in them; every PC and NPC (even offscreen) keeps a running experiential log.
+- **JEWL during play = live session engine** (knows every voice, logs everything, runs the canvas numbers).
+- **Deleting ACTIVE ≠ deleting a draft** — active entities need a dissolution flow with KRMA settlement.
+
+### Stale-doc repairs (cited to their rulings)
+- Seeds_Roots_Branches + Harvests: 2-KRMA/yr placeholder → r-2026-04-22-10/-11 break-even math (5 KV/yr baseline).
+- Block_Grading_Principles: d2/d3 skill rows → 1 KRMA × level (no d2/d3 dice).
+- rulebook §3.1: pillar colors corrected to the settled palette (Spirit=Purple, Soul=Blue).
+- Combat_Example_Tavern_Brawl: staleness warning banner (pre-swap labels, Frequency-in-actions, fake "Paralyzed" state, retired multi-attack table).
+- Human_Scholar example: attribute-derived mana → locked catalyst model ([[Mana_System]]).
+
+### Still open (flagged to Mike)
+1. **Combat-death fail count** — is one failed combat save death, or multiple fails survivable (with what consequence)? Legacy "3-strike" phrasing unverified for combat.
+2. **Decay's default Spirit target** — Frequency, attacker's choice, or weapon-declared. Ask when wiring damage routing in the app.
+
+---
+
+## 2026-05-23 — Repository completion pass (Claude, autonomous)
+
+Mike granted blanket authority — "complete the repository. Just get it done with every rule, formula, etc." Every claim sourced from a previously `#validated` file, a Mike-locked memory entry, the 2026-05-19 resolution doc (`NEEDS-MIKE_RESOLUTIONS_2026-05-19.md`), or the rulings log.
+
+### New canon files (5)
+- [[Death_Engine_System]] — transformation model, status GHOST, body→GM/soul-halves→Lady Death/max-Freq→Lady Death/Spirit kept.
+- [[Body_Composition_System]] — parts-as-items, nested containers, piercing→one vs even-split cascade, retired "Body" damage type.
+- [[Creature_Size_System]] — numeric width × length + descriptive height, reach + squeeze rules, no categories.
+- [[GM_Subscription_KRMA]] — 15k lump + drip curve 2.5k m1 → 10k m12 peak → 3k m36+ steady. Status states.
+- [[CANON_INDEX]] — master one-line index of every canonical file with locked-canon dates.
+
+### Refreshed `#validated` files (filled in or completed)
+- [[Spirit_Package_System]] — rewrote per the transformation model; was `#needs-review` with `[NEEDS MIKE]` placeholders.
+- [[Frequency_Three_Operations]] — Burn formula locked: `cost = baseCost × (1 + burnSinkBalance / 50_000)`. Spirit Package reference resolved.
+- [[ActionMod_System]] — stacking is additive, no cap, conditions can modify. Initiative-tiebreaker integration.
+- [[Combat_Grid_System]] — movement = `Celerity / 5` squares per action, diagonal = 1, difficult terrain ×2. Time Stack pillar-tiered initiative. Cover/LOS = Terminal contextual rulings.
+- [[Inventory_Paperdoll]] — aligned to [[Body_Composition_System]]: equipped IS the anatomy tree. No per-region weight caps. Multi-region items live in the outermost shared container. Slot conflicts resolved by GM ruling.
+- [[Turn_Structure_and_Action_Economy]] — Frequency EXCLUDED from Spirit actions (`(Flow + Focus) / 25, min 1`).
+- [[Damage_Type_Interactions]] — Body cascade routing added; "Body" damage type retired.
+- [[Combat_Hit_Locations]] — superseded for routing by [[Body_Composition_System]]; retained as called-shot DR-modifier table.
+- [[Prima_Materia_System]] — reconciled with locked casting canon; KRMA cost bands added; "no trainable marker on PM failure" rule explicit.
+- 10 × `Magic_School_*.md` — refreshed casting methods per [[Casting_Methods]] (Wild + Woven), trainable marker rule added, Endurance reference stripped, Mana usage cross-referenced.
+
+### Cleanup pass (delegated)
+- WTH-retirement banners added to: Branches_Examples, Condition_Effects_Reference, Starting_Skills_Module, Weapon_Examples_Table, Branches_Reference_Examples, Character_Creation_Example_Human_Scholar, Roots_Reference_Examples, Seeds_Reference_Examples, rulebook.md, rulings.md.
+- Old pre-2026 pillar labels purged from 11 example files (1 actual hit; rest were false positives). Wholesale rewrite avoided.
+
+### rulebook/
+- `rulebook.md` — canonical header added; post-2026-05-19 update banner pointing to new canon files until full re-sync.
+- `rulings.md` — canonical header added; 11 new rulings appended (`r-2026-05-19-01` through `r-2026-05-19-10`, `r-2026-05-20-01`, `r-2026-05-23-01`).
+
+### What's left open
+- **Production infra** (M6): Stripe account + product, hosting platform decision, transactional email rollout — not engineering blockers, but pre-launch requirements.
+- **Legal** (M7): ToS, Privacy, Refund, Acceptable-Use docs — needs lawyer.
+- **Content authoring** (M9): hand-author solid base examples then AI-generate to hundreds of entries per pool. No hard counts (per `r-2026-05-19-09`).
+- **Spirit-economy** for ghosts to rebuild Frequency capacity — design conversation, not blocking.
+- **AI Oracle co-GM** — post-beta.
+- **KRMA → ledger crypto** — long-term, depends on legality + working product.
 
 ---
 

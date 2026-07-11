@@ -6,6 +6,11 @@
 
 ---
 
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
+
 # Branches Reference Examples
 
 Reference tables of specific Branches with statistical mechanics, representing significant adult experiences, training, and career paths. These examples show how life events can mechanically enhance characters.
@@ -27,7 +32,7 @@ Branches represent adult life experiences and provide:
 
 **KV Cost:** 110  
 **Age Addition:** +4 years  
-**Prerequisites:** Intelligence 12+, Access to institution  
+**Prerequisites:** Wit 12+, Access to institution  
 **Description:** Years spent in scholarly research and academic study
 
 **Skills Gained:**

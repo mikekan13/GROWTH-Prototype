@@ -1,9 +1,9 @@
 # Frequency_Three_Operations.md
 
-**Status:** #needs-review
-**Source:** GROWTH-DESIGN-TRUTH §8.5 (Frequency Operations), memory `frequency-three-operations.md`, Mike's clarifications 2026-03-13
+**Status:** #validated
+**Source:** GROWTH-DESIGN-TRUTH §8.5 (Frequency Operations), memory `frequency-three-operations.md`, Mike's clarifications 2026-03-13, Burn formula locked Mike 2026-05-19 ([[NEEDS-MIKE_RESOLUTIONS_2026-05-19]] §0 / burn canon), Spirit Package locked 2026-05-19 ([[Spirit_Package_System]]).
 **Security:** PUBLIC
-**Last Updated:** 2026-05-03
+**Last Updated:** 2026-05-23
 
 ---
 
@@ -29,12 +29,22 @@ Frequency is **not a simple resource pool**. It supports three operations that m
 - **Recovery:** Refills on rest (Long Rest fully restores; Short Rest recovers other pools at the cost of 1 Frequency depletion — see [[Three_Pillar_Attributes]] §"Rest Mechanics").
 - **Triggers death save** if Current hits 0.
 
-### 3. Burn (destructive — global cap)
-- **Affects:** Frequency / KRMA permanently destroyed. **No one receives it.** Burned KRMA is removed from circulation entirely (analogous to burning a token).
-- **Used for:** Altering the outcome of a die roll, enabling an "impossible" action, or paying a cosmic price the system would not otherwise allow.
-- **Hard global limit:** burning is capped across the entire metaverse (see [[KRMA_System]] reserve pools — global burn cap is 5B KRMA; once reached, burning is permanently disabled).
-- **Meta-gameplay consequences:** because burn shrinks total supply, every burn is a metaverse-level event.
-- **[NEEDS MIKE]** — exact Burn formula (how much Frequency / KRMA per outcome shift, what kinds of outcomes can be bought, tier of consequences) is not yet specified. Treat any in-app Burn UI as placeholder until Mike defines the curve.
+### 3. Burn (destructive — true permanent removal)
+- **Affects:** Frequency / KRMA permanently destroyed. **No one receives it.** Burned KRMA exits the entire ledger. This is the **only** mechanic in GROWTH that ever removes KRMA from the system. Every other transaction — death, spend, deplete-into-frequency, abandonment — is a *transfer*.
+- **Conversion rate:** **1 max Frequency = 1 KRMA.** The character pays the cost by reducing their `frequency.level` (max), permanently. `current` is clamped to the new max.
+- **Used for:** Player narrative interventions during play — "I would like to burn Frequency to catch myself before I fall." The player requests; the GM and/or a high-level Godhead evaluate the request and assign a base cost.
+- **Cost authority:** a high-level Godhead (currently **Kai** by default; expected to migrate to a Terminal-tier Godhead with Eth'erling and Kai oversight) judges the **base cost** based on (a) the narrative scale of the requested outcome, and (b) the cumulative system-wide burn total.
+- **Anti-deflationary formula** (locked Mike 2026-05-19):
+
+```
+scaledCost = baseCost × (1 + burnSinkBalance / 50_000)
+```
+
+`burnSinkBalance` is the running total of all KRMA ever burned by anyone in the metaverse — the balance of the system-wide Burn Sink wallet. As burns accumulate, every future burn becomes more expensive. Target curve: a 1-KRMA cost at beta start grows toward ~2 KRMA by year 2. The `50_000` denominator is the calibration constant; expect to retune from real beta flux data.
+
+- **Hard global limit:** burning is also capped across the entire metaverse (see [[KRMA_System]] reserve pools — global burn cap is 5B KRMA; once reached, burning is permanently disabled).
+- **Meta-gameplay consequences:** because burn permanently shrinks total supply, every burn is a metaverse-level event recorded in the system Burn Sink wallet. The wallet is frozen by genesis; KRMA in it can never re-enter circulation.
+- **Example:** Player Tara fails a Celerity check climbing a cliff and is about to fall. She says "I want to burn Frequency to catch myself." Kai evaluates: this is a narrow, low-stakes save → `baseCost = 1`. If the system has burned 0 KRMA ever → `scaledCost = 1`. If the system has burned 50,000 KRMA ever → `scaledCost = 2`. Tara's `frequency.level` drops by 1 permanently; the catch happens; 1 KRMA leaves the ledger forever.
 
 ## Why the Distinction Matters
 
@@ -51,7 +61,7 @@ A simple "subtract from pool" model is insufficient. The Frequency attribute fun
 - [[Three_Pillar_Attributes]] — Frequency sits in the Spirit pillar (post-swap).
 - [[KRMA_System]] — Burn permanently shrinks the 100B global supply, capped at 5B total.
 - [[Lady_Death_Protocols]] — Frequency depleted to 0 triggers Combat Death saves.
-- [[Spirit_Package_System]] — On death, Frequency disposition (legacy hypothesis: 100% to Lady Death) is **[NEEDS MIKE]**.
+- [[Spirit_Package_System]] — On death, the character's Frequency `current` pool is already 0 (death triggered because it hit 0). The Frequency `level` (max capacity) is transferred in full to Lady Death's wallet. A ghost has no Frequency capacity.
 
 ---
 

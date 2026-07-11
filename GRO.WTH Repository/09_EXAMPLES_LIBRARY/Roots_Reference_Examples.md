@@ -7,6 +7,11 @@
 
 ---
 
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
+
 # Roots Reference Examples
 
 Reference tables of specific Roots with statistical mechanics, providing concrete examples for character background creation. These pre-designed examples show how childhood and upbringing experiences can be mechanically represented.

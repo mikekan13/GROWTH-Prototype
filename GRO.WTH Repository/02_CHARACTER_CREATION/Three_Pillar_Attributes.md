@@ -118,10 +118,10 @@ Total attribute pool = base (from Roots/Branches levels) + Seed augs + equipment
 
 ### Death Save System
 **Trigger:** Frequency current pool reaches zero from any source.  
-**Resolution:** FD + bodyResist vs Lady Death's roll (Combat Death). 3-strike rule.  
-**Fated Age Death:** independent system — Fate Die vs Lady Death at character's `fatedAge` (set by Seed). 3-strike rule, separate from combat strikes.  
+**Resolution:** FD + bodyResist vs Lady Death's roll (Combat Death). *(Survivable-fail count for combat saves pending Mike's ruling.)*  
+**Fated Age Death (ruling r-2026-06-09-01):** independent system — **Fate Die only** vs Tara's Death Roll, each year at/past `fatedAge` (set by Seed; Nectars/Thorns can augment). Each fail → Tara bestows an escalating-age **Thorn**. Third fail after fated age = death.  
 **No Effort:** Cannot wager attributes on death saves.  
-**Success:** Recover 1 Frequency point.  
+**Success:** Recover 1 Frequency point (combat save) / nothing happens that year (fated-age roll).  
 **Failure:** Character death (Spirit Package falls — see [[Spirit_Package_System]]).
 
 ## Magic Integration

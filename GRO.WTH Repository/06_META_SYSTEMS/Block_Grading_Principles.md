@@ -71,7 +71,7 @@ Per `WIP-elven-seed-design.md` and `WIP-15-seeds-batch-2026-05-09.md`:
 | Base Resist | 2 KRMA per point (absolute, positive-only) |
 | Fate Die | d4=5, d6=10, d8=20 (default), d12=40, d20=80 |
 | Fated Age | `ceil(fatedAge × 0.5)` (absolute, every year costs positive KRMA, no refunds) |
-| Skill (starting, if granted) | Apprentice d2=10, Novice d3=14, Student d4=19 |
+| Skill (starting, if granted) | **1 KRMA × skill level** (non-magic) / **2 KRMA × level** (magic); seed-level cap = level 4 (d4). *(There are NO d2/d3 dice — Mike 2026-05-11; the old Apprentice-d2/Novice-d3 row was stale. See [[KRMA_Costs_Table]] + `memory/skill-tiers-start-at-d4`.)* |
 | Nectar / Thorn | Kai-graded individually with synergies; baseline scale: +1 mod to roll ≈ 5 KV (contextual = less) |
 
 > Cross-check formulas against [[KRMA_Costs_Table]] before authoring. If the values differ, the locked WIP docs win and the table needs updating — flag for a parallel canon update.

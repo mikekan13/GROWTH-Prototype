@@ -329,3 +329,22 @@ entry that references the old.
 - **New canon surfaced**: (a) body parts have **condition tracks** the death system reads/writes; (b) **Negative Blossoms exist** — Blossoms are not only boons (lighter bar than Nectars/Thorns applies in both directions).
 - **Lands in rulebook**: §7 (Combat), §11 (Death)
 - **Files**: [[Lady_Death_Protocols]], [[Death_Engine_System]], [[Body_Composition]] (when written), Blossom docs
+
+### r-2026-06-11-06: Day-1 release scope — JEWL listens to the table; full Godhead agent system
+- **Ruling (Mike)**: Day 1 = "JEWL who listens to the table and controls the canvas." Live audio at the table is RELEASE scope, not future tech. The two biggest technical hurdles for release: (1) the JEWL live-audio session engine, (2) the full Godhead AI Agent system. Everything further out is "future tech problems" — release planning covers day-1 beta and on.
+- **Supersedes**: the older "Godhead dummy is enough for beta" assumption ([[beta-requirements]] memory) — scope is the FULL Godhead agent system.
+- **Lands in rulebook**: §14 (Platform/Release)
+- **Files**: ROADMAP.md (release scope), ai_systems.md
+
+### r-2026-06-11-07: Session voice architecture — native in-app voice rooms; Discord bot later
+- **Ruling (Mike)**: GROWTH is played primarily ONLINE; local-table and hybrid play are supported. Day-1 voice = **native in-app voice rooms** (WebRTC) — each remote player is a labeled audio stream; JEWL joins the room as a participant (hears per-speaker, transcribes in real time, logs to per-character history, speaks back via TTS). Local play = GM device joins as one "room" participant, split via diarization + one-time voice enrollment. Hybrid = both at once. A **Discord bot is the likely post-release bridge** ("a good place to go"), not day-1.
+- **Why native first**: speaker ID is free per-stream, full JEWL integration, no third-party platform dependency, honors canvas-as-OS (the table lives inside the artifact).
+- **Lands in rulebook**: §14 (Platform/Release)
+- **Files**: ai_systems.md, ROADMAP.md
+
+### r-2026-06-11-08: One character-agent architecture — AI character control is the heart
+- **Ruling (Mike)**: The full Godhead agent system is day-1, and the per-character AI control layer is "really the heart." Every Godhead must (1) **know how to play GROWTH** (rules mastery), (2) **manage the meta and their share** (duties + KRMA), and (3) **play the game** — "they are characters in the game too."
+- **Architectural consequence**: ONE character-agent architecture instantiated at every tier — NPC with AI-toggle on, lesser Godhead, JEWL (session-engine duty), Prime Godheads (maximum duty + share). Differences are scale of duty/share/memory, not kind. Pairs with [[ai-two-layers-and-universal-character-log]] (memory ≠ persona; every character logs regardless of who writes).
+- **Canon-core consequence**: the condensed canon (00_CANON_CORE.md) is a RUNTIME component — the rules-mastery layer every character agent loads at live, not just a dev-session artifact.
+- **Lands in rulebook**: §12 (Godheads), §14 (Platform/Release)
+- **Files**: ai_systems.md, Godheads_System

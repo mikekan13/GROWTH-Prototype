@@ -1,86 +1,98 @@
 # Inventory_Paperdoll.md
 
-**Status:** #needs-review
-**Source:** GROWTH-DESIGN-TRUTH §13.5 (Inventory), memory `inventory-paperdoll.md`, Mike's confirmation 2026-03-13
+**Status:** #validated
+**Source:** GROWTH-DESIGN-TRUTH §13.5 (Inventory); memory `inventory-paperdoll.md`; Mike's confirmation 2026-03-13; finalized 2026-05-23 in alignment with [[Body_Composition_System]] (body-parts-as-items) and [[Inventory_and_Encumbrance_System]] (Carry Level = Clout, global cap).
 **Security:** PUBLIC
-**Last Updated:** 2026-05-03
+**Last Updated:** 2026-05-23
 
 ---
 
-# Inventory: Three-Tier System with Per-Seed Paperdoll
+# Inventory: Three-Tier System Layered on Body Anatomy
 
-GROWTH inventory is split into **three categories**. Two of them use the Weight system (1-10); the third is narrative-only. The equipped paperdoll is **defined by the Seed**, not hardcoded — non-humanoid Seeds get their own slot regions.
+GROWTH inventory is split into **three categories**: Equipped, Carried, and Possessions. The Equipped tier is *not* a fixed list of named slots — it's the [[Body_Composition_System|body anatomy tree]] with items attached to specific body parts.
 
-## The Three Categories
+## The three categories
 
 ### 1. Equipped
 - Items currently worn or wielded on the character's body.
-- Slots are **body-region paperdoll regions** — see "Per-Seed Paperdoll" below.
-- Uses the **Weight system (1-10)** — Carry Level constrains how much can be equipped without encumbrance.
-- Affects ActionMod, armor resist, weapon access, etc.
+- Stored as items nested inside body-part containers — see [[#Equipped is the anatomy tree|below]].
+- **Counts toward Carry Level** (the global Clout-based encumbrance system), but **worn equipment is exempt from encumbrance penalties** while properly worn — see [[Inventory_and_Encumbrance_System]].
+- Affects ActionMod ([[ActionMod_System]]), armor resist, weapon access.
 
-### 2. Inventory
-- Items the character is **carrying but not equipped** — backpacks, pouches, hands of friends, etc.
-- Uses the **Weight system (1-10)** — counts against Carry Level.
-- Items move between Inventory and Equipped via player action (donning, drawing weapons, etc.).
+### 2. Carried
+- Items the character is carrying but not equipped — backpacks, pouches, slung weapons, items in hand without active use.
+- Counts toward Carry Level.
+- Items move between Carried and Equipped via player action (donning armor, drawing a weapon, etc.).
 
 ### 3. Possessions
-- Items the character **owns but is not carrying** — house, vehicle, stashed treasure, business holdings, livestock, real estate.
-- **Does NOT use the Weight system.** No encumbrance impact.
+- Items the character **owns but is not carrying** — house, vehicle, stashed treasure, business holdings, livestock, real estate, the off-world manor on the moon they bought during Roots.
+- **Does NOT count toward Carry Level.** No encumbrance impact.
 - Tracked narratively / as KV for character-wealth purposes.
 - Replaces the legacy "Assets System" that was tied to the now-retired Wealth Level (see [[Inventory_and_Encumbrance_System]] note about WTH retirement 2026-04-05).
 
-## Per-Seed Paperdoll
+## Equipped is the anatomy tree
 
-The set of equipped slots is **NOT a fixed list**. Each Seed defines its own paperdoll regions during Seed creation. The character sheet UI must render slots dynamically based on the character's Seed.
+The old paperdoll had a fixed list of slots ("Head, Body, Upper Left Arm, ..."). The new model **doesn't have a slot list at all**. Equipped items are nested inside body-part items in the anatomy tree.
 
-### Default Humanoid (10 regions)
+Example: a character wearing a helmet has the helmet item inside the `Head` container in their `bodyAnatomy`. Their Head's `contains` array holds: `[helmet, brain, left_eye, right_eye, left_ear, right_ear, tongue]`. The helmet is no different structurally from an organ — it's just an item attached to that body region.
 
-For Seeds whose body plan is human-shaped (Humans, Elves, Dwarves, most playable races), the default paperdoll has **10 regions**:
+This is the point: armor and organs share the same damage cascade. Damage to the head hits the helmet first (outer-most), then passes through to the head's other contents per the cascade rules ([[Body_Composition_System]] §"Damage cascade").
 
-1. Head
-2. Body (torso)
-3. Upper Left Arm
-4. Lower Left Arm
-5. Upper Right Arm
-6. Lower Right Arm
-7. Upper Left Leg
-8. Lower Left Leg
-9. Upper Right Leg
-10. Lower Right Leg
+### Authoring view
 
-### Non-Humanoid Seeds
+When the player equips an item, the UI inserts it into the appropriate body-part's `contains` array. The player picks the body part (or the UI infers one based on the item's `properties` — e.g., "Helmet" property auto-targets Head). Two characters of the same Seed share the same anatomy *template*, but each character's tree is mutable: parts can be lost, replaced, modified.
 
-When the GM creates a non-humanoid Seed, the paperdoll is customized. Examples:
+### Non-humanoid bodies
 
-- **Tailed Seed** — adds a Tail slot.
-- **Winged Seed** — adds Left Wing / Right Wing slots.
-- **Multi-limbed Seed (e.g., Insectoid)** — adds extra arm/leg pairs.
-- **Centauroid** — replaces leg regions with horse-body and four hoof regions.
-- **Serpentine / Wormlike** — collapses leg regions, expands body into segments.
+Each Seed declares its own anatomy from scratch ([[Body_Composition_System]] §"Baseline anatomy"). A six-armed Seed has six Arm body parts; equipping a sword "on the third left arm" places the item in that specific arm's `contains`. A tailed Seed has a Tail part with its own equippable region. There is no separate "non-humanoid paperdoll override" system — the anatomy tree IS the paperdoll.
 
-The Seed's paperdoll definition lives on the Seed, not the character. Two characters of the same Seed share the same paperdoll layout; characters of different Seeds may have very different layouts.
+## Per-region weight caps
 
-## Implementation Implication
+**There are no per-region weight caps.** Carry Level is global (`Clout × 10 lbs`, see [[Inventory_and_Encumbrance_System]]). Equipping 50 lbs of armor on one shoulder is mechanically identical to spreading it across the whole body — the engine cares about the total, not the per-region distribution.
 
-The character sheet's paperdoll panel is **not** a static layout. It must:
+(Narratively, the GM may rule that obviously absurd loadouts — three helms stacked on the head — don't fit. That's a Terminal ruling, not a hard rule.)
 
-1. Read the character's Seed.
-2. Pull the Seed's `equipment_slots` definition (array of slot regions with positions and labels).
-3. Render slots dynamically.
-4. Store equipped items keyed by slot ID, not by hardcoded slot name.
+## Multi-region items
 
-This applies to both the player sheet and the Watcher's view of party members.
+Items that span multiple body parts (e.g., a plate cuirass covering torso + upper arms, or a full-body robe) are represented by **placing the item in the OUTERMOST shared container**. A cuirass spanning the upper body sits in `Torso.contains`; armor that covers an entire humanoid sits in `Body.contains` (the root of the anatomy tree).
 
-## Open Items
+Damage cascading down then sees the cuirass first regardless of where the strike lands within its coverage area, because the cascade descends from outermost to innermost.
 
-- **Slot weight caps per region:** **[NEEDS MIKE]** — whether each region has its own carry limit, or only the global Carry Level applies.
-- **Multi-region items (e.g. plate cuirass spans torso + upper arms):** **[NEEDS MIKE]** — exact rule for items that occupy multiple regions.
-- **Slot conflict (two-handed weapons, dual-wielding):** **[NEEDS MIKE]**.
+For items whose coverage is genuinely multiple non-overlapping regions (e.g. paired pauldrons with one piece per shoulder), each piece is a separate item placed in its respective container.
+
+## Slot conflicts (two-handed, dual-wielding)
+
+- **Two-handed weapons** occupy both Hand parts simultaneously. The UI prevents equipping the second Hand while a two-handed weapon is active. Internally, both `Left Hand.contains` and `Right Hand.contains` reference the same item id — when the weapon is unequipped, both references clear.
+- **Dual-wielding** is allowed only with one-handed weapons in each Hand. No mechanical bonus or penalty for dual-wielding by default; specific Nectars/Thorns can grant or restrict it.
+- **Layered armor** is allowed up to the layer caps defined in [[Armor_System]] (Clothing 3 / Light 1 / Heavy 1 max per layer at the same body region).
+- **Conflict resolution** when an authoring tool genuinely doesn't know which slot an item belongs to (e.g., "rune ring of vague placement") — the player or GM picks. The system does not auto-resolve ambiguous slots.
+
+## Implementation implication
+
+The character sheet's "Inventory" panel is **not** a static layout. It must:
+
+1. Render the character's `bodyAnatomy` tree.
+2. Walk each body part's `contains` array.
+3. For each child, classify as **organ** (`isBodyPart: true`) or **equipment** (not flagged).
+4. Render equipment in slot-like UI; render organs in an internal-anatomy UI.
+5. Allow drag-equip: dropping a Carried item onto a body part inserts it into that part's `contains`.
+
+The UI is dynamic on every render. Items moving in or out of the tree affect downstream calculations (ActionMod, total Carry weight, damage cascade routing).
+
+## Cross-reference
+
+| Game term | Code surface |
+|---|---|
+| Body anatomy | `character.bodyAnatomy` (top-level on `GrowthCharacter`) |
+| Equipped item | a `GrowthWorldItem` inside any body-part container's `contains` array |
+| Carried items | `character.inventory` (existing field for non-equipped carry) |
+| Possessions | `character.identity.possessions` (free-form text + future structured items) |
+| Carry Level | `Clout × 10 lbs` — see [[Inventory_and_Encumbrance_System]] |
+| UI components | `components/character/InventorySection.tsx`, `components/canvas/InventoryCard.tsx` |
+| Drag-equip handlers | `components/canvas/RelationsCanvas.tsx` (inventory drag-drop hit-tests) |
 
 ---
 
 ## Links
-- Related: [[Inventory_and_Encumbrance_System]], [[Seeds_Roots_Branches_System]], [[Armor_System]]
+- Related: [[Body_Composition_System]], [[Inventory_and_Encumbrance_System]], [[Seeds_Roots_Branches_System]], [[Armor_System]]
 - References: [[Equipment_Conditions]], [[Weapon_System]], [[Material_System]]
-- Examples: *(none yet)*

@@ -1,8 +1,8 @@
 # Prima_Materia_System.md
 
-**Status:** #needs-validation  
-**Source:** VERY OLD MAGIC BOOK from original alpha version.md and user authority 2025-08-12  
-**Last Updated:** 2025-08-12
+**Status:** #validated
+**Source:** Alpha-era magic compendium ("VERY OLD MAGIC BOOK") and user authority 2025-08-12; reconciled with locked casting canon 2026-05-23 (the Prima Materia system runs in parallel to skill-based casting per [[Casting_Methods]] — it is artifact-mediated power, not personal magical growth).
+**Last Updated:** 2026-05-23
 
 ---
 
@@ -81,11 +81,32 @@ Prima Materias are **crystallized magic artifacts** created by master alchemists
 **Philosopher Stone Exception:** Can cast any school of magic
 
 ### Resolution Formula
-**Standard Casting:** Prima Materia Power Level vs Difficulty Rating (no Fate Die, no effort)  
-**Level 10 Exception:** Auto-success for any spell up to DR 500, no dice required  
-**No Mana Enhancement:** Cannot combine with [[Mana_System|mana points]] for additional power  
-**Wild Casting Rules:** Subject to [[Monkey_Paw_System|Monkey Paw]] effects on failure  
-**Enhanced Consequences:** Unstable variants produce worse failure effects
+**Standard Casting:** Prima Materia Power Dice (`Nd20`) vs Difficulty Rating. **No Fate Die, no Effort wager, no School Skill die.** The artifact provides all the casting math.
+**Level 10 Exception:** Auto-success for any spell up to DR 500, no dice required.
+**No Mana Enhancement:** Cannot combine with [[Mana_System|mana points]] for additional power. The Prima Materia is *itself* a sealed mana reservoir; external mana cannot stack.
+**Wild Casting Rules:** Activations are functionally wild casting and are subject to [[Monkey_Paw_System|Monkey Paw]] effects on failure.
+**Enhanced Consequences:** Unstable variants produce worse failure effects.
+
+### No Trainable Marker
+Failed Prima Materia activations do **NOT** mark the associated School trainable. The artifact is doing the casting; the user is not learning. This is the key difference from skill-based wild casting (see [[Casting_Methods]] §"Wild Casting") where failures DO mark the School trainable. Prima Materia is a power tool — using it doesn't improve the user.
+
+### KRMA Cost Alignment
+Prima Materia KV scales with the activation power dice and stability. Approximate KRMA bands (locked here as canonical pricing anchors; subject to retuning by [[Block_Grading_Principles|Kai's evaluator]] during beta):
+
+| Level | Unstable | Stable |
+|---|---|---|
+| 1 | ~100 KV | ~250 KV |
+| 2 | ~250 KV | ~600 KV |
+| 3 | ~600 KV | ~1,500 KV |
+| 4 | ~1,500 KV | ~4,000 KV |
+| 5 | ~4,000 KV | ~10,000 KV |
+| 6 | ~10,000 KV | ~25,000 KV |
+| 7 | ~25,000 KV | ~60,000 KV |
+| 8 | ~60,000 KV | ~150,000 KV |
+| 9 | ~150,000 KV | ~400,000 KV |
+| 10 (Perfect) | n/a (cannot be unstable) | ~1,000,000+ KV |
+
+(Stable variants are roughly 2.5× the KV of equivalent Unstable. The escalation rate matches the exponential rarity intent — each tier is a meaningful jump.)
 
 ### Universal Usage
 **Equal Access:** Works identically for everyone regardless of magical training  

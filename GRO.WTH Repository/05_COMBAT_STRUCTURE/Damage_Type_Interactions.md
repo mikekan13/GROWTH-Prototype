@@ -1,9 +1,9 @@
 # Damage_Type_Interactions.md
 
-**Status:** #needs-review
-**Source:** Claude Damage Knowledge dump.md, User clarification 2025-10-03, merged 2026-05-03 (absorbs former `Damage_Types_and_Effects.md`)
+**Status:** #validated
+**Source:** Claude Damage Knowledge dump.md, User clarification 2025-10-03, merged 2026-05-03 (absorbs former `Damage_Types_and_Effects.md`). Body-cascade routing added 2026-05-23 per [[Body_Composition_System]] canon. Damage→attribute structural map locked Mike 2026-06-09 (ruling r-2026-06-09-03).
 **Security:** PUBLIC
-**Last Updated:** 2026-05-03
+**Last Updated:** 2026-06-09
 
 ---
 
@@ -33,6 +33,22 @@ When multiple damage types apply in a single hit, they resolve in this fixed ord
 **Piercing → Slashing → Heat → Decay → Cold → Bashing → Energy**
 
 This guarantees consistent layer-by-layer math when armor and material modifiers are involved.
+
+## Body Cascade Routing (locked 2026-05-19)
+
+Damage that gets past outer armor enters the **body anatomy tree** ([[Body_Composition_System]]). Body parts ARE items in nested containers. The cascade is:
+
+1. **Outer layer** (whatever was hit — armor or body part) absorbs damage up to its `baseResist`.
+2. **Excess passes through** to the layer beneath in the container chain.
+3. **Routing of the passthrough depends on damage type:**
+   - **Piercing** — the attacker designates ONE internal to receive the FULL passthrough. The designated path can go multiple segments deep (e.g., Head → Brain).
+   - **All other damage types** — passthrough splits EVENLY across all internals. Each child receives `Math.floor(passthrough / N)`. Remainders are absorbed by the bearer's mass (intentional design: half-points don't propagate).
+4. Each child then runs the same step against its own resist + contents, recursively.
+5. When damage to a part meets or exceeds its `baseResist`, the part drops one condition tier.
+
+The **"Body" damage type was retired 2026-05-19** — it was redundant with the new material-based system. Every body part has a material (Hard/Soft); typed damage (P/S/H/D/C/B/E) resolves against that material. No more "Body" column.
+
+See [[Body_Composition_System]] for the full cascade engine and `HUMAN_BASELINE_ANATOMY` template.
 
 ## Massive Damage Rule (Universal)
 
@@ -146,22 +162,27 @@ GROWTH damage types have **no inherent ongoing damage** in the core rules. Persi
 
 ## Natural Damage-Attribute Affinities (KRMA Efficient)
 
-### Efficient Pairings (post-Jan-2026 pillar labels)
-**Piercing (P)** → **Clout** (Body) — physical force and penetration
-**Slashing (S)** → **Celerity** (Body) — speed and precision cutting
-**Heat (H)** → **Constitution** (Body) — physical endurance against temperature
-**Decay (D)** → **Focus** (Spirit) — will to resist corruption
-**Cold (C)** → **Willpower** (Soul) — mental resistance to numbing effects
-**Bashing (B)** → **Wisdom** (Soul) — understanding how to absorb impact
-**Energy (E)** → **Wit** (Soul) — mental processing of energy effects
+### The Structural Map (r-2026-06-09-03; targeting clarified r-2026-06-10-01)
 
-> **[NEEDS MIKE]** — this affinity table predates the Jan 2026 Soul/Spirit swap. Two of the seven damage types (Decay, Cold) crossed pillars in the swap; confirm whether the affinities still hold post-swap or whether they should rebalance now that Flow/Frequency/Focus live on Spirit and Will/Wisdom/Wit live on Soul.
+The damage string `P:S:H/D\C:B:E` maps **positionally** onto the nine-attribute layout — the damage format mirrors the GRO•WTH 3/1/3 structure itself. This map defines each type's **most-aligned attribute**, NOT a forced target:
 
-### KRMA Efficiency Benefits
-**Aligned Targeting:** Using natural affinities costs less [[KRMA_System|KRMA]]  
-**Creative Freedom:** Non-aligned targeting possible but costs more KRMA  
-**Pattern Guidance:** Encourages thematic consistency without hard restrictions  
-**Strategic Consideration:** Efficient combinations provide resource advantages
+| Position | Damage Type | Most-Aligned Attribute |
+|---|---|---|
+| `P` | Piercing | **Clout** (Body) |
+| `S` | Slashing | **Celerity** (Body) |
+| `H` | Heat | **Constitution** (Body) |
+| `D` | Decay | **Focus** (Spirit) — per the original archive mapping (`X_ARCHIVE_ORIGINS/Claude Damage Knowledge dump.md`); the attribute names were untouched by the Jan-2026 pillar-label swap |
+| `C` | Cold | **Willpower** (Soul) |
+| `B` | Bashing | **Wisdom** (Soul) |
+| `E` | Energy | **Wit** (Soul) |
+
+### Targeting Is Weapon-Declared; the AFFINITY CYCLE Prices the Drift
+
+**Authoritative spec: [[Damage_Targeting_KV_Spec]]** (Mike-provided 2026-06-10, ruling r-2026-06-10-02).
+
+The weapon declares which attribute its damage targets — any is legal. The 7 types + 7 cycle attributes form a **closed ring** (P→Clout … E→Wit, wrapping); the targeting multiplier on the item's **Damage Value KV component** is by ring distance: **0 = 1×, 1 = 2×, 2 = 5×, 3 = 10×**, with **Frequency off-ring at a flat 20×** and Flow unpriced pending Mike (spec §7.1). Wraparound counts — Energy→Clout is adjacent (2×).
+
+Canonical example: identical spears, same 15 piercing — targeting **Clout** (natural) = 1×; targeting **Constitution** (two steps) = **5×** the damage KV component. Guidepost, never a gate: off-alignment is legitimate advanced strategy, priced.
 
 ## Combat Resolution Example
 

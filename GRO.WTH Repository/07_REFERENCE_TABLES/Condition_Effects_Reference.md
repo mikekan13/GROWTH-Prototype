@@ -6,6 +6,11 @@
 
 ---
 
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
+
 # Condition Effects Reference
 
 Comprehensive reference for all status conditions, their effects, and recovery methods in GROWTH.

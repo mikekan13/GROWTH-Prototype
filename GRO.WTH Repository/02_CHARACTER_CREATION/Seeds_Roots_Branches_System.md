@@ -1,10 +1,10 @@
 # Seeds_Roots_Branches_System.md
 
 **Status:** #needs-validation
-**Source:** Core Rulebook v0.4.4.md, GROWTH_System_Archive_Complete_Content_Extraction.md, rulings 2026-04-22, formulas locked 2026-05-08 (Elven design session), tier framework + aug-variance rule confirmed 2026-05-10
+**Source:** Core Rulebook v0.4.4.md, GROWTH_System_Archive_Complete_Content_Extraction.md, rulings 2026-04-22, formulas locked 2026-05-08 (Elven design session), tier framework + aug-variance rule confirmed 2026-05-10; age-cost math synced to rulings r-2026-04-22-10/-11 on 2026-06-09
 **Security:** PUBLIC
 **Rulebook:** `rulebook/rulebook.md` §6 (Character Creation)
-**Last Updated:** 2026-05-10
+**Last Updated:** 2026-06-09
 
 ---
 
@@ -134,7 +134,7 @@ Total **Nectars + Thorns ≤ Fate Die value** for the seed. Example: an Elven d6
 **Starting Budget:** Seed determines total Frequency available for character creation.
 **Minimum Reserve:** Must retain at least 1 Frequency to play (cannot spend all).
 **Cost Reduction:** Adding age to Roots/Branches reduces their Frequency cost.
-**Age-Cost Ratio (Roots/Branches reductions):** **1 year of age = 2 KRMA reduction** in Root/Branch Frequency cost (ruling r-2026-04-22-04). Note this is the *Root/Branch reduction* rate — it is **decoupled** from the Seed's `fatedAgeKV` formula (`ceil(fatedAge × 0.5)`). The asymmetry is intentional: lifespan-as-resource (Seed) is a different economic axis than age-as-narrative-content (Roots/Branches).
+**Age-Cost Math (rulings r-2026-04-22-10 + r-2026-04-22-11, superseding the old 2-KRMA/yr placeholder):** Root KV = attribute levels + skill levels + net Nectar/Thorn KV (no direct age term). Frequency cost = `Root KV − break-even`, where **break-even = 100 + (Root age − 18) × 5**. An average year carries ~**5 KRMA of content KV** (baseline weight, not a formula input — intense years weigh far more). **Max Root age = 25**; older development belongs to Branches. This is **decoupled** from the Seed's `fatedAgeKV` formula (`ceil(fatedAge × 0.5)`) — lifespan-as-resource (Seed) is a different economic axis than age-as-narrative-content (Roots/Branches).
 **GM Budget:** GM's karma wallet (the **capacity ceiling**, not a sink — see `memory/gm-wallet-capacity.md`) determines what powerful Seeds/Roots/Branches the GM can spawn.
 
 ## Custom Creation Philosophy

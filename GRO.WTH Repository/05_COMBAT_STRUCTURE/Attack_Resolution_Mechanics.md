@@ -1,8 +1,8 @@
 # Attack_Resolution_Mechanics.md
 
 **Status:** #needs-validation  
-**Source:** User clarification 2025-08-08  
-**Last Updated:** 2025-08-08
+**Source:** User clarification 2025-08-08; multi-attack rule corrected per Mike 2026-06-09 (ruling r-2026-06-09-02)  
+**Last Updated:** 2026-06-09
 
 ---
 
@@ -17,15 +17,18 @@ GROWTH uses **dynamic difficulty resolution** where attack success depends on wh
 **Standard Resolution:** Uses normal [[Basic_Resolution_System|skill check mechanics]] (Fate Die + Skill Die + Effort vs DR)  
 **Attribute Governors:** Combat skills use appropriate [[Three_Pillar_Attributes|attributes]] as effort pools
 
-### Combat Skill Attack Multipliers
-**Higher skill levels grant multiple attacks per action:**
+### Multiple Attacks Per Action (corrected — ruling r-2026-06-09-02)
 
-| Skill Level | Attacks Per Action |
+**There is NO universal skill-level → attacks-per-action multiplier.** Extra attacks per action are granted by **Nectars and items** (and similar exploits), per [[Skill_Level_Progression]] and [[Nectars_and_Thorns_System]].
+
+The retired table below is preserved ONLY as an example of what a strong multi-attack Nectar could grant (Mike, 2026-06-09 — "that old table is a good example for a possibly strong nectar"):
+
+| (Example Nectar tiers) | Attacks Per Action |
 |---|---|
-| 1-5 | 1 attack |
-| 6-10 | 2 attacks |
-| 11-15 | 3 attacks |
-| 16-20 | 4 attacks |
+| baseline | 1 attack |
+| strong Nectar | 2 attacks |
+| stronger Nectar | 3 attacks |
+| top-end Nectar | 4 attacks |
 
 ## Defended vs Undefended Attacks
 

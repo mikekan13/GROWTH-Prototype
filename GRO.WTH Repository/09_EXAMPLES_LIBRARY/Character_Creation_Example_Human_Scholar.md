@@ -5,6 +5,13 @@
 **Security:** PUBLIC
 **Last Updated:** 2026-05-03
 
+---
+
+> **WTH RETIREMENT (2026-04-05):** This document predates the removal of
+> Wealth Level, Tech Level, and Health Level. Any references to those
+> systems below are historical context only — they are not active mechanics.
+> See [[GROvine_System]] and [[KRMA_System]] for what replaces them.
+
 > **MAY 2026 SWEEP NOTE:** This example pre-dates the WTH retirement (2026-04-05) and the clarification (2026-05-04) that Fears is reserved for future expansion, not a current system. WTH-level fields and Fears section have been corrected below. Numbers (skill levels, KV totals) were not re-derived — treat as illustrative. Spirit/Soul attribute groupings now reflect the post-Jan-2026 swap (Spirit = Flow/Frequency/Focus, Soul = Will/Wisdom/Wit).
 
 ---
@@ -138,12 +145,7 @@ This example demonstrates creating a scholarly character focused on knowledge, m
 
 ## Step 7: Magic and Mana
 
-**Mana Calculation (legacy formula — pending mana-system review):**
-- **Spirit Mana:** From the Spirit pillar (Flow + Frequency + Focus). *(Post-Jan-2026 swap: this is the Spirit pillar, not the Soul pillar.)*
-- **Body Mana:** Constitution 6 = 6 points
-- **Soul Mana:** (Willpower + Wisdom + Wit) ÷ 3 = (8+10+12) ÷ 3 = 10 points *(post-swap: this is the Soul pillar)*
-
-> **[NEEDS MIKE]** — mana derivation formula was authored pre-swap and uses old labels. Confirm whether mana derives from Spirit pillar, Soul pillar, or both, post-swap.
+**Mana (corrected 2026-06-09 to the locked catalyst model):** Mana is NOT derived from attributes. Per the #validated 2026-05-23 [[Mana_System]] and magic-school canon: **mana is stored on catalysts or in body parts**, separate from any attribute pool. Each mana point spent adds +1 to a casting roll; channel capacity per cast = **Overall Spellcasting Level** (sum of all 10 School skill levels). Lysander's Magic Theory is a mundane skill — his channel capacity comes only from actual School levels he trains. The old attribute-derived "Spirit/Body/Soul mana" formula that appeared here was pre-swap legacy and is retired.
 
 **Known Spells:** 
 - **Light** (Alteration/Mercy) - Theoretical knowledge, basic practice

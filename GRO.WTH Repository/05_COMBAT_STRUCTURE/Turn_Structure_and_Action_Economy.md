@@ -1,8 +1,8 @@
 # Turn_Structure_and_Action_Economy.md
 
-**Status:** #needs-validation
-**Source:** Core Rulebook v0.4.4.md - Three Phases System, User clarification 2025-10-03
-**Last Updated:** 2025-10-03
+**Status:** #validated
+**Source:** Core Rulebook v0.4.4.md - Three Phases System, User clarification 2025-10-03; Frequency exclusion from Spirit actions locked Mike 2026-05-20.
+**Last Updated:** 2026-05-23
 
 ---
 
@@ -57,7 +57,7 @@ Actions = MAX(1 + ActionMod, ActionMod + ROUNDDOWN(Sum of Pillar Attributes / 25
 
 **Examples:**
 - **75 total Body attributes** (Clout+Celerity+Constitution) = 75/25 = **3 Body actions per round**
-- **100 total Spirit attributes** (Flow+Frequency+Focus) = 100/25 = **4 Spirit actions per round**
+- **75 total Spirit attributes used for actions** (Flow+Focus only — Frequency intentionally EXCLUDED) = 75/25 = **3 Spirit actions per round**
 - **12 total Soul attributes** (Willpower+Wisdom+Wit) = 12/25 = 0, but minimum 1 = **1 Soul action per round**
 
 ### Body Pillar Actions
@@ -68,9 +68,9 @@ Actions = MAX(1 + ActionMod, ActionMod + ROUNDDOWN(Sum of Pillar Attributes / 25
 
 ### Spirit Pillar Actions
 **Spiritual Activities:** Magic casting, divine connection, energy manipulation
-**Attributes Used:** [[Three_Pillar_Attributes|Flow, Frequency, Focus]]
+**Attributes Used (for action count):** [[Three_Pillar_Attributes|Flow]] + [[Three_Pillar_Attributes|Focus]]. **Frequency is EXCLUDED from action count** (locked Mike 2026-05-20). Frequency is the life/death pool, not an action source. Frequency still belongs to the Spirit pillar conceptually — it just doesn't feed `actions` per round.
 **Examples:** Spell weaving, wild casting, channeling, spiritual defense
-**Action Pool:** (Flow Level + Frequency Level + Focus Level) / 25, minimum 1
+**Action Pool:** `(Flow Level + Focus Level) / 25, minimum 1` — Frequency level NOT included.
 
 ### Soul Pillar Actions
 **Mental Activities:** Tactics, perception, social interaction, willpower

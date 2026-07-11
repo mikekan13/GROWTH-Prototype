@@ -1,10 +1,10 @@
 # Harvests_System.md
 
 **Status:** #validated  
-**Source:** Core Rulebook v0.4.4.md (lines 637-677), ruling 2026-04-22  
+**Source:** Core Rulebook v0.4.4.md (lines 637-677), ruling 2026-04-22; budget-is-minimum + 5 KV/yr sync per rulings r-2026-06-09-05 / r-2026-04-22-10  
 **Security:** PUBLIC  
 **Rulebook:** `rulebook/rulebook.md` §8 (Harvests)  
-**Last Updated:** 2026-04-22
+**Last Updated:** 2026-06-09
 
 ---
 
@@ -21,11 +21,12 @@
 
 ## Harvest Mechanics
 
-*Per ruling r-2026-04-22-07: a Harvest is a **package of rewards** bought with time. The in-game time the character invests is the reward budget, converted at the age-to-KV rate (see [[Seeds_Roots_Branches_System]] Frequency Budget System — currently 2 KRMA per year of age, pending empirical validation).*
+*Per ruling r-2026-04-22-07: a Harvest is a **package of rewards** bought with time. The in-game time the character invests is the reward budget, converted at the age-to-KV baseline of **~5 KRMA per year** (ruling r-2026-04-22-10, superseding the old 2-KRMA/yr placeholder).*
 
-### Reward Budget = Time Invested
+### Reward Budget = Time Invested — and it's a FLOOR (ruling r-2026-06-09-05)
 - The character ages by the duration of the Harvest (e.g. a one-year training montage = +1 year to current age).
-- The aged years × age-to-KV rate = the KV budget the GM has to allocate as rewards (attribute improvements, skills, Nectars, equipment, etc.).
+- The aged years × age-to-KV rate = the **base/minimum** KV budget the GM allocates as rewards (attribute improvements, skills, Nectars, equipment, etc.).
+- **The time-budget is a minimum, not a cap** — the GM can also reward additional things beyond it (Mike, 2026-06-09).
 - This ties Harvests directly to the same KV math that governs Roots/Branches at character creation.
 
 ### GM-Initiated Process
