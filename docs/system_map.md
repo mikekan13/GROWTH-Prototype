@@ -32,6 +32,30 @@ principle): parties + a predicate that must HOLD + a typed penalty.
 - **Seeds**: Tara's 20% cap (threshold lives in predicate data — tunable) and
   the immutable Death-succession declaration. Acceptance: `scripts/test-contracts.ts`.
 
+## Wizard Crystallization Complete (added 2026-07-11, T29)
+
+The Entity Creation Wizard (8 steps, `components/entity/EntityCreationWizard.tsx`)
+now completes the full economic crossing on Review:
+
+- **The line debit** (INV-59/60/61): `services/entity.ts crystallizeEntity`
+  computes final-sheet TKV with the SAME deterministic evaluator as every
+  display and routes the GM investment through the ONE krma crystallization
+  path (campaign wallet → character wallet, LOCK, CHARACTER_INVEST). Runs
+  BEFORE the status flip — an unaffordable character fails the crossing and
+  reverts to DRAFT (KRMA limits GM power; grants stay for retry).
+- **Fix**: the krma service now records the crystallization event only
+  AFTER the transfer succeeds (previously a failed transfer left a
+  phantom crystallize entry that permanently blocked retries).
+- **Council Router**: goals created at crystallization get custodian
+  godheads recorded immediately (`goal-custodian.assignGoalCustodian` —
+  AI-routed with fallback; dispatcher triage still fires on top).
+- **Kai loop**: wizard steps offer PUBLISHED ForgeItems only — Kai's
+  scoring/pricing happened at authoring through the Forge chain, so
+  selection is evaluation-backed by construction.
+- Acceptance: `scripts/test-wizard-e2e.ts` (12 checks — exactly-one
+  investment == calculator, custodians per goal, double-crystallize and
+  insufficient-funds guards).
+
 ## Death Saves End-to-End (added 2026-07-11, T27 / r-2026-07-11-01/-02)
 
 **The roll (both doors):** character's Fate Die vs Tara's CHOSEN die (full

@@ -9,6 +9,9 @@ import type { GrowthCharacter, SkillGovernor } from '@/types/growth';
 import { assignMechanics } from './character';
 import { createGoal } from './goal';
 import { createPlaceholderGodHead } from './godhead-admin';
+import { crystallizeEntity as crystallizeKrma } from './krma/crystallization';
+import { calculateTKV } from './krma/evaluator';
+import { assignGoalCustodian } from './goal-custodian';
 
 /**
  * Entity service — campaign entity listing and management.
@@ -343,8 +346,38 @@ export async function crystallizeEntity(
   }
   charData.traits = existingTraits;
 
-  // Step 6: Strip the wizard scratchpad and persist character data + APPROVED
+  // Step 6: Strip the wizard scratchpad.
   delete (charData as Record<string, unknown>)._wizardDraft;
+
+  // Step 7: THE CRYSTALLIZATION LINE (T29, INV-59/60/61). Completing the
+  // wizard is the crossing — the GM investment (TKV of the final sheet)
+  // debits campaign wallet → character wallet through the ONE existing
+  // path. This runs BEFORE the status flip: a GM who can't afford the
+  // character gets a failed crystallization, not a free one (KRMA limits
+  // GM power). Same deterministic evaluator as the TKV displays — the
+  // ledger amount and the calculator agree by construction.
+  const tkv = calculateTKV(charData);
+  try {
+    await crystallizeKrma(userId, userRole, character.campaignId!, {
+      entityId,
+      entityType: 'character',
+      entityName: character.name,
+      karmicValue: tkv.total,
+      action: 'crystallize',
+    });
+  } catch (err) {
+    // assignMechanics (Step 1) may have flipped status while applying
+    // grants — a failed crossing must land the entity back in DRAFT so
+    // the GM can fund the wallet and retry. Grants stay applied (they're
+    // reapplied idempotently on the next attempt).
+    await prisma.character.update({
+      where: { id: entityId },
+      data: { status: 'DRAFT' },
+    }).catch(() => null);
+    throw err;
+  }
+
+  // Step 8: Persist character data + APPROVED (the debit succeeded).
   await prisma.character.update({
     where: { id: entityId },
     data: {
@@ -353,20 +386,28 @@ export async function crystallizeEntity(
     },
   });
 
-  // Step 7: Create Goals (each call fires godhead dispatcher for triage).
-  // Failures here don't roll back crystallization — log and continue.
+  // Step 9: Create Goals + assign custodian godheads (the Council Router).
+  // createGoal fires the dispatcher (Eth'erling triage); assignGoalCustodian
+  // records the custodian deterministically so the assignment exists even
+  // when the agent loop is disabled. Failures here don't roll back
+  // crystallization — the character is already invested and live.
   for (const g of validated.goals) {
     try {
-      await createGoal(userId, userRole, {
+      const goal = await createGoal(userId, userRole, {
         characterId: entityId,
         campaignId: character.campaignId!,
         description: g.description,
         priority: g.priority,
       });
+      try {
+        await assignGoalCustodian(goal.id);
+      } catch (err) {
+        console.error(`[crystallize] custodian assignment failed for goal ${goal.id}:`, err);
+      }
     } catch { /* swallow — character is already crystallized */ }
   }
 
-  // Step 8: Godhead provisioning — when entityType=GODHEAD (which happens
+  // Step 10: Godhead provisioning — when entityType=GODHEAD (which happens
   // automatically in Prime Campaign), spin up the GodHead row + KRMA wallet
   // so the AI agent has identity to run on. Persona placeholders here;
   // admin edits them via the AI Persona sub-panel on the character sheet.

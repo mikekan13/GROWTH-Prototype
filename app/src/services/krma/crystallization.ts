@@ -76,29 +76,14 @@ export async function crystallizeEntity(
     timestamp: new Date().toISOString(),
   };
 
-  // Look up GM name for event logging
-  const gmUser = await prisma.user.findUnique({ where: { id: gmUserId }, select: { username: true } });
-
-  // Record as a campaign event
-  await prisma.campaignEvent.create({
-    data: {
-      campaignId,
-      type: 'game_event',
-      actor: 'gm',
-      actorUserId: gmUserId,
-      actorName: gmUser?.username ?? 'GM',
-      payload: JSON.stringify({
-        subtype: 'crystallization',
-        ...entry,
-      }),
-    },
-  });
-
-  // ── KRMA investment (CHARACTER only for now) ────────────────────────────
+  // ── KRMA investment FIRST (CHARACTER only for now) ─────────────────────
   // When a character crystallizes, KRMA equal to its TKV is transferred from
   // the campaign wallet into a per-character wallet. On dissolve, it returns.
-  // Locations and items don't yet have per-entity wallets; their KV is only
-  // tracked in the campaignEvent ledger above.
+  // The transfer runs BEFORE the crystallization event is recorded: a failed
+  // transfer (insufficient campaign funds) must leave NO crystallize entry,
+  // otherwise the already-crystallized guard permanently blocks the retry
+  // (T29 e2e caught exactly that). Locations and items don't yet have
+  // per-entity wallets; their KV is only tracked in the campaignEvent ledger.
   if (input.entityType === 'character' && input.karmicValue > 0) {
     try {
       const campaignWallet = await getWalletByCampaign(campaignId);
@@ -141,14 +126,29 @@ export async function crystallizeEntity(
         });
       }
     } catch (err) {
-      // If the wallet transfer fails, the crystallization event is still recorded
-      // (the campaignEvent above succeeded). Surface the error so the caller can
-      // see it but don't roll back the ledger entry — they remain reconcilable.
       throw new ValidationError(
-        `Crystallization recorded but KRMA transfer failed: ${err instanceof Error ? err.message : String(err)}`
+        `Crystallization aborted — KRMA transfer failed: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
+
+  // Look up GM name for event logging
+  const gmUser = await prisma.user.findUnique({ where: { id: gmUserId }, select: { username: true } });
+
+  // Record as a campaign event (only after the money actually moved).
+  await prisma.campaignEvent.create({
+    data: {
+      campaignId,
+      type: 'game_event',
+      actor: 'gm',
+      actorUserId: gmUserId,
+      actorName: gmUser?.username ?? 'GM',
+      payload: JSON.stringify({
+        subtype: 'crystallization',
+        ...entry,
+      }),
+    },
+  });
 
   return entry;
 }
