@@ -7,6 +7,7 @@ import MagicSection from './MagicSection';
 import SkillsSection from './SkillsSection';
 import VitalsSection from './VitalsSection';
 import InventorySection from './InventorySection';
+import Paperdoll from './Paperdoll';
 
 interface CharacterSheetProps {
   character: GrowthCharacter;
@@ -14,6 +15,8 @@ interface CharacterSheetProps {
   characterId?: string;
   /** Optional — fired after a mutating action so the parent can refresh. */
   onRefresh?: () => void;
+  /** Optional — enables equip/unequip actions in the Paperdoll (default: false). */
+  canEditInventory?: boolean;
 }
 
 const FATE_DIE_LABELS: Record<string, string> = {
@@ -26,7 +29,7 @@ const CONDITION_MAP: Record<string, string> = {
   overwhelmed: 'WIL 0', confused: 'WIS 0', incoherent: 'WIT 0',
 };
 
-export default function CharacterSheet({ character, characterId, onRefresh }: CharacterSheetProps) {
+export default function CharacterSheet({ character, characterId, onRefresh, canEditInventory }: CharacterSheetProps) {
   const { identity, attributes, creation, conditions, traits, grovines } = character;
   const activeConditions = Object.entries(conditions).filter(([, v]) => v);
   const nectars = traits.filter(t => t.type === 'nectar');
@@ -225,8 +228,11 @@ export default function CharacterSheet({ character, characterId, onRefresh }: Ch
       {/* Vitals */}
       <VitalsSection vitals={character.vitals} />
 
-      {/* Inventory */}
-      <InventorySection inventory={character.inventory} />
+      {/* Inventory — Paperdoll when characterId is present (live 3-tier fetch), else legacy static view */}
+      {characterId
+        ? <Paperdoll characterId={characterId} canEdit={canEditInventory ?? false} />
+        : <InventorySection inventory={character.inventory} />
+      }
 
       {/* Notes */}
       {character.notes && (

@@ -5,6 +5,7 @@ import type { PhysicalDescription, BodyPartDescription } from '@/types/growth';
 import type { HeldItemData } from '@/types/item';
 import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
+import Paperdoll from './Paperdoll';
 
 const GENDER_OPTIONS = ['', 'Male', 'Female', 'Non-binary', 'Other'] as const;
 const BUILD_OPTIONS = [
@@ -1057,7 +1058,10 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             </div>
           </div>
           <div style={{ color: '#ccc' }}>
-            <InventorySection items={heldItems} />
+            {effectiveCharacter?.id
+              ? <Paperdoll characterId={effectiveCharacter.id} canEdit={canEdit ?? false} />
+              : <InventorySection items={heldItems} />
+            }
           </div>
         </div>
 

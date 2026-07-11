@@ -107,17 +107,18 @@ async function main() {
     // ── 4. Non-humanoid tree — zero code changes ──────────────────────
     const serpent: GrowthWorldItem = {
       name: 'Serpent Body',
+      description: '',
       isBodyPart: true,
       partName: 'Serpent',
       baseResist: 3,
       condition: 3,
       contains: [
-        { name: 'Head', isBodyPart: true, partName: 'Head', baseResist: 4, condition: 3, contains: [
-          { name: 'Venom Gland', isBodyPart: true, partName: 'Venom Gland', baseResist: 1, condition: 3 } as GrowthWorldItem,
+        { name: 'Head', description: '', isBodyPart: true, partName: 'Head', baseResist: 4, condition: 3, contains: [
+          { name: 'Venom Gland', description: '', isBodyPart: true, partName: 'Venom Gland', baseResist: 1, condition: 3 } as GrowthWorldItem,
         ] } as GrowthWorldItem,
-        { name: 'Coil A', isBodyPart: true, partName: 'Coil A', baseResist: 3, condition: 3 } as GrowthWorldItem,
-        { name: 'Coil B', isBodyPart: true, partName: 'Coil B', baseResist: 3, condition: 3 } as GrowthWorldItem,
-        { name: 'Tail', isBodyPart: true, partName: 'Tail', baseResist: 2, condition: 3 } as GrowthWorldItem,
+        { name: 'Coil A', description: '', isBodyPart: true, partName: 'Coil A', baseResist: 3, condition: 3 } as GrowthWorldItem,
+        { name: 'Coil B', description: '', isBodyPart: true, partName: 'Coil B', baseResist: 3, condition: 3 } as GrowthWorldItem,
+        { name: 'Tail', description: '', isBodyPart: true, partName: 'Tail', baseResist: 2, condition: 3 } as GrowthWorldItem,
       ],
     } as GrowthWorldItem;
     const serpentRegions = deriveRegions(serpent);

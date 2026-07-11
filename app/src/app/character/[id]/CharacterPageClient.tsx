@@ -62,6 +62,7 @@ export default function CharacterPageClient({
           character={parsed}
           characterId={canEdit ? characterData.id : undefined}
           onRefresh={() => router.refresh()}
+          canEditInventory={canEdit}
         />
         {showAIPersona && (
           <GodheadPersonaPanel godheadName={characterData.name} />

@@ -9,6 +9,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | AuthService | `services/auth.ts` | Login, registration, access code redemption on signup | Prisma, auth lib, access-code service |
 | CampaignService | `services/campaign.ts` | Campaign CRUD, invite code join, seat limits | Prisma, permissions |
 | ContractService | `services/contracts.ts` | T13 Terminal contracts: predicate DSL evaluator, debounced post-ledger hook, human-gated penalty pipeline, immutable tier | Prisma, ledger, krma/evaluator (TKV), types/contracts |
+| InventoryService | `services/inventory.ts` | T26 3-tier inventory: regions derived from body tree (INV-55), equip/unequip with layer caps (INV-52), Clout×10 encumbrance (INV-48), buildWornLayers for damage routing | Prisma, body-tree, body-damage, material, possession |
 | CharacterService | `services/character.ts` | Character CRUD, access control | Prisma, permissions, defaults |
 | BackstoryService | `services/backstory.ts` | Structured backstory submit/review | Prisma, permissions |
 | AccessCodeService | `services/access-code.ts` | Code generation, validation, redemption | Prisma, permissions |

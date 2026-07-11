@@ -32,6 +32,28 @@ principle): parties + a predicate that must HOLD + a typed penalty.
 - **Seeds**: Tara's 20% cap (threshold lives in predicate data — tunable) and
   the immutable Death-succession declaration. Acceptance: `scripts/test-contracts.ts`.
 
+## Inventory Paperdoll (added 2026-07-10, T26)
+
+Three tiers — EQUIPPED / CARRIED / POSSESSIONS — with NO hardcoded slots:
+equip regions are DERIVED from the character's body-part item tree
+(`lib/body-tree.ts` walks `bodyAnatomy`; INV-55), so a hand-built
+non-humanoid body produces its own regions with zero code changes.
+
+- Equip state = `equippedTo: <regionKey>` on the CampaignItem's data JSON
+  (single source of truth). Carried = held, not equipped. Possessions =
+  `owns` EntityRelationship links (INV-62).
+- **Damage integration**: `routeDamage` gained `wornLayers` — equipped
+  items absorb before the part they cover, resist × armor-category
+  multiplier (Clothing 0.5 / Light 1.0 / Heavy 1.5; layer caps Soft≤3,
+  Light≤1, Heavy≤1 per region, INV-52). Armor condition changes persist
+  back to the item rows (DESTROYED at 0).
+- Encumbrance: total held lbs vs Clout×10 (INV-48) with
+  Fine/Near Limit/Encumbered/Overloaded thresholds.
+- Surfaces: `components/character/Paperdoll.tsx` on the character sheet;
+  `GET /api/characters/[id]/inventory`, `POST/DELETE .../inventory/equip`.
+- Acceptance: `scripts/test-paperdoll.ts` (15 checks, incl. armored-torso
+  cascade and a serpent body tree).
+
 ## Time System (added 2026-06-10)
 
 Each campaign is a pocket universe with its own clock, stored in META CYCLES
