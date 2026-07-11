@@ -117,6 +117,14 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
 | useCampaignStream | `hooks/useCampaignStream.ts` | SSE connection to campaign stream. Provides: connection status, connected users, typed event subscriptions via `on()` |
 
+## AI — JEWL Prompt System (T18)
+
+| Module | File | Purpose | Dependencies |
+|--------|------|---------|-------------|
+| System prompts | `ai/copilot/prompts/system/{v1,v2}.ts` | Versioned personality prompts. v2 = the 15 behavioral laws from JEWL_Golden_Voice_Dataset_Seed.md; v1 = frozen pre-T18 rollback | — |
+| Prompt builder | `ai/copilot/prompts/system/index.ts` | Version selection (`JEWL_PROMPT_VERSION`), register injection (tone/age, safe defaults until T36), `formatToolErrorAsRupture` (INV-118) | v1, v2 |
+| Prompt regression | `scripts/test-jewl-prompt.ts` → `docs/jewl-prompt-regression.md` | Four live probes (compliment/jailbreak/rupture/player-routing) through the real dispatch pipeline | runtime |
+
 ## AI — Portrait Pipeline
 
 | Module | File | Purpose | Dependencies |
