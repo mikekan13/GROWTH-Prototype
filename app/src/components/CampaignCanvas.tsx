@@ -26,6 +26,7 @@ const ForgeWorkshop = dynamic(() => import('@/components/forge/ForgeWorkshop'), 
 const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), { ssr: false });
 const CharacterTab = dynamic(() => import('@/components/character/CharacterTab'), { ssr: false });
 const EffortWagerModal = dynamic(() => import('@/components/campaign/EffortWagerModal'), { ssr: false });
+const ContractsDock = dynamic(() => import('@/components/canvas/ContractsDock'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -1762,6 +1763,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             />
           </div>
         </div>
+
+        {/* Contracts dock — ADMIN-only, __PRIME__ campaign only */}
+        {campaign.name === '__PRIME__' && userRole === 'ADMIN' && (
+          <ContractsDock campaignId={campaign.id} />
+        )}
       </main>
 
       {/* Effort Wager Modal */}

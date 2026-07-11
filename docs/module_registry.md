@@ -8,6 +8,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 |--------|------|---------|-------------|
 | AuthService | `services/auth.ts` | Login, registration, access code redemption on signup | Prisma, auth lib, access-code service |
 | CampaignService | `services/campaign.ts` | Campaign CRUD, invite code join, seat limits | Prisma, permissions |
+| ContractService | `services/contracts.ts` | T13 Terminal contracts: predicate DSL evaluator, debounced post-ledger hook, human-gated penalty pipeline, immutable tier | Prisma, ledger, krma/evaluator (TKV), types/contracts |
 | CharacterService | `services/character.ts` | Character CRUD, access control | Prisma, permissions, defaults |
 | BackstoryService | `services/backstory.ts` | Structured backstory submit/review | Prisma, permissions |
 | AccessCodeService | `services/access-code.ts` | Code generation, validation, redemption | Prisma, permissions |
@@ -57,6 +58,7 @@ Last updated: 2026-04-05 (Entity Creation System — Session A partial)
 | Group | Components | Purpose |
 |-------|-----------|---------|
 | Character Display | CharacterSheet, AttributeBlock, MagicSection, SkillsSection, VitalsSection, InventorySection | Full character sheet rendering |
+| Contracts (T13) | canvas/ContractsDock | ADMIN-only overlay on the `__PRIME__` canvas: contract cards, evaluate, penalty confirm/reject, JSON-forward create dialog |
 | Character Builder | CharacterBuilder | 4-step wizard (Identity → Origin → Attributes → Review) |
 | Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, folder groups, localStorage persistence |
 | Canvas | FolderGroup | Card grouping system — visual bounding box, drag-all-together, party type with REST button |

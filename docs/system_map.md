@@ -1,10 +1,36 @@
 # GRO.WTH System Map
 
-Last updated: 2026-06-10 (Time system + per-object history + Location edit mode)
+Last updated: 2026-07-10 (Contract system T13; earlier: Time system + per-object history + Location edit mode)
 
 > NOTE: sections below lag the codebase in places (canvas folders, JEWL
 > dialog, godhead runtime, subscriptions). The code wins; this doc catches
 > up incrementally.
+
+## Contract System (added 2026-07-10, T13 / INV-115)
+
+Terminal-enforced obligations that keep the meta honest (same-mechanics
+principle): parties + a predicate that must HOLD + a typed penalty.
+
+- **Predicate DSL** (`types/contracts.ts`): typed JSON, never code —
+  comparisons over `tkv(character)` (locked sheet KV via the deterministic
+  evaluator + linked wallet balances), `walletBalance`, `reserveBalance`,
+  `totalSupply(excludeReserves)`, arithmetic, and/or/not, `before(date)`.
+- **Evaluator** (`services/contracts.ts`): fires debounced (~2s) after every
+  ledger commit (dynamic-import hook at the end of `executeTransaction`) +
+  manual/sweep routes. Reads only; writes = append-only `ContractEvaluation`
+  audit rows + the ACTIVE→VIOLATED flip (INV-14). Kill switch:
+  `CONTRACTS_ENABLED=false`.
+- **Penalty pipeline**: every violation creates ONE `PenaltyAction`
+  (PENDING_CONFIRMATION). ADMIN confirms → execution (KRMA_TRANSFER through
+  the ledger, STATUS_CHANGE/DISSOLUTION as character status). Nothing
+  destructive is automatic — Dissolution is always behind the human gate.
+- **Immutable tier** (INV-101): seed-only creation; PATCH/revoke rejected at
+  the service layer. `voteRef` reserved for the deferred in-game vote/Triu
+  mechanism.
+- **Surfaces**: ADMIN-only routes (`/api/contracts*`, `/api/penalty-actions/*`)
+  and the ContractsDock on the `__PRIME__` canvas (ADMIN-only overlay).
+- **Seeds**: Tara's 20% cap (threshold lives in predicate data — tunable) and
+  the immutable Death-succession declaration. Acceptance: `scripts/test-contracts.ts`.
 
 ## Time System (added 2026-06-10)
 

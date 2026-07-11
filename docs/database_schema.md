@@ -336,6 +336,24 @@ Supplementary metadata for God-head entities. Links to a Character record (unive
 - `walletId`: String (nullable) — God-head's KRMA wallet
 - God-heads use Claude (cloud API) for reasoning, not Ollama
 
+### Contract (T13, INV-115 — added 2026-07-10)
+Terminal-enforced obligation: parties, a predicate that must HOLD, a typed penalty.
+- `campaignId`: String? — null = Terminal-level; Prime-authored contracts carry `__PRIME__` id
+- `parties`: String — JSON `ContractParty[]` ({type: CHARACTER|GODHEAD|USER|CAMPAIGN, id, role?: BOUND|ENFORCER|BENEFICIARY})
+- `predicate`: String — JSON DSL (`ContractPredicate` in `types/contracts.ts`): comparisons over `tkv(characterId)` / `walletBalance` / `reserveBalance` / `totalSupply(excludeReserves)`, arithmetic, and/or/not, `before(dateISO)` deadlines
+- `penalty`: String — JSON `ContractPenalty`: FLAG_ADMIN | KRMA_TRANSFER | STATUS_CHANGE | DISSOLUTION
+- `immutable`: Boolean — below-the-vote-layer tier (INV-101); mutations rejected everywhere except seeding
+- `voteRef`: String? — deferred in-game vote/Triu verification mechanism
+- `status`: String — ACTIVE | VIOLATED | FULFILLED | REVOKED (revoke is the soft delete)
+
+### ContractEvaluation
+Append-only audit log — one row per evaluation (INV-14 spirit).
+- `holds`: Boolean; `detail`: String (JSON `EvaluationDetail` — computed leaf values); `trigger`: LEDGER_COMMIT | SWEEP | MANUAL
+
+### PenaltyAction
+Human-gated penalty pipeline. Every violation lands one PENDING_CONFIRMATION action (deduped); ADMIN confirm executes (Dissolution/status changes/KRMA transfers never run automatically), reject leaves the contract VIOLATED for review.
+- `kind` + `payload` (penalty frozen at violation time); `status`: PENDING_CONFIRMATION | EXECUTED | REJECTED; `resolvedBy/At`; `transactionId`: String? — KrmaTransaction pointer when execution moved KRMA (reason `CONTRACT_PENALTY`)
+
 ## JSON Field Schemas
 
 ### Character.data → GrowthCharacter

@@ -1,8 +1,34 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-06-10
+Last updated: 2026-07-10
 
-## Status (2026-06-10)
+## Status (2026-07-10) — BUILD PHASE (GROWTH_BUILD_PLAN.md is the active task list)
+
+The build phase runs off **GROWTH_BUILD_PLAN.md** (Part D: 42 ordered tasks;
+Fable builds 11 tagged tasks, executor model builds 31). Completed so far:
+
+- **T08** — DB reset verified + idempotent `npm run seed:all` (15 steps,
+  `__PRIME__` always rebuilt, reserves reconcile to exactly 100B via
+  `fullAudit()`; the audit step caught and fixed a 600k KRMA mint bug in
+  test-data seeding).
+- **T10** — fork portrait port verified complete (phase4 merge commits);
+  prod build repaired (`next build --webpack`).
+- **T11** — IdentityLockWizard split: 2,826-line monolith → 382-line main +
+  12 modules under `identity-lock/`, byte-identical moves, click-through
+  verified. **Character-creator fork RETIRED**; branch merged; remote
+  `master` fast-forwarded to mainline (stale local master quarantined —
+  contained a leaked API key, never pushed; see NEEDS-MIKE.md).
+- **T13** — Contract system (INV-115): predicate DSL, post-ledger evaluator,
+  human-gated penalty pipeline, immutable tier, Tara's 20% cap + Death
+  succession seeded, ADMIN ContractsDock on the Prime canvas.
+  `scripts/test-contracts.ts` = 12/12 PASS.
+
+**Next (Fable):** T12 (H100 smoke — awaiting Mike's pod window) → T17 (JEWL
+GodHead row + wallet) → T18 (JEWL behavioral-laws prompt) → T26 (paperdoll) →
+T27 (death e2e) → T29 (wizard D/E) → T32 (M4 golden path) → T35 (architecture
+memo + hosting discussion).
+
+## Earlier status (2026-06-10)
 
 Canvas-as-OS arc is live: Locations are recursive folders with drill-down +
 ancestor-collapse visibility, the ONE JEWL dialog covers create AND edit
