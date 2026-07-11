@@ -20,6 +20,8 @@ import './mistake-corpus';
 import './actors';
 import './time-metrics';
 import './place-on-canvas';
+import './remove-from-canvas';
+import './list-canvas-characters';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';

@@ -25,6 +25,57 @@ import { buildSttVocabulary } from '@/services/stt-vocabulary';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Whisper hallucinates a small zoo of stock phrases on silence — the model
+ * was trained on YouTube and falls back to closed-caption templates when the
+ * audio carries no speech. Strip them before they pollute the chat log or
+ * wake the classifier. Catches:
+ *   - YouTube outro phrases ("Thanks for watching", "Subscribe", etc.)
+ *   - Bare interjections ("Thank you.", "Bye.", "you", "music", "applause")
+ *   - Repeated-syllable noise ("hahahahaha", "Budazazaz...")
+ *   - Disconnected proper-noun lists with no clause ("Keter, Kether, Tiber")
+ *   - Pure punctuation / whitespace
+ */
+function isWhisperHallucination(raw: string): boolean {
+  const s = raw.trim();
+  if (!s) return true;
+  if (s.length < 2) return true;
+
+  const stripped = s.replace(/[.,!?;:\-—…"'`]/g, '').trim();
+  if (!stripped) return true;
+
+  const lower = stripped.toLowerCase();
+
+  // Bare stock phrases — exact match after stripping punctuation.
+  const exactStock = new Set([
+    'thank you', 'thanks', 'thanks for watching', 'thanks for watching the video',
+    'subscribe', 'like and subscribe', 'see you next time', 'bye', 'goodbye',
+    'you', 'i', 'me', 'mm', 'mhm', 'uh', 'um', 'oh', 'ah',
+    'music', 'applause', 'laughter', 'silence', 'sounds',
+    'okay', 'ok',
+  ]);
+  if (exactStock.has(lower)) return true;
+
+  // Repeated-syllable noise — same 2-4 char chunk repeated 4+ times back to
+  // back. Covers "hahahaha", "Budazazaz", "lalala", etc.
+  if (/^([a-z]{2,4})\1{3,}/i.test(stripped.replace(/\s+/g, ''))) return true;
+
+  // Repeated-word noise — same word repeated 3+ times in a row.
+  if (/\b(\w+)\b(?:[\s,.]+\1\b){2,}/i.test(s)) return true;
+
+  // Disconnected proper-noun list — 3+ capitalised tokens, comma-separated,
+  // no lowercase verb / preposition between them. Matches "Keter, Kether,
+  // Chokmah" style garbage Whisper emits when faced with cosmology in the
+  // initial-prompt vocab.
+  const tokens = s.split(/[,\s]+/).filter(Boolean);
+  if (tokens.length >= 3) {
+    const allCapitalised = tokens.every(t => /^[A-Z][a-zA-Z']*$/.test(t));
+    if (allCapitalised) return true;
+  }
+
+  return false;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -68,6 +119,13 @@ export async function POST(
 
     if (!transcript) {
       return NextResponse.json({ accepted: true, transcribed: false });
+    }
+
+    // Markers like "[empty transcript]" still need to flow through the
+    // marker-dedup path below; only raw hallucinations get dropped here.
+    const isMarker = transcript.startsWith('[') && transcript.endsWith(']');
+    if (!isMarker && isWhisperHallucination(transcript)) {
+      return NextResponse.json({ accepted: true, transcribed: false, hallucination: true });
     }
 
     // If the provider is 'none' or unimplemented, the transcript is a

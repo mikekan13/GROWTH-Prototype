@@ -29,7 +29,7 @@ import { prisma } from '@/lib/db';
 import { dispatchPrompt } from './runtime';
 import type { JewlPrompt } from './prompts/types';
 
-const CLASSIFIER_MIN_INTERVAL_MS = 8_000;
+const CLASSIFIER_MIN_INTERVAL_MS = 1_500;
 const CONTEXT_WINDOW_MS = 90_000; // last 90s of activity feeds the classifier
 const MAX_CONTEXT_MESSAGES = 25;
 
@@ -171,26 +171,38 @@ async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoni
   const system = [
     'You are a cheap pre-filter for a TTRPG copilot named JEWL. JEWL listens',
     'to the table continuously and decides moment-by-moment whether to engage.',
-    'Your only job is to classify the most recent activity into ONE of:',
+    'Your job: classify the LATEST [ambient] transcript (the bottommost one)',
+    'into ONE of:',
     '',
-    '  silent  - genuine silence, table noise, hallucinated transcripts ("Thank you.", "Bye.", "you"), or content JEWL has already responded to in the most recent assistant turn.',
-    '  react   - someone (GM or player) said something that wants an answer, a comment, or a confirmation. Default to react when in doubt — JEWL can choose to stay quiet at the Sonnet layer.',
-    '  act     - a tool call is clearly warranted (apply damage, advance clock, create an entity, voice an NPC, move a character, etc.).',
-    '  proact  - the GM has not asked but a real continuity beat is overdue (missed clock advance, an NPC was addressed and has not replied, time-since-last-activity is long enough that JEWL should check in).',
+    '  silent  - the LATEST transcript is genuine silence, table noise, or a',
+    '            known Whisper hallucination ("Thank you.", "Thanks for watching.",',
+    '            "Bye.", standalone "you", "I", "music", "applause", a list of',
+    '            disconnected single proper nouns with no verb/clause, a short',
+    '            repeated syllable like "Keter, Kether, Kether").',
+    '  react   - the LATEST transcript is real speech with content. Default here.',
+    '  act     - the LATEST transcript clearly asks for a tool call (apply damage,',
+    '            advance clock, create entity, voice an NPC, move a character).',
+    '  proact  - long silence after an unresolved beat that JEWL should check on.',
     '',
-    'Rules:',
-    '- DROP silence-hallucinations: "Thank you.", "Thanks for watching.", "Bye.", standalone "you", "I", "music", "applause" → silent.',
-    '- If recent transcripts look like real speech with content (>~5 words OR a clear question/command), prefer react over silent.',
-    '- If JEWL already replied to the same content in his last assistant turn, do NOT fire again → silent.',
-    '- If the audio is just background or one-off noise → silent.',
+    'CRITICAL RULES (apply in this order):',
+    '1. Look ONLY at the LATEST [ambient] line. Earlier context is just background.',
+    '2. If the latest [ambient] post-dates JEWL\'s last reply AND contains real',
+    '   words (a clause, a sentence, a directive), default REACT or ACT.',
+    '   "Already replied" suppression applies ONLY when the latest [ambient] is',
+    '   a verbatim or near-verbatim repeat of what JEWL just heard.',
+    '3. JEWL\'s prior assistant turns are CONTEXT, never grounds for silent. Do',
+    '   not classify "GM repeated himself" as silent — assume the GM had a',
+    '   reason (often: the UI didn\'t reflect JEWL\'s reply yet).',
+    '4. When the GM follows up after JEWL\'s reply (e.g. JEWL asked "who?" and',
+    '   the next [ambient] gives a name), that is ALWAYS react or act.',
+    '5. Drop silence-hallucinations only when the entire latest line IS the',
+    '   hallucination, not when real speech contains a stray hallucinated word.',
     '',
-    'OUTPUT FORMAT: a single line with the verdict, then optionally a colon and a short reason (under 80 chars). Examples:',
-    '  silent: hallucinated "Thank you."',
-    '  react: GM asked about Tara\'s status',
+    'OUTPUT FORMAT: one line, verdict word first, optional reason after a colon.',
+    '  silent: latest line is just "Thank you."',
+    '  react: GM answered the name question ("Valmir")',
     '  act: GM said "advance the clock by an hour"',
-    '  proact: 4 min of silence after combat ended',
-    '',
-    'Verdict word MUST be the first token. Reason is optional but encouraged.',
+    '  proact: 4 min after combat ended, JEWL has not checked in',
   ].join('\n');
 
   const user = [

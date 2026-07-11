@@ -952,15 +952,15 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             rEMOVE FROM fOLDER
           </button>
         )}
-        {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && (
+        {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && onDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete?.(node.id); }}
-            className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+            className="w-full px-3 py-1.5 text-left text-sm text-amber-400 hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
-            dELETE cHARACTER
+            rEMOVE FROM cANVAS
           </button>
         )}
       </CtxMenuPanel>

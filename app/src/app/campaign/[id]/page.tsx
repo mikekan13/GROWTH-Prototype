@@ -74,12 +74,15 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   //  (a) status is APPROVED or ACTIVE — these auto-place into the world on lock-in,
   //  (b) the GM has explicitly placed it via the Tools→Character picker (canvasX/Y set).
   // DRAFT/SUBMITTED-without-position stay in the Tapestry tab (entities API) until placed.
+  // EXCEPT: a `hiddenFromCanvas: true` flag on the character's data overrides
+  // both — that's how the GM hides a card without changing status. Cleared
+  // by setCanvasPosition (placing brings it back).
   const canvasCharacters = campaign.characters.filter(c => {
+    let parsed: { canvasX?: unknown; canvasY?: unknown; hiddenFromCanvas?: unknown } | null = null;
+    try { parsed = JSON.parse(c.data); } catch { /* ignore */ }
+    if (parsed?.hiddenFromCanvas === true) return false;
     if (c.status === 'APPROVED' || c.status === 'ACTIVE') return true;
-    try {
-      const d = JSON.parse(c.data);
-      return typeof d?.canvasX === 'number' && typeof d?.canvasY === 'number';
-    } catch { return false; }
+    return typeof parsed?.canvasX === 'number' && typeof parsed?.canvasY === 'number';
   });
 
   // Transform characters to CanvasNode format with full data

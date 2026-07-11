@@ -13,9 +13,9 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 
 export async function getCopilotHistory(campaignId: string, limit: number = 50) {
-  const messages = await prisma.copilotMessage.findMany({
+  const recent = await prisma.copilotMessage.findMany({
     where: { campaignId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
     take: limit,
     select: {
       id: true,
@@ -26,9 +26,10 @@ export async function getCopilotHistory(campaignId: string, limit: number = 50) 
       createdAt: true,
     },
   });
+  const messages = recent.reverse();
 
   return messages.map(m => ({
     ...m,
-    actions: m.actions ? JSON.parse(m.actions) : [],
+    actions: m.actions ?? null,
   }));
 }

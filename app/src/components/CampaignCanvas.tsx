@@ -121,8 +121,6 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       setSelectedCharacterId(null);
     }
   }, [activeTab]);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
   const [pendingWager, setPendingWager] = useState<EffortWagerPromptEvent | null>(null);
@@ -1170,36 +1168,39 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     }
   }, [campaign.id, stampTKV]);
 
-  const handleDeleteCharacter = useCallback(async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    const snapshotName = nodes.find(n => n.id === deleteTarget)?.name ?? 'character';
-    const targetId = deleteTarget;
+  // The right-click action used to permanently delete the character record.
+  // That was destructive, broken, and conceptually wrong for the canvas
+  // surface. Now it just hides the card via the canvas-position DELETE
+  // endpoint (clears canvasX/Y + sets hiddenFromCanvas=true). Re-place via
+  // the Tools picker or JEWL to bring it back.
+  const handleRemoveCharacterFromCanvas = useCallback(async (nodeId: string) => {
+    const snapshotName = nodes.find(n => n.id === nodeId)?.name ?? 'character';
+    // Optimistic local removal so the card disappears immediately.
+    setNodes(prev => prev.filter(n => n.id !== nodeId));
     try {
-      const res = await fetch(`/api/characters/${targetId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/characters/${nodeId}/canvas-position`, { method: 'DELETE' });
       if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete character');
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to remove from canvas');
+        // Rollback by refetching from server.
+        router.refresh();
         return;
       }
-      router.refresh();
       void fetch(`/api/campaigns/${campaign.id}/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mutationKind: 'delete-character',
+          mutationKind: 'remove-character-from-canvas',
           targetType: 'character',
-          targetId,
-          summary: `GM deleted character "${snapshotName}"`,
+          targetId: nodeId,
+          summary: `GM removed "${snapshotName}" from canvas`,
         }),
       }).catch(() => { /* best-effort observation */ });
     } catch {
       alert('Connection failed');
-    } finally {
-      setIsDeleting(false);
-      setDeleteTarget(null);
+      router.refresh();
     }
-  }, [campaign.id, deleteTarget, nodes, router]);
+  }, [campaign.id, nodes, router]);
 
   // ── Resize handler ──────────────────────────────────────────────────────
 
@@ -1610,7 +1611,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             trailblazers={trailblazers}
             onCreateCharacter={handleCreateCharacter}
             onPlaceCharacter={handlePlaceCharacter}
-            onDeleteCharacter={(nodeId) => setDeleteTarget(nodeId)}
+            onDeleteCharacter={handleRemoveCharacterFromCanvas}
             onCharacterUpdate={handleCharacterUpdate}
             onCreateLocation={handleCreateLocation}
             onDeleteLocation={handleDeleteLocation}
@@ -1936,19 +1937,6 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           </div>
         );
       })()}
-
-      {/* Delete confirmation dialog */}
-      <ConfirmDialog
-        isOpen={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDeleteCharacter}
-        title="Delete Character"
-        message="Are you sure you want to delete this character? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
-        isLoading={isDeleting}
-        variant="danger"
-      />
 
       {/* Crystallization confirmation dialog */}
       <ConfirmDialog
