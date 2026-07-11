@@ -32,6 +32,38 @@ principle): parties + a predicate that must HOLD + a typed penalty.
 - **Seeds**: Tara's 20% cap (threshold lives in predicate data — tunable) and
   the immutable Death-succession declaration. Acceptance: `scripts/test-contracts.ts`.
 
+## The M4 Golden Path — Godheads Play the Game (added 2026-07-11, T31+T32)
+
+**Lifecycle events (T31):** services now emit into the dispatcher —
+`blueprint.published` (→Kai), `blueprint.unused_for_90d` (daily sweep via
+`POST /api/forge/sweep`, →Tara), `goal.completed/failed/abandoned`
+(→Et'herling), `contract.violated` (→Selva/TRINITY per ruling 2026-07-10
+#2), `character.crystallized` (reserved route), `entity.retired` (reserved —
+emission lands with T30). PENDING invocation rows audit every emission when
+`GODHEAD_DISPATCHER` is off. Acceptance: `scripts/test-lifecycle-events.ts`.
+
+**The golden path (T32), proven LIVE 5 runs deep:** goal closes →
+Et'herling (haiku) judges and routes via `route_to_godhead` → Kai (sonnet)
+authors + grades the Nectar (INV-24) → `propose_nectar_bestowal` lands a
+STRUCTURED proposal in the godhead→GM channel → GM confirms on the
+bestowal card (GodHeadMessagesPanel) → trait lands with machine-enforceable
+rollModifiers, KRMA transfers Kai's wallet → character (GROVINE_NECTAR),
+every hop in GodHeadActionLog. Decline path: taxed conversion into max
+Frequency (10%, GROVINE_NECTAR_DECLINE; `NECTAR_DECLINE_TAX_RATE` config).
+INV-07 cap enforced at bestowal. Acceptance: `scripts/test-golden-path.ts`.
+
+Hardening from the live runs (each failure taught something):
+- `route_to_godhead` accepts stringified payloads + name aliases ('Lady
+  Death' → 'Tara Almswood') — haiku burned 4 routing attempts on strict
+  schema before this.
+- trait-modifier matching supports pipe alternatives ('navigation|leadership')
+  — AI-authored hooks produce them naturally.
+- Dispatcher closes its dispatch rows (no phantom RUNNING).
+- Et'herling AUTONOMOUSLY flags duplicate/rapid goal completions as reward
+  farming and holds the reward for GM review — emergent fraud detection,
+  kept deliberately; the acceptance test uses unique heroes + scrubs its
+  own memory residue.
+
 ## Wizard Crystallization Complete (added 2026-07-11, T29)
 
 The Entity Creation Wizard (8 steps, `components/entity/EntityCreationWizard.tsx`)

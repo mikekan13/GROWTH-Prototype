@@ -40,6 +40,7 @@ import './tools/evaluate-blueprint';
 import './tools/process-death';
 import './tools/decay-blueprint';
 import './tools/route-to-godhead';
+import './tools/propose-nectar-bestowal';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 

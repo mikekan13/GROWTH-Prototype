@@ -34,11 +34,16 @@ export type GodHeadEvent =
   | 'blueprint.submitted'        // Player submitted a request; Creator picks it up
   | 'blueprint.priced'           // Creator finished pricing; hand off to Kai
   | 'blueprint.evaluated'        // Kai finished evaluating; hand off to Et'herling
+  | 'blueprint.published'        // T31: a blueprint entered the catalog
   | 'blueprint.unused_for_90d'   // Lady Death decay candidate
   // Character lifecycle
   | 'character.locked'           // Player locked their character; crystallization fired
+  | 'character.crystallized'     // T31: wizard crossing completed — GM investment debited, sheet live
   | 'character.died'             // Frequency=0 in combat or Fated Age expired
   | 'death_save.resolved'        // T27: a Facing Death roll resolved (survive/fail/spared) — Tara's fiction beat + Thorn authorship
+  | 'entity.retired'             // T31: reserved — emission point lands with T30's retire flow
+  // Contracts (T13/T31)
+  | 'contract.violated'          // A Terminal contract flipped to VIOLATED — Triu's verification duty
   // Session / play
   | 'session.started'
   | 'session.ended'
@@ -70,11 +75,15 @@ const ROUTING_TABLE: Record<GodHeadEvent, ReadonlyArray<string>> = {
   'blueprint.submitted': ['Kai'],
   'blueprint.priced': ['Kai'],
   'blueprint.evaluated': ['Eth\'erling'],
+  'blueprint.published': ['Kai'],   // catalog growth is Kai's domain (tentative duty)
   'blueprint.unused_for_90d': ['Tara Almswood'],
 
   // Death routes to Lady Death (Tara) first; her process_death tool handles
   // the ledger split and Spirit Package composition.
   'character.locked': [],   // Currently a no-op route — reserved for future welcome ritual.
+  'character.crystallized': [], // Reserved — a welcome beat may land here later.
+  'entity.retired': ['Tara Almswood'], // Retirement is a soft ending — her domain. Emission lands with T30.
+  'contract.violated': ['Selva'], // TRINITY (Trayman/Selva/Triu) — Triu verifies contracts (ruling 2026-07-10 #2).
   'character.died': ['Tara Almswood'],
   // T27: every resolved death save is Tara's beat — survivals she may Thorn,
   // fated-age fails she authors the escalating age-Thorn for, spares she narrates.
@@ -160,7 +169,17 @@ export async function emit(
     void (async () => {
       try {
         const agent = await GodHeadAgent.load(godheadName);
-        await agent.invoke(event, payload);
+        const run = await agent.invoke(event, payload);
+        // The agent tracks its own invocation row; close our dispatch row
+        // so it doesn't linger RUNNING forever (T32 diag found phantoms).
+        await prisma.godHeadInvocation.update({
+          where: { id: inv.id },
+          data: {
+            status: 'DONE',
+            result: `dispatched — agent invocation ${run.invocationId} (${run.status})`,
+            finishedAt: new Date(),
+          },
+        }).catch(() => { /* swallow */ });
       } catch (err) {
         await prisma.godHeadInvocation.update({
           where: { id: inv.id },

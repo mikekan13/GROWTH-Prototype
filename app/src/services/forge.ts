@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
+import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
 // SkillGovernor type used indirectly via SKILL_GOVERNORS
 import { SKILL_GOVERNORS } from '@/types/growth';
 
@@ -317,7 +318,48 @@ export async function publishForgeItem(itemId: string, userId: string, userRole:
     data: { status: 'published' },
   });
 
+  // T31: lifecycle emission — godheads see the catalog grow.
+  void emitGodHeadEvent('blueprint.published', {
+    forgeItemId: updated.id,
+    name: updated.name,
+    type: updated.type,
+    campaignId: updated.campaignId,
+  });
+
   return { ...updated, data: JSON.parse(updated.data) };
+}
+
+/**
+ * T31 daily sweep: published blueprints never instantiated within the decay
+ * window get flagged and routed to Lady Death (blueprint.unused_for_90d).
+ * Idempotent — FLAGGED items aren't re-emitted.
+ */
+export async function sweepUnusedBlueprints(
+  windowDays = 90,
+): Promise<{ flagged: number }> {
+  const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  const stale = await prisma.forgeItem.findMany({
+    where: {
+      status: 'published',
+      useCount: 0,
+      decayStatus: 'ACTIVE',
+      updatedAt: { lt: cutoff },
+    },
+    select: { id: true, name: true, type: true, campaignId: true },
+  });
+  for (const item of stale) {
+    await prisma.forgeItem.update({
+      where: { id: item.id },
+      data: { decayStatus: 'FLAGGED' },
+    });
+    void emitGodHeadEvent('blueprint.unused_for_90d', {
+      forgeItemId: item.id,
+      name: item.name,
+      type: item.type,
+      campaignId: item.campaignId,
+    });
+  }
+  return { flagged: stale.length };
 }
 
 export async function unpublishForgeItem(itemId: string, userId: string, userRole: string) {

@@ -19,3 +19,10 @@ export const DEV_CAMPAIGN_GRANT = BigInt(50_000);
 
 /** Default Prime campaign wallet float (fund-prime-campaign.ts top-up target). */
 export const PRIME_CAMPAIGN_FLOAT = BigInt(100_000);
+
+/** Declining a Nectar converts it to raw KRMA into max Frequency minus this
+ *  tax (ruling r-2026-06-09 series — decline tax ~10%). */
+export const NECTAR_DECLINE_TAX_RATE = 0.10;
+
+/** Blueprint decay sweep window (T31 — blueprint.unused_for_90d). */
+export const BLUEPRINT_DECAY_WINDOW_DAYS = 90;

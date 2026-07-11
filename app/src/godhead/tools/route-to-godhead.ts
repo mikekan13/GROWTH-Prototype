@@ -19,17 +19,37 @@ import { registerTool, type ToolContext } from './registry';
 import { GodHeadAgent } from '../agent';
 
 const inputSchema = z.object({
-  godheadName: z.string().describe('Name of the godhead to invoke (e.g. "Kai", "Lady Death")'),
-  triggerType: z.string().describe('Synthetic trigger label, e.g. "delegated.evaluate_blueprint"'),
-  payload: z.record(z.string(), z.unknown()).describe('Payload to forward to the sub-agent'),
+  godheadName: z.string().describe('Name of the godhead to invoke (e.g. "Kai", "Tara Almswood")'),
+  triggerType: z.string().describe('Synthetic trigger label, e.g. "delegated.evaluate_blueprint" or "goal.completed"'),
+  // Models frequently pass stringified JSON for record args — accept both
+  // (the strict version cost Et'herling four failed routing attempts in
+  // the first live T32 run).
+  payload: z.preprocess(
+    (v) => {
+      if (typeof v === 'string') {
+        try { return JSON.parse(v) as unknown; } catch { return v; }
+      }
+      return v;
+    },
+    z.record(z.string(), z.unknown()),
+  ).describe('Payload to forward to the sub-agent (object, or JSON string of one)'),
 });
+
+/** Epithets agents naturally use → GodHead.name DB values. */
+const NAME_ALIASES: Record<string, string> = {
+  'lady death': 'Tara Almswood',
+  'tara': 'Tara Almswood',
+  'etherling': "Eth'erling",
+  "eth'erling": "Eth'erling",
+};
 
 registerTool({
   name: 'route_to_godhead',
   description: 'Eth\'erling: delegate a sub-task to another godhead. Returns the sub-agent\'s final response. Useful for orchestrating goal/blueprint flows that need Kai or Lady Death\'s specialty.',
   inputSchema,
   handler: async (input, context: ToolContext) => {
-    const { godheadName, triggerType, payload } = input as z.infer<typeof inputSchema>;
+    const { godheadName: rawName, triggerType, payload } = input as z.infer<typeof inputSchema>;
+    const godheadName = NAME_ALIASES[rawName.toLowerCase()] ?? rawName;
     if (godheadName === context.godHeadName) {
       throw new Error('Cannot route to self');
     }

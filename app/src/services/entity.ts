@@ -12,6 +12,7 @@ import { createPlaceholderGodHead } from './godhead-admin';
 import { crystallizeEntity as crystallizeKrma } from './krma/crystallization';
 import { calculateTKV } from './krma/evaluator';
 import { assignGoalCustodian } from './goal-custodian';
+import { emit as emitGodHeadEvent } from './godhead-dispatcher';
 
 /**
  * Entity service — campaign entity listing and management.
@@ -384,6 +385,14 @@ export async function crystallizeEntity(
       data: JSON.stringify(charData),
       status: 'APPROVED',
     },
+  });
+
+  // T31: lifecycle emission — the crossing is a world event.
+  void emitGodHeadEvent('character.crystallized', {
+    characterId: entityId,
+    characterName: character.name,
+    campaignId: character.campaignId,
+    tkv: tkv.total,
   });
 
   // Step 9: Create Goals + assign custodian godheads (the Council Router).

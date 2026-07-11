@@ -18,6 +18,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { executeTransaction } from '@/services/krma/ledger';
 import { calculateTKV } from '@/services/krma/evaluator';
+import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
 import type { GrowthCharacter } from '@/types/growth';
 import {
   contractPartySchema,
@@ -354,6 +355,14 @@ export async function evaluateContract(
         },
       });
     }
+    // T31: lifecycle emission — Triu's verification duty (TRINITY,
+    // ruling 2026-07-10 #2) sees every violation.
+    void emitGodHeadEvent('contract.violated', {
+      contractId: contract.id,
+      contractName: contract.name,
+      campaignId: contract.campaignId,
+      trigger,
+    });
   }
 
   return { contractId: contract.id, holds, violated, detail };

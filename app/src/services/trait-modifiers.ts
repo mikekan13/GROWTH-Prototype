@@ -49,7 +49,12 @@ export interface TraitModifierContext {
 function modifierMatches(mod: RollModifier, ctx: TraitModifierContext): boolean {
   if (mod.skillNamePattern) {
     if (!ctx.skillName) return false;
-    if (!ctx.skillName.toLowerCase().includes(mod.skillNamePattern.toLowerCase())) return false;
+    // Pipe alternatives: 'navigation|leadership|endurance' matches any one.
+    // AI-authored Nectars produce these naturally (T32 run 3) — the engine
+    // meets the content where it is.
+    const skill = ctx.skillName.toLowerCase();
+    const alternatives = mod.skillNamePattern.toLowerCase().split('|').map(s => s.trim()).filter(Boolean);
+    if (!alternatives.some(alt => skill.includes(alt))) return false;
   }
   if (mod.governorAttribute) {
     if (!ctx.governorAttribute) return false;

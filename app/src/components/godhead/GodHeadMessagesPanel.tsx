@@ -14,6 +14,54 @@ interface MessageRow {
   createdAt: string;
 }
 
+interface NectarBestowal {
+  kind: 'nectar_bestowal';
+  characterId: string;
+  goalId?: string;
+  nectar: {
+    name: string;
+    pillar: string;
+    mechanicalEffect: string;
+    rollModifiers?: Record<string, number>;
+  };
+  kv: number;
+  reason: string;
+  resolved?: { action: 'accept' | 'decline'; at: string; by: string };
+}
+
+function parseBestowal(content: string): NectarBestowal | null {
+  try {
+    const obj = JSON.parse(content);
+    if (obj && obj.kind === 'nectar_bestowal') return obj as NectarBestowal;
+  } catch { /* not JSON */ }
+  return null;
+}
+
+const NECTAR_PILLAR_COLOR: Record<string, string> = {
+  body:   '#f7525f',
+  spirit: '#582a72',
+  soul:   '#002f6c',
+};
+
+function pillarChip(pillar: string) {
+  const color = NECTAR_PILLAR_COLOR[pillar?.toLowerCase()] ?? '#582a72';
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '0 5px',
+      fontSize: '8px',
+      borderRadius: '2px',
+      border: `1px solid ${color}`,
+      color,
+      fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase' as const,
+      verticalAlign: 'middle',
+      marginLeft: '4px',
+    }}>{pillar}</span>
+  );
+}
+
 interface Props {
   campaignId: string;
   onClose?: () => void;
@@ -32,6 +80,8 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
   const [godheadName, setGodheadName] = useState('Eth\'erling');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [resolving, setResolving] = useState<Record<string, boolean>>({});
+  const [resolveError, setResolveError] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +122,31 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
       }
     } finally {
       setSending(false);
+    }
+  };
+
+  const resolveBestowal = async (messageId: string, action: 'accept' | 'decline') => {
+    setResolving(prev => ({ ...prev, [messageId]: true }));
+    setResolveError(prev => ({ ...prev, [messageId]: '' }));
+    try {
+      const res = await fetch(
+        `/api/campaigns/${campaignId}/godhead-messages/${messageId}/resolve-bestowal`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        }
+      );
+      if (res.ok) {
+        await load();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setResolveError(prev => ({ ...prev, [messageId]: body?.error ?? `Error ${res.status}` }));
+      }
+    } catch (err) {
+      setResolveError(prev => ({ ...prev, [messageId]: 'Network error' }));
+    } finally {
+      setResolving(prev => ({ ...prev, [messageId]: false }));
     }
   };
 
@@ -133,7 +208,96 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                   </span>
                   <span className="text-[8px]" style={{ color: '#666' }}>{new Date(m.createdAt).toLocaleString()}</span>
                 </div>
-                <p className="text-[11px]" style={{ color: '#ddd', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{m.content}</p>
+                {(() => {
+                  const bestowal = parseBestowal(m.content);
+                  if (bestowal) {
+                    const nPillar = bestowal.nectar.pillar?.toLowerCase();
+                    const nColor = NECTAR_PILLAR_COLOR[nPillar] ?? '#582a72';
+                    const mods = bestowal.nectar.rollModifiers;
+                    return (
+                      <div style={{ border: `1px solid ${nColor}`, borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+                        {/* Bestowal header */}
+                        <div style={{ backgroundColor: `${nColor}22`, padding: '4px 6px', borderBottom: `1px solid ${nColor}44`, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: nColor, fontSize: '10px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+                            ⟡ NECTAR PROPOSED — {bestowal.nectar.name}
+                          </span>
+                          {pillarChip(bestowal.nectar.pillar)}
+                        </div>
+                        {/* Body */}
+                        <div style={{ padding: '6px 7px', backgroundColor: 'rgba(26,26,46,0.6)' }}>
+                          {/* Reason */}
+                          <p style={{ color: '#ccc', fontSize: '11px', lineHeight: 1.45, marginBottom: '5px' }}>{bestowal.reason}</p>
+                          {/* Mechanical effect */}
+                          <div style={{ background: '#12122a', border: '1px solid #3a3a4e', borderRadius: '2px', padding: '4px 6px', marginBottom: mods ? '5px' : '4px' }}>
+                            <div style={{ color: '#888', fontSize: '8px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em', marginBottom: '2px' }}>MECHANICAL EFFECT</div>
+                            <p style={{ color: '#e8e0ff', fontSize: '10px', lineHeight: 1.4 }}>{bestowal.nectar.mechanicalEffect}</p>
+                          </div>
+                          {/* Roll modifiers */}
+                          {mods && Object.keys(mods).length > 0 && (
+                            <div style={{ marginBottom: '4px' }}>
+                              {Object.entries(mods).map(([k, v]) => (
+                                <span key={k} style={{ display: 'inline-block', marginRight: '6px', color: v >= 0 ? '#22ab94' : '#e85858', fontSize: '10px' }}>
+                                  {v >= 0 ? '+' : ''}{v} to {k}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* KV */}
+                          <div style={{ color: '#c9962e', fontSize: '10px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.04em', marginBottom: '5px' }}>
+                            KV COST: {bestowal.kv}
+                          </div>
+                          {/* Resolved / Actions */}
+                          {bestowal.resolved ? (
+                            <div style={{
+                              display: 'inline-block',
+                              fontSize: '9px',
+                              padding: '1px 6px',
+                              borderRadius: '2px',
+                              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                              letterSpacing: '0.06em',
+                              color: bestowal.resolved.action === 'accept' ? '#22ab94' : '#888',
+                              border: `1px solid ${bestowal.resolved.action === 'accept' ? '#22ab9444' : '#3a3a4e'}`,
+                              backgroundColor: bestowal.resolved.action === 'accept' ? 'rgba(34,171,148,0.08)' : 'rgba(255,255,255,0.03)',
+                            }}>
+                              {bestowal.resolved.action === 'accept' ? 'ACCEPTED' : 'DECLINED — converted to raw KRMA (10% tax)'}
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <button
+                                disabled={!!resolving[m.id]}
+                                onClick={() => resolveBestowal(m.id, 'accept')}
+                                style={{
+                                  padding: '2px 8px', fontSize: '9px', borderRadius: '2px', cursor: resolving[m.id] ? 'wait' : 'pointer',
+                                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em',
+                                  backgroundColor: resolving[m.id] ? '#1a1a2e' : '#22ab94',
+                                  color: resolving[m.id] ? '#22ab94' : '#0d1a17',
+                                  border: '1px solid #22ab94',
+                                }}>
+                                BESTOW
+                              </button>
+                              <button
+                                disabled={!!resolving[m.id]}
+                                onClick={() => resolveBestowal(m.id, 'decline')}
+                                style={{
+                                  padding: '2px 8px', fontSize: '9px', borderRadius: '2px', cursor: resolving[m.id] ? 'wait' : 'pointer',
+                                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em',
+                                  backgroundColor: '#2a2a3e',
+                                  color: '#888',
+                                  border: '1px solid #3a3a4e',
+                                }}>
+                                DECLINE → RAW KRMA
+                              </button>
+                              {resolveError[m.id] && (
+                                <span style={{ color: '#e85858', fontSize: '9px' }}>{resolveError[m.id]}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return <p className="text-[11px]" style={{ color: '#ddd', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{m.content}</p>;
+                })()}
                 {isFromGod && !m.readAt && (
                   <button onClick={() => markRead(m.id)}
                     className="text-[8px] mt-1 px-1.5 py-0.5 uppercase"
