@@ -259,6 +259,12 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     '',
     '=== CAMPAIGN DATA ===',
     context.campaignSummary,
+    // Complete present knowledge (Mike 2026-07-11): every character's
+    // effect-bearing state, every dispatch. Content can hook ANY event —
+    // JEWL is the interpreter and must SEE the rule text to enforce it.
+    context.tableState
+      ? `\n=== TABLE STATE (complete present knowledge — trait rule text is BINDING; enforce/coordinate these effects) ===\n${context.tableState}`
+      : '',
     context.retrievedData ? `\n=== RELEVANT DETAILS ===\n${context.retrievedData}` : '',
     context.rulesContext ? `\n=== RULES REFERENCE ===\n${context.rulesContext}` : '',
     `\n${memoryBlock}`,

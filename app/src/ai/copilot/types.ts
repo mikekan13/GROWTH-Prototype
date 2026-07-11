@@ -10,6 +10,11 @@ export interface CopilotAction {
 
 export interface CopilotContext {
   campaignSummary: string;
+  /** Complete present knowledge of every character at the table (Mike
+   *  2026-07-11): attributes, conditions, ALL trait effect text, equipment.
+   *  Always included — effect-bearing content must be PUSHED, never left
+   *  to mention-matching or tool calls JEWL might not think to make. */
+  tableState: string;
   retrievedData: string;
   rulesContext: string;
 }

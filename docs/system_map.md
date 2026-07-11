@@ -32,6 +32,48 @@ principle): parties + a predicate that must HOLD + a typed penalty.
 - **Seeds**: Tara's 20% cap (threshold lives in predicate data — tunable) and
   the immutable Death-succession declaration. Acceptance: `scripts/test-contracts.ts`.
 
+## Death Saves End-to-End (added 2026-07-11, T27 / r-2026-07-11-01/-02)
+
+**The roll (both doors):** character's Fate Die vs Tara's CHOSEN die (full
+ladder 1/2/3/d4/d6/d8/d12/d20, or she declines to reap). Ties go to Lady
+Death. Her post-roll authority is one-way mercy: she can spare a failed
+roll, never overrule a survived one. bodyResist plays no role.
+
+- **Triggers** (`death_save` SSE event, phase TRIGGERED): Frequency Deplete
+  crossing 0 (`services/frequency.ts`) and vital-part destruction
+  (`services/damage.ts`; `isVital` on Brain/Heart in the Human baseline).
+- **Service** (`services/death-save.ts`): roll resolution with injectable
+  rng; trait modifiers fire via the SAME engine as skill checks
+  (`skillName: 'Death Save'` matching — sources surfaced on the outcome);
+  COMBAT success restores 1 Frequency / vital +1 step; FATED_AGE
+  three-strike counter; failure marks `pendingDeathSplit`;
+  `sparePendingDeath` = the mercy window. Routes
+  `death_save.resolved` → Tara via the dispatcher.
+- **Dispatcher fix**: routing table keys are GodHead.name DB values — the
+  old `'Lady Death'` key silently dropped EVERY death event (her row is
+  `'Tara Almswood'`).
+- **UI** (black-void Mode 2): `DeathSaveDialog` (GM takeover on trigger —
+  die ladder + DO NOT REAP → dramatic result → SPARE THEM / OPEN THE
+  SPLIT) and `SplitConfirmDialog` (exact manifest routing preview,
+  two-step confirm → GHOST). Mounted in CampaignCanvas.
+- **Routes**: GET/POST/DELETE `/api/characters/[id]/death-save`; the split
+  executes only through the pre-existing GM death route.
+- Acceptance: `scripts/test-death-e2e.ts` (14 checks — trigger, survive+
+  restore, tie dies, mercy, Nectar buff flips a loss, full death with
+  ledger rows + Tara invocation).
+
+## JEWL Table State — Complete Present Knowledge (added 2026-07-11)
+
+Mike's directive: content can hook ANY interaction ("a Nectar that makes
+the whole party face death"), so JEWL — the effect-interpretation layer —
+must SEE everyone's effect-bearing state on every dispatch, pushed rather
+than mention-matched. `buildTableState` (context-assembler) injects a
+TABLE STATE block: every non-draft character's attributes (current/max),
+active conditions, EVERY trait with its rule text + rollModifiers, and
+held/equipped items. Soft cap 15 characters (overflow announced, never
+silent; deep detail via read_actors_state). See memory
+`effects-route-through-one-layer-2026-07-11`.
+
 ## Inventory Paperdoll (added 2026-07-10, T26)
 
 Three tiers — EQUIPPED / CARRIED / POSSESSIONS — with NO hardcoded slots:

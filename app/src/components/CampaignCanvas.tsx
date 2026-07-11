@@ -27,6 +27,7 @@ const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), {
 const CharacterTab = dynamic(() => import('@/components/character/CharacterTab'), { ssr: false });
 const EffortWagerModal = dynamic(() => import('@/components/campaign/EffortWagerModal'), { ssr: false });
 const ContractsDock = dynamic(() => import('@/components/canvas/ContractsDock'), { ssr: false });
+const DeathSaveDialog = dynamic(() => import('@/components/character/DeathSaveDialog'), { ssr: false });
 
 interface CanvasNode {
   id: string;
@@ -1954,6 +1955,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         isLoading={isCrystallizing}
         variant={crystallizeTarget?.direction === 'crystallize' ? 'info' : 'danger'}
       />
+
+      {/* Death save consequence surface — mounts invisible, activates on SSE event */}
+      <DeathSaveDialog campaignId={campaign.id} isGM={isGM} />
     </div>
   );
 }

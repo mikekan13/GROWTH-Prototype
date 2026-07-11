@@ -76,6 +76,9 @@ Nothing currently blocks coding work on the resolved items.
 ### Security (added 2026-07-10, T11):
 - **Leaked ANTHROPIC_API_KEY — confirm revoked.** Old local-only commits (May, `standalone/.env:6` in commits `a40fba4`/`9b00024`/`44710c8`) contain a real Anthropic key. GitHub push protection blocked the T11 master merge because of it; I abandoned that merge, so the key NEVER reached GitHub. It lives only in the local branch `archive/master-local-may-DO-NOT-PUSH` (never push it). Master's own May notes flagged this — if the key wasn't revoked back then, revoke it at console.anthropic.com now.
 
+### Content (added 2026-07-11, T27):
+- **Starting-trait rule text missing.** Test-fixture traits (`Adaptable`, `Haunted` from seed-test-srb) are name-only — no mechanical text exists anywhere, so JEWL correctly reports NONE ON FILE and can't enforce them. Needs authored rule text (you or Kai-with-curation; I don't invent trait mechanics). Also flagged for the executor: T23/T24 should make `applyCreationGrants` pass FULL blueprint rule text + rollModifiers through to trait instances.
+
 ### Canon (added 2026-07-10, T17):
 - **JEWL's pillar enum — confirm.** Seed has `BALANCE`; CANON_CORE §9 says Umbral/Severity "likely JEWL" (not locked). If SEVERITY is right, it's a one-line seed change + re-seed. [NEEDS MIKE]
 
