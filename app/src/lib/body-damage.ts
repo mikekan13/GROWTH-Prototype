@@ -53,6 +53,33 @@ export interface RouteDamageResult {
   events: DamageEvent[];
   /** True if any part was destroyed (condition 0). */
   anyDestroyed: boolean;
+  /** Condition changes to worn (equipped) items — caller persists these
+   *  back to the item instances (T26). Empty when no wornLayers passed. */
+  wornDamage: WornDamageResult[];
+}
+
+/** A worn (equipped) layer covering a body part (T26 paperdoll). */
+export interface WornLayer {
+  /** Caller's handle for persisting condition changes (CampaignItem id). */
+  itemId: string;
+  name: string;
+  /** Effective resist BEFORE the armor-category multiplier. */
+  baseResist: number;
+  /** Armor category — resolves the resist multiplier (ARMOR_LAYER_RULES). */
+  armorCategory?: 'Clothing' | 'Light' | 'Heavy';
+  condition: number;
+}
+
+export interface WornDamageResult {
+  itemId: string;
+  name: string;
+  partKey: string;
+  damageDealt: number;
+  effectiveResist: number;
+  brokeTier: boolean;
+  conditionBefore: number;
+  conditionAfter: number;
+  destroyed: boolean;
 }
 
 export interface RouteDamageOptions {
@@ -63,6 +90,14 @@ export interface RouteDamageOptions {
    * behavior as other damage types) — a safe default for accidental misuses.
    */
   piercingTargetPath?: string[];
+  /**
+   * Equipped items covering body parts (T26). Key = part path joined with
+   * '/' (e.g. 'Body/Torso'); value = layers ordered OUTERMOST FIRST.
+   * When damage reaches a covered part, the worn stack absorbs before the
+   * part itself — same absorb-then-passthrough rule, with each layer's
+   * resist scaled by its armor category (INV-52: layer rule is system-level).
+   */
+  wornLayers?: Record<string, WornLayer[]>;
 }
 
 const FALLBACK_RESIST = 0;
@@ -121,6 +156,55 @@ function applyToPart(
  *     receives Math.floor(passthrough / N), no remainder reassignment
  *     (the half-points are absorbed into the bearer's mass — by design).
  */
+/** Armor-category resist multipliers (mirrors ARMOR_LAYER_RULES in
+ *  types/material.ts — kept numeric here so this module stays pure). */
+const WORN_RESIST_MULTIPLIER: Record<string, number> = {
+  Clothing: 0.5,
+  Light: 1.0,
+  Heavy: 1.5,
+};
+
+/**
+ * Run incoming damage through the worn stack covering a part (outermost
+ * first). Each layer absorbs like a part: effective resist = baseResist ×
+ * category multiplier; if the incoming amount meets its resist the layer
+ * drops a condition tier. Returns the amount that reaches the part.
+ */
+function absorbThroughWorn(
+  layers: WornLayer[],
+  partKey: string,
+  amount: number,
+  worn: WornDamageResult[],
+): number {
+  let remaining = amount;
+  for (const layer of layers) {
+    if (remaining <= 0) break;
+    if (layer.condition <= 0) continue; // destroyed gear stops nothing
+    const mult = WORN_RESIST_MULTIPLIER[layer.armorCategory ?? ''] ?? 1.0;
+    const effectiveResist = Math.floor(layer.baseResist * mult);
+    const dealt = Math.max(0, remaining - effectiveResist);
+    const conditionBefore = layer.condition;
+    let brokeTier = false;
+    if (remaining >= effectiveResist && layer.condition > 0) {
+      layer.condition -= 1;
+      brokeTier = true;
+    }
+    worn.push({
+      itemId: layer.itemId,
+      name: layer.name,
+      partKey,
+      damageDealt: dealt,
+      effectiveResist,
+      brokeTier,
+      conditionBefore,
+      conditionAfter: layer.condition,
+      destroyed: layer.condition === 0,
+    });
+    remaining = dealt;
+  }
+  return remaining;
+}
+
 function routeDownward(
   node: GrowthWorldItem,
   parentPath: string[],
@@ -128,8 +212,17 @@ function routeDownward(
   amount: number,
   options: RouteDamageOptions,
   events: DamageEvent[],
+  worn: WornDamageResult[],
 ): { destroyedAny: boolean } {
   const myPath = node.partName ? [...parentPath, node.partName] : parentPath;
+
+  // T26: equipped layers covering this part absorb BEFORE the part itself.
+  const layers = options.wornLayers?.[myPath.join('/')];
+  if (layers && layers.length > 0) {
+    amount = absorbThroughWorn(layers, myPath.join('/'), amount, worn);
+    if (amount <= 0) return { destroyedAny: false };
+  }
+
   const resist = node.baseResist ?? FALLBACK_RESIST;
   const passthrough = Math.max(0, amount - resist);
   const r1 = applyToPart(node, myPath, damageType, amount, events);
@@ -146,7 +239,7 @@ function routeDownward(
     const targetIdx = internals.findIndex(c => c.partName === next);
     if (targetIdx === -1) {
       // Target not found at this level — degrade gracefully to even-split.
-      return distributeEvenly(node, internals, myPath, damageType, passthrough, options, events, destroyedAny);
+      return distributeEvenly(node, internals, myPath, damageType, passthrough, options, events, worn, destroyedAny);
     }
     const child = internals[targetIdx];
     const childResult = routeDownward(
@@ -156,12 +249,13 @@ function routeDownward(
       passthrough,
       { ...options, piercingTargetPath: rest },
       events,
+      worn,
     );
     destroyedAny = destroyedAny || childResult.destroyedAny;
     return { destroyedAny };
   }
 
-  return distributeEvenly(node, internals, myPath, damageType, passthrough, options, events, destroyedAny);
+  return distributeEvenly(node, internals, myPath, damageType, passthrough, options, events, worn, destroyedAny);
 }
 
 function distributeEvenly(
@@ -172,6 +266,7 @@ function distributeEvenly(
   passthrough: number,
   options: RouteDamageOptions,
   events: DamageEvent[],
+  worn: WornDamageResult[],
   destroyedAnyIn: boolean,
 ): { destroyedAny: boolean } {
   void parent; // referenced for parity with the routing API
@@ -179,7 +274,7 @@ function distributeEvenly(
   const share = Math.floor(passthrough / internals.length);
   if (share <= 0) return { destroyedAny };
   for (const child of internals) {
-    const childResult = routeDownward(child, parentPath, damageType, share, options, events);
+    const childResult = routeDownward(child, parentPath, damageType, share, options, events, worn);
     destroyedAny = destroyedAny || childResult.destroyedAny;
   }
   return { destroyedAny };
@@ -197,8 +292,14 @@ export function routeDamage(
 ): RouteDamageResult {
   const next = cloneItem(bodyRoot);
   const events: DamageEvent[] = [];
-  const { destroyedAny } = routeDownward(next, [], damageType, amount, options, events);
-  return { next, events, anyDestroyed: destroyedAny };
+  const worn: WornDamageResult[] = [];
+  // Worn layers are mutated during routing (condition drops) — clone so the
+  // module stays pure; results flow back via wornDamage.
+  const clonedOptions: RouteDamageOptions = options.wornLayers
+    ? { ...options, wornLayers: JSON.parse(JSON.stringify(options.wornLayers)) as Record<string, WornLayer[]> }
+    : options;
+  const { destroyedAny } = routeDownward(next, [], damageType, amount, clonedOptions, events, worn);
+  return { next, events, anyDestroyed: destroyedAny, wornDamage: worn };
 }
 
 /**

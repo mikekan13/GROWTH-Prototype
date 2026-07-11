@@ -24,7 +24,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
-import { routeDamage, HUMAN_BASELINE_ANATOMY, type DamageType, type DamageEvent } from '@/lib/body-damage';
+import { routeDamage, HUMAN_BASELINE_ANATOMY, type DamageType, type DamageEvent, type WornDamageResult } from '@/lib/body-damage';
+import { buildWornLayers } from '@/services/inventory';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
 
@@ -43,6 +44,8 @@ export interface ApplyDamageResult {
   anyDestroyed: boolean;
   /** New anatomy tree after damage (persisted to character.data). */
   bodyAnatomy: GrowthWorldItem;
+  /** Equipped-item absorption events (T26) — armor took the hit first. */
+  wornDamage: WornDamageResult[];
 }
 
 export async function applyDamageToCharacter(
@@ -72,16 +75,37 @@ export async function applyDamageToCharacter(
     (charData.bodyAnatomy as GrowthWorldItem | undefined) ??
     (JSON.parse(JSON.stringify(HUMAN_BASELINE_ANATOMY)) as GrowthWorldItem);
 
+  // T26: equipped items are the outer damage layers — armor absorbs before
+  // the body part it covers (outer-absorbs-first, INV-52 layer rules).
+  const wornLayers = await buildWornLayers(input.characterId);
+
   const result = routeDamage(currentAnatomy, input.damageType as DamageType, input.amount, {
     piercingTargetPath: input.piercingTargetPath,
+    wornLayers,
   });
 
-  // Persist
+  // Persist body
   const next: GrowthCharacter = { ...charData, bodyAnatomy: result.next };
   await prisma.character.update({
     where: { id: input.characterId },
     data: { data: JSON.stringify(next) },
   });
+
+  // Persist armor condition changes back to the item instances.
+  for (const wd of result.wornDamage) {
+    if (!wd.brokeTier) continue;
+    const row = await prisma.campaignItem.findUnique({ where: { id: wd.itemId } });
+    if (!row) continue;
+    const itemData = JSON.parse(row.data) as Record<string, unknown>;
+    itemData.condition = wd.conditionAfter;
+    await prisma.campaignItem.update({
+      where: { id: wd.itemId },
+      data: {
+        data: JSON.stringify(itemData),
+        ...(wd.destroyed ? { status: 'DESTROYED' } : {}),
+      },
+    });
+  }
 
   // Log to campaign events — keeps a replayable record alongside other
   // game events. Failure here doesn't roll back the damage (the damage
@@ -113,5 +137,6 @@ export async function applyDamageToCharacter(
     events: result.events,
     anyDestroyed: result.anyDestroyed,
     bodyAnatomy: result.next,
+    wornDamage: result.wornDamage,
   };
 }
