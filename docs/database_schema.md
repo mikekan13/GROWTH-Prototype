@@ -1,11 +1,7 @@
 # GRO.WTH Database Schema
 
-Last updated: 2026-06-10 (Time system foundation — Timescale, HistoryEntry, Campaign clock)
+Last updated: 2026-07-12 (T09 doc pass — all 38 models inventoried; GodHead cluster, Contract cluster, Subscription, auth tokens, EconomyConfig, JewlMistake added)
 Source of truth: `app/prisma/schema.prisma`
-
-> NOTE: this doc lags the schema in places (it predates the GodHeadMemory /
-> GodHeadInvocation / GodHeadActionLog / GodHeadMessage / Subscription /
-> EmailVerificationToken / PasswordResetToken models). The schema file wins.
 
 ### Campaign — time fields (added 2026-06-10)
 - `currentCycle`: Float, default 0 — the campaign's pocket-universe clock in META CYCLES (1 cycle ≈ 1 standard year). Rendered through the default timescale's calendar at display.
@@ -42,14 +38,18 @@ Core account. Roles determine interface access.
 ### Campaign
 GM-created game world container.
 - `worldContext`: Free-text world description for AI backstory assistance
-- `customPrompts`: JSON array of GM-defined backstory prompts (appended to defaults)
+- `customPrompts`: JSON array of GM-defined backstory prompts (legacy)
+- `applicationTemplate`: JSON `[{ id, prompt, required, category }]` — structured application form (supersedes customPrompts)
 - `listingStatus`: UNLISTED (default) | LISTED | CLOSED — controls EŶ∃tehrNET hub visibility
 - `listingDescription`: Public-facing campaign pitch (separate from internal description)
 - `listingTags`: JSON string[] — tags for hub filtering
 - `requiredFields`: JSON string[] — profile fields GM requires from applicants
 - `maxTrailblazers`: Seat limit (default 5, maps to subscription model)
 - `inviteCode`: 8-char hex code for player enrollment
-- Relations: characters, members (CampaignMember)
+- `aiSettings`: JSON<CampaignAISettings> — provider preferences per feature
+- `currentCycle`: Float (default 0) — pocket-universe clock in META CYCLES
+- `defaultTimescaleId`: String? — FK to campaign's primary Timescale
+- Relations: characters, members (CampaignMember), copilotMessages, jewlMistakes, godHeadMessages, timescales, historyEntries
 
 ### CampaignMember
 Player enrollment in a campaign (no character yet).
@@ -274,23 +274,44 @@ Campaign-level item entity. Represents weapons, armor, artifacts, prima materia,
 - Indexes: `(campaignId)`, `(campaignId, type)`, `(holderId)`, `(locationId)`
 
 ### Encounter
-Combat, social, or exploration encounter. Tracks three-phase resolution (Intention → Resolution → Impact).
-- `id`: String (cuid)
-- `campaignId`: String — which campaign
-- `name`: String — encounter name
-- `type`: String — `combat` | `social` | `exploration` | `puzzle` | `event`
-- `status`: String — `PLANNED` | `ACTIVE` | `PAUSED` | `RESOLVED`
-- `round`: Int — current combat round (0 = not started)
-- `phase`: String — `intention` | `resolution` | `impact`
-- `data`: JSON — `GrowthEncounter` (see `types/encounter.ts`)
-- `locationId`: String (optional) — where this encounter takes place
-- `sessionId`: String (optional) — which game session
-- `createdBy`: String — userId of creator (GM)
-- Indexes: `(campaignId)`, `(campaignId, status)`
+> NOTE: The Encounter model does NOT exist in the Prisma schema as of 2026-07-12. Encounter data is stored client-side or in CampaignEvent payloads. The EncounterTracker component exists in the UI but has no dedicated DB model yet. Remove this entry when a model is added.
 
 ### Session
 Auth session token.
 - 7-day expiration, cleaned up on logout or expiry
+
+### EmailVerificationToken
+Short-lived single-use token for email verification. Cascade-deletes with user.
+- `token`: String (unique) — issued by auth route, consumed by verify endpoint
+- `expiresAt`: DateTime; `consumedAt`: DateTime? — rows kept for audit after use
+
+### PasswordResetToken
+Short-lived single-use token for password reset. Same lifecycle as EmailVerificationToken.
+- `token`: String (unique); `expiresAt` / `consumedAt` DateTime
+
+### Subscription
+Tracks a paying GM through their KRMA-drip lifecycle. Drives `monthlyDrip()` schedule.
+- `userId`: String (unique) — one subscription per user
+- `status`: ACTIVE | PAST_DUE | CANCELED | FREE (ACTIVE/FREE = drips apply; FREE = admin-granted)
+- `plan`: String (default "watcher_default")
+- `subscribedAt`: DateTime — immutable anchor for the drip curve
+- `lastDripAt`: DateTime?; `lastDripMonthIndex`: Int — tracks which drips have run
+- `stripeCustomerId` / `stripeSubId`: String? (unique) — optional Stripe linkage
+
+### EconomyConfig
+ADMIN-tunable economy constants. Key-value store; service layer falls back to code defaults if key absent.
+- `key`: String (PK) — e.g. "drip"
+- `value`: String — JSON shape varies per key (e.g. `DripConfig` for "drip")
+- `updatedBy`: String? — ADMIN userId of last edit
+
+### JewlMistake
+GM mistake-bounty flagging corpus. When a GM flags a JEWL CopilotMessage as wrong, KRMA transfers from JEWL's wallet to GM's wallet.
+- `copilotMessageId` + `gmUserId`: unique pair (same GM can't double-flag)
+- `severity`: minor | major | critical
+- `bountyAmount`: BigInt — cached KRMA payout (KrmaTransaction is source of truth)
+- `transactionId`: String — pointer to the KrmaTransaction
+- `status`: flagged (Phase 2 will add acknowledged/disputed/resolved)
+- Indexes: (campaignId, createdAt), (gmUserId, createdAt), (sessionId)
 
 ### Goal
 Core gameplay loop entity. Tracks a character's narrative goal with God-head custodianship.
@@ -330,11 +351,48 @@ Supplementary metadata for God-head entities. Links to a Character record (unive
 - `domain`: String — "Death, decay, karmic recycling, blueprint maintenance"
 - `pillar`: String — MERCY | BALANCE | SEVERITY
 - `characterId`: String (unique) — FK to Character record
+- `aiActionMode`: Boolean (default false) — when true, the AI picks actions; false = human controls
 - `systemPrompt`: String — core personality + domain authority for Claude API calls
 - `temperature`: Float (default 0.7)
-- `active`: Boolean (default true)
-- `walletId`: String (nullable) — God-head's KRMA wallet
-- God-heads use Claude (cloud API) for reasoning, not Ollama
+- `defaultModel`: String? — Anthropic model id override (claude-sonnet-4-6, claude-haiku-4-5-20251001, etc.). NULL = runtime default
+- `walletId`: String? — God-head's KRMA wallet
+- Relations: memory (GodHeadMemory[]), invocations (GodHeadInvocation[]), actionLogs (GodHeadActionLog[]), tokenUsage (GodHeadTokenUsage[]), messages (GodHeadMessage[])
+- God-heads use Claude (cloud API) for reasoning
+
+### GodHeadMemory
+Agent-managed key-value store per God-head. Agent writes and reads arbitrary JSON under typed keys.
+- `godHeadId` + `key`: unique pair — e.g. "observations.kai.blueprint_preferences"
+- `value`: JSON string — agent owns the shape
+
+### GodHeadInvocation
+One triggered reasoning session for a God-head. Records full lifecycle and result.
+- `triggerType`: String — goal.created | blueprint.created | gm.requested_council | manual | etc.
+- `triggerData`: JSON — context passed at trigger time
+- `status`: PENDING | RUNNING | DONE | FAILED
+- `result`: JSON? — final output/summary
+- `stepCount`: Int — number of tool calls in this invocation
+- Relations: actionLogs (GodHeadActionLog[]), tokenUsage (GodHeadTokenUsage[]), messages (GodHeadMessage[])
+
+### GodHeadActionLog
+One tool call inside an invocation. Append-only per-hop audit trail.
+- `toolName`: String — read_entity | draft_blueprint | transfer_krma | route_to_godhead | etc.
+- `input`: JSON — tool input parameters
+- `output`: JSON? — tool return value
+- `error`: String? — error if tool call failed
+- `durationMs`: Int?
+
+### GodHeadTokenUsage
+Per-invocation token cost tracking.
+- `model`: String — claude-opus-4-6 | claude-sonnet-4-6 | etc.
+- `inputTokens` / `outputTokens`: Int
+- `costEstimate`: Float — USD estimate
+
+### GodHeadMessage
+Godhead ↔ GM communication channel, per campaign.
+- `direction`: GODHEAD_TO_GM | GM_TO_GODHEAD
+- `content`: String — plain text or JSON for structured payloads (e.g. Nectar proposals)
+- `readAt`: DateTime? — GM read receipt
+- Indexes: (campaignId, godHeadId, createdAt), (godHeadId, readAt), (invocationId)
 
 ### Contract (T13, INV-115 — added 2026-07-10)
 Terminal-enforced obligation: parties, a predicate that must HOLD, a typed penalty.

@@ -1,10 +1,6 @@
 # GRO.WTH System Map
 
-Last updated: 2026-07-10 (Contract system T13; earlier: Time system + per-object history + Location edit mode)
-
-> NOTE: sections below lag the codebase in places (canvas folders, JEWL
-> dialog, godhead runtime, subscriptions). The code wins; this doc catches
-> up incrementally.
+Last updated: 2026-07-12 (T09 doc pass — JEWL audio loop, GodHead agent runtime, Subscription drip added to Key Systems)
 
 ## Contract System (added 2026-07-10, T13 / INV-115)
 
@@ -213,9 +209,11 @@ Next.js 16 App Router with layered architecture adapted for the framework:
 Interface Layer     →  app/ (pages + API routes)
 Service Layer       →  services/ (business logic, Zod validation)
 Infrastructure      →  lib/ (auth, database, utilities, permissions, errors)
-AI Systems          →  ai/ (portrait pipeline, future Oracle)
+AI — JEWL Copilot  →  ai/copilot/ (classifier, runtime, context-assembler, tools)
+AI — GodHead Agent →  godhead/ (agent loop, tool registry, 20+ tools)
+AI — Portraits      →  ai/portraits/ (ComfyUI + FLUX.2 Dev + PuLID pipeline)
 Data Layer          →  Prisma 7 + SQLite (beta) → PostgreSQL (production)
-Types               →  types/growth.ts (GrowthCharacter, game mechanics)
+Types               →  types/ (growth.ts, krma.ts, contracts.ts, time.ts, etc.)
 ```
 
 ## Data Flow
@@ -365,6 +363,38 @@ API routes are thin wrappers: parse input → Zod validate → call service → 
 - GROvinePanel canvas component: add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking
 - Essence tab in CampaignCanvas: GROvine overview, Nectars/Blossoms/Thorns summary, Harvest log across all characters
 - Files: `components/canvas/GROvinePanel.tsx`, `components/canvas/HarvestCard.tsx`
+
+### JEWL Copilot (AI Session Engine)
+JEWL is the campaign copilot — always-listening when the GM is on a campaign page, masking itself as "Copilot" to players (wallet hidden; `ai/copilot/jewl-identity.ts`).
+
+- **No wake word**: Haiku classifier (`ai/copilot/classifier.ts`) runs first on every audio chunk or text input. Routes to Sonnet (CopilotService) only when warranted; idle audio dropped. ~$2/session budget target.
+- **Audio loop**: `POST /api/campaigns/[id]/audio-chunk` receives WebM chunks from the client (`components/copilot/JewlChip.tsx`); transcribes via Whisper (`services/stt-vocabulary.ts` biases proper-noun recognition); routes to CopilotService.
+- **Context assembler** (`ai/copilot/context-assembler.ts`): `buildTableState` injects TABLE STATE on every dispatch — all non-draft character attributes, active conditions, every trait with rollModifiers, held/equipped items. Soft cap 15 characters (overflow announced, never silent). `buildCampaignContext` assembles locations, recent events, active goals.
+- **Time awareness** (`ai/copilot/time-awareness.ts`): injects current campaign clock, timescale, active holidays into system context.
+- **Tools** (15+ in `ai/copilot/tools/`): actors, attribute-set, condition, damage, forge-blueprint, list-canvas-characters, memory, mistake-corpus, move-character, npc-speak, place-on-canvas, remove-from-canvas, time, time-metrics.
+- **Mistake bounty** (`services/jewl-mistake.ts`): GM flags a wrong JEWL message → KRMA transfer from JEWL wallet → GM wallet → corpus row for future training.
+- **Surfaces**: CopilotChat in Campaign Terminal, JewlChip status in canvas header, `/api/campaigns/[id]/copilot` (main inference), `/api/campaigns/[id]/audio-chunk` (STT loop), `/api/copilot/create-dialog` (entity/location creation), `/api/copilot/form-suggest` (form AI prefill).
+- **Files**: `ai/copilot/`, `services/jewl-mistake.ts`, `services/stt-vocabulary.ts`, `components/copilot/JewlChip.tsx`, `components/terminal/CopilotChat.tsx`
+
+### GodHead Agent Runtime
+AI personas linked to Character records. When `aiActionMode=true` the persona is autonomous; when false a human controls the character but memory is still captured.
+
+- **Dispatcher** (`services/godhead-dispatcher.ts`): Event bus. Services emit named events (goal.completed, blueprint.published, blueprint.unused_for_90d, contract.violated, character.crystallized). Dispatcher consults routing table → triggers the right godhead's agent. Kill switch: `GODHEAD_DISPATCHER=false` (audit rows still written).
+- **Agent loop** (`godhead/agent.ts`): Loads persona systemPrompt, runs Claude API with the godhead's tool registry, logs every tool call to GodHeadActionLog, closes invocation row on completion.
+- **Tool registry** (`godhead/tools/registry.ts`): 20+ tools — read-entity, draft-blueprint, evaluate-blueprint, propose-nectar-bestowal, route-to-godhead, send-message-to-gm, transfer-krma, read/write-my-memory, adopt/release-goal, etc. Domain-filtered per godhead.
+- **M4 golden path (T32, live)**: goal.completed → Et'herling (haiku) routes via `route_to_godhead` → Kai (sonnet) authors Nectar → `propose_nectar_bestowal` lands structured proposal in GodHeadMessage → GM confirms on GodHeadMessagesPanel → trait + KRMA land. Decline: 10% tax, GROVINE_NECTAR_DECLINE.
+- **Token/cost tracking**: GodHeadTokenUsage per invocation per model.
+- **Surfaces**: GodHeadMessagesPanel (GM), GodheadPersonaPanel (per-character settings), `/api/godhead/[id]/invoke`, `/api/admin/godheads/*`, `/api/campaigns/[id]/godhead-messages/*`.
+- **Files**: `godhead/`, `services/godhead-dispatcher.ts`, `services/godhead-admin.ts`, `services/nectar-bestowal.ts`, `components/godhead/GodHeadMessagesPanel.tsx`
+
+### Subscription & KRMA Drip
+Tracks paying GMs and runs the monthly KRMA injection schedule.
+
+- **Subscription** (`services/subscription.ts`): One row per GM. status: ACTIVE | PAST_DUE | CANCELED | FREE. `subscribe()` creates row + issues initial lump. `cancel()` stops future drips; existing KRMA stays.
+- **Drip calculator** (`services/subscription-drip.ts`): Anti-frontloading bell curve. Computes owed drips based on `lastDripMonthIndex`; each month's payout scales by position on the curve.
+- **Admin trigger**: `POST /api/admin/subscription-drip` (manual sweep). `GET/PATCH /api/admin/economy-config` tunes the drip constants via EconomyConfig KV store.
+- **Billing stub**: `POST /api/billing/stub-checkout`, `GET/POST/DELETE /api/billing/subscription` — Stripe-ready shape, no live Stripe in alpha.
+- **Files**: `services/subscription.ts`, `services/subscription-drip.ts`, `services/economy-config.ts`
 
 ### AI Systems (planned)
 - Portrait pipeline: ComfyUI + FLUX.2 Dev + PuLID (see PORTRAIT-PIPELINE.md)
