@@ -30,3 +30,9 @@ logs/
 **/.env
 **/.env.*
 !**/.env.example
+
+# Windows NUL device artifacts + DB backups / wipe scratch
+NUL
+**/NUL
+dev.db.backup*
+*.empty-wipe-*
