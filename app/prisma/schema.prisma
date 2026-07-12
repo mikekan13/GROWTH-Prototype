@@ -797,6 +797,19 @@ model AccessCode {
   expiresAt   DateTime? // Optional expiration
 }
 
+// ── EconomyConfig (T06) — ADMIN-tunable economy constants ────────────────
+// Key/value store for numbers that are guesstimates pending a balancing pass
+// (ruling 2026-07-10 / INV-17 AMENDED). Nothing here creates KRMA — these are
+// transfer sizes and thresholds executed through the ledger (INV-13/14). The
+// service layer parses `value` (JSON string, SQLite has no native JSON) and
+// falls back to code defaults when a key is absent, so an empty table is safe.
+model EconomyConfig {
+  key       String   @id // e.g. "drip"
+  value     String // JSON<config shape for this key>
+  updatedAt DateTime @updatedAt
+  updatedBy String? // ADMIN userId of last edit
+}
+
 // ============================================================
 // Contract System (T13, INV-115) — Terminal-enforced obligations
 // ============================================================

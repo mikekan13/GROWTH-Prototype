@@ -40,6 +40,7 @@ import { isAdminRole } from '@/lib/permissions';
 import { executeTransaction } from './krma/ledger';
 import { getWalletByOwner, getReserveWallet } from './krma/wallet';
 import { SUBSCRIBE_LUMP, monthlyDrip } from './subscription-drip';
+import { getDripConfig } from './economy-config';
 
 // The Terminal reserve wallet funds every GM allocation. Label matches the
 // genesis seed (`RESERVE_WALLETS.TERMINAL.label`). If beta rebrands this
@@ -135,10 +136,11 @@ export async function runDripForUser(
 
   const reserveWallet = await getReserveWallet(SUBSCRIPTION_RESERVE_LABEL);
   const userWallet = await getWalletByOwner(userId);
+  const dripConfig = await getDripConfig();
 
   const executed: Array<{ monthIndex: number; amount: number; transactionId: string }> = [];
   for (let m = sub.lastDripMonthIndex + 1; m <= elapsedMonths; m++) {
-    const amount = monthlyDrip(m);
+    const amount = monthlyDrip(m, dripConfig);
     if (amount <= 0) continue;
     const tx = await executeTransaction({
       fromWalletId: reserveWallet.id,
@@ -191,10 +193,11 @@ export async function runDripForAll(actorId: string, now: Date = new Date()) {
 async function allocateSubscribeLump(userId: string, subscriptionId: string, actorId: string): Promise<string> {
   const reserveWallet = await getReserveWallet(SUBSCRIPTION_RESERVE_LABEL);
   const userWallet = await getWalletByOwner(userId);
+  const { subscribeLump } = await getDripConfig();
   const tx = await executeTransaction({
     fromWalletId: reserveWallet.id,
     toWalletId: userWallet.id,
-    amount: BigInt(SUBSCRIBE_LUMP),
+    amount: BigInt(subscribeLump),
     state: 'FLUID',
     reason: 'GM_ALLOCATION',
     description: 'Subscription — initial lump-sum allocation',
