@@ -1,37 +1,29 @@
-// One-shot status: is pod running, how much have models downloaded, is ComfyUI responding.
+// One-shot status: is the pod running and is ComfyUI answering on the proxy.
+// No SSH (standing rule: RunPod proxy only). Pod id: app/.ssh/pod-id.txt.
 import fs from 'node:fs';
+import path from 'node:path';
 import { rp } from './runpod-api.mjs';
-import { execSync } from 'node:child_process';
 
-const ID = fs.readFileSync('C:/Projects/GRO.WTH/standalone/.ssh/pod-id.txt', 'utf-8').trim();
+const ID = fs.readFileSync(path.join(import.meta.dirname, '..', '.ssh', 'pod-id.txt'), 'utf-8').trim();
 const pod = await rp(`/pods/${ID}`);
-const ip = pod.publicIp;
-const sshPort = pod.portMappings?.['22'];
-console.log(`pod: ${pod.id}  status=${pod.desiredStatus}  ip=${ip}  ssh=${sshPort}  $${pod.costPerHr}/hr`);
+console.log(`pod: ${pod.id}  name=${pod.name}  status=${pod.desiredStatus}  $${pod.costPerHr}/hr`);
 
-if (!ip || !sshPort || pod.desiredStatus !== 'RUNNING') {
-  console.log('not reachable');
+if (pod.desiredStatus !== 'RUNNING') {
+  console.log('hibernated — wake with: node scripts/cloud-up.mjs');
   process.exit(0);
 }
 
-const KEY = 'C:/Projects/GRO.WTH/standalone/.ssh/runpod_growth';
-function ssh(cmd) {
-  try {
-    return execSync(
-      `ssh -i "${KEY}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${sshPort} root@${ip} ${JSON.stringify(cmd)}`,
-      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000 }
-    ).toString();
-  } catch (e) {
-    return `ERR: ${e.message.slice(0, 100)}`;
+const url = `https://${ID}-8188.proxy.runpod.net`;
+try {
+  const r = await fetch(`${url}/system_stats`, { signal: AbortSignal.timeout(15_000) });
+  if (r.ok) {
+    const stats = await r.json();
+    const gpu = stats?.devices?.[0];
+    console.log(`comfy: UP at ${url}`);
+    if (gpu) console.log(`gpu: ${gpu.name}  vram_free=${Math.round((gpu.vram_free ?? 0) / 1e9)}GB / ${Math.round((gpu.vram_total ?? 0) / 1e9)}GB`);
+  } else {
+    console.log(`comfy: proxy answered ${r.status} — ComfyUI may still be starting`);
   }
+} catch {
+  console.log(`comfy: NOT answering at ${url} (starting up, or launch ComfyUI on the pod)`);
 }
-
-console.log('--- models ---');
-console.log(ssh('du -sh /workspace/ComfyUI/models/*/  2>/dev/null | sort -h'));
-console.log('--- download log tail ---');
-console.log(ssh('tail -5 /workspace/download-models.log 2>/dev/null'));
-console.log('--- comfy running? ---');
-console.log(ssh('pgrep -af main.py 2>/dev/null || echo not running'));
-
-// Get the ComfyUI proxy URL (RunPod routes http ports through their proxy)
-console.log(`\ncomfy URL (once launched): https://${pod.id}-8188.proxy.runpod.net/`);

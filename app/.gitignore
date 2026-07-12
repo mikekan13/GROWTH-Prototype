@@ -51,3 +51,4 @@ next-env.d.ts
 !/public/portraits/angle-refs
 /public/portraits/angle-refs/*
 !/public/portraits/angle-refs/*.jpg
+.ssh/
