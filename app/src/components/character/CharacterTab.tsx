@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { PhysicalDescription, BodyPartDescription } from '@/types/growth';
 import type { HeldItemData } from '@/types/item';
+import { safeJsonParse } from '@/lib/safe-json';
 import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
@@ -192,8 +193,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         const owned: HeldItemData[] = items
           .filter((it: { holderId?: string | null }) => it.holderId === charId)
           .map((it: { id: string; name: string; type: string; status: string; data: string }) => {
-            let parsed: unknown = {};
-            try { parsed = JSON.parse(it.data); } catch { /* keep empty */ }
+            const parsed: unknown = safeJsonParse<unknown>(it.data, {}, 'heldItem.data');
             return {
               id: it.id,
               name: it.name,

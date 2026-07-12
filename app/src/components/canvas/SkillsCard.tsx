@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import type { SkillGovernor } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
+import { safeJsonParse } from '@/lib/safe-json';
 
 export interface SkillItem {
   name: string;
@@ -112,7 +113,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
         const items = (data.items || []).map((item: { id: string; name: string; status: string; data: string | object }) => ({
           id: item.id,
           name: item.name,
-          data: typeof item.data === 'string' ? JSON.parse(item.data) : item.data,
+          data: typeof item.data === 'string' ? safeJsonParse<Record<string, unknown>>(item.data, {}, 'forgeSkill.data') : item.data,
         }));
         setForgeSkills(items);
       })
