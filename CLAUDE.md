@@ -18,7 +18,7 @@ GRO.WTH is a digital-first TTRPG platform being rebuilt as a clean Next.js app. 
 - **GRO.WTH Beta/** — Legacy codebase. Keep `src/types/growth.ts` and visual DNA only.
 
 ## Critical Design Facts (Do Not Get Wrong)
-- **Soul/Spirit SWAPPED (Jan 2026)**: What the repository calls "Soul" (Flow/Frequency/Focus) is actually **Spirit** (Sulfur/Blue). What it calls "Spirit" (Willpower/Wisdom/Wit) is actually **Soul** (Mercury/Purple). This aligns with Orthodox anthropology (soma/psyche/pneuma).
+- **Soul/Spirit SWAPPED (Jan 2026)**: What the repository calls "Soul" (Flow/Frequency/Focus) is actually **Spirit** (Sulfur/Purple). What it calls "Spirit" (Willpower/Wisdom/Wit) is actually **Soul** (Mercury/Blue). This aligns with Orthodox anthropology (soma/psyche/pneuma).
 - **Pillar Colors (canonical, per palette 2026-05-02)**: Body=Red `#f7525f`, Spirit=Purple `#582a72`, Soul=Blue `#002f6c`, Terminal=Teal `#22ab94`, KRMA=Gold `#ffcc78`. Each pillar has 3 tones (see `memory/growth-color-palette.md` for full Sephirot mapping).
 - **Three Interfaces**: Trailblazer Portal (player), Watcher Console (GM), Terminal Admin (ADMIN-only — Mike). GODHEAD AI agents do NOT get the Terminal.
 - **Role hierarchy**: ADMIN (Mike) > GODHEAD (AI agent, plays/manages within the system) > WATCHER (GM, KRMA-constrained) > TRAILBLAZER (player, default on registration).
