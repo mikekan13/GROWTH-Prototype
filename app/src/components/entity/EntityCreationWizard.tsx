@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { SEED_CATALOG, FATE_DIE_VALUE, getSeed } from '@/lib/seed-catalog';
 import type { GrowthSeed, FateDie, SkillGovernor } from '@/types/growth';
 import { PILLARS } from '@/types/growth';
@@ -280,39 +280,80 @@ function IntakeStep({
 function SeedStep({
   draft,
   onChange,
+  campaignId,
 }: {
   draft: EntityDraft;
   onChange: (updates: Partial<EntityDraft>) => void;
+  campaignId: string;
 }) {
   const [search, setSearch] = useState('');
   const [dieFilter, setDieFilter] = useState<FateDie | 'all'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'kv-asc' | 'kv-desc'>('name');
   const [expandedSeed, setExpandedSeed] = useState<string | null>(null);
 
+  // T07 (INV-84 / canon M9): the wizard's seed list is gated to FORGE-PUBLISHED
+  // seeds. The 48 paper-version SEED_CATALOG entries are unbalanced reference
+  // material — never live content — so they appear ONLY to ADMIN, in a clearly
+  // labeled "paper reference (unbalanced)" group. Players/GMs see published
+  // forge seeds only (the forge service already forces status=published for
+  // non-GM callers).
+  const [forgeSeeds, setForgeSeeds] = useState<GrowthSeed[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [seedRes, meRes] = await Promise.all([
+          fetch(`/api/campaigns/${campaignId}/forge?type=seed&status=published`),
+          fetch('/api/auth/me'),
+        ]);
+        if (!cancelled && seedRes.ok) {
+          const d = await seedRes.json();
+          const mapped: GrowthSeed[] = (d.items || []).map(
+            (it: { name: string; karmicValue: number | null; data: Record<string, unknown> }) => ({
+              ...(it.data as unknown as GrowthSeed),
+              name: it.name,
+              // KV lives on the forge item (Kai-graded), not in `data`.
+              seedKV: typeof it.karmicValue === 'number' ? it.karmicValue : Number((it.data as { seedKV?: number }).seedKV ?? 0),
+            }),
+          );
+          setForgeSeeds(mapped);
+        }
+        if (!cancelled && meRes.ok) {
+          const me = await meRes.json();
+          setIsAdmin(me.user?.role === 'ADMIN');
+        }
+      } catch {
+        /* silent — an empty list renders the "author a seed" guidance below */
+      }
+      if (!cancelled) setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
   const filtered = useMemo(() => {
-    let seeds = [...SEED_CATALOG];
-
-    // Search
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      seeds = seeds.filter(s =>
-        s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q)
-      );
-    }
-
-    // Die filter
-    if (dieFilter !== 'all') {
-      seeds = seeds.filter(s => s.baseFateDie === dieFilter);
-    }
-
-    // Sort
-    if (sortBy === 'kv-asc') seeds.sort((a, b) => a.seedKV - b.seedKV);
-    else if (sortBy === 'kv-desc') seeds.sort((a, b) => b.seedKV - a.seedKV);
-    else seeds.sort((a, b) => a.name.localeCompare(b.name));
-
-    return seeds;
-  }, [search, dieFilter, sortBy]);
+    const applyFilters = (list: GrowthSeed[]): GrowthSeed[] => {
+      let seeds = [...list];
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        seeds = seeds.filter(s => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q));
+      }
+      if (dieFilter !== 'all') seeds = seeds.filter(s => s.baseFateDie === dieFilter);
+      if (sortBy === 'kv-asc') seeds.sort((a, b) => a.seedKV - b.seedKV);
+      else if (sortBy === 'kv-desc') seeds.sort((a, b) => b.seedKV - a.seedKV);
+      else seeds.sort((a, b) => a.name.localeCompare(b.name));
+      return seeds;
+    };
+    const canon = applyFilters(forgeSeeds).map(seed => ({ seed, isReference: false }));
+    // ADMIN reference group: paper CSV seeds not already published to the forge.
+    const reference = isAdmin
+      ? applyFilters(SEED_CATALOG.filter(csv => !forgeSeeds.some(f => f.name === csv.name))).map(seed => ({ seed, isReference: true }))
+      : [];
+    return [...canon, ...reference];
+  }, [search, dieFilter, sortBy, forgeSeeds, isAdmin]);
 
   const ATTR_LABELS: { key: keyof GrowthSeed['attributes']; label: string; pillar: string }[] = [
     { key: 'clout', label: 'CLT AUG', pillar: '#E8585A' },
@@ -387,13 +428,33 @@ function SeedStep({
 
       {/* Seed list */}
       <div className="space-y-1 max-h-[400px] overflow-y-auto pr-1">
-        {filtered.map(seed => {
+        {loading && (
+          <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/30 px-3 py-6 text-center">Loading seeds…</div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 px-3 py-6 text-center leading-relaxed">
+            No seeds published in this campaign yet. Ask your Watcher to author seeds via the Forge.
+          </div>
+        )}
+        {filtered.map(({ seed, isReference }, idx) => {
           const isSelected = draft.seed?.name === seed.name;
           const isExpanded = expandedSeed === seed.name;
           const totalAttrs = Object.values(seed.attributes).reduce((sum, v) => sum + v, 0);
+          const showReferenceHeader = isReference && (idx === 0 || !filtered[idx - 1].isReference);
 
           return (
-            <div key={seed.name}>
+            <Fragment key={`${isReference ? 'ref' : 'forge'}:${seed.name}`}>
+              {showReferenceHeader && (
+                <div className="mt-4 mb-1 px-3 py-1.5 border-l-2" style={{ borderColor: '#D07818', background: 'rgba(208,120,24,0.08)' }}>
+                  <div className="text-[11px] font-[family-name:var(--font-header)] tracking-wider uppercase" style={{ color: '#D07818' }}>
+                    Paper reference — unbalanced (ADMIN only)
+                  </div>
+                  <div className="text-[10px] font-[family-name:var(--font-terminal)] text-white/30">
+                    Legacy CSV seeds. Not live content — publish a balanced seed via the Forge to use it.
+                  </div>
+                </div>
+              )}
+              <div style={{ opacity: isReference ? 0.72 : 1 }}>
               {/* Seed row */}
               <div
                 className="flex items-center gap-3 px-3 py-2.5 border cursor-pointer transition-all"
@@ -521,6 +582,7 @@ function SeedStep({
                 </div>
               )}
             </div>
+            </Fragment>
           );
         })}
       </div>
@@ -1774,7 +1836,7 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
           </>
         )}
         {step === 1 && (
-          <SeedStep draft={draft} onChange={updateDraft} />
+          <SeedStep draft={draft} onChange={updateDraft} campaignId={campaignId} />
         )}
         {step === 2 && (
           <>
