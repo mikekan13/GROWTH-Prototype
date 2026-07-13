@@ -226,8 +226,8 @@ export interface GrowthTrait {
   rollModifiers?: RollModifier[];
   /**
    * Required pillar tag (locked Mike 2026-05-19). Determines death-engine
-   * routing: body → stripped to GM; soul → halved to Lady Death;
-   * spirit → kept. Ternary so future logic can distinguish Spirit from Soul
+   * routing (corrected 2026-07-13): body → stripped to GM; soul → half to GM,
+   * majority kept; spirit → kept. Ternary so future logic can distinguish Spirit from Soul
    * without re-tagging the catalog. Optional only on legacy un-tagged
    * records — new authoring requires it, and the death engine defaults
    * missing-pillar traits to 'spirit' (the safe-kept bucket).
@@ -238,6 +238,19 @@ export interface GrowthTrait {
   // nectar = permanent positive (from completing GRO.vines)
   // blossom = temporary buff (bestowed by Godheads during play)
   // thorn = permanent negative (from failed GRO.vines, death)
+
+  // ── Blossom custody (loan model, Mike 2026-07-13) ──
+  // A blossom is "borrowed power": the bestowing Godhead transfers KRMA from
+  // its own wallet onto the character (LOCK). That exact KRMA returns to the
+  // Godhead when the blossom expires or the character dies. These fields carry
+  // the chain of custody so the return is fully attributed. Only set on
+  // type === 'blossom'.
+  blossomInstanceId?: string;   // Unique per bestowal — idempotent return key
+  grantedByGodHeadId?: string;  // The Godhead that lent the power (return target)
+  grantedByGodHeadName?: string; // Cached for display/audit
+  kv?: number;                  // The borrowed KRMA (returned in full on expiry/death)
+  durationCycles?: number;      // Lifetime in meta cycles (granter-set); expiry = T23 clock
+  expiresAtCycle?: number;      // Campaign-clock cycle at which it auto-expires
 }
 
 // GRO.vine - Character narrative thread

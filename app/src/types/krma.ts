@@ -53,6 +53,11 @@ export type TransactionReason =
   | 'GROVINE_NECTAR_DECLINE'
   | 'GROVINE_TAX'
   | 'THORN_NECTAR_REPLACE'
+  // Blossoms — "borrowed power" loan from a Godhead (Mike 2026-07-13).
+  // Bestow lends Godhead → character (LOCK); return sends it home on
+  // expiry/death (character → Godhead, UNLOCK). Net-zero, fully attributed.
+  | 'BLOSSOM_BESTOW'
+  | 'BLOSSOM_RETURN'
   // Harvest
   | 'HARVEST_REWARD'
   | 'HARVEST_WEALTH'

@@ -10,6 +10,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { executeBatch, type CreateTransactionInput } from './ledger';
 import { getWalletByOwner, getWalletByCampaign, getWalletByCharacter, getSystemWallet } from './wallet';
 import { calculateTKV, calculateDeathSplit, hashEvaluator, splitSkillShares } from './evaluator';
+import { returnAllBlossoms } from '@/services/blossom';
 import { emit as emitGodHeadEvent } from '../godhead-dispatcher';
 import type { GrowthCharacter } from '@/types/growth';
 import type { TransactionRecord, DeathSplitManifest } from '@/types/krma';
@@ -148,6 +149,12 @@ export async function executeDeathSplit(
     results = await executeBatch(transactions);
   }
 
+  // Blossoms are loans of "borrowed power" — before the character transforms,
+  // return each active blossom's KRMA to the Godhead that lent it (character
+  // wallet → godhead wallet, UNLOCK, fully attributed). Chain of custody,
+  // Mike 2026-07-13. transformCharacterToGhost then drops the blossom traits.
+  const blossomReturns = await returnAllBlossoms(charData, characterId, campaignId, 'death');
+
   // ── Character transformation (locked Mike 2026-05-19) ──
   // The character is NOT destroyed; they become a ghost. Mutate their data
   // blob in place: zero body attributes/skills, halve soul attributes/skills,
@@ -170,6 +177,8 @@ export async function executeDeathSplit(
     cause: deathContext.cause,
     sessionId: deathContext.sessionId,
     spiritPackageKV: manifest.toPlayer,
+    blossomsReturnedKV: blossomReturns.total,
+    blossomReturns: blossomReturns.returns,
     batchId,
   }).catch(() => { /* swallow */ });
 
