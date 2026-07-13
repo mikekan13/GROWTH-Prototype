@@ -49,121 +49,18 @@ export const TRAIT_KV_GUARDRAILS = {
 
 // ── TKV Calculation ──
 
-import { calculateItemKV, type HeldItemForTKV } from '@/lib/kv-calculator';
+import { calculateCharacterTKV, type HeldItemForTKV } from '@/lib/kv-calculator';
 
+/**
+ * Server-authoritative TKV. Single source of truth = the browser-safe pure
+ * implementation in lib/kv-calculator, so the character sheet (which computes
+ * TKV live in the browser) and the ledger (which charges it) can NEVER
+ * disagree. The server side keeps only the crypto-bearing evaluator identity
+ * (hashEvaluator, below) and the seed/death logic. Behavior parity is locked
+ * by lib/kv-calculator.test.ts.
+ */
 export function calculateTKV(character: GrowthCharacter, heldItems: HeldItemForTKV[] = []): TKVBreakdown {
-  const attrs = character.attributes;
-
-  // Body attributes
-  const body = {
-    clout: attrs.clout.level * KV_PER_ATTRIBUTE_LEVEL,
-    celerity: attrs.celerity.level * KV_PER_ATTRIBUTE_LEVEL,
-    constitution: attrs.constitution.level * KV_PER_ATTRIBUTE_LEVEL,
-    subtotal: 0,
-  };
-  body.subtotal = body.clout + body.celerity + body.constitution;
-
-  // Spirit attributes
-  const spirit = {
-    flow: attrs.flow.level * KV_PER_ATTRIBUTE_LEVEL,
-    frequency: attrs.frequency.level * KV_PER_ATTRIBUTE_LEVEL,
-    focus: attrs.focus.level * KV_PER_ATTRIBUTE_LEVEL,
-    subtotal: 0,
-  };
-  spirit.subtotal = spirit.flow + spirit.frequency + spirit.focus;
-
-  // Soul attributes
-  const soul = {
-    willpower: attrs.willpower.level * KV_PER_ATTRIBUTE_LEVEL,
-    wisdom: attrs.wisdom.level * KV_PER_ATTRIBUTE_LEVEL,
-    wit: attrs.wit.level * KV_PER_ATTRIBUTE_LEVEL,
-    subtotal: 0,
-  };
-  soul.subtotal = soul.willpower + soul.wisdom + soul.wit;
-
-  // Skills
-  const skills = character.skills.map(s => ({
-    name: s.name,
-    kv: s.level * KV_PER_SKILL_LEVEL,
-    governors: s.governors as string[],
-  }));
-  const skillsTotal = skills.reduce((sum, s) => sum + s.kv, 0);
-
-  // Magic school skills
-  const magicSkills: Array<{ school: string; kv: number }> = [];
-  const magicPillars = [character.magic.mercy, character.magic.severity, character.magic.balance];
-  for (const pillar of magicPillars) {
-    if (pillar.skillLevels) {
-      for (const [school, level] of Object.entries(pillar.skillLevels)) {
-        if (level && level > 0) {
-          magicSkills.push({ school, kv: level * KV_PER_MAGIC_SKILL_LEVEL });
-        }
-      }
-    }
-  }
-  const magicTotal = magicSkills.reduce((sum, s) => sum + s.kv, 0);
-
-  // Body resist
-  const baseResist = character.vitals?.baseResist ?? 0;
-  const bodyResist = {
-    total: baseResist * KV_PER_BODY_RESIST,
-    rate: KV_PER_BODY_RESIST,
-  };
-
-  // Traits (Nectars/Thorns/Blossoms) — KV is metadata-stamped at creation by Godhead.
-  // We read the `kv` field if present on mechanicalEffect parse, otherwise 0.
-  const traits = character.traits.map(t => ({
-    name: t.name,
-    kv: parseTraitKV(t),
-    type: t.type,
-    deathClassification: parseDeathClassification(t),
-  }));
-  const traitsTotal = traits.reduce((sum, t) => sum + t.kv, 0);
-
-  // Held items contribute to TKV (per Mike 2026-05-13: "anything on a player sheet counts")
-  const items = heldItems.map(it => {
-    const raw = it.karmicValue;
-    const kaiValue = typeof raw === 'bigint' ? Number(raw) : (typeof raw === 'number' ? raw : null);
-    const kv = kaiValue && kaiValue > 0 ? kaiValue : calculateItemKV(it.data);
-    return { id: it.id, name: it.name, kv, type: it.type };
-  });
-  const itemsTotal = items.reduce((sum, i) => sum + i.kv, 0);
-
-  // ── Seed-contributed creation values (set by applyCreationGrants once GM applies mechanics) ──
-  // Attribute augs — 1 KRMA per aug point (positive + negative, both count toward TKV)
-  const augsTotal = Object.values(attrs).reduce((sum, a) => {
-    const pos = (a as { augmentPositive?: number })?.augmentPositive ?? 0;
-    const neg = (a as { augmentNegative?: number })?.augmentNegative ?? 0;
-    return sum + pos + neg;
-  }, 0);
-  const augs = { total: augsTotal, rate: 1 };
-
-  // Fate Die — from creation.seed.baseFateDie
-  const dieKey = character.creation?.seed?.baseFateDie;
-  const fateDieValue = dieKey ? (FATE_DIE_KV[dieKey] ?? 0) : 0;
-  const fateDie = { die: dieKey ?? '', kv: fateDieValue };
-
-  // Fated Age — ceil(years × 0.5)
-  const creationFatedAge = character.creation?.fatedAge;
-  const fatedAgeYears = creationFatedAge ?? character.fatedAge ?? 0;
-  const fatedAgeValue = fatedAgeYears > 0 ? Math.ceil(fatedAgeYears * 0.5) : 0;
-  const fatedAge = { years: fatedAgeYears, kv: fatedAgeValue };
-
-  const total = body.subtotal + spirit.subtotal + soul.subtotal
-    + skillsTotal + magicTotal + bodyResist.total + traitsTotal + itemsTotal
-    + augsTotal + fateDieValue + fatedAgeValue;
-
-  return {
-    version: EVALUATOR_VERSION,
-    total,
-    body, spirit, soul,
-    skills, skillsTotal,
-    magicSkills, magicTotal,
-    bodyResist,
-    traits, traitsTotal,
-    items, itemsTotal,
-    augs, fateDie, fatedAge,
-  };
+  return calculateCharacterTKV(character, heldItems);
 }
 
 // ── Seed KV Calculation ──
@@ -541,23 +438,4 @@ export function splitSkillShares(total: number, governors: string[]): SkillGover
     }
     return { governor: governors[i], pillar, share, toGM, kept };
   });
-}
-
-/** Extract KV from a trait. Traits get KV stamped by Godhead at creation (stored in mechanicalEffect or a future kv field). */
-function parseTraitKV(trait: { mechanicalEffect?: string }): number {
-  // Look for a KV annotation in mechanicalEffect like "KV:5" or "[5 KV]"
-  if (!trait.mechanicalEffect) return 0;
-  const match = trait.mechanicalEffect.match(/(?:KV[:\s]*|^\[?\s*)(\d+)\s*(?:KV\]?)?/i);
-  return match ? parseInt(match[1], 10) : 0;
-}
-
-/** Extract death classification from trait metadata */
-function parseDeathClassification(trait: { mechanicalEffect?: string; type: string }): 'kept' | 'destroyed' {
-  // Look for death classification annotation: "death:kept" or "death:destroyed"
-  if (trait.mechanicalEffect) {
-    if (/death:\s*kept/i.test(trait.mechanicalEffect)) return 'kept';
-    if (/death:\s*destroyed/i.test(trait.mechanicalEffect)) return 'destroyed';
-  }
-  // Default: nectars are destroyed, thorns are kept (thorns represent scars/lessons)
-  return trait.type === 'thorn' ? 'kept' : 'destroyed';
 }
