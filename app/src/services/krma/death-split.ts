@@ -9,7 +9,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { executeBatch, type CreateTransactionInput } from './ledger';
 import { getWalletByOwner, getWalletByCampaign, getWalletByCharacter, getSystemWallet } from './wallet';
-import { calculateTKV, calculateDeathSplit, hashEvaluator } from './evaluator';
+import { calculateTKV, calculateDeathSplit, hashEvaluator, splitSkillShares } from './evaluator';
 import { emit as emitGodHeadEvent } from '../godhead-dispatcher';
 import type { GrowthCharacter } from '@/types/growth';
 import type { TransactionRecord, DeathSplitManifest } from '@/types/krma';
@@ -219,7 +219,8 @@ function transformCharacterToGhost(character: GrowthCharacter): GrowthCharacter 
     for (const a of SOUL_ATTRS) {
       const attr = c.attributes[a];
       if (attr && (attr.level ?? 0) > 0) {
-        const newLevel = Math.floor((attr.level ?? 0) / 2);
+        // GM reclaims floor(½); the ghost keeps the MAJORITY (ceil ½).
+        const newLevel = Math.ceil((attr.level ?? 0) / 2);
         attr.level = newLevel;
         if ((attr.current ?? 0) > newLevel) attr.current = newLevel;
       }
@@ -229,29 +230,28 @@ function transformCharacterToGhost(character: GrowthCharacter): GrowthCharacter 
     }
   }
 
-  // Skills — drop body, halve soul, keep spirit
-  const BODY_GOV = new Set(['clout', 'celerity', 'constitution']);
-  const SOUL_GOV = new Set(['willpower', 'wisdom', 'wit']);
+  // Skills — the ghost keeps the sum of the per-governor "kept" shares
+  // (splitSkillShares, the same function that drives the KRMA split, so the two
+  // can't drift). Body shares contribute 0, soul shares keep the majority,
+  // spirit shares keep all. A skill whose kept level is 0 (pure-body) is dropped.
   if (Array.isArray(c.skills)) {
-    c.skills = c.skills.filter(s => {
-      const govs = (s.governors as string[]) ?? [];
-      const hasBody = govs.some(g => BODY_GOV.has(g));
-      if (hasBody) return false;
-      return true;
-    }).map(s => {
-      const govs = (s.governors as string[]) ?? [];
-      const hasSoul = govs.some(g => SOUL_GOV.has(g));
-      if (hasSoul) {
-        return { ...s, level: Math.floor((s.level ?? 0) / 2) };
-      }
-      return s;
-    });
+    c.skills = c.skills
+      .map(s => {
+        const govs = (s.governors as string[]) ?? [];
+        const level = s.level ?? 0;
+        const keptLevel = splitSkillShares(level, govs).reduce((sum, sh) => sum + sh.kept, 0);
+        return { skill: s, keptLevel };
+      })
+      .filter(({ keptLevel }) => keptLevel > 0)
+      .map(({ skill, keptLevel }) => ({ ...skill, level: keptLevel }));
   }
 
-  // Traits — drop body-pillared; keep spirit + soul (the KRMA half-strip is
-  // handled at the ledger; the trait itself remains as identity).
+  // Traits — blossoms vanish on death (their KRMA returns to the bestowing
+  // Godhead); body-pillared traits are stripped; spirit + soul traits stay as
+  // identity (the KRMA half-strip for soul is handled at the ledger).
   if (Array.isArray(c.traits)) {
     c.traits = c.traits.filter(t => {
+      if ((t as { type?: string }).type === 'blossom') return false;
       const pillar = (t as { pillar?: 'body' | 'spirit' | 'soul' }).pillar ?? 'spirit';
       return pillar !== 'body';
     });

@@ -293,7 +293,9 @@ export function calculateDeathSplit(character: GrowthCharacter, tkv: TKVBreakdow
     }
   }
 
-  // Soul attributes → halved, the lost half → Lady Death; remaining half stays on character
+  // Soul attributes → halved: floor(½) stripped to the GM, the MAJORITY (ceil ½)
+  // stays on the ghost's Spirit package (corrected canon 2026-07-13 — Lady Death
+  // takes ONLY Frequency; the soul half goes to the GM like body does).
   for (const attr of SOUL_ATTRIBUTES) {
     const kv = tkv.soul[attr];
     if (kv > 0) {
@@ -303,17 +305,17 @@ export function calculateDeathSplit(character: GrowthCharacter, tkv: TKVBreakdow
         components.push({
           source: `attribute:${attr}`,
           kv: lost,
-          destination: 'lady_death',
-          reason: `Soul attribute → half stripped to Lady Death`,
+          destination: 'campaign',
+          reason: `Soul attribute → half stripped to GM`,
         });
-        toLadyDeath += lost;
+        toCampaign += lost;
       }
       if (kept > 0) {
         components.push({
           source: `attribute:${attr}`,
           kv: kept,
           destination: 'kept',
-          reason: `Soul attribute → half retained on ghost`,
+          reason: `Soul attribute → majority retained on ghost`,
         });
       }
     }
@@ -372,6 +374,11 @@ export function calculateDeathSplit(character: GrowthCharacter, tkv: TKVBreakdow
   // Legacy un-tagged traits default to spirit (the safe-kept bucket).
   for (const trait of tkv.traits) {
     if (trait.kv === 0) continue;
+    // Blossoms are temporary Godhead-bestowed buffs — on death they simply
+    // vanish and their KRMA returns to the Godhead who bestowed them (canon
+    // 2026-07-13). They never route to GM/Lady Death/ghost. (The actual
+    // return-to-Godhead transfer is execution-side — see death-split memory.)
+    if (trait.type === 'blossom') continue;
     const pillar = (trait as { pillar?: 'body' | 'spirit' | 'soul' }).pillar ?? 'spirit';
     if (pillar === 'body') {
       components.push({
@@ -382,23 +389,24 @@ export function calculateDeathSplit(character: GrowthCharacter, tkv: TKVBreakdow
       });
       toCampaign += trait.kv;
     } else if (pillar === 'soul') {
+      // Soul → floor(½) to GM, majority retained (corrected 2026-07-13; was Lady Death).
       const lost = Math.floor(trait.kv / 2);
       const kept = trait.kv - lost;
       if (lost > 0) {
         components.push({
           source: `trait:${trait.name}`,
           kv: lost,
-          destination: 'lady_death',
-          reason: `${trait.type} (soul) → half to Lady Death`,
+          destination: 'campaign',
+          reason: `${trait.type} (soul) → half to GM`,
         });
-        toLadyDeath += lost;
+        toCampaign += lost;
       }
       if (kept > 0) {
         components.push({
           source: `trait:${trait.name}`,
           kv: kept,
           destination: 'kept',
-          reason: `${trait.type} (soul) → half retained on ghost`,
+          reason: `${trait.type} (soul) → majority retained on ghost`,
         });
       }
     } else {
@@ -448,69 +456,91 @@ function calculateSkillSplit(
   kv: number,
   governors: string[],
 ): { toCampaign: number; toLadyDeath: number; components: DeathSplitComponent[] } {
-  if (kv === 0 || governors.length === 0) {
+  const shares = splitSkillShares(kv, governors);
+  if (shares.length === 0) {
     return { toCampaign: 0, toLadyDeath: 0, components: [] };
   }
-
-  const pillars = governors.map(g => getAttributePillar(g));
-  const hasBody = pillars.includes('body');
-  const hasSoul = pillars.includes('soul');
-  const hasSpirit = pillars.includes('spirit');
-
-  // Body presence ⇒ strip entirely. Body wins on mixed governors (per canon —
-  // body is the most aggressive rule, applied first).
-  if (hasBody) {
-    return {
-      toCampaign: kv,
-      toLadyDeath: 0,
-      components: [{
-        source: `skill:${name}`,
-        kv,
+  let toCampaign = 0;
+  const components: DeathSplitComponent[] = [];
+  for (const s of shares) {
+    if (s.toGM > 0) {
+      toCampaign += s.toGM;
+      components.push({
+        source: `skill:${name}:${s.governor}`,
+        kv: s.toGM,
         destination: 'campaign',
-        reason: 'Body-governed skill → stripped to GM',
-      }],
-    };
-  }
-
-  // Soul presence (no body) ⇒ halve to Lady Death, retain rest.
-  if (hasSoul) {
-    const lost = Math.floor(kv / 2);
-    const kept = kv - lost;
-    const comps: DeathSplitComponent[] = [];
-    if (lost > 0) {
-      comps.push({ source: `skill:${name}`, kv: lost, destination: 'lady_death', reason: 'Soul-governed skill → half to Lady Death' });
+        reason: `${s.pillar}-governed skill share → to GM`,
+      });
     }
-    if (kept > 0) {
-      comps.push({ source: `skill:${name}`, kv: kept, destination: 'kept', reason: 'Soul-governed skill → half retained on ghost' });
-    }
-    return { toCampaign: 0, toLadyDeath: lost, components: comps };
-  }
-
-  // Pure Spirit governance ⇒ kept on ghost.
-  if (hasSpirit) {
-    return {
-      toCampaign: 0,
-      toLadyDeath: 0,
-      components: [{
-        source: `skill:${name}`,
-        kv,
+    if (s.kept > 0) {
+      components.push({
+        source: `skill:${name}:${s.governor}`,
+        kv: s.kept,
         destination: 'kept',
-        reason: 'Spirit-governed skill → retained on ghost',
-      }],
-    };
+        reason: `${s.pillar}-governed skill share → retained on ghost`,
+      });
+    }
+  }
+  // Skills never route to Lady Death — she takes only Frequency (canon 2026-07-13).
+  return { toCampaign, toLadyDeath: 0, components };
+}
+
+// ── Per-governor skill share split (corrected canon 2026-07-13) ──
+//
+// A skill's value/levels divide evenly across its governors; each share then
+// follows its governor's pillar rule:
+//   • Body   → 100% to GM
+//   • Soul   → floor(½) to GM, the majority (ceil ½) retained on the ghost
+//   • Spirit → 100% retained on the ghost
+// Uneven division favors the Spirit package: extra unit(s) go to the governor
+// that retains the most (spirit > soul > body). Because KV_PER_SKILL_LEVEL = 1,
+// `total` is interchangeably KV or levels for non-magic skills — so both the
+// KRMA split (here) and the ghost's resulting skill level
+// (transformCharacterToGhost) derive from this one function and cannot drift.
+
+export interface SkillGovernorShare {
+  governor: string;
+  pillar: 'body' | 'soul' | 'spirit' | 'unknown';
+  share: number;
+  toGM: number;
+  kept: number;
+}
+
+export function splitSkillShares(total: number, governors: string[]): SkillGovernorShare[] {
+  if (total <= 0 || governors.length === 0) return [];
+  const n = governors.length;
+  const pillars: SkillGovernorShare['pillar'][] = governors.map(g => {
+    const p = getAttributePillar(g);
+    return p === 'body' || p === 'soul' || p === 'spirit' ? p : 'unknown';
+  });
+
+  const base = Math.floor(total / n);
+  let remainder = total - base * n;
+  const shares = pillars.map(() => base);
+  // Extra unit(s) go to the highest-retention governor (spirit > soul > body/unknown).
+  const retentionRank = (p: SkillGovernorShare['pillar']) =>
+    p === 'spirit' ? 3 : p === 'soul' ? 2 : p === 'unknown' ? 1 : 0;
+  const order = pillars.map((_, i) => i).sort((a, b) => retentionRank(pillars[b]) - retentionRank(pillars[a]));
+  for (const idx of order) {
+    if (remainder <= 0) break;
+    shares[idx] += 1;
+    remainder -= 1;
   }
 
-  // Unknown governor (shouldn't happen) — keep, log via reason.
-  return {
-    toCampaign: 0,
-    toLadyDeath: 0,
-    components: [{
-      source: `skill:${name}`,
-      kv,
-      destination: 'kept',
-      reason: 'Unclassified skill governor — retained by default',
-    }],
-  };
+  return pillars.map((pillar, i) => {
+    const share = shares[i];
+    let toGM = 0;
+    let kept = 0;
+    if (pillar === 'body') {
+      toGM = share;
+    } else if (pillar === 'soul') {
+      toGM = Math.floor(share / 2);
+      kept = share - toGM;
+    } else {
+      kept = share; // spirit or unknown → retained on the ghost
+    }
+    return { governor: governors[i], pillar, share, toGM, kept };
+  });
 }
 
 /** Extract KV from a trait. Traits get KV stamped by Godhead at creation (stored in mechanicalEffect or a future kv field). */

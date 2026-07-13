@@ -107,15 +107,15 @@
 
 - **[INV-35] On death: Body attrs (Clout/Celerity/Constitution) → level/current/augments = 0; their KRMA value transfers to GM/campaign wallet.** — Body is a physical substrate; ghosts lack it. — source: MEM_death_engine
 
-- **[INV-36] On death: Soul attrs (Willpower/Wisdom/Wit) → halved (floor); lost-half KRMA → Lady Death; kept-half stays on character.** — Partial soul persistence is the canonical ghost condition. — source: MEM_death_engine
+- **[INV-36 CORRECTED 2026-07-13] On death: Soul attrs (Willpower/Wisdom/Wit) → halved; floor(½) KRMA → GM; the MAJORITY (ceil ½) stays on the character.** — Was "lost-half → Lady Death" — WRONG; Lady Death takes ONLY Frequency (INV-37). — source: [[death-split-corrected-2026-07-13]], MEM_death_engine
 
 - **[INV-37] On death: Frequency → level/current = 0; full KRMA value of max-Freq capacity → Lady Death. Ghost has no Frequency capacity.** — Lady Death's wallet grows via character death — this is the economy's primary sink routing. — source: MEM_death_engine
 
 - **[INV-38] On death: Spirit Flow + Focus remain untouched on the ghost.** — Spirit is the ghost's surviving nature. — source: MEM_death_engine
 
-- **[INV-39] On death: Skills with any Body governor → removed (KRMA to GM). Soul-only skills → halved. Pure-Spirit skills → untouched. Magic (Spirit) skills → kept.** — Consistent with attribute stripping rules per pillar. — source: MEM_death_engine
+- **[INV-39 CORRECTED 2026-07-13] On death: skills split PER-GOVERNOR — levels divide evenly across a skill's governors, each share by pillar (Body→GM, Soul→floor½ GM / majority kept, Spirit→kept); uneven division favors the Spirit package.** — A mixed body+soul skill is NOT fully removed — only the body share strips (e.g. lvl-14 Clout+Wisdom → GM 10, skill lands at 4). `splitSkillShares` drives both the KRMA split and the ghost level. — source: [[death-split-corrected-2026-07-13]], MEM_death_engine
 
-- **[INV-40] On death: Traits are split by their `pillar` field — Body trait → stripped/KRMA to GM; Soul trait → kept, half KRMA to Lady Death; Spirit trait → kept fully. Legacy untagged traits default to Spirit.** — The trait `pillar` field is load-bearing for the death engine; missing it causes wrong KRMA routing. — source: MEM_trait_pillar, MEM_death_engine
+- **[INV-40 CORRECTED 2026-07-13] On death: Traits split by their `pillar` field — Body trait → stripped/KRMA to GM; Soul trait → kept, half KRMA to GM (was Lady Death); Spirit trait → kept fully. Blossoms vanish (KRMA → bestowing Godhead). Legacy untagged traits default to Spirit.** — The trait `pillar` field is load-bearing for the death engine; missing it causes wrong KRMA routing. — source: [[death-split-corrected-2026-07-13]], MEM_trait_pillar, MEM_death_engine
 
 - **[INV-41] Every trait MUST carry a `pillar` field. Untagged traits default to Spirit but the tag should be set explicitly.** — Without the tag the death-split is ambiguous. — source: MEM_trait_pillar
 
