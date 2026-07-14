@@ -1,10 +1,11 @@
 /**
  * JEWL mistake bounty — GM-only flag endpoint.
  *
- * POST a CopilotMessage id + severity. The service debits JEWL's wallet,
- * credits the GM's wallet, persists a JewlMistake row, returns 201.
+ * POST a CopilotMessage id + severity. The service records a JewlMistake claim
+ * (no KRMA moves yet — transfer-on-acceptance, T19) and fires a GM_MISTAKE_FLAG
+ * prompt so JEWL can acknowledge (pays) or dispute (→ Et'herling). Returns 201.
  *
- * Phase 1: GM flags directly; no UI; no resolution loop. See
+ * GET lists the campaign's flags with their resolution lifecycle. See
  * [[jewl-is-the-interface-2026-06-15]] for the full design.
  */
 
@@ -53,6 +54,7 @@ export async function POST(
         bountyAmount: record.bountyAmount.toString(),
         transactionId: record.transactionId,
         status: record.status,
+        resolution: record.resolution,
         createdAt: record.createdAt.toISOString(),
       },
       { status: 201 },
@@ -83,6 +85,7 @@ export async function GET(
         bountyAmount: r.bountyAmount.toString(),
         transactionId: r.transactionId,
         status: r.status,
+        resolution: r.resolution,
         createdAt: r.createdAt.toISOString(),
       })),
     });

@@ -305,12 +305,14 @@ ADMIN-tunable economy constants. Key-value store; service layer falls back to co
 - `updatedBy`: String? — ADMIN userId of last edit
 
 ### JewlMistake
-GM mistake-bounty flagging corpus. When a GM flags a JEWL CopilotMessage as wrong, KRMA transfers from JEWL's wallet to GM's wallet.
+GM mistake-bounty flagging corpus. A GM flags a JEWL CopilotMessage as wrong; the flag is a CLAIM — no KRMA moves until resolved (transfer-on-acceptance, T19). JEWL acknowledges (bounty pays JEWL→GM) or disputes (Et'herling adjudicates: upheld pays, overturned pays nothing).
 - `copilotMessageId` + `gmUserId`: unique pair (same GM can't double-flag)
-- `severity`: minor | major | critical
-- `bountyAmount`: BigInt — cached KRMA payout (KrmaTransaction is source of truth)
-- `transactionId`: String — pointer to the KrmaTransaction
-- `status`: flagged (Phase 2 will add acknowledged/disputed/resolved)
+- `severity`: minor | major | critical (amount resolved from EconomyConfig `mistakeBounty` at flag time)
+- `bountyAmount`: BigInt — PENDING payout locked at flag time
+- `transactionId`: String? — KrmaTransaction pointer; NULL until the bounty actually pays (accepted / dispute upheld)
+- `status`: flagged → acknowledged | disputed → resolved
+- `resolution`: String? — accepted | upheld | overturned (null while flagged/disputed)
+- `adjudicationInvocationId`: String? — GodHeadInvocation id of the Et'herling ruling (dispute path)
 - Indexes: (campaignId, createdAt), (gmUserId, createdAt), (sessionId)
 
 ### Goal

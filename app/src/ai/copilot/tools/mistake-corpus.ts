@@ -26,8 +26,8 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { NotFoundError, ValidationError } from '@/lib/errors';
 import { registerJewlTool } from './registry';
+import { acceptMistake, disputeMistake } from '@/services/jewl-mistake';
 import type { JewlTool, JewlToolHandlerResult, JewlToolContext } from './types';
 
 // ── update_mistake_status ──
@@ -42,60 +42,43 @@ const updateMistakeStatusSchema = z.object({
 export const updateMistakeStatusTool: JewlTool = {
   name: 'update_mistake_status',
   description:
-    'After a GM_MISTAKE_FLAG prompt, formally record your judgment on the ' +
-    'flag. Status "acknowledged" = you agree you were wrong; "disputed" = ' +
-    'you push back. Response is your reasoning (one or two short sentences). ' +
-    'Call this ONCE per flag, AFTER you have replied in the chip. The mistake ' +
-    'row must currently be "flagged" — re-marking is intentionally blocked so ' +
-    'the audit trail stays clean.',
+    'After a GM_MISTAKE_FLAG prompt, resolve the flag. "acknowledged" = you ' +
+    'own it: the pending bounty pays from your wallet to the GM. "disputed" = ' +
+    'you push back: Et\'erling adjudicates and either upholds (bounty pays) or ' +
+    'overturns (nothing moves). Response is your reasoning (one or two short ' +
+    'sentences). Call this ONCE per flag, AFTER you have replied in the chip. ' +
+    'The row must currently be "flagged" — re-marking is blocked so the audit ' +
+    'trail stays clean.',
   inputSchema: updateMistakeStatusSchema,
   handler: async (input, ctx: JewlToolContext): Promise<JewlToolHandlerResult> => {
     const parsed = updateMistakeStatusSchema.parse(input);
-    const row = await prisma.jewlMistake.findUnique({
-      where: { id: parsed.mistakeId },
-      select: { id: true, campaignId: true, status: true },
-    });
-    if (!row) throw new NotFoundError('Mistake not found');
-    if (row.campaignId !== ctx.campaignId) {
-      throw new ValidationError('Mistake does not belong to this campaign');
-    }
-    if (row.status !== 'flagged') {
-      throw new ValidationError(
-        `Mistake status is "${row.status}"; only "flagged" rows can be resolved`,
-      );
-    }
 
-    const updated = await prisma.jewlMistake.update({
-      where: { id: parsed.mistakeId },
-      data: {
-        status: parsed.status,
-        // Append response into the note field with a clear marker so the
-        // existing display logic keeps working. Phase 4 can split this
-        // into its own column if the UX wants distinct GM-note vs
-        // JEWL-response panels.
-        note: appendJewlResponse(row, parsed.response, parsed.status),
-      },
-    });
+    // Both paths validate (exists, this-campaign, still 'flagged') in the
+    // service; acceptance moves KRMA, dispute invokes Et'herling.
+    const record =
+      parsed.status === 'acknowledged'
+        ? await acceptMistake({
+            mistakeId: parsed.mistakeId,
+            response: parsed.response,
+            campaignId: ctx.campaignId,
+          })
+        : await disputeMistake({
+            mistakeId: parsed.mistakeId,
+            response: parsed.response,
+            campaignId: ctx.campaignId,
+          });
 
     return {
       output: {
-        mistakeId: updated.id,
-        newStatus: updated.status,
+        mistakeId: record.id,
+        newStatus: record.status,
+        resolution: record.resolution,
+        bountyPaidKrma: record.transactionId ? record.bountyAmount.toString() : '0',
         response: parsed.response,
       },
     };
   },
 };
-
-function appendJewlResponse(
-  row: { id: string },
-  response: string,
-  status: 'acknowledged' | 'disputed',
-): string {
-  void row; // avoid unused-arg lint
-  const marker = status === 'acknowledged' ? 'JEWL acknowledged' : 'JEWL disputes';
-  return `${marker}: ${response}`;
-}
 
 // ── query_mistake_corpus ──
 

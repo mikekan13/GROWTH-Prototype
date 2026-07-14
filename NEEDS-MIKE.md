@@ -95,6 +95,11 @@ Nothing currently blocks coding work on the resolved items.
 ### Economy design confirm (added 2026-07-13, T15):
 - **Payout-report basis definition — confirm.** Built the payout-report service (`services/krma/payout-report.ts`, INV-114): each GM steward's payout basis = Σ over their campaigns of (fluid liquid + crystallized locked), via the existing `getCampaignEconomy`. Test 7/7 (shares sum to 100%, JEWL + `__PRIME__` excluded per INV-70). **Two choices I made — veto if wrong:** (1) the basis is the GM's IN-WORLD KRMA (campaign fluid+crystallized) and does NOT include their UNDEPLOYED user-wallet drip balance — INV-114 frames it as "how much of their KRMA is deployed in their world," but if undeployed drip should count toward payout it's a one-line add; (2) `__PRIME__` is excluded (control room, not a booth). **Deferred (UI):** the GM-facing utilization widget ("Your KRMA: X total / Y liquid / Z deployed") — unverifiable overnight with Playwright MCP down; the data (`getCampaignEconomy`) + report service are ready for it.
 
+### T19 mistake-dispute loop (added 2026-07-14):
+- ✅ RULED 2026-07-14 — **transfer-on-acceptance** (you picked it over transfer-on-flag). Built: flag records a claim (no KRMA); JEWL `acknowledged` pays the bounty JEWL→GM; JEWL `disputed` invokes **Et'herling** (`rule_jewl_mistake` godhead tool) who rules `upheld` (pays) or `overturned` (nothing). Amounts now live in EconomyConfig `mistakeBounty` (10/100/1000 default, ADMIN-tunable). Rollback flag `MISTAKE_BOUNTY_ENABLED`. `scripts/test-jewl-mistake.ts` 24/24, npm test 28, build green.
+- **Needs a live real-API smoke (like T32's golden path):** the deterministic test drives the `rule_jewl_mistake` tool directly. The full `disputeMistake → Eth'erling LLM invocation → she calls the tool` path builds + is wired, but a real Anthropic call in a dev campaign hasn't been run to confirm she actually reaches for the tool. Recommend one supervised dispute in the Prime campaign when you're next present.
+- **Guesstimate to confirm:** bounty amounts (10/100/1000 KRMA by severity). Trivial vs JEWL's 1B wallet by design; tune from the corpus later.
+
 ### Dev environment (added 2026-07-10, T08):
 - **whisper-server won't start via /boot** — `start.bat` not found (`logs/whisper.err.log`). Pre-existing; dev server itself fine. Say the word and I'll fix the launcher path.
 

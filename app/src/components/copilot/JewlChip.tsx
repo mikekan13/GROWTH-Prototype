@@ -27,6 +27,16 @@ import { usePathname } from 'next/navigation';
 const REVEAL_JEWL = process.env.NEXT_PUBLIC_REVEAL_JEWL === 'true';
 const COPILOT_LABEL = REVEAL_JEWL ? 'JEWL' : 'Copilot';
 
+/**
+ * Collapse a mistake row's (status, resolution) into the single string the
+ * badge renders. A 'resolved' row carries its adjudicated outcome so the GM
+ * sees whether their bounty was upheld or overturned by Et'herling.
+ */
+function badgeKey(status: string, resolution?: string | null): string {
+  if (status === 'resolved' && resolution) return `resolved:${resolution}`;
+  return status;
+}
+
 interface CopilotMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -223,12 +233,13 @@ export function JewlChip() {
           gmUserId: string;
           copilotMessageId: string;
           status: string;
+          resolution?: string | null;
         }>) {
           if (myId && m.gmUserId !== myId) continue;
           // If multiple rows exist (shouldn't, but just in case), prefer the
           // latest non-flagged status. JSON arrives newest-first.
           if (!next.has(m.copilotMessageId)) {
-            next.set(m.copilotMessageId, m.status);
+            next.set(m.copilotMessageId, badgeKey(m.status, m.resolution));
           }
         }
         setFlagStatusById(next);
@@ -269,10 +280,11 @@ export function JewlChip() {
             gmUserId: string;
             copilotMessageId: string;
             status: string;
+            resolution?: string | null;
           }>) {
             if (myId && m.gmUserId !== myId) continue;
             if (!next.has(m.copilotMessageId)) {
-              next.set(m.copilotMessageId, m.status);
+              next.set(m.copilotMessageId, badgeKey(m.status, m.resolution));
             }
           }
           setFlagStatusById(next);
@@ -1036,14 +1048,21 @@ export function JewlChip() {
                         >
                           {flagStatusById.has(m.id) ? (
                             (() => {
-                              const status = flagStatusById.get(m.id)!;
+                              const [status, resolution] = flagStatusById.get(m.id)!.split(':');
                               const label =
                                 status === 'acknowledged' ? '✓ owned'
                                 : status === 'disputed' ? '⚡ disputed'
+                                : status === 'resolved'
+                                  ? (resolution === 'upheld' ? '⚖ upheld'
+                                    : resolution === 'overturned' ? '⚖ overturned'
+                                    : '⚖ resolved')
                                 : '⚐ flagged';
                               const color =
                                 status === 'acknowledged' ? 'rgba(34, 171, 148, 0.85)'
                                 : status === 'disputed' ? 'rgba(208, 160, 48, 0.85)'
+                                : status === 'resolved'
+                                  ? (resolution === 'upheld' ? 'rgba(34, 171, 148, 0.85)'
+                                    : 'rgba(255,255,255,0.4)')
                                 : 'rgba(231, 76, 60, 0.75)';
                               return (
                                 <span
@@ -1054,9 +1073,13 @@ export function JewlChip() {
                                     textTransform: 'uppercase',
                                   }}
                                   title={
-                                    status === 'acknowledged' ? 'JEWL acknowledged the mistake'
-                                    : status === 'disputed' ? 'JEWL disputes the flag'
-                                    : 'Flagged — JEWL has not responded yet'
+                                    status === 'acknowledged' ? 'JEWL acknowledged the mistake — bounty paid'
+                                    : status === 'disputed' ? 'JEWL disputes the flag — Et\'erling adjudicating'
+                                    : status === 'resolved'
+                                      ? (resolution === 'upheld' ? 'Et\'erling upheld the flag — bounty paid'
+                                        : resolution === 'overturned' ? 'Et\'erling overturned the flag — no bounty'
+                                        : 'Adjudicated by Et\'erling')
+                                    : 'Flagged — bounty pending JEWL\'s response'
                                   }
                                 >
                                   {label}

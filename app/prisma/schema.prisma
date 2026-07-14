@@ -770,13 +770,22 @@ model JewlMistake {
   sessionId        String?
   severity         String   // minor | major | critical
   note             String   @default("")
-  // KRMA paid out by this flag (cached for convenience; KrmaTransaction is source of truth).
+  // PENDING bounty (resolved from EconomyConfig at flag time). No KRMA moves on
+  // flag — the transfer fires on acceptance or an upheld dispute (T19, INV-121).
   bountyAmount     BigInt
-  // Pointer to the KrmaTransaction row that moved the KRMA.
-  transactionId    String
-  // Resolution lifecycle — flagged immediately on creation; Phase 2 adds
-  // 'acknowledged' / 'disputed' / 'resolved' once JEWL writes back.
+  // Pointer to the KrmaTransaction that moved the KRMA. NULL until the bounty
+  // actually pays (accepted, or dispute upheld). Overturned disputes never pay.
+  transactionId    String?
+  // Resolution lifecycle (T19):
+  //   flagged      — GM raised the claim; no KRMA has moved yet.
+  //   acknowledged — JEWL owned it → bounty paid (terminal).
+  //   disputed     — JEWL pushed back → routed to Et'herling to adjudicate.
+  //   resolved     — Et'herling ruled; see `resolution` for the outcome (terminal).
   status           String   @default("flagged")
+  // Adjudicated outcome: accepted | upheld | overturned. Null while flagged/disputed.
+  resolution       String?
+  // GodHeadInvocation id for the Et'herling adjudication (dispute path only).
+  adjudicationInvocationId String?
   createdAt        DateTime @default(now())
 
   @@unique([copilotMessageId, gmUserId])

@@ -51,7 +51,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | GodHeadDispatcher | `services/godhead-dispatcher.ts` | Event bus for godhead invocations. Services emit named events (goal.completed, blueprint.published, etc.); dispatcher consults routing table and triggers godhead agent runs | godhead agent, Prisma, GODHEAD_DISPATCHER env flag |
 | HistoryService | `services/history.ts` | Writes and queries HistoryEntry rows — per-canvas-object perspective-based history timestamped in meta cycles. One event → N perspective entries sharing eventGroupId | Prisma |
 | InventoryService | `services/inventory.ts` | T26 3-tier inventory: regions derived from body tree (INV-55), equip/unequip with layer caps (INV-52), Clout×10 encumbrance (INV-48), buildWornLayers for damage routing | Prisma, body-tree, body-damage, material, possession |
-| JewlMistakeService | `services/jewl-mistake.ts` | GM flags a JEWL CopilotMessage as wrong → KRMA bounty transfers from JEWL wallet to GM wallet → corpus row created for future training | ledger, wallet, Prisma |
+| JewlMistakeService | `services/jewl-mistake.ts` | GM flags a JEWL CopilotMessage as wrong (records a claim, NO payout). JEWL resolves via `acceptMistake` (bounty pays JEWL→GM) or `disputeMistake` (invokes Et'herling to adjudicate). `payMistakeBounty` = single transfer path. Feature-flag `MISTAKE_BOUNTY_ENABLED`; amounts from EconomyConfig `mistakeBounty` | ledger, wallet, economy-config, godhead/agent, Prisma |
 | NectarBestowService | `services/nectar-bestowal.ts` | T32 golden path landing half: GM confirms a godhead's structured Nectar proposal → trait lands on character with rollModifiers, KRMA transfers Kai→character (GROVINE_NECTAR) | ledger, ForgeService, Prisma |
 | PossessionService | `services/possession.ts` | Reads/writes owns EntityRelationship rows linking a character to entities they possess (locations, items, goals, etc.) | Prisma |
 | SessionRewardService | `services/session-reward.ts` | ADMIN-triggered session-end KRMA rewards distributed to participating characters | ledger, Prisma, permissions |
@@ -211,6 +211,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | read-my-wallet / read-wallet | `godhead/tools/read-*-wallet.ts` | Wallet balance reads |
 | release-goal | `godhead/tools/release-goal.ts` | Remove custodianId from a goal |
 | route-to-godhead | `godhead/tools/route-to-godhead.ts` | Et'herling routing tool: maps event to target godhead by name/alias, dispatches invocation |
+| rule-jewl-mistake | `godhead/tools/rule-jewl-mistake.ts` | Et'herling adjudicates a disputed JEWL mistake flag: `upheld` pays the bounty (JEWL→GM via payMistakeBounty), `overturned` pays nothing; row → resolved (T19) |
 | search-blueprints | `godhead/tools/search-blueprints.ts` | Search ForgeItem catalog by name/type/tags |
 | send-message-to-gm | `godhead/tools/send-message-to-gm.ts` | Write a GodHeadMessage (GODHEAD_TO_GM direction) |
 | transfer-krma | `godhead/tools/transfer-krma.ts` | Executes a KRMA transfer through the ledger (godhead as actor) |
