@@ -134,6 +134,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [heldItems, setHeldItems] = useState<HeldItemData[]>([]);
+  // T28 — member-stage backstory submission (player → Watcher approval signal).
+  const [backstorySubmitted, setBackstorySubmitted] = useState(false);
+  const [submittingBackstory, setSubmittingBackstory] = useState(false);
 
   const selectedSeed = useMemo(
     () => campaignSeeds.find(s => s.name === selectedSeedName),
@@ -257,6 +260,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
       fetch(`/api/campaigns/${campaignId}/members/me`)
         .then(r => r.json())
         .then(data => {
+          if (data.member) {
+            setBackstorySubmitted(!!data.member.backstorySubmitted);
+          }
           if (data.member?.characterDesc) {
             try {
               const desc: CharacterDescData = JSON.parse(data.member.characterDesc);
@@ -1115,41 +1121,65 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             </button>
             <button
               onClick={async () => {
-                if (!characterName || !backstoryText) return;
+                if (!characterName || !backstoryText || submittingBackstory) return;
                 // Save current draft first so the Watcher sees the latest.
                 await save();
-                // Transition character status to SUBMITTED. For non-character
-                // (member-stage) flows this is a no-op — the watcher already
-                // sees the characterDesc via the member endpoint.
                 if (effectiveCharacter?.id) {
+                  // Existing character: transition its status to SUBMITTED.
                   try {
                     await fetch(`/api/characters/${effectiveCharacter.id}`, {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ status: 'SUBMITTED' }),
                     });
+                    setBackstorySubmitted(true);
                   } catch (err) {
                     console.error('Submit failed:', err);
                   }
+                  return;
+                }
+                // Member-stage (no character yet): signal the Watcher that the
+                // backstory is ready for approval (T28). The GM builds the sheet
+                // WITH the player after approving — the player never self-advances.
+                setSubmittingBackstory(true);
+                try {
+                  const res = await fetch(`/api/campaigns/${campaignId}/members/me`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ submit: true }),
+                  });
+                  if (res.ok) {
+                    setBackstorySubmitted(true);
+                  } else {
+                    const d = await res.json().catch(() => ({}));
+                    alert(d.error || 'Failed to submit to your Watcher.');
+                  }
+                } finally {
+                  setSubmittingBackstory(false);
                 }
               }}
-              disabled={!characterName || !backstoryText}
+              disabled={!characterName || !backstoryText || submittingBackstory}
               className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 backgroundColor: characterName && backstoryText ? '#582a72' : '#333',
                 color: characterName && backstoryText ? '#fff' : '#555',
                 border: '1px solid rgba(88, 42, 114, 0.4)',
-                borderRadius: '2px', cursor: characterName && backstoryText ? 'pointer' : 'default',
+                borderRadius: '2px', cursor: characterName && backstoryText && !submittingBackstory ? 'pointer' : 'default',
               }}
             >
-              Submit to Watcher
+              {submittingBackstory ? 'Submitting...' : backstorySubmitted ? 'Re-submit to Watcher' : 'Submit to Watcher'}
             </button>
             {lastSaved && !dirty && (
               <span className="text-xs" style={{ color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 Last saved {lastSaved}
               </span>
             )}
+          </div>
+        )}
+        {isEditable && !effectiveCharacter?.id && backstorySubmitted && (
+          <div className="text-xs mt-2" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+            Submitted to your Watcher for approval. Keep refining your portrait and identity while you wait — your Watcher will build your character with you once approved.
           </div>
         )}
       </div>

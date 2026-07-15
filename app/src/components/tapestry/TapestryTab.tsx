@@ -26,6 +26,8 @@ interface CampaignMemberData {
   id: string;
   status: string;
   joinedAt: string;
+  // T28: player has submitted their backstory for the GM's approval.
+  backstorySubmitted?: boolean;
   user: {
     id: string;
     username: string;
@@ -158,6 +160,16 @@ function ApplicationsPanel({ campaignId }: { campaignId: string }) {
               >
                 {statusLabel(member.status)}
               </span>
+              {/* T28: player has submitted their backstory for approval. */}
+              {member.status === 'BACKSTORY' && member.backstorySubmitted && (
+                <span
+                  className="text-[9px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] px-2 py-0.5"
+                  style={{ background: 'rgba(34,171,148,0.15)', color: 'var(--accent-teal)' }}
+                  title="This player submitted their backstory for your approval. Review it, then build their character with them."
+                >
+                  ✓ Backstory ready
+                </span>
+              )}
             </div>
             {profile?.bio && (
               <div className="text-white/40 text-xs font-[family-name:var(--font-terminal)] leading-relaxed mb-2 line-clamp-2">

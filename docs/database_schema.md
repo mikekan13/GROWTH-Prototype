@@ -55,6 +55,9 @@ GM-created game world container.
 Player enrollment in a campaign (no character yet).
 - Unique constraint: one membership per user per campaign
 - Created when player redeems invite code or applies via EŶ∃tehrNET hub
+- `status`: INTERESTED → BACKSTORY → CHARACTER_CREATION → ACTIVE (or REJECTED)
+- `characterDesc`: JSON draft (backstory + physical + portrait state) before a Character exists
+- `backstorySubmitted` / `backstorySubmittedAt` (T28): player's signal that their backstory is ready for the GM's approval. Set via PATCH `members/me { submit: true }` (guarded to status=BACKSTORY). The player never self-advances — the GM builds the sheet with them after approving.
 
 ### CampaignApplication (updated)
 - `profileSnapshot`: JSON snapshot of applicant's profile at time of application

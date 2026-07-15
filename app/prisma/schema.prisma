@@ -195,6 +195,12 @@ model CampaignMember {
   status          String               @default("INTERESTED") // INTERESTED, BACKSTORY, CHARACTER_CREATION, ACTIVE, REJECTED
   application     CampaignApplication?
   characterDesc   String?              // JSON: player's backstory + physical description before character exists
+  // T28: the player submits their backstory FOR the GM's approval (GM approves
+  // first — no player self-advance, ruling 2026-07-12). This is the signal the
+  // GM sees; status only advances when the GM builds the character with them.
+  // Portrait/identity work stays open while approval is pending.
+  backstorySubmitted   Boolean          @default(false)
+  backstorySubmittedAt DateTime?
   joinedAt        DateTime             @default(now())
 
   @@unique([campaignId, userId])
