@@ -3,6 +3,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import EyetehrnetLogo from '@/components/EyetehrnetLogo';
+import {
+  type CampaignAISettings,
+  type AIFeature,
+  type AIProviderChoice,
+  CLOUD_ONLY_FEATURES,
+} from '@/ai/types';
+
+/**
+ * GM-configurable AI features (T20). forgeAuthoring is cloud-only and shown
+ * locked. INV-69: player-facing copy says "Copilot", never JEWL.
+ */
+const AI_FEATURES: { key: AIFeature; label: string; hint: string }[] = [
+  { key: 'copilot', label: 'Copilot', hint: 'Campaign co-pilot chat' },
+  { key: 'portraitGeneration', label: 'Portrait Generation', hint: 'Character image generation' },
+  { key: 'referenceDescription', label: 'Reference Description', hint: 'Describe uploaded reference photos' },
+];
 
 const PROFILE_FIELDS = [
   { key: 'firstName', label: 'First Name' },
@@ -33,6 +49,7 @@ interface CampaignSettingsFormProps {
     listingDescription: string;
     listingTags: string[];
     requiredFields: string[];
+    aiSettings: CampaignAISettings;
   };
 }
 
@@ -58,6 +75,54 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
   const [requiredFields, setRequiredFields] = useState<string[]>(initialData.requiredFields);
   const [savingListing, setSavingListing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+
+  // AI settings (T20) — separate save target: /ai-settings PATCH.
+  const [aiDefaultProvider, setAiDefaultProvider] = useState<AIProviderChoice>(
+    initialData.aiSettings.defaultProvider,
+  );
+  const [aiOverrides, setAiOverrides] = useState<Partial<Record<AIFeature, AIProviderChoice>>>(
+    initialData.aiSettings.overrides ?? {},
+  );
+  const [aiVisionModel, setAiVisionModel] = useState(initialData.aiSettings.localVisionModel ?? '');
+  const [aiTextModel, setAiTextModel] = useState(initialData.aiSettings.localTextModel ?? '');
+  const [savingAI, setSavingAI] = useState(false);
+
+  function setOverride(feature: AIFeature, choice: 'default' | AIProviderChoice) {
+    setAiOverrides(prev => {
+      const next = { ...prev };
+      if (choice === 'default') delete next[feature];
+      else next[feature] = choice;
+      return next;
+    });
+  }
+
+  async function handleSaveAI() {
+    setSavingAI(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/ai-settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          defaultProvider: aiDefaultProvider,
+          overrides: aiOverrides,
+          localVisionModel: aiVisionModel.trim() || undefined,
+          localTextModel: aiTextModel.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to save AI settings');
+        return;
+      }
+      setSuccess('AI settings updated.');
+    } catch {
+      setError('Network error');
+    } finally {
+      setSavingAI(false);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -404,6 +469,99 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
           className="px-6 py-2 bg-[var(--accent-teal)] text-black text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] hover:bg-[var(--accent-teal)]/80 disabled:opacity-50 transition-colors"
         >
           {savingListing ? 'Saving...' : 'Save Listing'}
+        </button>
+      </div>
+
+      {/* AI Settings (T20) */}
+      <div className="border-t border-[var(--accent-teal)]/20 pt-6 space-y-4">
+        <h3 className="text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-header)] text-[var(--accent-teal)]/80">
+          AI Settings
+        </h3>
+        <p className="text-[10px] text-[var(--surface-dark)]/40 -mt-2">
+          Choose local (your own hardware) or cloud for each AI feature. System-critical AI always runs in the cloud.
+        </p>
+
+        <div>
+          <label className={labelClass}>Default Provider</label>
+          <select
+            value={aiDefaultProvider}
+            onChange={e => setAiDefaultProvider(e.target.value as AIProviderChoice)}
+            className={inputClass}
+          >
+            <option value="cloud">Cloud</option>
+            <option value="local">Local</option>
+          </select>
+          <p className="text-[10px] text-[var(--surface-dark)]/40 mt-1">
+            Used for any feature set to &ldquo;Use default&rdquo; below.
+          </p>
+        </div>
+
+        <div>
+          <label className={labelClass}>Per-Feature Override</label>
+          <div className="space-y-2">
+            {AI_FEATURES.map(f => (
+              <div key={f.key} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm text-[var(--surface-dark)]">{f.label}</div>
+                  <div className="text-[10px] text-[var(--surface-dark)]/40">{f.hint}</div>
+                </div>
+                <select
+                  value={aiOverrides[f.key] ?? 'default'}
+                  onChange={e => setOverride(f.key, e.target.value as 'default' | AIProviderChoice)}
+                  className={inputClass + ' w-40 flex-shrink-0'}
+                >
+                  <option value="default">Use default</option>
+                  <option value="cloud">Cloud</option>
+                  <option value="local">Local</option>
+                </select>
+              </div>
+            ))}
+            {CLOUD_ONLY_FEATURES.map(key => (
+              <div key={key} className="flex items-center justify-between gap-3 opacity-60">
+                <div className="min-w-0">
+                  <div className="text-sm text-[var(--surface-dark)]">Forge Authoring</div>
+                  <div className="text-[10px] text-[var(--surface-dark)]/40">Blueprint authoring &mdash; cloud-only</div>
+                </div>
+                <span className="w-40 flex-shrink-0 text-right text-xs uppercase tracking-wider text-[var(--accent-gold)]">
+                  Cloud (locked)
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>Local Vision Model</label>
+            <input
+              type="text"
+              value={aiVisionModel}
+              onChange={e => setAiVisionModel(e.target.value)}
+              maxLength={100}
+              placeholder="llava"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Local Text Model</label>
+            <input
+              type="text"
+              value={aiTextModel}
+              onChange={e => setAiTextModel(e.target.value)}
+              maxLength={100}
+              placeholder="gemma2:9b"
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveAI}
+          disabled={savingAI}
+          className="px-6 py-2 bg-[var(--accent-teal)] text-black text-xs uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] hover:bg-[var(--accent-teal)]/80 disabled:opacity-50 transition-colors"
+        >
+          {savingAI ? 'Saving...' : 'Save AI Settings'}
         </button>
       </div>
 

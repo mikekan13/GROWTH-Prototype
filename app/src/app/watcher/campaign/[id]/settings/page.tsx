@@ -5,6 +5,7 @@ import { canManageCampaign } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import Link from 'next/link';
 import CampaignSettingsForm from '@/components/campaign/CampaignSettingsForm';
+import { getCampaignAISettings } from '@/ai/campaign-ai';
 
 export default async function CampaignSettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -33,6 +34,8 @@ export default async function CampaignSettingsPage({ params }: { params: Promise
   const requiredFields: string[] = campaign.requiredFields
     ? JSON.parse(campaign.requiredFields as string)
     : [];
+
+  const aiSettings = await getCampaignAISettings(campaign.id);
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
@@ -64,6 +67,7 @@ export default async function CampaignSettingsPage({ params }: { params: Promise
             listingDescription: campaign.listingDescription || '',
             listingTags,
             requiredFields,
+            aiSettings,
           }}
         />
 
