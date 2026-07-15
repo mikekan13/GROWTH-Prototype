@@ -23,6 +23,7 @@ export interface GrowthAttribute {
   augmentSources?: AugmentSource[]; // Itemized breakdown of augment sources
   // Pool Max = level + augmentPositive - augmentNegative
   // When current reaches 0, character gets condition + overflow to frequency
+  trainable?: boolean;    // Marked by a failed raw/unskilled check; cleared at Long Rest (r-2026-07-15-01)
 }
 
 // Frequency is special - only level + current, no augments
@@ -145,6 +146,7 @@ export interface GrowthSkill {
   governors: SkillGovernor[]; // At least one required — which attributes govern this skill
   description?: string;     // Clarifies intent for GM/AI interpretation
   forgeItemId?: string;     // Reference to campaign ForgeItem (if created via Forge)
+  trainable?: boolean;      // Marked by a failed skill check; cleared at Long Rest (r-2026-07-15-01)
   // Skill die: 1-3=flat bonus, 4-5=d4, 6-7=d6, 8-11=d8, 12-19=d12, 20=d20
   // Modifiers come from external sources (gear, nectars, buffs) — not stored on skill
 }
