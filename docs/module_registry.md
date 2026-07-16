@@ -41,6 +41,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | BurnService | `services/burn.ts` | Permanent KRMA removal from the metaverse. Character burn (voluntary, costs KRMA), BurnLedger total tracking, hard cap enforcement (5B) | ledger, wallet, Prisma |
 | CharacterAttributeService | `services/character-attribute.ts` | Applies attribute-pool changes (spend/restore/setLevel) via character-actions pure functions, persists, returns FieldChange[] for changelog | character-actions, character.ts, Prisma |
 | CharacterGrantsService | `services/character-grants.ts` | Applies Seed/Root/Branch ForgeItem data onto a character's GrowthCharacter blob at assignMechanics time | ForgeService, Prisma |
+| AdvancementService | `services/advancement.ts` | Pure trainable→upgrade engine (r-2026-07-15-01): mark attr/skill trainable on failed checks, listTrainables grouped by pillar, applyAdvancements (all-or-nothing, spends max Freq, TKV-neutral, no ledger), clearTrainables | character-actions, types/growth |
+| AdvancementOpsService | `services/advancement-ops.ts` | DB wrapper for advancement: permission check (canEditCharacter), load→applyAdvancements→save, broadcasts character_update | advancement, permissions, campaign-stream, Prisma |
 | CharacterLocationService | `services/character-location.ts` | Moves a character between Locations by replacing their located_at EntityRelationship edges in a single transaction | Prisma, EntityRelationship |
 | DamageService | `services/damage.ts` | Applies typed damage to character body anatomy via body-container cascade (lib/body-damage.ts), triggers death save at 0 Frequency / vital destruction | body-damage, frequency, Prisma |
 | EconomyConfigService | `services/economy-config.ts` | Read/write ADMIN-tunable economy constants (EconomyConfig KV store). Falls back to code defaults when key absent | Prisma, subscription-drip |
@@ -99,7 +101,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Entity Wizard | entity/EntityCreationWizard | 8-step entity creation wizard (wizard crystallizes on Review — T29, INV-59/60/61) |
 | Canvas | RelationsCanvas | SVG infinite canvas with pan/zoom, node dragging, KRMA Line, viewport culling, folder groups, localStorage persistence |
 | Canvas | FolderGroup | Card grouping system — visual bounding box, drag-all-together, party type with REST button |
-| Canvas | RestPanel | GM rest UI — short/long toggle, character checkboxes with warnings (Overwhelmed/F=0), apply + results |
+| Canvas | RestPanel | GM rest UI — short/long toggle, character checkboxes with warnings (Overwhelmed/F=0), apply + results. Long Rest: per-character trainable-upgrade picker grouped by pillar, Frequency-budget-guarded (r-2026-07-15-01) |
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel showing real CampaignItems (HeldItemData). Weight level display, carry capacity tracking, condition/material/damage info, equip toggle, remove-from-inventory button, drop-target highlighting |
 | Canvas Cards | PossessionsCard | Possession relationships sub-panel (entities owned via 'owns' EntityRelationship edges) |
@@ -330,6 +332,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/godhead/[id]/invoke | POST | GodHead agent runtime — dispatch a manual invocation |
 | /api/penalty-actions/[id] | PATCH | ContractService (ADMIN confirm or reject a PenaltyAction) |
 | /api/characters/[id]/ai-action-mode | PATCH | GodHeadAdminService (toggle aiActionMode on a godhead character) |
+| /api/characters/[id]/advancement | POST | AdvancementOpsService (apply trainable upgrade picks, r-2026-07-15-01) |
 | /api/characters/[id]/burn | POST | BurnService (character voluntarily burns KRMA) |
 | /api/characters/[id]/canvas-position | PATCH | Lightweight canvas position persistence (no character data change) |
 | /api/characters/[id]/controller | PATCH | Character controller assignment (GM transfers control) |

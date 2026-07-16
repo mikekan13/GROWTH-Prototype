@@ -1523,6 +1523,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 ## PHASE S — M1: The Sheet Becomes Playable
 
 ### TASK T21: Frequency pool UI + three operations
+- **STATUS 2026-07-15: gap 1 (Spend-as-upgrade) SHIPPED via the advancement loop (r-2026-07-15-01)** — failed checks mark trainables (both check routes + auto-resolve), Long Rest RestPanel picker applies picks (max Freq −cost, target +1, TKV-neutral, no ledger), `POST /api/characters/[id]/advancement` for direct application. Remaining: gap 2 (dedicated meter w/ burn-scar ticks — visual call, NEEDS-MIKE) + whether old Spend-credits-KRMA op survives (NEEDS-MIKE). Deplete/Burn were pre-built.
 - **Type:** build
 - **Depends on:** T16
 - **Do with:** Executor — semantics fully specified here; UI patterns exist.

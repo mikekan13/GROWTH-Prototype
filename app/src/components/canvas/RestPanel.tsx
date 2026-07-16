@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { GrowthCharacter } from '@/types/growth';
+import { listTrainables, type TrainableItem, type Pillar } from '@/services/advancement';
 
 interface CharacterInfo {
   id: string;
@@ -16,16 +17,57 @@ interface RestPanelProps {
   onRestComplete: () => void;
 }
 
+const PILLAR_COLORS: Record<Pillar, string> = {
+  body: '#f7525f',
+  spirit: '#582a72',
+  soul: '#002f6c',
+};
+const PILLAR_ORDER: Pillar[] = ['body', 'spirit', 'soul'];
+
+const pickKey = (item: { kind: string; name: string }) => `${item.kind}:${item.name.toLowerCase()}`;
+
 export default function RestPanel({ characters, campaignId, onClose, onRestComplete }: RestPanelProps) {
   const [restType, setRestType] = useState<'short' | 'long'>('short');
   const [selected, setSelected] = useState<Set<string>>(() => new Set(characters.map(c => c.id)));
   const [applying, setApplying] = useState(false);
+  // Long-Rest advancement picks (r-2026-07-15-01): charId → set of pick keys.
+  const [advPicks, setAdvPicks] = useState<Record<string, Set<string>>>({});
   const [results, setResults] = useState<Array<{
     name: string;
     applied: boolean;
     reason?: string;
     changes: Record<string, { from: number; to: number }>;
+    advanced?: Array<{ kind: string; name: string; from: number; to: number; cost: number }>;
   }> | null>(null);
+
+  const trainablesByChar = useMemo(() => {
+    const map: Record<string, TrainableItem[]> = {};
+    for (const c of characters) {
+      try { map[c.id] = listTrainables(c.data); } catch { map[c.id] = []; }
+    }
+    return map;
+  }, [characters]);
+
+  const togglePick = (charId: string, item: TrainableItem) => {
+    setAdvPicks(prev => {
+      const next = { ...prev };
+      const set = new Set(next[charId] ?? []);
+      const key = pickKey(item);
+      if (set.has(key)) set.delete(key);
+      else set.add(key);
+      next[charId] = set;
+      return next;
+    });
+  };
+
+  /** Total Frequency cost of a character's current picks. */
+  const pickCost = (charId: string): number => {
+    const set = advPicks[charId];
+    if (!set?.size) return 0;
+    return (trainablesByChar[charId] ?? [])
+      .filter(item => set.has(pickKey(item)))
+      .reduce((sum, item) => sum + item.cost, 0);
+  };
 
   const allSelected = selected.size === characters.length;
 
@@ -57,12 +99,24 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
     if (selected.size === 0) return;
     setApplying(true);
     try {
+      // Build advancement picks for selected characters (long rest only).
+      const picks: Record<string, Array<{ kind: string; name: string }>> = {};
+      if (restType === 'long') {
+        for (const charId of selected) {
+          const set = advPicks[charId];
+          if (!set?.size) continue;
+          const items = (trainablesByChar[charId] ?? []).filter(i => set.has(pickKey(i)));
+          if (items.length) picks[charId] = items.map(i => ({ kind: i.kind, name: i.name }));
+        }
+      }
+
       const res = await fetch(`/api/campaigns/${campaignId}/rest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: restType,
           characterIds: [...selected],
+          ...(Object.keys(picks).length ? { picks } : {}),
         }),
       });
       if (res.ok) {
@@ -136,11 +190,18 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
             }}>
               <span style={{ fontWeight: 600 }}>{r.name}</span>
               {r.applied ? (
-                <span style={{ color: TERMINAL, marginLeft: 6 }}>
-                  {Object.entries(r.changes).filter(([, v]) => v.from !== v.to).map(([attr, v]) =>
-                    `${attr}: ${v.from}\u2192${v.to}`
-                  ).join(', ') || 'no change'}
-                </span>
+                <>
+                  <span style={{ color: TERMINAL, marginLeft: 6 }}>
+                    {Object.entries(r.changes).filter(([, v]) => v.from !== v.to).map(([attr, v]) =>
+                      `${attr}: ${v.from}\u2192${v.to}`
+                    ).join(', ') || 'no change'}
+                  </span>
+                  {r.advanced && r.advanced.length > 0 && (
+                    <div style={{ color: '#ffcc78', marginTop: 2 }}>
+                      {'\u25b2 '}{r.advanced.map(a => `${a.name} ${a.from}\u2192${a.to}`).join(', ')}
+                    </div>
+                  )}
+                </>
               ) : (
                 <span style={{ color: '#E8585A', marginLeft: 6 }}>{r.reason}</span>
               )}
@@ -228,60 +289,145 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
               const warning = getWarning(char);
               const isSelected = selected.has(char.id);
               const freq = char.data.attributes?.frequency;
+              const trainables = trainablesByChar[char.id] ?? [];
+              const showPicker = restType === 'long' && isSelected && trainables.length > 0;
+              const cost = pickCost(char.id);
+              const maxFreq = freq?.level ?? 0;
+              const picked = advPicks[char.id];
 
               return (
-                <div
-                  key={char.id}
-                  onClick={() => toggleChar(char.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '5px 6px',
-                    borderRadius: 4,
-                    background: isSelected ? 'rgba(255,255,255,0.05)' : 'transparent',
-                    border: `1px solid ${isSelected ? 'rgba(255,255,255,0.12)' : 'transparent'}`,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {/* Checkbox */}
+                <div key={char.id}>
                   <div
+                    onClick={() => toggleChar(char.id)}
                     style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: 3,
-                      border: `1px solid ${isSelected ? TERMINAL : 'rgba(255,255,255,0.3)'}`,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
+                      gap: 8,
+                      padding: '5px 6px',
+                      borderRadius: 4,
+                      background: isSelected ? 'rgba(255,255,255,0.05)' : 'transparent',
+                      border: `1px solid ${isSelected ? 'rgba(255,255,255,0.12)' : 'transparent'}`,
+                      cursor: 'pointer',
                     }}
                   >
-                    {isSelected && <span style={{ color: TERMINAL, fontSize: 10, lineHeight: 1 }}>{'\u2713'}</span>}
+                    {/* Checkbox */}
+                    <div
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 3,
+                        border: `1px solid ${isSelected ? TERMINAL : 'rgba(255,255,255,0.3)'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isSelected && <span style={{ color: TERMINAL, fontSize: 10, lineHeight: 1 }}>{'\u2713'}</span>}
+                    </div>
+
+                    {/* Name */}
+                    <span style={{ fontSize: 11, flex: 1, fontWeight: 500 }}>{char.name}</span>
+
+                    {/* Frequency indicator */}
+                    {freq && restType === 'short' && (
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
+                        F:{freq.current}/{freq.level}
+                      </span>
+                    )}
+
+                    {/* Long-rest Frequency budget after picks */}
+                    {freq && restType === 'long' && cost > 0 && (
+                      <span style={{ fontSize: 9, color: '#ffcc78' }}>
+                        F max {maxFreq}{'\u2192'}{maxFreq - cost}
+                      </span>
+                    )}
+
+                    {/* Warning */}
+                    {warning && (
+                      <span style={{
+                        fontSize: 8,
+                        padding: '1px 4px',
+                        borderRadius: 3,
+                        background: '#E8585A22',
+                        color: '#E8585A',
+                        fontWeight: 600,
+                      }}>
+                        {warning}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Name */}
-                  <span style={{ fontSize: 11, flex: 1, fontWeight: 500 }}>{char.name}</span>
-
-                  {/* Frequency indicator */}
-                  {freq && restType === 'short' && (
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
-                      F:{freq.current}/{freq.level}
-                    </span>
-                  )}
-
-                  {/* Warning */}
-                  {warning && (
-                    <span style={{
-                      fontSize: 8,
-                      padding: '1px 4px',
-                      borderRadius: 3,
-                      background: '#E8585A22',
-                      color: '#E8585A',
-                      fontWeight: 600,
+                  {/* Trainable upgrade picker (Long Rest, r-2026-07-15-01) */}
+                  {showPicker && (
+                    <div style={{
+                      marginLeft: 22,
+                      marginTop: 2,
+                      padding: '4px 6px',
+                      borderLeft: '2px solid rgba(255,204,120,0.3)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
                     }}>
-                      {warning}
-                    </span>
+                      <div style={{ fontSize: 8, color: 'rgba(255,204,120,0.7)', letterSpacing: '0.08em', fontWeight: 600 }}>
+                        TRAINABLE {'\u2014'} pick upgrades (spends max Frequency)
+                      </div>
+                      {[...PILLAR_ORDER, 'other' as const].map(pillar => {
+                        const items = pillar === 'other'
+                          ? trainables.filter(t => t.pillars.length === 0)
+                          : trainables.filter(t => t.pillars.includes(pillar));
+                        if (!items.length) return null;
+                        return (
+                          <div key={pillar}>
+                            <div style={{ fontSize: 8, color: pillar === 'other' ? 'rgba(255,255,255,0.5)' : (PILLAR_COLORS[pillar] === '#002f6c' ? '#5b8fd9' : PILLAR_COLORS[pillar]), fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
+                              {pillar}
+                            </div>
+                            {items.map(item => {
+                              const key = pickKey(item);
+                              const isPicked = picked?.has(key) ?? false;
+                              // Budget guard: adding this pick must keep max Freq \u2265 1.
+                              const wouldExceed = !isPicked && maxFreq - (cost + item.cost) < 1;
+                              return (
+                                <div
+                                  key={key}
+                                  onClick={e => { e.stopPropagation(); if (!wouldExceed) togglePick(char.id, item); }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '2px 4px',
+                                    borderRadius: 3,
+                                    cursor: wouldExceed ? 'default' : 'pointer',
+                                    opacity: wouldExceed ? 0.35 : 1,
+                                    background: isPicked ? 'rgba(255,204,120,0.1)' : 'transparent',
+                                  }}
+                                >
+                                  <div style={{
+                                    width: 11,
+                                    height: 11,
+                                    borderRadius: 2,
+                                    border: `1px solid ${isPicked ? '#ffcc78' : 'rgba(255,255,255,0.3)'}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                  }}>
+                                    {isPicked && <span style={{ color: '#ffcc78', fontSize: 8, lineHeight: 1 }}>{'\u2713'}</span>}
+                                  </div>
+                                  <span style={{ fontSize: 10, flex: 1 }}>{item.name}</span>
+                                  <span style={{ fontSize: 9, color: isPicked ? '#ffcc78' : 'rgba(255,255,255,0.4)' }}>
+                                    {item.currentLevel}{'\u2192'}{item.currentLevel + 1}
+                                  </span>
+                                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
+                                    {'\u2212'}{item.cost}F
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );

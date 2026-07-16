@@ -20,6 +20,7 @@ import { getSkillDieType, parseDie } from '@/lib/dice-utils';
 import { storePendingCheck, removePendingCheck } from '@/lib/pending-checks';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { createCampaignEvent } from '@/services/campaign-event';
+import { markAttributeTrainable, markSkillTrainable } from '@/services/advancement';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const dynamic = 'force-dynamic';
@@ -146,6 +147,34 @@ export async function POST(
       const total = pending.sdResult + autoFdResult;
       const success = total >= pending.dr;
       const margin = total - pending.dr;
+
+      // Failed check → mark trainable (r-2026-07-15-01), same as the wager path.
+      if (!success) {
+        try {
+          const freshChar = await prisma.character.findUnique({
+            where: { id: character.id },
+            select: { data: true },
+          });
+          if (freshChar) {
+            const freshData = JSON.parse(freshChar.data) as GrowthCharacter;
+            if (pending.isSkilled && pending.skillName) {
+              markSkillTrainable(freshData, pending.skillName);
+            } else {
+              markAttributeTrainable(freshData, pending.attributeName);
+            }
+            await prisma.character.update({
+              where: { id: character.id },
+              data: { data: JSON.stringify(freshData) },
+            });
+            broadcastEvent(campaignId, {
+              kind: 'character_update',
+              characterId: character.id,
+              characterName: character.name,
+              fields: ['attributes', 'skills'],
+            });
+          }
+        } catch { /* mark is best-effort on the timeout path */ }
+      }
 
       broadcastEvent(campaignId, {
         kind: 'check_result',

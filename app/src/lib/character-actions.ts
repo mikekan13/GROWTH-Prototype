@@ -345,10 +345,25 @@ export function restShort(character: GrowthCharacter): RestResult {
 /**
  * Long Rest: refill ALL attribute pools (including Frequency) to max.
  * Clears all depletion conditions. No cost, no restrictions.
+ *
+ * Also clears ALL trainable marks (r-2026-07-15-01): advancement picks are
+ * applied BEFORE calling this (see the rest route), then the Long Rest wipes
+ * every remaining mark — trained or not. Inlined here (not imported from
+ * services/advancement) because advancement.ts imports from this module.
  */
 export function restLong(character: GrowthCharacter): RestResult {
   const c = deepCloneCharacter(character);
   const changes: string[] = [];
+
+  let marksCleared = 0;
+  for (const attr of Object.values(c.attributes)) {
+    const a = attr as { trainable?: boolean };
+    if (a.trainable) { a.trainable = false; marksCleared++; }
+  }
+  for (const skill of c.skills ?? []) {
+    if (skill.trainable) { skill.trainable = false; marksCleared++; }
+  }
+  if (marksCleared > 0) changes.push(`Trainable marks cleared: ${marksCleared}`);
 
   for (const attrName of ALL_ATTRIBUTES) {
     const attr = c.attributes[attrName];

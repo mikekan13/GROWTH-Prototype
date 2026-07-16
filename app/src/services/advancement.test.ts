@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultCharacter } from '@/lib/defaults';
+import { restLong } from '@/lib/character-actions';
 import {
   markAttributeTrainable,
   markSkillTrainable,
@@ -103,5 +104,22 @@ describe('advancement — trainable → Long-Rest upgrade loop (r-2026-07-15-01)
     c = markSkillTrainable(c, 'Lockpicking');
     c = clearTrainables(c);
     expect(listTrainables(c)).toEqual([]);
+  });
+
+  it('restLong clears remaining trainable marks and restores pools at the new max', () => {
+    let c = fixture();
+    c = markAttributeTrainable(c, 'clout');
+    c = markSkillTrainable(c, 'Lockpicking');
+
+    // Advance only clout (Freq 10 → 9); Lockpicking mark stays… until the rest.
+    const advanced = applyAdvancements(c, [{ kind: 'attribute', name: 'clout' }]).character;
+    const rested = restLong(advanced);
+
+    expect(rested.applied).toBe(true);
+    expect(listTrainables(rested.character)).toEqual([]); // ALL marks wiped
+    // Pools refill at the NEW max Frequency (9, not 10).
+    expect(rested.character.attributes.frequency.level).toBe(9);
+    expect(rested.character.attributes.frequency.current).toBe(9);
+    expect(rested.changes.some(ch => ch.includes('Trainable marks cleared'))).toBe(true);
   });
 });

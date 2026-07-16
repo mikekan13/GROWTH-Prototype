@@ -4,6 +4,7 @@ import { errorResponse } from '@/lib/api';
 import { prisma } from '@/lib/db';
 import { canManageCampaign } from '@/lib/permissions';
 import { restShort, restLong } from '@/lib/character-actions';
+import { applyAdvancements, AdvancementError, type AdvancementPick, type AppliedAdvancement } from '@/services/advancement';
 import { createChangeLogEntry } from '@/services/changelog';
 import { createCampaignEvent } from '@/services/campaign-event';
 import type { GrowthCharacter } from '@/types/growth';
@@ -32,9 +33,11 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { type, characterIds } = body as {
+    const { type, characterIds, picks } = body as {
       type: 'short' | 'long';
       characterIds?: string[];
+      /** Long Rest only: advancement picks per character (r-2026-07-15-01). */
+      picks?: Record<string, AdvancementPick[]>;
     };
 
     if (type !== 'short' && type !== 'long') {
@@ -62,12 +65,41 @@ export async function POST(
       applied: boolean;
       reason?: string;
       changes: Record<string, { from: number; to: number }>;
+      advanced?: AppliedAdvancement[];
     }> = [];
 
     for (const char of characters) {
       const charData = JSON.parse(char.data) as GrowthCharacter;
+
+      // Long Rest advancement (r-2026-07-15-01): apply the character's picks
+      // FIRST (raises stats, spends max Frequency), so restLong then restores
+      // pools at the NEW max and clears the remaining trainable marks.
+      // All-or-nothing per character: bad picks fail this character's rest.
+      let preRest = charData;
+      let advanced: AppliedAdvancement[] | undefined;
+      const charPicks = type === 'long' ? picks?.[char.id] : undefined;
+      if (charPicks?.length) {
+        try {
+          const advResult = applyAdvancements(charData, charPicks);
+          preRest = advResult.character;
+          advanced = advResult.applied;
+        } catch (err) {
+          if (err instanceof AdvancementError) {
+            results.push({
+              characterId: char.id,
+              name: char.name,
+              applied: false,
+              reason: `Advancement failed: ${err.message}`,
+              changes: {},
+            });
+            continue;
+          }
+          throw err;
+        }
+      }
+
       const restFn = type === 'short' ? restShort : restLong;
-      const result = restFn(charData);
+      const result = restFn(preRest);
 
       if (result.applied) {
         // Save updated character
@@ -102,6 +134,7 @@ export async function POST(
           name: char.name,
           applied: true,
           changes: changesMap,
+          advanced,
         });
       } else {
         results.push({
@@ -121,6 +154,12 @@ export async function POST(
     let description = `${type === 'short' ? 'Short' : 'Long'} Rest granted`;
     if (appliedNames.length > 0) {
       description += `: ${appliedNames.join(', ')} restored`;
+    }
+    const advancedEntries = results
+      .filter(r => r.applied && r.advanced?.length)
+      .map(r => `${r.name} (${r.advanced!.map(a => `${a.name} ${a.from}→${a.to}`).join(', ')})`);
+    if (advancedEntries.length > 0) {
+      description += `. Advanced: ${advancedEntries.join('; ')}`;
     }
     if (skippedEntries.length > 0) {
       description += `. Skipped: ${skippedEntries.join(', ')}`;

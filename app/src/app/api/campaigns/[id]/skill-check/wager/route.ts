@@ -22,6 +22,7 @@ import { getPendingCheck, removePendingCheck, storePendingCheck } from '@/lib/pe
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { gatherTraitModifiers, type TraitModifierContribution } from '@/services/trait-modifiers';
+import { markAttributeTrainable, markSkillTrainable } from '@/services/advancement';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const dynamic = 'force-dynamic';
@@ -118,6 +119,16 @@ export async function POST(
         }
       }
 
+      // Failed check → mark the tested thing trainable (r-2026-07-15-01):
+      // skill check marks the skill; raw/unskilled check marks the governor attribute.
+      if (!success) {
+        if (pending.isSkilled && pending.skillName) {
+          markSkillTrainable(charData, pending.skillName);
+        } else {
+          markAttributeTrainable(charData, pending.attributeName);
+        }
+      }
+
       await prisma.character.update({
         where: { id: pending.characterId },
         data: { data: JSON.stringify(charData) },
@@ -128,7 +139,7 @@ export async function POST(
         kind: 'character_update',
         characterId: pending.characterId,
         characterName: pending.characterName,
-        fields: ['attributes'],
+        fields: ['attributes', 'skills'],
       });
     }
 
