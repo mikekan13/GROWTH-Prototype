@@ -21,6 +21,7 @@ import { storePendingCheck, removePendingCheck } from '@/lib/pending-checks';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { markAttributeTrainable, markSkillTrainable } from '@/services/advancement';
+import { gatherTraitModifiers, type TraitModifierContribution } from '@/services/trait-modifiers';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const dynamic = 'force-dynamic';
@@ -144,35 +145,50 @@ export async function POST(
 
       // Roll FD and resolve with 0 effort
       const autoFdResult = rollDie(fdMax);
-      const total = pending.sdResult + autoFdResult;
+
+      // T24: trait modifiers fire on the auto-resolve path too — skipping the
+      // wager forfeits Effort, never the character's Nectars/Blossoms/Thorns.
+      let traitFlat = 0;
+      let traitSources: TraitModifierContribution[] = [];
+      let freshData: GrowthCharacter | null = null;
+      try {
+        const freshChar = await prisma.character.findUnique({
+          where: { id: character.id },
+          select: { data: true },
+        });
+        if (freshChar) {
+          freshData = JSON.parse(freshChar.data) as GrowthCharacter;
+          const mods = gatherTraitModifiers(freshData, {
+            skillName: pending.skillName,
+            governorAttribute: pending.attributeName,
+          });
+          traitFlat = mods.totalFlat;
+          traitSources = mods.sources;
+        }
+      } catch { /* no modifier applied on load/parse failure */ }
+
+      const total = pending.sdResult + autoFdResult + traitFlat;
       const success = total >= pending.dr;
       const margin = total - pending.dr;
 
       // Failed check → mark trainable (r-2026-07-15-01), same as the wager path.
-      if (!success) {
+      if (!success && freshData) {
         try {
-          const freshChar = await prisma.character.findUnique({
-            where: { id: character.id },
-            select: { data: true },
-          });
-          if (freshChar) {
-            const freshData = JSON.parse(freshChar.data) as GrowthCharacter;
-            if (pending.isSkilled && pending.skillName) {
-              markSkillTrainable(freshData, pending.skillName);
-            } else {
-              markAttributeTrainable(freshData, pending.attributeName);
-            }
-            await prisma.character.update({
-              where: { id: character.id },
-              data: { data: JSON.stringify(freshData) },
-            });
-            broadcastEvent(campaignId, {
-              kind: 'character_update',
-              characterId: character.id,
-              characterName: character.name,
-              fields: ['attributes', 'skills'],
-            });
+          if (pending.isSkilled && pending.skillName) {
+            markSkillTrainable(freshData, pending.skillName);
+          } else {
+            markAttributeTrainable(freshData, pending.attributeName);
           }
+          await prisma.character.update({
+            where: { id: character.id },
+            data: { data: JSON.stringify(freshData) },
+          });
+          broadcastEvent(campaignId, {
+            kind: 'character_update',
+            characterId: character.id,
+            characterName: character.name,
+            fields: ['attributes', 'skills'],
+          });
         } catch { /* mark is best-effort on the timeout path */ }
       }
 
@@ -187,6 +203,8 @@ export async function POST(
         fdDie: fateDie,
         fdResult: autoFdResult,
         effort: 0,
+        traitFlat,
+        traitSources,
         total,
         dr: pending.dr,
         success,
@@ -210,6 +228,7 @@ export async function POST(
           skillDie: { die: pending.sdDie, value: pending.sdResult, isFlat: pending.sdDie.startsWith('flat') },
           fateDie: { die: fateDie, value: autoFdResult },
           effort: 0,
+          flatModifiers: traitFlat || undefined,
           total,
           dr: pending.dr,
           success,

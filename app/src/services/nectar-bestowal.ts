@@ -52,7 +52,8 @@ export const proposalSchema = z.object({
     pillar: z.enum(['body', 'spirit', 'soul']),
     mechanicalEffect: z.string().min(1).max(1000),
     rollModifiers: z.array(z.object({
-      flat: z.number().int(),
+      // INV-29: negatives live ONLY on Thorns — a Nectar is always positive.
+      flat: z.number().int().min(1),
       skillNamePattern: z.string().optional(),
       governorAttribute: z.string().optional(),
       label: z.string().optional(),

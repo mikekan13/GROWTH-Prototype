@@ -1560,6 +1560,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert.
 
 ### TASK T24: Traits modify rolls
+- **STATUS 2026-07-16: SHIPPED.** Engine + wager-path application + itemized broadcast pre-existed (trait-modifiers.ts). Closed the two real gaps: (1) the 90s auto-resolve timeout path now gathers trait modifiers before computing success (skipping the wager forfeits Effort, never traits) and reports traitFlat/traitSources + flatModifiers in the terminal payload; (2) INV-29 enforced at authoring — nectar-bestowal + blossom rollModifier schemas require `flat ≥ 1` (negatives live only on Thorns). Blossom-expiry-removes-modifier is automatic via T23 (trait removed → modifier gone). test-blossom-custody.ts ALL PASS.
 - **Type:** build
 - **Depends on:** T22, T23
 - **Do with:** Executor — single injection point into the existing dice service.

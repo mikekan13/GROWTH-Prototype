@@ -29,7 +29,8 @@ export const bestowBlossomSchema = z.object({
   rollModifiers: z
     .array(
       z.object({
-        flat: z.number().int(),
+        // INV-29: negatives live ONLY on Thorns — a Blossom is a buff.
+        flat: z.number().int().min(1),
         skillNamePattern: z.string().optional(),
         governorAttribute: z.string().optional(),
         label: z.string().optional(),
