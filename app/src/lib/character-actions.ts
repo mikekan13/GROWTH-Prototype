@@ -519,7 +519,7 @@ export function recomputeAugments(character: GrowthCharacter): ActionResult {
  */
 export function addTrait(
   character: GrowthCharacter,
-  trait: { name: string; type: 'nectar' | 'blossom' | 'thorn'; pillar?: 'body' | 'spirit' | 'soul'; category?: string; description?: string; source?: string; mechanicalEffect?: string },
+  trait: { name: string; type: 'nectar' | 'blossom' | 'thorn'; pillar?: 'body' | 'spirit' | 'soul'; category?: string; description?: string; source?: string; mechanicalEffect?: string; durationCycles?: number; expiresAtCycle?: number },
 ): ActionResult {
   const c = deepCloneCharacter(character);
   if (!Array.isArray(c.traits)) c.traits = [];
@@ -528,6 +528,17 @@ export function addTrait(
   const key = `${trait.type}::${name.toLowerCase()}`;
   const existing = c.traits.find(t => `${t.type}::${t.name.toLowerCase()}` === key);
   if (existing) return { character: c, changes: [`Trait "${name}" already exists`] };
+
+  // INV-07: Nectar+Thorn count cap = Fate Die value. Blossoms are exempt.
+  if (trait.type !== 'blossom') {
+    const fdStr = c.creation?.seed?.baseFateDie || 'd6';
+    const cap = parseInt(fdStr.replace(/\D/g, ''), 10) || 6;
+    const permanentCount = c.traits.filter(t => t.type === 'nectar' || t.type === 'thorn').length;
+    if (permanentCount >= cap) {
+      return { character: c, changes: [`Trait cap reached: ${permanentCount}/${cap} permanent traits (Fate Die ${fdStr}). Blossoms are exempt.`] };
+    }
+  }
+
   const next: GrowthTrait = {
     name,
     type: trait.type,
@@ -536,6 +547,8 @@ export function addTrait(
     description: trait.description ?? '',
     source: trait.source,
     mechanicalEffect: trait.mechanicalEffect,
+    ...(trait.type === 'blossom' && trait.durationCycles ? { durationCycles: trait.durationCycles } : {}),
+    ...(trait.type === 'blossom' && trait.expiresAtCycle !== undefined ? { expiresAtCycle: trait.expiresAtCycle } : {}),
   };
   c.traits.push(next);
   return { character: c, changes: [`Added ${trait.type} (${next.pillar}): ${name}`] };

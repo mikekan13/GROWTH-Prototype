@@ -235,3 +235,61 @@ export async function expireBlossom(
   });
   return { returned };
 }
+
+/**
+ * T23 clock hook: expire every blossom in the campaign whose expiresAtCycle
+ * has been reached. Called after the campaign clock moves (advance/set).
+ * Godhead-bestowed blossoms return their borrowed KRMA (expireBlossom);
+ * GM-authored blossoms (no custody chain) are simply removed from the sheet.
+ * Per-blossom failures are isolated so one bad row can't block the sweep.
+ */
+export async function sweepExpiredBlossoms(
+  campaignId: string,
+  currentCycle: number,
+): Promise<{ expired: Array<{ characterId: string; characterName: string; name: string; returned: number }> }> {
+  const characters = await prisma.character.findMany({
+    where: { campaignId },
+    select: { id: true, name: true, data: true },
+  });
+
+  const expired: Array<{ characterId: string; characterName: string; name: string; returned: number }> = [];
+
+  for (const ch of characters) {
+    let charData: GrowthCharacter;
+    try {
+      charData = JSON.parse(ch.data) as GrowthCharacter;
+    } catch {
+      continue;
+    }
+    const due = (charData.traits ?? []).filter(
+      t => t.type === 'blossom' && typeof t.expiresAtCycle === 'number' && t.expiresAtCycle <= currentCycle,
+    );
+    if (due.length === 0) continue;
+
+    for (const blossom of due) {
+      try {
+        if (blossom.blossomInstanceId) {
+          const { returned } = await expireBlossom(ch.id, blossom.blossomInstanceId);
+          expired.push({ characterId: ch.id, characterName: ch.name, name: blossom.name, returned });
+        } else {
+          // GM-authored blossom without custody — remove the trait, no ledger.
+          const fresh = await prisma.character.findUnique({ where: { id: ch.id } });
+          if (!fresh) continue;
+          const freshData = JSON.parse(fresh.data) as GrowthCharacter;
+          freshData.traits = (freshData.traits ?? []).filter(
+            t => !(t.type === 'blossom' && t.name === blossom.name && t.expiresAtCycle === blossom.expiresAtCycle),
+          );
+          await prisma.character.update({
+            where: { id: ch.id },
+            data: { data: JSON.stringify(freshData) },
+          });
+          expired.push({ characterId: ch.id, characterName: ch.name, name: blossom.name, returned: 0 });
+        }
+      } catch {
+        // Isolated: a failed expiry (missing wallet, race) must not block the rest.
+      }
+    }
+  }
+
+  return { expired };
+}

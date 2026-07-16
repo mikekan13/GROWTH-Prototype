@@ -16,6 +16,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import { writeHistory } from '@/services/history';
+import { sweepExpiredBlossoms } from '@/services/blossom';
 import {
   STANDARD_CALENDAR,
   cycleToLocalDate,
@@ -238,7 +239,21 @@ export async function advanceClock(
     visibility: 'gm',
   }]);
 
-  return { currentCycle: campaign.currentCycle, deltaCycles, localDate };
+  // T23: elapsed blossoms expire against the moved clock (borrowed KRMA
+  // returns to its Godhead; GM-authored blossoms just fall off the sheet).
+  const { expired } = await sweepExpiredBlossoms(campaignId, campaign.currentCycle);
+  if (expired.length > 0) {
+    await writeHistory(campaignId, campaign.currentCycle, expired.map(e => ({
+      subjectType: 'character' as const,
+      subjectId: e.characterId,
+      type: 'blossom_expired',
+      summary: `Blossom "${e.name}" expired on ${e.characterName}${e.returned > 0 ? ` — ${e.returned} KRMA returned to its Godhead` : ''}`,
+      actorId: userId,
+      visibility: 'gm' as const,
+    })));
+  }
+
+  return { currentCycle: campaign.currentCycle, deltaCycles, localDate, expiredBlossoms: expired };
 }
 
 export async function setClock(
@@ -264,7 +279,21 @@ export async function setClock(
     actorId: userId,
     visibility: 'gm',
   }]);
-  return { currentCycle: campaign.currentCycle, localDate };
+
+  // T23: setting the clock forward can elapse blossoms too.
+  const { expired } = await sweepExpiredBlossoms(campaignId, campaign.currentCycle);
+  if (expired.length > 0) {
+    await writeHistory(campaignId, campaign.currentCycle, expired.map(e => ({
+      subjectType: 'character' as const,
+      subjectId: e.characterId,
+      type: 'blossom_expired',
+      summary: `Blossom "${e.name}" expired on ${e.characterName}${e.returned > 0 ? ` — ${e.returned} KRMA returned to its Godhead` : ''}`,
+      actorId: userId,
+      visibility: 'gm' as const,
+    })));
+  }
+
+  return { currentCycle: campaign.currentCycle, localDate, expiredBlossoms: expired };
 }
 
 // ── Location timescale resolution (inheritance up located_at) ─────────────

@@ -1548,6 +1548,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert.
 
 ### TASK T23: Traits editor + Blossoms
+- **STATUS 2026-07-16: SHIPPED.** Editor (add w/ pillar picker, edit, remove) pre-existed. Added: INV-07 cap enforcement (UI block w/ message + `addTrait` pure guard, cap = Fate Die value, blossoms exempt); bearer-agnostic linter warning (characterName tokens vs trait text, non-blocking); blossom duration authoring (cycles field on add form → expiresAtCycle anchored to the campaign clock via /clock fetch); ⏳ expiry chip + tooltip lines; **auto-expiry wired**: `sweepExpiredBlossoms` (new, services/blossom.ts) called from `advanceClock` + `setClock` — godhead blossoms return borrowed KRMA via `expireBlossom`, GM-authored ones just fall off; `blossom_expired` history entries per expiry.
 - **Type:** build
 - **Depends on:** T16
 - **Do with:** Executor — model + UI with explicit rules; lint is mechanical.

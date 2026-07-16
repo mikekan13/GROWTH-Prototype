@@ -60,7 +60,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | SttVocabularyService | `services/stt-vocabulary.ts` | Builds per-campaign proper-noun vocabulary string for Whisper STT to bias recognition of unusual names (Val, Et'herling, etc.) | Prisma |
 | SubscriptionService | `services/subscription.ts` | Manages GM Subscription lifecycle (subscribe/cancel) and runs monthly KRMA drip schedule | subscription-drip, ledger, Prisma |
 | SubscriptionDripService | `services/subscription-drip.ts` | Anti-frontloading bell-curve KRMA drip calculator. Computes how many drips are owed and how much each is worth based on month index | ledger, Prisma |
-| TimeService | `services/time.ts` | Timescale CRUD, campaign clock get/advance/set, ensureDefaultTimescale, resolveTimescaleForLocation (walks located_at upward), characterDualAge | Prisma |
+| TimeService | `services/time.ts` | Timescale CRUD, campaign clock get/advance/set, ensureDefaultTimescale, resolveTimescaleForLocation (walks located_at upward), characterDualAge. Clock advance/set triggers sweepExpiredBlossoms (T23) + blossom_expired history | Prisma, blossom |
 | TraitModifierService | `services/trait-modifiers.ts` | Sums roll-affecting effects from Nectars/Blossoms/Thorns into a single bonus for skill checks and death saves | Prisma, growth types |
 
 ## Infrastructure (lib/)
@@ -110,7 +110,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (280px) and expanded (420px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance/layer/coverage, prima materia, material modifiers, weapon properties, weight labels, condition, GM notes. Compact view shows material + damage/resist summary |
 | Canvas Cards | GROvinePanel | GROvine management sub-panel for characters. Add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking |
 | Canvas Cards | VitalsCard | Character vitals sub-panel on canvas — body part grid, damage tracking, conditions |
-| Canvas Cards | TraitsCard | Character traits sub-panel — Nectars (permanent), Blossoms (temporary), Thorns (permanent negative) |
+| Canvas Cards | TraitsCard | Character traits sub-panel — Nectars (permanent), Blossoms (temporary), Thorns (permanent negative). T23: INV-07 cap block (FD value, blossoms exempt), bearer-agnostic linter warning, blossom duration field + ⏳ expiry chip |
 | Canvas Cards | MagicCard | Character magic sub-panel — mercy/severity/balance spell display |
 | Canvas Cards | BackstoryCard | Character backstory sub-panel — structured prompt responses, narrative view |
 | Canvas Cards | HarvestCard | Harvest log sub-panel — GROvine completion history across characters |

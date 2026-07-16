@@ -2371,11 +2371,25 @@ export default function RelationsCanvas({
                 return <VitalsCard vitals={(charData.vitals as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'traits':
                 return <TraitsCard
-                  traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string }>) || []}
+                  traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string; durationCycles?: number; expiresAtCycle?: number }>) || []}
                   fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined}
+                  characterName={node.name}
                   onClose={() => togglePanel(node.id, panelKey)}
-                  onAddTrait={onCharacterUpdate ? (trait) => {
-                    const result = addTrait(charData as unknown as GrowthCharacter, trait);
+                  onAddTrait={onCharacterUpdate ? async (trait) => {
+                    // Blossom with a duration: anchor expiry to the campaign clock (T23).
+                    let expiresAtCycle: number | undefined;
+                    if (trait.type === 'blossom' && trait.durationCycles && campaignId) {
+                      try {
+                        const res = await fetch(`/api/campaigns/${campaignId}/clock`, { cache: 'no-store' });
+                        if (res.ok) {
+                          const clock = await res.json();
+                          if (typeof clock.currentCycle === 'number') {
+                            expiresAtCycle = clock.currentCycle + trait.durationCycles;
+                          }
+                        }
+                      } catch { /* open-ended if the clock is unreachable */ }
+                    }
+                    const result = addTrait(charData as unknown as GrowthCharacter, { ...trait, expiresAtCycle });
                     if (result.changes.length > 0) onCharacterUpdate(node.id, result.character, result.changes);
                   } : undefined}
                   onRemoveTrait={onCharacterUpdate ? (type, name) => {

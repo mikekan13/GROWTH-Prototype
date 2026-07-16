@@ -11,11 +11,17 @@ export interface TraitItem {
   description?: string;
   source?: string;
   mechanicalEffect?: string;
+  /** Blossom only: lifetime in meta cycles (granter-set). */
+  durationCycles?: number;
+  /** Blossom only: campaign-clock cycle at which it auto-expires (T23 sweep). */
+  expiresAtCycle?: number;
 }
 
 interface TraitsCardProps {
   traits: TraitItem[];
   fateDie?: string;
+  /** For the bearer-agnostic linter — trait text should say "the bearer", never the character's name. */
+  characterName?: string;
   onClose?: () => void;
   onAddTrait?: (trait: TraitItem) => void;
   onRemoveTrait?: (type: 'nectar' | 'blossom' | 'thorn', name: string) => void;
@@ -30,7 +36,7 @@ const TYPE_STYLES: Record<string, { color: string; bg: string; icon: string; lab
 
 const FATE_MAX: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
 
-export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRemoveTrait, onUpdateTrait }: TraitsCardProps) {
+export default function TraitsCard({ traits, fateDie, characterName, onClose, onAddTrait, onRemoveTrait, onUpdateTrait }: TraitsCardProps) {
   const [filter, setFilter] = useState<string>('all');
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -39,16 +45,18 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
   const [newPillar, setNewPillar] = useState<'body' | 'spirit' | 'soul'>('spirit');
   const [newDescription, setNewDescription] = useState('');
   const [newEffect, setNewEffect] = useState('');
+  const [newDuration, setNewDuration] = useState<string>(''); // blossom only, cycles
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editEffect, setEditEffect] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const isEditable = !!(onAddTrait || onRemoveTrait || onUpdateTrait);
 
   const resetAdd = () => {
-    setNewName(''); setNewType('nectar'); setNewPillar('spirit'); setNewDescription(''); setNewEffect(''); setShowAddForm(false);
+    setNewName(''); setNewType('nectar'); setNewPillar('spirit'); setNewDescription(''); setNewEffect(''); setNewDuration(''); setShowAddForm(false);
   };
   const submitAdd = () => {
     if (!onAddTrait || !newName.trim()) return;
+    const duration = newType === 'blossom' ? parseFloat(newDuration) : NaN;
     onAddTrait({
       name: newName.trim(),
       type: newType,
@@ -57,6 +65,7 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
       description: newDescription.trim() || undefined,
       mechanicalEffect: newEffect.trim() || undefined,
       source: 'Manual',
+      ...(Number.isFinite(duration) && duration > 0 ? { durationCycles: duration } : {}),
     });
     resetAdd();
   };
@@ -77,6 +86,20 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
   const thorns = safeTraits.filter(t => t.type === 'thorn');
   const maxPermanent = fateDie ? FATE_MAX[fateDie] : undefined;
   const permanentCount = nectars.length + thorns.length;
+
+  // INV-07: Nectar+Thorn cap = Fate Die value; Blossoms exempt.
+  const capReached = newType !== 'blossom' && maxPermanent !== undefined && permanentCount >= maxPermanent;
+
+  // Bearer-agnostic linter (INV-28): trait text says "the bearer", never the
+  // character's name. Warning only — the GM may have a reason.
+  const nameTokens = (characterName ?? '')
+    .split(/\s+/)
+    .map(t => t.trim().toLowerCase())
+    .filter(t => t.length >= 3);
+  const traitText = `${newName} ${newDescription} ${newEffect}`.toLowerCase();
+  const bearerWarning = nameTokens.some(t => traitText.includes(t));
+
+  const canAdd = !!newName.trim() && !capReached;
 
   const filtered = filter === 'all' ? safeTraits : safeTraits.filter(t => t.type === filter);
 
@@ -158,13 +181,36 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
                   placeholder="Mechanical effect (e.g. +1 melee, KV:5)..."
                   className="w-full bg-transparent outline-none text-[10px] text-gray-300 px-1 py-0.5 border-b"
                   style={{ borderColor: '#3a3a4e', fontFamily: 'var(--font-terminal), Consolas, monospace' }} />
+                {/* Blossom duration (cycles on the campaign clock; blank = open-ended) */}
+                {newType === 'blossom' && (
+                  <div className="flex gap-2 items-center">
+                    <label className="text-[9px]" style={{ color: '#22ab94' }}>Duration (cycles):</label>
+                    <input type="number" value={newDuration} onChange={e => setNewDuration(e.target.value)} onMouseDown={e => e.stopPropagation()}
+                      min={0} step="any" placeholder="∞"
+                      className="w-16 bg-transparent outline-none text-[10px] text-white px-1 py-0.5 border"
+                      style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }} />
+                    <span className="text-[8px]" style={{ color: '#666' }}>auto-expires as the clock advances</span>
+                  </div>
+                )}
+                {/* INV-07 cap block */}
+                {capReached && (
+                  <div className="text-[9px] px-1.5 py-1" style={{ color: '#E84040', backgroundColor: 'rgba(232,64,64,0.1)', border: '1px solid rgba(232,64,64,0.3)', borderRadius: '2px' }}>
+                    Trait cap reached: {permanentCount}/{maxPermanent} permanent traits (Fate Die {fateDie}). Blossoms are exempt.
+                  </div>
+                )}
+                {/* Bearer-agnostic linter (warning only) */}
+                {bearerWarning && (
+                  <div className="text-[9px] px-1.5 py-1" style={{ color: '#D0A030', backgroundColor: 'rgba(208,160,48,0.1)', border: '1px solid rgba(208,160,48,0.3)', borderRadius: '2px' }}>
+                    {'⚠'} Trait text should be bearer-agnostic — say &quot;the bearer&quot;, not the character&apos;s name.
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button onClick={e => { e.stopPropagation(); submitAdd(); }} onMouseDown={e => e.stopPropagation()}
-                    disabled={!newName.trim()}
+                    disabled={!canAdd}
                     className="text-[9px] px-2 py-0.5 uppercase"
                     style={{
-                      color: newName.trim() ? '#22ab94' : '#666',
-                      border: '1px solid', borderColor: newName.trim() ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
+                      color: canAdd ? '#22ab94' : '#666',
+                      border: '1px solid', borderColor: canAdd ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
                       borderRadius: '2px',
                     }}>Add</button>
                   <button onClick={e => { e.stopPropagation(); resetAdd(); }} onMouseDown={e => e.stopPropagation()}
@@ -206,6 +252,8 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
                   modifiers={[
                     ...(trait.category ? [{ name: `Category: ${trait.category}`, value: 0 }] : []),
                     ...(trait.mechanicalEffect ? [{ name: trait.mechanicalEffect, value: 0 }] : []),
+                    ...(trait.type === 'blossom' && trait.expiresAtCycle !== undefined ? [{ name: `Expires at cycle ${trait.expiresAtCycle}`, value: 0 }] : []),
+                    ...(trait.type === 'blossom' && trait.expiresAtCycle === undefined && trait.durationCycles ? [{ name: `Duration: ${trait.durationCycles} cycles`, value: 0 }] : []),
                     ...(trait.source ? [{ name: `Source: ${trait.source}`, value: 0, source: { name: trait.source, type: trait.type, description: trait.description } }] : []),
                   ]} totalValue={0}>
                   <div className="p-2 border transition-colors cursor-pointer group" onMouseDown={e => e.stopPropagation()}
@@ -216,6 +264,11 @@ export default function TraitsCard({ traits, fateDie, onClose, onAddTrait, onRem
                           <span style={{ color: ts.color }}>{ts.icon}</span>
                           <span className="text-sm font-medium" style={{ color: ts.color }}>{trait.name}</span>
                           <span className="text-[8px] px-1" style={{ backgroundColor: ts.color, color: '#1a1a2e', borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{ts.label}</span>
+                          {trait.type === 'blossom' && (trait.expiresAtCycle !== undefined || trait.durationCycles) && (
+                            <span className="text-[8px] px-1" style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.35)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                              {trait.expiresAtCycle !== undefined ? `⏳ exp @ ${trait.expiresAtCycle}` : `⏳ ${trait.durationCycles} cyc`}
+                            </span>
+                          )}
                         </div>
                         {editingKey === `${trait.type}::${trait.name.toLowerCase()}` ? (
                           <div className="space-y-1 mt-1">
