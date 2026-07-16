@@ -1572,6 +1572,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert; hooks are additive data.
 
 ### TASK T25: Damage → auto-conditions + overflow
+- **STATUS 2026-07-16: SHIPPED.** Chain was mostly pre-built: depletion conditions auto-apply in `updateAttribute` (all 9), overflow-to-Frequency-current in `spendAttribute` (INV-43 Deplete-never-Spend), conditions render on card+sheet, `applyAttributeDamage` service existed (JEWL tool). Closed: (1) death trigger now FIRES when attribute damage zeroes Frequency (directly `frequency_zero` or via `attribute_overflow:<attr>`) — was computed but never broadcast; (2) GM-facing HTTP surface: POST /damage now takes `{ mode:'attribute', targetAttribute, amount }` alongside body mode. Overflow-chain vitest added (40/40); test-death-e2e PASS.
 - **Type:** build
 - **Depends on:** T21
 - **Do with:** Executor — depletion table is documented; routing exists in `lib/body-damage.ts`.

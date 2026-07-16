@@ -21,6 +21,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { spendAttribute, updateAttribute, type AttributeName } from '@/lib/character-actions';
+import { broadcastDeathSave } from '@/services/death-save';
 import type { GrowthCharacter, GrowthConditions } from '@/types/growth';
 
 export const ATTRIBUTE_NAMES = [
@@ -68,6 +69,8 @@ export async function applyAttributeDamage(
     throw new ValidationError('Invalid character data — cannot apply damage');
   }
 
+  const freqBefore = charData.attributes?.frequency?.current ?? 0;
+
   const result = spendAttribute(
     charData,
     input.targetAttribute as AttributeName,
@@ -78,6 +81,22 @@ export async function applyAttributeDamage(
     where: { id: input.characterId },
     data: { data: JSON.stringify(result.character) },
   });
+
+  // T25: crossing into Frequency 0 (directly or via overflow) opens the
+  // Facing Death door — same GM-screen trigger as the deplete path (T27).
+  const freqAfterSpend = result.character.attributes?.frequency?.current ?? 0;
+  if (freqBefore > 0 && freqAfterSpend <= 0 && character.campaignId) {
+    broadcastDeathSave(character.campaignId, {
+      kind: 'death_save',
+      phase: 'TRIGGERED',
+      characterId: character.id,
+      characterName: character.name,
+      door: 'COMBAT',
+      trigger: input.targetAttribute === 'frequency'
+        ? 'frequency_zero'
+        : `attribute_overflow:${input.targetAttribute}`,
+    });
+  }
 
   // Mirror Fable's damage panel: log to the campaign event stream so the
   // existing replay surfaces show it. JEWL will additionally write a

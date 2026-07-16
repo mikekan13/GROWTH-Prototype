@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultCharacter } from '@/lib/defaults';
-import { addTrait } from './character-actions';
+import { addTrait, spendAttribute } from './character-actions';
 
 describe('addTrait — INV-07 Fate-Die cap + blossom duration (T23)', () => {
   it('blocks nectars/thorns beyond the Fate Die cap; blossoms are exempt', () => {
@@ -24,6 +24,20 @@ describe('addTrait — INV-07 Fate-Die cap + blossom duration (T23)', () => {
     const b = res.character.traits.find(t => t.type === 'blossom')!;
     expect(b.durationCycles).toBe(5);
     expect(b.expiresAtCycle).toBe(12);
+  });
+
+  it('T25 overflow chain: attribute → 0 applies its condition, excess depletes Frequency current', () => {
+    const c = createDefaultCharacter('Overflow Test');
+    c.attributes.clout.current = 2;
+    c.attributes.frequency.current = 4;
+
+    const res = spendAttribute(c, 'clout', 5); // 2 absorbed, 3 overflow
+    expect(res.character.attributes.clout.current).toBe(0);
+    expect(res.character.conditions.weak).toBe(true); // clout's depletion condition
+    expect(res.character.attributes.frequency.current).toBe(1); // 4 − 3
+    expect(res.changes.join(' ')).toContain('Overflow: 3 damage to Frequency');
+    // INV-43: overflow is a Deplete — max Frequency untouched.
+    expect(res.character.attributes.frequency.level).toBe(c.attributes.frequency.level);
   });
 
   it('does not stamp duration fields on non-blossom traits', () => {

@@ -336,7 +336,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/characters/[id]/burn | POST | BurnService (character voluntarily burns KRMA) |
 | /api/characters/[id]/canvas-position | PATCH | Lightweight canvas position persistence (no character data change) |
 | /api/characters/[id]/controller | PATCH | Character controller assignment (GM transfers control) |
-| /api/characters/[id]/damage | POST | DamageService (apply typed damage to body part) |
+| /api/characters/[id]/damage | POST | DamageService (body cascade) or CharacterAttributeService (`mode:'attribute'` — pool depletion w/ conditions + Frequency overflow + death trigger, T25) |
 | /api/characters/[id]/death | POST | CharacterService (confirm death, trigger KRMA death split) |
 | /api/characters/[id]/death-save | GET, POST, DELETE | DeathSaveService (get pending save, resolve roll, cancel mercy window) |
 | /api/characters/[id]/frequency | PATCH | FrequencyService (spend/restore Frequency) |
