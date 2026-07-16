@@ -49,6 +49,7 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
         { name: `Rank: ${rank}`, value: 0 },
         { name: `Skill Die: ${die}`, value: 0 },
         { name: `Governors: ${govStr}`, value: 0 },
+        ...(skill.trainable ? [{ name: 'TRAINABLE — upgradable at Long Rest (1 Frequency)', value: 0 }] : []),
         ...(skill.description ? [{ name: skill.description, value: 0 }] : []),
       ]}
       totalValue={skill.level}
@@ -69,6 +70,19 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
               </span>
             ))}
           </div>
+          {/* Trainable badge (r-2026-07-15-01): failed check → upgradable at Long Rest */}
+          {skill.trainable && (
+            <span className="px-1 text-[8px] uppercase" style={{
+              backgroundColor: 'rgba(255,204,120,0.2)',
+              color: '#b8860b',
+              border: '1px solid rgba(255,204,120,0.6)',
+              borderRadius: '2px',
+              fontFamily: 'var(--font-header)',
+              letterSpacing: '0.06em',
+            }}>
+              {'▲'} Trainable
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Level bar */}

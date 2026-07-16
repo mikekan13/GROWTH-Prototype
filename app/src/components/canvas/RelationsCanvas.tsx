@@ -2415,6 +2415,9 @@ export default function RelationsCanvas({
                       },
                     }));
                   }}
+                  onCheckSkill={isGM && onSkillCheck ? (skillName, dr, revealDR) => {
+                    onSkillCheck(node.id, skillName, undefined, dr, revealDR);
+                  } : undefined}
                   onRequestSkill={(request) => {
                     fetch(`/api/campaigns/${campaignId}/requests`, {
                       method: 'POST',

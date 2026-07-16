@@ -12,6 +12,8 @@ export interface SkillItem {
   governors: SkillGovernor[];
   description?: string;
   forgeItemId?: string;
+  /** Marked by a failed skill check; cleared at Long Rest (r-2026-07-15-01). */
+  trainable?: boolean;
 }
 
 export interface ForgeSkillItem {
@@ -29,6 +31,8 @@ interface SkillsCardProps {
   onRemoveSkill?: (skillName: string) => void;
   onUpdateSkillLevel?: (skillName: string, newLevel: number) => void;
   onRollSkill?: (skillName: string) => void;
+  /** GM one-click check: opens an inline DR row, fires the server-side check flow (SD roll → player Effort wager). */
+  onCheckSkill?: (skillName: string, dr: number, revealDR: boolean) => void;
   onRequestSkill?: (request: { name: string; governors: SkillGovernor[]; description?: string }) => void;
 }
 
@@ -86,10 +90,14 @@ const GOV_COLOR: Record<string, string> = {
   willpower: '#002f6c', wisdom: '#002f6c', wit: '#002f6c',
 };
 
-export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onRequestSkill }: SkillsCardProps) {
+export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAddSkill, onRemoveSkill, onUpdateSkillLevel, onRollSkill, onCheckSkill, onRequestSkill }: SkillsCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
+  // Inline check row (GM one-click check flow)
+  const [checkSkillName, setCheckSkillName] = useState<string | null>(null);
+  const [checkDR, setCheckDR] = useState(10);
+  const [checkRevealDR, setCheckRevealDR] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillGovs, setNewSkillGovs] = useState<Set<SkillGovernor>>(new Set());
@@ -448,6 +456,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                     { name: `Max Roll: ${maxRoll}`, value: maxRoll },
                     ...(effortToCap > 0 ? [{ name: `Effort to Cap: +${effortToCap}`, value: effortToCap }] : []),
                     { name: `Gov: ${(skill.governors || []).map(g => GOV_ABBREV[g] || g).join(', ')}`, value: 0 },
+                    ...(skill.trainable ? [{ name: 'TRAINABLE — upgradable at Long Rest (1 Frequency)', value: 0 }] : []),
                     ...(skill.description ? [{ name: skill.description, value: 0 }] : []),
                   ]} totalValue={skill.level}>
                   <div className="p-1.5 border transition-colors group" onMouseDown={e => e.stopPropagation()}
@@ -467,6 +476,17 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                             }}>{GOV_ABBREV[gov]}</span>
                           ))}
                         </div>
+                        {/* Trainable badge (r-2026-07-15-01) */}
+                        {skill.trainable && (
+                          <span className="text-[7px] px-1 flex-shrink-0 uppercase" style={{
+                            backgroundColor: 'rgba(255,204,120,0.15)',
+                            color: '#ffcc78',
+                            border: '1px solid rgba(255,204,120,0.4)',
+                            borderRadius: '2px',
+                            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                            letterSpacing: '0.06em',
+                          }}>{'▲'} Trainable</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {/* Level adjust buttons (only when editable) */}
@@ -484,17 +504,25 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                             >+</button>
                           </div>
                         )}
-                        {/* Roll button */}
-                        {onRollSkill && (
+                        {/* Roll button — one-click check flow when available, else terminal prefill */}
+                        {(onCheckSkill || onRollSkill) && (
                           <button
-                            onClick={e => { e.stopPropagation(); onRollSkill(skill.name); }}
-                            className="text-[8px] px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity uppercase"
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (onCheckSkill) {
+                                setCheckSkillName(prev => prev === skill.name ? null : skill.name);
+                              } else {
+                                onRollSkill!(skill.name);
+                              }
+                            }}
+                            className={`text-[8px] px-1.5 py-0.5 transition-opacity uppercase ${checkSkillName === skill.name ? '' : 'opacity-0 group-hover:opacity-100'}`}
                             style={{
                               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                               color: '#ffcc78',
                               border: '1px solid rgba(255,204,120,0.3)',
                               borderRadius: '2px',
                               letterSpacing: '0.05em',
+                              backgroundColor: checkSkillName === skill.name ? 'rgba(255,204,120,0.15)' : 'transparent',
                             }}
                           >
                             Roll
@@ -518,6 +546,49 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                         <span className="text-xs font-bold px-1" style={{ backgroundColor: '#1a1a2e', color: dieColor(skill.level), border: `1px solid ${dieColor(skill.level)}40`, borderRadius: '2px', minWidth: '30px', textAlign: 'center' }}>{die}</span>
                       </div>
                     </div>
+
+                    {/* Inline check row — GM sets DR, fires the server check (SD → player wager) */}
+                    {onCheckSkill && checkSkillName === skill.name && (
+                      <div className="flex items-center gap-2 mt-1.5 pt-1.5" style={{ borderTop: '1px solid #3a3a4e' }}>
+                        <span className="text-[9px]" style={{ color: '#888' }}>DR</span>
+                        <input
+                          type="number"
+                          value={checkDR}
+                          onChange={e => setCheckDR(Math.max(1, parseInt(e.target.value) || 1))}
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => e.stopPropagation()}
+                          min={1}
+                          className="w-12 bg-transparent outline-none text-xs text-white px-1 py-0.5 border"
+                          style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                          autoFocus
+                        />
+                        <label className="flex items-center gap-1 text-[8px] cursor-pointer" style={{ color: '#888' }} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={checkRevealDR}
+                            onChange={e => setCheckRevealDR(e.target.checked)}
+                            style={{ width: 10, height: 10 }}
+                          />
+                          reveal DR
+                        </label>
+                        <button
+                          onClick={e => { e.stopPropagation(); onCheckSkill(skill.name, checkDR, checkRevealDR); setCheckSkillName(null); }}
+                          onMouseDown={e => e.stopPropagation()}
+                          className="text-[9px] px-2 py-0.5 uppercase ml-auto"
+                          style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}
+                        >
+                          Check
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); setCheckSkillName(null); }}
+                          onMouseDown={e => e.stopPropagation()}
+                          className="text-[9px] px-1.5 py-0.5 uppercase text-gray-500"
+                          style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}
+                        >
+                          {'×'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </ComplexTooltip>
               );

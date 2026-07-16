@@ -105,7 +105,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel showing real CampaignItems (HeldItemData). Weight level display, carry capacity tracking, condition/material/damage info, equip toggle, remove-from-inventory button, drop-target highlighting |
 | Canvas Cards | PossessionsCard | Possession relationships sub-panel (entities owned via 'owns' EntityRelationship edges) |
-| Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, Roll button, Request button (player), add form (GM). No categories or combat flags |
+| Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, trainable badge (r-2026-07-15-01), Roll button (GM: inline DR row → one-click server check; else terminal prefill), Request button (player), forge-picker add form (GM). No categories or combat flags |
 | Canvas Cards | LocationCard | Expandable location card on canvas. Compact (280px) and expanded (480px) views. Shows description, tech/wealth/danger levels, features, ley lines, tags |
 | Canvas Cards | WorldItemCard | Expandable world item card on canvas. Compact (280px) and expanded (420px) views. Shows damage (P:S:H/D\\C:B:E), armor resistance/layer/coverage, prima materia, material modifiers, weapon properties, weight labels, condition, GM notes. Compact view shows material + damage/resist summary |
 | Canvas Cards | GROvinePanel | GROvine management sub-panel for characters. Add/complete/fail/abandon GRO.vines, G/R/O detail view, capacity tracking |

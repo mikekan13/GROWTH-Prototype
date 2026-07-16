@@ -1536,6 +1536,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert; services untouched (all pre-existing).
 
 ### TASK T22: Skills CRUD + check-flow UX
+- **STATUS 2026-07-16: SHIPPED.** Most was already built (spec's "SkillsCard is read-only" was stale): forge-picker add, remove, +/- level, player request flow, die progression, EffortWagerModal round-trip all pre-existed. Added this pass: `trainable` badge on SkillsCard (canvas) + SkillsSection (player sheet) with tooltip lines; GM one-click check from SkillsCard (Roll → inline DR row + reveal toggle → existing `onSkillCheck` server flow; terminal-prefill kept as non-GM fallback). Acceptance chain complete end-to-end with T21's advancement loop.
 - **Type:** build
 - **Depends on:** T21
 - **Do with:** Executor — completes an existing half-built panel; server logic done.
