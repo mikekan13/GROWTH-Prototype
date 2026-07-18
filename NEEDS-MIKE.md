@@ -110,6 +110,11 @@ Nothing currently blocks coding work on the resolved items.
 ### Magic advancement wiring — no cast flow to hook (added 2026-07-15):
 - r-2026-07-15-01 says magic-school levels advance at cost **2**, marked on **Wild Cast failure** (not Woven). `ADVANCE_COST_MAGIC_SKILL` is ready, BUT there is **no server-side casting/resolution flow in the app at all** (magic exists only as sheet data: `magic.{mercy,severity,balance}.skillLevels` + display components). Nothing to mark from. Options: (a) wait until the casting flow is built (my default — flag and move on), or (b) build a minimal wild-cast check route now just to drive advancement. Also needs a structure call when built: trainable school marks would live per-pillar (e.g. `magic.mercy.trainableSchools`) — confirm when we get there.
 
+### T42 reference-data seeding BLOCKED — sources aren't what the plan assumed (added 2026-07-17):
+- The plan calls `Condition_Effects_Reference.md` post-audit-trustworthy. It isn't: `#needs-validation`, WTH-era staleness self-flagged, and **it does not contain the 9 depletion conditions at all** (older taxonomy: monkey paws / injury tiers / hit-location / etc.). The depletion effects the app uses live only in code + CANON_CORE §2.
+- `Complete_Materials_Reference.md` is `#needs-review` and diverges from the in-code catalog on nearly EVERY field (13 name-matched materials, one exact numeric agreement total); 10 code-only materials, 33 reference-only rows; three conflicting weight scales, none in lbs.
+- Full audit + 6 specific questions: `docs/t42-reference-audit-2026-07-17.md`. **Core question: which is truth — the tuned in-code catalog or the reference file?** I won't seed either direction without your call.
+
 ### Dev environment (added 2026-07-10, T08):
 - **whisper-server won't start via /boot** — `start.bat` not found (`logs/whisper.err.log`). Pre-existing; dev server itself fine. Say the word and I'll fix the launcher path.
 

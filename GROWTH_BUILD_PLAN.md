@@ -1768,6 +1768,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert.
 
 ### TASK T42: Seed audited reference data
+- **STATUS 2026-07-17: BLOCKED → NEEDS-MIKE.** Canon-keeper audit (docs/t42-reference-audit-2026-07-17.md) shows the task's premises don't hold: Condition_Effects_Reference.md is `#needs-validation` and does NOT contain the 9 depletion conditions (older WTH-era taxonomy); Complete_Materials_Reference.md is `#needs-review` and mismatches lib/materials.ts on nearly every field (plus 3 conflicting weight scales, none lbs). Seeding would transcribe unvalidated data over possibly-deliberate code values. 6 questions filed in NEEDS-MIKE — chief: which is truth, code catalog or reference file?
 - **Type:** build
 - **Depends on:** T08
 - **Do with:** Executor — transcription from NAMED audited sources only.
