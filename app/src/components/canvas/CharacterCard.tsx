@@ -1753,6 +1753,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               { key: 'goals', icon: '\ud83c\udf31', label: 'GRO.VINES', isOpen: openPanels?.has('goals') || false, onClick: () => onPanelToggle(node.id, 'goals') },
               { key: 'harvests', icon: '\u2618', label: 'HARVESTS', isOpen: openPanels?.has('harvests') || false, onClick: () => onPanelToggle(node.id, 'harvests') },
               { key: 'possessions', icon: '\u2756', label: 'POSSESSIONS', isOpen: openPanels?.has('possessions') || false, onClick: () => onPanelToggle(node.id, 'possessions') },
+              { key: 'krma', icon: '\u049c', label: 'KRMA', isOpen: openPanels?.has('krma') || false, onClick: () => onPanelToggle(node.id, 'krma') },
             ] : []),
           ];
           return (

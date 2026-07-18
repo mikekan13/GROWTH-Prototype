@@ -1755,6 +1755,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** SQLite remains source of truth until the verified cutover commit.
 
 ### TASK T41: Transaction history UI
+- **STATUS 2026-07-17: SHIPPED.** `TransactionHistory.tsx` + the three transaction routes (me / character / campaign) pre-existed from T15 but the component was MOUNTED NOWHERE. Mounted: (1) Watcher dashboard "Wallet Ledger" section (`source='me'`); (2) character canvas Ҝ KRMA panel (CharacterCard panel button → RelationsCanvas → `source={kind:'character'}`); (3) Terminal admin global metrics ALREADY existed (krmaMetrics hero readout — reserves/circulation/burned/tx count). INV-70 holds (routes are self/character-scoped; wallet IDs opaque; JEWL masking at serializers per T17).
 - **Type:** build
 - **Depends on:** T15
 - **Do with:** Executor — read-only views over existing APIs.

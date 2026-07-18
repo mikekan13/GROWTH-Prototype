@@ -13,6 +13,7 @@ import SkillsCard from "./SkillsCard";
 import type { SkillItem } from "./SkillsCard";
 import MagicCard from "./MagicCard";
 import GoalCard from "./GoalCard";
+import TransactionHistory from "@/components/krma/TransactionHistory";
 import BackstoryCard from "./BackstoryCard";
 import HarvestCard from "./HarvestCard";
 import PossessionsCard from "./PossessionsCard";
@@ -2458,6 +2459,12 @@ export default function RelationsCanvas({
                   characterId={node.id}
                   campaignId={campaignId}
                   isGM={isGM}
+                  onClose={() => togglePanel(node.id, panelKey)}
+                />;
+              case 'krma':
+                return <TransactionHistory
+                  source={{ kind: 'character', id: node.id }}
+                  title={`KRMA — ${node.name}`}
                   onClose={() => togglePanel(node.id, panelKey)}
                 />;
               case 'magic':

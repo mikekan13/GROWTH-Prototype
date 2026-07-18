@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import DashboardShell from '@/components/DashboardShell';
 import Link from 'next/link';
 import CampaignCreator from '@/components/CampaignCreator';
+import TransactionHistory from '@/components/krma/TransactionHistory';
 
 function formatKrma(n: bigint): string {
   return Number(n).toLocaleString();
@@ -140,6 +141,12 @@ export default async function WatcherDashboard() {
         </div>
 
         <CampaignCreator />
+
+        {/* Wallet ledger (T41) — read-only history over the Watcher's own wallet */}
+        <div>
+          <div className="text-xs uppercase tracking-wider text-[var(--surface-dark)]/40 mb-3">Wallet Ledger</div>
+          <TransactionHistory source="me" title="WALLET LEDGER" />
+        </div>
       </div>
     </DashboardShell>
   );
