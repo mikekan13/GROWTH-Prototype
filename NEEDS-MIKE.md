@@ -69,9 +69,21 @@ Not a real concept. Lifespan is its own track, authored per seed. Removed from d
 
 ---
 
-## STILL OPEN (active blockers — none requiring design input)
+## STILL OPEN — ⚠ SEVERAL NEED MIKE'S DESIGN RULINGS (as of 2026-07-17)
 
-Nothing currently blocks coding work on the resolved items.
+> **The build queue is EXHAUSTED — every remaining task waits on an answer
+> below.** The ones needing actual design calls (not just actions) are marked
+> **[RULING]**. Answer inline under each item, or say it on voice.
+
+**[RULING] items at a glance:**
+1. **T21 gap 1 residual** — old Spend-credits-KRMA op: keep as separate Freq→wallet conversion, or retire now that advancement is the upgrade path?
+2. **T21 gap 2** — dedicated Frequency meter w/ burn-scar ticks, or highlighted bar good enough for beta?
+3. **T28 pt 2** — entity ownership model for the GM "Build Character" handoff.
+4. **Magic advancement** — wait for the cast flow, or build a minimal wild-cast route now to drive school marking?
+5. **T42** — which is truth: in-code materials catalog or Complete_Materials_Reference.md? And where do the 9 depletion-condition effects canonically live? (6 sub-questions: docs/t42-reference-audit-2026-07-17.md)
+6. **Economy confirm** — T15/T19 guesstimate amounts (payout split, mistake bounties 10/100/1000).
+
+**Action (not design) items:** T19 live Et'herling smoke (needs you present), T12 pod smoke, whisper launcher fix, hosting/Stripe/production list below.
 
 ### Security (added 2026-07-10, T11):
 - ~~**Leaked ANTHROPIC_API_KEY**~~ ✅ REMOVED 2026-07-12. Mike: old key, remove it. Purged from the LOCAL repo entirely — deleted branch `archive/master-local-may-DO-NOT-PUSH`, local tag `pre-secret-scrub-2026-05-19`, and the filter-branch `refs/original` backup, then `reflog expire --all` + `gc --prune=now`. Verified commit `a40fba4` (held the key at `standalone/.env`) is purged; no `sk-ant-` reachable from any ref. Confirmed NEVER on origin (not an ancestor of `origin/master`; pushed tag `pre-T11-merge` doesn't contain it). Active `app/.env` key is a SEPARATE valid key — untouched.
