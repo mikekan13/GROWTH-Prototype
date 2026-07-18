@@ -16,14 +16,31 @@ interface GoalData {
   description: string;
   status: string;
   priority: number;
+  custodianId?: string | null;
   custodianName?: string | null;
   pillar?: string | null;
   resistancePrompt?: string | null; // GM notes
   milestones?: string | null;
+  opportunities?: string | null; // JSON array (T33)
   nectarsEarned: number;
   createdAt: string;
   completedAt?: string | null;
 }
+
+interface GoalOpportunity {
+  id: string;
+  description: string;
+  narrative?: string;
+  status: 'OPEN' | 'RESOLVED';
+  outcome?: 'SEIZED' | 'MISSED';
+  method?: 'check' | 'krma' | 'narrative';
+  note?: string;
+  declaredAt: string;
+  resolvedAt?: string;
+}
+
+interface GodheadOption { id: string; name: string; pillar: string }
+interface EntityOption { id: string; name: string; entityType: string }
 
 interface GoalCardProps {
   characterId: string;
@@ -34,6 +51,7 @@ interface GoalCardProps {
 
 const STATUS_STYLES: Record<string, { color: string; bg: string; label: string }> = {
   ACTIVE: { color: '#3EB89A', bg: 'rgba(62,184,154,0.1)', label: 'ACTIVE' },
+  DORMANT: { color: '#8a8ab0', bg: 'rgba(138,138,176,0.1)', label: 'DORMANT' },
   COMPLETED: { color: '#D4A830', bg: 'rgba(212,168,48,0.1)', label: 'DONE' },
   FAILED: { color: '#E8585A', bg: 'rgba(232,88,90,0.1)', label: 'FAILED' },
   ABANDONED: { color: '#888', bg: 'rgba(136,136,136,0.1)', label: 'LEFT' },
@@ -58,6 +76,19 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
   const [creating, setCreating] = useState(false);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
   const [resistanceEntities, setResistanceEntities] = useState<Record<string, ResistanceEntity[]>>({});
+  // T34: custodian picker
+  const [godheads, setGodheads] = useState<GodheadOption[] | null>(null);
+  const [editingCustodian, setEditingCustodian] = useState<string | null>(null); // goalId
+  // T33: resistance picker
+  const [addingResistance, setAddingResistance] = useState<string | null>(null); // goalId
+  const [campaignEntities, setCampaignEntities] = useState<EntityOption[] | null>(null);
+  const [entityFilter, setEntityFilter] = useState('');
+  // T33: opportunities
+  const [declaringOpp, setDeclaringOpp] = useState<string | null>(null); // goalId
+  const [newOppDesc, setNewOppDesc] = useState('');
+  const [resolvingOpp, setResolvingOpp] = useState<string | null>(null); // opportunityId
+  const [resolveMethod, setResolveMethod] = useState<'check' | 'krma' | 'narrative'>('check');
+  const [resolveNote, setResolveNote] = useState('');
 
   const fetchGoals = useCallback(async () => {
     try {
@@ -154,6 +185,122 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
     } catch { /* silent */ }
   };
 
+  // Observation: JEWL witnesses goal mutations (same pattern as create/abandon).
+  const postObservation = (mutationKind: string, summary: string) => {
+    if (!campaignId) return;
+    void fetch(`/api/campaigns/${campaignId}/observation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mutationKind, targetType: 'character', targetId: characterId, summary }),
+    }).catch(() => { /* best-effort */ });
+  };
+
+  // T34: lifecycle transitions — COMPLETED/FAILED route through the
+  // dispatcher server-side (goal.completed/goal.failed → T32 chain).
+  const handleTransition = async (goalId: string, to: 'COMPLETED' | 'FAILED' | 'DORMANT' | 'ACTIVE') => {
+    const desc = goals.find(g => g.id === goalId)?.description ?? 'goal';
+    try {
+      const res = await fetch(`/api/goals/${goalId}/transition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to }),
+      });
+      if (res.ok) {
+        await fetchGoals();
+        postObservation('goal-transition', `GM moved goal "${desc.slice(0, 200)}" → ${to}`);
+      }
+    } catch { /* silent */ }
+  };
+
+  const loadGodheads = async () => {
+    if (godheads !== null) return;
+    try {
+      const res = await fetch('/api/godheads');
+      if (res.ok) {
+        const data = await res.json();
+        setGodheads(data.godheads || []);
+      } else setGodheads([]);
+    } catch { setGodheads([]); }
+  };
+
+  const handleSetCustodian = async (goalId: string, custodianId: string) => {
+    try {
+      const res = await fetch(`/api/goals/${goalId}/custodian`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custodianId }),
+      });
+      if (res.ok) {
+        setEditingCustodian(null);
+        await fetchGoals();
+      }
+    } catch { /* silent */ }
+  };
+
+  const loadEntities = async () => {
+    if (campaignEntities !== null || !campaignId) return;
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/entities`);
+      if (res.ok) {
+        const data = await res.json();
+        setCampaignEntities(data.entities || []);
+      } else setCampaignEntities([]);
+    } catch { setCampaignEntities([]); }
+  };
+
+  const handleAddResistance = async (goalId: string, entityId: string) => {
+    try {
+      const res = await fetch(`/api/goals/${goalId}/resistance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entityId }),
+      });
+      if (res.ok) {
+        setAddingResistance(null);
+        setEntityFilter('');
+        await fetchResistance(goalId);
+      }
+    } catch { /* silent */ }
+  };
+
+  const handleRemoveResistance = async (goalId: string, entityId: string) => {
+    try {
+      const res = await fetch(`/api/goals/${goalId}/resistance?entityId=${encodeURIComponent(entityId)}`, { method: 'DELETE' });
+      if (res.ok) await fetchResistance(goalId);
+    } catch { /* silent */ }
+  };
+
+  const handleDeclareOpp = async (goalId: string) => {
+    if (!newOppDesc.trim()) return;
+    try {
+      const res = await fetch(`/api/goals/${goalId}/opportunity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: newOppDesc.trim() }),
+      });
+      if (res.ok) {
+        setNewOppDesc('');
+        setDeclaringOpp(null);
+        await fetchGoals();
+      }
+    } catch { /* silent */ }
+  };
+
+  const handleResolveOpp = async (goalId: string, opportunityId: string, outcome: 'SEIZED' | 'MISSED') => {
+    try {
+      const res = await fetch(`/api/goals/${goalId}/opportunity`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunityId, outcome, method: resolveMethod, note: resolveNote.trim() || undefined }),
+      });
+      if (res.ok) {
+        setResolvingOpp(null);
+        setResolveNote('');
+        await fetchGoals();
+      }
+    } catch { /* silent */ }
+  };
+
   const activeGoals = goals.filter(g => g.status === 'ACTIVE');
   const filtered = filter === 'ALL' ? goals : goals.filter(g => g.status === filter);
 
@@ -240,6 +387,7 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
           <div className="flex flex-wrap gap-1 mb-3">
             {[
               { key: 'ACTIVE', label: `ACTIVE (${activeGoals.length})`, color: '#3EB89A' },
+              { key: 'DORMANT', label: `DORMANT (${goals.filter(g => g.status === 'DORMANT').length})`, color: '#8a8ab0' },
               { key: 'COMPLETED', label: `DONE (${goals.filter(g => g.status === 'COMPLETED').length})`, color: '#D4A830' },
               { key: 'FAILED', label: `FAILED (${goals.filter(g => g.status === 'FAILED').length})`, color: '#E8585A' },
               { key: 'ABANDONED', label: `LEFT (${goals.filter(g => g.status === 'ABANDONED').length})`, color: '#888' },
@@ -271,8 +419,12 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
               let milestones: Array<{ id: string; description: string; completed: boolean }> = [];
               try { if (goal.milestones) milestones = JSON.parse(goal.milestones); } catch { /* skip */ }
               const doneMilestones = milestones.filter(m => m.completed).length;
+              let opportunities: GoalOpportunity[] = [];
+              try { if (goal.opportunities) opportunities = JSON.parse(goal.opportunities); } catch { /* skip */ }
+              const openOpps = opportunities.filter(o => o.status === 'OPEN');
               const resistance = resistanceEntities[goal.id] || [];
               const hasNoResistance = goal.status === 'ACTIVE' && resistance.length === 0 && isOpen;
+              const isLive = goal.status === 'ACTIVE' || goal.status === 'DORMANT';
 
               return (
                 <div key={goal.id}
@@ -295,6 +447,11 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                           {resistance.length > 0 && (
                             <span className="text-[9px]" style={{ color: '#E8585A' }}>
                               {'\u2694'} {resistance.length} resistance
+                            </span>
+                          )}
+                          {openOpps.length > 0 && (
+                            <span className="text-[9px]" style={{ color: '#ffcc78' }}>
+                              {'\u26a1'} {openOpps.length} open opportunit{openOpps.length === 1 ? 'y' : 'ies'}
                             </span>
                           )}
                           {milestones.length > 0 && (
@@ -321,20 +478,103 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                   {/* Expanded details */}
                   {isOpen && (
                     <div className="px-2 pb-2 border-t" style={{ borderColor: '#3a3a4e' }}>
-                      {/* Resistance entities */}
-                      {resistance.length > 0 && (
+                      {/* Custodian (T34: GM-editable) */}
+                      {(goal.custodianName || isGM) && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <span className="text-[9px] uppercase" style={{ color: '#888', fontFamily: 'var(--font-bebas-neue)', letterSpacing: '0.05em' }}>Custodian</span>
+                          {editingCustodian === goal.id ? (
+                            <select
+                              className="text-[10px] bg-transparent border px-1 py-0.5"
+                              style={{ borderColor: '#3a3a4e', borderRadius: '2px', color: '#D4A830', backgroundColor: '#1a1a2e' }}
+                              defaultValue={goal.custodianId ?? ''}
+                              onMouseDown={e => e.stopPropagation()}
+                              onClick={e => e.stopPropagation()}
+                              onChange={e => { if (e.target.value) handleSetCustodian(goal.id, e.target.value); }}
+                            >
+                              <option value="" disabled>{godheads === null ? 'Loading...' : 'Pick a godhead...'}</option>
+                              {(godheads ?? []).map(gh => (
+                                <option key={gh.id} value={gh.id}>{gh.name} ({gh.pillar})</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: PILLAR_COLORS[goal.pillar || 'BALANCE'] || '#D4A830' }}>
+                              {'\u2726'} {goal.custodianName ?? 'unassigned'}
+                            </span>
+                          )}
+                          {isGM && isLive && editingCustodian !== goal.id && (
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditingCustodian(goal.id); loadGodheads(); }}
+                              onMouseDown={e => e.stopPropagation()}
+                              className="text-[9px] px-1 hover:bg-white/10"
+                              style={{ color: '#888', borderRadius: '2px' }} title="Change custodian">{'\u270e'}</button>
+                          )}
+                          {editingCustodian === goal.id && (
+                            <button onClick={e => { e.stopPropagation(); setEditingCustodian(null); }} onMouseDown={e => e.stopPropagation()}
+                              className="text-[9px] px-1" style={{ color: '#888' }}>{'\u00d7'}</button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Resistance entities (T33: GM add/remove) */}
+                      {(resistance.length > 0 || (isGM && isLive)) && (
                         <div className="mt-2">
-                          <p className="text-[9px] uppercase mb-1" style={{ color: '#E8585A', fontFamily: 'var(--font-bebas-neue)', letterSpacing: '0.05em' }}>Resistance</p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[9px] uppercase" style={{ color: '#E8585A', fontFamily: 'var(--font-bebas-neue)', letterSpacing: '0.05em' }}>Resistance</p>
+                            {isGM && isLive && addingResistance !== goal.id && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setAddingResistance(goal.id); setEntityFilter(''); loadEntities(); }}
+                                onMouseDown={e => e.stopPropagation()}
+                                className="text-[9px] px-1 hover:bg-white/10"
+                                style={{ color: '#E8585A', borderRadius: '2px' }} title="Link an entity as resistance">+</button>
+                            )}
+                          </div>
                           {resistance.map((r) => (
-                            <div key={r.relationshipId} className="flex items-center gap-1.5 text-[10px] py-0.5 pl-1 border-l-2" style={{ borderColor: '#E8585A' }}>
+                            <div key={r.relationshipId} className="flex items-center gap-1.5 text-[10px] py-0.5 pl-1 border-l-2 group/res" style={{ borderColor: '#E8585A' }}>
                               <span style={{ color: '#E8585A' }}>{'\u2694'}</span>
                               <span style={{ color: '#ccc' }}>{r.name}</span>
                               <span className="text-[8px]" style={{ color: '#888' }}>({r.entityType})</span>
                               {r.custodianName && (
                                 <span className="text-[8px]" style={{ color: '#D4A830' }}>{'\u2726'}{r.custodianName}</span>
                               )}
+                              {isGM && isLive && (
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleRemoveResistance(goal.id, r.entityId); }}
+                                  onMouseDown={e => e.stopPropagation()}
+                                  className="text-[9px] px-1 ml-auto opacity-0 group-hover/res:opacity-100 hover:bg-red-900/30"
+                                  style={{ color: '#ff6b6b', borderRadius: '2px' }} title="Unlink">{'\u00d7'}</button>
+                              )}
                             </div>
                           ))}
+                          {isGM && addingResistance === goal.id && (
+                            <div className="mt-1 p-1.5 border" style={{ borderColor: '#E8585A44', borderRadius: '2px', backgroundColor: '#1a1a2e' }}>
+                              <input
+                                type="text" value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
+                                onMouseDown={e => e.stopPropagation()} placeholder="Filter entities..." autoFocus
+                                className="w-full bg-transparent outline-none text-[10px] text-white px-1 py-0.5 border-b"
+                                style={{ borderColor: '#3a3a4e' }}
+                              />
+                              <div className="max-h-28 overflow-y-auto mt-1">
+                                {campaignEntities === null ? (
+                                  <div className="text-[9px] text-gray-500 py-1">Loading...</div>
+                                ) : (campaignEntities
+                                    .filter(en => !resistance.some(r => r.entityId === en.id))
+                                    .filter(en => !entityFilter.trim() || en.name.toLowerCase().includes(entityFilter.toLowerCase()))
+                                    .slice(0, 30)
+                                    .map(en => (
+                                      <button key={en.id}
+                                        onClick={e => { e.stopPropagation(); handleAddResistance(goal.id, en.id); }}
+                                        onMouseDown={e => e.stopPropagation()}
+                                        className="w-full text-left text-[10px] px-1 py-0.5 hover:bg-white/10"
+                                        style={{ color: '#ccc', borderRadius: '2px' }}>
+                                        {en.name} <span style={{ color: '#666' }}>({en.entityType})</span>
+                                      </button>
+                                    )))}
+                              </div>
+                              <button onClick={e => { e.stopPropagation(); setAddingResistance(null); }} onMouseDown={e => e.stopPropagation()}
+                                className="text-[9px] px-1.5 py-0.5 mt-1 uppercase text-gray-500"
+                                style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}>Cancel</button>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -342,8 +582,110 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                       {isGM && hasNoResistance && (
                         <div className="mt-2 p-1.5" style={{ backgroundColor: 'rgba(232,88,90,0.05)', borderRadius: '2px', border: '1px dashed #E8585A33' }}>
                           <p className="text-[9px]" style={{ color: '#E8585A88' }}>
-                            No resistance assigned — create entities in the Tapestry and link them to this goal
+                            No resistance assigned — link entities with the + above (who pushes back?)
                           </p>
+                        </div>
+                      )}
+
+                      {/* Opportunities (T33): the O of GRO — leverage moments */}
+                      {(opportunities.length > 0 || (isGM && isLive)) && (
+                        <div className="mt-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-[9px] uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue)', letterSpacing: '0.05em' }}>Opportunities</p>
+                            {isGM && isLive && declaringOpp !== goal.id && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setDeclaringOpp(goal.id); setNewOppDesc(''); }}
+                                onMouseDown={e => e.stopPropagation()}
+                                className="text-[9px] px-1 hover:bg-white/10"
+                                style={{ color: '#ffcc78', borderRadius: '2px' }} title="Declare an opportunity">+</button>
+                            )}
+                          </div>
+                          {opportunities.map(opp => (
+                            <div key={opp.id} className="text-[10px] py-0.5 pl-1 border-l-2" style={{ borderColor: opp.status === 'OPEN' ? '#ffcc78' : '#3a3a4e' }}>
+                              <div className="flex items-center gap-1.5">
+                                <span style={{ color: opp.status === 'OPEN' ? '#ffcc78' : '#666' }}>{'⚡'}</span>
+                                <span style={{ color: opp.status === 'OPEN' ? '#ccc' : '#777' }}>{opp.description}</span>
+                                {opp.status === 'RESOLVED' && (
+                                  <span className="text-[8px] px-1" style={{
+                                    backgroundColor: opp.outcome === 'SEIZED' ? 'rgba(62,184,154,0.15)' : 'rgba(232,88,90,0.15)',
+                                    color: opp.outcome === 'SEIZED' ? '#3EB89A' : '#E8585A',
+                                    borderRadius: '2px',
+                                  }}>{opp.outcome} via {opp.method}</span>
+                                )}
+                                {isGM && isLive && opp.status === 'OPEN' && resolvingOpp !== opp.id && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setResolvingOpp(opp.id); setResolveMethod('check'); setResolveNote(''); }}
+                                    onMouseDown={e => e.stopPropagation()}
+                                    className="text-[8px] px-1 ml-auto uppercase hover:bg-white/10"
+                                    style={{ color: '#ffcc78', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>Resolve</button>
+                                )}
+                              </div>
+                              {opp.note && opp.status === 'RESOLVED' && (
+                                <div className="text-[8px] pl-4" style={{ color: '#666' }}>{opp.note}</div>
+                              )}
+                              {isGM && resolvingOpp === opp.id && (
+                                <div className="mt-1 p-1.5 border" style={{ borderColor: '#ffcc7844', borderRadius: '2px', backgroundColor: '#1a1a2e' }}>
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <span className="text-[8px]" style={{ color: '#888' }}>via</span>
+                                    {(['check', 'krma', 'narrative'] as const).map(m => (
+                                      <button key={m}
+                                        onClick={e => { e.stopPropagation(); setResolveMethod(m); }}
+                                        onMouseDown={e => e.stopPropagation()}
+                                        className="text-[8px] px-1.5 py-0.5 uppercase"
+                                        style={{
+                                          borderRadius: '2px',
+                                          backgroundColor: resolveMethod === m ? '#ffcc78' : '#2a2a3e',
+                                          color: resolveMethod === m ? '#1a1a2e' : '#888',
+                                          border: `1px solid ${resolveMethod === m ? '#ffcc78' : '#3a3a4e'}`,
+                                        }}>{m}</button>
+                                    ))}
+                                  </div>
+                                  {resolveMethod === 'check' && (
+                                    <p className="text-[8px] mb-1" style={{ color: '#666' }}>
+                                      Run the check from the character&apos;s Skills panel, then record the result here.
+                                    </p>
+                                  )}
+                                  <input
+                                    type="text" value={resolveNote} onChange={e => setResolveNote(e.target.value)}
+                                    onMouseDown={e => e.stopPropagation()}
+                                    placeholder={resolveMethod === 'check' ? 'e.g. Lockpicking vs DR 12 — success' : resolveMethod === 'krma' ? 'e.g. spent 3 Frequency' : 'What happened?'}
+                                    className="w-full bg-transparent outline-none text-[9px] text-white px-1 py-0.5 border-b mb-1"
+                                    style={{ borderColor: '#3a3a4e' }}
+                                  />
+                                  <div className="flex gap-1">
+                                    <button onClick={e => { e.stopPropagation(); handleResolveOpp(goal.id, opp.id, 'SEIZED'); }} onMouseDown={e => e.stopPropagation()}
+                                      className="text-[8px] px-1.5 py-0.5 uppercase"
+                                      style={{ color: '#3EB89A', border: '1px solid rgba(62,184,154,0.4)', borderRadius: '2px' }}>Seized</button>
+                                    <button onClick={e => { e.stopPropagation(); handleResolveOpp(goal.id, opp.id, 'MISSED'); }} onMouseDown={e => e.stopPropagation()}
+                                      className="text-[8px] px-1.5 py-0.5 uppercase"
+                                      style={{ color: '#E8585A', border: '1px solid rgba(232,88,90,0.4)', borderRadius: '2px' }}>Missed</button>
+                                    <button onClick={e => { e.stopPropagation(); setResolvingOpp(null); }} onMouseDown={e => e.stopPropagation()}
+                                      className="text-[8px] px-1.5 py-0.5 uppercase text-gray-500"
+                                      style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}>Cancel</button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {isGM && declaringOpp === goal.id && (
+                            <div className="mt-1 p-1.5 border" style={{ borderColor: '#ffcc7844', borderRadius: '2px', backgroundColor: '#1a1a2e' }}>
+                              <input
+                                type="text" value={newOppDesc} onChange={e => setNewOppDesc(e.target.value)}
+                                onMouseDown={e => e.stopPropagation()} placeholder="Describe the moment of leverage..." autoFocus
+                                className="w-full bg-transparent outline-none text-[10px] text-white px-1 py-0.5 border-b mb-1"
+                                style={{ borderColor: '#3a3a4e' }}
+                              />
+                              <div className="flex gap-1">
+                                <button onClick={e => { e.stopPropagation(); handleDeclareOpp(goal.id); }} onMouseDown={e => e.stopPropagation()}
+                                  disabled={!newOppDesc.trim()}
+                                  className="text-[9px] px-2 py-0.5 uppercase"
+                                  style={{ color: newOppDesc.trim() ? '#ffcc78' : '#666', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>Declare</button>
+                                <button onClick={e => { e.stopPropagation(); setDeclaringOpp(null); }} onMouseDown={e => e.stopPropagation()}
+                                  className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
+                                  style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}>Cancel</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -368,13 +710,37 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                         </div>
                       )}
 
-                      {/* Actions — GM only, only abandon */}
-                      {isGM && goal.status === 'ACTIVE' && (
-                        <div className="flex gap-1 mt-2">
+                      {/* Actions — GM lifecycle transitions (T34: complete/fail route
+                          through the dispatcher server-side, never silent flips) */}
+                      {isGM && isLive && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <button onClick={e => { e.stopPropagation(); handleTransition(goal.id, 'COMPLETED'); }} onMouseDown={e => e.stopPropagation()}
+                            className="px-2 py-0.5 text-[9px] uppercase"
+                            style={{ borderRadius: '2px', border: '1px solid rgba(212,168,48,0.5)', color: '#D4A830' }}>
+                            Complete
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleTransition(goal.id, 'FAILED'); }} onMouseDown={e => e.stopPropagation()}
+                            className="px-2 py-0.5 text-[9px] uppercase"
+                            style={{ borderRadius: '2px', border: '1px solid rgba(232,88,90,0.5)', color: '#E8585A' }}>
+                            Fail
+                          </button>
+                          {goal.status === 'ACTIVE' ? (
+                            <button onClick={e => { e.stopPropagation(); handleTransition(goal.id, 'DORMANT'); }} onMouseDown={e => e.stopPropagation()}
+                              className="px-2 py-0.5 text-[9px] uppercase"
+                              style={{ borderRadius: '2px', border: '1px solid rgba(138,138,176,0.5)', color: '#8a8ab0' }}>
+                              Sleep
+                            </button>
+                          ) : (
+                            <button onClick={e => { e.stopPropagation(); handleTransition(goal.id, 'ACTIVE'); }} onMouseDown={e => e.stopPropagation()}
+                              className="px-2 py-0.5 text-[9px] uppercase"
+                              style={{ borderRadius: '2px', border: '1px solid rgba(62,184,154,0.5)', color: '#3EB89A' }}>
+                              Reactivate
+                            </button>
+                          )}
                           <button onClick={e => { e.stopPropagation(); handleAbandon(goal.id); }} onMouseDown={e => e.stopPropagation()}
-                            className="px-2 py-0.5 text-[9px]"
+                            className="px-2 py-0.5 text-[9px] uppercase"
                             style={{ borderRadius: '2px', border: '1px solid #555', color: '#888' }}>
-                            Abandon (KRMA cost)
+                            Abandon
                           </button>
                         </div>
                       )}

@@ -12,6 +12,7 @@ import TraitsCard from "./TraitsCard";
 import SkillsCard from "./SkillsCard";
 import type { SkillItem } from "./SkillsCard";
 import MagicCard from "./MagicCard";
+import GoalCard from "./GoalCard";
 import BackstoryCard from "./BackstoryCard";
 import HarvestCard from "./HarvestCard";
 import PossessionsCard from "./PossessionsCard";
@@ -2451,6 +2452,13 @@ export default function RelationsCanvas({
                       });
                     });
                   }}
+                />;
+              case 'goals':
+                return <GoalCard
+                  characterId={node.id}
+                  campaignId={campaignId}
+                  isGM={isGM}
+                  onClose={() => togglePanel(node.id, panelKey)}
                 />;
               case 'magic':
                 return <MagicCard magic={(charData.magic as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;

@@ -8,7 +8,7 @@ import { emit as emitGodHeadEvent } from './godhead-dispatcher';
 // ── Constants ────────────────────────────────────────────────────────────
 
 export const MAX_ACTIVE_GOALS = 5;
-export const GOAL_STATUSES = ['ACTIVE', 'COMPLETED', 'FAILED', 'ABANDONED'] as const;
+export const GOAL_STATUSES = ['ACTIVE', 'DORMANT', 'COMPLETED', 'FAILED', 'ABANDONED'] as const;
 export const PILLARS = ['MERCY', 'BALANCE', 'SEVERITY'] as const;
 
 // ── Zod Schemas ──────────────────────────────────────────────────────────
@@ -208,8 +208,8 @@ export async function abandonGoal(goalId: string, userId: string, userRole: stri
     include: { character: { include: { campaign: true } } },
   });
   if (!goal) throw new NotFoundError('Goal not found');
-  if (goal.status !== 'ACTIVE') {
-    throw new ValidationError('Can only abandon active goals');
+  if (goal.status !== 'ACTIVE' && goal.status !== 'DORMANT') {
+    throw new ValidationError('Can only abandon active or dormant goals');
   }
 
   // Only GM or admin can abandon — abandonment carries a KRMA cost
@@ -241,16 +241,33 @@ export async function abandonGoal(goalId: string, userId: string, userRole: stri
   return updated;
 }
 
-/**
- * Mark a goal as completed. SYSTEM-ONLY — called by God-head custodians
- * when they determine (via campaign context) that the goal has been achieved.
- * Not exposed as a user-facing API action.
- */
-export async function completeGoal(goalId: string) {
-  const goal = await prisma.goal.findUnique({ where: { id: goalId } });
+/** GM/admin permission check shared by the lifecycle transitions (T34).
+ *  Pass no userId for SYSTEM callers (godhead custodian tools). */
+async function requireGoalGm(goalId: string, userId?: string, userRole?: string) {
+  const goal = await prisma.goal.findUnique({
+    where: { id: goalId },
+    include: { character: { include: { campaign: true } } },
+  });
   if (!goal) throw new NotFoundError('Goal not found');
-  if (goal.status !== 'ACTIVE') {
-    throw new ValidationError('Can only complete active goals');
+  if (userId !== undefined) {
+    const isGM = goal.character.campaign?.gmUserId === userId;
+    if (!isGM && !isAdminRole(userRole ?? '')) {
+      throw new ForbiddenError('Only the GM or admin can transition goals');
+    }
+  }
+  return goal;
+}
+
+/**
+ * Mark a goal as completed. Callable by the GM from the goal card (T34)
+ * or by God-head custodian tools (system caller, no userId). Either way
+ * the transition routes through the goal.completed dispatcher event —
+ * never a silent state flip.
+ */
+export async function completeGoal(goalId: string, userId?: string, userRole?: string) {
+  const goal = await requireGoalGm(goalId, userId, userRole);
+  if (goal.status !== 'ACTIVE' && goal.status !== 'DORMANT') {
+    throw new ValidationError('Can only complete active or dormant goals');
   }
 
   const updated = await prisma.goal.update({
@@ -269,15 +286,14 @@ export async function completeGoal(goalId: string) {
 }
 
 /**
- * Mark a goal as failed. SYSTEM-ONLY — called by God-head custodians
- * when they determine (via campaign context) that the goal is no longer achievable.
- * Not exposed as a user-facing API action.
+ * Mark a goal as failed. Callable by the GM from the goal card (T34) or by
+ * God-head custodian tools (system caller, no userId). Routes through the
+ * goal.failed dispatcher event — never a silent state flip.
  */
-export async function failGoal(goalId: string) {
-  const goal = await prisma.goal.findUnique({ where: { id: goalId } });
-  if (!goal) throw new NotFoundError('Goal not found');
-  if (goal.status !== 'ACTIVE') {
-    throw new ValidationError('Can only fail active goals');
+export async function failGoal(goalId: string, userId?: string, userRole?: string) {
+  const goal = await requireGoalGm(goalId, userId, userRole);
+  if (goal.status !== 'ACTIVE' && goal.status !== 'DORMANT') {
+    throw new ValidationError('Can only fail active or dormant goals');
   }
 
   const updated = await prisma.goal.update({
@@ -295,6 +311,40 @@ export async function failGoal(goalId: string) {
   return updated;
 }
 
+/**
+ * ACTIVE → DORMANT (T34): the goal sleeps — still on the sheet, not counted
+ * against the active cap, no terminal outcome. No dispatcher event (the T31
+ * event list is enumerated and dormancy is not a godhead-reaction moment).
+ */
+export async function setGoalDormant(goalId: string, userId: string, userRole: string) {
+  const goal = await requireGoalGm(goalId, userId, userRole);
+  if (goal.status !== 'ACTIVE') {
+    throw new ValidationError('Can only make active goals dormant');
+  }
+  return prisma.goal.update({
+    where: { id: goalId },
+    data: { status: 'DORMANT' },
+  });
+}
+
+/** DORMANT → ACTIVE (T34). Re-enforces the active-goal cap. */
+export async function reactivateGoal(goalId: string, userId: string, userRole: string) {
+  const goal = await requireGoalGm(goalId, userId, userRole);
+  if (goal.status !== 'DORMANT') {
+    throw new ValidationError('Can only reactivate dormant goals');
+  }
+  const activeCount = await prisma.goal.count({
+    where: { characterId: goal.characterId, status: 'ACTIVE' },
+  });
+  if (activeCount >= MAX_ACTIVE_GOALS) {
+    throw new ValidationError(`Maximum ${MAX_ACTIVE_GOALS} active goals per entity`);
+  }
+  return prisma.goal.update({
+    where: { id: goalId },
+    data: { status: 'ACTIVE' },
+  });
+}
+
 // ── Custodian Assignment (called from goal-custodian service) ─────────
 
 export async function assignCustodian(
@@ -307,6 +357,25 @@ export async function assignCustodian(
     where: { id: goalId },
     data: { custodianId, custodianName, pillar },
   });
+}
+
+/**
+ * GM changes a goal's custodian godhead (T34). Council Router / adopt_goal
+ * assign automatically; this is the GM override from the goal card.
+ */
+export async function setCustodian(
+  goalId: string,
+  userId: string,
+  userRole: string,
+  custodianId: string,
+) {
+  await requireGoalGm(goalId, userId, userRole);
+  const godhead = await prisma.godHead.findUnique({
+    where: { id: custodianId },
+    select: { id: true, name: true, pillar: true },
+  });
+  if (!godhead) throw new NotFoundError('Godhead not found');
+  return assignCustodian(goalId, godhead.id, godhead.name, godhead.pillar);
 }
 
 // ── GM Resistance Notes ──────────────────────────────────────────────
@@ -374,6 +443,22 @@ export async function declareOpportunity(
     }).catch(() => { /* event log is non-critical */ });
   }
 
+  // Persist the opportunity on the goal (T33) so the card can list and
+  // resolve it. JSON array column, same pattern as milestones.
+  const opportunityId = crypto.randomUUID();
+  const opportunities = parseOpportunities(goal.opportunities);
+  opportunities.push({
+    id: opportunityId,
+    description: validated.description,
+    narrative: validated.narrative,
+    status: 'OPEN',
+    declaredAt: new Date().toISOString(),
+  });
+  await prisma.goal.update({
+    where: { id: validated.goalId },
+    data: { opportunities: JSON.stringify(opportunities) },
+  });
+
   // Use 'goal.created' as the closest existing dispatcher event until the
   // routing table is extended with 'goal.opportunity'. Payload carries the
   // op marker so handlers can distinguish.
@@ -387,5 +472,94 @@ export async function declareOpportunity(
     narrative: validated.narrative,
   });
 
-  return { ok: true, goalId: validated.goalId };
+  return { ok: true, goalId: validated.goalId, opportunityId };
+}
+
+// ── Opportunity Resolution (T33) ─────────────────────────────────────
+
+export interface GoalOpportunity {
+  id: string;
+  description: string;
+  narrative?: string;
+  status: 'OPEN' | 'RESOLVED';
+  /** SEIZED = the moment advanced the goal; MISSED = it slipped away. */
+  outcome?: 'SEIZED' | 'MISSED';
+  /** How it resolved: a skill check, a KRMA spend, or pure narrative. */
+  method?: 'check' | 'krma' | 'narrative';
+  note?: string;
+  declaredAt: string;
+  resolvedAt?: string;
+}
+
+function parseOpportunities(raw: string | null): GoalOpportunity[] {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+export const resolveOpportunitySchema = z.object({
+  goalId: z.string().min(1),
+  opportunityId: z.string().min(1),
+  outcome: z.enum(['SEIZED', 'MISSED']),
+  method: z.enum(['check', 'krma', 'narrative']),
+  /** e.g. the check result ("Lockpicking vs DR 12 — success") or KRMA amount. */
+  note: z.string().max(500).optional(),
+});
+export type ResolveOpportunityInput = z.infer<typeof resolveOpportunitySchema>;
+
+/**
+ * GM resolves an open opportunity (T33): the moment resolved via a skill
+ * check (run through the normal check flow — record its result here), a
+ * KRMA spend, or narrative fiat. Logged as a campaign event.
+ */
+export async function resolveOpportunity(
+  userId: string,
+  userRole: string,
+  input: ResolveOpportunityInput,
+) {
+  const validated = resolveOpportunitySchema.parse(input);
+  const goal = await requireGoalGm(validated.goalId, userId, userRole);
+
+  const opportunities = parseOpportunities(goal.opportunities);
+  const opp = opportunities.find(o => o.id === validated.opportunityId);
+  if (!opp) throw new NotFoundError('Opportunity not found on this goal');
+  if (opp.status === 'RESOLVED') {
+    throw new ValidationError('Opportunity already resolved');
+  }
+
+  opp.status = 'RESOLVED';
+  opp.outcome = validated.outcome;
+  opp.method = validated.method;
+  opp.note = validated.note;
+  opp.resolvedAt = new Date().toISOString();
+
+  await prisma.goal.update({
+    where: { id: validated.goalId },
+    data: { opportunities: JSON.stringify(opportunities) },
+  });
+
+  const campaignId = goal.character.campaign?.id;
+  if (campaignId) {
+    const { createCampaignEvent } = await import('./campaign-event');
+    await createCampaignEvent({
+      campaignId,
+      type: 'game_event',
+      actor: 'gm',
+      actorUserId: userId,
+      actorName: 'GM',
+      characterId: goal.characterId,
+      characterName: goal.character.name,
+      payload: {
+        kind: 'game_event',
+        eventType: 'opportunity_resolved',
+        description: `Opportunity ${validated.outcome === 'SEIZED' ? 'seized' : 'missed'} (${validated.method}) on goal "${goal.description}": ${opp.description}${validated.note ? ` — ${validated.note}` : ''}`,
+      },
+    }).catch(() => { /* event log is non-critical */ });
+  }
+
+  return { ok: true, opportunity: opp };
 }

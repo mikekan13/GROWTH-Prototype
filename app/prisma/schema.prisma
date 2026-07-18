@@ -581,7 +581,7 @@ model Goal {
   campaignId      String?   // Nullable: God-head meta-goals may be campaign-independent
 
   description     String    // Plain language ("Find my father's killer")
-  status          String    @default("ACTIVE") // ACTIVE, COMPLETED, FAILED, ABANDONED
+  status          String    @default("ACTIVE") // ACTIVE, DORMANT, COMPLETED, FAILED, ABANDONED (T34)
   priority        Int       @default(1) // 1-5, entity sets priority
 
   // God-head custodianship — which God-head "picked up" this GRO.vine
@@ -595,6 +595,8 @@ model Goal {
 
   // Progress tracking
   milestones      String?   // JSON: [{ id, description, completed, nectarAwarded?, completedAt? }]
+  // Opportunity moments (T33): the O of GRO — GM-triggered leverage moments.
+  opportunities   String?   // JSON: [{ id, description, narrative?, status: OPEN|RESOLVED, outcome?, method?, note?, declaredAt, resolvedAt? }]
   nectarsEarned   Int       @default(0)
 
   createdAt       DateTime  @default(now())

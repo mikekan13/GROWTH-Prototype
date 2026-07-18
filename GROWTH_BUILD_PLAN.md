@@ -1663,6 +1663,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** dispatcher flag.
 
 ### TASK T33: GROvine Resistance + Opportunity UI
+- **STATUS 2026-07-17: SHIPPED** (with T34, same pass). Resistance service/routes/display pre-existed (resisted_by edges); added GM add/remove UI on GoalCard (filterable entity picker over /entities, per-row unlink). Opportunities now PERSIST (Goal.opportunities JSON column, migration `goal_opportunities`): declare appends OPEN entry; new `resolveOpportunity` + PATCH /opportunity — GM resolves SEIZED/MISSED via method check|krma|narrative (check runs through the normal T22 check flow, result recorded), campaign event logged; ⚡ open-count chip. **GoalCard MOUNTED** (was orphaned): new 'goals' panel (🌱 GRO.VINES) on CharacterCard → RelationsCanvas.
 - **Type:** build
 - **Depends on:** T32
 - **Do with:** Executor — display + linking UI over existing models.
@@ -1674,6 +1675,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert.
 
 ### TASK T34: Goal lifecycle + custodian UI
+- **STATUS 2026-07-17: SHIPPED** (with T33). Added DORMANT status (schema comment + GOAL_STATUSES + card style/filter). `completeGoal`/`failGoal` were dead code ("SYSTEM-ONLY" comment, zero callers) — now GM-callable per this task's acceptance (optional userId/role args; system callers unchanged; lifecycle-events script still PASS), reachable via new POST /api/goals/[id]/transition + card buttons (Complete/Fail/Sleep/Reactivate/Abandon) — completion/failure always routes through goal.completed/goal.failed dispatcher events, no silent flips. Dormant excluded from the 5-active cap; reactivate re-checks it. Custodian now GM-editable: `setCustodian` + PATCH /custodian + card picker fed by new GET /api/godheads (Watcher+ directory). Card mutations post JEWL observations.
 - **Type:** build
 - **Depends on:** T32
 - **Do with:** Executor — state machine + picker over existing services.
