@@ -1734,6 +1734,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** stub route restorable; test mode only.
 
 ### TASK T39: Ledger pseudonymization (pre-Postgres)
+- **STATUS 2026-07-17: SHIPPED.** Audit result: the ledger was ALREADY opaque — KrmaTransaction/BurnLedger carry `actorId` cuid + actorType only (no username/email columns), no name interpolation into descriptions, HistoryEntry actorId opaque, TransactionHistory UI shows raw ids (no User join). PII = User row + cached `CampaignEvent.actorName`. Built `scripts/erase-user.ts` (dry-run default, `--yes` to execute, ADMIN-refusal guard): blanks User PII (username→departed-steward-<shortid>, email→<id>@erased.invalid, random hash, profiles nulled), deletes sessions+tokens, scrubs actorName→'Departed Steward'; User row survives for FK/chain integrity. Verified live: created test user → erased → `verify-ledger.ts` chain VALID → test row cleaned up.
 - **Type:** refactor
 - **Depends on:** T14
 - **Do with:** Executor — mechanical indirection with a verification test.
