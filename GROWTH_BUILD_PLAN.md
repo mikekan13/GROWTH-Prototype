@@ -1711,6 +1711,7 @@ The copilot chat uses old token names `--accent-gold` and `--accent-teal` which 
 - **Rollback:** revert; flags default safe.
 
 ### TASK T37: Email verification + password reset
+- **STATUS 2026-07-17: SHIPPED.** Backend pre-existed (token models, lib/auth-tokens, lib/email Resend+console fallback, rate-limited forgot/reset/verify-email routes, enumeration-safe forgot). Closed the gaps: (1) verify-on-register — registerUser now issues the email_verification token + sends the link (best-effort, never blocks registration; re-requestable); (2) the emailed URLs pointed at PAGES THAT DIDN'T EXIST — built `/auth/forgot`, `/auth/reset` (?token form → POST /reset), `/auth/email-verified` (verify GET's redirect target), Part C powder-blue styling; (3) "Forgot password?" link on the login AuthForm. NOTE: `scripts/test-reset-and-tokens.ts` expects a 'ClaudePlayer' seed user absent from the current dev DB (pre-existing fixture mismatch — script predates the current seed set; flow verified via build + route/service review).
 - **Type:** build
 - **Depends on:** none
 - **Do with:** Executor — standard auth surface; provider lib exists (`lib/email.ts`, Resend).

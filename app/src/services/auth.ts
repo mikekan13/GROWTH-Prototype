@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { AuthError, ConflictError } from '@/lib/errors';
 import { hashPassword, verifyPassword, createSession } from '@/lib/auth';
 import { validateAccessCode } from '@/services/access-code';
+import { issueToken } from '@/lib/auth-tokens';
+import { sendEmail } from '@/lib/email';
 
 // --- Schemas ---
 
@@ -79,6 +81,26 @@ export async function registerUser(input: z.infer<typeof registerSchema>) {
   });
 
   await createSession(user.id);
+
+  // T37: verify-on-register — issue the email-verification token and send
+  // the link. Best-effort: registration never fails on a mail hiccup; the
+  // user can re-request via /api/auth/verify-email/request.
+  try {
+    const token = await issueToken(user.id, 'email_verification');
+    const verifyUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/api/auth/verify-email/${token}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'GRO.WTH — verify your email',
+      textBody: [
+        `Welcome to GRO.WTH, ${user.username}.`,
+        '',
+        'Verify your email address with the link below:',
+        verifyUrl,
+        '',
+        'This link expires in 24 hours.',
+      ].join('\n'),
+    });
+  } catch { /* re-requestable — do not block registration */ }
 
   return {
     user: { id: user.id, username: user.username, role: user.role },

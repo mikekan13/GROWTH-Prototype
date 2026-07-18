@@ -136,6 +136,15 @@ export default function AuthForm() {
         >
           {loading ? '...' : mode === 'login' ? '[ ENTER ]' : '[ BEGIN ]'}
         </button>
+
+        {mode === 'login' && (
+          <a
+            href="/auth/forgot"
+            className="block text-center text-[10px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] text-[var(--accent-teal)]/70 hover:text-[var(--accent-teal)]"
+          >
+            Forgot password?
+          </a>
+        )}
       </form>
     </div>
   );
