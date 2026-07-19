@@ -76,7 +76,7 @@ Not a real concept. Lifespan is its own track, authored per seed. Removed from d
 > **[RULING]**. Answer inline under each item, or say it on voice.
 
 **[RULING] items at a glance:**
-1. **T21 gap 1 residual** — old Spend-credits-KRMA op: keep as separate Freq→wallet conversion, or retire now that advancement is the upgrade path?
+1. ~~**T21 gap 1 residual** — Spend-credits-KRMA op~~ ✅ RULED 2026-07-19 (r-2026-07-19-01): RETIRED. No character→wallet conversion except spirit-package breakdown after death. Built same day.
 2. **T21 gap 2** — dedicated Frequency meter w/ burn-scar ticks, or highlighted bar good enough for beta?
 3. **T28 pt 2** — entity ownership model for the GM "Build Character" handoff.
 4. **Magic advancement** — wait for the cast flow, or build a minimal wild-cast route now to drive school marking?
@@ -116,7 +116,7 @@ Not a real concept. Lifespan is its own track, authored per seed. Removed from d
 
 ### T21 Frequency pool UI — mostly pre-built, two gaps need your call (added 2026-07-15):
 - **~70% already exists** (do NOT rebuild): `FrequencyOpsPanel.tsx` is the full Spend/Deplete/Burn picker with live burn-preview; `services/frequency.ts` (spend reduces max + credits the character wallet 1:1; deplete reduces current only) + `services/burn.ts` (scaledCost formula, sink transfer) + routes `/frequency` and `/burn`; CharacterSheet mounts the ops trigger; CharacterCard highlights Frequency; RestPanel restores. Deplete + Burn match the spec's acceptance test as-is.
-- **Gap 1 — ✅ BUILT 2026-07-15 via the advancement loop (r-2026-07-15-01).** Failed checks mark trainables; Long Rest opens the upgrade picker in RestPanel; each pick = max Freq −cost AND target +1, atomic, TKV-neutral, no ledger. **One residual call:** `services/frequency.ts` Spend still ALSO exists as a separate op that reduces max and credits the character wallet 1 KRMA (a ledger transfer from Terminal reserve) — that contradicts the folder-move ruling if Spend and advancement are the same mechanic. Keep Spend-credits-KRMA as a distinct op (Freq → liquid wallet KRMA for non-stat uses), or retire it now that advancement is the upgrade path?
+- **Gap 1 — ✅ BUILT 2026-07-15 via the advancement loop (r-2026-07-15-01); residual ✅ RULED 2026-07-19 (r-2026-07-19-01):** Spend-credits-KRMA RETIRED — no transfers into a player's wallet from their own character except breaking down a spirit package after death. frequency.ts narrowed to Deplete; FrequencyOpsPanel now Deplete/Burn only.
 - **Gap 2 — dedicated meter (visual call).** Spec wants Frequency as its own prominent zone with **burn-scar tick marks** for burned capacity, "NOT one bar among nine." Today it's an `AttributeBlock` among the nine, just gold-highlighted. Want me to build the standalone meter, or is the highlighted bar good enough for beta?
 
 ### Magic advancement wiring — no cast flow to hook (added 2026-07-15):

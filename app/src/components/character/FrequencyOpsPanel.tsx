@@ -1,13 +1,15 @@
 'use client';
 
 /**
- * Frequency Ops Panel — the three-way Spend / Deplete / Burn picker.
+ * Frequency Ops Panel — the Deplete / Burn picker.
  *
- * Per Mike's canon (frequency-three-operations memory):
- *   - SPEND   = reduce MAX permanently, credit character wallet 1:1 (upgrade pool).
+ * Per Mike's canon (frequency-three-operations + r-2026-07-19-01):
  *   - DEPLETE = reduce CURRENT pool only (damage / mid-session cost). Refills on rest.
  *   - BURN    = permanent destruction (1:1 against max, scaled by sink-balance).
  *               Carries a preview pass because the multiplier shifts with global burn flux.
+ *   - Upgrades happen via the trainable→Long-Rest advancement loop
+ *     (r-2026-07-15-01), NOT here. The old Spend-credits-KRMA op is retired
+ *     (r-2026-07-19-01): living stats are never a wallet-liquidity source.
  *
  * Renders inline (modal layer can wrap), takes character id + current
  * level/current, executes via the relevant API and notifies parent on success.
@@ -15,7 +17,7 @@
 
 import { useState } from 'react';
 
-type Op = 'spend' | 'deplete' | 'burn';
+type Op = 'deplete' | 'burn';
 
 interface Props {
   characterId: string;
@@ -34,27 +36,19 @@ export interface AppliedResult {
   scaledCost?: number;
   /** Burn-only: multiplier (1.0 = baseline) */
   multiplier?: number;
-  /** Spend-only: KRMA credit transaction id, if a character wallet existed */
-  krmaCreditTransactionId?: string | null;
 }
 
-// Accent colors for each op tab. Spend uses Soul tier-2 (Chesed) instead of
-// tier-1 Chokmah — tier-2 is the text-on-dark-safe variant from the canon
-// palette (memory: growth-color-palette).
 const OP_COLOR: Record<Op, string> = {
-  spend:   '#6fa8dc',   // blue (Soul tier-2 Chesed) — upgrade currency
   deplete: '#ffcc78',   // gold (KRMA) — pool damage
   burn:    '#E8585A',   // coral (Body accent) — destruction
 };
 
 const OP_LABEL: Record<Op, string> = {
-  spend:   'Spend',
   deplete: 'Deplete',
   burn:    'Burn',
 };
 
 const OP_HINT: Record<Op, string> = {
-  spend:   'Reduce MAX. Credit 1:1 KRMA for upgrades. Permanent.',
   deplete: 'Reduce CURRENT pool only. Refills on rest.',
   burn:    'Permanent destruction. Scaled by global burn flux.',
 };
@@ -153,7 +147,7 @@ export default function FrequencyOpsPanel({
         return;
       }
 
-      // Spend or Deplete
+      // Deplete
       const res = await fetch(`/api/characters/${characterId}/frequency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -170,7 +164,6 @@ export default function FrequencyOpsPanel({
         amount,
         newLevel: data.maxAfter,
         newPool: data.currentAfter,
-        krmaCreditTransactionId: data.krmaCreditTransactionId,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
@@ -183,7 +176,6 @@ export default function FrequencyOpsPanel({
   const canApply = (() => {
     if (submitting) return false;
     if (op === 'burn') return burnBaseCost > 0 && !!burnPreview && !burnPreview.insufficientFrequency;
-    if (op === 'spend') return amount > 0 && currentLevel - amount >= 1;
     return amount > 0 && currentPool - amount >= 0; // deplete
   })();
 
@@ -216,8 +208,8 @@ export default function FrequencyOpsPanel({
         </div>
 
         {/* Op picker */}
-        <div className="grid grid-cols-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          {(['spend', 'deplete', 'burn'] as const).map(o => (
+        <div className="grid grid-cols-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          {(['deplete', 'burn'] as const).map(o => (
             <button
               key={o}
               onClick={() => { setOp(o); setError(null); setBurnPreview(null); }}
@@ -345,7 +337,7 @@ export default function FrequencyOpsPanel({
                   maxLength={300}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder={op === 'spend' ? 'Upgrade target / advancement' : 'Damage source / cost paid'}
+                  placeholder="Damage source / cost paid"
                   className="w-full px-3 py-2 text-[12px] font-[family-name:var(--font-terminal)] bg-black/40 border text-white placeholder:text-white/25"
                   style={{ borderColor: `${accent}33` }}
                 />
@@ -355,25 +347,12 @@ export default function FrequencyOpsPanel({
               <div className="border p-2 text-[12px] font-[family-name:var(--font-terminal)]"
                 style={{ borderColor: `${accent}33`, background: `${accent}08` }}
               >
-                {op === 'spend' ? (
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-white/50">Max</span>
-                      <span style={{ color: accent }}>{currentLevel} → {Math.max(1, currentLevel - amount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/50">KRMA credit</span>
-                      <span style={{ color: accent }}>+{amount} Ҝ</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-between">
-                    <span className="text-white/50">Pool</span>
-                    <span style={{ color: accent }}>
-                      {currentPool} → {Math.max(0, currentPool - amount)}
-                    </span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-white/50">Pool</span>
+                  <span style={{ color: accent }}>
+                    {currentPool} → {Math.max(0, currentPool - amount)}
+                  </span>
+                </div>
               </div>
             </>
           )}

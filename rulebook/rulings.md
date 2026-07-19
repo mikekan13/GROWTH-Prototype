@@ -377,3 +377,10 @@ entry that references the old.
 - **Still open [NEEDS MIKE]**: crafting/inventing Frequency costs (undefined); whether any non-pool conditions (Thorns) persist through a Long Rest.
 - **Lands in rulebook**: §3 (Attributes/Skills), §7 (Frequency), Rest section
 - **Files**: 00_CANON_CORE.md (Rest + Frequency), Three_Pillar_Attributes.md, types/growth.ts (trainable flag), services/advancement.ts (new), lib/character-actions.ts (restLong), memory [[trainable-attribute-skill-growth]]
+
+### r-2026-07-19-01: No character→wallet KRMA conversion except spirit-package breakdown after death
+- **Ruling (Mike, verbal)**: "There shouldn't be a transfer to wallets of a player from a player except from a spirit package after death — like if they choose to break down a spirit package." A living character's stats are NOT a liquidity source: no operation converts Frequency (or any stat) into wallet KRMA. The ONLY stat→wallet conversion in the system is the player choosing to break down the **spirit package** they keep after their character's death.
+- **Retires**: the pre-advancement "Spend" op in `services/frequency.ts` (max Freq −N + 1:1 FLUID credit from Terminal reserve to the character wallet). It contradicted r-2026-07-15-01's TKV-neutral folder-move model and this ruling.
+- **What remains**: Frequency leaves a living character only via **Advancement** (r-2026-07-15-01, TKV-neutral), **Deplete** (current pool, restored by rest), or **Burn** (permanent destruction, services/burn.ts).
+- **Lands in rulebook**: §economy (KRMA states), §death (spirit package)
+- **Files**: services/frequency.ts (spend removed), FrequencyOpsPanel.tsx (picker narrowed), 00_CANON_CORE.md economy section

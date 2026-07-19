@@ -1,17 +1,19 @@
 /**
- * Frequency Service — the two non-burn operations on Frequency.
+ * Frequency Service — the Deplete operation on Frequency.
  *
- * Per Mike's canon (memory: frequency-three-operations):
- *   1. **Spend**   — reduces MAX Frequency permanently; credits the character
- *                    wallet 1:1 with FLUID KRMA the GM/player can apply to
- *                    upgrades (attribute bumps, new skills, etc.).
+ * Per canon (memory: frequency-three-operations + r-2026-07-19-01):
+ *   1. **Advance** — the ONLY way max Frequency converts into permanence:
+ *                    the trainable→Long-Rest upgrade loop
+ *                    (services/advancement.ts, r-2026-07-15-01). TKV-neutral,
+ *                    no ledger.
  *   2. **Deplete** — reduces CURRENT pool (damage / cost-paid-now), does NOT
- *                    touch max. Refilled by rest.
+ *                    touch max. Refilled by rest. Lives here.
  *   3. **Burn**    — permanent destruction. Lives in services/burn.ts.
  *
- * This module owns Spend + Deplete. Burn stays separate because it carries
- * a multiplier-aware preview/execute pair and a system-wide invariant
- * (frozen sink wallet).
+ * The old "Spend" op (max −N + 1:1 FLUID wallet credit) is RETIRED
+ * (r-2026-07-19-01): a living character's stats are never a liquidity
+ * source. The only stat→wallet conversion in the system is breaking down a
+ * spirit package after death.
  */
 
 import 'server-only';
@@ -19,14 +21,12 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
-import { executeTransaction } from './krma/ledger';
-import { getWalletByCharacter, getReserveWallet } from './krma/wallet';
 import { broadcastDeathSave } from './death-save';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const frequencyOpSchema = z.object({
   characterId: z.string().min(1),
-  op: z.enum(['spend', 'deplete']),
+  op: z.enum(['deplete']),
   amount: z.number().int().positive().max(1_000_000),
   reason: z.string().min(1).max(300).optional(),
 });
@@ -34,13 +34,12 @@ export const frequencyOpSchema = z.object({
 export type FrequencyOpInput = z.infer<typeof frequencyOpSchema>;
 
 export interface FrequencyOpResult {
-  op: 'spend' | 'deplete';
+  op: 'deplete';
   amount: number;
   maxBefore: number;
   maxAfter: number;
   currentBefore: number;
   currentAfter: number;
-  krmaCreditTransactionId: string | null;
 }
 
 export async function executeFrequencyOp(
@@ -68,54 +67,9 @@ export async function executeFrequencyOp(
   const maxBefore = freq.level;
   const currentBefore = freq.current;
 
-  let maxAfter = maxBefore;
-  let currentAfter = currentBefore;
-  let krmaCreditTransactionId: string | null = null;
-
-  if (validated.op === 'spend') {
-    // Spend reduces MAX (and pool shifts with it). Anti-zero guard: leave 1
-    // min Frequency unless the call is for a death-pathway elsewhere.
-    if (maxBefore - validated.amount < 1) {
-      throw new ValidationError(`Cannot spend ${validated.amount} — would drop max below 1 (current max: ${maxBefore})`);
-    }
-    maxAfter = maxBefore - validated.amount;
-    // Current can't exceed new max.
-    currentAfter = Math.min(currentBefore, maxAfter);
-    freq.level = maxAfter;
-    freq.current = currentAfter;
-
-    // Credit the character wallet (or fall back to Terminal reserve if the
-    // character isn't crystallized yet — in that case no ledger fires).
-    try {
-      const charWallet = await getWalletByCharacter(validated.characterId);
-      const reserveWallet = await getReserveWallet('Terminal');
-      const tx = await executeTransaction({
-        fromWalletId: reserveWallet.id,
-        toWalletId: charWallet.id,
-        amount: BigInt(validated.amount),
-        state: 'FLUID',
-        reason: 'CHARACTER_ADJUST',
-        description: `Spend: ${validated.reason ?? 'frequency-to-credit'}`,
-        metadata: {
-          characterId: validated.characterId,
-          op: 'spend',
-          maxBefore,
-          maxAfter,
-        },
-        actorId: userId,
-        actorType: 'GM',
-        idempotencyKey: `freq-spend::${validated.characterId}::${Date.now()}::${validated.amount}`,
-      });
-      krmaCreditTransactionId = tx.id;
-    } catch {
-      // No character wallet yet (pre-crystallization) — mechanical spend
-      // still happens, ledger waits until the character has a wallet.
-    }
-  } else {
-    // Deplete reduces CURRENT pool only. Floor at 0.
-    currentAfter = Math.max(0, currentBefore - validated.amount);
-    freq.current = currentAfter;
-  }
+  // Deplete reduces CURRENT pool only. Floor at 0.
+  const currentAfter = Math.max(0, currentBefore - validated.amount);
+  freq.current = currentAfter;
 
   await prisma.character.update({
     where: { id: validated.characterId },
@@ -140,9 +94,8 @@ export async function executeFrequencyOp(
     op: validated.op,
     amount: validated.amount,
     maxBefore,
-    maxAfter,
+    maxAfter: maxBefore,
     currentBefore,
     currentAfter,
-    krmaCreditTransactionId,
   };
 }
