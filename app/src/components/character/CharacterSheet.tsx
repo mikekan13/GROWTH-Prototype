@@ -119,13 +119,16 @@ export default function CharacterSheet({ character, characterId, onRefresh, canE
               Spirit <span className="text-[var(--surface-dark)]/30">(Sulfur)</span>
             </div>
             <AttributeBlock name="Flow" abbr="FLO" attribute={attributes.flow} pillarColor={PILLARS.spirit.color} />
+            {/* r-2026-07-19-02: no ops trigger on the player sheet — players
+                aren't meant to know about Frequency burn early on. Frequency
+                reaches them through play (damage, rest, advancement); the
+                FrequencyOpsPanel stays available for GM surfaces. */}
             <AttributeBlock
               name="Frequency"
               abbr="FRQ"
               attribute={attributes.frequency}
               pillarColor={PILLARS.spirit.color}
               isFrequency
-              characterId={characterId}
               onFrequencyOpApplied={onRefresh}
             />
             <AttributeBlock name="Focus" abbr="FOC" attribute={attributes.focus} pillarColor={PILLARS.spirit.color} />

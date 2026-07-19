@@ -77,7 +77,7 @@ Not a real concept. Lifespan is its own track, authored per seed. Removed from d
 
 **[RULING] items at a glance:**
 1. ~~**T21 gap 1 residual** — Spend-credits-KRMA op~~ ✅ RULED 2026-07-19 (r-2026-07-19-01): RETIRED. No character→wallet conversion except spirit-package breakdown after death. Built same day.
-2. **T21 gap 2** — dedicated Frequency meter w/ burn-scar ticks, or highlighted bar good enough for beta?
+2. ~~**T21 gap 2** — dedicated Frequency meter~~ ✅ RULED 2026-07-19 (r-2026-07-19-02): NO meter — players aren't meant to know about burn early. Ops trigger removed from the player sheet same day.
 3. **T28 pt 2** — entity ownership model for the GM "Build Character" handoff.
 4. **Magic advancement** — wait for the cast flow, or build a minimal wild-cast route now to drive school marking?
 5. **T42** — which is truth: in-code materials catalog or Complete_Materials_Reference.md? And where do the 9 depletion-condition effects canonically live? (6 sub-questions: docs/t42-reference-audit-2026-07-17.md)

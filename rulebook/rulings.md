@@ -384,3 +384,10 @@ entry that references the old.
 - **What remains**: Frequency leaves a living character only via **Advancement** (r-2026-07-15-01, TKV-neutral), **Deplete** (current pool, restored by rest), or **Burn** (permanent destruction, services/burn.ts).
 - **Lands in rulebook**: §economy (KRMA states), §death (spirit package)
 - **Files**: services/frequency.ts (spend removed), FrequencyOpsPanel.tsx (picker narrowed), 00_CANON_CORE.md economy section
+
+### r-2026-07-19-02: No dedicated Frequency meter; burn is invisible to players early on
+- **Ruling (Mike, verbal)**: "No need for a bar — players are not meant to even know about Frequency being burned in the beginning." The spec'd dedicated Frequency meter with burn-scar tick marks is CUT. The standard highlighted attribute bar is the player-facing display. Frequency burn is a discovered mechanic: it reaches players through play, not through UI affordances.
+- **Implementation**: the ⚡ ops trigger removed from the player CharacterSheet (it exposed Deplete/Burn to character owners). FrequencyOpsPanel remains as a component for GM-side surfaces. Closes T21 gap 2.
+- **Design principle**: "Discovered, not created" — burn joins the set of mechanics the interface deliberately under-explains.
+- **Lands in rulebook**: §UI notes / §economy (burn)
+- **Files**: CharacterSheet.tsx (trigger removed), FrequencyOpsPanel.tsx (GM-surface reserve)
