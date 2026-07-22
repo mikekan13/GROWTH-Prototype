@@ -394,9 +394,9 @@ entry that references the old.
 
 ### r-2026-07-20-01: Character creation phases, stat visibility, and controller-flag ownership (T28 pt 2)
 - **Ruling (Mike, verbal)**, the full creation pipeline:
-  1. **Player draft phase** — the player works on character creation directly: description, backstory, portrait, etc. It is just a draft. **The player does NOT see stats** during this phase — none exist yet to see.
+  1. **Player draft phase** — the player works on character creation directly: description, backstory, portrait, etc. It is just a draft. There are **no stats during this phase — not hidden, they don't exist yet**. Stats are DERIVED from the narrative (story → mechanics), so nothing mechanical exists until the seed is chosen in phase 3.
   2. **Narrative sign-off** — GM signs off on the described character AND the player is happy → next phase.
-  3. **GM + JEWL mechanics phase** — the GM takes the described character and works WITH JEWL to assign the right Seed, Root, and Branches so the mechanics match the backstory/description. This may involve the GM creating CUSTOM seeds/roots/branches — and by extension anything down to items — or reusing content already on the hub that others created. Whatever it takes, the GM assembles it.
+  3. **GM + JEWL mechanics phase (story → mechanics)** — the GM reads the narrative and finds or creates a **Seed that matches it**, and that seed is what STARTS the stats. Example: backstory says "lived with his parents, normal childhood, farmer family" → GM creates/finds a matching seed → the seed generates the starting stats. Root and Branches likewise. This may involve the GM creating CUSTOM seeds/roots/branches — and by extension anything down to items — or reusing content already on the hub that others created. Whatever it takes, the GM assembles it. **This is the core loop: the story is the input, the mechanics are derived output.**
   4. **Mechanics approval** — GM presents the assembled character to the player, who can approve.
   5. **Godhead chain** — once GM and player are both happy, it is sent up the godhead chain to log and monitor for obvious exploits etc. (the 4-party model, character-sheet-approval-model-2026-07-12).
   6. **Crystallization** — crystallized ABOVE the line, into the **Party folder** if attached to a player.
