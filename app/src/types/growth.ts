@@ -156,13 +156,56 @@ export type MagicSchool =
   | 'Abjuration' | 'Alteration' | 'Conjuration' | 'Dissolution' | 'Divination'
   | 'Enchantment' | 'Force' | 'Fortune' | 'Illusion' | 'Restoration';
 
+/**
+ * How a spell's DR was assembled. Canon (Magic_DR_Calculation_System): DR is
+ * ADDITIVE — a base per-effect DR, plus scaling for targets / size / duration /
+ * range, plus summed additional-school DRs for multi-school casts. This makes a
+ * spell's difficulty a function of what the player actually asked for, which is
+ * why JEWL coaxes these params from vague intent (r-2026-07-22-01).
+ */
+export interface SpellDRBreakdown {
+  base: number;          // base DR for the core effect
+  targets?: number;      // + per additional target
+  size?: number;         // + per size category above baseline
+  duration?: number;     // + per time increment
+  range?: number;        // + per distance category
+  schools?: number;      // multi-school: summed additional-school DRs
+  total: number;         // the DR the cast rolls against
+}
+
+/**
+ * A lasting effect a spell leaves behind (enchantment / permanent alteration).
+ * Spells can genuinely do anything — including creating trait-like or item-like
+ * persistence — which is exactly why high-power spells route through the system
+ * (r-2026-07-22-01). The concrete authored payload (trait rollModifiers, item
+ * data) rides here once the spell crystallizes into a real object.
+ */
+export interface SpellPersistentEffect {
+  kind: 'trait' | 'item' | 'other';
+  description: string;
+}
+
+/**
+ * Spell — a freeform authored object, kin to Nectars/Thorns (r-2026-07-22-01).
+ * Legacy fields (name/school/description/cost/strength/castingMethod) preserved
+ * for the existing display cards; the structured payload below is the
+ * 2026-07-22 DRAFT pending Mike's sign-off before it drives gameplay.
+ */
 export interface GrowthSpell {
   name: string;
-  school: MagicSchool;
-  description: string;
-  cost?: number;        // Mana/effort cost
-  strength?: number;    // 1-10 spell strength
-  castingMethod?: 'weaving' | 'wild';
+  school: MagicSchool;              // primary school (pillar/attribute via MAGIC_SCHOOLS)
+  description: string;              // the intended magical effect (player intent)
+  cost?: number;                    // legacy mana/effort cost — superseded by manaCost
+  strength?: number;                // 1-10 spell strength level
+  castingMethod?: 'weaving' | 'wild'; // 'weaving' = Woven (canon term); 'wild' = Wild Cast
+
+  // ── structured payload (r-2026-07-22-01 DRAFT — pending sign-off) ──
+  schools?: MagicSchool[];          // all involved schools; multi-school uses the WEAKEST die
+  dr?: SpellDRBreakdown;            // computed additive difficulty
+  manaCost?: number;                // mana spent; each point adds +1 to the casting roll
+  failureConditions?: string;       // Woven: pre-established; Wild: Monkey-Paw risk on fail
+  persistentEffects?: SpellPersistentEffect[]; // enchantments this spell leaves behind
+  requiresSystemReview?: boolean;   // true when dr.total >= systemEngagementDR (godhead oversight)
 }
 
 export interface WovenSpell {

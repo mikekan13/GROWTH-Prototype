@@ -19,10 +19,12 @@ import { DEFAULT_DRIP_CONFIG, type DripConfig } from './subscription-drip';
 
 const DRIP_KEY = 'drip';
 const MISTAKE_BOUNTY_KEY = 'mistakeBounty';
+const MAGIC_CASTING_KEY = 'magicCasting';
 const CACHE_TTL_MS = 30_000;
 
 let dripCache: { config: DripConfig; at: number } | null = null;
 let bountyCache: { config: MistakeBountyConfig; at: number } | null = null;
+let magicCache: { config: MagicCastingConfig; at: number } | null = null;
 
 /**
  * JEWL mistake-bounty payout sizes by severity, in whole KRMA. Anchors per
@@ -142,6 +144,67 @@ export async function setMistakeBountyConfig(
     update: { value: JSON.stringify(next), updatedBy: updatedBy ?? null },
   });
   bountyCache = { config: next, at: Date.now() };
+  return next;
+}
+
+/**
+ * Casting constants (r-2026-07-22-01 / -02), ADMIN-tunable test values:
+ *   - manaPerKrma: how much mana one KRMA buys. Mike: "set conversion... around
+ *     4 mana = 1 KRMA" but "I don't know what this will be without testing."
+ *   - systemEngagementDR: the DR at/above which a cast requires godhead/Terminal
+ *     oversight (Casting_Methods L6 "Heroic"). Mike: "a threshold where the
+ *     godheads get involved... that power level may change but a good place to
+ *     start testing." Starts at 50.
+ * Both deliberately live here so playtest can move them without a deploy.
+ */
+export interface MagicCastingConfig {
+  manaPerKrma: number;
+  systemEngagementDR: number;
+}
+
+export const DEFAULT_MAGIC_CASTING_CONFIG: MagicCastingConfig = {
+  manaPerKrma: 4,
+  systemEngagementDR: 50,
+};
+
+export const magicCastingPatchSchema = z
+  .object({
+    manaPerKrma: z.number().int().min(1).optional(),
+    systemEngagementDR: z.number().int().min(1).optional(),
+  })
+  .strict();
+
+export type MagicCastingPatch = z.infer<typeof magicCastingPatchSchema>;
+
+/** Current casting config: DB row merged over code defaults, or defaults if absent. */
+export async function getMagicCastingConfig(): Promise<MagicCastingConfig> {
+  if (magicCache && Date.now() - magicCache.at < CACHE_TTL_MS) return magicCache.config;
+  const row = await prisma.economyConfig.findUnique({ where: { key: MAGIC_CASTING_KEY } });
+  let config: MagicCastingConfig = DEFAULT_MAGIC_CASTING_CONFIG;
+  if (row) {
+    try {
+      config = { ...DEFAULT_MAGIC_CASTING_CONFIG, ...(JSON.parse(row.value) as Partial<MagicCastingConfig>) };
+    } catch {
+      config = DEFAULT_MAGIC_CASTING_CONFIG;
+    }
+  }
+  magicCache = { config, at: Date.now() };
+  return config;
+}
+
+/** Apply an ADMIN patch to the casting config, persist it, and bust the cache. */
+export async function setMagicCastingConfig(
+  patch: MagicCastingPatch,
+  updatedBy?: string,
+): Promise<MagicCastingConfig> {
+  const current = await getMagicCastingConfig();
+  const next: MagicCastingConfig = { ...current, ...patch };
+  await prisma.economyConfig.upsert({
+    where: { key: MAGIC_CASTING_KEY },
+    create: { key: MAGIC_CASTING_KEY, value: JSON.stringify(next), updatedBy: updatedBy ?? null },
+    update: { value: JSON.stringify(next), updatedBy: updatedBy ?? null },
+  });
+  magicCache = { config: next, at: Date.now() };
   return next;
 }
 

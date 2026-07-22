@@ -416,3 +416,12 @@ entry that references the old.
 - **Still needs Mike before full hardcode**: exact mana↔KRMA number; per-effect DR value review; the structured spell-effect schema sign-off (fields above — Mike confirmed they exist; formalize then confirm).
 - **Lands in rulebook**: §magic (new consolidated casting section), promote the 4 supporting files to validated w/ TBD numbers flagged.
 - **Files (future build)**: new services/magic casting flow, GrowthSpell schema expansion (types/growth.ts), JEWL cast tool, Woven request→GM→godhead pipeline.
+
+### r-2026-07-22-02: Casting constants are tunable test values (addendum to r-2026-07-22-01)
+- **Ruling (Mike, verbal)**:
+  - **Mana↔KRMA rate**: "I don't know what this will be without testing." → NOT a locked number. Ships as an ADMIN-tunable EconomyConfig constant, starting value ≈4 mana : 1 KRMA, to be tuned via playtest.
+  - **System-engagement DR threshold**: "There is a threshold where the godheads get involved. That power level may change but that is a good place to start testing." → **DR 50** confirmed as the starting godhead-involvement threshold (matches Casting_Methods.md L6/Heroic), also an ADMIN-tunable constant so the power level can move with testing.
+  - **Spell schema**: "sounds good" → Fable to draft the structured spell-effect object from canon and present it for sign-off before it's wired into gameplay.
+- **Build directive**: both numbers live in config (code default + ADMIN override), same pattern as `mistakeBounty`. Nothing about the casting core waits on a final number — testing sets them.
+- **Lands in rulebook**: §magic (constants table, flagged tunable)
+- **Files**: services/economy-config.ts (or a magic-config), the cast-resolution engine reads them.
