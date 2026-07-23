@@ -135,6 +135,37 @@ export interface DeathSaveEvent {
   survived?: boolean;
 }
 
+// ── Magic Cast (r-2026-07-22-01) ──────────────────────────────────────────
+
+/**
+ * A cast resolved server-side (POST /api/characters/[id]/cast). Broadcast to
+ * everyone so the GM/JEWL sees Monkey Paw + system-review flags immediately.
+ */
+export interface CastResultEvent {
+  kind: 'cast_result';
+  characterId: string;
+  characterName: string;
+  method: 'wild' | 'woven';
+  spellName?: string;
+  schools: string[];
+  /** Multi-school casts resolve on the weakest school's die. */
+  weakestSchool: string;
+  fateRoll: number;
+  schoolContribution: number;
+  associatedContribution: number;
+  manaSpent: number;
+  total: number;
+  dr: number;
+  margin: number;
+  success: boolean;
+  /** Wild miss → GM/JEWL owes a Monkey Paw effect (instant, unavoidable). */
+  monkeyPaw: boolean;
+  /** Wild miss → this school is advancement-trainable at cost 2 (wiring pending). */
+  schoolToMarkTrainable: string | null;
+  /** DR crossed systemEngagementDR → godhead/Terminal oversight flagged. */
+  requiresSystemReview: boolean;
+}
+
 // ── Terminal Event Relay ──────────────────────────────────────────────────
 
 /** A persisted terminal event relayed in real-time */
@@ -161,6 +192,7 @@ export type StreamEventData =
   | CharacterUpdateEvent
   | PortraitUpdateEvent
   | DeathSaveEvent
+  | CastResultEvent
   | TerminalEventRelay
   | HeartbeatEvent;
 

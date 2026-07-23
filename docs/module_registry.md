@@ -47,6 +47,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | DamageService | `services/damage.ts` | Applies typed damage to character body anatomy via body-container cascade (lib/body-damage.ts), triggers death save at 0 Frequency / vital destruction | body-damage, frequency, Prisma |
 | EconomyConfigService | `services/economy-config.ts` | Read/write ADMIN-tunable constants (EconomyConfig KV store): drip curve, mistakeBounty, magicCasting (manaPerKrma default 4, systemEngagementDR default 50 — r-2026-07-22-02). Falls back to code defaults when key absent | Prisma, subscription-drip |
 | MagicCastService | `services/magic-cast.ts` | Pure cast-resolution engine (r-2026-07-22-01): computeCastPlan (weakest-school die, woven associated-skill die, DR system-review flag) + resolveCast (FD+school+associated+mana vs DR; wild-fail → Monkey Paw + school trainable mark). No db, no randomness | types/growth, dice-utils |
+| MagicCastOpsService | `services/magic-cast-ops.ts` | DB/rolling wrapper for casting: permission check, reads magicCasting config, rolls FD (seed baseFateDie, d6 fallback) + school/associated dice via lib/dice, resolves, deducts mana from magic.mana + persists, broadcasts character_update + cast_result SSE. Canon-silent defaults flagged in NEEDS-MIKE: mana consumed on fail; DR≥threshold flags review, doesn't block. Trainable mark reported, not persisted (storage awaits ruling) | magic-cast, economy-config, dice, permissions, campaign-stream, Prisma |
 | EntityContentsService | `services/entity-contents.ts` | Reads/writes located_at EntityRelationship rows to anchor child entities (Locations, Characters, CampaignItems) inside a parent entity | Prisma |
 | EntityQuickGenService | `services/entity-quick-gen.ts` | AI-assisted NPC speed creation: expands a freeform prompt into a wizard-shaped EntityDraft via Claude | Claude provider, Prisma |
 | FrequencyService | `services/frequency.ts` | Deplete Frequency (current pool only). Spend-credits-KRMA op RETIRED (r-2026-07-19-01 — upgrades go through advancement; no character→wallet conversion except post-death spirit-package breakdown). Triggers death save when hitting 0 | death-save, Prisma |
@@ -334,6 +335,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/penalty-actions/[id] | PATCH | ContractService (ADMIN confirm or reject a PenaltyAction) |
 | /api/characters/[id]/ai-action-mode | PATCH | GodHeadAdminService (toggle aiActionMode on a godhead character) |
 | /api/characters/[id]/advancement | POST | AdvancementOpsService (apply trainable upgrade picks, r-2026-07-15-01) |
+| /api/characters/[id]/cast | POST | MagicCastOpsService (resolve a wild/woven cast server-side, r-2026-07-22-01: schools/method/dr/manaSpent/associatedSkillName; broadcasts cast_result) |
 | /api/characters/[id]/burn | POST | BurnService (character voluntarily burns KRMA) |
 | /api/characters/[id]/canvas-position | PATCH | Lightweight canvas position persistence (no character data change) |
 | /api/characters/[id]/controller | PATCH | Character controller assignment (GM transfers control) |
