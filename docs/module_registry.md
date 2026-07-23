@@ -185,7 +185,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | JewlIdentity | `ai/copilot/jewl-identity.ts` | Name masking: serializes JEWL as "Copilot" to players; wallet hidden |
 | RulesSearch | `ai/copilot/rules-search.ts` | Vector/text search over game rules for JEWL context injection |
 | TimeAwareness | `ai/copilot/time-awareness.ts` | Injects current campaign clock and timescale context into JEWL's system context |
-| JEWL Tools | `ai/copilot/tools/` | 15+ tool implementations: actors (read actor state), attribute-set, condition, damage, forge-blueprint, list-canvas-characters, memory, mistake-corpus, move-character, npc-speak, place-on-canvas, remove-from-canvas, time, time-metrics; plus index + registry + types |
+| JEWL Tools | `ai/copilot/tools/` | 16 tool files: actors (read actor state), attribute-set, cast (preview_cast + resolve_cast — the casting co-pilot, r-2026-07-22-01), condition, damage, forge-blueprint, list-canvas-characters, memory, mistake-corpus, move-character, npc-speak, place-on-canvas, remove-from-canvas, time, time-metrics; plus index + registry + types |
 
 ## AI — JEWL Prompt System (T18)
 

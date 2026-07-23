@@ -62,6 +62,53 @@ export interface CastOpResult {
   spellName?: string;
 }
 
+export interface CastPreviewResult {
+  characterId: string;
+  plan: CastPlan;
+  manaAvailable: number;
+  systemEngagementDR: number;
+}
+
+/**
+ * Compute the cast plan WITHOUT rolling or mutating — what JEWL shows the
+ * caster while coaxing params from vague intent (r-2026-07-22-01). Same
+ * permission gate as executeCast so a preview can't probe other sheets.
+ */
+export async function previewCast(
+  userId: string,
+  userRole: string,
+  input: CastOpRequest,
+): Promise<CastPreviewResult> {
+  const validated = castRequestSchema.parse(input);
+
+  const character = await prisma.character.findUnique({
+    where: { id: validated.characterId },
+    include: { campaign: { select: { gmUserId: true } } },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!canEditCharacter(userId, userRole, character)) {
+    throw new ForbiddenError('Cannot cast for this character');
+  }
+
+  const charData = JSON.parse(character.data) as GrowthCharacter;
+  const config = await getMagicCastingConfig();
+
+  let plan: CastPlan;
+  try {
+    plan = computeCastPlan(charData, validated, config.systemEngagementDR);
+  } catch (err) {
+    if (err instanceof CastError) throw new ValidationError(err.message);
+    throw err;
+  }
+
+  return {
+    characterId: character.id,
+    plan,
+    manaAvailable: charData.magic?.mana?.current ?? 0,
+    systemEngagementDR: config.systemEngagementDR,
+  };
+}
+
 export async function executeCast(
   userId: string,
   userRole: string,

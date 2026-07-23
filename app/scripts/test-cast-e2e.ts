@@ -22,6 +22,7 @@
 import './_server-only-shim';
 import { prisma } from '../src/lib/db';
 import { executeCast } from '../src/services/magic-cast-ops';
+import { previewCastTool, resolveCastTool } from '../src/ai/copilot/tools/cast';
 import { getMagicCastingConfig } from '../src/services/economy-config';
 import { MAGIC_SCHOOLS, type GrowthCharacter, type MagicSchool } from '../src/types/growth';
 
@@ -158,6 +159,36 @@ async function main() {
       atThreshold.resolution.requiresSystemReview);
     check(`DR ${config.systemEngagementDR - 1} does not`,
       !belowThreshold.resolution.requiresSystemReview);
+
+    // 7. JEWL co-pilot tools (r-2026-07-22-01) — handlers driven directly.
+    const toolCtx = {
+      campaignId: character.campaignId ?? '',
+      actorId: admin.id,
+      actorRole: admin.role,
+    };
+    const manaBefore = (await loadSheet(id)).magic?.mana?.current ?? 0;
+    const preview = await previewCastTool.handler({
+      casterCharacterId: id, schools: ['Force', 'Restoration'], method: 'wild', dr: 30,
+    }, toolCtx);
+    const previewOut = preview.output as {
+      plan: { weakestSchool: string }; manaAvailable: number;
+    };
+    check('preview_cast returns the plan (weakest school)',
+      previewOut.plan.weakestSchool === 'Restoration');
+    check('preview_cast reports available mana', previewOut.manaAvailable === manaBefore);
+    check('preview_cast does not mutate mana',
+      ((await loadSheet(id)).magic?.mana?.current ?? 0) === manaBefore);
+    const resolved = await resolveCastTool.handler({
+      casterCharacterId: id, schools: ['Force'], method: 'wild', dr: 1,
+      manaSpent: 2, spellName: 'JEWL Co-pilot Smoke',
+    }, toolCtx);
+    const resolvedOut = resolved.output as {
+      resolution: { success: boolean }; manaRemaining: number;
+    };
+    check('resolve_cast rolls + succeeds at DR 1', resolvedOut.resolution.success);
+    check('resolve_cast deducts mana + reports affected',
+      resolvedOut.manaRemaining === manaBefore - 2 &&
+      (resolved.affected?.characters?.[0]?.changes?.length ?? 0) > 0);
   } finally {
     await prisma.character.update({ where: { id }, data: { data: backup } });
   }

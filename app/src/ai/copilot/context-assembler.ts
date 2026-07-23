@@ -258,6 +258,7 @@ function isRulesQuery(message: string): boolean {
     'depletion', 'frequency', 'harvest', 'grovine', 'seed',
     'body', 'soul', 'spirit', 'nectar', 'blossom', 'thorn',
     'combat', 'death', 'rest', 'wager', 'spend', 'deplete', 'burn',
+    'cast', 'spell', 'magic', 'mana', 'school', 'woven', 'wild', 'monkey paw',
   ];
   const lower = message.toLowerCase();
   return ruleKeywords.some(kw => lower.includes(kw));
