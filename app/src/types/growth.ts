@@ -188,8 +188,9 @@ export interface SpellPersistentEffect {
 /**
  * Spell — a freeform authored object, kin to Nectars/Thorns (r-2026-07-22-01).
  * Legacy fields (name/school/description/cost/strength/castingMethod) preserved
- * for the existing display cards; the structured payload below is the
- * 2026-07-22 DRAFT pending Mike's sign-off before it drives gameplay.
+ * for the existing display cards; the structured payload below is SIGNED OFF
+ * canon (r-2026-07-23-01) and may drive gameplay. Open items are the numbers
+ * (mana↔KRMA, per-effect DR) and the build wiring, not the shape.
  */
 export interface GrowthSpell {
   name: string;

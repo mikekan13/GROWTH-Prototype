@@ -425,3 +425,9 @@ entry that references the old.
 - **Build directive**: both numbers live in config (code default + ADMIN override), same pattern as `mistakeBounty`. Nothing about the casting core waits on a final number — testing sets them.
 - **Lands in rulebook**: §magic (constants table, flagged tunable)
 - **Files**: services/economy-config.ts (or a magic-config), the cast-resolution engine reads them.
+
+### r-2026-07-23-01: Spell-effect schema SIGNED OFF (confirms r-2026-07-22-01 #4)
+- **Ruling (Mike, verbal)**: "Yeah looks good" — the structured GrowthSpell object drafted 2026-07-22 is APPROVED as canon. Fields: `schools[]` (multi-school → weakest die), `dr {base,targets?,size?,duration?,range?,schools?,total}` (additive), `manaCost` (+1/point to the roll), `failureConditions`, `persistentEffects[]` (enchantments left behind — trait/item/other), `requiresSystemReview` (dr.total ≥ systemEngagementDR). Legacy fields retained for existing display cards.
+- **Status**: the schema is no longer "draft" — it may be wired into gameplay. Open magic items that remain are the NUMBERS (exact mana↔KRMA, per-effect DR review) and the follow-on BUILD units (see NEEDS-MIKE / STATE-OF-PLAY), not the shape.
+- **Lands in rulebook**: §magic (spell object)
+- **Files**: types/growth.ts GrowthSpell (drop the "DRAFT pending sign-off" caveat on next touch)
