@@ -10,6 +10,9 @@ import {
   getMistakeBountyConfig,
   setMistakeBountyConfig,
   mistakeBountyPatchSchema,
+  getMagicCastingConfig,
+  setMagicCastingConfig,
+  magicCastingPatchSchema,
 } from '@/services/economy-config';
 
 export const dynamic = 'force-dynamic';
@@ -19,18 +22,20 @@ export async function GET() {
   try {
     const session = await requireAuth();
     if (!isAdminRole(session.user.role)) throw new ForbiddenError('Admin only');
-    const [drip, mistakeBounty] = await Promise.all([
+    const [drip, mistakeBounty, magicCasting] = await Promise.all([
       getDripConfig(),
       getMistakeBountyConfig(),
+      getMagicCastingConfig(),
     ]);
-    return NextResponse.json({ drip, mistakeBounty });
+    return NextResponse.json({ drip, mistakeBounty, magicCasting });
   } catch (error) {
     return errorResponse(error);
   }
 }
 
 // PATCH /api/admin/economy-config — override tunables. ADMIN only.
-// Body: { drip?: Partial<DripConfig>, mistakeBounty?: Partial<MistakeBountyConfig> }.
+// Body: { drip?: Partial<DripConfig>, mistakeBounty?: Partial<MistakeBountyConfig>,
+//         magicCasting?: Partial<MagicCastingConfig> } (r-2026-07-22-02 tunables).
 // Values merge over the current config; nothing here mints KRMA (INV-13) — it
 // only changes transfer sizes.
 export async function PATCH(request: NextRequest) {
@@ -45,8 +50,11 @@ export async function PATCH(request: NextRequest) {
     const mistakeBounty = body?.mistakeBounty
       ? await setMistakeBountyConfig(mistakeBountyPatchSchema.parse(body.mistakeBounty), session.user.id)
       : await getMistakeBountyConfig();
+    const magicCasting = body?.magicCasting
+      ? await setMagicCastingConfig(magicCastingPatchSchema.parse(body.magicCasting), session.user.id)
+      : await getMagicCastingConfig();
 
-    return NextResponse.json({ drip, mistakeBounty });
+    return NextResponse.json({ drip, mistakeBounty, magicCasting });
   } catch (error) {
     return errorResponse(error);
   }
