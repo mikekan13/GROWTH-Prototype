@@ -4,11 +4,11 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
 // SkillGovernor type used indirectly via SKILL_GOVERNORS
-import { SKILL_GOVERNORS } from '@/types/growth';
+import { SKILL_GOVERNORS, MAGIC_SCHOOLS } from '@/types/growth';
 
 // ── Forge Item Types ──────────────────────────────────────────────────────
 
-export const FORGE_ITEM_TYPES = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'] as const;
+export const FORGE_ITEM_TYPES = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn', 'spell'] as const;
 export type ForgeItemType = typeof FORGE_ITEM_TYPES[number];
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────
@@ -71,6 +71,40 @@ const forgeTraitDataSchema = z.object({
   description: z.string().max(500),
   mechanicalEffect: z.string().max(300).optional(),
   source: z.string().max(200).optional(),
+});
+
+// Woven spell (r-2026-07-22-01 #4/#5, schema signed off r-2026-07-23-01).
+// Mechanics fields are OPTIONAL here because a PlayerRequest starts as pure
+// intent (player → GM → godhead chain fills DR/mana); learnSpell enforces
+// completeness before a spell can reach a character's knownSpells.
+const magicSchoolSchema = z.enum(Object.keys(MAGIC_SCHOOLS) as [string, ...string[]]);
+
+const spellDrBreakdownSchema = z.object({
+  base: z.number().int().min(1),
+  targets: z.number().int().min(0).optional(),
+  size: z.number().int().min(0).optional(),
+  duration: z.number().int().min(0).optional(),
+  range: z.number().int().min(0).optional(),
+  schools: z.number().int().min(0).optional(),
+  total: z.number().int().min(1),
+}).refine(
+  (d) => d.total === d.base + (d.targets ?? 0) + (d.size ?? 0) + (d.duration ?? 0)
+    + (d.range ?? 0) + (d.schools ?? 0),
+  { message: 'DR is additive: total must equal the sum of its parts' },
+);
+
+export const forgeSpellDataSchema = z.object({
+  description: z.string().min(1).max(2000),
+  school: magicSchoolSchema,
+  schools: z.array(magicSchoolSchema).max(10).optional(),
+  castingMethod: z.literal('weaving').default('weaving'),
+  dr: spellDrBreakdownSchema.optional(),
+  manaCost: z.number().int().min(0).optional(),
+  failureConditions: z.string().max(1000).optional(),
+  persistentEffects: z.array(z.object({
+    kind: z.enum(['trait', 'item', 'other']),
+    description: z.string().max(500),
+  })).max(10).optional(),
 });
 
 // Root/Branch attribute schema — starting levels (not augments)
@@ -147,6 +181,7 @@ function validateForgeData(type: string, data: unknown) {
     case 'nectar':
     case 'blossom':
     case 'thorn': return forgeTraitDataSchema.parse(data);
+    case 'spell': return forgeSpellDataSchema.parse(data);
     default: throw new ValidationError(`Unknown forge item type: ${type}`);
   }
 }

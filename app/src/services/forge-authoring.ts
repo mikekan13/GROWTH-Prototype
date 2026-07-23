@@ -146,6 +146,16 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - description: string (what this negative trait does, max 500 chars)
   - mechanicalEffect: string (the mechanical penalty or restriction, max 300 chars)
   - source: string (origin — innate, acquired, cursed, etc.)`,
+
+  spell: `Generate a JSON object for a WOVEN SPELL (r-2026-07-22-01) with these fields:
+  - description: string (the concrete magical effect, max 2000 chars)
+  - school: the PRIMARY school — one of: Abjuration, Alteration, Conjuration, Dissolution, Divination, Enchantment, Force, Fortune, Illusion, Restoration
+  - schools: string[] — EVERY school the effect draws on (multi-school casts roll the WEAKEST involved school's die; each additional school adds to the DR)
+  - castingMethod: "weaving" (always — Wild casts are improvised, never authored)
+  - dr: { base, targets?, size?, duration?, range?, schools?, total } — DR is ADDITIVE: base per the core effect, plus scaling for extra targets / size categories / duration increments / range categories, plus summed DRs of additional schools. total MUST equal the sum of the parts. DR 50+ engages godhead/Terminal oversight — author most spells below that unless the intent is genuinely that powerful.
+  - manaCost: integer 0+ (mana the weave consumes; each point of mana adds +1 to the casting roll)
+  - failureConditions: string (what happens on a missed Woven cast — Woven spells NEVER trigger a Monkey Paw; they fail per these authored conditions, max 1000 chars)
+  - persistentEffects: array of { kind: "trait"|"item"|"other", description } — lasting effects the spell leaves behind (enchantments, permanent alterations). Spells that create real permanence should carry proportionally high DR.`,
 };
 
 // ── KV estimation guidance ───────────────────────────────────────────────

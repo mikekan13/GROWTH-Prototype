@@ -257,7 +257,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
     } catch { /* silent */ }
   };
 
-  const types = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'];
+  const types = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn', 'spell'];
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const resolvedRequests = requests.filter(r => r.status !== 'pending');
 
@@ -330,7 +330,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   className="text-[14px] bg-transparent text-white outline-none px-2 py-1 border"
                   style={{ borderColor: '#3a3a4e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                 >
-                  {['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn'].map(t => (
+                  {['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn', 'spell'].map(t => (
                     <option key={t} value={t} style={{ backgroundColor: '#1a1a2e' }}>{t}</option>
                   ))}
                 </select>
