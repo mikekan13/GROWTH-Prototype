@@ -12,9 +12,9 @@ interface TerminalEventRowProps {
 // ── Actor Badge Colors ─────────────────────────────────────────────────────
 
 const ACTOR_COLORS: Record<string, string> = {
-  player: '#22ab94',
-  gm: '#ffcc78',
-  ai_copilot: '#582a72',
+  player: 'var(--terminal-prime)',
+  gm: 'var(--krma-gold)',
+  ai_copilot: 'var(--pillar-spirit)',
   system: '#666',
 };
 
@@ -93,7 +93,7 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
     >
       <div className="flex items-center gap-2 px-2 py-1.5 cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <ActorBadge actor={event.actor} color={actorColor} />
-        <span className="text-xs flex-shrink-0" style={{ color: '#ffcc78' }}>{icon}</span>
+        <span className="text-xs flex-shrink-0" style={{ color: 'var(--krma-gold)' }}>{icon}</span>
         {event.characterName && (
           <span className="text-[13px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#8e7cc3' }}>
             {event.characterName}
@@ -118,7 +118,7 @@ function ChangeLogRow({ event, payload, onRevert, reverting }: {
                 <span style={{ color: '#666', minWidth: '140px' }}>{change.path}</span>
                 <span style={{ color: '#ff6b6b' }}>{JSON.stringify(change.previousValue)}</span>
                 <span style={{ color: '#666' }}>{'\u2192'}</span>
-                <span style={{ color: '#22ab94' }}>{JSON.stringify(change.newValue)}</span>
+                <span style={{ color: 'var(--terminal-prime)' }}>{JSON.stringify(change.newValue)}</span>
               </div>
             ))}
           </div>
@@ -161,7 +161,7 @@ const DIE_MAX: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 
 function dieValueColor(dieType: string, value: number): string {
   if (value === 1) return '#FF4444';
   if (value === (DIE_MAX[dieType] ?? 0)) return '#44FF66';
-  return '#ffcc78';
+  return 'var(--krma-gold)';
 }
 
 function getTotalExtreme(payload: DiceRollPayload): 'min' | 'max' | null {
@@ -179,20 +179,20 @@ function getTotalExtreme(payload: DiceRollPayload): 'min' | 'max' | null {
 
 function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRollPayload }) {
   const actorColor = ACTOR_COLORS[event.actor] || '#666';
-  const successColor = payload.success === true ? '#22ab94' : payload.success === false ? '#ff6b6b' : '#ffcc78';
+  const successColor = payload.success === true ? 'var(--terminal-prime)' : payload.success === false ? '#ff6b6b' : 'var(--krma-gold)';
   const resultLabel = payload.success === true ? 'SUCCESS' : payload.success === false ? 'FAILURE' : '';
   const totalExtreme = getTotalExtreme(payload);
-  const totalColor = totalExtreme === 'min' ? '#FF4444' : totalExtreme === 'max' ? '#44FF66' : '#ffcc78';
+  const totalColor = totalExtreme === 'min' ? '#FF4444' : totalExtreme === 'max' ? '#44FF66' : 'var(--krma-gold)';
 
   return (
     <div style={{
       backgroundColor: 'rgba(255,204,120,0.06)',
-      borderLeft: '3px solid #ffcc78',
+      borderLeft: '3px solid var(--krma-gold)',
       borderRadius: '2px',
     }}>
       <div className="flex items-center gap-2 px-2 py-1.5">
         <ActorBadge actor={event.actor} color={actorColor} />
-        <span className="text-xs flex-shrink-0" style={{ color: '#ffcc78' }}>{'\uD83C\uDFB2'}</span>
+        <span className="text-xs flex-shrink-0" style={{ color: 'var(--krma-gold)' }}>{'\uD83C\uDFB2'}</span>
         {event.characterName && (
           <span className="text-[13px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#8e7cc3' }}>
             {event.characterName}
@@ -211,7 +211,7 @@ function DiceRollRow({ event, payload }: { event: TerminalEvent; payload: DiceRo
                   <b style={{ color: dieValueColor(d.dieType, d.value) }}>{d.value}</b>
                 </span>
               ))}
-              {' = '}<b style={{ color: '#ffcc78' }}>{payload.total}</b>
+              {' = '}<b style={{ color: 'var(--krma-gold)' }}>{payload.total}</b>
             </>
           ) : (
             payload.context
@@ -311,13 +311,13 @@ function CommandRow({ event: _event, payload }: { event: TerminalEvent; payload:
   return (
     <div className="px-2 py-1" style={{ opacity: 0.7 }}>
       <div className="text-[13px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-        <span style={{ color: '#22ab94' }}>{'>'} </span>
+        <span style={{ color: 'var(--terminal-prime)' }}>{'>'} </span>
         <span style={{ color: '#888' }}>{payload.input}</span>
       </div>
       {payload.result && (
         <div className="text-[13px] pl-3" style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
-          color: payload.success ? '#22ab94' : '#ff6b6b',
+          color: payload.success ? 'var(--terminal-prime)' : '#ff6b6b',
         }}>
           {payload.result}
         </div>
@@ -330,17 +330,17 @@ function CommandRow({ event: _event, payload }: { event: TerminalEvent; payload:
 
 function AIMessageRow({ event, payload }: { event: TerminalEvent; payload: AIMessagePayload }) {
   const severityColors: Record<string, string> = {
-    info: '#582a72',
-    warning: '#ffcc78',
-    action: '#22ab94',
+    info: 'var(--pillar-spirit)',
+    warning: 'var(--krma-gold)',
+    action: 'var(--terminal-prime)',
     question: '#E8585A',
   };
-  const color = severityColors[payload.severity] || '#582a72';
+  const color = severityColors[payload.severity] || 'var(--pillar-spirit)';
 
   return (
     <div style={{ borderLeft: `3px solid ${color}`, borderRadius: '2px' }}>
       <div className="flex items-start gap-2 px-2 py-1.5">
-        <ActorBadge actor="ai_copilot" color="#582a72" />
+        <ActorBadge actor="ai_copilot" color="var(--pillar-spirit)" />
         <span className="text-xs flex-shrink-0" style={{ color }}>{'\u25C6'}</span>
         <span className="text-[12px] flex-1 italic" style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -359,7 +359,7 @@ function GameEventRow({ event, payload }: { event: TerminalEvent; payload: GameE
     <div className="flex items-center gap-2 px-2 py-1" style={{ opacity: 0.6 }}>
       <div className="flex-1 text-center text-[13px] uppercase tracking-widest" style={{
         fontFamily: 'var(--font-terminal), Consolas, monospace',
-        color: '#22ab94',
+        color: 'var(--terminal-prime)',
       }}>
         {'═══ '}{payload.description}{' ═══'}
       </div>

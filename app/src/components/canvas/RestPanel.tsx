@@ -197,7 +197,7 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
                     ).join(', ') || 'no change'}
                   </span>
                   {r.advanced && r.advanced.length > 0 && (
-                    <div style={{ color: '#ffcc78', marginTop: 2 }}>
+                    <div style={{ color: 'var(--krma-gold)', marginTop: 2 }}>
                       {'\u25b2 '}{r.advanced.map(a => `${a.name} ${a.from}\u2192${a.to}`).join(', ')}
                     </div>
                   )}
@@ -338,7 +338,7 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
 
                     {/* Long-rest Frequency budget after picks */}
                     {freq && restType === 'long' && cost > 0 && (
-                      <span style={{ fontSize: 9, color: '#ffcc78' }}>
+                      <span style={{ fontSize: 9, color: 'var(--krma-gold)' }}>
                         F max {maxFreq}{'\u2192'}{maxFreq - cost}
                       </span>
                     )}
@@ -408,16 +408,16 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
                                     width: 11,
                                     height: 11,
                                     borderRadius: 2,
-                                    border: `1px solid ${isPicked ? '#ffcc78' : 'rgba(255,255,255,0.3)'}`,
+                                    border: `1px solid ${isPicked ? 'var(--krma-gold)' : 'rgba(255,255,255,0.3)'}`,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     flexShrink: 0,
                                   }}>
-                                    {isPicked && <span style={{ color: '#ffcc78', fontSize: 8, lineHeight: 1 }}>{'\u2713'}</span>}
+                                    {isPicked && <span style={{ color: 'var(--krma-gold)', fontSize: 8, lineHeight: 1 }}>{'\u2713'}</span>}
                                   </div>
                                   <span style={{ fontSize: 10, flex: 1 }}>{item.name}{item.kind === 'school' && item.magicPillar ? ` (${item.magicPillar})` : ''}</span>
-                                  <span style={{ fontSize: 9, color: isPicked ? '#ffcc78' : 'rgba(255,255,255,0.4)' }}>
+                                  <span style={{ fontSize: 9, color: isPicked ? 'var(--krma-gold)' : 'rgba(255,255,255,0.4)' }}>
                                     {item.currentLevel}{'\u2192'}{item.currentLevel + 1}
                                   </span>
                                   <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>

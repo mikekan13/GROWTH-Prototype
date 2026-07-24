@@ -18,6 +18,7 @@
   --accent-amber: #D07818;
   --accent-coral: #E84040;
   --terminal-green: #40E070;
+  --terminal-prime: #22ab94; /* canon Terminal teal (INV-03, Prime Frame) */
   --krma-gold: #FFCC78;
 
   /* Derived */
@@ -38,6 +39,7 @@
   --color-teal: var(--accent-teal);
   --color-gold: var(--accent-gold);
   --color-amber: var(--accent-amber);
+  --color-terminal: var(--terminal-prime);
   --color-krma: var(--krma-gold);
 
   /* Surfaces */

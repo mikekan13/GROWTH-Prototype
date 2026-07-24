@@ -332,7 +332,7 @@ function GrovinesPanel({ nodes }: { nodes: CanvasNode[] }) {
                     <span className="text-white/40 ml-1">{vine.resistance || 'Hidden'}</span>
                   </div>
                   <div>
-                    <span className="text-[#ffcc78] font-bold">O</span>
+                    <span className="text-[var(--krma-gold)] font-bold">O</span>
                     <span className="text-white/40 ml-1">{vine.opportunity || 'Awaiting'}</span>
                   </div>
                 </div>

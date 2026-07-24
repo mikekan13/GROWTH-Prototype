@@ -37,8 +37,8 @@ interface ContractsDockProps {
 // ── Style helpers ─────────────────────────────────────────────────────────────
 
 const STATUS_CHIP: Record<ContractStatus, { label: string; bg: string; color: string }> = {
-  ACTIVE:    { label: 'ACTIVE',     bg: 'rgba(34,171,148,0.18)',  color: '#22ab94' },
-  VIOLATED:  { label: 'VIOLATED',   bg: 'rgba(247,82,95,0.18)',   color: '#f7525f' },
+  ACTIVE:    { label: 'ACTIVE',     bg: 'rgba(34,171,148,0.18)',  color: 'var(--terminal-prime)' },
+  VIOLATED:  { label: 'VIOLATED',   bg: 'rgba(247,82,95,0.18)',   color: 'var(--pillar-body)' },
   FULFILLED: { label: 'FULFILLED',  bg: 'rgba(255,204,120,0.25)', color: '#c9962e' },
   REVOKED:   { label: 'REVOKED',    bg: 'rgba(120,120,120,0.18)', color: '#888'    },
 };
@@ -238,7 +238,7 @@ function ContractCard({ contract, onRefresh }: { contract: Contract; onRefresh: 
           {contract.penaltyActions.length > 0 && (
             <div
               style={{
-                border: '1px solid #f7525f',
+                border: '1px solid var(--pillar-body)',
                 borderRadius: '3px',
                 padding: '6px 8px',
                 marginBottom: '8px',
@@ -250,7 +250,7 @@ function ContractCard({ contract, onRefresh }: { contract: Contract; onRefresh: 
                   <div
                     style={{
                       fontSize: '10px',
-                      color: '#f7525f',
+                      color: 'var(--pillar-body)',
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
                       fontWeight: 700,
                       marginBottom: '4px',
@@ -268,9 +268,9 @@ function ContractCard({ contract, onRefresh }: { contract: Contract; onRefresh: 
                         fontFamily: 'var(--font-terminal), Consolas, monospace',
                         fontWeight: 700,
                         letterSpacing: '0.05em',
-                        background: confirmingActionId === pa.id ? '#f7525f' : 'rgba(247,82,95,0.2)',
-                        color: confirmingActionId === pa.id ? '#fff' : '#f7525f',
-                        border: '1px solid #f7525f',
+                        background: confirmingActionId === pa.id ? 'var(--pillar-body)' : 'rgba(247,82,95,0.2)',
+                        color: confirmingActionId === pa.id ? '#fff' : 'var(--pillar-body)',
+                        border: '1px solid var(--pillar-body)',
                         borderRadius: '3px',
                         cursor: actionBusy ? 'not-allowed' : 'pointer',
                       }}
@@ -312,7 +312,7 @@ function ContractCard({ contract, onRefresh }: { contract: Contract; onRefresh: 
                 fontSize: '9px',
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 background: 'rgba(34,171,148,0.15)',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 border: '1px solid rgba(34,171,148,0.5)',
                 borderRadius: '3px',
                 cursor: evaluating ? 'not-allowed' : 'pointer',
@@ -325,7 +325,7 @@ function ContractCard({ contract, onRefresh }: { contract: Contract; onRefresh: 
                 style={{
                   fontSize: '9px',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  color: evalResult.holds ? '#22ab94' : '#f7525f',
+                  color: evalResult.holds ? 'var(--terminal-prime)' : 'var(--pillar-body)',
                 }}
               >
                 {evalResult.holds ? 'HOLDS' : evalResult.violated ? 'VIOLATED' : 'FALSE'}
@@ -407,7 +407,7 @@ function CreateContractDialog({
       <div
         style={{
           background: '#dce6f0',
-          border: '2px solid #ffcc78',
+          border: '2px solid var(--krma-gold)',
           borderRadius: '6px',
           width: '520px',
           maxHeight: '90vh',
@@ -431,7 +431,7 @@ function CreateContractDialog({
             style={{
               fontFamily: 'var(--font-header), Bebas Neue, Impact, sans-serif',
               fontSize: '18px',
-              color: '#ffcc78',
+              color: 'var(--krma-gold)',
               letterSpacing: '0.1em',
             }}
           >
@@ -504,7 +504,7 @@ function CreateContractDialog({
             <div
               style={{
                 fontSize: '10px',
-                color: '#f7525f',
+                color: 'var(--pillar-body)',
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 background: 'rgba(247,82,95,0.1)',
                 border: '1px solid rgba(247,82,95,0.3)',
@@ -525,7 +525,7 @@ function CreateContractDialog({
               style={{
                 ...cancelBtnStyle,
                 background: busy ? 'rgba(34,171,148,0.1)' : 'rgba(34,171,148,0.2)',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 border: '1px solid rgba(34,171,148,0.6)',
                 cursor: busy ? 'not-allowed' : 'pointer',
               }}
@@ -614,7 +614,7 @@ export default function ContractsDock({ campaignId }: ContractsDockProps) {
           width: '300px',
           display: 'flex',
           flexDirection: 'column',
-          border: '2px solid #ffcc78',
+          border: '2px solid var(--krma-gold)',
           borderRadius: '6px',
           overflow: 'hidden',
           boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
@@ -655,7 +655,7 @@ export default function ContractsDock({ campaignId }: ContractsDockProps) {
                 padding: '0 5px',
                 borderRadius: '3px',
                 background: 'rgba(34,171,148,0.2)',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 fontWeight: 700,
               }}
@@ -671,7 +671,7 @@ export default function ContractsDock({ campaignId }: ContractsDockProps) {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 fontSize: '16px',
                 cursor: 'pointer',
                 lineHeight: 1,
@@ -684,7 +684,7 @@ export default function ContractsDock({ campaignId }: ContractsDockProps) {
           )}
 
           {/* Collapse toggle */}
-          <span style={{ color: '#ffcc78', fontSize: '10px' }}>
+          <span style={{ color: 'var(--krma-gold)', fontSize: '10px' }}>
             {collapsed ? '▶' : '▼'}
           </span>
         </div>
@@ -704,7 +704,7 @@ export default function ContractsDock({ campaignId }: ContractsDockProps) {
             {loading ? (
               <div
                 style={{
-                  color: '#22ab94',
+                  color: 'var(--terminal-prime)',
                   fontSize: '10px',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                   textAlign: 'center',

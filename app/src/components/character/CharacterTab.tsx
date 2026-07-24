@@ -536,14 +536,14 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               placeholder="Character Name"
               className="text-2xl p-1 text-center w-full max-w-md mx-auto block"
               style={{
-                backgroundColor: 'transparent', color: '#ffcc78', border: 'none',
-                borderBottom: '1px solid #582a72',
+                backgroundColor: 'transparent', color: 'var(--krma-gold)', border: 'none',
+                borderBottom: '1px solid var(--pillar-spirit)',
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 letterSpacing: '0.15em', outline: 'none',
               }}
             />
           ) : (
-            <h2 className="text-2xl" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#ffcc78', letterSpacing: '0.15em' }}>
+            <h2 className="text-2xl" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: 'var(--krma-gold)', letterSpacing: '0.15em' }}>
               {characterName || 'Unnamed'}
             </h2>
           )}
@@ -568,7 +568,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                   setDirty(true);
                 }}
                 className="w-full text-sm p-2"
-                style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px', colorScheme: 'dark' }}
+                style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px', colorScheme: 'dark' }}
               >
                 <option value="" style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>— Select a Seed —</option>
                 {campaignSeeds.map(s => (
@@ -602,7 +602,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                       <span style={{ color: '#D0A030' }}>Fated Age {selectedSeed.data.fatedAge}</span>
                     )}
                     {selectedSeed.data.nectars && selectedSeed.data.nectars.length > 0 && (
-                      <span style={{ color: '#22ab94' }}>Nectars: {selectedSeed.data.nectars.join(', ')}</span>
+                      <span style={{ color: 'var(--terminal-prime)' }}>Nectars: {selectedSeed.data.nectars.join(', ')}</span>
                     )}
                     {selectedSeed.data.thorns && selectedSeed.data.thorns.length > 0 && (
                       <span style={{ color: '#E8585A' }}>Thorns: {selectedSeed.data.thorns.join(', ')}</span>
@@ -619,10 +619,10 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         </div>
 
         {/* ── SECTION: Reference Photos ── */}
-        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+        <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="text-base uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+              <div className="text-base uppercase" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
                 Reference Photos
               </div>
               <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -638,7 +638,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     className="px-4 py-2 text-xs uppercase tracking-wider transition-colors"
                     style={{
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
-                      backgroundColor: describing || !selectedSeed ? '#333' : '#582a72',
+                      backgroundColor: describing || !selectedSeed ? '#333' : 'var(--pillar-spirit)',
                       color: describing || !selectedSeed ? '#666' : '#fff',
                       border: '1px solid rgba(88, 42, 114, 0.4)',
                       borderRadius: '2px', cursor: describing || !selectedSeed ? 'default' : 'pointer',
@@ -651,7 +651,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                   className="px-4 py-2 text-xs uppercase tracking-wider transition-colors cursor-pointer"
                   style={{
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    backgroundColor: uploading ? '#333' : '#22ab94',
+                    backgroundColor: uploading ? '#333' : 'var(--terminal-prime)',
                     color: uploading ? '#666' : '#000',
                     border: '1px solid rgba(34, 171, 148, 0.4)',
                     borderRadius: '2px',
@@ -673,7 +673,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           <div className="flex gap-3 flex-wrap">
             {referencePhotos.map((photo, i) => (
               <div key={photo} className="relative group">
-                <div className="border overflow-hidden" style={{ borderColor: i === 0 ? '#D0A030' : '#582a72', borderWidth: i === 0 ? '2px' : '1px', borderRadius: '3px', width: '100px', height: '125px' }}>
+                <div className="border overflow-hidden" style={{ borderColor: i === 0 ? '#D0A030' : 'var(--pillar-spirit)', borderWidth: i === 0 ? '2px' : '1px', borderRadius: '3px', width: '100px', height: '125px' }}>
                   <img src={photo} alt={`Reference ${i + 1}`} className="w-full h-full object-cover" />
                 </div>
                 {i === 0 && (
@@ -694,7 +694,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               </div>
             ))}
             {isEditable && referencePhotos.length === 0 && (
-              <label className="border border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '100px', height: '125px', backgroundColor: '#111' }}>
+              <label className="border border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', width: '100px', height: '125px', backgroundColor: '#111' }}>
                 <div className="text-2xl" style={{ color: '#8e7cc3', opacity: 0.4 }}>+</div>
                 <div className="text-xs mt-1" style={{ color: '#8e7cc3', opacity: 0.4, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                   Add Photo
@@ -703,7 +703,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               </label>
             )}
             {isEditable && referencePhotos.length > 0 && (
-              <label className="border border-dashed flex items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: '#582a72', borderRadius: '3px', width: '50px', height: '125px', backgroundColor: '#111' }}>
+              <label className="border border-dashed flex items-center justify-center cursor-pointer hover:border-solid transition-colors" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', width: '50px', height: '125px', backgroundColor: '#111' }}>
                 <div className="text-xl" style={{ color: '#8e7cc3', opacity: 0.4 }}>+</div>
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} className="hidden" disabled={uploading} />
               </label>
@@ -713,8 +713,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
         {/* PHYSICAL IDENTITY — body-part-driven */}
         {selectedSeed ? (
-          <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-            <div className="text-base uppercase mb-3" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+          <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+            <div className="text-base uppercase mb-3" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
               Physical Identity
             </div>
             <div className="text-xs mb-4" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -733,12 +733,12 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 </label>
                 {isEditable ? (
                   <div>
-                    <div className="text-sm mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+                    <div className="text-sm mb-1" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
                       {desiredAge}
                     </div>
                     <input type="range" min={10} max={selectedSeed?.data.fatedAge || 200} value={desiredAge}
                       onChange={e => { setDesiredAge(Number(e.target.value)); setDirty(true); }}
-                      className="w-full" style={{ accentColor: '#582a72' }} />
+                      className="w-full" style={{ accentColor: 'var(--pillar-spirit)' }} />
                     <div className="flex justify-between text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>
                       <span>10</span>
                       <span>Fated: {selectedSeed?.data.fatedAge || '—'}</span>
@@ -755,7 +755,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 </label>
                 {isEditable && selectedSeed.data.heightRange ? (
                   <div>
-                    <div className="text-sm mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+                    <div className="text-sm mb-1" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
                       {pd.height != null && !isNaN(pd.height) ? inchesToDisplay(pd.height) : '—'}
                     </div>
                     <input
@@ -764,7 +764,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                       max={selectedSeed.data.heightRange.max}
                       value={pd.height || Math.round((selectedSeed.data.heightRange.min + selectedSeed.data.heightRange.max) / 2)}
                       onChange={e => updateHeight(Number(e.target.value))}
-                      className="w-full" style={{ accentColor: '#582a72' }}
+                      className="w-full" style={{ accentColor: 'var(--pillar-spirit)' }}
                     />
                     <div className="flex justify-between text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                       <span>{inchesToDisplay(selectedSeed.data.heightRange.min)}</span>
@@ -789,7 +789,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     value={pd.skinTone || ''}
                     onChange={e => updateField('skinTone', e.target.value)}
                     className="w-full text-sm p-1"
-                    style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px' }}
+                    style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }}
                   >
                     <option value="">—</option>
                     {selectedSeed.data.skinToneOptions.map(t => (
@@ -904,8 +904,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         )}
 
         {/* ── SECTION: Style Preferences ── */}
-        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-          <div className="text-base uppercase mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+        <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+          <div className="text-base uppercase mb-1" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
             Style Preferences
           </div>
           <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -928,7 +928,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     style={{ backgroundColor: 'transparent' }}
                   />
                 ) : (
-                  <div className="w-10 h-10 border" style={{ backgroundColor: styleColors[key], borderColor: '#582a72', borderRadius: '2px' }} />
+                  <div className="w-10 h-10 border" style={{ backgroundColor: styleColors[key], borderColor: 'var(--pillar-spirit)', borderRadius: '2px' }} />
                 )}
                 <div className="text-xs mt-0.5" style={{ color: '#444', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>
                   {styleColors[key]}
@@ -960,9 +960,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     className="px-2 py-1 text-xs transition-colors"
                     style={{
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
-                      backgroundColor: selected ? '#582a72' : '#111',
-                      color: selected ? '#ffcc78' : '#666',
-                      border: `1px solid ${selected ? '#582a72' : '#2a2a3e'}`,
+                      backgroundColor: selected ? 'var(--pillar-spirit)' : '#111',
+                      color: selected ? 'var(--krma-gold)' : '#666',
+                      border: `1px solid ${selected ? 'var(--pillar-spirit)' : '#2a2a3e'}`,
                       borderRadius: '2px',
                       cursor: isEditable ? 'pointer' : 'default',
                       opacity: !selected && styleAesthetics.length >= 2 ? 0.3 : 1,
@@ -975,17 +975,17 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             </div>
             {styleAesthetics.length > 0 && (
               <div className="text-xs mt-2" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                Style: <span style={{ color: '#ffcc78' }}>{styleAesthetics.join(' + ')}</span>
+                Style: <span style={{ color: 'var(--krma-gold)' }}>{styleAesthetics.join(' + ')}</span>
               </div>
             )}
           </div>
         </div>
 
         {/* ── SECTION: Visual Identity ── */}
-        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+        <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="text-base uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+              <div className="text-base uppercase" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
                 Visual Identity
               </div>
               <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -999,9 +999,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 className="px-5 py-2 text-xs uppercase tracking-[0.12em] transition-colors"
                 style={{
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  backgroundColor: selectedSeed ? '#582a72' : '#333',
+                  backgroundColor: selectedSeed ? 'var(--pillar-spirit)' : '#333',
                   color: selectedSeed ? '#fff' : '#555',
-                  border: '1px solid #582a72', borderRadius: '2px',
+                  border: '1px solid var(--pillar-spirit)', borderRadius: '2px',
                   cursor: !selectedSeed ? 'default' : 'pointer',
                 }}
               >
@@ -1050,10 +1050,10 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         </div>
 
         {/* INVENTORY */}
-        <div className="border p-4" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+        <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="text-base uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+              <div className="text-base uppercase" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
                 Inventory
               </div>
               <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -1072,8 +1072,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         </div>
 
         {/* BACKSTORY */}
-        <div className="border p-4 flex flex-col" style={{ borderColor: '#582a72', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-          <div className="text-base uppercase mb-2" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+        <div className="border p-4 flex flex-col" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+          <div className="text-base uppercase mb-2" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
             Backstory
           </div>
           <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -1088,7 +1088,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               placeholder="Write your character's story here..."
               className="w-full text-sm p-3 resize-none"
               style={{
-                backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px',
+                backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px',
                 fontFamily: 'var(--font-terminal), Consolas, monospace', minHeight: '250px',
               }}
             />
@@ -1111,7 +1111,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
-                backgroundColor: dirty ? '#22ab94' : '#333',
+                backgroundColor: dirty ? 'var(--terminal-prime)' : '#333',
                 color: dirty ? '#000' : '#666',
                 border: '1px solid rgba(34, 171, 148, 0.4)',
                 borderRadius: '2px', cursor: dirty ? 'pointer' : 'default',
@@ -1162,7 +1162,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
-                backgroundColor: characterName && backstoryText ? '#582a72' : '#333',
+                backgroundColor: characterName && backstoryText ? 'var(--pillar-spirit)' : '#333',
                 color: characterName && backstoryText ? '#fff' : '#555',
                 border: '1px solid rgba(88, 42, 114, 0.4)',
                 borderRadius: '2px', cursor: characterName && backstoryText && !submittingBackstory ? 'pointer' : 'default',
@@ -1171,7 +1171,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               {submittingBackstory ? 'Submitting...' : backstorySubmitted ? 'Re-submit to Watcher' : 'Submit to Watcher'}
             </button>
             {lastSaved && !dirty && (
-              <span className="text-xs" style={{ color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              <span className="text-xs" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 Last saved {lastSaved}
               </span>
             )}
@@ -1195,7 +1195,7 @@ function PortraitFrame({ label, portrait, loading }: { label: string; portrait: 
       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
         {label}
       </div>
-      <div className="relative border overflow-hidden" style={{ borderColor: portrait ? '#D0A030' : '#582a72', backgroundColor: '#111', width: '200px', height: '275px' }}>
+      <div className="relative border overflow-hidden" style={{ borderColor: portrait ? '#D0A030' : 'var(--pillar-spirit)', backgroundColor: '#111', width: '200px', height: '275px' }}>
         {portrait ? (
           <img src={portrait} alt={label} className="w-full h-full object-cover"
             onError={e => { (e.target as HTMLImageElement).src = '/EmptyPortrait.png'; (e.target as HTMLImageElement).className = 'w-full h-full object-contain'; }} />
@@ -1205,7 +1205,7 @@ function PortraitFrame({ label, portrait, loading }: { label: string; portrait: 
               Generating...
             </div>
             <div className="mt-2 w-16 h-1 rounded overflow-hidden" style={{ backgroundColor: '#1a1a2e' }}>
-              <div className="h-full animate-pulse" style={{ backgroundColor: '#582a72', width: '60%' }} />
+              <div className="h-full animate-pulse" style={{ backgroundColor: 'var(--pillar-spirit)', width: '60%' }} />
             </div>
           </div>
         ) : (
@@ -1268,7 +1268,7 @@ function FieldSelect({ label, value, options, editable, onChange }: {
       <label className="text-xs uppercase block mb-0.5" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{label}</label>
       {editable ? (
         <select value={value || ''} onChange={e => onChange(e.target.value)} className="w-full text-sm p-1"
-          style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px' }}>
+          style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }}>
           {options.map(o => <option key={o} value={o}>{o || '\u2014'}</option>)}
         </select>
       ) : (
@@ -1286,7 +1286,7 @@ function FieldInput({ label, value, placeholder, editable, fullWidth, onChange }
       <label className="text-xs uppercase block mb-0.5" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{label}</label>
       {editable ? (
         <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          className="w-full text-sm p-1" style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px' }} />
+          className="w-full text-sm p-1" style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }} />
       ) : (
         <div className="text-sm p-1" style={{ color: '#ccc' }}>{value || '\u2014'}</div>
       )}
@@ -1302,7 +1302,7 @@ function FieldTextarea({ label, value, placeholder, editable, onChange }: {
       <label className="text-xs uppercase block mb-0.5" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{label}</label>
       {editable ? (
         <textarea value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={2}
-          className="w-full text-sm p-1 resize-none" style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px' }} />
+          className="w-full text-sm p-1 resize-none" style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }} />
       ) : (
         <div className="text-sm p-1 whitespace-pre-wrap" style={{ color: '#ccc' }}>{value || '\u2014'}</div>
       )}

@@ -1251,7 +1251,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           <div className="flex items-center gap-1.5">
             <div className="w-[6px] h-[6px] bg-[var(--pillar-body)]" />
             <div className="w-[6px] h-[6px] bg-[var(--pillar-soul)]" />
-            <div className="w-[6px] h-[6px] bg-[#002F6C]" />
+            <div className="w-[6px] h-[6px] bg-[var(--pillar-soul)]" />
           </div>
           <span className="text-[var(--accent-teal)]/40 text-[8px] tracking-[0.3em] font-[family-name:var(--font-terminal)]">
             CANVAS://session.layer.0
@@ -1329,7 +1329,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 {/* Purple box — fluid */}
                 <div
                   className="h-16 min-w-16 px-3 flex flex-col items-center justify-center"
-                  style={{ background: '#582a72' }}
+                  style={{ background: 'var(--pillar-spirit)' }}
                 >
                   <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.fluid)}</span>
                   <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">FLD</span>
@@ -1416,7 +1416,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 <button
                   onClick={() => setFocalEntityId(null)}
                   style={{
-                    color: '#ffcc78',
+                    color: 'var(--krma-gold)',
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
@@ -1436,7 +1436,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                       onClick={() => setFocalEntityId(crumb.id)}
                       disabled={i === breadcrumb.length - 1}
                       style={{
-                        color: i === breadcrumb.length - 1 ? '#fff' : '#ffcc78',
+                        color: i === breadcrumb.length - 1 ? '#fff' : 'var(--krma-gold)',
                         background: 'transparent',
                         border: 'none',
                         cursor: i === breadcrumb.length - 1 ? 'default' : 'pointer',
@@ -1473,7 +1473,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   background: '#1a1a2e',
-                  border: '2px solid #ffcc78',
+                  border: '2px solid var(--krma-gold)',
                   borderRadius: 6,
                   padding: 28,
                   maxWidth: 500,
@@ -1487,7 +1487,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                     fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                     fontSize: 22,
                     letterSpacing: '0.12em',
-                    color: '#ffcc78',
+                    color: 'var(--krma-gold)',
                     marginBottom: 4,
                   }}
                 >
@@ -1510,13 +1510,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                     }}
                   >
                     {(pendingLocationCommit.contentCounts.locations ?? 0) > 0 && (
-                      <span><span style={{ color: '#22ab94' }}>⌂</span> {pendingLocationCommit.contentCounts.locations} sub-locations</span>
+                      <span><span style={{ color: 'var(--terminal-prime)' }}>⌂</span> {pendingLocationCommit.contentCounts.locations} sub-locations</span>
                     )}
                     {(pendingLocationCommit.contentCounts.characters ?? 0) > 0 && (
-                      <span><span style={{ color: '#f7525f' }}>✴</span> {pendingLocationCommit.contentCounts.characters} characters</span>
+                      <span><span style={{ color: 'var(--pillar-body)' }}>✴</span> {pendingLocationCommit.contentCounts.characters} characters</span>
                     )}
                     {(pendingLocationCommit.contentCounts.npcs ?? 0) > 0 && (
-                      <span><span style={{ color: '#ffcc78' }}>✴</span> {pendingLocationCommit.contentCounts.npcs} NPCs</span>
+                      <span><span style={{ color: 'var(--krma-gold)' }}>✴</span> {pendingLocationCommit.contentCounts.npcs} NPCs</span>
                     )}
                     {(pendingLocationCommit.contentCounts.items ?? 0) > 0 && (
                       <span><span style={{ color: '#8e7cc3' }}>❖</span> {pendingLocationCommit.contentCounts.items} items</span>
@@ -1533,14 +1533,14 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                       marginBottom: 16,
                     }}
                   >
-                    <div style={{ fontSize: 10, color: '#ffcc78', letterSpacing: '0.15em', marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, color: 'var(--krma-gold)', letterSpacing: '0.15em', marginBottom: 4 }}>
                       KRMA TO DEBIT
                     </div>
                     <div
                       style={{
                         fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                         fontSize: 28,
-                        color: '#ffcc78',
+                        color: 'var(--krma-gold)',
                         letterSpacing: '0.04em',
                       }}
                     >
@@ -1587,8 +1587,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                     disabled={crystallizing}
                     style={{
                       padding: '8px 20px',
-                      background: 'linear-gradient(135deg, #ffcc78, #d09f55)',
-                      border: '1px solid #ffcc78',
+                      background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
+                      border: '1px solid var(--krma-gold)',
                       color: '#000',
                       fontFamily: 'inherit',
                       fontSize: 12,
@@ -1711,8 +1711,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             className="absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1 text-[9px] uppercase tracking-[0.2em] transition-colors"
             style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: showTerminal ? '#0a0a1a' : '#22ab94',
-              backgroundColor: showTerminal ? '#22ab94' : 'rgba(10, 10, 26, 0.9)',
+              color: showTerminal ? '#0a0a1a' : 'var(--terminal-prime)',
+              backgroundColor: showTerminal ? 'var(--terminal-prime)' : 'rgba(10, 10, 26, 0.9)',
               border: '1px solid rgba(34, 171, 148, 0.4)',
               borderBottom: showTerminal ? 'none' : undefined,
               borderRadius: '3px 3px 0 0',

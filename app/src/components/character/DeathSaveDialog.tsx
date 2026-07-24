@@ -36,16 +36,16 @@ const VOID: React.CSSProperties = {
   position:'fixed', inset:0, zIndex:9000, background:'#000',
   display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Consolas,monospace',
 };
-const BAR: React.CSSProperties = { position:'absolute', left:0, right:0, height:'3px', background:'#f7525f' };
-const RULE: React.CSSProperties = { width:'100%', height:'2px', background:'#f7525f', margin:'8px 0 48px' };
+const BAR: React.CSSProperties = { position:'absolute', left:0, right:0, height:'3px', background:'var(--pillar-body)' };
+const RULE: React.CSSProperties = { width:'100%', height:'2px', background:'var(--pillar-body)', margin:'8px 0 48px' };
 const BADGE: React.CSSProperties = {
-  display:'inline-block', background:'#f7525f', color:'#000',
+  display:'inline-block', background:'var(--pillar-body)', color:'#000',
   fontFamily:'Bebas Neue,monospace', fontSize:'1.25rem', letterSpacing:'0.08em',
   padding:'2px 12px', marginBottom:'16px',
 };
 function btn(active: boolean, variant: 'coral'|'ghost'|'white' = 'coral'): React.CSSProperties {
   if (variant === 'coral') return {
-    background: active ? '#f7525f' : '#1a1a1a', color: active ? '#000' : '#444',
+    background: active ? 'var(--pillar-body)' : '#1a1a1a', color: active ? '#000' : '#444',
     border:'none', fontFamily:'Bebas Neue,monospace', fontSize:'1.25rem',
     letterSpacing:'0.1em', padding:'14px 36px', cursor: active ? 'pointer' : 'not-allowed',
   };
@@ -141,7 +141,7 @@ export default function DeathSaveDialog({ campaignId, isGM }: Props) {
             {trig.fateDie && (
               <div style={{ color:'#fff', fontSize:'1rem' }}>
                 {'Fate Die: '}
-                <span style={{ color:'#f7525f', fontFamily:'Bebas Neue,monospace', fontSize:'1.25rem' }}>
+                <span style={{ color:'var(--pillar-body)', fontFamily:'Bebas Neue,monospace', fontSize:'1.25rem' }}>
                   {trig.fateDie}
                 </span>
               </div>
@@ -157,9 +157,9 @@ export default function DeathSaveDialog({ campaignId, isGM }: Props) {
               <div style={{ display:'flex', flexWrap:'wrap', gap:'10px', marginBottom:'16px' }}>
                 {DIE_CHOICES.map(c => (
                   <button key={c} onClick={() => setChoice(c)} style={{
-                    background: choice===c ? '#f7525f' : 'transparent',
+                    background: choice===c ? 'var(--pillar-body)' : 'transparent',
                     color: choice===c ? '#000' : '#fff',
-                    border:`1px solid ${choice===c ? '#f7525f' : '#444'}`,
+                    border:`1px solid ${choice===c ? 'var(--pillar-body)' : '#444'}`,
                     fontFamily:'Consolas,monospace', fontSize:'1rem',
                     padding:'8px 18px', cursor:'pointer', minWidth:'52px',
                   }}>{c}</button>
@@ -212,7 +212,7 @@ export default function DeathSaveDialog({ campaignId, isGM }: Props) {
                     <div style={{ color:'#aaa', fontSize:'0.72rem', letterSpacing:'0.1em', marginBottom:'4px' }}>
                       LADY DEATH ({res.taraChoice.toUpperCase()})
                     </div>
-                    <div style={{ fontSize:'2.5rem', fontFamily:'Bebas Neue,monospace', color:'#f7525f' }}>
+                    <div style={{ fontSize:'2.5rem', fontFamily:'Bebas Neue,monospace', color:'var(--pillar-body)' }}>
                       {res.taraResult}
                     </div>
                   </div>
@@ -221,7 +221,7 @@ export default function DeathSaveDialog({ campaignId, isGM }: Props) {
 
               <div style={{
                 fontFamily:'Bebas Neue,monospace', fontSize:'2.5rem', letterSpacing:'0.1em',
-                color: res.survived ? '#22ab94' : '#f7525f', marginBottom: res.survived ? 0 : '28px',
+                color: res.survived ? 'var(--terminal-prime)' : 'var(--pillar-body)', marginBottom: res.survived ? 0 : '28px',
               }}>
                 {res.survived ? 'SURVIVES' : 'THE ROLL FAILS'}
               </div>
@@ -232,7 +232,7 @@ export default function DeathSaveDialog({ campaignId, isGM }: Props) {
           {failActions && (
             <div style={{ display:'flex', gap:'16px', flexWrap:'wrap', marginTop:'8px' }}>
               <button onClick={() => setSplit(true)} style={{
-                background:'#f7525f', color:'#000', border:'none',
+                background:'var(--pillar-body)', color:'#000', border:'none',
                 fontFamily:'Bebas Neue,monospace', fontSize:'1.1rem', letterSpacing:'0.08em',
                 padding:'12px 28px', cursor:'pointer',
               }}>OPEN THE SPLIT</button>

@@ -14,7 +14,7 @@ interface GROvinePanelProps {
 }
 
 const STATUS_COLORS = {
-  active: '#22ab94',
+  active: 'var(--terminal-prime)',
   completed: '#4ade80',
   failed: '#E8585A',
 };
@@ -53,7 +53,7 @@ export default function GROvinePanel({
     <div style={{
       width: 380,
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-      border: '2px solid #22ab94',
+      border: '2px solid var(--terminal-prime)',
       borderRadius: 3,
       color: '#fff',
       fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -75,7 +75,7 @@ export default function GROvinePanel({
             fontSize: 14,
             letterSpacing: '0.15em',
             textTransform: 'uppercase',
-            color: '#22ab94',
+            color: 'var(--terminal-prime)',
           }}>
             GRO.vines
           </div>
@@ -155,7 +155,7 @@ export default function GROvinePanel({
                 borderRadius: 2,
                 marginBottom: 8,
               }}>
-                <div style={{ fontSize: 9, color: '#22ab94', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                <div style={{ fontSize: 9, color: 'var(--terminal-prime)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                   New Goal
                 </div>
                 <input
@@ -191,7 +191,7 @@ export default function GROvinePanel({
                   background: 'rgba(34,171,148,0.08)',
                   border: '1px dashed rgba(34,171,148,0.3)',
                   borderRadius: 2,
-                  color: '#22ab94',
+                  color: 'var(--terminal-prime)',
                   fontSize: 9,
                   cursor: 'pointer',
                   textTransform: 'uppercase',
@@ -315,7 +315,7 @@ function VineRow({
           </GROSection>
 
           {/* O - Opportunity */}
-          <GROSection letter="O" label="Opportunity" color="#ffcc78">
+          <GROSection letter="O" label="Opportunity" color="var(--krma-gold)">
             {vine.opportunity || <em style={{ opacity: 0.4 }}>Awaiting Godhead intervention</em>}
           </GROSection>
 
@@ -329,7 +329,7 @@ function VineRow({
               borderRadius: 2,
               fontSize: 9,
             }}>
-              <span style={{ color: '#ffcc78' }}>Reward: </span>
+              <span style={{ color: 'var(--krma-gold)' }}>Reward: </span>
               <span style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {vine.reward.type === 'nectar' ? 'Nectar' : 'KRMA'}
                 {vine.reward.description ? ` — ${vine.reward.description}` : ''}

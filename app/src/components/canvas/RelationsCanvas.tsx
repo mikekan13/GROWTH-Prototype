@@ -1151,8 +1151,8 @@ export default function RelationsCanvas({
       case "opportunity": return "var(--accent-gold)";
       case "alliance":    return "var(--pillar-spirit)";
       case "conflict":    return "var(--pillar-soul)";
-      case "owns":        return "#ffcc78"; // KRMA gold — possession tether
-      case "located_at":  return "#582a72"; // Spirit purple — containment tether
+      case "owns":        return "var(--krma-gold)"; // KRMA gold — possession tether
+      case "located_at":  return "var(--pillar-spirit)"; // Spirit purple — containment tether
       default:            return "#808080";
     }
   }, []);
@@ -1975,7 +1975,7 @@ export default function RelationsCanvas({
     // Direction-aware backlight: Red = going up (crystallizing), Blue = going down (dissolving)
     const preDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
     const hasCrossed = preDragY !== undefined && ((preDragY > 0 && visualY <= 0) || (preDragY <= 0 && visualY > 0));
-    const glowColor = hasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#582a72';
+    const glowColor = hasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : 'var(--pillar-spirit)';
     const showGlow = hasCrossed || isShimmering;
     const glowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
@@ -2010,8 +2010,8 @@ export default function RelationsCanvas({
           const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, invPanelH);
           return (
             <>
-              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={4} strokeDasharray="8 5" opacity={0.6} />
-              <circle cx={tetherEndX} cy={tetherEndY} r={5} fill="#ffcc78" opacity={0.8} />
+              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="var(--krma-gold)" strokeWidth={4} strokeDasharray="8 5" opacity={0.6} />
+              <circle cx={tetherEndX} cy={tetherEndY} r={5} fill="var(--krma-gold)" opacity={0.8} />
             </>
           );
         })()}
@@ -2029,8 +2029,8 @@ export default function RelationsCanvas({
           const tetherEndY = clampPanelY(anchorY + offset.y + 20, visualY, subPanelH);
           return (
             <React.Fragment key={`tether-${node.id}-${panelKey}`}>
-              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="#ffcc78" strokeWidth={4} strokeDasharray="8 5" opacity={0.6} />
-              <circle cx={tetherEndX} cy={tetherEndY} r={5} fill="#ffcc78" opacity={0.8} />
+              <line x1={anchorX} y1={anchorY} x2={tetherEndX} y2={tetherEndY} stroke="var(--krma-gold)" strokeWidth={4} strokeDasharray="8 5" opacity={0.6} />
+              <circle cx={tetherEndX} cy={tetherEndY} r={5} fill="var(--krma-gold)" opacity={0.8} />
             </React.Fragment>
           );
         })}
@@ -2163,8 +2163,8 @@ export default function RelationsCanvas({
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           return (
             <g key="anchor-radio-inv" style={{ pointerEvents: 'none' }}>
-              <circle cx={anchorX} cy={anchorY} r={7} fill="none" stroke="#ffcc78" strokeWidth={1.5} opacity={0.8} />
-              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.9} />
+              <circle cx={anchorX} cy={anchorY} r={7} fill="none" stroke="var(--krma-gold)" strokeWidth={1.5} opacity={0.8} />
+              <circle cx={anchorX} cy={anchorY} r={3.5} fill="var(--krma-gold)" opacity={0.9} />
             </g>
           );
         })()}
@@ -2177,8 +2177,8 @@ export default function RelationsCanvas({
           const { x: anchorX, y: anchorY } = scaleAnchor(rawAnchorX, rawAnchorY);
           return (
             <g key={`anchor-radio-${node.id}-${panelKey}`} style={{ pointerEvents: 'none' }}>
-              <circle cx={anchorX} cy={anchorY} r={7} fill="none" stroke="#ffcc78" strokeWidth={1.5} opacity={0.8} />
-              <circle cx={anchorX} cy={anchorY} r={3.5} fill="#ffcc78" opacity={0.9} />
+              <circle cx={anchorX} cy={anchorY} r={7} fill="none" stroke="var(--krma-gold)" strokeWidth={1.5} opacity={0.8} />
+              <circle cx={anchorX} cy={anchorY} r={3.5} fill="var(--krma-gold)" opacity={0.9} />
             </g>
           );
         })}
@@ -3003,7 +3003,7 @@ export default function RelationsCanvas({
             const isShimmering = shimmeringNodes.has(node.id);
             const locPreDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
             const locHasCrossed = locPreDragY !== undefined && ((locPreDragY > 0 && visualY <= 0) || (locPreDragY <= 0 && visualY > 0));
-            const locGlowColor = locHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#582a72';
+            const locGlowColor = locHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : 'var(--pillar-spirit)';
             const locShowGlow = locHasCrossed || isShimmering;
             const locGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
@@ -3105,7 +3105,7 @@ export default function RelationsCanvas({
             const isShimmering = shimmeringNodes.has(node.id);
             const itemPreDragY = isDraggingNode ? nodePositions.get(node.id)?.y : undefined;
             const itemHasCrossed = itemPreDragY !== undefined && ((itemPreDragY > 0 && visualY <= 0) || (itemPreDragY <= 0 && visualY > 0));
-            const itemGlowColor = itemHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : '#582a72';
+            const itemGlowColor = itemHasCrossed ? (visualY <= 0 ? '#E84040' : '#4080E8') : 'var(--pillar-spirit)';
             const itemShowGlow = itemHasCrossed || isShimmering;
             const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
@@ -3298,7 +3298,7 @@ export default function RelationsCanvas({
         const f = folders.find(fl => fl.locationInfo?.locationId === canvasMenu.editLocationId);
         const li = f?.locationInfo;
         const isActive = li?.status === 'ACTIVE';
-        const item = 'w-full px-3 py-1.5 text-left text-xs hover:bg-[#22ab94]/20 font-[Consolas,monospace] cursor-pointer';
+        const item = 'w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--terminal-prime)]/20 font-[Consolas,monospace] cursor-pointer';
         return (
           <div
             className="fixed z-[100]"
@@ -3836,7 +3836,7 @@ function CanvasToolbox({
             <ToolboxButton
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg>}
               label="Location"
-              color="#582a72"
+              color="var(--pillar-spirit)"
               onClick={() => {
                 const name = window.prompt('Location name:');
                 if (name?.trim()) onCreateLocation?.({ name: name.trim() });
@@ -3845,7 +3845,7 @@ function CanvasToolbox({
             <ToolboxButton
               icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" /><line x1="6" y1="2" x2="6" y2="4" /><line x1="10" y1="2" x2="10" y2="4" /><line x1="14" y1="2" x2="14" y2="4" /></svg>}
               label="Item"
-              color="#ffcc78"
+              color="var(--krma-gold)"
               onClick={() => setShowForgeItems(v => !v)}
             />
           </div>
@@ -3853,7 +3853,7 @@ function CanvasToolbox({
           {/* Character picker — opened by the Character button above */}
           {showCharacterPicker && (
             <div style={{ marginBottom: 8, maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 4, background: 'rgba(34,171,148,0.06)', border: '1px solid rgba(34,171,148,0.3)', borderRadius: 6 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#22ab94', letterSpacing: '0.08em', padding: '2px 4px 6px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--terminal-prime)', letterSpacing: '0.08em', padding: '2px 4px 6px' }}>
                 {'☸'} PLACE CHARACTER ON CANVAS {pickerCharacters.length > 0 ? `(${pickerCharacters.length})` : ''}
               </div>
               {pickerLoading ? (
@@ -3865,8 +3865,8 @@ function CanvasToolbox({
               ) : (
                 pickerCharacters.map(ch => {
                   const onCanvas = nodeIdSet.has(ch.id);
-                  const statusColor = ch.status === 'ACTIVE' ? '#22ab94'
-                    : ch.status === 'APPROVED' ? '#ffcc78'
+                  const statusColor = ch.status === 'ACTIVE' ? 'var(--terminal-prime)'
+                    : ch.status === 'APPROVED' ? 'var(--krma-gold)'
                     : ch.status === 'SUBMITTED' ? '#b4a7d6'
                     : ch.status === 'DRAFT' ? 'rgba(255,255,255,0.4)'
                     : '#888';
@@ -3905,7 +3905,7 @@ function CanvasToolbox({
                           {[ch.seedName, ch.stewardName, ch.status].filter(Boolean).join(' · ')}
                         </span>
                       </span>
-                      <span style={{ fontSize: 8, color: onCanvas ? '#22ab94' : 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>
+                      <span style={{ fontSize: 8, color: onCanvas ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>
                         {onCanvas ? 'REPOSITION' : 'PLACE'}
                       </span>
                     </button>
@@ -3918,7 +3918,7 @@ function CanvasToolbox({
           {/* Forge item picker - opened by the Item button above */}
           {showForgeItems && (
             <div style={{ marginBottom: 8, maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 4, background: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.25)', borderRadius: 6 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#ffcc78', letterSpacing: '0.08em', padding: '2px 4px 6px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--krma-gold)', letterSpacing: '0.08em', padding: '2px 4px 6px' }}>
                 {'⚒'} PLACE FROM FORGE {publishedItems.length > 0 ? `(${publishedItems.length})` : ''}
               </div>
               {publishedItems.length === 0 ? (
@@ -4006,7 +4006,7 @@ function ToolboxButton({ icon, label, color, onClick }: { icon: React.ReactNode;
       style={{
         flex: 1,
         padding: '6px 4px',
-        background: 'linear-gradient(135deg, #22ab94 0%, #1e9b82 100%)',
+        background: 'linear-gradient(135deg, var(--terminal-prime) 0%, #1e9b82 100%)',
         border: '1px solid rgba(34,171,148,0.5)',
         borderRadius: 2,
         color: '#fdfdfd',
@@ -4252,8 +4252,8 @@ function CanvasCreateDialog({
   const left = Math.min(screenX, (typeof window !== 'undefined' ? window.innerWidth : 1000) - FORM_W - 8);
   const top = Math.min(screenY, (typeof window !== 'undefined' ? window.innerHeight : 800) - 540 - 8);
 
-  const fieldClass = 'w-full px-1.5 py-0.5 text-xs text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/80 rounded-none outline-none focus:border-[#22ab94]';
-  const labelClass = 'text-[9px] tracking-[0.15em] uppercase text-[#22ab94]/70 font-[Consolas,monospace]';
+  const fieldClass = 'w-full px-1.5 py-0.5 text-xs text-white font-[Consolas,monospace] border border-[var(--terminal-prime)]/40 bg-black/80 rounded-none outline-none focus:border-[var(--terminal-prime)]';
+  const labelClass = 'text-[9px] tracking-[0.15em] uppercase text-[var(--terminal-prime)]/70 font-[Consolas,monospace]';
 
   return (
     <div
@@ -4272,20 +4272,20 @@ function CanvasCreateDialog({
         style={{ maxHeight: proposal ? 100 : 220, minHeight: 60 }}
       >
         {conversation.length === 0 && loading && (
-          <div className="text-[10px] text-[#22ab94]/60 font-[Consolas,monospace] italic">
+          <div className="text-[10px] text-[var(--terminal-prime)]/60 font-[Consolas,monospace] italic">
             ✦ JEWL is thinking…
           </div>
         )}
         {conversation.map((t, i) => (
           <div key={i} className="space-y-0.5">
-            <div className={`text-[8px] tracking-[0.18em] uppercase font-[Consolas,monospace] ${t.role === 'jewl' ? 'text-[#22ab94]' : 'text-[#D0A030]/70'}`}>
+            <div className={`text-[8px] tracking-[0.18em] uppercase font-[Consolas,monospace] ${t.role === 'jewl' ? 'text-[var(--terminal-prime)]' : 'text-[#D0A030]/70'}`}>
               {t.role === 'jewl' ? '✦ jEWL' : 'yOU'}
             </div>
             {t.images && t.images.length > 0 && (
               <div className="flex gap-1 flex-wrap mb-0.5">
                 {t.images.map((url, j) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={j} src={url} alt="" className="border border-[#22ab94]/40" style={{ maxHeight: 72, maxWidth: 96, objectFit: 'cover' }} />
+                  <img key={j} src={url} alt="" className="border border-[var(--terminal-prime)]/40" style={{ maxHeight: 72, maxWidth: 96, objectFit: 'cover' }} />
                 ))}
               </div>
             )}
@@ -4297,7 +4297,7 @@ function CanvasCreateDialog({
           </div>
         ))}
         {loading && conversation.length > 0 && (
-          <div className="text-[10px] text-[#22ab94]/60 font-[Consolas,monospace] italic">
+          <div className="text-[10px] text-[var(--terminal-prime)]/60 font-[Consolas,monospace] italic">
             ✦ JEWL is thinking…
           </div>
         )}
@@ -4376,10 +4376,10 @@ function CanvasCreateDialog({
                 {pendingImages.map((url, i) => (
                   <div key={i} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="border border-[#22ab94]/40" style={{ height: 48, width: 64, objectFit: 'cover' }} />
+                    <img src={url} alt="" className="border border-[var(--terminal-prime)]/40" style={{ height: 48, width: 64, objectFit: 'cover' }} />
                     <button
                       onClick={() => setPendingImages(prev => prev.filter((_, j) => j !== i))}
-                      className="absolute -top-1 -right-1 w-4 h-4 text-[9px] bg-black border border-[#22ab94] text-[#22ab94] hover:bg-[#22ab94]/20"
+                      className="absolute -top-1 -right-1 w-4 h-4 text-[9px] bg-black border border-[var(--terminal-prime)] text-[var(--terminal-prime)] hover:bg-[var(--terminal-prime)]/20"
                       title="Remove"
                     >×</button>
                   </div>
@@ -4416,7 +4416,7 @@ function CanvasCreateDialog({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={loading || pendingImages.length >= 5}
-              className="px-2 py-0.5 text-[11px] font-[Consolas,monospace] text-[#22ab94]/80 border border-[#22ab94]/40 hover:bg-[#22ab94]/10 disabled:opacity-40 disabled:cursor-not-allowed mr-auto"
+              className="px-2 py-0.5 text-[11px] font-[Consolas,monospace] text-[var(--terminal-prime)]/80 border border-[var(--terminal-prime)]/40 hover:bg-[var(--terminal-prime)]/10 disabled:opacity-40 disabled:cursor-not-allowed mr-auto"
               title="Attach images (up to 5, 5MB each)"
             >📎 IMG</button>
           )}
@@ -4434,14 +4434,14 @@ function CanvasCreateDialog({
               <button
                 onClick={commit}
                 disabled={!edit.name.trim()}
-                className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[#22ab94] border border-[#22ab94] hover:bg-[#22ab94]/90 disabled:bg-[#22ab94]/30 disabled:text-[#22ab94]/50 disabled:cursor-not-allowed"
+                className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[var(--terminal-prime)] border border-[var(--terminal-prime)] hover:bg-[var(--terminal-prime)]/90 disabled:bg-[var(--terminal-prime)]/30 disabled:text-[var(--terminal-prime)]/50 disabled:cursor-not-allowed"
               >COMMIT</button>
             </>
           ) : (
             <button
               onClick={send}
               disabled={(!input.trim() && pendingImages.length === 0) || loading}
-              className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[#22ab94] border border-[#22ab94] hover:bg-[#22ab94]/90 disabled:bg-[#22ab94]/30 disabled:text-[#22ab94]/50 disabled:cursor-not-allowed"
+              className="px-3 py-0.5 text-[10px] tracking-[0.12em] font-bold font-[Consolas,monospace] text-black bg-[var(--terminal-prime)] border border-[var(--terminal-prime)] hover:bg-[var(--terminal-prime)]/90 disabled:bg-[var(--terminal-prime)]/30 disabled:text-[var(--terminal-prime)]/50 disabled:cursor-not-allowed"
             >SEND</button>
           )}
         </div>

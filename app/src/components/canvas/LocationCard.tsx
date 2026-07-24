@@ -264,7 +264,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
                 fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
                 fontSize: 14,
                 fontWeight: 'bold',
-                color: '#ffcc78',
+                color: 'var(--krma-gold)',
               }}>
                 {node.name}
               </span>
@@ -302,7 +302,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
                     border: '1px solid rgba(255,204,120,0.4)',
                     borderRadius: 3,
                     fontSize: 10,
-                    color: '#ffcc78',
+                    color: 'var(--krma-gold)',
                     fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                     letterSpacing: '0.04em',
                   }}
@@ -333,7 +333,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
               padding: '3px 12px',
               background: node.status === 'DESTROYED' ? 'rgba(232,88,90,0.2)' : 'rgba(255,204,120,0.15)',
               fontSize: 9,
-              color: node.status === 'DESTROYED' ? '#E8585A' : '#ffcc78',
+              color: node.status === 'DESTROYED' ? '#E8585A' : 'var(--krma-gold)',
               textTransform: 'uppercase',
               letterSpacing: '0.15em',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -352,7 +352,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             right: '-21px',
             width: 36,
             height: 36,
-            background: '#582a72',
+            background: 'var(--pillar-spirit)',
             border: 'none',
             borderRadius: '50%',
             color: '#F5F4EF',
@@ -403,7 +403,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
                 fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
                 fontSize: 16,
                 fontWeight: 'bold',
-                color: '#ffcc78',
+                color: 'var(--krma-gold)',
               }}>
                 {node.name}
               </div>
@@ -460,7 +460,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             }}
           >
             <div>
-              <SectionLabel color={reserve != null ? '#ffcc78' : 'rgba(255,255,255,0.4)'}>KRMA Reserve</SectionLabel>
+              <SectionLabel color={reserve != null ? 'var(--krma-gold)' : 'rgba(255,255,255,0.4)'}>KRMA Reserve</SectionLabel>
               <div
                 style={{
                   fontSize: 9,
@@ -478,7 +478,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
                 style={{
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                   fontSize: 24,
-                  color: reserve != null ? '#ffcc78' : 'rgba(255,255,255,0.25)',
+                  color: reserve != null ? 'var(--krma-gold)' : 'rgba(255,255,255,0.25)',
                   letterSpacing: '0.04em',
                   lineHeight: 1,
                 }}
@@ -541,7 +541,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             {data.controlledBy && (
               <div>
                 <SectionLabel>Controlled By</SectionLabel>
-                <div style={{ fontSize: 10, color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{data.controlledBy}</div>
+                <div style={{ fontSize: 10, color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{data.controlledBy}</div>
               </div>
             )}
           </div>
@@ -706,7 +706,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
                     <span
                       style={{
                         fontFamily: 'Consolas, monospace',
-                        color: '#22ab94',
+                        color: 'var(--terminal-prime)',
                         fontSize: 12,
                       }}
                     >
@@ -727,7 +727,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
               border: '1px solid rgba(255,204,120,0.15)',
               borderRadius: 2,
             }}>
-              <SectionLabel color="#ffcc78">GM Notes</SectionLabel>
+              <SectionLabel color="var(--krma-gold)">GM Notes</SectionLabel>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{data.notes}</div>
             </div>
           )}
@@ -739,7 +739,7 @@ export default function LocationCard({ node, isExpanded, onToggleExpand, onDelet
             padding: '4px 14px',
             background: node.status === 'DESTROYED' ? 'rgba(232,88,90,0.2)' : 'rgba(255,204,120,0.15)',
             fontSize: 9,
-            color: node.status === 'DESTROYED' ? '#E8585A' : '#ffcc78',
+            color: node.status === 'DESTROYED' ? '#E8585A' : 'var(--krma-gold)',
             textTransform: 'uppercase',
             letterSpacing: '0.15em',
             textAlign: 'center',

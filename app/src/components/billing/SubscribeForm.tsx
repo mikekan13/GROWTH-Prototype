@@ -38,7 +38,7 @@ export default function SubscribeForm({ alreadySubscribed, currentStatus }: Prop
   if (alreadySubscribed && currentStatus === 'ACTIVE') {
     return (
       <div className="border p-3 text-[12px] font-[family-name:var(--font-terminal)] text-center"
-        style={{ borderColor: 'rgba(34,171,148,0.4)', background: 'rgba(34,171,148,0.08)', color: '#22ab94' }}
+        style={{ borderColor: 'rgba(34,171,148,0.4)', background: 'rgba(34,171,148,0.08)', color: 'var(--terminal-prime)' }}
       >
         ✓ Subscription active — KRMA drip is running.
       </div>
@@ -62,7 +62,7 @@ export default function SubscribeForm({ alreadySubscribed, currentStatus }: Prop
         disabled={submitting}
         className="w-full py-3 text-[12px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] font-bold disabled:opacity-40 transition-all hover:brightness-110"
         style={{
-          background: submitting ? 'rgba(255,204,120,0.3)' : 'linear-gradient(135deg, #ffcc78, #d99a36)',
+          background: submitting ? 'rgba(255,204,120,0.3)' : 'linear-gradient(135deg, var(--krma-gold), #d99a36)',
           color: '#000',
           boxShadow: submitting ? 'none' : '0 0 24px rgba(255,204,120,0.3)',
         }}
@@ -78,7 +78,7 @@ export default function SubscribeForm({ alreadySubscribed, currentStatus }: Prop
       )}
       {success && (
         <div className="border p-2 text-[11px] font-[family-name:var(--font-terminal)] text-center"
-          style={{ borderColor: 'rgba(34,171,148,0.4)', background: 'rgba(34,171,148,0.08)', color: '#22ab94' }}
+          style={{ borderColor: 'rgba(34,171,148,0.4)', background: 'rgba(34,171,148,0.08)', color: 'var(--terminal-prime)' }}
         >
           ✓ {success}
         </div>

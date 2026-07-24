@@ -94,7 +94,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: '#1a1a2e',
-        borderColor: '#ffcc78',
+        borderColor: 'var(--krma-gold)',
         borderRadius: '3px',
         width: '440px',
       }}
@@ -103,7 +103,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
       <div
         className="p-3 text-white cursor-grab"
         style={{
-          background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)',
+          background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)',
           borderRadius: '2px 2px 0 0',
         }}
       >
@@ -124,7 +124,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
               <p
                 className="text-xs"
                 style={{
-                  color: '#ffcc78',
+                  color: 'var(--krma-gold)',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                   fontSize: '10px',
                 }}
@@ -203,7 +203,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
                       width: '20px',
                       textAlign: 'center',
                       fontFamily: 'Consolas, monospace',
-                      color: '#ffcc78',
+                      color: 'var(--krma-gold)',
                       fontSize: '14px',
                       flexShrink: 0,
                     }}
@@ -241,7 +241,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
                       className="text-right flex-shrink-0"
                       style={{
                         fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                        color: '#ffcc78',
+                        color: 'var(--krma-gold)',
                         fontSize: '13px',
                         letterSpacing: '0.04em',
                       }}
@@ -252,7 +252,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
                   <span
                     style={{
                       fontFamily: 'Consolas, monospace',
-                      color: '#22ab94',
+                      color: 'var(--terminal-prime)',
                       fontSize: '14px',
                       flexShrink: 0,
                       marginLeft: '4px',

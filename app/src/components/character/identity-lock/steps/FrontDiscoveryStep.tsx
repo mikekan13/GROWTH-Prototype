@@ -196,7 +196,7 @@ export function FrontDiscoveryStep({ state, dispatch, tuning, gen, displayIndex,
                     <input type="number" min={1} max={20} value={batchCount}
                       onChange={e => setBatchCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
                       className="w-12 text-center text-xs py-1 px-1"
-                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#fff', border: '1px solid #582a72', borderRadius: '2px' }}
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#fff', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }}
                     />
                     <button onClick={handleFrontPerfect}
                       className="px-5 py-2.5 text-xs uppercase tracking-wider transition-colors font-bold"
@@ -209,14 +209,14 @@ export function FrontDiscoveryStep({ state, dispatch, tuning, gen, displayIndex,
                 <div className="flex justify-center items-center gap-2">
                   <button onClick={() => generateFrontFace()}
                     className="px-4 py-2 text-xs uppercase tracking-wider transition-colors"
-                    style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#582a72', color: '#fff', border: '1px solid #582a72', borderRadius: '2px' }}>
+                    style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: 'var(--pillar-spirit)', color: '#fff', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }}>
                     Generate Face
                   </button>
                   <span className="text-xs" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>×</span>
                   <input type="number" min={1} max={20} value={batchCount}
                     onChange={e => setBatchCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
                     className="w-12 text-center text-xs py-1 px-1"
-                    style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#fff', border: '1px solid #582a72', borderRadius: '2px' }}
+                    style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', backgroundColor: '#1a1a2e', color: '#fff', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' }}
                   />
                 </div>
               )}

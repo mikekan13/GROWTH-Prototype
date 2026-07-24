@@ -42,7 +42,7 @@ function getWeightStatus(totalLbs: number, capacityLbs: number): WeightStatus {
 function getWeightStatusColor(status: WeightStatus): string {
   switch (status) {
     case 'Fine': return '#4ade80';
-    case 'Near Limit': return '#ffcc78';
+    case 'Near Limit': return 'var(--krma-gold)';
     case 'Encumbered': return '#f59e0b';
     case 'Overloaded': return '#E8585A';
   }
@@ -102,20 +102,20 @@ export default function InventoryCard({
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: '#1a1a2e',
-        borderColor: '#ffcc78',
+        borderColor: 'var(--krma-gold)',
         borderRadius: '3px',
         borderWidth: isDropTarget ? '3px' : '1px',
         boxShadow: isDropTarget ? '0 0 24px rgba(255, 204, 120, 0.7), inset 0 0 12px rgba(255, 204, 120, 0.25)' : 'none',
       }}
     >
       {/* Header */}
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-lg">{'🎒'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>INVENTORY</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 {safeItems.length} items {'•'} {formatLbs(totalLbs)}/{capacityLbs} lbs
               </p>
             </div>
@@ -158,7 +158,7 @@ export default function InventoryCard({
           borderBottom: '1px solid rgba(255, 204, 120, 0.3)',
           textAlign: 'center',
           fontSize: '10px',
-          color: '#ffcc78',
+          color: 'var(--krma-gold)',
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -183,9 +183,9 @@ export default function InventoryCard({
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                   letterSpacing: '0.05em',
                   fontSize: '11px',
-                  backgroundColor: filter === filterType ? '#582a72' : '#2a2a3e',
-                  color: filter === filterType ? '#ffcc78' : '#888',
-                  border: `1px solid ${filter === filterType ? '#ffcc78' : '#3a3a4e'}`,
+                  backgroundColor: filter === filterType ? 'var(--pillar-spirit)' : '#2a2a3e',
+                  color: filter === filterType ? 'var(--krma-gold)' : '#888',
+                  border: `1px solid ${filter === filterType ? 'var(--krma-gold)' : '#3a3a4e'}`,
                 }}
               >
                 {filterType}
@@ -210,7 +210,7 @@ export default function InventoryCard({
             </div>
             <div className="p-2 text-center" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', border: '1px solid #3a3a4e' }}>
               <div className="text-xs" style={{ color: '#888', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>VALUE</div>
-              <div className="text-sm font-bold" style={{ color: '#ffcc78' }}>{totalValue} &#x049C;V</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--krma-gold)' }}>{totalValue} &#x049C;V</div>
             </div>
           </div>
 
@@ -364,7 +364,7 @@ function InventoryItemRow({
                 <h4 className="text-xs font-medium truncate" style={{ color: rarityColor }}>{item.name}</h4>
                 {isEquipped && (
                   <span className="text-white px-1 flex-shrink-0" style={{
-                    backgroundColor: '#22ab94',
+                    backgroundColor: 'var(--terminal-prime)',
                     borderRadius: '2px',
                     fontSize: '8px',
                     lineHeight: '14px',
@@ -411,7 +411,7 @@ function InventoryItemRow({
 
           <div className="flex items-center gap-1 ml-1 flex-shrink-0">
             {data.value != null && (
-              <span style={{ fontSize: '9px', color: '#ffcc78' }}>{data.value}&#x049C;</span>
+              <span style={{ fontSize: '9px', color: 'var(--krma-gold)' }}>{data.value}&#x049C;</span>
             )}
             {onToggleEquip && (item.type === 'weapon' || item.type === 'armor' || item.type === 'accessory') && (
               <button
@@ -421,7 +421,7 @@ function InventoryItemRow({
                 style={{ borderRadius: '2px' }}
                 title={isEquipped ? 'Unequip' : 'Equip'}
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke={isEquipped ? '#22ab94' : '#666'} strokeWidth={2}>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke={isEquipped ? 'var(--terminal-prime)' : '#666'} strokeWidth={2}>
                   {isEquipped ? (
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
                   ) : (
@@ -466,8 +466,8 @@ function InventoryItemRow({
             <MiniStat label="Condition" value={conditionLabel} color={conditionColor} />
             <MiniStat label="Rarity" value={getRarityLabel(data.rarity)} color={rarityColor} />
             {data.quality != null && <MiniStat label="Quality" value={`${data.quality}/10`} color="#c4a0e8" />}
-            {data.baseResist != null && <MiniStat label="Resist" value={data.baseResist} color="#002f6c" />}
-            {data.value != null && <MiniStat label="Value" value={`${data.value} ҜV`} color="#ffcc78" />}
+            {data.baseResist != null && <MiniStat label="Resist" value={data.baseResist} color="var(--pillar-soul)" />}
+            {data.value != null && <MiniStat label="Value" value={`${data.value} ҜV`} color="var(--krma-gold)" />}
           </div>
 
           {/* Materials */}
@@ -492,7 +492,7 @@ function InventoryItemRow({
               <div style={{ fontSize: '8px', color: '#E8585A', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Damage</div>
               <div style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>
                 {formatDamage(data.damage)}
-                {data.damageScaling && <span style={{ fontSize: '9px', color: '#ffcc78', marginLeft: 6 }}>scales with wielder</span>}
+                {data.damageScaling && <span style={{ fontSize: '9px', color: 'var(--krma-gold)', marginLeft: 6 }}>scales with wielder</span>}
               </div>
               <div className="flex flex-wrap gap-3 mt-1" style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>
                 {data.range && <span>Range: {data.range}</span>}
@@ -520,14 +520,14 @@ function InventoryItemRow({
           {/* Item abilities (display name + description; KV hidden) */}
           {data.itemAbilities && data.itemAbilities.length > 0 && (
             <div className="mt-2 p-1.5" style={{ background: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.15)', borderRadius: 2 }}>
-              <div style={{ fontSize: '8px', color: '#ffcc78', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Abilities</div>
+              <div style={{ fontSize: '8px', color: 'var(--krma-gold)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Abilities</div>
               <ul style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {data.itemAbilities.map((ab, i) => (
                   <li key={i}>
                     <div style={{ fontSize: '10px', color: '#fff', fontWeight: 600 }}>{ab.name}</div>
                     <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>{ab.description}</div>
                     {ab.mechanicalEffect && (
-                      <div style={{ fontSize: '9px', color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{ab.mechanicalEffect}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{ab.mechanicalEffect}</div>
                     )}
                   </li>
                 ))}
@@ -575,7 +575,7 @@ function InventoryItemRow({
 
           {data.notes && (
             <div className="mt-2 p-1.5" style={{ background: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.1)', borderRadius: 2 }}>
-              <div style={{ fontSize: '8px', color: '#ffcc78', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Notes</div>
+              <div style={{ fontSize: '8px', color: 'var(--krma-gold)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Notes</div>
               <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>{data.notes}</div>
             </div>
           )}
@@ -593,7 +593,7 @@ function InventoryItemRow({
             pointerEvents: 'none',
             zIndex: 10001,
             background: '#1a1a2e',
-            border: '1px solid #ffcc78',
+            border: '1px solid var(--krma-gold)',
             borderRadius: 3,
             padding: '4px 8px',
             fontSize: 11,

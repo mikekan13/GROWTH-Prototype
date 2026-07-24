@@ -251,9 +251,9 @@ export default function IdentityLockWizard({
               title={`Jump to ${s.label}`}
             >
               <div className="h-1 mb-1 rounded-full transition-colors"
-                style={{ backgroundColor: isDone ? '#D0A030' : isActive ? '#582a72' : '#2a2a3e' }} />
+                style={{ backgroundColor: isDone ? '#D0A030' : isActive ? 'var(--pillar-spirit)' : '#2a2a3e' }} />
               <div className="text-xs uppercase tracking-wider" style={{
-                color: isDone ? '#D0A030' : isActive ? '#582a72' : '#666',
+                color: isDone ? '#D0A030' : isActive ? 'var(--pillar-spirit)' : '#666',
                 fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px',
               }}>{s.label}</div>
             </div>

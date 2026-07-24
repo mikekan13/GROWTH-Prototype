@@ -98,10 +98,10 @@ function Portrait({ username, borderColor, labelColor, label, size = 'large', tk
         </div>
         {/* TKV box — flush under portrait */}
         {!isEmpty && tkv !== undefined && (
-          <div style={{ border: '1px solid #ffcc78', borderTop: 'none' }}>
+          <div style={{ border: '1px solid var(--krma-gold)', borderTop: 'none' }}>
             <div
               className="text-center text-[7px] leading-none py-0.5"
-              style={{ background: '#f7525f', color: '#ffcc78', fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.08em' }}
+              style={{ background: 'var(--pillar-body)', color: 'var(--krma-gold)', fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.08em' }}
             >
               <span style={{ fontFamily: '"Inknut Antiqua", serif', fontWeight: 900, fontSize: '7px' }}>Ҝ</span>V
             </div>
@@ -177,7 +177,7 @@ export default function CampaignCard({
           </span>
           <span
             className="text-[10px] px-1.5 py-0.5 text-white/50"
-            style={{ fontFamily: 'Consolas, monospace', background: '#582a72' }}
+            style={{ fontFamily: 'Consolas, monospace', background: 'var(--pillar-spirit)' }}
           >
             {memberCount}/{maxTrailblazers}
           </span>
@@ -242,10 +242,10 @@ export default function CampaignCard({
             <>
               <div className="w-[1px] self-stretch bg-[var(--accent-teal)]/15 shrink-0 my-2" />
               <div className="flex flex-col items-center justify-end self-end mb-1">
-                <div style={{ border: '1px solid #ffcc78', minWidth: '70px' }}>
+                <div style={{ border: '1px solid var(--krma-gold)', minWidth: '70px' }}>
                   <div
                     className="text-center text-[7px] leading-none py-0.5 px-2"
-                    style={{ background: '#f7525f', color: '#ffcc78', fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.08em' }}
+                    style={{ background: 'var(--pillar-body)', color: 'var(--krma-gold)', fontFamily: '"Bebas Neue", sans-serif', letterSpacing: '0.08em' }}
                   >
                     PARTY <span style={{ fontFamily: '"Inknut Antiqua", serif', fontWeight: 900, fontSize: '7px' }}>Ҝ</span>V
                   </div>

@@ -24,7 +24,7 @@ const LAYER_META: Record<ArmorLayer, { label: string; color: string; desc: strin
 };
 
 const CONDITION_LABELS: Record<number, { label: string; color: string }> = {
-  4: { label: 'Undamaged', color: '#22ab94' },
+  4: { label: 'Undamaged', color: 'var(--terminal-prime)' },
   3: { label: 'Worn', color: '#D0A030' },
   2: { label: 'Broken', color: '#D07818' },
   1: { label: 'Destroyed', color: '#E84040' },

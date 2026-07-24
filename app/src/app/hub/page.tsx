@@ -24,7 +24,7 @@ export default async function HubPage() {
         <div className="shrink-0 bg-[var(--surface-dark)] border border-[var(--accent-teal)]/20 mt-4">
           <div className="relative">
             <div className="h-[2px] bg-[var(--accent-teal)]/30" />
-            <div className="bg-[#582a72] py-3 px-6 relative overflow-visible">
+            <div className="bg-[var(--pillar-spirit)] py-3 px-6 relative overflow-visible">
               <div className="absolute top-1/2 left-0 right-0 h-[2px] -translate-y-1/2 bg-[var(--krma-gold)]/40" />
               <div className="relative z-10 text-center space-y-2">
                 <p className="text-white/70 text-sm font-[family-name:var(--font-terminal)] tracking-wider">

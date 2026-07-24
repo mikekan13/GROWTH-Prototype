@@ -214,15 +214,15 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
   );
 
   return (
-    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '400px' }}>
+    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: 'var(--krma-gold)', borderRadius: '3px', width: '400px' }}>
       {/* Header */}
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-lg">{'\u2605'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>SKILLS</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 {safeSkills.length} skill{safeSkills.length !== 1 ? 's' : ''}
               </p>
             </div>
@@ -230,14 +230,14 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
           <div className="flex items-center gap-1">
             {isEditable && (
               <button onClick={e => { e.stopPropagation(); const opening = !showAddForm; setShowAddForm(opening); if (opening) setForgeLoading(true); setShowRequestForm(false); }} onMouseDown={e => e.stopPropagation()}
-                className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: '#ffcc78' }}>
+                className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: 'var(--krma-gold)' }}>
                 +
               </button>
             )}
             {isPlayer && onRequestSkill && (
               <button onClick={e => { e.stopPropagation(); setShowRequestForm(!showRequestForm); setShowAddForm(false); }} onMouseDown={e => e.stopPropagation()}
                 className="px-1.5 py-0.5 hover:bg-white/20 transition-colors text-[8px] uppercase"
-                style={{ borderRadius: '2px', color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
+                style={{ borderRadius: '2px', color: 'var(--terminal-prime)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
                 Request
               </button>
             )}
@@ -257,8 +257,8 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
         <div className="p-3" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
           {/* Add Skill from Forge (GM) */}
           {showAddForm && onAddSkill && (
-            <div className="mb-3 p-2 border" style={{ borderColor: '#ffcc78', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
-              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Assign Forged Skill</div>
+            <div className="mb-3 p-2 border" style={{ borderColor: 'var(--krma-gold)', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
+              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Assign Forged Skill</div>
               {forgeLoading ? (
                 <div className="text-[10px] text-gray-400 py-2 text-center">Loading forge skills...</div>
               ) : forgeSkills.length === 0 ? (
@@ -300,7 +300,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                       onClick={e => { e.stopPropagation(); handleAddForgeSkill(); }}
                       onMouseDown={e => e.stopPropagation()}
                       className="text-[9px] px-2 py-0.5 uppercase"
-                      style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}
+                      style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}
                     >
                       Assign
                     </button>
@@ -341,7 +341,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                           key={fs.id}
                           onClick={e => { e.stopPropagation(); setSelectedForgeSkill(fs); setForgeSkillLevel(1); }}
                           onMouseDown={e => e.stopPropagation()}
-                          className="w-full text-left p-1.5 border transition-colors hover:border-[#ffcc78]"
+                          className="w-full text-left p-1.5 border transition-colors hover:border-[var(--krma-gold)]"
                           style={{ borderRadius: '2px', backgroundColor: '#1a1a2e', borderColor: '#3a3a4e' }}
                         >
                           <div className="flex items-center gap-1.5">
@@ -378,8 +378,8 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
 
           {/* Request Skill Form (Player) */}
           {showRequestForm && onRequestSkill && (
-            <div className="mb-3 p-2 border" style={{ borderColor: '#22ab94', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
-              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Request a Skill</div>
+            <div className="mb-3 p-2 border" style={{ borderColor: 'var(--terminal-prime)', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
+              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Request a Skill</div>
               <div className="space-y-2">
                 <input
                   type="text"
@@ -408,7 +408,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                     disabled={!canSubmit}
                     className="text-[9px] px-2 py-0.5 uppercase"
                     style={{
-                      color: canSubmit ? '#22ab94' : '#666',
+                      color: canSubmit ? 'var(--terminal-prime)' : '#666',
                       border: '1px solid',
                       borderColor: canSubmit ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
                       borderRadius: '2px',
@@ -480,7 +480,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                         {skill.trainable && (
                           <span className="text-[7px] px-1 flex-shrink-0 uppercase" style={{
                             backgroundColor: 'rgba(255,204,120,0.15)',
-                            color: '#ffcc78',
+                            color: 'var(--krma-gold)',
                             border: '1px solid rgba(255,204,120,0.4)',
                             borderRadius: '2px',
                             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -518,7 +518,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                             className={`text-[8px] px-1.5 py-0.5 transition-opacity uppercase ${checkSkillName === skill.name ? '' : 'opacity-0 group-hover:opacity-100'}`}
                             style={{
                               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                              color: '#ffcc78',
+                              color: 'var(--krma-gold)',
                               border: '1px solid rgba(255,204,120,0.3)',
                               borderRadius: '2px',
                               letterSpacing: '0.05em',
@@ -575,7 +575,7 @@ export default function SkillsCard({ skills, campaignId, isPlayer, onClose, onAd
                           onClick={e => { e.stopPropagation(); onCheckSkill(skill.name, checkDR, checkRevealDR); setCheckSkillName(null); }}
                           onMouseDown={e => e.stopPropagation()}
                           className="text-[9px] px-2 py-0.5 uppercase ml-auto"
-                          style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}
+                          style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}
                         >
                           Check
                         </button>

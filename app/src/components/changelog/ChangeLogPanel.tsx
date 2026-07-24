@@ -10,9 +10,9 @@ interface ChangeLogPanelProps {
 }
 
 const ACTOR_COLORS: Record<ChangeActor, string> = {
-  player: '#22ab94',
-  gm: '#ffcc78',
-  ai_copilot: '#582a72',
+  player: 'var(--terminal-prime)',
+  gm: 'var(--krma-gold)',
+  ai_copilot: 'var(--pillar-spirit)',
   system: '#666',
 };
 
@@ -141,10 +141,10 @@ export default function ChangeLogPanel({ campaignId, visible = true, onRevert }:
       <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span style={{ color: '#ffcc78', fontSize: '14px' }}>{'\u25C8'}</span>
+            <span style={{ color: 'var(--krma-gold)', fontSize: '14px' }}>{'\u25C8'}</span>
             <h2 className="text-sm uppercase tracking-widest" style={{
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-              color: '#ffcc78',
+              color: 'var(--krma-gold)',
               fontSize: '18px',
             }}>CHANGE LOG</h2>
           </div>
@@ -153,7 +153,7 @@ export default function ChangeLogPanel({ campaignId, visible = true, onRevert }:
             className="px-2 py-1 text-[10px] uppercase tracking-wider transition-colors"
             style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: '#22ab94',
+              color: 'var(--terminal-prime)',
               border: '1px solid rgba(34, 171, 148, 0.4)',
               backgroundColor: 'transparent',
             }}
@@ -284,7 +284,7 @@ export default function ChangeLogPanel({ campaignId, visible = true, onRevert }:
                 }}>{ACTOR_LABELS[entry.actor]}</span>
 
                 {/* Category icon */}
-                <span className="text-xs flex-shrink-0" style={{ color: '#ffcc78' }}>{icon}</span>
+                <span className="text-xs flex-shrink-0" style={{ color: 'var(--krma-gold)' }}>{icon}</span>
 
                 {/* Character name */}
                 <span className="text-[9px] flex-shrink-0" style={{
@@ -323,7 +323,7 @@ export default function ChangeLogPanel({ campaignId, visible = true, onRevert }:
                         <span style={{ color: '#666', minWidth: '140px' }}>{change.path}</span>
                         <span style={{ color: '#ff6b6b' }}>{JSON.stringify(change.previousValue)}</span>
                         <span style={{ color: '#666' }}>{'\u2192'}</span>
-                        <span style={{ color: '#22ab94' }}>{JSON.stringify(change.newValue)}</span>
+                        <span style={{ color: 'var(--terminal-prime)' }}>{JSON.stringify(change.newValue)}</span>
                       </div>
                     ))}
                   </div>
@@ -373,7 +373,7 @@ export default function ChangeLogPanel({ campaignId, visible = true, onRevert }:
             className="w-full py-2 text-[10px] uppercase tracking-wider transition-colors"
             style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: '#22ab94',
+              color: 'var(--terminal-prime)',
               backgroundColor: 'transparent',
               border: '1px solid rgba(34, 171, 148, 0.2)',
             }}

@@ -180,7 +180,7 @@ export default function DashboardShell({ username, role, realRole, children }: D
           <div className="flex items-center gap-1.5">
             <div className="w-[6px] h-[6px] bg-[var(--pillar-body)]" />
             <div className="w-[6px] h-[6px] bg-[var(--pillar-soul)]" />
-            <div className="w-[6px] h-[6px] bg-[#002F6C]" />
+            <div className="w-[6px] h-[6px] bg-[var(--pillar-soul)]" />
           </div>
           <span className="text-[var(--accent-teal)]/40 text-[8px] tracking-[0.3em] font-[family-name:var(--font-terminal)]">
             TERMINAL://reality.layer.0

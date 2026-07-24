@@ -123,7 +123,7 @@ export default function SplitConfirmDialog({
           maxHeight: '90vh',
           overflowY: 'auto',
           background: '#000',
-          border: '1px solid #f7525f',
+          border: '1px solid var(--pillar-body)',
           padding: '48px',
           position: 'relative',
           color: '#fff',
@@ -141,12 +141,12 @@ export default function SplitConfirmDialog({
         }}>
           THE DEATH ENGINE
         </h2>
-        <div style={{ width: '100%', height: '2px', background: '#f7525f', marginBottom: '32px' }} />
+        <div style={{ width: '100%', height: '2px', background: 'var(--pillar-body)', marginBottom: '32px' }} />
 
         {/* Character badge */}
         <div style={{
           display: 'inline-block',
-          background: '#f7525f',
+          background: 'var(--pillar-body)',
           color: '#000',
           fontFamily: 'Bebas Neue, monospace',
           fontSize: '1.1rem',
@@ -166,7 +166,7 @@ export default function SplitConfirmDialog({
 
         {/* Error */}
         {previewError && (
-          <div style={{ color: '#f7525f', fontSize: '0.9rem', marginBottom: '24px' }}>
+          <div style={{ color: 'var(--pillar-body)', fontSize: '0.9rem', marginBottom: '24px' }}>
             {previewError}
           </div>
         )}
@@ -200,7 +200,7 @@ export default function SplitConfirmDialog({
                     <span style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
                       <span style={{ color: '#666', fontSize: '0.8rem' }}>{c.reason}</span>
                       <span style={{
-                        color: dest === 'lady_death' ? '#f7525f' : '#aaa',
+                        color: dest === 'lady_death' ? 'var(--pillar-body)' : '#aaa',
                         minWidth: '52px',
                         textAlign: 'right',
                         fontFamily: 'Consolas, monospace',
@@ -229,7 +229,7 @@ export default function SplitConfirmDialog({
               </div>
               <div>
                 <span style={{ color: '#555', marginRight: '8px' }}>To Lady Death:</span>
-                <span style={{ color: '#f7525f' }}>{preview.manifest.toLadyDeath} KV</span>
+                <span style={{ color: 'var(--pillar-body)' }}>{preview.manifest.toLadyDeath} KV</span>
               </div>
             </div>
           </>
@@ -258,7 +258,7 @@ export default function SplitConfirmDialog({
                   onClick={() => setArmed(true)}
                   disabled={!preview}
                   style={{
-                    background: preview ? '#f7525f' : '#1a1a1a',
+                    background: preview ? 'var(--pillar-body)' : '#1a1a1a',
                     color: preview ? '#000' : '#444',
                     border: 'none',
                     fontFamily: 'Bebas Neue, monospace',

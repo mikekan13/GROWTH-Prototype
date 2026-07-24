@@ -450,7 +450,7 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                             </span>
                           )}
                           {openOpps.length > 0 && (
-                            <span className="text-[9px]" style={{ color: '#ffcc78' }}>
+                            <span className="text-[9px]" style={{ color: 'var(--krma-gold)' }}>
                               {'\u26a1'} {openOpps.length} open opportunit{openOpps.length === 1 ? 'y' : 'ies'}
                             </span>
                           )}
@@ -460,7 +460,7 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                             </span>
                           )}
                           {goal.nectarsEarned > 0 && (
-                            <span className="text-[9px]" style={{ color: '#ffcc78' }}>
+                            <span className="text-[9px]" style={{ color: 'var(--krma-gold)' }}>
                               {'\u2736'}{goal.nectarsEarned}
                             </span>
                           )}
@@ -591,19 +591,19 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                       {(opportunities.length > 0 || (isGM && isLive)) && (
                         <div className="mt-2">
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="text-[9px] uppercase" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue)', letterSpacing: '0.05em' }}>Opportunities</p>
+                            <p className="text-[9px] uppercase" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue)', letterSpacing: '0.05em' }}>Opportunities</p>
                             {isGM && isLive && declaringOpp !== goal.id && (
                               <button
                                 onClick={e => { e.stopPropagation(); setDeclaringOpp(goal.id); setNewOppDesc(''); }}
                                 onMouseDown={e => e.stopPropagation()}
                                 className="text-[9px] px-1 hover:bg-white/10"
-                                style={{ color: '#ffcc78', borderRadius: '2px' }} title="Declare an opportunity">+</button>
+                                style={{ color: 'var(--krma-gold)', borderRadius: '2px' }} title="Declare an opportunity">+</button>
                             )}
                           </div>
                           {opportunities.map(opp => (
-                            <div key={opp.id} className="text-[10px] py-0.5 pl-1 border-l-2" style={{ borderColor: opp.status === 'OPEN' ? '#ffcc78' : '#3a3a4e' }}>
+                            <div key={opp.id} className="text-[10px] py-0.5 pl-1 border-l-2" style={{ borderColor: opp.status === 'OPEN' ? 'var(--krma-gold)' : '#3a3a4e' }}>
                               <div className="flex items-center gap-1.5">
-                                <span style={{ color: opp.status === 'OPEN' ? '#ffcc78' : '#666' }}>{'⚡'}</span>
+                                <span style={{ color: opp.status === 'OPEN' ? 'var(--krma-gold)' : '#666' }}>{'⚡'}</span>
                                 <span style={{ color: opp.status === 'OPEN' ? '#ccc' : '#777' }}>{opp.description}</span>
                                 {opp.status === 'RESOLVED' && (
                                   <span className="text-[8px] px-1" style={{
@@ -617,7 +617,7 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                                     onClick={e => { e.stopPropagation(); setResolvingOpp(opp.id); setResolveMethod('check'); setResolveNote(''); }}
                                     onMouseDown={e => e.stopPropagation()}
                                     className="text-[8px] px-1 ml-auto uppercase hover:bg-white/10"
-                                    style={{ color: '#ffcc78', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>Resolve</button>
+                                    style={{ color: 'var(--krma-gold)', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>Resolve</button>
                                 )}
                               </div>
                               {opp.note && opp.status === 'RESOLVED' && (
@@ -634,9 +634,9 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                                         className="text-[8px] px-1.5 py-0.5 uppercase"
                                         style={{
                                           borderRadius: '2px',
-                                          backgroundColor: resolveMethod === m ? '#ffcc78' : '#2a2a3e',
+                                          backgroundColor: resolveMethod === m ? 'var(--krma-gold)' : '#2a2a3e',
                                           color: resolveMethod === m ? '#1a1a2e' : '#888',
-                                          border: `1px solid ${resolveMethod === m ? '#ffcc78' : '#3a3a4e'}`,
+                                          border: `1px solid ${resolveMethod === m ? 'var(--krma-gold)' : '#3a3a4e'}`,
                                         }}>{m}</button>
                                     ))}
                                   </div>
@@ -679,7 +679,7 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                                 <button onClick={e => { e.stopPropagation(); handleDeclareOpp(goal.id); }} onMouseDown={e => e.stopPropagation()}
                                   disabled={!newOppDesc.trim()}
                                   className="text-[9px] px-2 py-0.5 uppercase"
-                                  style={{ color: newOppDesc.trim() ? '#ffcc78' : '#666', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>Declare</button>
+                                  style={{ color: newOppDesc.trim() ? 'var(--krma-gold)' : '#666', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>Declare</button>
                                 <button onClick={e => { e.stopPropagation(); setDeclaringOpp(null); }} onMouseDown={e => e.stopPropagation()}
                                   className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
                                   style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}>Cancel</button>

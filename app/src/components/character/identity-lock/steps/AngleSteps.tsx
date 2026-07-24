@@ -81,13 +81,13 @@ export function AngleSteps({ state, dispatch, tuning, gen, characterData, pickin
               return (
                 <div key={angle} className="flex flex-col items-center">
                   <div className="text-xs uppercase tracking-wider mb-1" style={{
-                    color: a.grade === 'almost_perfect' ? '#D0A030' : a.grade === 'good' ? '#22ab94' : a.grade === 'bad' ? '#E8585A' : '#8e7cc3',
+                    color: a.grade === 'almost_perfect' ? '#D0A030' : a.grade === 'good' ? 'var(--terminal-prime)' : a.grade === 'bad' ? '#E8585A' : '#8e7cc3',
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
                   }}>
                     {ANGLE_LABELS[angle]}
                   </div>
                   <div className="relative border overflow-hidden" style={{
-                    borderColor: a.grade === 'almost_perfect' ? '#D0A030' : a.grade === 'good' ? '#22ab94' : a.imagePath ? '#582a72' : '#2a2a3e',
+                    borderColor: a.grade === 'almost_perfect' ? '#D0A030' : a.grade === 'good' ? 'var(--terminal-prime)' : a.imagePath ? 'var(--pillar-spirit)' : '#2a2a3e',
                     borderWidth: a.grade === 'almost_perfect' ? '2px' : '1px',
                     backgroundColor: '#111', width: '130px', aspectRatio: '3/4',
                   }}>
@@ -168,12 +168,12 @@ export function AngleSteps({ state, dispatch, tuning, gen, characterData, pickin
           {state.step === 'angle_grading' && (
             <div className="flex flex-wrap gap-2 justify-center">
               {hasBadAngles && (
-                <WizardButton onClick={() => dispatch({ type: 'REGEN_BAD_ANGLES' })} color="#582a72" label="Regenerate Bad" />
+                <WizardButton onClick={() => dispatch({ type: 'REGEN_BAD_ANGLES' })} color="var(--pillar-spirit)" label="Regenerate Bad" />
               )}
-              <WizardButton onClick={() => dispatch({ type: 'REGEN_ALL_ANGLES' })} color="#582a72" label="Redo All Angles" />
+              <WizardButton onClick={() => dispatch({ type: 'REGEN_ALL_ANGLES' })} color="var(--pillar-spirit)" label="Redo All Angles" />
               {allGraded && hasAnyGood && (
                 <>
-                  <WizardButton onClick={() => generateBody()} color="#22ab94" label="See Full Body" />
+                  <WizardButton onClick={() => generateBody()} color="var(--terminal-prime)" label="See Full Body" />
                   <WizardButton onClick={() => dispatch({ type: 'SKIP_BODY' })} color="#444" label="Skip to Testing" />
                 </>
               )}

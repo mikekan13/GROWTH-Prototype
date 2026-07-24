@@ -66,7 +66,7 @@ export function BodyDiscoveryStep({ state, dispatch, tuning, gen, bodyCandidates
                   const p = state.angles[k].imagePath;
                   if (!p) return null;
                   return (
-                    <div key={k} className="border overflow-hidden group relative" style={{ borderColor: '#582a72', aspectRatio: '3/4', cursor: 'pointer' }}>
+                    <div key={k} className="border overflow-hidden group relative" style={{ borderColor: 'var(--pillar-spirit)', aspectRatio: '3/4', cursor: 'pointer' }}>
                       <img src={p} alt={ANGLE_LABELS[k]} className="w-full h-full object-cover" />
                       <div className="hidden group-hover:flex fixed inset-0 z-50 pointer-events-none items-center justify-center bg-black/70">
                         <img src={p} alt={ANGLE_LABELS[k]} style={{ maxHeight: '80vh', maxWidth: '100%', width: 'auto', height: 'auto' }} />
@@ -89,7 +89,7 @@ export function BodyDiscoveryStep({ state, dispatch, tuning, gen, bodyCandidates
                   <button onClick={() => setBodyViewIndex(Math.max(0, bodyDisplayIndex - 1))}
                     style={{ color: bodyDisplayIndex > 0 ? '#D0A030' : '#333', fontSize: '18px', cursor: bodyDisplayIndex > 0 ? 'pointer' : 'default' }}>◀</button>
                 )}
-                <div className="relative border overflow-hidden" style={{ borderColor: bodyDisplayImage ? '#22ab94' : '#2a2a3e', width: '140px', aspectRatio: '1/2', backgroundColor: '#111' }}>
+                <div className="relative border overflow-hidden" style={{ borderColor: bodyDisplayImage ? 'var(--terminal-prime)' : '#2a2a3e', width: '140px', aspectRatio: '1/2', backgroundColor: '#111' }}>
                   {bodyDisplayImage ? (
                     <div className="group relative w-full h-full">
                       <img src={bodyDisplayImage} alt="Full body" className="w-full h-full object-cover" />
@@ -205,15 +205,15 @@ export function BodyDiscoveryStep({ state, dispatch, tuning, gen, bodyCandidates
             </div>
             <div className="flex gap-2 justify-center">
               <WizardButton onClick={() => dispatch({ type: 'ADVANCE_TO_FINETUNE' })} color="#D0A030" label="Finetune" />
-              <WizardButton onClick={() => dispatch({ type: 'ADVANCE_TO_LOCK' })} color="#22ab94" label="Accept — Lock Identity" />
-              <WizardButton onClick={() => generateBody()} color="#582a72" label="Retry Body" />
+              <WizardButton onClick={() => dispatch({ type: 'ADVANCE_TO_LOCK' })} color="var(--terminal-prime)" label="Accept — Lock Identity" />
+              <WizardButton onClick={() => generateBody()} color="var(--pillar-spirit)" label="Retry Body" />
               <WizardButton onClick={() => dispatch({ type: 'BACK_TO_FRONT' })} color="#333" label="Back to Face" />
             </div>
             </div>
           )}
           {!state.bodyImage && !state.bodyGenerating && (
             <div className="flex gap-2 justify-center">
-              <WizardButton onClick={() => generateBody()} color="#22ab94" label="Generate Body" />
+              <WizardButton onClick={() => generateBody()} color="var(--terminal-prime)" label="Generate Body" />
               <WizardButton onClick={() => dispatch({ type: 'BACK_TO_FRONT' })} color="#333" label="Back to Face" />
             </div>
           )}

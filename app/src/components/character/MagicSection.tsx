@@ -29,7 +29,7 @@ const PILLAR_STYLES = {
     subtitle: 'Flow + Focus',
     color: '#8e7cc3',
     bg: 'rgba(88, 42, 114, 0.08)',
-    borderColor: '#582a72',
+    borderColor: 'var(--pillar-spirit)',
     desc: 'Harmony of opposing forces',
     icon: '\u2696',
   },

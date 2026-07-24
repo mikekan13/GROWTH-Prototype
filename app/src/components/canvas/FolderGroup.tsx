@@ -397,9 +397,9 @@ export function FolderGroupRect({
         height={collapsed ? HEADER_HEIGHT : locationHeaderHeight(folder)}
         rx={8}
         ry={8}
-        fill={isDropTarget ? '#22ab94' : color}
+        fill={isDropTarget ? 'var(--terminal-prime)' : color}
         fillOpacity={1}
-        stroke={isDropTarget ? '#22ab94' : 'none'}
+        stroke={isDropTarget ? 'var(--terminal-prime)' : 'none'}
         strokeWidth={isDropTarget ? 3 : 0}
         data-folder-location-id={folder.locationInfo?.locationId || undefined}
         style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
@@ -421,7 +421,7 @@ export function FolderGroupRect({
       <text
         x={bounds.x + 8}
         y={bounds.y - 6}
-        fill={folder.type === 'party' ? '#22ab94' : color}
+        fill={folder.type === 'party' ? 'var(--terminal-prime)' : color}
         fontSize={labelFontSize}
         fontWeight={700}
         fontFamily="var(--font-terminal), Consolas, monospace"
@@ -454,10 +454,10 @@ export function FolderGroupRect({
           >
             <div style={{
               display: 'flex', flexDirection: 'column', overflow: 'hidden',
-              border: '4px solid #ffcc78', borderRadius: 8,
+              border: '4px solid var(--krma-gold)', borderRadius: 8,
               fontFamily: "'Bebas Neue', var(--font-bebas-neue), sans-serif",
             }}>
-              <div style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: 40, textAlign: 'center', lineHeight: '1', padding: '10px 20px', letterSpacing: '0.08em' }}>
+              <div style={{ backgroundColor: 'var(--pillar-body)', color: 'var(--krma-gold)', fontSize: 40, textAlign: 'center', lineHeight: '1', padding: '10px 20px', letterSpacing: '0.08em' }}>
                 T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V
               </div>
               <div style={{ backgroundColor: '#b4a7d6', color: '#8e7cc3', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
@@ -486,7 +486,7 @@ export function FolderGroupRect({
               style={{
                 width: 64,
                 height: 64,
-                border: '2px solid #ffcc78',
+                border: '2px solid var(--krma-gold)',
                 borderRadius: 4,
                 background: 'rgba(0,0,0,0.4)',
                 display: 'flex',
@@ -535,7 +535,7 @@ export function FolderGroupRect({
                 padding: '5px 10px',
                 background: 'rgba(0,0,0,0.6)',
                 border: '1px solid rgba(34,171,148,0.6)',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
                 fontSize: 11,
                 letterSpacing: '0.08em',
@@ -577,8 +577,8 @@ export function FolderGroupRect({
                 onMouseDown={(e) => e.stopPropagation()}
                 style={{
                   padding: '5px 10px',
-                  background: 'linear-gradient(135deg, #ffcc78, #d09f55)',
-                  border: '1px solid #ffcc78',
+                  background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
+                  border: '1px solid var(--krma-gold)',
                   color: '#000',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                   fontSize: 11,
@@ -616,7 +616,7 @@ export function FolderGroupRect({
                   padding: '5px 10px',
                   background: 'rgba(0,0,0,0.6)',
                   border: '1px solid rgba(255,204,120,0.6)',
-                  color: '#ffcc78',
+                  color: 'var(--krma-gold)',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                   fontSize: 11,
                   letterSpacing: '0.08em',
@@ -652,19 +652,19 @@ export function FolderGroupRect({
               >
                 {(folder.locationInfo.contentCounts.locations ?? 0) > 0 && (
                   <span title="Sub-locations">
-                    <span style={{ color: '#22ab94', marginRight: 4 }}>⌂</span>
+                    <span style={{ color: 'var(--terminal-prime)', marginRight: 4 }}>⌂</span>
                     {folder.locationInfo.contentCounts.locations}
                   </span>
                 )}
                 {(folder.locationInfo.contentCounts.characters ?? 0) > 0 && (
                   <span title="Characters / PCs">
-                    <span style={{ color: '#f7525f', marginRight: 4 }}>✴</span>
+                    <span style={{ color: 'var(--pillar-body)', marginRight: 4 }}>✴</span>
                     {folder.locationInfo.contentCounts.characters}
                   </span>
                 )}
                 {(folder.locationInfo.contentCounts.npcs ?? 0) > 0 && (
                   <span title="NPCs">
-                    <span style={{ color: '#ffcc78', marginRight: 4 }}>✴</span>
+                    <span style={{ color: 'var(--krma-gold)', marginRight: 4 }}>✴</span>
                     {folder.locationInfo.contentCounts.npcs}
                   </span>
                 )}
@@ -737,7 +737,7 @@ export function FolderGroupRect({
                     </div>
                     <div>
                       <div style={{ fontSize: 18, letterSpacing: '0.15em', color: 'rgba(34,171,148,0.8)' }}>DANGER</div>
-                      <div style={{ fontSize: 22, color: li.dangerLevel == null ? undefined : li.dangerLevel >= 7 ? '#f7525f' : li.dangerLevel >= 4 ? '#ffcc78' : '#22ab94' }}>
+                      <div style={{ fontSize: 22, color: li.dangerLevel == null ? undefined : li.dangerLevel >= 7 ? 'var(--pillar-body)' : li.dangerLevel >= 4 ? 'var(--krma-gold)' : 'var(--terminal-prime)' }}>
                         {li.dangerLevel != null ? `${li.dangerLevel} / 10` : emptyPlaceholder}
                       </div>
                     </div>
@@ -758,7 +758,7 @@ export function FolderGroupRect({
                               padding: '3px 12px',
                               background: 'rgba(34,171,148,0.15)',
                               border: '1px solid rgba(34,171,148,0.4)',
-                              color: '#22ab94',
+                              color: 'var(--terminal-prime)',
                               letterSpacing: '0.08em',
                             }}
                           >
@@ -814,7 +814,7 @@ export function FolderGroupRect({
                 justifyContent: 'flex-end',
                 gap: 6,
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                color: '#ffcc78',
+                color: 'var(--krma-gold)',
               }}
               title={`${reserve.toLocaleString()} Ҝ — KRMA Reserve`}
             >
@@ -857,13 +857,13 @@ export function FolderGroupRect({
           >
             <div style={{
               display: 'flex', flexDirection: 'column', overflow: 'hidden',
-              border: '4px solid #ffcc78', borderRadius: 8,
+              border: '4px solid var(--krma-gold)', borderRadius: 8,
               fontFamily: "'Bebas Neue', var(--font-bebas-neue), sans-serif",
             }}>
-              <div style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: 32, textAlign: 'center', lineHeight: '1', padding: '12px 20px', letterSpacing: '0.08em' }}>
+              <div style={{ backgroundColor: 'var(--pillar-body)', color: 'var(--krma-gold)', fontSize: 32, textAlign: 'center', lineHeight: '1', padding: '12px 20px', letterSpacing: '0.08em' }}>
                 KRMA RES
               </div>
-              <div style={{ backgroundColor: '#ffcc7822', color: '#ffcc78', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
+              <div style={{ backgroundColor: '#ffcc7822', color: 'var(--krma-gold)', fontSize: 56, textAlign: 'center', lineHeight: '1.1', padding: '8px 20px', fontWeight: 700 }}>
                 {formatReserve(reserve)} <span style={{ fontSize: 36, opacity: 0.85 }}>Ҝ</span>
               </div>
             </div>

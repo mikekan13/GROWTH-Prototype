@@ -752,7 +752,7 @@ export function JewlChip() {
             height: 8,
             borderRadius: '50%',
             background:
-              audioStatus === 'listening' ? '#22ab94'
+              audioStatus === 'listening' ? 'var(--terminal-prime)'
               : audioStatus === 'muted' ? '#888'
               : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#e74c3c'
               : '#444',
@@ -961,7 +961,7 @@ export function JewlChip() {
                           ? '1px solid rgba(34, 171, 148, 0.25)'
                           : '1px solid rgba(255,255,255,0.1)',
                       color:
-                        m.role === 'user' ? '#22ab94' : 'rgba(255,255,255,0.88)',
+                        m.role === 'user' ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.88)',
                       whiteSpace: 'pre-wrap',
                     }}
                   >
@@ -1380,7 +1380,7 @@ export function JewlChip() {
               disabled={loading || (!input.trim() && pendingImages.length === 0)}
               style={{
                 background: 'rgba(34, 171, 148, 0.2)',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 border: '1px solid rgba(34, 171, 148, 0.4)',
                 fontSize: 9,
                 letterSpacing: '0.15em',

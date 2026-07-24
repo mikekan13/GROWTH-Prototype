@@ -28,7 +28,7 @@ export default async function SubscribePage() {
     <DashboardShell username={session.user.username} role={session.user.role}>
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         <header className="space-y-2">
-          <div className="text-[12px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[#22ab94]">
+          <div className="text-[12px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[var(--terminal-prime)]">
             EŶ∃tehrNET · Subscription
           </div>
           <h1 className="text-3xl font-[family-name:var(--font-header)] tracking-[0.12em] text-[#F5F4EF]">
@@ -49,7 +49,7 @@ export default async function SubscribePage() {
               Your Status
             </span>
             <span className="text-[11px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.15em]"
-              style={{ color: sub?.status === 'ACTIVE' ? '#22ab94' : sub?.status === 'PAST_DUE' ? '#E8585A' : '#ffcc78' }}
+              style={{ color: sub?.status === 'ACTIVE' ? 'var(--terminal-prime)' : sub?.status === 'PAST_DUE' ? '#E8585A' : 'var(--krma-gold)' }}
             >
               {sub?.status ?? 'NO SUBSCRIPTION'}
             </span>
@@ -74,7 +74,7 @@ export default async function SubscribePage() {
             style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
           >
             <span className="text-white/70">KRMA Wallet</span>
-            <span className="text-[14px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+            <span className="text-[14px] font-[family-name:var(--font-bebas-neue)] text-[var(--krma-gold)]">
               {Number(balance).toLocaleString()} <span className="text-[11px]">Ҝ</span>
             </span>
           </div>
@@ -88,17 +88,17 @@ export default async function SubscribePage() {
           }}
         >
           <div className="flex items-baseline justify-between">
-            <span className="text-[18px] font-[family-name:var(--font-header)] tracking-[0.15em] uppercase text-[#ffcc78]">
+            <span className="text-[18px] font-[family-name:var(--font-header)] tracking-[0.15em] uppercase text-[var(--krma-gold)]">
               Watcher Plan
             </span>
-            <span className="text-[24px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+            <span className="text-[24px] font-[family-name:var(--font-bebas-neue)] text-[var(--krma-gold)]">
               ${MONTHLY_USD}
               <span className="text-[12px] text-white/50 ml-1">/ month</span>
             </span>
           </div>
           <ul className="space-y-1.5 text-[13px] font-[family-name:var(--font-terminal)] text-white/70 leading-relaxed">
-            <li>· <span className="text-[#ffcc78]">{lumpKRMA} Ҝ</span> immediate lump on subscribe</li>
-            <li>· <span className="text-[#ffcc78]">{month1KRMA} Ҝ</span> KRMA drip month 1, scaling up to 10,000 Ҝ by month 12</li>
+            <li>· <span className="text-[var(--krma-gold)]">{lumpKRMA} Ҝ</span> immediate lump on subscribe</li>
+            <li>· <span className="text-[var(--krma-gold)]">{month1KRMA} Ҝ</span> KRMA drip month 1, scaling up to 10,000 Ҝ by month 12</li>
             <li>· Host unlimited campaigns; up to 5 Trailblazer seats per campaign</li>
             <li>· Access to GodHead invocations (Kai, Lady Death, Et&apos;herling)</li>
             <li>· Forge authoring pipeline + global content catalog</li>
@@ -109,7 +109,7 @@ export default async function SubscribePage() {
             <div className="border-t pt-3 mt-3"
               style={{ borderColor: 'rgba(255,255,255,0.08)' }}
             >
-              <div className="text-[10px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] text-[#ffcc78] mb-2">
+              <div className="text-[10px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] text-[var(--krma-gold)] mb-2">
                 ⚠ DEV STUB MODE
               </div>
               <p className="text-[11px] text-white/40 font-[family-name:var(--font-terminal)] leading-relaxed mb-3">

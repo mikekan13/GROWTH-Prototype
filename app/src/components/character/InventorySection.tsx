@@ -122,7 +122,7 @@ function ItemRow({ item }: { item: HeldItemData }) {
               {data.equipped && (
                 <span
                   className="text-white px-1.5 py-px text-[9px] uppercase tracking-wider"
-                  style={{ backgroundColor: '#22ab94', borderRadius: 2 }}
+                  style={{ backgroundColor: 'var(--terminal-prime)', borderRadius: 2 }}
                 >
                   Equipped
                 </span>

@@ -35,7 +35,7 @@ export function PersonaLockStep({ state, dispatch, tuning, gen }: {
             )}
             {ANGLE_KEYS.map(k => state.angles[k].imagePath && (
               <MiniFrame key={k} label={ANGLE_LABELS[k]} imagePath={state.angles[k].imagePath!}
-                borderColor={state.angles[k].grade === 'almost_perfect' ? '#D0A030' : '#22ab94'} />
+                borderColor={state.angles[k].grade === 'almost_perfect' ? '#D0A030' : 'var(--terminal-prime)'} />
             ))}
             {state.bodyImage && (
               <MiniFrame label="Body" imagePath={state.bodyImage} borderColor="#8e7cc3" />
@@ -45,12 +45,12 @@ export function PersonaLockStep({ state, dispatch, tuning, gen }: {
             {state.step === 'generating_final' && (
               <>
                 {state.finalBust ? (
-                  <MiniFrame label="Official Bust" imagePath={state.finalBust} borderColor="#22ab94" />
+                  <MiniFrame label="Official Bust" imagePath={state.finalBust} borderColor="var(--terminal-prime)" />
                 ) : (
                   <MiniFramePlaceholder label="Official Bust" startTime={state.generationStartTime} />
                 )}
                 {state.finalFullBody ? (
-                  <MiniFrame label="Official Body" imagePath={state.finalFullBody} borderColor="#22ab94" />
+                  <MiniFrame label="Official Body" imagePath={state.finalFullBody} borderColor="var(--terminal-prime)" />
                 ) : (
                   <MiniFramePlaceholder label="Official Body" startTime={state.finalBust ? state.generationStartTime : null} />
                 )}

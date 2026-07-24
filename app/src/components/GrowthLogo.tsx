@@ -41,7 +41,7 @@ export default function GrowthLogo({ scale = 1 }: GrowthLogoProps) {
       <span className="self-stretch bg-[#F5F4EF]" style={{ width: `${s(8)}px` }} />
       {/* G — coral red on white */}
       <span
-        className="flex items-center justify-center text-[#F7525F] bg-[#FFFFFF] font-[family-name:var(--font-terminal)] font-bold leading-none"
+        className="flex items-center justify-center text-[var(--pillar-body)] bg-[#FFFFFF] font-[family-name:var(--font-terminal)] font-bold leading-none"
         style={{ fontSize: `${s(103)}px`, padding: `${s(18)}px ${s(0.5)}px` }}
       >
         G
@@ -92,7 +92,7 @@ export default function GrowthLogo({ scale = 1 }: GrowthLogoProps) {
       </span>
       {/* H — dark navy on cream */}
       <span
-        className="flex items-center justify-center text-[#002F6C] bg-[#F5F4EF] font-[family-name:var(--font-terminal)] font-bold leading-none"
+        className="flex items-center justify-center text-[var(--pillar-soul)] bg-[#F5F4EF] font-[family-name:var(--font-terminal)] font-bold leading-none"
         style={{ fontSize: `${s(103)}px`, padding: `${s(18)}px ${s(0.5)}px` }}
       >
         H

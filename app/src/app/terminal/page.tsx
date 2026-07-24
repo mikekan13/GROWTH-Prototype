@@ -67,14 +67,14 @@ export default async function TerminalDashboard() {
             href={`/campaign/${primeCampaign.id}`}
             className="block border-2 transition-all hover:brightness-110"
             style={{
-              borderColor: '#ffcc78',
+              borderColor: 'var(--krma-gold)',
               background: 'linear-gradient(90deg, rgba(34,171,148,0.12) 0%, rgba(0,0,0,0.7) 60%, rgba(88,42,114,0.18) 100%)',
               boxShadow: '0 0 32px rgba(255,204,120,0.15)',
             }}
           >
             <div className="flex items-center justify-between px-5 py-4">
               <div>
-                <div className="text-[11px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[#ffcc78]">
+                <div className="text-[11px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[var(--krma-gold)]">
                   ENTER  ·  {PRIME_CAMPAIGN_DISPLAY}
                 </div>
                 <div className="text-[20px] font-[family-name:var(--font-header)] tracking-[0.1em] text-white mt-1">
@@ -84,7 +84,7 @@ export default async function TerminalDashboard() {
                   Cosmic control surface. {primeGodheadCount} god-head{primeGodheadCount === 1 ? '' : 's'} in the council. Campaign-cards forthcoming. ADMIN-only.
                 </div>
               </div>
-              <div className="text-[#22ab94] text-[28px] font-[family-name:var(--font-bebas-neue)] tracking-wider">
+              <div className="text-[var(--terminal-prime)] text-[28px] font-[family-name:var(--font-bebas-neue)] tracking-wider">
                 ›
               </div>
             </div>
@@ -112,18 +112,18 @@ export default async function TerminalDashboard() {
                   >
                     <span
                       className="uppercase leading-none"
-                      style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '24px', color: '#582a72', fontWeight: 'bold', letterSpacing: '-0.01em' }}
+                      style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '24px', color: 'var(--pillar-spirit)', fontWeight: 'bold', letterSpacing: '-0.01em' }}
                     >
                       {formatKrma(krmaMetrics.totalInReserves + krmaMetrics.totalCirculation)}
                     </span>
-                    <span className="leading-none" style={{ fontSize: '20px', color: '#582a72', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                    <span className="leading-none" style={{ fontSize: '20px', color: 'var(--pillar-spirit)', fontWeight: 'bold', letterSpacing: '0.02em' }}>
                       <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '16px', fontWeight: 900 }}>Ҝ</span>
                       <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
                     </span>
                   </div>
                   <div
                     className="h-[40px] min-w-[40px] px-2 flex flex-col items-center justify-center"
-                    style={{ background: '#582a72' }}
+                    style={{ background: 'var(--pillar-spirit)' }}
                   >
                     <span className="text-white text-[11px] font-bold whitespace-nowrap" style={{ fontFamily: 'Consolas, monospace' }}>{formatKrma(krmaMetrics.totalCirculation)}</span>
                     <span className="text-white/50 text-[6px] tracking-[0.1em]" style={{ fontFamily: 'Consolas, monospace' }}>CIRC</span>

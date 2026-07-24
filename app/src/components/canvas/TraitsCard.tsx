@@ -29,8 +29,8 @@ interface TraitsCardProps {
 }
 
 const TYPE_STYLES: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-  nectar: { color: '#ffcc78', bg: 'rgba(255,204,120,0.1)', icon: '\u2736', label: 'NECTAR' },
-  blossom: { color: '#22ab94', bg: 'rgba(34,171,148,0.1)', icon: '\u2740', label: 'BLOSSOM' },
+  nectar: { color: 'var(--krma-gold)', bg: 'rgba(255,204,120,0.1)', icon: '\u2736', label: 'NECTAR' },
+  blossom: { color: 'var(--terminal-prime)', bg: 'rgba(34,171,148,0.1)', icon: '\u2740', label: 'BLOSSOM' },
   thorn: { color: '#E84040', bg: 'rgba(232,64,64,0.1)', icon: '\u2737', label: 'THORN' },
 };
 
@@ -104,15 +104,15 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
   const filtered = filter === 'all' ? safeTraits : safeTraits.filter(t => t.type === filter);
 
   return (
-    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '400px' }}>
+    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: 'var(--krma-gold)', borderRadius: '3px', width: '400px' }}>
       {/* Header */}
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-lg">{'\u2736'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>NECTARS, BLOSSOMS & THORNS</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 {nectars.length} nectars {'\u2022'} {blossoms.length} blossoms {'\u2022'} {thorns.length} thorns
                 {maxPermanent !== undefined && <span> {'\u2022'} {permanentCount}/{maxPermanent} permanent</span>}
               </p>
@@ -121,7 +121,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
           <div className="flex items-center gap-1">
             {isEditable && onAddTrait && (
               <button onClick={e => { e.stopPropagation(); setShowAddForm(s => !s); }} onMouseDown={e => e.stopPropagation()}
-                className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: '#ffcc78' }}>
+                className="p-1 hover:bg-white/20 transition-colors text-xs" style={{ borderRadius: '2px', color: 'var(--krma-gold)' }}>
                 +
               </button>
             )}
@@ -141,8 +141,8 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
         <div className="p-3" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
           {/* Add Trait form */}
           {showAddForm && onAddTrait && (
-            <div className="mb-3 p-2 border" style={{ borderColor: '#ffcc78', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
-              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Add Trait</div>
+            <div className="mb-3 p-2 border" style={{ borderColor: 'var(--krma-gold)', borderRadius: '2px', backgroundColor: '#2a2a3e' }}>
+              <div className="text-[9px] uppercase tracking-wider mb-2" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Add Trait</div>
               <div className="space-y-2">
                 <div className="flex gap-1">
                   {(['nectar','blossom','thorn'] as const).map(t => (
@@ -157,7 +157,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                 <div className="flex gap-1 items-center">
                   <span className="text-[9px]" style={{ color: '#888', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>Pillar:</span>
                   {([
-                    { key: 'body' as const, color: '#f7525f', label: 'BODY' },
+                    { key: 'body' as const, color: 'var(--pillar-body)', label: 'BODY' },
                     { key: 'spirit' as const, color: '#8e7cc3', label: 'SPIRIT' },
                     { key: 'soul' as const, color: '#6fa8dc', label: 'SOUL' },
                   ]).map(p => (
@@ -184,7 +184,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                 {/* Blossom duration (cycles on the campaign clock; blank = open-ended) */}
                 {newType === 'blossom' && (
                   <div className="flex gap-2 items-center">
-                    <label className="text-[9px]" style={{ color: '#22ab94' }}>Duration (cycles):</label>
+                    <label className="text-[9px]" style={{ color: 'var(--terminal-prime)' }}>Duration (cycles):</label>
                     <input type="number" value={newDuration} onChange={e => setNewDuration(e.target.value)} onMouseDown={e => e.stopPropagation()}
                       min={0} step="any" placeholder="∞"
                       className="w-16 bg-transparent outline-none text-[10px] text-white px-1 py-0.5 border"
@@ -209,7 +209,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                     disabled={!canAdd}
                     className="text-[9px] px-2 py-0.5 uppercase"
                     style={{
-                      color: canAdd ? '#22ab94' : '#666',
+                      color: canAdd ? 'var(--terminal-prime)' : '#666',
                       border: '1px solid', borderColor: canAdd ? 'rgba(34,171,148,0.4)' : '#3a3a4e',
                       borderRadius: '2px',
                     }}>Add</button>
@@ -225,16 +225,16 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
           <div className="flex flex-wrap gap-1 mb-3">
             {[
               { key: 'all', label: 'ALL' },
-              { key: 'nectar', label: `NECTARS (${nectars.length})`, color: '#ffcc78' },
-              { key: 'blossom', label: `BLOSSOMS (${blossoms.length})`, color: '#22ab94' },
+              { key: 'nectar', label: `NECTARS (${nectars.length})`, color: 'var(--krma-gold)' },
+              { key: 'blossom', label: `BLOSSOMS (${blossoms.length})`, color: 'var(--terminal-prime)' },
               { key: 'thorn', label: `THORNS (${thorns.length})`, color: '#E84040' },
             ].map(f => (
               <button key={f.key} onClick={e => { e.stopPropagation(); setFilter(f.key); }} onMouseDown={e => e.stopPropagation()}
                 className="px-2 py-1 text-xs transition-colors uppercase"
                 style={{
                   borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em', fontSize: '11px',
-                  backgroundColor: filter === f.key ? '#582a72' : '#2a2a3e', color: filter === f.key ? (f.color || '#ffcc78') : '#888',
-                  border: `1px solid ${filter === f.key ? (f.color || '#ffcc78') : '#3a3a4e'}`,
+                  backgroundColor: filter === f.key ? 'var(--pillar-spirit)' : '#2a2a3e', color: filter === f.key ? (f.color || 'var(--krma-gold)') : '#888',
+                  border: `1px solid ${filter === f.key ? (f.color || 'var(--krma-gold)') : '#3a3a4e'}`,
                 }}>
                 {f.label}
               </button>
@@ -265,7 +265,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                           <span className="text-sm font-medium" style={{ color: ts.color }}>{trait.name}</span>
                           <span className="text-[8px] px-1" style={{ backgroundColor: ts.color, color: '#1a1a2e', borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{ts.label}</span>
                           {trait.type === 'blossom' && (trait.expiresAtCycle !== undefined || trait.durationCycles) && (
-                            <span className="text-[8px] px-1" style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.35)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                            <span className="text-[8px] px-1" style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.35)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                               {trait.expiresAtCycle !== undefined ? `⏳ exp @ ${trait.expiresAtCycle}` : `⏳ ${trait.durationCycles} cyc`}
                             </span>
                           )}
@@ -283,7 +283,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                             <div className="flex gap-1">
                               <button onClick={e => { e.stopPropagation(); saveEdit(trait); }} onMouseDown={e => e.stopPropagation()}
                                 className="text-[9px] px-2 py-0.5 uppercase"
-                                style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}>Save</button>
+                                style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}>Save</button>
                               <button onClick={e => { e.stopPropagation(); setEditingKey(null); }} onMouseDown={e => e.stopPropagation()}
                                 className="text-[9px] px-2 py-0.5 uppercase text-gray-500"
                                 style={{ border: '1px solid #3a3a4e', borderRadius: '2px' }}>Cancel</button>

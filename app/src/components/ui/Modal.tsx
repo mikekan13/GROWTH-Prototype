@@ -34,7 +34,7 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
       <div
         className={`w-full p-8 ${sizeClasses[size]}`}
         style={{
-          background: 'linear-gradient(135deg, #22ab94 0%, #1e9b82 50%, #22ab94 100%)',
+          background: 'linear-gradient(135deg, var(--terminal-prime) 0%, #1e9b82 50%, var(--terminal-prime) 100%)',
           boxShadow: '0 20px 60px rgba(34, 171, 148, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
           borderRadius: '1.5rem',
           border: '2px solid rgba(255, 255, 255, 0.3)',

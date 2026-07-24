@@ -63,18 +63,18 @@ export default async function WatcherDashboard() {
             >
               <span
                 className="uppercase leading-none"
-                style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: '#582a72', fontWeight: 'bold', letterSpacing: '-0.01em' }}
+                style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: 'var(--pillar-spirit)', fontWeight: 'bold', letterSpacing: '-0.01em' }}
               >
                 {formatKrma(personalBalance + totalInCampaigns)}
               </span>
-              <span className="leading-none" style={{ fontSize: '28px', color: '#582a72', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+              <span className="leading-none" style={{ fontSize: '28px', color: 'var(--pillar-spirit)', fontWeight: 'bold', letterSpacing: '0.02em' }}>
                 <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '22px', fontWeight: 900 }}>Ҝ</span>
                 <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
               </span>
             </div>
             <div
               className="h-[48px] min-w-[48px] px-3 flex flex-col items-center justify-center"
-              style={{ background: '#582a72' }}
+              style={{ background: 'var(--pillar-spirit)' }}
             >
               <span className="text-white text-[14px] font-bold whitespace-nowrap" style={{ fontFamily: 'Consolas, monospace' }}>{formatKrma(personalBalance)}</span>
               <span className="text-white/50 text-[7px] tracking-[0.1em]" style={{ fontFamily: 'Consolas, monospace' }}>SELF</span>

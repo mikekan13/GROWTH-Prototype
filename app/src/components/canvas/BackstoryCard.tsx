@@ -38,15 +38,15 @@ export default function BackstoryCard({ backstory, physicalDescription, onPhysic
   const totalSections = sections.length + (prompts.length > 0 ? 1 : 0);
 
   return (
-    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '420px' }}>
+    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: 'var(--krma-gold)', borderRadius: '3px', width: '420px' }}>
       {/* Header */}
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-lg">{'\u270E'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>BACKSTORY & NOTES</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 {totalSections} sections{prompts.length > 0 && ` \u2022 ${prompts.length} prompts`}
               </p>
             </div>
@@ -68,7 +68,7 @@ export default function BackstoryCard({ backstory, physicalDescription, onPhysic
         <div className="p-3 space-y-3 max-h-96 overflow-y-auto" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
           {/* Physical Description */}
           <div>
-            <div className="text-[9px] uppercase mb-2" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
+            <div className="text-[9px] uppercase mb-2" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
               PHYSICAL DESCRIPTION
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -108,15 +108,15 @@ export default function BackstoryCard({ backstory, physicalDescription, onPhysic
           </div>
 
           {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: '#582a72', opacity: 0.5 }} />
+          <div style={{ height: '1px', backgroundColor: 'var(--pillar-spirit)', opacity: 0.5 }} />
 
           {/* Narrative Sections */}
           {sections.map(({ key, label, icon }) => (
             <div key={key}>
-              <div className="text-[9px] uppercase mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
+              <div className="text-[9px] uppercase mb-1" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
                 {icon} {label}
               </div>
-              <div className="p-2 text-xs leading-relaxed" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#ccc', borderLeft: '3px solid #582a72' }}>
+              <div className="p-2 text-xs leading-relaxed" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', color: '#ccc', borderLeft: '3px solid var(--pillar-spirit)' }}>
                 {backstory[key] as string}
               </div>
             </div>
@@ -124,12 +124,12 @@ export default function BackstoryCard({ backstory, physicalDescription, onPhysic
 
           {prompts.length > 0 && (
             <div>
-              <div className="text-[9px] uppercase mb-1" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
+              <div className="text-[9px] uppercase mb-1" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em' }}>
                 {'\u2753'} BACKSTORY PROMPTS
               </div>
               <div className="space-y-2">
                 {prompts.map((p, i) => (
-                  <div key={i} className="p-2" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', borderLeft: '3px solid #582a72' }}>
+                  <div key={i} className="p-2" style={{ backgroundColor: '#2a2a3e', borderRadius: '2px', borderLeft: '3px solid var(--pillar-spirit)' }}>
                     <div className="text-[10px] mb-1" style={{ color: '#c4a0e8' }}>{p.question}</div>
                     <div className="text-xs" style={{ color: '#ccc' }}>{p.answer}</div>
                   </div>

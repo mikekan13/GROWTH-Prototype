@@ -29,15 +29,15 @@ export default function HarvestCard({ harvests, onClose }: HarvestCardProps) {
   const safeHarvests = Array.isArray(harvests) ? harvests : [];
 
   return (
-    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '400px' }}>
+    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: 'var(--krma-gold)', borderRadius: '3px', width: '400px' }}>
       {/* Header */}
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-lg">{'\u2618'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>HARVESTS</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 {safeHarvests.length} harvest{safeHarvests.length !== 1 ? 's' : ''} recorded
               </p>
             </div>
@@ -75,7 +75,7 @@ export default function HarvestCard({ harvests, onClose }: HarvestCardProps) {
                     {h.krmaChange !== undefined && h.krmaChange !== 0 && (
                       <span className="text-[10px] px-1" style={{
                         backgroundColor: '#1a1a2e',
-                        color: h.krmaChange > 0 ? '#22ab94' : '#E84040',
+                        color: h.krmaChange > 0 ? 'var(--terminal-prime)' : '#E84040',
                         border: `1px solid ${h.krmaChange > 0 ? '#22ab9440' : '#E8404040'}`,
                         borderRadius: '2px',
                       }}>
@@ -87,7 +87,7 @@ export default function HarvestCard({ harvests, onClose }: HarvestCardProps) {
                   {h.rewards && h.rewards.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {h.rewards.map((r, j) => (
-                        <span key={j} className="text-[8px] px-1" style={{ backgroundColor: 'rgba(34,171,148,0.15)', color: '#22ab94', borderRadius: '2px' }}>{r}</span>
+                        <span key={j} className="text-[8px] px-1" style={{ backgroundColor: 'rgba(34,171,148,0.15)', color: 'var(--terminal-prime)', borderRadius: '2px' }}>{r}</span>
                       ))}
                     </div>
                   )}

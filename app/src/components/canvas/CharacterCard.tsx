@@ -234,7 +234,7 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
 
   const inner = (
     <div className={`flex items-center gap-2 ${isFrequency ? 'rounded' : ''}`}
-      style={isFrequency ? { backgroundColor: 'rgba(255, 204, 120, 0.15)', border: '2px solid #ffcc78', padding: '2px', marginLeft: '-4px', marginRight: '-4px' } : undefined}
+      style={isFrequency ? { backgroundColor: 'rgba(255, 204, 120, 0.15)', border: '2px solid var(--krma-gold)', padding: '2px', marginLeft: '-4px', marginRight: '-4px' } : undefined}
     >
       <span className="text-xl font-bold text-white" style={{ fontFamily: 'Consolas, monospace', minWidth: '40px', paddingLeft: '8px' }}>{current}</span>
       <div
@@ -245,7 +245,7 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
         {/* Current fill */}
         <div className="absolute top-0 left-0 h-full rounded" style={{
           width: `${pct}%`,
-          background: 'linear-gradient(90deg, #ffcc78 0%, #ffaa44 100%)',
+          background: 'linear-gradient(90deg, var(--krma-gold) 0%, #ffaa44 100%)',
           boxShadow: isLow ? '0 0 8px rgba(255, 0, 0, 0.6)' : isFrequency ? '0 0 12px rgba(255, 204, 120, 0.5)' : 'none',
           transition: isDragging ? 'none' : 'width 0.3s',
           zIndex: 2,
@@ -658,7 +658,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             {false && onSkillCheck && (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowSkillCheckMenu(true); }}
-                className="w-full px-3 py-1.5 text-left text-sm text-[#22ab94] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+                className="w-full px-3 py-1.5 text-left text-sm text-[var(--terminal-prime)] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -856,7 +856,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           const fdMax = parseDie(fateDie);
           return (
           <div className="px-3 py-2 space-y-1" style={{ width: '220px' }} onClick={e => e.stopPropagation()}>
-            <div className="text-[10px] tracking-[0.15em] uppercase text-[#22ab94] font-[Consolas,monospace] mb-1">
+            <div className="text-[10px] tracking-[0.15em] uppercase text-[var(--terminal-prime)] font-[Consolas,monospace] mb-1">
               {node.name} — {fateDie.toUpperCase()}
             </div>
             {/* DR input + reveal toggle — compact single row */}
@@ -868,14 +868,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 max={40}
                 value={skillCheckDR}
                 onChange={e => setSkillCheckDR(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-12 text-xs px-1 py-0.5 text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/60 rounded-none outline-none focus:border-[#22ab94]"
+                className="w-12 text-xs px-1 py-0.5 text-white font-[Consolas,monospace] border border-[#22ab94]/40 bg-black/60 rounded-none outline-none focus:border-[var(--terminal-prime)]"
               />
               <label className="flex items-center gap-1 cursor-pointer" onClick={e => e.stopPropagation()}>
                 <input
                   type="checkbox"
                   checked={skillCheckRevealDR}
                   onChange={e => setSkillCheckRevealDR(e.target.checked)}
-                  className="w-3 h-3 accent-[#22ab94]"
+                  className="w-3 h-3 accent-[var(--terminal-prime)]"
                 />
                 <span className="text-[9px] text-white/40 font-[Consolas,monospace]">SHOW</span>
               </label>
@@ -1010,7 +1010,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         borderRadius: '3px',
         border: '2px solid #22ab9499',
         background: aiActionOn ? '#22ab9433' : '#000',
-        color: '#22ab94',
+        color: 'var(--terminal-prime)',
         cursor: controllerSaving ? 'wait' : 'pointer',
         whiteSpace: 'nowrap',
         textShadow: '0 0 10px rgba(34,171,148,0.7)',
@@ -1087,13 +1087,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             width: '500px', height: '220px', userSelect: 'none',
             // ACTIVE = crystallized: subtle gold border. Drop target still wins.
             borderColor: isDropTarget
-              ? '#ffcc78'
+              ? 'var(--krma-gold)'
               : node.status === 'ACTIVE'
                 ? 'rgba(255, 204, 120, 0.65)'
                 : 'rgba(55, 65, 81, 0.5)',
             willChange: isDropTarget ? 'filter' : 'transform',
             filter: isDropTarget
-              ? 'drop-shadow(0 0 6px #ffcc78) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
+              ? 'drop-shadow(0 0 6px var(--krma-gold)) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
               : isDragging
                 ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
                 : node.status === 'ACTIVE'
@@ -1118,7 +1118,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           <div className="flex-1 flex flex-col" style={{ height: '220px' }}>
             {/* Name */}
             <div className="flex items-center gap-2 mb-1" style={{ height: '24px' }}>
-              <div className="font-bold truncate" style={{ fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '14px', color: '#ffcc78' }}>
+              <div className="font-bold truncate" style={{ fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '14px', color: 'var(--krma-gold)' }}>
                 {node.name}
               </div>
               {aiTogglePill}
@@ -1127,11 +1127,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             <div className="absolute flex flex-col overflow-hidden" style={{
               top: '0px', right: '0px',
               minWidth: '64px',
-              border: '2px solid #ffcc78',
+              border: '2px solid var(--krma-gold)',
               borderBottomLeftRadius: '6px', borderTopRightRadius: '8px', zIndex: 5,
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
-              <div className="flex items-center justify-center" style={{ backgroundColor: '#f7525f', color: '#ffcc78', fontSize: '12px', lineHeight: '1', letterSpacing: '0.08em', padding: '3px 8px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
+              <div className="flex items-center justify-center" style={{ backgroundColor: 'var(--pillar-body)', color: 'var(--krma-gold)', fontSize: '12px', lineHeight: '1', letterSpacing: '0.08em', padding: '3px 8px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
               <div className="flex items-center justify-center" style={{ backgroundColor: '#b4a7d6', color: '#8e7cc3', fontSize: '17px', lineHeight: '1.1', padding: '2px 8px' }}>{tkv}</div>
             </div>
 
@@ -1139,7 +1139,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             {/* 3 Pillar Attribute Bars (vertical, compact view) */}
             <div className="flex gap-1 flex-1">
               {/* BODY */}
-              <div className="flex flex-col flex-1 border border-red-500/40 rounded p-1" style={{ backgroundColor: '#f7525f' }}>
+              <div className="flex flex-col flex-1 border border-red-500/40 rounded p-1" style={{ backgroundColor: 'var(--pillar-body)' }}>
                 <div className="text-[8px] font-bold text-white mb-1 text-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F714; BODY</div>
                 <div className="flex gap-0.5 flex-1">
                   {[
@@ -1151,7 +1151,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                       <div className="flex-1 relative w-full bg-black/40 rounded overflow-hidden" style={{ minHeight: '60px' }}>
                         <div className="absolute bottom-0 left-0 w-full rounded transition-all duration-300" style={{
                           height: `${getBarPercent(attr)}%`,
-                          background: 'linear-gradient(0deg, #ffcc78 0%, #ffaa44 100%)'
+                          background: 'linear-gradient(0deg, var(--krma-gold) 0%, #ffaa44 100%)'
                         }} />
                       </div>
                       <span className="text-[8px] font-bold text-white mt-0.5" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{label}</span>
@@ -1161,7 +1161,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               </div>
 
               {/* SPIRIT (Flow/Frequency/Focus) */}
-              <div className="flex flex-col flex-1 border border-purple-500/40 rounded p-1" style={{ backgroundColor: '#582a72' }}>
+              <div className="flex flex-col flex-1 border border-purple-500/40 rounded p-1" style={{ backgroundColor: 'var(--pillar-spirit)' }}>
                 <div className="text-[8px] font-bold text-white mb-1 text-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70E; SPIRIT</div>
                 <div className="flex gap-0.5 flex-1">
                   {[
@@ -1173,7 +1173,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                       <div className="flex-1 relative w-full bg-black/40 rounded overflow-hidden" style={{ minHeight: '60px' }}>
                         <div className="absolute bottom-0 left-0 w-full rounded transition-all duration-300" style={{
                           height: `${getBarPercent(attr)}%`,
-                          background: 'linear-gradient(0deg, #ffcc78 0%, #ffaa44 100%)'
+                          background: 'linear-gradient(0deg, var(--krma-gold) 0%, #ffaa44 100%)'
                         }} />
                       </div>
                       <span className="text-[8px] font-bold text-white mt-0.5" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{label}</span>
@@ -1183,7 +1183,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               </div>
 
               {/* SOUL (Willpower/Wisdom/Wit) */}
-              <div className="flex flex-col flex-1 border border-blue-500/40 rounded p-1" style={{ backgroundColor: '#002f6c' }}>
+              <div className="flex flex-col flex-1 border border-blue-500/40 rounded p-1" style={{ backgroundColor: 'var(--pillar-soul)' }}>
                 <div className="text-[8px] font-bold text-white mb-1 text-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70D; SOUL</div>
                 <div className="flex gap-0.5 flex-1">
                   {[
@@ -1195,7 +1195,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                       <div className="flex-1 relative w-full bg-black/40 rounded overflow-hidden" style={{ minHeight: '60px' }}>
                         <div className="absolute bottom-0 left-0 w-full rounded transition-all duration-300" style={{
                           height: `${getBarPercent(attr)}%`,
-                          background: 'linear-gradient(0deg, #ffcc78 0%, #ffaa44 100%)'
+                          background: 'linear-gradient(0deg, var(--krma-gold) 0%, #ffaa44 100%)'
                         }} />
                       </div>
                       <span className="text-[8px] font-bold text-white mt-0.5" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{label}</span>
@@ -1264,7 +1264,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           // Swap depth shadows for a gold glow when hovered (same filter count, no perf regression vs baseline).
           // ACTIVE = crystallized: subtle ambient gold glow.
           filter: isDropTarget
-            ? 'drop-shadow(0 0 6px #ffcc78) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
+            ? 'drop-shadow(0 0 6px var(--krma-gold)) drop-shadow(0 0 14px rgba(255, 204, 120, 0.8))'
             : isDragging
               ? 'drop-shadow(8px 16px 20px rgba(0, 0, 0, 0.7)) drop-shadow(4px 8px 10px rgba(0, 0, 0, 0.5))'
               : node.status === 'ACTIVE'
@@ -1282,21 +1282,21 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               header begins (444px reserved on the right). The controller
               pill sits fully above this band so both stripes pass through
               uninterrupted, forming a menu-options bar. */}
-          <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: '#22ab94', zIndex: 0 }} />
-          <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: '#582a72', zIndex: 0 }} />
+          <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: 'var(--terminal-prime)', zIndex: 0 }} />
+          <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: 'var(--pillar-spirit)', zIndex: 0 }} />
           <div style={{ width: '128px' }} />
 
           {/* Character Name */}
           <div className="px-3 flex justify-center overflow-visible relative" style={{
-            backgroundColor: '#002f6c', width: '284px', height: '42px',
-            borderLeft: '13px solid #22ab94', marginTop: '-13px',
+            backgroundColor: 'var(--pillar-soul)', width: '284px', height: '42px',
+            borderLeft: '13px solid var(--terminal-prime)', marginTop: '-13px',
             zIndex: 1,
           }}>
             {(() => {
               const fs = getNameFontSize(node.name);
               return (
                 <div className="font-bold absolute whitespace-nowrap" style={{
-                  color: '#ffcc78', fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
+                  color: 'var(--krma-gold)', fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
                   fontSize: `${fs}px`, lineHeight: `${fs}px`, bottom: '3px',
                 }}>{node.name}</div>
               );
@@ -1305,13 +1305,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
           {/* Buffer stripe */}
           <div className="flex flex-col" style={{ width: '10px', flexShrink: 0 }}>
-            <div style={{ height: '14px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '15px', backgroundColor: '#582a72' }} />
+            <div style={{ height: '14px', backgroundColor: 'var(--terminal-prime)' }} />
+            <div style={{ height: '15px', backgroundColor: 'var(--pillar-spirit)' }} />
           </div>
 
           {/* Fate Die */}
           <div style={{ width: '154px', marginTop: '-10px', position: 'relative', zIndex: 1 }}>
-            <div className="px-2 py-1 flex items-center justify-center" style={{ backgroundColor: '#ffcc78', borderRadius: '4px' }}>
+            <div className="px-2 py-1 flex items-center justify-center" style={{ backgroundColor: 'var(--krma-gold)', borderRadius: '4px' }}>
               <span style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', fontFamily: 'Consolas, monospace' }}>
                 &#x2B22;{seed?.baseFateDie?.replace('d', '') || '6'}
               </span>
@@ -1320,8 +1320,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
           {/* Buffer */}
           <div className="flex flex-col" style={{ width: '13px' }}>
-            <div style={{ height: '14px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '15px', backgroundColor: '#582a72' }} />
+            <div style={{ height: '14px', backgroundColor: 'var(--terminal-prime)' }} />
+            <div style={{ height: '15px', backgroundColor: 'var(--pillar-spirit)' }} />
           </div>
 
           {/* Controller pill — first item in the menu-options bar. Lifted
@@ -1341,7 +1341,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         <div className="flex items-stretch gap-0.5 pr-1" style={{ height: '55px' }}>
           <div style={{ width: '426px' }} />
           <div style={{ width: '10px' }} />
-          <div className="flex items-center justify-center" style={{ width: '154px', height: '22px', backgroundColor: '#f7525f', marginLeft: '-3px' }}>
+          <div className="flex items-center justify-center" style={{ width: '154px', height: '22px', backgroundColor: 'var(--pillar-body)', marginLeft: '-3px' }}>
             <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>FATE DIE</div>
           </div>
           <div style={{ width: 'calc(100% - 426px - 10px - 154px - 444px)' }} />
@@ -1361,7 +1361,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           <div className="relative" style={{
             marginTop: '-55px', marginLeft: '3px',
             paddingTop: '3px', paddingRight: '13px', paddingBottom: '3px', paddingLeft: '0',
-            backgroundColor: '#ffcc78'
+            backgroundColor: 'var(--krma-gold)'
           }}>
             <div className="relative w-full h-full bg-gray-900 overflow-hidden" style={{ width: '400px' }}>
               {node.portrait ? (
@@ -1374,18 +1374,18 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
           {/* Buffer stripe */}
           <div className="flex flex-col" style={{ width: '10px', flexShrink: 0, marginTop: '-55px' }}>
-            <div style={{ height: '473px', backgroundColor: '#582a72' }} />
-            <div style={{ height: '15px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '3px', backgroundColor: '#ffcc78' }} />
+            <div style={{ height: '473px', backgroundColor: 'var(--pillar-spirit)' }} />
+            <div style={{ height: '15px', backgroundColor: 'var(--terminal-prime)' }} />
+            <div style={{ height: '3px', backgroundColor: 'var(--krma-gold)' }} />
           </div>
 
           {/* Horizontal connecting stripe */}
           <div className="absolute flex flex-col" style={{
             left: '426px', top: '388px', right: 'calc(59px + 13px + 444px + 2px)', height: '48px', zIndex: -1
           }}>
-            <div style={{ height: '30px', backgroundColor: '#582a72' }} />
-            <div style={{ height: '15px', backgroundColor: '#22ab94' }} />
-            <div style={{ height: '3px', backgroundColor: '#ffcc78' }} />
+            <div style={{ height: '30px', backgroundColor: 'var(--pillar-spirit)' }} />
+            <div style={{ height: '15px', backgroundColor: 'var(--terminal-prime)' }} />
+            <div style={{ height: '3px', backgroundColor: 'var(--krma-gold)' }} />
           </div>
 
           {/* ── Middle Column ── */}
@@ -1397,7 +1397,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   <div className="text-[11px] font-bold text-white text-center mb-0.5">{seed?.name || 'Human'}</div>
                   <div className="text-[8px] font-bold text-white">SEED</div>
                 </div>
-                <div className="rounded border border-red-500/40 p-2 flex flex-col items-center justify-center" style={{ backgroundColor: '#f7525f', height: 'calc(50% - 1px)' }}>
+                <div className="rounded border border-red-500/40 p-2 flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--pillar-body)', height: 'calc(50% - 1px)' }}>
                   <div className="text-[11px] font-bold text-white text-center mb-0.5">{root?.name || 'Unknown'}</div>
                   <div className="text-[8px] font-bold text-white">ROOT</div>
                 </div>
@@ -1405,7 +1405,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
               <div className="flex gap-0.5 flex-1">
                 {/* Possessions */}
-                <div className="rounded border border-blue-500/40 p-2 flex flex-col" style={{ backgroundColor: '#002f6c', width: '276px', marginLeft: '8px' }}>
+                <div className="rounded border border-blue-500/40 p-2 flex flex-col" style={{ backgroundColor: 'var(--pillar-soul)', width: '276px', marginLeft: '8px' }}>
                   <div className="text-xs font-bold text-white mb-1">POSSESSIONS</div>
                   <div className="overflow-y-auto flex-1">
                     {ownedPossessions.length > 0 ? ownedPossessions.map((row, i) => (
@@ -1430,7 +1430,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 <div className="grid grid-cols-2 gap-0.5 flex-1">
                   <div className="space-y-0.5 h-full">
                     {[1, 2].map(n => (
-                      <div key={n} className="rounded border border-teal-500/40 p-2 flex flex-col" style={{ backgroundColor: '#22ab94', height: 'calc(50% - 1px)' }}>
+                      <div key={n} className="rounded border border-teal-500/40 p-2 flex flex-col" style={{ backgroundColor: 'var(--terminal-prime)', height: 'calc(50% - 1px)' }}>
                         <div className="flex items-center gap-1 mb-1">
                           <span className="text-sm">&#x2699;&#xFE0F;</span>
                           <span className="text-[10px] font-bold text-white">{n}</span>
@@ -1443,7 +1443,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                     ))}
                   </div>
                   <div className="space-y-0.5 h-full">
-                    <div className="rounded border border-teal-500/40 p-1 flex flex-col justify-center items-center" style={{ backgroundColor: '#22ab94', height: 'calc(50% - 1px)' }}>
+                    <div className="rounded border border-teal-500/40 p-1 flex flex-col justify-center items-center" style={{ backgroundColor: 'var(--terminal-prime)', height: 'calc(50% - 1px)' }}>
                       <div className="text-[8px] font-bold text-white">AGE</div>
                       <div className="text-sm font-bold text-white">{data?.age || '0'}</div>
                     </div>
@@ -1457,20 +1457,20 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             </div>
 
             {/* ── GRO.VINES section ── */}
-            <div className="rounded border border-teal-500/40 p-3 flex flex-col" style={{ backgroundColor: '#22ab94' }}>
+            <div className="rounded border border-teal-500/40 p-3 flex flex-col" style={{ backgroundColor: 'var(--terminal-prime)' }}>
               <div className="grid grid-cols-2 gap-2 mb-2">
-                <div className="rounded flex items-center justify-center" style={{ width: '141px', height: '31px', backgroundColor: '#002f6c', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78' }}>GRO.VINES</div>
+                <div className="rounded flex items-center justify-center" style={{ width: '141px', height: '31px', backgroundColor: 'var(--pillar-soul)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: 'var(--krma-gold)' }}>GRO.VINES</div>
                 <div className="flex justify-end">
-                  <div className="rounded flex items-center justify-center" style={{ width: '141px', height: '31px', backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78' }}>OPPORTUNITIES</div>
+                  <div className="rounded flex items-center justify-center" style={{ width: '141px', height: '31px', backgroundColor: 'var(--pillar-body)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: 'var(--krma-gold)' }}>OPPORTUNITIES</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 relative">
                 {/* Purple separator */}
-                <div className="absolute" style={{ width: '8px', backgroundColor: '#582a72', top: '-10px', bottom: '-3px', left: 'calc(50% - 11px)', zIndex: 10 }} />
+                <div className="absolute" style={{ width: '8px', backgroundColor: 'var(--pillar-spirit)', top: '-10px', bottom: '-3px', left: 'calc(50% - 11px)', zIndex: 10 }} />
 
                 {/* Goals */}
                 <div className="relative">
-                  <div className="absolute rounded" style={{ borderTop: '18px solid #002f6c', borderBottom: '33px solid #002f6c', borderLeft: '3px solid #002f6c', borderRight: '7px solid #002f6c', top: '-10px', bottom: '-3px', left: '-3px', right: '7px', pointerEvents: 'none' }} />
+                  <div className="absolute rounded" style={{ borderTop: '18px solid var(--pillar-soul)', borderBottom: '33px solid var(--pillar-soul)', borderLeft: '3px solid var(--pillar-soul)', borderRight: '7px solid var(--pillar-soul)', top: '-10px', bottom: '-3px', left: '-3px', right: '7px', pointerEvents: 'none' }} />
                   <div className="relative" style={{ marginRight: '14px' }}>
                     {vines.map((vine, i) => (
                       <div key={i} className="border border-white/20 flex relative items-center" style={{
@@ -1478,7 +1478,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                       }}>
                         <div className="absolute flex items-center justify-center" style={{
                           width: '20px', height: '20px', top: '-1px', left: '-2px',
-                          backgroundColor: '#002f6c', color: '#ffffff', fontSize: '10px', fontWeight: 'bold'
+                          backgroundColor: 'var(--pillar-soul)', color: '#ffffff', fontSize: '10px', fontWeight: 'bold'
                         }}>{i + 1}</div>
                         <span className="px-2 py-2 pl-8 text-[10px]" style={{ color: '#8e7cc3' }}>{vine.goal || '...'}</span>
                       </div>
@@ -1488,7 +1488,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
                 {/* Opportunities */}
                 <div className="relative">
-                  <div className="absolute rounded" style={{ borderTop: '18px solid #f7525f', borderBottom: '33px solid #f7525f', borderLeft: '7px solid #f7525f', borderRight: '3px solid #f7525f', top: '-10px', bottom: '-3px', left: '-7px', right: '-3px', pointerEvents: 'none' }} />
+                  <div className="absolute rounded" style={{ borderTop: '18px solid var(--pillar-body)', borderBottom: '33px solid var(--pillar-body)', borderLeft: '7px solid var(--pillar-body)', borderRight: '3px solid var(--pillar-body)', top: '-10px', bottom: '-3px', left: '-7px', right: '-3px', pointerEvents: 'none' }} />
                   <div className="relative">
                     {vines.map((vine, i) => (
                       <div key={i} className="border border-white/20 flex relative items-center" style={{
@@ -1498,7 +1498,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                         {vine.kv && (
                           <span className="px-2 py-1 mr-1" style={{
                             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '10px',
-                            color: '#ffcc78', backgroundColor: '#582a72', borderRadius: '2px'
+                            color: 'var(--krma-gold)', backgroundColor: 'var(--pillar-spirit)', borderRadius: '2px'
                           }}>+{vine.kv} KV</span>
                         )}
                       </div>
@@ -1519,7 +1519,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             ]} totalValue={bodyAction}>
               <div className="border border-red-500/40 p-1 flex flex-col items-center justify-center cursor-help" style={{ backgroundColor: '#ea9999', height: '96px', marginBottom: '81px' }}>
                 <div className="text-lg mb-1 font-bold text-white">[&#8756;]</div>
-                <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: '#ffcc78', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+                <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: 'var(--krma-gold)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
                   <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{bodyAction}</div>
                 </div>
               </div>
@@ -1537,7 +1537,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             ]} totalValue={spiritAction}>
               <div className="border border-purple-500/40 p-1 flex flex-col items-center justify-center cursor-help" style={{ backgroundColor: '#8e7cc3', height: '96px', marginBottom: '81px' }}>
                 <div className="text-lg mb-1 font-bold text-white">[&#8756;]</div>
-                <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: '#ffcc78', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+                <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: 'var(--krma-gold)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
                   <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{spiritAction}</div>
                 </div>
               </div>
@@ -1552,7 +1552,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             ]} totalValue={soulAction}>
               <div className="border border-blue-500/40 p-1 flex flex-col items-center justify-center cursor-help" style={{ backgroundColor: '#6fa8dc', height: '96px' }}>
                 <div className="text-lg mb-1 font-bold text-white">[&#8756;]</div>
-                <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: '#ffcc78', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+                <div className="px-2 py-1 rounded border-2 flex items-center justify-center" style={{ borderColor: 'var(--krma-gold)', backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
                   <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{soulAction}</div>
                 </div>
               </div>
@@ -1620,25 +1620,25 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           </div>
 
           {/* ── TKV Box (centered under portrait) ── */}
-          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '530px', border: '3px solid #ffcc78', zIndex: 10 }}>
-            <div className="w-full flex items-center justify-center" style={{ backgroundColor: '#f7525f', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', height: '28px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
+          <div className="absolute flex flex-col" style={{ backgroundColor: '#b4a7d6', height: '62px', width: '180px', left: '120px', top: '530px', border: '3px solid var(--krma-gold)', zIndex: 10 }}>
+            <div className="w-full flex items-center justify-center" style={{ backgroundColor: 'var(--pillar-body)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: 'var(--krma-gold)', height: '28px' }}>T<span style={{ fontFamily: "'Inknut Antiqua', var(--font-inknut-antiqua), serif", fontWeight: 900 }}>&#x049C;</span>V</div>
             <div className="w-full flex items-center justify-center" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '19px', color: '#8e7cc3', height: '34px' }}>{tkv}</div>
           </div>
 
           {/* ── RIGHT COLUMN: Attributes — HORIZONTAL BAR DESIGN ── */}
           <div style={{ marginTop: '-84px', width: '444px' }}>
             {/* Purple buffer */}
-            <div style={{ height: '14px', backgroundColor: '#582a72' }} />
+            <div style={{ height: '14px', backgroundColor: 'var(--pillar-spirit)' }} />
 
             {/* ATTRIBUTES Label */}
-            <div className="flex items-center justify-center" style={{ backgroundColor: '#002f6c', width: '444px', height: '39px' }}>
-              <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: '#ffcc78', fontWeight: 'bold' }}>ATTRIBUTES</div>
+            <div className="flex items-center justify-center" style={{ backgroundColor: 'var(--pillar-soul)', width: '444px', height: '39px' }}>
+              <div style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '24px', color: 'var(--krma-gold)', fontWeight: 'bold' }}>ATTRIBUTES</div>
             </div>
 
             {/* Attribute pillars */}
             <div className="space-y-1" style={{ marginTop: '4px' }}>
               {/* BODY */}
-              <div className="border border-red-500/40 p-3 flex flex-col" style={{ backgroundColor: '#f7525f', height: '176px' }}>
+              <div className="border border-red-500/40 p-3 flex flex-col" style={{ backgroundColor: 'var(--pillar-body)', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F714; BODY</div>
                 <ComplexTooltip disabled={isBarDragging} title="Clout" baseValue={attributes?.clout?.level || 0} currentValue={attributes?.clout?.current || 0} modifiers={buildAttrModifiers(attributes?.clout)} totalValue={getAttrMax(attributes?.clout)}>
                   <HBar label="CLT" attrName="clout" current={attributes?.clout?.current || 0} max={getAttrMax(attributes?.clout)} onAttributeChange={handleAttributeChange} onAttributeMaxChange={handleAttributeMaxChange} onDragStateChange={handleBarDragState} {...getConditionState('clout')} />
@@ -1652,7 +1652,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               </div>
 
               {/* SPIRIT (Flow/Frequency/Focus) */}
-              <div className="border border-purple-500/40 p-3 flex flex-col" style={{ backgroundColor: '#582a72', height: '176px' }}>
+              <div className="border border-purple-500/40 p-3 flex flex-col" style={{ backgroundColor: 'var(--pillar-spirit)', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70E; SPIRIT</div>
                 <ComplexTooltip disabled={isBarDragging} title="Flow" baseValue={attributes?.flow?.level || 0} currentValue={attributes?.flow?.current || 0} modifiers={buildAttrModifiers(attributes?.flow)} totalValue={getAttrMax(attributes?.flow)}>
                   <HBar label="FLO" attrName="flow" current={attributes?.flow?.current || 0} max={getAttrMax(attributes?.flow)} onAttributeChange={handleAttributeChange} onAttributeMaxChange={handleAttributeMaxChange} onDragStateChange={handleBarDragState} {...getConditionState('flow')} />
@@ -1666,7 +1666,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               </div>
 
               {/* SOUL (Willpower/Wisdom/Wit) */}
-              <div className="border border-blue-500/40 p-3 flex flex-col" style={{ backgroundColor: '#002f6c', height: '176px' }}>
+              <div className="border border-blue-500/40 p-3 flex flex-col" style={{ backgroundColor: 'var(--pillar-soul)', height: '176px' }}>
                 <div className="text-sm font-bold text-white mb-2" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>&#x1F70D; SOUL</div>
                 <ComplexTooltip disabled={isBarDragging} title="Willpower" baseValue={attributes?.willpower?.level || 0} currentValue={attributes?.willpower?.current || 0} modifiers={buildAttrModifiers(attributes?.willpower)} totalValue={getAttrMax(attributes?.willpower)}>
                   <HBar label="WIL" attrName="willpower" current={attributes?.willpower?.current || 0} max={getAttrMax(attributes?.willpower)} onAttributeChange={handleAttributeChange} onAttributeMaxChange={handleAttributeMaxChange} onDragStateChange={handleBarDragState} {...getConditionState('willpower')} />
@@ -1714,8 +1714,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         {isExpanded && (() => {
           const btnStyle = (isOpen: boolean) => ({
             height: '26px', padding: '0 10px',
-            backgroundColor: isOpen ? '#22c55e' : '#582a72',
-            border: `2px solid ${isOpen ? '#4ade80' : '#ffcc78'}`,
+            backgroundColor: isOpen ? '#22c55e' : 'var(--pillar-spirit)',
+            border: `2px solid ${isOpen ? '#4ade80' : 'var(--krma-gold)'}`,
             borderRadius: '0 0 4px 4px',
             color: 'white',
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -1736,7 +1736,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 data-panel-circle={label.toLowerCase()}
                 style={{
                   width: '10px', height: '10px', borderRadius: '50%', marginLeft: '2px', flexShrink: 0,
-                  border: `2px solid ${isOpen ? '#4ade80' : '#ffcc78'}`,
+                  border: `2px solid ${isOpen ? '#4ade80' : 'var(--krma-gold)'}`,
                   backgroundColor: 'transparent',
                 }}
               />
@@ -1815,7 +1815,7 @@ function ControllerMenuItem({
         padding: '10px 20px',
         border: 'none',
         background: selected ? '#22ab9444' : 'transparent',
-        color: selected ? '#22ab94' : 'rgba(255,255,255,0.85)',
+        color: selected ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.85)',
         letterSpacing: '0.05em',
         cursor: disabled ? 'wait' : 'pointer',
         position: 'relative',
@@ -1828,7 +1828,7 @@ function ControllerMenuItem({
         if (!selected) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
       }}
     >
-      <span style={{ color: '#22ab94' }}>&gt;&nbsp;</span>{label}
+      <span style={{ color: 'var(--terminal-prime)' }}>&gt;&nbsp;</span>{label}
     </button>
   );
 }

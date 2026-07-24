@@ -633,10 +633,10 @@ function RootStep({
       </div>
 
       {draft.root ? (
-        <div className="border p-4 space-y-3" style={{ borderColor: '#22ab94', background: 'rgba(34, 171, 148, 0.08)' }}>
+        <div className="border p-4 space-y-3" style={{ borderColor: 'var(--terminal-prime)', background: 'rgba(34, 171, 148, 0.08)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#22ab94' }}>
+              <div className="text-[15px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: 'var(--terminal-prime)' }}>
                 {draft.root.name}
               </div>
               <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/40 mt-1">
@@ -656,7 +656,7 @@ function RootStep({
               {Object.entries(attrs).filter(([, v]) => v > 0).map(([attr, val]) => (
                 <span key={attr} className="text-[11px] px-1.5 py-0.5 uppercase" style={{
                   backgroundColor: 'rgba(34, 171, 148, 0.15)',
-                  color: '#22ab94',
+                  color: 'var(--terminal-prime)',
                   borderRadius: '2px',
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 }}>{attr.slice(0, 3)} {val}</span>
@@ -668,7 +668,7 @@ function RootStep({
               {skills.map((s, i) => (
                 <span key={i} className="text-[11px] px-1.5 py-0.5" style={{
                   backgroundColor: 'rgba(255,204,120,0.1)',
-                  color: '#ffcc78',
+                  color: 'var(--krma-gold)',
                   borderRadius: '2px',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                 }}>{s.name} ({s.level})</span>
@@ -718,7 +718,7 @@ function RootStep({
               <button
                 key={item.id}
                 onClick={() => selectRoot(item)}
-                className="w-full text-left p-3 border transition-colors hover:border-[#22ab94]"
+                className="w-full text-left p-3 border transition-colors hover:border-[var(--terminal-prime)]"
                 style={{
                   borderColor: 'rgba(255,255,255,0.08)',
                   backgroundColor: '#1a1a2e',
@@ -726,7 +726,7 @@ function RootStep({
                 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: '#22ab94' }}>
+                  <span className="text-[14px] font-[family-name:var(--font-header)] tracking-wider" style={{ color: 'var(--terminal-prime)' }}>
                     {item.name}
                   </span>
                   {freq != null && (
@@ -816,9 +816,9 @@ function BranchesPanel({
                 onClick={() => toggle(b)}
                 className="px-2.5 py-1 text-[11px] uppercase tracking-[0.08em] font-[family-name:var(--font-terminal)] border transition-colors"
                 style={{
-                  borderColor: sel ? '#22ab94' : 'rgba(255,255,255,0.12)',
+                  borderColor: sel ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.12)',
                   background: sel ? 'rgba(34, 171, 148, 0.18)' : 'rgba(0,0,0,0.3)',
-                  color: sel ? '#22ab94' : 'rgba(255,255,255,0.5)',
+                  color: sel ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.5)',
                 }}
               >
                 {b.name}
@@ -916,10 +916,10 @@ function AttributesStep({
       })}
 
       <div className="flex items-center justify-between p-3 border" style={{ borderColor: 'rgba(255,204,120,0.25)', background: 'rgba(255,204,120,0.04)' }}>
-        <span className="text-[12px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.12em] text-[#ffcc78]">
+        <span className="text-[12px] font-[family-name:var(--font-terminal)] uppercase tracking-[0.12em] text-[var(--krma-gold)]">
           Attribute Total
         </span>
-        <span className="text-[18px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+        <span className="text-[18px] font-[family-name:var(--font-bebas-neue)] text-[var(--krma-gold)]">
           {attrTotal} <span className="text-[12px] text-white/40">Ҝ</span>
         </span>
       </div>
@@ -1021,7 +1021,7 @@ function SkillsStep({
                 className="w-6 h-6 text-[12px] border text-white/60 disabled:opacity-25"
                 style={{ borderColor: 'rgba(255,255,255,0.15)' }}
               >−</button>
-              <span className="w-6 text-center text-[13px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+              <span className="w-6 text-center text-[13px] font-[family-name:var(--font-bebas-neue)] text-[var(--krma-gold)]">
                 {sk.level}
               </span>
               <button
@@ -1040,7 +1040,7 @@ function SkillsStep({
             style={{ background: 'rgba(255,204,120,0.04)' }}
           >
             <span className="text-white/40">Skill Subtotal</span>
-            <span className="text-[#ffcc78]">{totalKV} Ҝ</span>
+            <span className="text-[var(--krma-gold)]">{totalKV} Ҝ</span>
           </div>
         </div>
       )}
@@ -1163,7 +1163,7 @@ function TraitsStep({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-[13px] font-[family-name:var(--font-terminal)] text-white/40 leading-relaxed">
-          Nectars + Thorns cap at Fate Die value: <span className="text-[#ffcc78]">{cap}</span> ({fateDie})
+          Nectars + Thorns cap at Fate Die value: <span className="text-[var(--krma-gold)]">{cap}</span> ({fateDie})
         </div>
         <div className="text-[12px] font-[family-name:var(--font-terminal)] text-white/50">
           {traitCount} / {cap}
@@ -1380,9 +1380,9 @@ function ReviewStep({
         </div>
         {draft.root && (
           <div className="text-[11px] font-[family-name:var(--font-terminal)] text-white/50">
-            Root: <span className="text-[#22ab94]">{draft.root.name}</span>
+            Root: <span className="text-[var(--terminal-prime)]">{draft.root.name}</span>
             {draft.branches.length > 0 && (
-              <> · Branches: <span className="text-[#22ab94]">{draft.branches.map(b => b.name).join(', ')}</span></>
+              <> · Branches: <span className="text-[var(--terminal-prime)]">{draft.branches.map(b => b.name).join(', ')}</span></>
             )}
           </div>
         )}
@@ -1411,8 +1411,8 @@ function ReviewStep({
               </td>
             </tr>
             <tr>
-              <td className="px-3 py-2 text-[#ffcc78] uppercase tracking-[0.12em] font-bold">TKV Total</td>
-              <td className="px-3 py-2 text-right text-[18px] font-[family-name:var(--font-bebas-neue)] text-[#ffcc78]">
+              <td className="px-3 py-2 text-[var(--krma-gold)] uppercase tracking-[0.12em] font-bold">TKV Total</td>
+              <td className="px-3 py-2 text-right text-[18px] font-[family-name:var(--font-bebas-neue)] text-[var(--krma-gold)]">
                 {totalKV} Ҝ
               </td>
             </tr>
@@ -1421,7 +1421,7 @@ function ReviewStep({
               <td className="px-3 py-1.5 text-right text-[11px] text-white/30">
                 {draft.targetKV} Ҝ
                 {totalKV > draft.targetKV * 1.25 && <span className="ml-2 text-[#E8585A]">over</span>}
-                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[#22ab94]">under</span>}
+                {totalKV < draft.targetKV * 0.6 && <span className="ml-2 text-[var(--terminal-prime)]">under</span>}
               </td>
             </tr>
           </tbody>
@@ -1896,7 +1896,7 @@ export default function EntityCreationWizard({ campaignId, entityId, onCancel, o
             style={{
               background: canAdvance() && !crystallizing && !quickGenerating
                 ? (step === STEPS.length - 1
-                    ? 'linear-gradient(135deg, #ffcc78, #d99a36)'
+                    ? 'linear-gradient(135deg, var(--krma-gold), #d99a36)'
                     : 'linear-gradient(135deg, #3EB89A, #2D9A7E)')
                 : 'rgba(62,184,154,0.3)',
               color: '#000',

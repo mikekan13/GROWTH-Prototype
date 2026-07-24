@@ -80,7 +80,7 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
     }}>
       <span className="text-[13px] flex-shrink-0" style={{
         fontFamily: 'var(--font-terminal), Consolas, monospace',
-        color: '#22ab94',
+        color: 'var(--terminal-prime)',
       }}>{'>'}</span>
       <input
         ref={inputRef}
@@ -94,7 +94,7 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
         style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
           color: '#ccc',
-          caretColor: '#22ab94',
+          caretColor: 'var(--terminal-prime)',
         }}
         autoComplete="off"
         spellCheck={false}
@@ -105,7 +105,7 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
         className="text-[13px] px-2 py-1 uppercase tracking-wider transition-colors"
         style={{
           fontFamily: 'var(--font-terminal), Consolas, monospace',
-          color: value.trim() ? '#22ab94' : 'rgba(34,171,148,0.3)',
+          color: value.trim() ? 'var(--terminal-prime)' : 'rgba(34,171,148,0.3)',
           border: `1px solid ${value.trim() ? 'rgba(34,171,148,0.4)' : 'rgba(34,171,148,0.15)'}`,
           backgroundColor: 'transparent',
           borderRadius: '2px',

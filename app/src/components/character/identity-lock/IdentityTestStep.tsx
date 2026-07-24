@@ -40,7 +40,7 @@ export function IdentityTestStep({ state, dispatch, onGenerateTest }: {
             placeholder="plate armor, battle stance, angry expression..."
             disabled={state.testGenerating}
             className="w-full text-xs p-2"
-            style={{ backgroundColor: '#1a1a2e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+            style={{ backgroundColor: '#1a1a2e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
           />
         </div>
         <div>
@@ -52,14 +52,14 @@ export function IdentityTestStep({ state, dispatch, onGenerateTest }: {
             onChange={e => setComposition(e.target.value)}
             disabled={state.testGenerating}
             className="text-xs p-2"
-            style={{ backgroundColor: '#1a1a2e', color: '#ccc', border: '1px solid #582a72', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+            style={{ backgroundColor: '#1a1a2e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
           >
             {COMPOSITION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <WizardButton
           onClick={() => onGenerateTest(steeringWords, composition)}
-          color={state.testGenerating ? '#333' : '#582a72'}
+          color={state.testGenerating ? '#333' : 'var(--pillar-spirit)'}
           label={state.testGenerating ? 'Generating...' : 'Generate Test'}
         />
       </div>
@@ -90,7 +90,7 @@ export function IdentityTestStep({ state, dispatch, onGenerateTest }: {
             {state.lockedFace && <MiniFrame label="Identity" imagePath={state.lockedFace} borderColor="#D0A030" />}
             {state.testImages.map((t, i) => (
               <div key={i} className="flex flex-col items-center">
-                <div className="border overflow-hidden" style={{ borderColor: '#582a72', width: '100px', aspectRatio: '3/4', backgroundColor: '#111' }}>
+                <div className="border overflow-hidden" style={{ borderColor: 'var(--pillar-spirit)', width: '100px', aspectRatio: '3/4', backgroundColor: '#111' }}>
                   <img src={t.imagePath} alt={`Test ${i + 1}`} className="w-full h-full object-cover" />
                 </div>
                 <div className="text-center mt-1 max-w-[100px]">

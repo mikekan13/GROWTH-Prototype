@@ -62,17 +62,17 @@ interface InventoryData {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const ENC_COLORS: Record<EncumbranceStatus, string> = {
-  Fine:          '#22ab94',
-  'Near Limit':  '#ffcc78',
+  Fine:          'var(--terminal-prime)',
+  'Near Limit':  'var(--krma-gold)',
   Encumbered:    '#D07818',
-  Overloaded:    '#f7525f',
+  Overloaded:    'var(--pillar-body)',
 };
 
 const COND_COLOR: Record<number, string> = {
-  3: '#22ab94',
-  2: '#ffcc78',
+  3: 'var(--terminal-prime)',
+  2: 'var(--krma-gold)',
   1: '#D07818',
-  0: '#f7525f',
+  0: 'var(--pillar-body)',
 };
 
 const COND_LABEL: Record<number, string> = {
@@ -178,7 +178,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
     return (
       <div>
         <div className="section-badge inline-block text-sm mb-3">Inventory</div>
-        <div className="text-xs" style={{ color: '#f7525f' }}>{loadErr ?? 'No data.'}</div>
+        <div className="text-xs" style={{ color: 'var(--pillar-body)' }}>{loadErr ?? 'No data.'}</div>
       </div>
     );
   }
@@ -245,7 +245,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
                   onDragLeave={canEdit ? () => setDragOver(null) : undefined}
                   onDrop={canEdit ? e => { e.preventDefault(); void onDropRegion(region.key); } : undefined}
                   className={isTarget
-                    ? 'rounded outline outline-1 outline-dashed outline-[#22ab94] bg-[#22ab94]/5'
+                    ? 'rounded outline outline-1 outline-dashed outline-[var(--terminal-prime)] bg-[var(--terminal-prime)]/5'
                     : 'rounded'
                   }
                 >
@@ -301,7 +301,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
                                 onClick={() => void unequip(item.id)}
                                 title={`Unequip ${item.name}`}
                                 aria-label={`Unequip ${item.name}`}
-                                className="ml-1 text-[var(--surface-dark)]/30 hover:text-[#f7525f] text-[11px] leading-none transition-colors"
+                                className="ml-1 text-[var(--surface-dark)]/30 hover:text-[var(--pillar-body)] text-[11px] leading-none transition-colors"
                               >
                                 &#x2297;
                               </button>
@@ -389,12 +389,12 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
                           key={region.key}
                           disabled={region.condition === 0}
                           onClick={() => void equip(item.id, region.key)}
-                          className="block w-full text-left text-xs py-1 hover:bg-[#22ab94]/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm"
+                          className="block w-full text-left text-xs py-1 hover:bg-[var(--terminal-prime)]/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm"
                           style={{ paddingLeft: `${8 + region.depth * 12}px` }}
                         >
                           {region.partName}
                           {region.condition === 0 && (
-                            <span className="ml-1 text-[10px]" style={{ color: '#f7525f' }}>
+                            <span className="ml-1 text-[10px]" style={{ color: 'var(--pillar-body)' }}>
                               (destroyed)
                             </span>
                           )}
@@ -405,7 +405,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
 
                   {/* Inline equip error (e.g. layer cap violation) */}
                   {equipErr && (
-                    <div className="ml-4 text-xs mt-0.5 mb-1" style={{ color: '#f7525f' }}>
+                    <div className="ml-4 text-xs mt-0.5 mb-1" style={{ color: 'var(--pillar-body)' }}>
                       {equipErr}
                     </div>
                   )}

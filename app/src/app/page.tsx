@@ -23,7 +23,7 @@ export default async function Home() {
           <div className="flex items-center gap-2">
             <div className="w-[8px] h-[8px] bg-[var(--pillar-body)]" />
             <div className="w-[8px] h-[8px] bg-[var(--pillar-soul)]" />
-            <div className="w-[8px] h-[8px] bg-[#002F6C]" />
+            <div className="w-[8px] h-[8px] bg-[var(--pillar-soul)]" />
           </div>
           <span className="text-[var(--pillar-spirit)]/50 text-[9px] tracking-widest">TERMINAL://reality.layer.0</span>
           <span className="text-[var(--pillar-spirit)]/30 text-[9px]">&#x2298; &#x2295;</span>
@@ -144,7 +144,7 @@ export default async function Home() {
         {/* Purple dialogue band with energy gold line — breaks out of window */}
         <div className="relative">
           <div className="h-[2px] bg-[var(--pillar-spirit)]/40" />
-          <div className="energy-band bg-[#582a72] py-1.5 px-4 relative overflow-visible">
+          <div className="energy-band bg-[var(--pillar-spirit)] py-1.5 px-4 relative overflow-visible">
             <div className="absolute top-1/2 -left-[50vw] -right-[50vw] h-[20px] -translate-y-1/2 bg-[var(--krma-gold)]/20 blur-lg" />
             <div className="absolute top-1/2 -left-[50vw] -right-[50vw] h-[3px] -translate-y-1/2 bg-[var(--krma-gold)]" />
             <div className="energy-line absolute top-1/2 -left-[50vw] -right-[50vw] h-[3px] -translate-y-1/2" />

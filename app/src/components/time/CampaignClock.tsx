@@ -91,7 +91,7 @@ export default function CampaignClock({ campaignId, isGM }: { campaignId: string
           ...mono,
           background: 'rgba(0,0,0,0.7)',
           border: '1px solid rgba(255,204,120,0.5)',
-          color: '#ffcc78',
+          color: 'var(--krma-gold)',
           padding: '6px 12px',
           fontSize: 11,
           letterSpacing: '0.08em',
@@ -105,7 +105,7 @@ export default function CampaignClock({ campaignId, isGM }: { campaignId: string
         <span style={{ opacity: 0.6 }}>⧗</span>
         <span>{localDate.formatted}</span>
         {localDate.holidays.length > 0 && (
-          <span style={{ color: '#22ab94' }} title={localDate.holidays.map(h => h.name).join(', ')}>✦ {localDate.holidays[0].name}</span>
+          <span style={{ color: 'var(--terminal-prime)' }} title={localDate.holidays.map(h => h.name).join(', ')}>✦ {localDate.holidays[0].name}</span>
         )}
         <span style={{ opacity: 0.4, fontSize: 9 }}>{clock.currentCycle.toFixed(3)} cyc</span>
       </button>
@@ -122,7 +122,7 @@ export default function CampaignClock({ campaignId, isGM }: { campaignId: string
                     key={label}
                     disabled={busy}
                     onClick={() => advance(amt, unit)}
-                    style={{ ...mono, fontSize: 10, padding: '5px 4px', background: 'rgba(34,171,148,0.12)', border: '1px solid rgba(34,171,148,0.4)', color: '#22ab94', cursor: 'pointer' }}
+                    style={{ ...mono, fontSize: 10, padding: '5px 4px', background: 'rgba(34,171,148,0.12)', border: '1px solid rgba(34,171,148,0.4)', color: 'var(--terminal-prime)', cursor: 'pointer' }}
                   >
                     {label}
                   </button>
@@ -150,14 +150,14 @@ export default function CampaignClock({ campaignId, isGM }: { campaignId: string
                 <button
                   disabled={busy}
                   onClick={() => { const n = parseFloat(customAmount); if (n > 0) advance(n, customUnit); }}
-                  style={{ ...mono, fontSize: 10, padding: '5px 10px', background: 'linear-gradient(135deg, #ffcc78, #d09f55)', border: '1px solid #ffcc78', color: '#000', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ ...mono, fontSize: 10, padding: '5px 10px', background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)', border: '1px solid var(--krma-gold)', color: '#000', fontWeight: 700, cursor: 'pointer' }}
                 >
                   GO
                 </button>
               </div>
               <button
                 onClick={() => { setEditorOpen(true); setOpen(false); }}
-                style={{ ...mono, fontSize: 10, padding: '6px', background: 'transparent', border: '1px solid rgba(255,204,120,0.4)', color: '#ffcc78', cursor: 'pointer', letterSpacing: '0.1em' }}
+                style={{ ...mono, fontSize: 10, padding: '6px', background: 'transparent', border: '1px solid rgba(255,204,120,0.4)', color: 'var(--krma-gold)', cursor: 'pointer', letterSpacing: '0.1em' }}
               >
                 ⚙ cALENDAR & tIMESCALE
               </button>
@@ -253,7 +253,7 @@ function CalendarEditor({ campaignId, timescale, onClose }: {
             </div>
 
             {/* Months */}
-            <div style={{ ...mono, fontSize: 9, color: '#ffcc78', letterSpacing: '0.15em', marginTop: 4 }}>MONTHS</div>
+            <div style={{ ...mono, fontSize: 9, color: 'var(--krma-gold)', letterSpacing: '0.15em', marginTop: 4 }}>MONTHS</div>
             {cal.months.map((m, i) => (
               <div key={i} style={row}>
                 <input style={{ ...inp, flex: 1 }} value={m.name} onChange={e => setMonth(i, { name: e.target.value })} />
@@ -268,11 +268,11 @@ function CalendarEditor({ campaignId, timescale, onClose }: {
             ))}
             <button
               onClick={() => setCal(c => ({ ...c, months: [...c.months, { name: `Month ${c.months.length + 1}`, days: 30 }] }))}
-              style={{ ...mono, fontSize: 10, padding: '4px', background: 'rgba(34,171,148,0.12)', border: '1px dashed rgba(34,171,148,0.4)', color: '#22ab94', cursor: 'pointer' }}
+              style={{ ...mono, fontSize: 10, padding: '4px', background: 'rgba(34,171,148,0.12)', border: '1px dashed rgba(34,171,148,0.4)', color: 'var(--terminal-prime)', cursor: 'pointer' }}
             >+ add month</button>
 
             {/* Holidays */}
-            <div style={{ ...mono, fontSize: 9, color: '#ffcc78', letterSpacing: '0.15em', marginTop: 4 }}>HOLIDAYS</div>
+            <div style={{ ...mono, fontSize: 9, color: 'var(--krma-gold)', letterSpacing: '0.15em', marginTop: 4 }}>HOLIDAYS</div>
             {(cal.holidays ?? []).map((h, i) => (
               <div key={i} style={row}>
                 <input style={{ ...inp, flex: 1 }} value={h.name} onChange={e => setCal(c => ({ ...c, holidays: (c.holidays ?? []).map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
@@ -292,7 +292,7 @@ function CalendarEditor({ campaignId, timescale, onClose }: {
             ))}
             <button
               onClick={() => setCal(c => ({ ...c, holidays: [...(c.holidays ?? []), { name: 'New Holiday', month: 1, day: 1 }] }))}
-              style={{ ...mono, fontSize: 10, padding: '4px', background: 'rgba(34,171,148,0.12)', border: '1px dashed rgba(34,171,148,0.4)', color: '#22ab94', cursor: 'pointer' }}
+              style={{ ...mono, fontSize: 10, padding: '4px', background: 'rgba(34,171,148,0.12)', border: '1px dashed rgba(34,171,148,0.4)', color: 'var(--terminal-prime)', cursor: 'pointer' }}
             >+ add holiday</button>
 
             {error && <div style={{ ...mono, fontSize: 10, color: '#ff6666' }}>{error}</div>}
@@ -302,7 +302,7 @@ function CalendarEditor({ campaignId, timescale, onClose }: {
               <button
                 onClick={save}
                 disabled={saving}
-                style={{ ...mono, fontSize: 10, padding: '6px 14px', background: 'linear-gradient(135deg, #ffcc78, #d09f55)', border: '1px solid #ffcc78', color: '#000', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em' }}
+                style={{ ...mono, fontSize: 10, padding: '6px 14px', background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)', border: '1px solid var(--krma-gold)', color: '#000', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em' }}
               >
                 {saving ? 'SAVING…' : 'COMMIT'}
               </button>

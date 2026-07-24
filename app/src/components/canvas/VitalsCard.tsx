@@ -63,7 +63,7 @@ const LAYER_META: Record<string, { label: string; color: string; mult: string }>
 };
 
 const COND_LABELS: Record<number, { label: string; color: string }> = {
-  4: { label: 'Undamaged', color: '#22ab94' },
+  4: { label: 'Undamaged', color: 'var(--terminal-prime)' },
   3: { label: 'Worn', color: '#D0A030' },
   2: { label: 'Broken', color: '#D07818' },
   1: { label: 'Destroyed', color: '#E84040' },
@@ -100,15 +100,15 @@ export default function VitalsCard({ vitals, onClose }: VitalsCardProps) {
   const hasEquipment = layers.some(([, s]) => s.length > 0);
 
   return (
-    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '420px' }}>
+    <div className="border transition-all duration-200" style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#1a1a2e', borderColor: 'var(--krma-gold)', borderRadius: '3px', width: '420px' }}>
       {/* Header */}
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-lg">{'\u2695'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>VITALS & EQUIPMENT</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 Base Resist {vitals.baseResist || 0} {'\u2022'} Rest Rate {vitals.restRate || 0} {'\u2022'} Carry {vitals.carryLevel || 0}
                 {vitals.weightStatus === 'Encumbered' && <span style={{ color: '#E84040' }}> ENCUMBERED</span>}
               </p>
@@ -158,8 +158,8 @@ export default function VitalsCard({ vitals, onClose }: VitalsCardProps) {
                       className="px-2 py-0.5 text-xs transition-colors uppercase"
                       style={{
                         borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em', fontSize: '10px',
-                        backgroundColor: activeLayer === l ? '#582a72' : '#2a2a3e', color: activeLayer === l ? '#ffcc78' : '#888',
-                        border: `1px solid ${activeLayer === l ? '#ffcc78' : '#3a3a4e'}`,
+                        backgroundColor: activeLayer === l ? 'var(--pillar-spirit)' : '#2a2a3e', color: activeLayer === l ? 'var(--krma-gold)' : '#888',
+                        border: `1px solid ${activeLayer === l ? 'var(--krma-gold)' : '#3a3a4e'}`,
                       }}>
                       {l === 'all' ? 'ALL' : (LAYER_META[l]?.label || l)}
                     </button>
@@ -194,7 +194,7 @@ export default function VitalsCard({ vitals, onClose }: VitalsCardProps) {
                                 </div>
                                 <div className="flex items-center gap-2 text-[9px]">
                                   <span style={{ color: cond.color }}>{cond.label}</span>
-                                  <span style={{ color: '#ffcc78' }}>R{slot.resistance}</span>
+                                  <span style={{ color: 'var(--krma-gold)' }}>R{slot.resistance}</span>
                                 </div>
                               </div>
                               {slot.properties && slot.properties.length > 0 && (

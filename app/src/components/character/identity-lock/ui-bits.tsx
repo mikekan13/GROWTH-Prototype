@@ -125,13 +125,13 @@ export function DebugPanel({ info }: { info: { prompt: string; pass2Prompt?: str
     <div className="mt-3 border" style={{ borderColor: '#333', borderRadius: '3px', backgroundColor: '#0a0a15' }}>
       <button onClick={() => setOpen(!open)} className="w-full text-left px-2 py-1 flex justify-between items-center"
         style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px', color: '#555' }}>
-        <span>Debug — Workflow: <span style={{ color: info.workflow.includes('flux2') ? '#4ec9b0' : info.workflow.includes('controlnet') ? '#22ab94' : info.workflow.includes('pulid') ? '#D0A030' : '#E8585A' }}>{info.workflow}</span> | Seed: {info.seed} | {(info.timeMs / 1000).toFixed(1)}s</span>
+        <span>Debug — Workflow: <span style={{ color: info.workflow.includes('flux2') ? '#4ec9b0' : info.workflow.includes('controlnet') ? 'var(--terminal-prime)' : info.workflow.includes('pulid') ? '#D0A030' : '#E8585A' }}>{info.workflow}</span> | Seed: {info.seed} | {(info.timeMs / 1000).toFixed(1)}s</span>
         <span>{open ? '▾' : '▸'}</span>
       </button>
       {open && (
         <div className="px-2 pb-2 space-y-2" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
           <div>
-            <div style={{ color: '#22ab94' }}>PASS 1 PROMPT (identity gen):</div>
+            <div style={{ color: 'var(--terminal-prime)' }}>PASS 1 PROMPT (identity gen):</div>
             <div style={{ color: '#888', wordBreak: 'break-all' }}>{info.prompt}</div>
           </div>
           {info.pass2Prompt && (

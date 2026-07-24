@@ -50,6 +50,7 @@ const TYPE_COLORS: Record<string, string> = {
   nectar: '#3EB89A',
   blossom: '#D0A030',
   thorn: '#E8585A',
+  spell: '#582a72', // hex like its siblings — this map feeds alpha-concat
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -267,10 +268,10 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
       <div className="flex-shrink-0 px-6 py-4 border-b" style={{ borderColor: 'rgba(255,204,120,0.2)' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <span style={{ color: '#ffcc78', fontSize: '20px' }}>{'\u2692'}</span>
+            <span style={{ color: 'var(--krma-gold)', fontSize: '20px' }}>{'\u2692'}</span>
             <h2 className="text-sm uppercase tracking-[0.2em]" style={{
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-              color: '#ffcc78',
+              color: 'var(--krma-gold)',
               fontSize: '24px',
             }}>THE FORGE</h2>
           </div>
@@ -280,7 +281,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
               className="px-3 py-1 text-[14px] uppercase tracking-wider transition-colors"
               style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
-                color: '#ffcc78',
+                color: 'var(--krma-gold)',
                 border: '1px solid rgba(255,204,120,0.4)',
                 backgroundColor: showCreateForm ? 'rgba(255,204,120,0.15)' : 'transparent',
                 borderRadius: '2px',
@@ -302,8 +303,8 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 letterSpacing: '0.05em',
                 color: activeType === t ? '#0a0a1a' : '#888',
-                backgroundColor: activeType === t ? (TYPE_COLORS[t] || '#ffcc78') : 'transparent',
-                border: `1px solid ${activeType === t ? (TYPE_COLORS[t] || '#ffcc78') : 'rgba(255,255,255,0.1)'}`,
+                backgroundColor: activeType === t ? (TYPE_COLORS[t] || 'var(--krma-gold)') : 'transparent',
+                border: `1px solid ${activeType === t ? (TYPE_COLORS[t] || 'var(--krma-gold)') : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: '2px',
               }}
             >
@@ -318,7 +319,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
         {/* Create Form (GM only) */}
         {showCreateForm && isGM && (
           <div className="p-4 border" style={{ borderColor: 'rgba(255,204,120,0.3)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-            <div className="text-[16px] uppercase tracking-wider mb-3" style={{ color: '#ffcc78', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+            <div className="text-[16px] uppercase tracking-wider mb-3" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
               New Design
             </div>
             <div className="space-y-3">
@@ -411,7 +412,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                               onClick={() => handlePullSuggestion(item.id)}
                               className="text-[13px] px-2 py-0.5 uppercase tracking-wider flex-shrink-0 ml-2"
                               style={{
-                                color: '#22ab94',
+                                color: 'var(--terminal-prime)',
                                 border: '1px solid rgba(34,171,148,0.4)',
                                 borderRadius: '2px',
                                 fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -425,7 +426,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                         disabled={authoring}
                         className="text-[13px] px-3 py-1 uppercase tracking-wider"
                         style={{
-                          color: authoring ? '#666' : '#582a72',
+                          color: authoring ? '#666' : 'var(--pillar-spirit)',
                           border: `1px solid ${authoring ? '#3a3a4e' : 'rgba(88, 42, 114,0.4)'}`,
                           borderRadius: '2px',
                           fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -451,7 +452,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
                   disabled={!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0}
                   className="text-[14px] px-3 py-1 uppercase tracking-wider"
                   style={{
-                    color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : '#582a72',
+                    color: (!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#666' : 'var(--pillar-spirit)',
                     border: `1px solid ${(!newName.trim() || !newDesc.trim() || authoring || checkingGlobal || !!authorResult || globalSuggestions.length > 0) ? '#3a3a4e' : 'rgba(88, 42, 114,0.5)'}`,
                     borderRadius: '2px',
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -509,7 +510,7 @@ export default function ForgePanel({ campaignId, isGM, userId: _userId, onPlaceI
         ) : (
           <div>
             <div className="text-[16px] uppercase tracking-wider mb-2 flex items-center gap-2" style={{
-              color: '#ffcc78',
+              color: 'var(--krma-gold)',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             }}>
               <span>{'\u2692'}</span>
@@ -651,7 +652,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
                   <button
                     onClick={() => onPublish(item.id)}
                     className="text-[14px] px-1.5 py-0.5 uppercase"
-                    style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                    style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                   >Publish</button>
                   <button
                     onClick={() => onDelete(item.id)}
@@ -666,7 +667,7 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
                     <button
                       onClick={onPlace}
                       className="text-[14px] px-1.5 py-0.5 uppercase"
-                      style={{ color: '#ffcc78', border: '1px solid rgba(255,204,120,0.4)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                      style={{ color: 'var(--krma-gold)', border: '1px solid rgba(255,204,120,0.4)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
                     >Place on Canvas</button>
                   )}
                   <button
@@ -747,7 +748,7 @@ function RequestRow({ request, isGM, onResolve, onRefresh: _onRefresh }: {
               <button
                 onClick={() => onResolve(request.id, 'approved')}
                 className="text-[14px] px-1.5 py-0.5 uppercase"
-                style={{ color: '#22ab94', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.3)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
               >Approve</button>
               <button
                 onClick={() => onResolve(request.id, 'denied')}
@@ -864,7 +865,7 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
           borderRadius: '2px',
           fontFamily: 'var(--font-terminal), Consolas, monospace',
         }}>
-          <span style={{ color: '#ffcc78', fontSize: '11px' }}>Effect: </span>{mechanicalEffect}
+          <span style={{ color: 'var(--krma-gold)', fontSize: '11px' }}>Effect: </span>{mechanicalEffect}
         </div>
       )}
 
@@ -927,7 +928,7 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
               return (
                 <span key={i} className="text-[12px] px-1.5 py-0.5" style={{
                   backgroundColor: '#ffcc7820',
-                  color: '#ffcc78',
+                  color: 'var(--krma-gold)',
                   borderRadius: '2px',
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
                   border: '1px solid #ffcc7830',
@@ -997,7 +998,7 @@ function ForgeReviewPanel({ result, onConfirm, onReject, onRetry }: {
           onClick={onConfirm}
           className="text-[14px] px-3 py-1 uppercase tracking-wider"
           style={{
-            color: '#22ab94',
+            color: 'var(--terminal-prime)',
             border: '1px solid rgba(34,171,148,0.4)',
             borderRadius: '2px',
             fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -1131,13 +1132,13 @@ function MaterialDesigner() {
         className="w-full flex items-center justify-between mb-2"
       >
         <div className="text-[16px] uppercase tracking-wider flex items-center gap-2" style={{
-          color: '#22ab94',
+          color: 'var(--terminal-prime)',
           fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
         }}>
           <span>{'\u2B23'}</span>
           Material Catalog ({allMaterials.length})
         </div>
-        <span style={{ color: '#22ab94', fontSize: 14 }}>{isOpen ? '\u25B2' : '\u25BC'}</span>
+        <span style={{ color: 'var(--terminal-prime)', fontSize: 14 }}>{isOpen ? '\u25B2' : '\u25BC'}</span>
       </button>
 
       {isOpen && (
@@ -1148,7 +1149,7 @@ function MaterialDesigner() {
             className="px-3 py-1.5 text-[13px] uppercase tracking-wider transition-colors"
             style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: '#22ab94',
+              color: 'var(--terminal-prime)',
               border: '1px solid rgba(34,171,148,0.4)',
               backgroundColor: showCreate ? 'rgba(34,171,148,0.15)' : 'transparent',
               borderRadius: '2px',
@@ -1160,7 +1161,7 @@ function MaterialDesigner() {
           {/* Create Form */}
           {showCreate && (
             <div className="p-4 border space-y-3" style={{ borderColor: 'rgba(34,171,148,0.3)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-              <div className="text-[15px] uppercase tracking-wider" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
+              <div className="text-[15px] uppercase tracking-wider" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>
                 Design New Material
               </div>
 
@@ -1182,9 +1183,9 @@ function MaterialDesigner() {
                       style={{
                         borderRadius: '2px',
                         fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                        backgroundColor: newResistType === rt ? '#22ab94' : '#2a2a3e',
+                        backgroundColor: newResistType === rt ? 'var(--terminal-prime)' : '#2a2a3e',
                         color: newResistType === rt ? 'white' : '#666',
-                        border: `1px solid ${newResistType === rt ? '#22ab94' : '#3a3a4e'}`,
+                        border: `1px solid ${newResistType === rt ? 'var(--terminal-prime)' : '#3a3a4e'}`,
                       }}
                     >{rt}</button>
                   ))}
@@ -1242,7 +1243,7 @@ function MaterialDesigner() {
                 <button onClick={handleCreate} disabled={!newName.trim()}
                   className="text-[14px] px-3 py-1 uppercase tracking-wider"
                   style={{
-                    color: newName.trim() ? '#22ab94' : '#666',
+                    color: newName.trim() ? 'var(--terminal-prime)' : '#666',
                     border: `1px solid ${newName.trim() ? 'rgba(34,171,148,0.4)' : '#3a3a4e'}`,
                     borderRadius: '2px',
                     fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -1290,12 +1291,12 @@ function MaterialDesigner() {
                       {isCustom && (
                         <span className="text-[11px] px-1 py-0.5" style={{
                           borderRadius: '2px', backgroundColor: 'rgba(34,171,148,0.15)',
-                          color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                          color: 'var(--terminal-prime)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                         }}>custom</span>
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[13px]" style={{ color: '#22ab94', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                      <span className="text-[13px]" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                         R{mat.baseResist}
                       </span>
                       <span className="text-[13px]" style={{ color: '#c0c0c0', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -1315,7 +1316,7 @@ function MaterialDesigner() {
                       <div className="grid grid-cols-3 gap-3 text-center">
                         <div>
                           <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Resist</div>
-                          <div className="text-[16px] font-bold" style={{ color: '#22ab94', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.baseResist}</div>
+                          <div className="text-[16px] font-bold" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>{mat.baseResist}</div>
                         </div>
                         <div>
                           <div className="text-[11px] uppercase" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>Weight</div>

@@ -160,7 +160,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
                 fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
                 fontSize: 13,
                 fontWeight: 'bold',
-                color: '#ffcc78',
+                color: 'var(--krma-gold)',
               }}>
                 {node.name}
               </span>
@@ -221,7 +221,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             right: '-21px',
             width: 36,
             height: 36,
-            background: '#582a72',
+            background: 'var(--pillar-spirit)',
             border: 'none',
             borderRadius: '50%',
             color: '#F5F4EF',
@@ -272,7 +272,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
                 fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
                 fontSize: 16,
                 fontWeight: 'bold',
-                color: '#ffcc78',
+                color: 'var(--krma-gold)',
               }}>
                 {node.name}
               </div>
@@ -328,7 +328,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             <MiniStat label="Condition" value={conditionLabel} color={conditionColor} />
             <MiniStat label="Weight" value={data.weightLevel != null ? `${data.weightLevel} (${getWeightLabel(data.weightLevel)})` : '-'} color="#c0c0c0" />
 
-            <MiniStat label="Value" value={data.value != null ? `${data.value} KV` : '-'} color="#ffcc78" />
+            <MiniStat label="Value" value={data.value != null ? `${data.value} KV` : '-'} color="var(--krma-gold)" />
           </div>
 
           {/* Weapon damage */}
@@ -362,7 +362,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
               border: '1px solid rgba(0, 47, 108,0.15)',
               borderRadius: 2,
             }}>
-              <SectionLabel color="#002f6c">Armor</SectionLabel>
+              <SectionLabel color="var(--pillar-soul)">Armor</SectionLabel>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>Resistance: </span>
@@ -392,14 +392,14 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
               border: '1px solid rgba(88, 42, 114,0.15)',
               borderRadius: 2,
             }}>
-              <SectionLabel color="#582a72">Prima Materia — {data.primaMateria.school}</SectionLabel>
+              <SectionLabel color="var(--pillar-spirit)">Prima Materia — {data.primaMateria.school}</SectionLabel>
               <div style={{ display: 'flex', gap: 16, fontSize: 10, fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 <span style={{ color: '#fff' }}>Level: {data.primaMateria.level}</span>
                 <span style={{ color: data.primaMateria.stable ? '#4ade80' : '#f59e0b' }}>
                   {data.primaMateria.stable ? 'Stable' : 'Unstable'}
                 </span>
                 {data.primaMateria.charges != null && (
-                  <span style={{ color: '#22ab94' }}>Charges: {data.primaMateria.charges}</span>
+                  <span style={{ color: 'var(--terminal-prime)' }}>Charges: {data.primaMateria.charges}</span>
                 )}
               </div>
             </div>
@@ -465,7 +465,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
             fontFamily: 'var(--font-terminal), Consolas, monospace',
           }}>
             {node.holderName ? (
-              <span>Held by: <span style={{ color: '#ffcc78' }}>{node.holderName}</span></span>
+              <span>Held by: <span style={{ color: 'var(--krma-gold)' }}>{node.holderName}</span></span>
             ) : node.locationName ? (
               <span>Located at: <span style={{ color: '#8e7cc3' }}>{node.locationName}</span></span>
             ) : (
@@ -482,7 +482,7 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
               border: '1px solid rgba(255,204,120,0.15)',
               borderRadius: 2,
             }}>
-              <SectionLabel color="#ffcc78">GM Notes</SectionLabel>
+              <SectionLabel color="var(--krma-gold)">GM Notes</SectionLabel>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>{data.notes}</div>
             </div>
           )}

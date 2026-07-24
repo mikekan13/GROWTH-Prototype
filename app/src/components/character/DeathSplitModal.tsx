@@ -205,7 +205,7 @@ export default function DeathSplitModal({ characterId, characterName, onClose, o
               style={{ borderColor: 'rgba(255,255,255,0.08)' }}
             >
               <span className="text-white/40">TKV at Death</span>
-              <span className="text-[#ffcc78]">{preview.tkv.total} Ҝ</span>
+              <span className="text-[var(--krma-gold)]">{preview.tkv.total} Ҝ</span>
             </div>
 
             {/* Component breakdown */}

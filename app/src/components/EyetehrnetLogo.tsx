@@ -27,8 +27,8 @@ export default function EyetehrnetLogo({ scale = 1, className = '' }: Eyetehrnet
 
   const red = '#E8585A';
   const teal = '#2DB8A0';
-  const purple = '#582a72';
-  const blue = '#002F6C';
+  const purple = 'var(--pillar-spirit)';
+  const blue = 'var(--pillar-soul)';
 
   const box = (bg: string, color: string, font: string, weight: number, extraFontSize?: number): React.CSSProperties => ({
     fontFamily: font,

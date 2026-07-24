@@ -777,12 +777,12 @@ export default function CampaignTerminal({
       <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span style={{ color: connected ? '#22ab94' : '#666', fontSize: '14px' }} title={connected ? 'Connected (live)' : 'Disconnected (polling)'}>
+            <span style={{ color: connected ? 'var(--terminal-prime)' : '#666', fontSize: '14px' }} title={connected ? 'Connected (live)' : 'Disconnected (polling)'}>
               {connected ? '\u25C8' : '\u25CB'}
             </span>
             <h2 className="text-sm uppercase tracking-widest" style={{
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-              color: '#22ab94',
+              color: 'var(--terminal-prime)',
               fontSize: '18px',
             }}>CAMPAIGN TERMINAL</h2>
             {connectedUsers && connectedUsers.length > 0 && (
@@ -797,7 +797,7 @@ export default function CampaignTerminal({
             {activeSession && (
               <span className="text-[13px] px-2 py-0.5" style={{
                 fontFamily: 'var(--font-terminal), Consolas, monospace',
-                color: '#22ab94',
+                color: 'var(--terminal-prime)',
                 border: '1px solid rgba(34,171,148,0.4)',
                 borderRadius: '2px',
               }}>
@@ -815,7 +815,7 @@ export default function CampaignTerminal({
                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                   letterSpacing: '0.05em',
                   color: terminalMode === 'terminal' ? '#0a0a1a' : '#888',
-                  backgroundColor: terminalMode === 'terminal' ? '#22ab94' : 'transparent',
+                  backgroundColor: terminalMode === 'terminal' ? 'var(--terminal-prime)' : 'transparent',
                 }}
               >
                 Terminal
@@ -840,7 +840,7 @@ export default function CampaignTerminal({
                 className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
                 style={{
                   fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  color: '#22ab94',
+                  color: 'var(--terminal-prime)',
                   border: '1px solid rgba(34, 171, 148, 0.4)',
                   backgroundColor: 'transparent',
                 }}
@@ -865,8 +865,8 @@ export default function CampaignTerminal({
                 fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                 letterSpacing: '0.05em',
                 color: activeFilter === f.key ? '#0a0a1a' : '#888',
-                backgroundColor: activeFilter === f.key ? '#22ab94' : 'transparent',
-                border: `1px solid ${activeFilter === f.key ? '#22ab94' : 'rgba(255,255,255,0.1)'}`,
+                backgroundColor: activeFilter === f.key ? 'var(--terminal-prime)' : 'transparent',
+                border: `1px solid ${activeFilter === f.key ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: '2px',
               }}
             >
@@ -936,7 +936,7 @@ export default function CampaignTerminal({
                   )}
                   <span className="text-[12px] uppercase tracking-wider flex-1" style={{
                     fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                    color: '#22ab94',
+                    color: 'var(--terminal-prime)',
                     letterSpacing: '0.1em',
                   }}>
                     {group.label}

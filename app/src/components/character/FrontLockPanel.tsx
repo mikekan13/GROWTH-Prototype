@@ -213,7 +213,7 @@ export function FrontLockPanel({
   const terminalFont = { fontFamily: 'var(--font-terminal), Consolas, monospace' };
   const btnBase = 'px-3 py-2 text-xs uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-wait';
   const btnStyle = { ...terminalFont, backgroundColor: '#1a1a1a', color: '#D0A030', border: '1px solid #D0A030', borderRadius: '2px' } as const;
-  const primaryStyle = { ...terminalFont, backgroundColor: '#582a72', color: '#fff', border: '1px solid #582a72', borderRadius: '2px' } as const;
+  const primaryStyle = { ...terminalFont, backgroundColor: 'var(--pillar-spirit)', color: '#fff', border: '1px solid var(--pillar-spirit)', borderRadius: '2px' } as const;
 
   return (
     <div>

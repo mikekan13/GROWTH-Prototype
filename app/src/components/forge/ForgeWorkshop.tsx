@@ -513,7 +513,7 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
                       fetchCampaignItems();
                     }}
                     className="px-3 py-1.5 text-[11px] uppercase font-[Consolas,monospace] border transition-colors"
-                    style={{ borderColor: '#22ab94', color: '#22ab94' }}
+                    style={{ borderColor: 'var(--terminal-prime)', color: 'var(--terminal-prime)' }}
                   >
                     PUBLISH
                   </button>

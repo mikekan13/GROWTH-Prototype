@@ -95,7 +95,7 @@ function SkillRow({ skill }: { skill: GrowthSkill }) {
                   width: '3px',
                   height: '12px',
                   backgroundColor: i < skill.level
-                    ? (i < 3 ? 'var(--surface-dark)' : i < 5 ? '#D0A030' : i < 7 ? '#3EB89A' : i < 11 ? '#582a72' : i < 19 ? '#E8585A' : '#FFCC78')
+                    ? (i < 3 ? 'var(--surface-dark)' : i < 5 ? '#D0A030' : i < 7 ? '#3EB89A' : i < 11 ? 'var(--pillar-spirit)' : i < 19 ? '#E8585A' : 'var(--krma-gold)')
                     : 'rgba(30, 45, 64, 0.08)',
                 }}
               />

@@ -151,7 +151,7 @@ export default function GodheadPersonaPanel({ godheadName }: Props) {
         style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'linear-gradient(90deg, rgba(34,171,148,0.08) 0%, rgba(0,0,0,0.5) 100%)' }}
       >
         <div>
-          <div className="text-[11px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[#22ab94]">
+          <div className="text-[11px] font-[family-name:var(--font-terminal)] tracking-[0.2em] uppercase text-[var(--terminal-prime)]">
             ◈ AI Persona
           </div>
           <div className="text-[14px] font-[family-name:var(--font-header)] tracking-[0.1em] text-white mt-0.5">
@@ -162,7 +162,7 @@ export default function GodheadPersonaPanel({ godheadName }: Props) {
           <div className="text-[10px] uppercase tracking-[0.15em] font-[family-name:var(--font-terminal)] text-white/40">
             Pillar
           </div>
-          <div className="text-[12px] font-[family-name:var(--font-terminal)] text-[#22ab94]">
+          <div className="text-[12px] font-[family-name:var(--font-terminal)] text-[var(--terminal-prime)]">
             {data.pillar}
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function GodheadPersonaPanel({ godheadName }: Props) {
         <Metric label="Invocations" value={data.invocationCount.toString()} />
         <Metric label="Tokens (in+out)" value={(data.totalInputTokens + data.totalOutputTokens).toLocaleString()} />
         <Metric label="Cost est" value={`$${data.totalCostEstimateUSD.toFixed(4)}`} />
-        <Metric label="KRMA Wallet" value={`${Number(data.walletBalance).toLocaleString()} Ҝ`} color="#ffcc78" />
+        <Metric label="KRMA Wallet" value={`${Number(data.walletBalance).toLocaleString()} Ҝ`} color="var(--krma-gold)" />
       </div>
       {data.lastInvocationAt && (
         <div className="px-5 py-1.5 text-[10px] font-[family-name:var(--font-terminal)] text-white/30 border-b"
@@ -254,7 +254,7 @@ export default function GodheadPersonaPanel({ godheadName }: Props) {
         )}
         {saveMsg && (
           <div className="border p-2 text-[11px] font-[family-name:var(--font-terminal)] text-center"
-            style={{ borderColor: 'rgba(34,171,148,0.4)', background: 'rgba(34,171,148,0.08)', color: '#22ab94' }}
+            style={{ borderColor: 'rgba(34,171,148,0.4)', background: 'rgba(34,171,148,0.08)', color: 'var(--terminal-prime)' }}
           >
             ✓ {saveMsg}
           </div>
@@ -270,7 +270,7 @@ export default function GodheadPersonaPanel({ godheadName }: Props) {
             disabled={!dirty || saving}
             className="px-5 py-2 text-[11px] uppercase tracking-[0.12em] font-[family-name:var(--font-terminal)] font-bold disabled:opacity-30 transition-all"
             style={{
-              background: dirty && !saving ? 'linear-gradient(135deg, #22ab94, #1a8d7a)' : 'rgba(34,171,148,0.3)',
+              background: dirty && !saving ? 'linear-gradient(135deg, var(--terminal-prime), #1a8d7a)' : 'rgba(34,171,148,0.3)',
               color: '#000',
               boxShadow: dirty && !saving ? '0 0 20px rgba(34,171,148,0.3)' : 'none',
             }}

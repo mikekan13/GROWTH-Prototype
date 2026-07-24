@@ -38,13 +38,13 @@ function parseBestowal(content: string): NectarBestowal | null {
 }
 
 const NECTAR_PILLAR_COLOR: Record<string, string> = {
-  body:   '#f7525f',
-  spirit: '#582a72',
-  soul:   '#002f6c',
+  body:   'var(--pillar-body)',
+  spirit: 'var(--pillar-spirit)',
+  soul:   'var(--pillar-soul)',
 };
 
 function pillarChip(pillar: string) {
-  const color = NECTAR_PILLAR_COLOR[pillar?.toLowerCase()] ?? '#582a72';
+  const color = NECTAR_PILLAR_COLOR[pillar?.toLowerCase()] ?? 'var(--pillar-spirit)';
   return (
     <span style={{
       display: 'inline-block',
@@ -151,7 +151,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
   };
 
   return (
-    <div className="border" style={{ backgroundColor: '#1a1a2e', borderColor: '#582a72', borderRadius: '3px', width: '480px' }}>
+    <div className="border" style={{ backgroundColor: '#1a1a2e', borderColor: 'var(--pillar-spirit)', borderRadius: '3px', width: '480px' }}>
       <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #2a1a52 0%, #1a0d3a 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                 borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.05em',
                 backgroundColor: filter === f ? '#2a1a52' : '#2a2a3e',
                 color: filter === f ? '#fff' : '#888',
-                border: `1px solid ${filter === f ? '#582a72' : '#3a3a4e'}`,
+                border: `1px solid ${filter === f ? 'var(--pillar-spirit)' : '#3a3a4e'}`,
               }}>
               {f === 'ALL' ? 'ALL' : f === 'GODHEAD_TO_GM' ? '← FROM GODS' : '→ TO GODS'}
             </button>
@@ -189,7 +189,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
           ) : messages.length === 0 ? (
             <div className="text-center text-gray-400 py-4">No messages.</div>
           ) : messages.map(m => {
-            const color = PILLAR_COLOR[m.godHeadPillar] ?? '#582a72';
+            const color = PILLAR_COLOR[m.godHeadPillar] ?? 'var(--pillar-spirit)';
             const isFromGod = m.direction === 'GODHEAD_TO_GM';
             return (
               <div key={m.id}
@@ -212,7 +212,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                   const bestowal = parseBestowal(m.content);
                   if (bestowal) {
                     const nPillar = bestowal.nectar.pillar?.toLowerCase();
-                    const nColor = NECTAR_PILLAR_COLOR[nPillar] ?? '#582a72';
+                    const nColor = NECTAR_PILLAR_COLOR[nPillar] ?? 'var(--pillar-spirit)';
                     const mods = bestowal.nectar.rollModifiers;
                     return (
                       <div style={{ border: `1px solid ${nColor}`, borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
@@ -236,7 +236,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                           {mods && Object.keys(mods).length > 0 && (
                             <div style={{ marginBottom: '4px' }}>
                               {Object.entries(mods).map(([k, v]) => (
-                                <span key={k} style={{ display: 'inline-block', marginRight: '6px', color: v >= 0 ? '#22ab94' : '#e85858', fontSize: '10px' }}>
+                                <span key={k} style={{ display: 'inline-block', marginRight: '6px', color: v >= 0 ? 'var(--terminal-prime)' : '#e85858', fontSize: '10px' }}>
                                   {v >= 0 ? '+' : ''}{v} to {k}
                                 </span>
                               ))}
@@ -255,7 +255,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                               borderRadius: '2px',
                               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                               letterSpacing: '0.06em',
-                              color: bestowal.resolved.action === 'accept' ? '#22ab94' : '#888',
+                              color: bestowal.resolved.action === 'accept' ? 'var(--terminal-prime)' : '#888',
                               border: `1px solid ${bestowal.resolved.action === 'accept' ? '#22ab9444' : '#3a3a4e'}`,
                               backgroundColor: bestowal.resolved.action === 'accept' ? 'rgba(34,171,148,0.08)' : 'rgba(255,255,255,0.03)',
                             }}>
@@ -269,9 +269,9 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                                 style={{
                                   padding: '2px 8px', fontSize: '9px', borderRadius: '2px', cursor: resolving[m.id] ? 'wait' : 'pointer',
                                   fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em',
-                                  backgroundColor: resolving[m.id] ? '#1a1a2e' : '#22ab94',
-                                  color: resolving[m.id] ? '#22ab94' : '#0d1a17',
-                                  border: '1px solid #22ab94',
+                                  backgroundColor: resolving[m.id] ? '#1a1a2e' : 'var(--terminal-prime)',
+                                  color: resolving[m.id] ? 'var(--terminal-prime)' : '#0d1a17',
+                                  border: '1px solid var(--terminal-prime)',
                                 }}>
                                 BESTOW
                               </button>
@@ -301,7 +301,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                 {isFromGod && !m.readAt && (
                   <button onClick={() => markRead(m.id)}
                     className="text-[8px] mt-1 px-1.5 py-0.5 uppercase"
-                    style={{ color: '#ffcc78', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>
+                    style={{ color: 'var(--krma-gold)', border: '1px solid rgba(255,204,120,0.3)', borderRadius: '2px' }}>
                     Mark Read
                   </button>
                 )}
@@ -320,7 +320,7 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                   borderRadius: '2px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                   backgroundColor: godheadName === name ? '#2a1a52' : '#2a2a3e',
                   color: godheadName === name ? '#fff' : '#888',
-                  border: `1px solid ${godheadName === name ? '#582a72' : '#3a3a4e'}`,
+                  border: `1px solid ${godheadName === name ? 'var(--pillar-spirit)' : '#3a3a4e'}`,
                 }}>{name}</button>
             ))}
           </div>
@@ -337,8 +337,8 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
             className="mt-1 px-3 py-1 text-[10px] uppercase float-right"
             style={{
               color: (draft.trim() && !sending) ? '#1a1a2e' : '#555',
-              backgroundColor: (draft.trim() && !sending) ? '#582a72' : '#2a2a3e',
-              border: '1px solid #582a72',
+              backgroundColor: (draft.trim() && !sending) ? 'var(--pillar-spirit)' : '#2a2a3e',
+              border: '1px solid var(--pillar-spirit)',
               borderRadius: '2px',
               fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
               letterSpacing: '0.05em',

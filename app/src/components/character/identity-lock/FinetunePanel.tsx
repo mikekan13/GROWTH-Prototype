@@ -318,7 +318,7 @@ export function FinetunePanel({
             <React.Fragment key={i}>
               <span className="text-xs" style={{ color: '#444' }}>→</span>
               <div className="flex flex-col items-center flex-shrink-0">
-                <div className="border overflow-hidden group relative" style={{ borderColor: i === history.length - 1 ? '#22ab94' : '#333', width: '40px', aspectRatio: '1/2', backgroundColor: '#111', cursor: 'pointer' }}>
+                <div className="border overflow-hidden group relative" style={{ borderColor: i === history.length - 1 ? 'var(--terminal-prime)' : '#333', width: '40px', aspectRatio: '1/2', backgroundColor: '#111', cursor: 'pointer' }}>
                   <img src={edit.imagePath} alt={edit.prompt} className="w-full h-full object-cover" title={edit.prompt} />
                   <button onClick={toggleSave} className="absolute top-0 right-0 text-xs"
                     style={{ color: isSaved ? '#D0A030' : '#666', backgroundColor: 'rgba(0,0,0,0.5)', fontSize: '10px', padding: '0 2px', cursor: 'pointer' }}
@@ -353,7 +353,7 @@ export function FinetunePanel({
         <div
           ref={containerRef}
           className="relative border overflow-hidden"
-          style={{ borderColor: '#22ab94', width: '300px', aspectRatio: '1/2', backgroundColor: '#111', cursor: paintMode !== 'off' ? 'crosshair' : 'default' }}
+          style={{ borderColor: 'var(--terminal-prime)', width: '300px', aspectRatio: '1/2', backgroundColor: '#111', cursor: paintMode !== 'off' ? 'crosshair' : 'default' }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -413,7 +413,7 @@ export function FinetunePanel({
               onChange={e => setMaskFeather(parseInt(e.target.value))}
               style={{ width: '60px', accentColor: '#D0A030' }}
               title="Expands the mask outward at full opacity — lets edits extend beyond painted area without fading" />
-            <span className="text-xs" style={{ color: paintedPixels > 0 ? '#22ab94' : '#666', ...termFont, fontSize: '9px' }}>
+            <span className="text-xs" style={{ color: paintedPixels > 0 ? 'var(--terminal-prime)' : '#666', ...termFont, fontSize: '9px' }}>
               {paintedPixels > 0 ? `✓ ${paintedPixels}px painted` : 'paint area to edit'}
             </span>
           </>
@@ -534,7 +534,7 @@ export function FinetunePanel({
         {history.length >= 3 && !finetuneGenerating && (
           <WizardButton
             onClick={onBake}
-            color={history.length >= 4 ? '#582a72' : '#4a3770'}
+            color={history.length >= 4 ? 'var(--pillar-spirit)' : '#4a3770'}
             label={history.length >= 4 ? '✦ Bake (refresh quality)' : 'Bake'}
           />
         )}
@@ -542,7 +542,7 @@ export function FinetunePanel({
           <WizardButton onClick={onReset} color="#E8585A" label="Reset" />
         )}
         {history.length > 0 && !finetuneGenerating && (
-          <WizardButton onClick={onAccept} color="#22ab94" label="Accept — Lock Identity" />
+          <WizardButton onClick={onAccept} color="var(--terminal-prime)" label="Accept — Lock Identity" />
         )}
       </div>
     </div>

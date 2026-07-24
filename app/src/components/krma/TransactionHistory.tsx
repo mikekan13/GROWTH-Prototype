@@ -29,16 +29,16 @@ interface TransactionHistoryProps {
 }
 
 const REASON_COLOR: Record<string, string> = {
-  GENESIS_SEED: '#ffcc78',
-  RESERVE_TRANSFER: '#ffcc78',
-  CAMPAIGN_FUND: '#22ab94',
+  GENESIS_SEED: 'var(--krma-gold)',
+  RESERVE_TRANSFER: 'var(--krma-gold)',
+  CAMPAIGN_FUND: 'var(--terminal-prime)',
   CAMPAIGN_DEFUND: '#E8585A',
-  CHARACTER_INVEST: '#582a72',
+  CHARACTER_INVEST: 'var(--pillar-spirit)',
   CHARACTER_ADJUST: '#888',
   SESSION_REWARD: '#3EB89A',
   GROVINE_NECTAR: '#D4A830',
-  STORY_INFLUENCE: '#582a72',
-  BLUEPRINT_AUTHOR: '#22ab94',
+  STORY_INFLUENCE: 'var(--pillar-spirit)',
+  BLUEPRINT_AUTHOR: 'var(--terminal-prime)',
   DEATH_BODY_RETURN: '#E84040',
   DEATH_SOUL_SPLIT: '#E84040',
   DEATH_SPIRIT_TO_PLAYER: '#E84040',
@@ -100,14 +100,14 @@ export default function TransactionHistory({ source, reasonFilter, title, onClos
   const hasNext = offset + limit < total;
 
   return (
-    <div className="border" style={{ backgroundColor: '#1a1a2e', borderColor: '#ffcc78', borderRadius: '3px', width: '440px' }}>
-      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, #582a72 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
+    <div className="border" style={{ backgroundColor: '#1a1a2e', borderColor: 'var(--krma-gold)', borderRadius: '3px', width: '440px' }}>
+      <div className="p-3 text-white cursor-grab" style={{ background: 'linear-gradient(135deg, var(--pillar-spirit) 0%, #3d1952 100%)', borderRadius: '2px 2px 0 0' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg">{'₿'}</span>
             <div>
               <h3 className="font-semibold text-sm" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em', fontSize: '15px' }}>{title ?? 'TRANSACTIONS'}</h3>
-              <p className="text-xs" style={{ color: '#ffcc78', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
+              <p className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '10px' }}>
                 {total} total {reasonFilter ? `(filter: ${reasonFilter})` : ''}
               </p>
             </div>
@@ -157,7 +157,7 @@ export default function TransactionHistory({ source, reasonFilter, title, onClos
           <div className="flex justify-between items-center mt-3 pt-2 border-t" style={{ borderColor: '#3a3a4e' }}>
             <button onClick={() => load(Math.max(0, offset - limit))} disabled={!hasPrev}
               className="text-[9px] px-2 py-0.5 uppercase"
-              style={{ color: hasPrev ? '#ffcc78' : '#555', border: '1px solid', borderColor: hasPrev ? '#ffcc7855' : '#3a3a4e', borderRadius: '2px' }}>
+              style={{ color: hasPrev ? 'var(--krma-gold)' : '#555', border: '1px solid', borderColor: hasPrev ? '#ffcc7855' : '#3a3a4e', borderRadius: '2px' }}>
               ← Prev
             </button>
             <span className="text-[9px]" style={{ color: '#888' }}>
@@ -165,7 +165,7 @@ export default function TransactionHistory({ source, reasonFilter, title, onClos
             </span>
             <button onClick={() => load(offset + limit)} disabled={!hasNext}
               className="text-[9px] px-2 py-0.5 uppercase"
-              style={{ color: hasNext ? '#ffcc78' : '#555', border: '1px solid', borderColor: hasNext ? '#ffcc7855' : '#3a3a4e', borderRadius: '2px' }}>
+              style={{ color: hasNext ? 'var(--krma-gold)' : '#555', border: '1px solid', borderColor: hasNext ? '#ffcc7855' : '#3a3a4e', borderRadius: '2px' }}>
               Next →
             </button>
           </div>
