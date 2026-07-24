@@ -431,3 +431,40 @@ entry that references the old.
 - **Status**: the schema is no longer "draft" — it may be wired into gameplay. Open magic items that remain are the NUMBERS (exact mana↔KRMA, per-effect DR review) and the follow-on BUILD units (see NEEDS-MIKE / STATE-OF-PLAY), not the shape.
 - **Lands in rulebook**: §magic (spell object)
 - **Files**: types/growth.ts GrowthSpell (drop the "DRAFT pending sign-off" caveat on next touch)
+
+### r-2026-07-23-02: Spent mana LINGERS with the spell (default value routing)
+- **Ruling (Mike, verbal)**: "All spells (unless specially crafted): the mana spent to cast lingers WITH the spell. It slowly transfers back to the weave (GM wallet) — that can take a long time, especially for really powerful spells. Godheads may be attracted to it. Someone else could try and tap into it. Or it slowly just fades back to the weave."
+- **Consequences**: mana is consumed on success AND failure (the pool reduction stands) but its KV is never destroyed — it becomes lingering residue at/with the cast. Default lifecycle: slow decay → GM wallet, decay time scales with cast power. While lingering: godhead attraction is possible; other casters can attempt to tap it. Specially crafted spells may override the routing.
+- **Lands in rulebook**: §magic (mana lifecycle)
+- **Files**: cast flow (residue record on cast), clock sweep (decay → GM wallet, mirrors blossom expiry), godhead hooks later.
+
+### r-2026-07-23-03: DR-50+ casts RESOLVE first, godhead verification is async (log + verify)
+- **Ruling (Mike, verbal + picker)**: the reason DR-50+ engages godheads is the POWER of such spells — they can create or change things permanently, "so KRMA and the transfer of value must be logged and verified." Flow decision: **resolve, then verify** — the cast lands at the table in real time; a godhead invocation is dispatched immediately after to audit and log the value movement. Effects never wait on an AI round-trip.
+- **Lands in rulebook**: §magic (system engagement)
+- **Files**: magic-cast-ops (persist flagged casts durably + dispatcher emit), godhead-dispatcher routing.
+
+### r-2026-07-23-04: Spell-learning economics — KV matched narratively; weave fee → authoring godhead; liquid returns to GM
+- **Ruling (Mike, verbal)**: the spell's KV "is determined and it needs to be matched. This is handled narratively" — reagent sacrifice of equivalent KRMA value, direct essence transfer via Frequency, time, "it can be paid for however." Split: "the cost for the actual spell WEAVE is given to the godhead creating it. The remaining covers the actual KV of the spell added to the character, and the equivalent KRMA is reduced from whatever means and returned to GM."
+- **Weave fee sizing (picker)**: an ADMIN-tunable system rate (like manaPerKrma), starting value set in config, playtest-tuned.
+- **Consequences**: supersedes the 2026-07-23 interim "learning moves no KRMA." Character nets: pays KV+fee from a narrative source, gains the spell (KV crystallized on sheet). GM nets the liquid KV-equivalent; authoring godhead nets the fee. Full ledger accounting, nothing minted.
+- **Lands in rulebook**: §magic (spell acquisition), §economy
+- **Files**: economy-config (weave fee rate), spell-grant (fee transfer + KV gate), forge-authoring (Kai prices spell KV).
+
+### r-2026-07-23-05: Mana acquisition is NARRATIVE — no fixed regen mechanic
+- **Ruling (Mike, verbal)**: "Mana comes from all over. It is narratively gained, refilled, etc." (per the repository's recovery-methods flavor). No rest formula, no automatic refill.
+- **Consequences**: the system needs an actuation surface (GM/JEWL op to grant/adjust mana when the narrative provides it), not a regen loop.
+- **Lands in rulebook**: §magic (mana lifecycle)
+- **Files**: mana adjust op + JEWL tool.
+
+### r-2026-07-23-06: Trainable-schools storage confirmed — magic.<pillar>.trainableSchools
+- **Ruling (Mike, picker)**: "Yes" — wild-cast failure marks persist as `magic.<pillar>.trainableSchools` (mirroring skillLevels); Long Rest offers marked schools at advancement cost 2 (r-2026-07-15-01); marks clear with the rest like all trainables.
+- **Files**: types/growth (MagicPillar), magic-cast-ops (persist mark), advancement engine + RestPanel picker.
+
+### r-2026-07-23-07: Payout basis = TOTAL TKV in the GM's wallet/orbit (correction to the T15 build)
+- **Ruling (Mike, verbal)**: real-money payout "is simply determined by TKV in a GM's wallet — everything, crystallized or otherwise. ALL KRMA is accounted for during payouts; that is where the percentages come from."
+- **Consequences**: corrects the T15 interim choice that excluded the GM's undeployed user-wallet drip balance. Basis = undeployed wallet liquid + deployed campaign fluid + crystallized. (JEWL + `__PRIME__` remain excluded per INV-70.)
+- **Files**: services/krma/payout-report.ts.
+
+### r-2026-07-23-08: Mistake bounties stay tunable; future option = adjudicator-priced severity
+- **Ruling (Mike, verbal)**: "This will have to be tunable... maybe even decided on the severity of the bug or mistake." Current 10/100/1000 (minor/moderate/severe) stands as the tunable starting point (EconomyConfig mistakeBounty, already ADMIN-tunable). Flagged future option: Et'herling prices each mistake individually at adjudication instead of fixed tiers — not built yet.
+- **Files**: none now (already tunable); godhead adjudication later if the dynamic option is taken.
