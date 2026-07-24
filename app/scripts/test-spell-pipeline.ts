@@ -167,6 +167,7 @@ async function main() {
           state: tx.state === 'LOCK' ? 'UNLOCK' : 'FLUID',
           reason: 'CORRECTION',
           description: `test-spell-pipeline reconcile (${tx.reason})`,
+          metadata: { source: 'test-spell-pipeline', reconciles: tx.id },
           campaignId: campaign.id,
           actorId: gm.id,
           actorType: 'SYSTEM',
