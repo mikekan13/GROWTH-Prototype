@@ -1,9 +1,9 @@
-/**
+﻿/**
  * T15 acceptance — booth-rental payout report (INV-114 / INV-70).
  *
  * Runs computePayoutReport against the seeded dev DB and asserts the invariants
  * of a fair split: shares sum to 100% (when there's KRMA), payouts sum to ~the
- * pool, each steward's total = liquid + locked, and no JEWL/system wallet leaks
+ * pool, each steward's total = walletLiquid + liquid + locked (r-2026-07-23-07), and no JEWL/system wallet leaks
  * in. Read-only — writes nothing.
  *
  * Run: npx tsx scripts/test-payout-report.ts   (exits non-zero on failure)
@@ -26,7 +26,7 @@ async function main() {
   console.log(`  stewards: ${report.stewards.length}, grand total KRMA: ${report.grandTotalKrma}`);
 
   check('report carries the requested pool', report.distributablePool === POOL);
-  check('each steward total = liquid + locked', report.stewards.every(s => s.total === s.liquid + s.locked));
+  check('each steward total = walletLiquid + liquid + locked (r-2026-07-23-07)', report.stewards.every(s => s.total === s.walletLiquid + s.liquid + s.locked));
 
   if (report.grandTotalKrma > 0) {
     const shareSum = report.stewards.reduce((s, r) => s + r.sharePct, 0);

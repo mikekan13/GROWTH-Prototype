@@ -15,11 +15,11 @@ import { getCampaignEconomy } from './wallet';
  * INV-70: JEWL / godhead / system wallets never appear here — the basis is GM
  * stewards' campaign economies only, so JEWL's wallet is structurally excluded.
  *
- * BASIS DEFINITION (flagged for Mike): a steward's basis = the sum over the
- * campaigns they run of (fluid + crystallized). It does NOT (yet) include a
- * GM's UNDEPLOYED user-wallet balance — INV-114 frames the utilization view as
- * "how much of their KRMA is deployed in their world," so the basis is the
- * in-world KRMA. If undeployed drip should also count, that's a one-line add.
+ * BASIS DEFINITION (RULED r-2026-07-23-07): payout is determined by the TOTAL
+ * TKV in a GM's orbit — "everything, crystallized or otherwise; ALL KRMA is
+ * accounted for during payouts." Basis = undeployed user-wallet balance +
+ * in-world fluid + crystallized. (Supersedes the T15 interim choice that
+ * excluded the undeployed wallet.)
  * The __PRIME__ meta campaign is excluded (it is the control room, not a booth).
  */
 
@@ -29,9 +29,10 @@ export interface StewardPayout {
   stewardId: string;
   stewardName: string;
   campaignIds: string[];
-  liquid: number; // fluid across their campaigns (undeployed-in-world)
+  walletLiquid: number; // undeployed user-wallet balance (r-2026-07-23-07)
+  liquid: number; // fluid across their campaigns (deployed, not yet crystallized)
   locked: number; // crystallized into characters
-  total: number; // liquid + locked — the payout basis
+  total: number; // walletLiquid + liquid + locked — the payout basis
   sharePct: number; // 0..100, share of the grand total
   payout: number; // sharePct/100 × distributablePool (rounded)
 }
@@ -66,9 +67,11 @@ export async function computePayoutReport(distributablePool: number): Promise<Pa
     bySteward.set(c.gmUserId, entry);
   }
 
-  // Sum each steward's in-world liquid + locked via the established economy view.
+  // Sum each steward's TOTAL orbit: undeployed wallet + in-world liquid + locked.
   const rows: Omit<StewardPayout, 'sharePct' | 'payout'>[] = [];
   for (const [stewardId, { name, campaignIds }] of bySteward) {
+    const userWallet = await prisma.wallet.findUnique({ where: { ownerId: stewardId } });
+    const walletLiquid = Number(userWallet?.balance ?? BigInt(0));
     let liquid = 0;
     let locked = 0;
     for (const campaignId of campaignIds) {
@@ -76,7 +79,11 @@ export async function computePayoutReport(distributablePool: number): Promise<Pa
       liquid += Number(econ.fluid);
       locked += Number(econ.crystallized);
     }
-    rows.push({ stewardId, stewardName: name, campaignIds, liquid, locked, total: liquid + locked });
+    rows.push({
+      stewardId, stewardName: name, campaignIds,
+      walletLiquid, liquid, locked,
+      total: walletLiquid + liquid + locked,
+    });
   }
 
   const grandTotalKrma = rows.reduce((sum, r) => sum + r.total, 0);
