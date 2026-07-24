@@ -164,6 +164,21 @@ async function main() {
     check(`DR ${config.systemEngagementDR - 1} does not`,
       !belowThreshold.resolution.requiresSystemReview);
 
+    // r-2026-07-23-03: the flagged cast dispatches an async verification —
+    // the invocation row (PENDING when dispatcher disabled) is the durable log.
+    await new Promise((r) => setTimeout(r, 500)); // emit is fire-and-forget
+    const selva = await prisma.godHead.findUnique({ where: { name: 'Selva' } });
+    if (selva) {
+      const inv = await prisma.godHeadInvocation.findFirst({
+        where: { triggerType: 'cast.system_review', godHeadId: selva.id },
+        orderBy: { startedAt: 'desc' },
+      });
+      check('DR-50+ cast logged a cast.system_review invocation (Triu/TRINITY)',
+        !!inv && inv.triggerData.includes(id));
+    } else {
+      check('DR-50+ dispatch (Selva not seeded — route would skip)', true, 'skipped');
+    }
+
     // 7. JEWL co-pilot tools (r-2026-07-22-01) — handlers driven directly.
     const toolCtx = {
       campaignId: character.campaignId ?? '',

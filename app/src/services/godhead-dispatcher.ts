@@ -44,6 +44,8 @@ export type GodHeadEvent =
   | 'entity.retired'             // T31: reserved — emission point lands with T30's retire flow
   // Contracts (T13/T31)
   | 'contract.violated'          // A Terminal contract flipped to VIOLATED — Triu's verification duty
+  // Magic (r-2026-07-23-03)
+  | 'cast.system_review'         // DR ≥ systemEngagementDR cast resolved — value movement must be logged + verified (async)
   // Session / play
   | 'session.started'
   | 'session.ended'
@@ -84,6 +86,9 @@ const ROUTING_TABLE: Record<GodHeadEvent, ReadonlyArray<string>> = {
   'character.crystallized': [], // Reserved — a welcome beat may land here later.
   'entity.retired': ['Tara Almswood'], // Retirement is a soft ending — her domain. Emission lands with T30.
   'contract.violated': ['Selva'], // TRINITY (Trayman/Selva/Triu) — Triu verifies contracts (ruling 2026-07-10 #2).
+  // DR-50+ casts resolve first; verification is async (r-2026-07-23-03).
+  // Value-movement VERIFICATION is Triu's duty → TRINITY entry, same as contracts.
+  'cast.system_review': ['Selva'],
   'character.died': ['Tara Almswood'],
   // T27: every resolved death save is Tara's beat — survivals she may Thorn,
   // fated-age fails she authors the escalating age-Thorn for, spares she narrates.

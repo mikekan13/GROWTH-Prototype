@@ -34,6 +34,7 @@ import {
 import type { GrowthCharacter, MagicSchool } from '@/types/growth';
 import { MAGIC_SCHOOLS } from '@/types/growth';
 import { markSchoolTrainable } from './advancement';
+import { emit as emitGodHeadEvent } from './godhead-dispatcher';
 
 const magicSchool = z.custom<MagicSchool>(
   (s): s is MagicSchool => typeof s === 'string' && s in MAGIC_SCHOOLS,
@@ -206,6 +207,26 @@ export async function executeCast(
       schoolToMarkTrainable: resolution.schoolToMarkTrainable,
       requiresSystemReview: resolution.requiresSystemReview,
     });
+  }
+
+  // DR-50+ = resolve first, verify async (r-2026-07-23-03): the invocation
+  // row (PENDING when the dispatcher is disabled) IS the durable log; Triu's
+  // verification duty picks it up via the TRINITY route.
+  if (resolution.requiresSystemReview && character.campaignId) {
+    void emitGodHeadEvent('cast.system_review', {
+      campaignId: character.campaignId,
+      characterId: character.id,
+      characterName: character.name,
+      casterUserId: userId,
+      spellName: validated.spellName ?? null,
+      method: plan.method,
+      schools: plan.schools,
+      dr: plan.dr,
+      manaSpent: plan.manaSpent,
+      success: resolution.success,
+      total: resolution.total,
+      margin: resolution.margin,
+    }).catch(() => { /* verification dispatch must never fail the cast */ });
   }
 
   return {
