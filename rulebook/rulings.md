@@ -468,3 +468,11 @@ entry that references the old.
 ### r-2026-07-23-08: Mistake bounties stay tunable; future option = adjudicator-priced severity
 - **Ruling (Mike, verbal)**: "This will have to be tunable... maybe even decided on the severity of the bug or mistake." Current 10/100/1000 (minor/moderate/severe) stands as the tunable starting point (EconomyConfig mistakeBounty, already ADMIN-tunable). Flagged future option: Et'herling prices each mistake individually at adjudication instead of fixed tiers — not built yet.
 - **Files**: none now (already tunable); godhead adjudication later if the dynamic option is taken.
+
+### r-2026-07-23-09: Balance numbers are DELEGATED to the godhead system — not Mike-set
+- **Ruling (Mike, verbal)**: "For numbers on anything... I don't know. That is going to be largely your job on setting up the godhead system so it can accurately measure and change values till they are balanced."
+- **Scope**: all playtest-tunable constants — per-effect DR values, mana↔KRMA rate, weave fee rate, mistake bounty amounts, system-engagement threshold, and future numeric knobs. They ship as reasonable starting values in EconomyConfig; the godhead system OWNS convergence: measure play (cast outcomes, KRMA flow, TKV drift), evaluate balance, adjust the tunables.
+- **Supersedes**: the "exact mana↔KRMA number TBD — Mike to confirm" and "per-effect DR review with Mike" open items (r-2026-07-22-01/-02). Extends the existing KV-pricing delegation to the whole numeric layer.
+- **Open sub-question (authority)**: do godheads change tunables AUTONOMOUSLY or propose-with-ADMIN-confirm? (Asked 2026-07-23; governs the tuner build.)
+- **Lands in rulebook**: §economy (governance of constants), §godheads (tuning duty)
+- **Files (future build)**: godhead balance-measurement duty + EconomyConfig write path for godheads.
