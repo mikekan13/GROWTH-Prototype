@@ -52,7 +52,7 @@ if (-not $NoWhisper) {
     } else {
         Write-Host '[boot] starting whisper-server (logs -> logs\whisper.*.log)...' -ForegroundColor Cyan
         Start-Process -FilePath 'cmd.exe' `
-            -ArgumentList '/c', 'start.bat' `
+            -ArgumentList ('/c "' + (Join-Path $WhisperDir 'start.bat') + '"') `
             -WorkingDirectory $WhisperDir `
             -RedirectStandardOutput (Join-Path $LogDir 'whisper.out.log') `
             -RedirectStandardError  (Join-Path $LogDir 'whisper.err.log') `

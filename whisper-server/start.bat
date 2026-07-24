@@ -14,7 +14,7 @@ if not exist ".venv\Scripts\python.exe" (
         pause
         exit /b 1
     )
-    echo [whisper-server] installing dependencies (one-time, ~1-2 GB download)...
+    echo [whisper-server] installing dependencies ^(one-time, ~1-2 GB download^)...
     ".venv\Scripts\python.exe" -m pip install --upgrade pip
     ".venv\Scripts\python.exe" -m pip install -r requirements.txt
     if errorlevel 1 (

@@ -476,3 +476,16 @@ entry that references the old.
 - **Open sub-question (authority)**: do godheads change tunables AUTONOMOUSLY or propose-with-ADMIN-confirm? (Asked 2026-07-23; governs the tuner build.)
 - **Lands in rulebook**: §economy (governance of constants), §godheads (tuning duty)
 - **Files (future build)**: godhead balance-measurement duty + EconomyConfig write path for godheads.
+
+### r-2026-07-23-10: Godheads VOTE on balance changes; ADMIN override is absolute
+- **Ruling (Mike, verbal — answers r-2026-07-23-09's authority sub-question)**: "They will vote and decide amongst themselves. I will have the ability to override and set it to whatever I want."
+- **Consequences**: tunable changes are a COLLECTIVE godhead decision — a vote among the godheads, then the winning value lands in EconomyConfig (logged, attributed to the vote). No per-change human gate. ADMIN (Mike) can override any constant at any time via the existing admin economy-config surface; an override stands until the system has cause to revisit.
+- **Lands in rulebook**: §godheads (balance-council duty), §economy
+- **Files (future build)**: godhead vote mechanism + EconomyConfig write path attributed to the council; admin override already exists (/api/admin/economy-config).
+
+### r-2026-07-23-11: Mana is a NARRATIVE CONTAINER for KRMA — no escrow, no special custody
+- **Ruling (Mike, verbal — closes the mana-KV-custody question)**: "That isn't needed. The GM is managing his campaign. So if he puts mana into it then it has a KRMA value associated to it like everything else... Mana is just a narrative container for KRMA — basically like everything else."
+- **Consequences**: mana needs NO wallet/escrow leg. Like items and other in-world containers, mana carries associated KRMA value within the GM's campaign accounting; granting mana is the GM deploying value narratively, spending it moves that value into the cast/residue, decay returns it to the ambient campaign pool. All bookkeeping-level — no ledger transfers, nothing mints, and the godhead tuner measures mana as in-world deployed value like everything else.
+- **Confirms**: the shipped ManaResidue implementation (bookkeeping decay, no transfers) is the CORRECT shape, not an interim.
+- **Lands in rulebook**: §magic (mana lifecycle), §economy (containers)
+- **Files**: none — shipped shape confirmed. Future: count mana pools/residues in campaign-economy metrics for the tuner.
