@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Woven-spell pipeline acceptance (r-2026-07-22-01 #5) — player request →
  * GM approve (godhead-authored mechanics via modifiedData) → learnSpell →
  * knownSpells → woven cast of the learned spell.
@@ -11,8 +11,9 @@
  *     with requiresSystemReview derived from config; duplicate learn rejected.
  *  6. The learned spell's params drive a woven executeCast.
  *
- * NO KRMA moves anywhere in this pipeline (spell-learning pricing is a
- * pending Mike ruling — see NEEDS-MIKE).
+ * Economics (r-2026-07-23-04): the spell's KV locks campaign→character
+ * (SPELL_LEARNED) and a weave fee pays Kai (SPELL_WEAVE_FEE); both are
+ * asserted, then reconciled with CORRECTION counter-transfers in cleanup.
  *
  * Run: npx tsx scripts/test-spell-pipeline.ts
  */
@@ -22,6 +23,7 @@ import { createPlayerRequest, resolvePlayerRequest, forgeSpellDataSchema } from 
 import { learnSpell } from '../src/services/spell-grant';
 import { executeCast } from '../src/services/magic-cast-ops';
 import { getMagicCastingConfig } from '../src/services/economy-config';
+import { executeTransaction } from '../src/services/krma/ledger';
 import { MAGIC_SCHOOLS, type GrowthCharacter, type MagicSchool } from '../src/types/growth';
 
 let failures = 0;
@@ -48,6 +50,7 @@ const AUTHORED = {
   castingMethod: 'weaving',
   dr: { base: 10, duration: 2, total: 12 },
   manaCost: 2,
+  kv: 8,
   failureConditions: 'The ward flickers out; the caster is dazzled for one round.',
   persistentEffects: [],
 };
@@ -112,6 +115,17 @@ async function main() {
     const expectedPillar = MAGIC_SCHOOLS[SCHOOL].pillar;
     check('spell lands in the primary school\'s pillar', learned.pillar === expectedPillar);
     const config = await getMagicCastingConfig();
+    // r-2026-07-23-04 economics: KV locked into the learner + weave fee to Kai.
+    check('spell KV locked into the learner', learned.kvLocked === AUTHORED.kv);
+    const expectedFee = Math.max(1, Math.ceil(AUTHORED.kv * config.weaveFeeRate));
+    check('weave fee paid to the authoring godhead',
+      learned.weaveFee === expectedFee || learned.weaveFee === 0,
+      `fee=${learned.weaveFee}`);
+    check('spell carries its kv on the sheet', learned.spell.kv === AUTHORED.kv);
+    const learnTx = await prisma.krmaTransaction.findFirst({
+      where: { reason: 'SPELL_LEARNED', idempotencyKey: `spell-learn:${resolved.forgeItemId}:${character.id}` },
+    });
+    check('SPELL_LEARNED ledger row exists', !!learnTx);
     check('requiresSystemReview derived from config',
       learned.spell.requiresSystemReview === (AUTHORED.dr.total >= config.systemEngagementDR));
     const sheet = JSON.parse(
@@ -137,6 +151,29 @@ async function main() {
       cast.resolution.dr === 12 && !cast.resolution.monkeyPaw);
   } finally {
     await prisma.character.update({ where: { id: character.id }, data: { data: backup } });
+    // Ledger is append-only — reconcile the test's KV lock + weave fee with
+    // CORRECTION counter-transfers (same pattern as test-death-e2e).
+    if (cleanupForgeIds.length) {
+      const keys = [
+        `spell-learn:${cleanupForgeIds[0]}:${character.id}`,
+        `spell-weave-fee:${cleanupForgeIds[0]}:${character.id}`,
+      ];
+      const txs = await prisma.krmaTransaction.findMany({ where: { idempotencyKey: { in: keys } } });
+      for (const tx of txs) {
+        await executeTransaction({
+          fromWalletId: tx.toWalletId,
+          toWalletId: tx.fromWalletId,
+          amount: tx.amount,
+          state: tx.state === 'LOCK' ? 'UNLOCK' : 'FLUID',
+          reason: 'CORRECTION',
+          description: `test-spell-pipeline reconcile (${tx.reason})`,
+          campaignId: campaign.id,
+          actorId: gm.id,
+          actorType: 'SYSTEM',
+          idempotencyKey: `spell-test-reconcile:${tx.id}`,
+        });
+      }
+    }
     if (requestId) await prisma.playerRequest.deleteMany({ where: { id: requestId } });
     if (cleanupForgeIds.length) {
       await prisma.forgeItem.deleteMany({ where: { id: { in: cleanupForgeIds } } });

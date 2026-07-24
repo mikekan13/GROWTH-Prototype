@@ -10,11 +10,15 @@
  * is enforced HERE (dr + manaCost required), so requests can stay
  * intent-only upstream.
  *
- * KRMA: deliberately NO ledger movement. The nectar golden path pays
- * godhead→character because bestowal is a REWARD; a player-requested spell
- * is not, and no ruling prices spell-learning (mana is system-priced at
- * CAST time instead). Flagged in NEEDS-MIKE — add the transfer here if
- * Mike rules spells carry KV at learn time.
+ * KRMA (r-2026-07-23-04): the spell's KV must be MATCHED — the payment
+ * source is narrative (reagent sacrifice, essence via Frequency, time; the
+ * GM/JEWL adjudicate it at the table, outside the ledger). Ledger side:
+ *  - spell KV: campaign pool → character wallet, LOCK, 'SPELL_LEARNED'
+ *    (the GM's absorbed narrative payment re-crystallizes into the learner;
+ *    the sheet carries spell.kv and the evaluator prices it).
+ *  - weave fee: campaign pool → authoring godhead (Kai — the Forge's
+ *    pricing godhead), FLUID, 'SPELL_WEAVE_FEE', rate = config.weaveFeeRate
+ *    of KV (min 1 when KV > 0).
  */
 
 import 'server-only';
@@ -24,6 +28,8 @@ import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/errors';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { getMagicCastingConfig } from './economy-config';
 import { forgeSpellDataSchema } from './forge';
+import { executeTransaction } from './krma/ledger';
+import { getWalletByCharacter, createCharacterWallet } from './krma/wallet';
 import type { GrowthCharacter, GrowthSpell, MagicSchool } from '@/types/growth';
 import { MAGIC_SCHOOLS } from '@/types/growth';
 
@@ -38,6 +44,10 @@ export interface LearnSpellResult {
   characterId: string;
   spell: GrowthSpell;
   pillar: 'mercy' | 'severity' | 'balance';
+  /** KRMA locked into the learner (the spell's KV). */
+  kvLocked: number;
+  /** Weave fee paid to the authoring godhead. */
+  weaveFee: number;
 }
 
 export async function learnSpell(
@@ -71,9 +81,9 @@ export async function learnSpell(
   }
 
   const data = forgeSpellDataSchema.parse(JSON.parse(forgeItem.data));
-  if (!data.dr || data.manaCost === undefined) {
+  if (!data.dr || data.manaCost === undefined || data.kv === undefined) {
     throw new ValidationError(
-      'Spell mechanics incomplete — the godhead chain must author dr and manaCost before it can be taught',
+      'Spell mechanics incomplete — the godhead chain must author dr, manaCost and kv before it can be taught',
     );
   }
 
@@ -89,6 +99,7 @@ export async function learnSpell(
     schools: (data.schools as MagicSchool[] | undefined) ?? [school],
     dr: data.dr,
     manaCost: data.manaCost,
+    kv: data.kv,
     failureConditions: data.failureConditions,
     persistentEffects: data.persistentEffects,
     requiresSystemReview: data.dr.total >= config.systemEngagementDR,
@@ -112,6 +123,57 @@ export async function learnSpell(
     data: { data: JSON.stringify(charData) },
   });
 
+  // Ledger (r-2026-07-23-04): lock the KV into the learner + pay the weave fee.
+  const kvLocked = data.kv;
+  let weaveFee = 0;
+  if (character.campaignId && kvLocked > 0) {
+    const campaignWallet = await prisma.wallet.findFirst({
+      where: { campaignId: character.campaignId, walletType: 'CAMPAIGN' },
+    });
+    if (!campaignWallet) throw new ValidationError('Campaign wallet missing — cannot settle spell KV');
+
+    let charWallet;
+    try {
+      charWallet = await getWalletByCharacter(character.id);
+    } catch {
+      charWallet = await createCharacterWallet(character.id, character.campaignId);
+    }
+
+    await executeTransaction({
+      fromWalletId: campaignWallet.id,
+      toWalletId: charWallet.id,
+      amount: BigInt(kvLocked),
+      state: 'LOCK',
+      reason: 'SPELL_LEARNED',
+      description: `Woven spell learned: ${spell.name} (KV ${kvLocked}, matched narratively)`,
+      metadata: { forgeItemId: forgeItem.id, characterId: character.id },
+      campaignId: character.campaignId,
+      actorId: userId,
+      actorType: 'GM',
+      idempotencyKey: `spell-learn:${forgeItem.id}:${character.id}`,
+    });
+
+    weaveFee = Math.max(1, Math.ceil(kvLocked * config.weaveFeeRate));
+    const kai = await prisma.godHead.findUnique({ where: { name: 'Kai' } });
+    if (kai?.walletId) {
+      await executeTransaction({
+        fromWalletId: campaignWallet.id,
+        toWalletId: kai.walletId,
+        amount: BigInt(weaveFee),
+        state: 'FLUID',
+        reason: 'SPELL_WEAVE_FEE',
+        description: `Weave fee for ${spell.name} (${Math.round(config.weaveFeeRate * 100)}% of KV ${kvLocked})`,
+        metadata: { forgeItemId: forgeItem.id, characterId: character.id },
+        campaignId: character.campaignId,
+        actorId: userId,
+        actorType: 'GM',
+        idempotencyKey: `spell-weave-fee:${forgeItem.id}:${character.id}`,
+      });
+    } else {
+      weaveFee = 0; // Kai not seeded (bare dev DB) — fee skipped, KV lock stands.
+    }
+  }
+
   if (character.campaignId) {
     broadcastEvent(character.campaignId, {
       kind: 'character_update',
@@ -121,5 +183,5 @@ export async function learnSpell(
     });
   }
 
-  return { characterId: character.id, spell, pillar };
+  return { characterId: character.id, spell, pillar, kvLocked, weaveFee };
 }

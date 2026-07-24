@@ -200,10 +200,11 @@ export interface GrowthSpell {
   strength?: number;                // 1-10 spell strength level
   castingMethod?: 'weaving' | 'wild'; // 'weaving' = Woven (canon term); 'wild' = Wild Cast
 
-  // ── structured payload (r-2026-07-22-01 DRAFT — pending sign-off) ──
+  // ── structured payload (SIGNED OFF r-2026-07-23-01) ──
   schools?: MagicSchool[];          // all involved schools; multi-school uses the WEAKEST die
   dr?: SpellDRBreakdown;            // computed additive difficulty
   manaCost?: number;                // mana spent; each point adds +1 to the casting roll
+  kv?: number;                      // KRMA value of the spell — priced at authoring, matched narratively at learn (r-2026-07-23-04)
   failureConditions?: string;       // Woven: pre-established; Wild: Monkey-Paw risk on fail
   persistentEffects?: SpellPersistentEffect[]; // enchantments this spell leaves behind
   requiresSystemReview?: boolean;   // true when dr.total >= systemEngagementDR (godhead oversight)

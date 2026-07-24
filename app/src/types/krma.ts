@@ -53,6 +53,10 @@ export type TransactionReason =
   | 'GROVINE_NECTAR_DECLINE'
   | 'GROVINE_TAX'
   | 'THORN_NECTAR_REPLACE'
+  // Spells (r-2026-07-23-04): KV crystallizes onto the learner; the weave
+  // fee pays the authoring godhead. Narrative payment covers the liquid side.
+  | 'SPELL_LEARNED'
+  | 'SPELL_WEAVE_FEE'
   // Blossoms — "borrowed power" loan from a Godhead (Mike 2026-07-13).
   // Bestow lends Godhead → character (LOCK); return sends it home on
   // expiry/death (character → Godhead, UNLOCK). Net-zero, fully attributed.

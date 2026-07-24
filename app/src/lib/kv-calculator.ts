@@ -81,6 +81,13 @@ export function calculateCharacterTKV(character: GrowthCharacter, heldItems: Hel
         }
       }
     }
+    // Learned spells carry authored KV (r-2026-07-23-04) — crystallized value
+    // priced by the godhead chain, matched narratively at learn time.
+    for (const spell of (pillar as { knownSpells?: Array<{ name: string; kv?: number }> }).knownSpells ?? []) {
+      if (spell.kv && spell.kv > 0) {
+        magicSkills.push({ school: `spell:${spell.name}`, kv: spell.kv });
+      }
+    }
   }
   const magicTotal = magicSkills.reduce((sum, s) => sum + s.kv, 0);
 

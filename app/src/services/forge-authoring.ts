@@ -154,6 +154,7 @@ const TYPE_SCHEMAS: Record<string, string> = {
   - castingMethod: "weaving" (always — Wild casts are improvised, never authored)
   - dr: { base, targets?, size?, duration?, range?, schools?, total } — DR is ADDITIVE: base per the core effect, plus scaling for extra targets / size categories / duration increments / range categories, plus summed DRs of additional schools. total MUST equal the sum of the parts. DR 50+ engages godhead/Terminal oversight — author most spells below that unless the intent is genuinely that powerful.
   - manaCost: integer 0+ (mana the weave consumes; each point of mana adds +1 to the casting roll)
+  - kv: integer 0+ — the spell's KRMA value, graded like a Nectar by mechanical + narrative impact (scale it with DR, permanence, and breadth; a modest single-target utility weave is ~5-15 KV, permanent enchantments far more). The learner must match this value narratively and a weave fee on top pays the authoring godhead (r-2026-07-23-04).
   - failureConditions: string (what happens on a missed Woven cast — Woven spells NEVER trigger a Monkey Paw; they fail per these authored conditions, max 1000 chars)
   - persistentEffects: array of { kind: "trait"|"item"|"other", description } — lasting effects the spell leaves behind (enchantments, permanent alterations). Spells that create real permanence should carry proportionally high DR.`,
 };

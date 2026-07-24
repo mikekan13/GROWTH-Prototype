@@ -160,17 +160,22 @@ export async function setMistakeBountyConfig(
 export interface MagicCastingConfig {
   manaPerKrma: number;
   systemEngagementDR: number;
+  /** Weave fee to the authoring godhead as a fraction of spell KV
+   *  (r-2026-07-23-04; min 1 KRMA applied at learn). Playtest-tunable. */
+  weaveFeeRate: number;
 }
 
 export const DEFAULT_MAGIC_CASTING_CONFIG: MagicCastingConfig = {
   manaPerKrma: 4,
   systemEngagementDR: 50,
+  weaveFeeRate: 0.1,
 };
 
 export const magicCastingPatchSchema = z
   .object({
     manaPerKrma: z.number().int().min(1).optional(),
     systemEngagementDR: z.number().int().min(1).optional(),
+    weaveFeeRate: z.number().min(0).max(1).optional(),
   })
   .strict();
 

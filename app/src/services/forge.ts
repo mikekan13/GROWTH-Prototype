@@ -100,6 +100,9 @@ export const forgeSpellDataSchema = z.object({
   castingMethod: z.literal('weaving').default('weaving'),
   dr: spellDrBreakdownSchema.optional(),
   manaCost: z.number().int().min(0).optional(),
+  /** KRMA value of the spell (r-2026-07-23-04) — priced by the godhead chain
+   *  at authoring; required (with dr + manaCost) before the spell can be taught. */
+  kv: z.number().int().min(0).optional(),
   failureConditions: z.string().max(1000).optional(),
   persistentEffects: z.array(z.object({
     kind: z.enum(['trait', 'item', 'other']),
