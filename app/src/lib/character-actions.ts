@@ -363,6 +363,13 @@ export function restLong(character: GrowthCharacter): RestResult {
   for (const skill of c.skills ?? []) {
     if (skill.trainable) { skill.trainable = false; marksCleared++; }
   }
+  for (const pillar of ['mercy', 'severity', 'balance'] as const) {
+    const block = c.magic?.[pillar];
+    if (block?.trainableSchools?.length) {
+      marksCleared += block.trainableSchools.length;
+      block.trainableSchools = [];
+    }
+  }
   if (marksCleared > 0) changes.push(`Trainable marks cleared: ${marksCleared}`);
 
   for (const attrName of ALL_ATTRIBUTES) {

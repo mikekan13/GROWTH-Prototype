@@ -107,8 +107,12 @@ async function main() {
     });
     check('wild DR-999 misses', !wildMiss.resolution.success);
     check('wild miss → Monkey Paw', wildMiss.resolution.monkeyPaw);
-    check('wild miss → school trainable intent (cost 2, wiring pending)',
+    check('wild miss → school trainable intent',
       wildMiss.resolution.schoolToMarkTrainable === 'Force');
+    const afterMiss = await loadSheet(id);
+    const forcePillar = MAGIC_SCHOOLS['Force'].pillar;
+    check('wild miss PERSISTS the school mark (r-2026-07-23-06)',
+      (afterMiss.magic?.[forcePillar]?.trainableSchools ?? []).includes('Force'));
 
     // 3. Multi-school resolves on the weakest school.
     const multi = await executeCast(admin.id, admin.role, {

@@ -372,14 +372,16 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
                       <div style={{ fontSize: 8, color: 'rgba(255,204,120,0.7)', letterSpacing: '0.08em', fontWeight: 600 }}>
                         TRAINABLE {'\u2014'} pick upgrades (spends max Frequency)
                       </div>
-                      {[...PILLAR_ORDER, 'other' as const].map(pillar => {
-                        const items = pillar === 'other'
-                          ? trainables.filter(t => t.pillars.length === 0)
-                          : trainables.filter(t => t.pillars.includes(pillar));
+                      {[...PILLAR_ORDER, 'magic' as const, 'other' as const].map(pillar => {
+                        const items = pillar === 'magic'
+                          ? trainables.filter(t => t.kind === 'school')
+                          : pillar === 'other'
+                            ? trainables.filter(t => t.pillars.length === 0 && t.kind !== 'school')
+                            : trainables.filter(t => t.pillars.includes(pillar));
                         if (!items.length) return null;
                         return (
                           <div key={pillar}>
-                            <div style={{ fontSize: 8, color: pillar === 'other' ? 'rgba(255,255,255,0.5)' : (PILLAR_COLORS[pillar] === '#002f6c' ? '#5b8fd9' : PILLAR_COLORS[pillar]), fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
+                            <div style={{ fontSize: 8, color: pillar === 'other' ? 'rgba(255,255,255,0.5)' : pillar === 'magic' ? '#b08fd9' : (PILLAR_COLORS[pillar] === '#002f6c' ? '#5b8fd9' : PILLAR_COLORS[pillar]), fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
                               {pillar}
                             </div>
                             {items.map(item => {
@@ -414,7 +416,7 @@ export default function RestPanel({ characters, campaignId, onClose, onRestCompl
                                   }}>
                                     {isPicked && <span style={{ color: '#ffcc78', fontSize: 8, lineHeight: 1 }}>{'\u2713'}</span>}
                                   </div>
-                                  <span style={{ fontSize: 10, flex: 1 }}>{item.name}</span>
+                                  <span style={{ fontSize: 10, flex: 1 }}>{item.name}{item.kind === 'school' && item.magicPillar ? ` (${item.magicPillar})` : ''}</span>
                                   <span style={{ fontSize: 9, color: isPicked ? '#ffcc78' : 'rgba(255,255,255,0.4)' }}>
                                     {item.currentLevel}{'\u2192'}{item.currentLevel + 1}
                                   </span>

@@ -4,10 +4,12 @@ import { restLong } from '@/lib/character-actions';
 import {
   markAttributeTrainable,
   markSkillTrainable,
+  markSchoolTrainable,
   listTrainables,
   applyAdvancements,
   clearTrainables,
   AdvancementError,
+  ADVANCE_COST_MAGIC_SKILL,
 } from './advancement';
 import type { GrowthCharacter, GrowthSkill } from '@/types/growth';
 
@@ -104,6 +106,42 @@ describe('advancement — trainable → Long-Rest upgrade loop (r-2026-07-15-01)
     c = markSkillTrainable(c, 'Lockpicking');
     c = clearTrainables(c);
     expect(listTrainables(c)).toEqual([]);
+  });
+
+  it('marks magic schools trainable into their pillar and lists them at cost 2 (r-2026-07-23-06)', () => {
+    let c = fixture();
+    c = markSchoolTrainable(c, 'Force');
+    c = markSchoolTrainable(c, 'Force'); // dedupe
+    const items = listTrainables(c).filter(i => i.kind === 'school');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      kind: 'school', name: 'Force', cost: ADVANCE_COST_MAGIC_SKILL, pillars: [],
+    });
+    expect(items[0].magicPillar).toBeDefined();
+  });
+
+  it('advances a school +1 for 2 Frequency (folder move)', () => {
+    let c = fixture();
+    c = markSchoolTrainable(c, 'Force');
+    const item = listTrainables(c).find(i => i.kind === 'school')!;
+    const freqBefore = c.attributes.frequency.level;
+
+    const res = applyAdvancements(c, [{ kind: 'school', name: 'Force' }]);
+    expect(res.frequencySpent).toBe(2);
+    expect(res.character.attributes.frequency.level).toBe(freqBefore - 2);
+    expect(res.character.magic?.[item.magicPillar!]?.skillLevels?.Force).toBe(item.currentLevel + 1);
+  });
+
+  it('clearTrainables + restLong wipe school marks too', () => {
+    let c = fixture();
+    c = markSchoolTrainable(c, 'Illusion');
+    expect(listTrainables(clearTrainables(c)).filter(i => i.kind === 'school')).toEqual([]);
+
+    let c2 = fixture();
+    c2 = markSchoolTrainable(c2, 'Illusion');
+    const rested = restLong(c2);
+    expect(listTrainables(rested.character)).toEqual([]);
+    expect(rested.changes.some(ch => ch.includes('Trainable marks cleared'))).toBe(true);
   });
 
   it('restLong clears remaining trainable marks and restores pools at the new max', () => {

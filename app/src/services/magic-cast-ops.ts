@@ -5,15 +5,14 @@
  * server-side — dice are never client-supplied), resolves, deducts mana,
  * saves, broadcasts. Mirrors advancement-ops.ts.
  *
- * Deliberate non-inferences (canon SILENT, flagged in NEEDS-MIKE):
- *  - Mana is consumed whether the cast succeeds or fails (no refund rule
- *    exists; Mana_System.md never distinguishes).
- *  - DR >= systemEngagementDR FLAGS review, does not block resolution —
- *    matches the signed-off schema's requiresSystemReview boolean
- *    (r-2026-07-23-01). If Mike rules "block", gate before the roll here.
- *  - The wild-fail trainable mark is REPORTED (schoolToMarkTrainable), not
- *    persisted — trainable-schools storage structure awaits Mike's call
- *    (r-2026-07-15-01 magic wiring).
+ * Ruled behaviors (ruling session #2, 2026-07-23):
+ *  - Mana is consumed on success AND failure; its KV is not destroyed — it
+ *    LINGERS with the spell and decays back to the GM wallet over time
+ *    (r-2026-07-23-02; residue tracking is its own unit).
+ *  - DR >= systemEngagementDR: resolve first, godhead verification is async
+ *    (r-2026-07-23-03) — the flag rides the result + cast_result event.
+ *  - Wild miss persists the school mark into magic.<pillar>.trainableSchools
+ *    (r-2026-07-23-06); Long Rest offers it at advancement cost 2.
  */
 
 import 'server-only';
@@ -34,6 +33,7 @@ import {
 } from './magic-cast';
 import type { GrowthCharacter, MagicSchool } from '@/types/growth';
 import { MAGIC_SCHOOLS } from '@/types/growth';
+import { markSchoolTrainable } from './advancement';
 
 const magicSchool = z.custom<MagicSchool>(
   (s): s is MagicSchool => typeof s === 'string' && s in MAGIC_SCHOOLS,
@@ -158,9 +158,19 @@ export async function executeCast(
   const resolution = resolveCast(plan, rolls);
 
   let manaRemaining = manaCurrent;
+  let sheetChanged = false;
   if (plan.manaSpent > 0 && charData.magic?.mana) {
     charData.magic.mana.current = manaCurrent - plan.manaSpent;
     manaRemaining = charData.magic.mana.current;
+    sheetChanged = true;
+  }
+  // Wild miss → persist the school mark (r-2026-07-23-06); Long Rest offers
+  // it at cost 2 via the advancement loop.
+  if (resolution.schoolToMarkTrainable) {
+    markSchoolTrainable(charData, resolution.schoolToMarkTrainable);
+    sheetChanged = true;
+  }
+  if (sheetChanged) {
     await prisma.character.update({
       where: { id: validated.characterId },
       data: { data: JSON.stringify(charData) },
@@ -168,7 +178,7 @@ export async function executeCast(
   }
 
   if (character.campaignId) {
-    if (plan.manaSpent > 0) {
+    if (sheetChanged) {
       broadcastEvent(character.campaignId, {
         kind: 'character_update',
         characterId: character.id,

@@ -23,7 +23,7 @@ import type { GrowthCharacter } from '@/types/growth';
 export const advancementRequestSchema = z.object({
   characterId: z.string().min(1),
   picks: z.array(z.object({
-    kind: z.enum(['attribute', 'skill']),
+    kind: z.enum(['attribute', 'skill', 'school']),
     name: z.string().min(1),
   })).min(1),
 });

@@ -3,8 +3,8 @@
  *
  * Pure sheet math (no db, no ledger). "Frequency is the character's wallet /
  * health": raising a number on the sheet SPENDS Frequency — 1 per attribute or
- * non-magic skill level (magic-school levels cost 2, but those live in
- * `character.magic.skillLevels` and are a flagged follow-up, not MVP).
+ * non-magic skill level, 2 per magic-school level (r-2026-07-23-06: schools are
+ * marked by wild-cast failures into magic.<pillar>.trainableSchools).
  *
  * The KRMA does not move owner or amount — the GM owns the players' KRMA, and
  * advancing a stat just shifts 1 KRMA "folder" within that pool (liquid
@@ -15,8 +15,8 @@
  * can pay for; after the Long Rest, ALL trainable marks clear.
  */
 
-import type { GrowthCharacter } from '@/types/growth';
-import { PILLARS } from '@/types/growth';
+import type { GrowthCharacter, MagicSchool } from '@/types/growth';
+import { PILLARS, MAGIC_SCHOOLS } from '@/types/growth';
 import { setAttributeLevel, updateSkillLevel } from '@/lib/character-actions';
 import type { AttributeName } from '@/lib/character-actions';
 
@@ -37,22 +37,26 @@ export const ADVANCE_COST_SKILL = 1;
 export const ADVANCE_COST_MAGIC_SKILL = 2;
 
 export interface TrainableItem {
-  kind: 'attribute' | 'skill';
+  kind: 'attribute' | 'skill' | 'school';
   name: string;
   currentLevel: number;
   /** Frequency to raise this by +1. */
   cost: number;
-  /** Pillars this item touches (attribute → its pillar; skill → its governors' pillars). */
+  /** Pillars this item touches (attribute → its pillar; skill → its governors'
+   *  pillars; magic schools have NO body/spirit/soul pillar → empty, see
+   *  magicPillar). */
   pillars: Pillar[];
+  /** School kind only: which magic pillar (mercy/severity/balance) it belongs to. */
+  magicPillar?: 'mercy' | 'severity' | 'balance';
 }
 
 export interface AdvancementPick {
-  kind: 'attribute' | 'skill';
+  kind: 'attribute' | 'skill' | 'school';
   name: string;
 }
 
 export interface AppliedAdvancement {
-  kind: 'attribute' | 'skill';
+  kind: 'attribute' | 'skill' | 'school';
   name: string;
   from: number;
   to: number;
@@ -94,6 +98,27 @@ export function markSkillTrainable(
   return character;
 }
 
+/**
+ * Mark a magic school trainable after a failed WILD cast (r-2026-07-23-06;
+ * Woven misses never mark). Lives in magic.<pillar>.trainableSchools.
+ */
+export function markSchoolTrainable(
+  character: GrowthCharacter,
+  school: MagicSchool,
+): GrowthCharacter {
+  const pillar = MAGIC_SCHOOLS[school]?.pillar;
+  if (!pillar) return character;
+  character.magic ??= {
+    mercy: { schools: [], knownSpells: [] },
+    severity: { schools: [], knownSpells: [] },
+    balance: { schools: [], knownSpells: [] },
+  };
+  const block = character.magic[pillar];
+  block.trainableSchools ??= [];
+  if (!block.trainableSchools.includes(school)) block.trainableSchools.push(school);
+  return character;
+}
+
 // ── Listing ──
 
 /** All currently-trainable items (attributes + regular skills), with cost + pillars. */
@@ -125,6 +150,20 @@ export function listTrainables(character: GrowthCharacter): TrainableItem[] {
       cost: ADVANCE_COST_SKILL,
       pillars,
     });
+  }
+
+  for (const magicPillar of ['mercy', 'severity', 'balance'] as const) {
+    const block = character.magic?.[magicPillar];
+    for (const school of block?.trainableSchools ?? []) {
+      items.push({
+        kind: 'school',
+        name: school,
+        currentLevel: block?.skillLevels?.[school] ?? 0,
+        cost: ADVANCE_COST_MAGIC_SKILL,
+        pillars: [],
+        magicPillar,
+      });
+    }
   }
 
   return items;
@@ -185,6 +224,11 @@ export function applyAdvancements(
       const res = setAttributeLevel(working, item.name as AttributeName, item.currentLevel + 1);
       working = res.character;
       changes.push(...res.changes);
+    } else if (item.kind === 'school') {
+      const block = working.magic![item.magicPillar!];
+      block.skillLevels ??= {};
+      block.skillLevels[item.name as MagicSchool] = item.currentLevel + 1;
+      changes.push(`${item.name} (${item.magicPillar}) school: ${item.currentLevel} → ${item.currentLevel + 1}`);
     } else {
       const res = updateSkillLevel(working, item.name, item.currentLevel + 1);
       working = res.character;
@@ -207,13 +251,17 @@ export function applyAdvancements(
   return { character: working, applied, frequencySpent: totalCost, changes };
 }
 
-/** Clear ALL trainable marks (attributes + skills). Called at Long Rest. */
+/** Clear ALL trainable marks (attributes + skills + magic schools). Called at Long Rest. */
 export function clearTrainables(character: GrowthCharacter): GrowthCharacter {
   for (const attr of Object.values(character.attributes)) {
     if ((attr as { trainable?: boolean }).trainable) (attr as { trainable?: boolean }).trainable = false;
   }
   for (const skill of character.skills ?? []) {
     if (skill.trainable) skill.trainable = false;
+  }
+  for (const pillar of ['mercy', 'severity', 'balance'] as const) {
+    const block = character.magic?.[pillar];
+    if (block?.trainableSchools?.length) block.trainableSchools = [];
   }
   return character;
 }

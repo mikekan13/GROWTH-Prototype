@@ -222,6 +222,9 @@ export interface MagicPillar {
   schools: MagicSchool[];
   knownSpells: GrowthSpell[];
   skillLevels?: Partial<Record<MagicSchool, number>>; // Skill level per school
+  /** Schools marked by wild-cast failures — advance at cost 2 on Long Rest
+   *  (r-2026-07-23-06 / r-2026-07-15-01), then clear like all trainables. */
+  trainableSchools?: MagicSchool[];
 }
 
 export interface GrowthMagic {
