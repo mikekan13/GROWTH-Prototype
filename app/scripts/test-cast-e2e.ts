@@ -23,6 +23,7 @@ import './_server-only-shim';
 import { prisma } from '../src/lib/db';
 import { executeCast } from '../src/services/magic-cast-ops';
 import { previewCastTool, resolveCastTool } from '../src/ai/copilot/tools/cast';
+import { adjustMana, sweepManaResidues } from '../src/services/mana';
 import { getMagicCastingConfig } from '../src/services/economy-config';
 import { MAGIC_SCHOOLS, type GrowthCharacter, type MagicSchool } from '../src/types/growth';
 
@@ -208,6 +209,27 @@ async function main() {
     check('resolve_cast deducts mana + reports affected',
       resolvedOut.manaRemaining === manaBefore - 2 &&
       (resolved.affected?.characters?.[0]?.changes?.length ?? 0) > 0);
+
+    // 8. Mana lifecycle (r-2026-07-23-02/-05): spent mana lingers as residue,
+    // fades over ~dr cycles; narrative gains land via adjustMana.
+    const residues = await prisma.manaResidue.findMany({
+      where: { campaignId: character.campaignId ?? '', characterId: id },
+    });
+    check('mana casts left lingering residue rows', residues.length >= 2,
+      `${residues.length} rows`);
+    const partial = await sweepManaResidues(character.campaignId!, 1);
+    check('residue decays on clock advance', partial.decayed.length >= 1);
+    const full = await sweepManaResidues(character.campaignId!, 999999);
+    const left = await prisma.manaResidue.count({
+      where: { campaignId: character.campaignId ?? '', characterId: id },
+    });
+    check('residue fully fades back to the weave',
+      partial.fadedOut + full.fadedOut >= 2 && left === 0);
+    const beforeGrant = (await loadSheet(id)).magic?.mana?.current ?? 0;
+    const granted = await adjustMana(admin.id, admin.role, {
+      characterId: id, delta: 3, note: 'e2e — ley line surge',
+    });
+    check('adjust_mana grants narrative mana', granted.current === beforeGrant + 3);
   } finally {
     await prisma.character.update({ where: { id }, data: { data: backup } });
   }

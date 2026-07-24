@@ -13,6 +13,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { previewCast, executeCast } from '@/services/magic-cast-ops';
+import { adjustMana } from '@/services/mana';
 import { MAGIC_SCHOOLS, type MagicSchool } from '@/types/growth';
 import { registerJewlTool } from './registry';
 import type { JewlTool, JewlToolHandlerResult } from './types';
@@ -136,5 +137,36 @@ export const resolveCastTool: JewlTool = {
   },
 };
 
+const adjustManaInputSchema = z.object({
+  characterId: z.string().min(1).describe('The character whose mana pool changes.'),
+  delta: z.number().int().describe('Change to CURRENT mana (negative to drain).'),
+  maxDelta: z.number().int().optional()
+    .describe('Optional change to MAX mana (capacity shifts from major narrative sources).'),
+  note: z.string().max(500).optional()
+    .describe('The narrative source — ley line, ritual, reagent, tapped residue, etc.'),
+});
+
+export const adjustManaTool: JewlTool = {
+  name: 'adjust_mana',
+  description:
+    'Grant or drain a character\'s mana for a NARRATIVE reason. There is no ' +
+    'automatic regen in GROWTH — mana comes from all over (ley lines, rituals, ' +
+    'rest at sacred places, tapping lingering residue, GM rulings). Use when ' +
+    'the fiction provides or costs mana. Current is clamped to [0, max]; pass ' +
+    'maxDelta only when capacity itself changes.',
+  inputSchema: adjustManaInputSchema,
+  handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
+    const parsed = adjustManaInputSchema.parse(input);
+    const result = await adjustMana(ctx.actorId, ctx.actorRole, parsed);
+    return {
+      output: result,
+      affected: {
+        characters: [{ id: result.characterId, changes: [`mana → ${result.current}/${result.max}`] }],
+      },
+    };
+  },
+};
+
 registerJewlTool(previewCastTool);
 registerJewlTool(resolveCastTool);
+registerJewlTool(adjustManaTool);

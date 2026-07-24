@@ -901,3 +901,23 @@ model PenaltyAction {
   @@index([status, createdAt])
   @@index([contractId])
 }
+
+// Lingering mana residue (r-2026-07-23-02): spent mana's KV stays WITH the
+// spell and slowly fades back to the weave. Rows decay on clock advance
+// (~dr cycles to fully fade). While present: godhead-attractable, tappable.
+// NOTE: decay is bookkeeping-only for now — no KRMA transfer until mana KV
+// custody is ruled (transferring would mint; see NEEDS-MIKE).
+model ManaResidue {
+  id            String   @id @default(cuid())
+  campaignId    String
+  characterId   String?
+  spellName     String?
+  method        String   // wild | woven
+  dr            Int
+  manaInitial   Int
+  manaRemaining Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([campaignId])
+}

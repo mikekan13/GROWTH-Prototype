@@ -17,6 +17,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import { writeHistory } from '@/services/history';
 import { sweepExpiredBlossoms } from '@/services/blossom';
+import { sweepManaResidues } from '@/services/mana';
 import {
   STANDARD_CALENDAR,
   cycleToLocalDate,
@@ -253,6 +254,19 @@ export async function advanceClock(
     })));
   }
 
+  // r-2026-07-23-02: lingering mana residue fades back to the weave with time.
+  const manaSweep = await sweepManaResidues(campaignId, deltaCycles);
+  if (manaSweep.fadedOut > 0) {
+    await writeHistory(campaignId, campaign.currentCycle, [{
+      subjectType: 'campaign',
+      subjectId: campaignId,
+      type: 'mana_residue_faded',
+      summary: `${manaSweep.fadedOut} lingering mana residue${manaSweep.fadedOut === 1 ? '' : 's'} faded back to the weave`,
+      actorId: userId,
+      visibility: 'gm',
+    }]);
+  }
+
   return { currentCycle: campaign.currentCycle, deltaCycles, localDate, expiredBlossoms: expired };
 }
 
@@ -264,6 +278,10 @@ export async function setClock(
 ) {
   await requireGm(campaignId, userId, userRole);
   const defaultTs = await ensureDefaultTimescale(campaignId);
+  const prior = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { currentCycle: true },
+  });
   const campaign = await prisma.campaign.update({
     where: { id: campaignId },
     data: { currentCycle: input.currentCycle },
@@ -281,6 +299,8 @@ export async function setClock(
   }]);
 
   // T23: setting the clock forward can elapse blossoms too.
+  // r-2026-07-23-02: same for lingering mana residue.
+  await sweepManaResidues(campaignId, Math.max(0, campaign.currentCycle - (prior?.currentCycle ?? campaign.currentCycle)));
   const { expired } = await sweepExpiredBlossoms(campaignId, campaign.currentCycle);
   if (expired.length > 0) {
     await writeHistory(campaignId, campaign.currentCycle, expired.map(e => ({

@@ -35,6 +35,7 @@ import type { GrowthCharacter, MagicSchool } from '@/types/growth';
 import { MAGIC_SCHOOLS } from '@/types/growth';
 import { markSchoolTrainable } from './advancement';
 import { emit as emitGodHeadEvent } from './godhead-dispatcher';
+import { recordCastResidue } from './mana';
 
 const magicSchool = z.custom<MagicSchool>(
   (s): s is MagicSchool => typeof s === 'string' && s in MAGIC_SCHOOLS,
@@ -206,6 +207,19 @@ export async function executeCast(
       monkeyPaw: resolution.monkeyPaw,
       schoolToMarkTrainable: resolution.schoolToMarkTrainable,
       requiresSystemReview: resolution.requiresSystemReview,
+    });
+  }
+
+  // r-2026-07-23-02: spent mana LINGERS with the spell — record the residue
+  // (decays back to the weave on clock advance; godhead-attractable).
+  if (plan.manaSpent > 0 && character.campaignId) {
+    await recordCastResidue({
+      campaignId: character.campaignId,
+      characterId: character.id,
+      spellName: validated.spellName,
+      method: plan.method,
+      dr: plan.dr,
+      manaSpent: plan.manaSpent,
     });
   }
 
