@@ -21,6 +21,7 @@
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { screen } from './jewl/screening';
 
 export type ContentCategory = 'dialogue' | 'perception' | 'reasoning' | 'world' | 'meta';
 export type Sensitivity = 'sensitive' | 'safe';
@@ -136,6 +137,13 @@ function escapeRegExp(s: string): string {
  * shorter match running first.
  */
 export function stripAndForward(content: string, identifiers: string[]): StripResult {
+  // T15 tap (Addendum B3): the full-stream screening choke point. Phase 1's
+  // `screen()` is a stateless pass-through (always 'pass', retains nothing)
+  // — wired here so the future pattern-flagging/GM-routing project has
+  // exactly one call site to extend. Inert today; never affects this
+  // function's return value.
+  screen(content, { subsystem: 'sanitize.stripAndForward' });
+
   let text = content;
   const roleMap: Record<string, string> = {};
   let tokenIdx = 0;

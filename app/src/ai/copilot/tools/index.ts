@@ -23,6 +23,13 @@ import './place-on-canvas';
 import './remove-from-canvas';
 import './list-canvas-characters';
 import './cast';
+import './daya-ledger-read';
+import './daya-affect-read';
+import './daya-sheet-diff';
+import './daya-routing-log';
+import './daya-world-inspect';
+import './daya-pov-view';
+import './daya-recall-probe';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';

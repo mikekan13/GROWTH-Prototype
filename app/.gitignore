@@ -52,3 +52,6 @@ next-env.d.ts
 /public/portraits/angle-refs/*
 !/public/portraits/angle-refs/*.jpg
 .ssh/
+
+# local-only, user-owned data (T15 client-store stub — Addendum B3, never committed)
+/.local/
