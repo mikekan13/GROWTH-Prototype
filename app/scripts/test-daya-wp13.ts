@@ -33,6 +33,7 @@ import type { AnthropicLike, DayaFetch } from '../src/daya/model-client';
 import { seedDayaRoom } from './seed-daya-room';
 import {
   ensureJewlDayaEntity,
+  jewlSheetData,
   JEWL_ENTITY_NAME,
   JEWL_FIFTEEN_LAWS,
 } from '../src/daya/jewl-persona';
@@ -139,7 +140,20 @@ async function main() {
     const campaign = seeded.campaign;
 
     // ── Setup: JEWL, a normal comparison entity, and an action target ────
-    const jewl1 = await ensureJewlDayaEntity(campaign.id);
+    // Production resolves JEWL's ONE sheet in the Prime campaign; a test
+    // seeds a stand-in sheet in its throwaway campaign and passes the
+    // campaignId override so it never touches the real Prime rows.
+    await prisma.character.create({
+      data: {
+        name: JEWL_ENTITY_NAME,
+        entityType: 'GODHEAD',
+        userId: campaign.gmUserId,
+        campaignId: campaign.id,
+        data: jewlSheetData(),
+        status: 'ACTIVE',
+      },
+    });
+    const jewl1 = await ensureJewlDayaEntity({ campaignId: campaign.id });
     const normalChar = await prisma.character.create({
       data: {
         name: '__TEST_DAYA_WP13__ Normal',
@@ -170,7 +184,7 @@ async function main() {
 
     // ── 1. JEWL DayaEntity exists; persona carries the 15 laws ───────────
     console.log('\n-- 1. JEWL DayaEntity + canon persona --');
-    check('jewl: character created', !!jewl1.characterId);
+    check('jewl: character resolved', !!jewl1.characterId);
     check('jewl: entity created', !!jewl1.entityId);
     check('jewl: first ensure reports created=true', jewl1.created === true);
 
@@ -202,7 +216,7 @@ async function main() {
     check('jewl: his real Spirit prompt carries canon (a law phrase present)', spiritPromptForJewl.includes(JEWL_FIFTEEN_LAWS[0]));
 
     // Idempotency: re-ensuring never resets persona/affect/memory.
-    const jewl2 = await ensureJewlDayaEntity(campaign.id);
+    const jewl2 = await ensureJewlDayaEntity({ campaignId: campaign.id });
     check('jewl: second ensure reports created=false', jewl2.created === false);
     check('jewl: second ensure resolves the SAME character', jewl2.characterId === jewl1.characterId);
     check('jewl: second ensure resolves the SAME entity', jewl2.entityId === jewl1.entityId);

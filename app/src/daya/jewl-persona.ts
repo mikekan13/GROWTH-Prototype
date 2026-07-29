@@ -25,11 +25,15 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import type { BiasProfile, VoiceParams } from './renderer';
 
-/** Character.name for the well-known JEWL entity inside a DAYA test/room
- * campaign. Distinct from the production JEWL GodHead row (jewl-identity.ts)
- * — that one is campaign-agnostic and drives the live copilot chat surface;
- * this one is the DAYA-ensemble test/reference entity for Phase 1. */
-export const JEWL_ENTITY_NAME = '__JEWL__';
+/** Character.name of JEWL's ONE character sheet. It lives in the Prime
+ * Campaign (`__PRIME__`) — the Prime Campaign drives the meta and meta
+ * rules — never in a test/room campaign. His DayaEntity anchors 1:1 to
+ * that sheet; he operates in every campaign FROM there (one soul, one
+ * sheet, many tables). */
+export const JEWL_ENTITY_NAME = 'JEWL';
+
+/** Well-known name of the Prime Campaign that holds JEWL's sheet. */
+export const PRIME_CAMPAIGN_NAME = '__PRIME__';
 
 /**
  * The 15 behavioral laws (condensed, paraphrased — never a verbatim design-
@@ -103,8 +107,11 @@ export const JEWL_INTROSPECTION = 0.98;
 
 /** A minimal-but-complete attribute set so the ensemble's soulState /
  * effort-adjacent reads never crash on a missing attribute — JEWL doesn't
- * play the mechanics himself, but the sheet shape must be well-formed. */
-function jewlSheetData(): string {
+ * play the mechanics himself, but the sheet shape must be well-formed.
+ * Exported for TEST harnesses that seed a stand-in JEWL sheet in a
+ * throwaway campaign; production never fabricates his sheet — the real
+ * one is seeded in the Prime Campaign. */
+export function jewlSheetData(): string {
   const flat = (level: number) => ({ level, current: level, augmentPositive: 0, augmentNegative: 0 });
   return JSON.stringify({
     attributes: {
@@ -128,37 +135,44 @@ export interface EnsureJewlEntityResult {
 }
 
 /**
- * Finds-or-creates the well-known JEWL Character (`__JEWL__`, entityType
- * GODHEAD) inside the given campaign, and finds-or-creates his 1:1
- * DayaEntity with the canon persona profile + near-1.0 introspection +
- * ACTIVE status (he is always awake — he is the guardian, never dormant).
+ * Resolves JEWL's ONE character sheet — in the Prime Campaign (the Prime
+ * Campaign drives the meta; his sheet is NEVER duplicated into other
+ * campaigns) — and finds-or-creates his 1:1 DayaEntity with the canon
+ * persona profile + near-1.0 introspection + ACTIVE status (he is always
+ * awake — he is the guardian, never dormant). Never creates a Character:
+ * if the Prime sheet is missing, that is a seeding defect and this throws.
  * Idempotent: calling this again never resets his persona, affect, or
  * memory — only the initial creation seeds them.
+ *
+ * `opts.campaignId` is a TEST-ONLY override pointing at a throwaway
+ * campaign that has seeded its own stand-in 'JEWL' character (see
+ * scripts/test-daya-wp13.ts). Production callers pass nothing.
  */
-export async function ensureJewlDayaEntity(campaignId: string): Promise<EnsureJewlEntityResult> {
-  let character = await prisma.character.findFirst({
+export async function ensureJewlDayaEntity(opts: { campaignId?: string } = {}): Promise<EnsureJewlEntityResult> {
+  let campaignId = opts.campaignId;
+  if (!campaignId) {
+    const prime = await prisma.campaign.findFirst({
+      where: { name: PRIME_CAMPAIGN_NAME },
+      select: { id: true },
+    });
+    if (!prime) {
+      throw new Error(`ensureJewlDayaEntity: Prime campaign (${PRIME_CAMPAIGN_NAME}) not found — seed it first`);
+    }
+    campaignId = prime.id;
+  }
+
+  const character = await prisma.character.findFirst({
     where: { name: JEWL_ENTITY_NAME, campaignId },
     select: { id: true },
   });
-  let createdCharacter = false;
   if (!character) {
-    const gmRow = await prisma.campaign.findUniqueOrThrow({ where: { id: campaignId }, select: { gmUserId: true } });
-    character = await prisma.character.create({
-      data: {
-        name: JEWL_ENTITY_NAME,
-        entityType: 'GODHEAD',
-        userId: gmRow.gmUserId,
-        campaignId,
-        data: jewlSheetData(),
-        status: 'ACTIVE',
-      },
-      select: { id: true },
-    });
-    createdCharacter = true;
+    throw new Error(
+      `ensureJewlDayaEntity: no '${JEWL_ENTITY_NAME}' character in campaign ${campaignId} — his sheet lives in the Prime campaign and is never fabricated here`,
+    );
   }
 
   const existingEntity = await prisma.dayaEntity.findUnique({ where: { characterId: character.id } });
-  const created = createdCharacter && !existingEntity;
+  const created = !existingEntity;
 
   const entity = await prisma.dayaEntity.upsert({
     where: { characterId: character.id },
