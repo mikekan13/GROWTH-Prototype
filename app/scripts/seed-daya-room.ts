@@ -79,8 +79,9 @@ async function ensureCampaign(name: string) {
   });
   console.log(`+ Created campaign ${name} (${campaign.id})`);
 
-  await prisma.campaignMember.create({ data: { campaignId: campaign.id, userId: gm.id } });
-  console.log(`+ Added GM as member`);
+  // App invariant: the GM is NOT a campaignMember — gmUserId on the
+  // campaign is the sole GM link. Adding a member row for the GM breaks
+  // campaign-page loading.
 
   return campaign;
 }
