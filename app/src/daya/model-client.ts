@@ -56,6 +56,29 @@ export class DayaTierUnavailableError extends AppError {
   }
 }
 
+/**
+ * WP14 — thrown when an L1/L2 call is aborted by our own request timeout
+ * (DAYA_{tier}_TIMEOUT_MS) rather than a hard connection failure. On a
+ * serverless-billed L1 (scale-to-zero), the first request of a session can
+ * be slow while a worker spins up — this is NOT "the endpoint is down"
+ * (DayaTierUnavailableError), it's "still reachable, just not answered
+ * yet." Callers (conversation.ts) use this distinction to surface a
+ * 'warming' state instead of 'core_offline'.
+ */
+export class DayaWarmingTimeoutError extends AppError {
+  constructor(
+    public readonly tier: DayaTier,
+    public readonly timeoutMs: number,
+  ) {
+    super(`DAYA tier ${tier} timed out after ${timeoutMs}ms — likely still warming up from a cold start`, 504);
+    this.name = 'DayaWarmingTimeoutError';
+  }
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && (err.name === 'AbortError' || /aborted/i.test(err.message));
+}
+
 // ── Injectable transports (production: real network; tests: fakes) ────────
 
 export interface DayaFetchResponse {
@@ -66,7 +89,7 @@ export interface DayaFetchResponse {
 }
 export type DayaFetch = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: string },
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
 ) => Promise<DayaFetchResponse>;
 
 /** Minimal shape of the Anthropic client this module needs — decoupled from
@@ -95,6 +118,11 @@ export interface DayaClientOverrides {
 // ── Pricing (WP2b will ratify real figures — placeholder estimates) ───────
 
 const DEFAULT_C_MODEL = 'claude-sonnet-4-6';
+
+/** WP14 — generous default so a serverless-billed L1/L2 cold start (worker
+ * scale-from-zero, ~2-3 min) doesn't get aborted mid-spin-up. Override per
+ * tier via DAYA_L1_TIMEOUT_MS / DAYA_L2_TIMEOUT_MS. */
+const DEFAULT_TIER_TIMEOUT_MS = 240_000;
 
 /** $ per 1M tokens, in/out. L1/L2 are self-hosted — compute cost, not
  * tracked per-token here; unknown models estimate $0 rather than guess. */
@@ -131,7 +159,15 @@ function resolveOpenAiTierConfig(tier: 'L1' | 'L2'): { url: string; model: strin
   return { url, model };
 }
 
-async function callOpenAiCompatible(
+/**
+ * Exported (WP14) so its auth-header + timeout behavior can be unit-tested
+ * directly against an injected fetchImpl, without going through chat()'s
+ * prisma.dayaModelCall.create() write — keeps these tests DB-free, matching
+ * this project's vitest convention (see vitest.config.ts). Production
+ * callers still go through chat(), which meters every call; this is not a
+ * second entry point for real traffic.
+ */
+export async function callOpenAiCompatible(
   tier: 'L1' | 'L2',
   params: DayaChatParams,
   fetchImpl: DayaFetch,
@@ -156,11 +192,38 @@ async function callOpenAiCompatible(
     requestBody.chat_template_kwargs = { enable_thinking: false };
   }
 
-  const res = await fetchImpl(`${url.replace(/\/+$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
+  // WP14 — RunPod serverless (and other cold-start-billed hosts) gate the
+  // OpenAI-compatible endpoint behind a bearer token; the current
+  // always-on pod has none configured, so absent = unchanged (no header).
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const apiKey = process.env[`DAYA_${tier}_API_KEY`];
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  // WP14 — generous, env-configurable timeout so a cold start (worker
+  // spinning up from zero) doesn't get treated as a hard failure. An abort
+  // here throws the typed DayaWarmingTimeoutError, distinguishable from a
+  // real connection/HTTP failure, so callers can surface "still waking up"
+  // instead of "offline."
+  const timeoutMs = Number(process.env[`DAYA_${tier}_TIMEOUT_MS`] ?? DEFAULT_TIER_TIMEOUT_MS);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: DayaFetchResponse;
+  try {
+    res = await fetchImpl(`${url.replace(/\/+$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new DayaWarmingTimeoutError(tier, timeoutMs);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');

@@ -34,11 +34,15 @@ interface DayaAuthoringStateDTO {
 }
 
 interface ConverseResultDTO {
-  status: 'ok' | 'disabled' | 'dormant' | 'core_offline';
+  status: 'ok' | 'disabled' | 'dormant' | 'core_offline' | 'warming';
   action?: { kind: string; content?: string };
   memoryEntryId?: string;
   detail?: string;
 }
+
+// WP14 — coarse read on the self-hosted L1 core's readiness, from
+// POST .../daya/warm. 'unknown' = haven't probed yet this mount.
+type CoreStatus = 'unknown' | 'ready' | 'warming' | 'offline' | 'disabled';
 
 interface TimeSkipResultDTO {
   framing?: string;
@@ -93,6 +97,7 @@ export default function DayaTestCanvas({
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [coreStatus, setCoreStatus] = useState<CoreStatus>('unknown');
 
   const [framing, setFraming] = useState('');
   const [alsoDream, setAlsoDream] = useState(false);
@@ -131,6 +136,38 @@ export default function DayaTestCanvas({
     setChat([]);
     setTimeSkipResult(null);
   }, [refresh]);
+
+  // WP14 — trigger the L1 persona core's warm-up the moment a character is
+  // selected (i.e. as soon as this canvas is looked at), before the GM has
+  // typed anything, so a serverless cold start is already underway by the
+  // time she sends her first message. Polls while 'warming' so the UI can
+  // reflect the entity settling in; stops once 'ready'/'offline'/'disabled'.
+  useEffect(() => {
+    if (!characterId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function pollWarm() {
+      try {
+        const result = await postJson<{ status: CoreStatus }>(`/api/characters/${characterId}/daya/warm`, {});
+        if (cancelled) return;
+        setCoreStatus(result.status);
+        if (result.status === 'warming') {
+          timer = setTimeout(() => void pollWarm(), 4000);
+        }
+      } catch {
+        if (!cancelled) setCoreStatus('offline');
+      }
+    }
+
+    setCoreStatus('unknown');
+    void pollWarm();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [characterId]);
 
   async function handleWrap() {
     setError(null);
@@ -209,12 +246,17 @@ export default function DayaTestCanvas({
     setSending(true);
     try {
       const result = await postJson<ConverseResultDTO>(`/api/characters/${characterId}/daya/converse`, { message: text });
+      // A real answer is the strongest signal the core is up — reflect
+      // that immediately rather than waiting for the next warm poll tick.
+      if (result.status === 'ok') setCoreStatus('ready');
       if (result.status === 'disabled') {
         setChat((prev) => [...prev, { who: 'system', text: 'DAYA_ENABLED is off — this trigger was only audited, not run.' }]);
       } else if (result.status === 'dormant') {
         setChat((prev) => [...prev, { who: 'system', text: 'She is not awake yet — flip the enable gate above.' }]);
       } else if (result.status === 'core_offline') {
         setChat((prev) => [...prev, { who: 'system', text: `Her core isn't reachable right now (${result.detail ?? 'L1 offline'}) — the pod may not be up.` }]);
+      } else if (result.status === 'warming') {
+        setChat((prev) => [...prev, { who: 'system', text: `She's still stirring awake — that took longer than she usually needs. Give her another moment and try again.` }]);
       } else if (result.action?.kind === 'speak') {
         setChat((prev) => [...prev, { who: 'entity', text: result.action?.content ?? '' }]);
       } else if (result.action?.kind === 'act') {
@@ -398,6 +440,14 @@ export default function DayaTestCanvas({
 
               <section style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
                 <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>5. Converse</h2>
+                {(coreStatus === 'warming' || (sending && coreStatus !== 'ready')) && (
+                  <div style={{ background: '#ffcc7822', border: '1px solid #ffcc78', padding: 8, marginBottom: 8, borderRadius: 4 }}>
+                    <p style={{ margin: 0 }}>{selectedCharacter?.name ?? 'She'} is stirring, coming awake…</p>
+                    <p style={{ margin: '2px 0 0', opacity: 0.6, fontSize: '0.75em' }}>
+                      persona core warming up from a cold start — first reply can take a minute or two
+                    </p>
+                  </div>
+                )}
                 <div style={{ minHeight: 120, border: '1px solid #eee', padding: 8, marginBottom: 8, maxHeight: 300, overflowY: 'auto' }}>
                   {chat.length === 0 && <p style={{ opacity: 0.6 }}>No messages yet.</p>}
                   {chat.map((line, i) => (

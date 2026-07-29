@@ -18,16 +18,17 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { deliverStimulus, isDayaEnabled, type WakeResult } from './events';
-import { DayaTierUnavailableError, type DayaClientOverrides } from './model-client';
+import { DayaTierUnavailableError, DayaWarmingTimeoutError, type DayaClientOverrides } from './model-client';
+import { warmL1, type L1Status, type L1WarmOverrides } from './l1-warm';
 
-export type ConverseStatus = 'ok' | 'disabled' | 'dormant' | 'core_offline';
+export type ConverseStatus = 'ok' | 'disabled' | 'dormant' | 'core_offline' | 'warming';
 
 export interface ConverseResult {
   status: ConverseStatus;
   action?: WakeResult['action'];
   memoryEntryId?: string;
-  /** Human-readable detail for the 'core_offline' state — never surfaced as
-   * a raw error, just a plain "her core isn't reachable yet" note. */
+  /** Human-readable detail for the 'core_offline'/'warming' states — never
+   * surfaced as a raw error, just a plain note about what's going on. */
   detail?: string;
 }
 
@@ -35,8 +36,11 @@ export interface ConverseResult {
  * Sends one message to a wrapped, ACTIVE DAYA entity and returns what she
  * did. Degrades gracefully (spec §5): DAYA_ENABLED off -> 'disabled';
  * entity missing/not ACTIVE -> 'dormant'; L1 endpoint unreachable/unset ->
- * 'core_offline' (never a raw thrown error, never rerouted to cloud tier C
- * — the router already fails locally, this just surfaces the state).
+ * 'core_offline'; L1 reachable but slow/cold (WP14, our own request
+ * timeout firing rather than a connection failure — a serverless worker
+ * spinning up from zero) -> 'warming' (never a raw thrown error, never
+ * rerouted to cloud tier C — the router already fails locally, this just
+ * surfaces the state).
  */
 export async function converseWithEntity(
   characterId: string,
@@ -64,9 +68,30 @@ export async function converseWithEntity(
     const result = await deliverStimulus(characterId, 'dialogue', message, overrides);
     return { status: 'ok', action: result.action, memoryEntryId: result.memoryEntryId };
   } catch (err) {
+    // Order matters: DayaWarmingTimeoutError extends AppError, not
+    // DayaTierUnavailableError, so this must be checked first — a cold
+    // start is "still reachable, just not answered yet," never
+    // 'core_offline'.
+    if (err instanceof DayaWarmingTimeoutError) {
+      return { status: 'warming', detail: err.message };
+    }
     if (err instanceof DayaTierUnavailableError) {
       return { status: 'core_offline', detail: err.message };
     }
     throw err;
   }
+}
+
+/**
+ * WP14 — GM/ADMIN-gated wrapper around l1-warm.ts's warmL1(), for the
+ * "call this the moment the persona canvas mounts" trigger. Separate from
+ * converseWithEntity because warming the L1 core is infrastructure, not a
+ * per-entity action — it needs no characterId, just the caller's role.
+ */
+export async function warmEntityCore(actorRole: string, overrides: L1WarmOverrides = {}): Promise<{ status: L1Status }> {
+  if (!isWatcherOrAbove(actorRole)) {
+    throw new ForbiddenError('GM/ADMIN only — the persona-harness conversation surface is Watcher-console-and-above');
+  }
+  const status = await warmL1(overrides);
+  return { status };
 }
