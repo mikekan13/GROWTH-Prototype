@@ -139,15 +139,27 @@ async function callOpenAiCompatible(
   const { url, model: tierModel } = resolveOpenAiTierConfig(tier);
   const model = params.model || tierModel;
 
+  const requestBody: Record<string, unknown> = {
+    model,
+    messages: params.messages,
+    max_tokens: params.maxTokens ?? 1024,
+    temperature: params.temperature ?? 0.7,
+  };
+
+  // The self-hosted persona core (Qwen3.6-class) ships with an interleaved
+  // reasoning mode that emits chain-of-thought ("Here's a thinking process:")
+  // into the message content. DAYA's own interior monologue is prompted
+  // content, not the model's reasoning trace — the trace must never reach an
+  // entity's phenomenal stream. Suppress it via the chat template unless
+  // explicitly re-enabled. Harmless for models whose template ignores the kwarg.
+  if (process.env.DAYA_DISABLE_THINKING !== 'false') {
+    requestBody.chat_template_kwargs = { enable_thinking: false };
+  }
+
   const res = await fetchImpl(`${url.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      messages: params.messages,
-      max_tokens: params.maxTokens ?? 1024,
-      temperature: params.temperature ?? 0.7,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {
