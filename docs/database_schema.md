@@ -444,6 +444,7 @@ The entity's private phenomenal ledger (Meta-Memory Ledger). Append-only. Distin
 - `entityRefs`: JSON ids referenced; `classification`: JSON (content category, sensitivity, IC/OOC)
 - `clusterId?`: dream-tick hierarchy grouping; `parentMemoryId?`: memories-of-memories
 - Indexes: (entityId, narrativeCycle), (entityId, salience)
+- No schema change, but usage is now live end-to-end (persona harness memory layer): rows are written by `daya/memory.ts`'s `ingestStimulus` (the tagger sets valence/arousal/salience/entityRefs/classification, and `salience` is stored already amplified by encode-time arousal — a flashbulb/threat effect); rows already OOC-classified never reach this table (residency check). `daya/recall.ts` reads this table to score, gate (Wisdom breadth / Wit speed / Thorn blocks), and surface memories, and writes back a small rehearsal `salience` bump on every surfaced row plus a new low-salience self-ingested row when a reach-worthy recall attempt is gated out.
 
 ### DayaAffect
 1:1 with DayaEntity. Mood vector — event-driven internal state for AI-controlled characters (absorbs the uncommitted `CharacterDisposition` prototype). Drives move ONLY on real game events (frequency loss, death saves, goal outcomes, advancement) and decay toward baseline on the campaign clock. Read by prompt assembly (JEWL table state, npc_speak) so an AI-voiced character's condition shapes behavior. See `services/daya-affect.ts`.

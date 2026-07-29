@@ -16,6 +16,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentCycleOf } from '@/services/history';
+import { ingestStimulus } from './memory';
 
 // ── Trigger taxonomy ─────────────────────────────────────────────────────
 
@@ -59,23 +60,6 @@ export function registerHandler(kind: DayaTriggerKind, handler: DayaTriggerHandl
   HANDLERS[kind] = handler;
 }
 
-// ── v0 tagging stub (WP4 Tagger replaces) ───────────────────────────────
-
-/**
- * v0 stub — WP4 Tagger replaces. Assigns provisional zeroed valence/arousal/
- * salience so ingest rows aren't left with meaningless nulls; the real
- * Tagger reads stimulus content plus the entity's stats and produces
- * stat-informed values (recall gating depends on this later).
- */
-export function tagStimulus(entry: { content: string }): {
-  valence: number;
-  arousal: number;
-  salience: number;
-} {
-  void entry;
-  return { valence: 0, arousal: 0, salience: 0 };
-}
-
 // ── Shared helpers ───────────────────────────────────────────────────────
 
 /** Create-if-missing DayaEntity for a character (mirrors daya-affect.ts). */
@@ -92,33 +76,30 @@ async function ensureDayaEntity(
 }
 
 // ── Default handlers: stimulus + gm_intervention ────────────────────────
-// Phase 1 stub: log + write a DayaMemoryEntry ingest row. Real tagging
-// (valence/salience/classification) arrives with WP4's Tagger — see
-// tagStimulus() above.
+// Tags via the meta-memory tagger (src/daya/memory.ts) and applies the OOC
+// residency check: OOC content is processed but never persisted.
 
 async function ingestHandler(
   trigger: Extract<DayaTrigger, { kind: 'stimulus' | 'gm_intervention' }>,
 ): Promise<HandlerResult> {
   const { id: daId, campaignId } = await ensureDayaEntity(trigger.entityId);
   const cycle = campaignId ? await currentCycleOf(campaignId) : 0;
-  const tags = tagStimulus({ content: trigger.content });
   const source = trigger.kind === 'gm_intervention' ? 'gm_intervention' : trigger.source;
 
-  const row = await prisma.dayaMemoryEntry.create({
-    data: {
-      entityId: daId,
-      narrativeCycle: cycle,
-      source,
-      content: trigger.content,
-      valence: tags.valence,
-      arousal: tags.arousal,
-      salience: tags.salience,
-      classification: JSON.stringify({ provisional: true }), // v0 — WP4 Tagger replaces
-    },
+  const result = await ingestStimulus({
+    entityId: daId,
+    cycle,
+    source,
+    content: trigger.content,
   });
 
-  console.log(`[daya/events] ${trigger.kind} ingested for entity ${daId} (memory ${row.id})`);
-  return { memoryEntryId: row.id };
+  if (!result.persisted) {
+    console.log(`[daya/events] ${trigger.kind} classified OOC — not persisted for entity ${daId}`);
+    return {};
+  }
+
+  console.log(`[daya/events] ${trigger.kind} ingested for entity ${daId} (memory ${result.memoryEntryId})`);
+  return { memoryEntryId: result.memoryEntryId };
 }
 
 registerHandler('stimulus', (t) => ingestHandler(t as Extract<DayaTrigger, { kind: 'stimulus' }>));
