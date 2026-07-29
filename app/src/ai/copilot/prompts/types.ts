@@ -21,6 +21,7 @@ export type JewlPromptSource =
   | 'GM_VOICE'             // GM spoke (STT) — not wired yet
   | 'PLAYER_VOICE'         // Player spoke (STT) — not wired yet
   | 'TABLE_AMBIENT'        // ambient audio capture — not wired yet
+  | 'UI_ACTIVITY'          // UI navigation/behavior breadcrumb — JEWL watches the whole session, not just chat
   | 'JEWL_AUTONOMOUS_TICK' // self-triggered tick — not wired yet
   | 'AI_AGENT';            // another AI prompted JEWL — not wired yet
 

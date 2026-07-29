@@ -2625,10 +2625,14 @@ export default function RelationsCanvas({
             });
           } else {
             // Right-click on open canvas IS talking to JEWL — seamless, no
-            // intermediate menu. The clicked spot lands as visible,
-            // editable seed text in his chat.
+            // intermediate menu. He appears AT the click point; the spot
+            // lands as visible, editable seed text in his chat.
             window.dispatchEvent(new CustomEvent('jewl:open', {
-              detail: { seed: `[canvas @ (${Math.round(world.x)}, ${Math.round(world.y)})] ` },
+              detail: {
+                seed: `[canvas @ (${Math.round(world.x)}, ${Math.round(world.y)})] `,
+                x: e.clientX,
+                y: e.clientY,
+              },
             }));
             setCanvasMenu(null);
           }
@@ -3322,7 +3326,11 @@ export default function RelationsCanvas({
                 style={{ color: '#fff' }}
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('jewl:open', {
-                    detail: { seed: `[re: ${f?.name ?? 'this place'}] ` },
+                    detail: {
+                      seed: `[re: ${f?.name ?? 'this place'}] `,
+                      x: canvasMenu.screenX,
+                      y: canvasMenu.screenY,
+                    },
                   }));
                   setCanvasMenu(null);
                 }}

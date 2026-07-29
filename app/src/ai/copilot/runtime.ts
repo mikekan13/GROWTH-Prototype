@@ -172,7 +172,9 @@ function formatToolResultText(r: JewlToolCallResult): string {
  * for JEWL's benefit, not human-readable conversation. */
 async function saveUserPrompt(prompt: JewlPrompt): Promise<string> {
   const isSystemTrigger =
-    prompt.source === 'TABLE_AMBIENT' || prompt.source === 'JEWL_AUTONOMOUS_TICK';
+    prompt.source === 'TABLE_AMBIENT' ||
+    prompt.source === 'UI_ACTIVITY' ||
+    prompt.source === 'JEWL_AUTONOMOUS_TICK';
   const displayName = isSystemTrigger ? '[system]' : prompt.actorName;
   const row = await prisma.copilotMessage.create({
     data: {

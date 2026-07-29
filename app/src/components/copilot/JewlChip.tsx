@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
+import { CtxMenuBorder, CtxMenuScanlines, ctxMenuStyle } from '@/components/ui/ContextMenu';
 
 /**
  * JEWL's name is private canon ([[jewl-identity-and-wallet-private]]). All
@@ -104,6 +105,11 @@ export function JewlChip() {
   const campaignId = extractCampaignId(pathname);
 
   const [open, setOpen] = useState(false);
+  // Where JEWL materializes. Right-click anchors him AT the click point —
+  // he uses the context of where (and what) the GM clicked. null = the
+  // hotkey fallback position (lower right). Per Mike 2026-07-29: no
+  // corner chip; JEWL appears where you summon him.
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
   const [session, setSession] = useState<SessionUser | null>(null);
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
@@ -150,6 +156,21 @@ export function JewlChip() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Summoned, not resident: clicking anywhere OUTSIDE the panel dismisses
+  // it (a right-click outside dismisses-then-resummons at the new spot via
+  // the contextmenu listener). Esc already closes via the hotkey handler.
+  useEffect(() => {
+    if (!open) return;
+    function onDocMouseDown(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [open]);
 
   // Hotkeys
   useEffect(() => {
@@ -163,15 +184,18 @@ export function JewlChip() {
           target.isContentEditable
         );
 
-      // Ctrl/Cmd-K toggles from anywhere
+      // Ctrl/Cmd-K toggles from anywhere (hotkey = no click point, so the
+      // panel uses its fallback position)
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
+        setAnchor(null);
         setOpen(o => !o);
         return;
       }
       // "/" opens when not typing
       if (e.key === '/' && !isTyping && !open) {
         e.preventDefault();
+        setAnchor(null);
         setOpen(true);
         return;
       }
@@ -186,22 +210,112 @@ export function JewlChip() {
     return () => window.removeEventListener('keydown', onKey);
   }, [campaignId, open]);
 
-  // Canvas right-click → "Ask Jewl" fires this event with a context seed
-  // (the clicked spot / subject). One JEWL dialog, contextual payload —
-  // per [[one-contextual-jewl-dialog-2026-06-07]]. The seed lands as
-  // VISIBLE, editable text in the input, never hidden context.
+  // Any surface can summon JEWL via this event with a context seed (the
+  // clicked spot / subject) and the click position. One JEWL dialog,
+  // contextual payload — per [[one-contextual-jewl-dialog-2026-06-07]].
+  // The seed lands as VISIBLE, editable text in the input, never hidden
+  // context; the panel opens AT the click point.
   useEffect(() => {
     if (!campaignId) return;
     function onJewlOpen(e: Event) {
-      const seed = (e as CustomEvent<{ seed?: string }>).detail?.seed;
+      const detail = (e as CustomEvent<{ seed?: string; x?: number; y?: number }>).detail;
+      setAnchor(detail?.x != null && detail?.y != null ? { x: detail.x, y: detail.y } : null);
       setOpen(true);
-      if (seed) setInput(prev => (prev ? prev : seed));
+      if (detail?.seed) setInput(prev => (prev ? prev : detail.seed!));
       // Panel may still be mounting this tick — focus after paint.
       setTimeout(() => inputRef.current?.focus(), 50);
     }
     window.addEventListener('jewl:open', onJewlOpen);
     return () => window.removeEventListener('jewl:open', onJewlOpen);
   }, [campaignId]);
+
+  // JEWL is the DEFAULT right-click everywhere in a campaign — canvas,
+  // tapestry, forge, any page under the campaign route. A more specific
+  // contextual menu (location chooser, character-card menu) preventDefaults
+  // its own event and wins; anything unhandled reaches here and summons
+  // JEWL at the cursor. A [data-jewl-subject] ancestor names the subject
+  // for the seed text.
+  useEffect(() => {
+    if (!campaignId) return;
+    function onContextMenu(e: MouseEvent) {
+      if (e.defaultPrevented) return; // a contextual menu already claimed it
+      const target = e.target as HTMLElement | null;
+      // Native browser menu stays for text inputs (copy/paste matters).
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      // Right-click inside the open panel is not a re-summon.
+      if (target && panelRef.current?.contains(target)) return;
+      e.preventDefault();
+      const subject = target?.closest?.('[data-jewl-subject]')?.getAttribute('data-jewl-subject');
+      setAnchor({ x: e.clientX, y: e.clientY });
+      setOpen(true);
+      if (subject) setInput(prev => (prev ? prev : `[re: ${subject}] `));
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    window.addEventListener('contextmenu', onContextMenu);
+    return () => window.removeEventListener('contextmenu', onContextMenu);
+  }, [campaignId]);
+
+  // UI-activity breadcrumbs — JEWL watches the whole session, not just the
+  // chat. Every surface change inside the campaign posts a small [ui]
+  // breadcrumb; the server-side classifier watches the trail and lets JEWL
+  // burst through when someone looks stuck or keeps bouncing around.
+  const prevPathRef = useRef<string | null>(null);
+  const lastCrumbAtRef = useRef(0);
+  useEffect(() => {
+    if (!campaignId || !pathname) return;
+    const prev = prevPathRef.current;
+    prevPathRef.current = pathname;
+    if (prev === null || prev === pathname) return; // first mount / no change
+    const now = Date.now();
+    if (now - lastCrumbAtRef.current < 3000) return; // rapid transits collapse
+    lastCrumbAtRef.current = now;
+    const surface = (p: string) =>
+      p.replace(/^\/(watcher\/)?campaign\/[^/]+/, '').replace(/^\//, '') || 'canvas';
+    fetch(`/api/campaigns/${campaignId}/ui-activity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: `navigated ${surface(prev)} -> ${surface(pathname)}` }),
+    }).catch(() => { /* breadcrumbs are best-effort */ });
+  }, [campaignId, pathname]);
+
+  // Burst-through — JEWL can reach out FIRST. While the panel is closed, a
+  // slow poll watches for a new assistant message (a proact reply the
+  // classifier let through, or a reply that landed after the GM closed
+  // him); when one appears he opens himself and speaks. The baseline is
+  // set on the first closed poll so history never replays as a burst.
+  const burstBaselineRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant' && !m.id.startsWith('temp-') && !m.id.startsWith('resp-') && !m.id.startsWith('err-'));
+    if (lastAssistant) burstBaselineRef.current = lastAssistant.id;
+  }, [open, messages]);
+  useEffect(() => {
+    if (!campaignId || open) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/copilot/history`);
+        if (!res.ok || cancelled) return;
+        const d = await res.json();
+        const msgs: CopilotMessage[] = d.messages || [];
+        const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
+        if (!lastAssistant || cancelled) return;
+        if (burstBaselineRef.current === null) {
+          burstBaselineRef.current = lastAssistant.id;
+          return;
+        }
+        if (lastAssistant.id !== burstBaselineRef.current) {
+          burstBaselineRef.current = lastAssistant.id;
+          initialHistoryLoadedRef.current = true; // he may speak this one aloud
+          setMessages(msgs);
+          setAnchor(null);
+          setOpen(true);
+        }
+      } catch { /* poll is best-effort */ }
+    };
+    const interval = setInterval(tick, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [campaignId, open]);
 
   // Lazy-load session + history when first opened
   useEffect(() => {
@@ -712,105 +826,52 @@ export function JewlChip() {
 
   if (!campaignId) return null;
 
+  // Anchored placement: JEWL materializes AT the click point, clamped so
+  // the panel never runs off-screen. No anchor (hotkey) = lower right.
+  const PANEL_W = 380;
+  const PANEL_H = 500;
+  const anchoredPos = anchor
+    ? {
+        left: Math.max(8, Math.min(anchor.x, window.innerWidth - PANEL_W - 10)),
+        top: Math.max(8, Math.min(anchor.y, window.innerHeight - PANEL_H - 10)),
+      }
+    : { bottom: 84, right: 20 };
+
   return (
     <>
-      {/* Floating chip — always-visible presence */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        aria-label={open ? `Close ${COPILOT_LABEL}` : `Open ${COPILOT_LABEL}`}
-        title={`${COPILOT_LABEL}  ( / or Ctrl-K )`}
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          background: 'rgba(0, 0, 0, 0.85)',
-          border: '1px solid rgba(208, 160, 48, 0.5)',
-          boxShadow: open
-            ? '0 0 16px rgba(208, 160, 48, 0.45)'
-            : '0 2px 12px rgba(0,0,0,0.6)',
-          color: '#D0A030',
-          fontFamily: 'Consolas, monospace',
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: 'pointer',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.boxShadow = '0 0 18px rgba(208, 160, 48, 0.55)';
-          e.currentTarget.style.borderColor = 'rgba(208, 160, 48, 0.9)';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.boxShadow = open
-            ? '0 0 16px rgba(208, 160, 48, 0.45)'
-            : '0 2px 12px rgba(0,0,0,0.6)';
-          e.currentTarget.style.borderColor = 'rgba(208, 160, 48, 0.5)';
-        }}
-      >
-        <span style={{ letterSpacing: '1px' }}>{'>_'}</span>
-        {/* Audio status dot — bottom-right of the pill. Color-coded so the
-            GM can glance at JEWL and know if he's listening, muted, or off.
-            Pulses brighter for ~1s when a chunk successfully transcribes —
-            visual confirmation the pipeline is alive even when JEWL stays
-            silent (his default for ambient context). */}
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            bottom: 5,
-            right: 5,
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background:
-              audioStatus === 'listening' ? 'var(--terminal-prime)'
-              : audioStatus === 'muted' ? '#888'
-              : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#e74c3c'
-              : '#444',
-            boxShadow:
-              audioStatus === 'listening' && Date.now() - chunkPulse < 1500
-                ? '0 0 14px rgba(34, 171, 148, 1)'
-                : audioStatus === 'listening'
-                ? '0 0 6px rgba(34, 171, 148, 0.7)'
-                : 'none',
-            transition: 'box-shadow 0.4s ease',
-          }}
-        />
-      </button>
-
-      {/* Expand panel */}
+      {/* No corner chip — JEWL is summoned by right-click (anywhere in the
+          campaign) or "/" / Ctrl-K. He appears where you call him. */}
       {open && (
         <div
+          ref={panelRef}
           role="dialog"
           aria-label="Co-pilot"
           style={{
             position: 'fixed',
-            bottom: 84,
-            right: 20,
-            width: 380,
-            height: 500,
+            ...anchoredPos,
+            width: PANEL_W,
+            height: PANEL_H,
             maxHeight: 'calc(100vh - 120px)',
-            background: 'rgba(0, 0, 0, 0.96)',
-            border: '1px solid rgba(208, 160, 48, 0.4)',
-            boxShadow:
-              '0 8px 32px rgba(0,0,0,0.85), 0 0 24px rgba(208, 160, 48, 0.18)',
+            background: '#000',
+            border: 'none',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
             zIndex: 9998,
             display: 'flex',
             flexDirection: 'column',
             fontFamily: 'Consolas, monospace',
+            padding: '6px',
           }}
         >
+          {/* The ^v^v undulating chrome — same skin as every context menu.
+              JEWL is the OS runner; his overlay IS a Terminal surface.
+              count sized up so the strip wraps the full 380x500 panel. */}
+          <CtxMenuBorder count={90} />
+          <CtxMenuScanlines />
           {/* Header */}
           <div
             style={{
               padding: '10px 14px',
-              borderBottom: '1px solid rgba(208, 160, 48, 0.25)',
+              borderBottom: '1px solid #333',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -819,13 +880,12 @@ export function JewlChip() {
           >
             <div
               style={{
-                color: '#D0A030',
-                fontSize: 10,
-                letterSpacing: '0.3em',
-                textTransform: 'uppercase',
+                color: '#fff',
+                fontSize: 12,
+                fontFamily: "'Inknut Antiqua', serif",
               }}
             >
-              ✦ {COPILOT_LABEL}
+              {ctxMenuStyle(COPILOT_LABEL)}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Audio status label + mute toggle. Always rendered so the
@@ -932,7 +992,7 @@ export function JewlChip() {
               gap: 8,
             }}
           >
-            {messages.filter(m => m.username !== '[system]').length === 0 && !loading ? (
+            {messages.filter(m => m.username !== '[system]' && m.username !== '[ui]').length === 0 && !loading ? (
               <div
                 style={{
                   textAlign: 'center',
@@ -957,7 +1017,7 @@ export function JewlChip() {
                 Ask. I&apos;ve been watching.
               </div>
             ) : (
-              messages.filter(m => m.username !== '[system]').map(m => {
+              messages.filter(m => m.username !== '[system]' && m.username !== '[ui]').map(m => {
                 const toolCalls = m.role === 'assistant' ? parseAssistantActions(m.actions) : null;
                 const userAction = m.role === 'user' ? parseUserAction(m.actions) : null;
                 return (

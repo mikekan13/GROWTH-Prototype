@@ -648,6 +648,28 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       <CtxMenuStreamLabel />
       <CtxMenuPanel>
         {/* Main menu buttons — hidden when a sub-picker is open */}
+        {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
+          /* Ask Jewl about THIS character — the panel opens at the click
+             point with the subject as visible seed text. Per
+             [[one-contextual-jewl-dialog-2026-06-07]]. */
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('jewl:open', {
+                detail: {
+                  seed: `[re: character ${node.name}] `,
+                  x: contextMenuPos.x,
+                  y: contextMenuPos.y,
+                },
+              }));
+              setShowContextMenu(false);
+            }}
+            className="w-full px-3 py-1.5 text-left text-sm text-[#D0A030] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+          >
+            <span style={{ letterSpacing: '1px' }}>{'>_'}</span>
+            aSK jEWL
+          </button>
+        )}
         {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
           <>
             {/* Die menu retired 2026-06-07 — dice rolling is moving to its

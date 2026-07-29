@@ -50,10 +50,9 @@ export function ctxMenuStyle(text: string) {
 
 // ── ^v^v undulating border ────────────────────────────────────────────────
 
-export function CtxMenuBorder() {
+export function CtxMenuBorder({ count = 50 }: { count?: number } = {}) {
   useEffect(() => { ensureCtxMenuStyles(); }, []);
 
-  const count = 50;
   const charSize = 10;
   const redSize = 14;
   const bandH = redSize + 2;

@@ -132,7 +132,9 @@ export async function maybeFireClassifier(
     actorRole: ctx.actorRole,
     text:
       `Classifier verdict: ${verdict.toUpperCase()}. ` +
-      `Review the last ~90s of [ambient] transcripts. Reply, run a tool, voice an NPC, or stay silent (empty output) if the classifier was overeager.`,
+      `Review the last ~90s of [ambient] transcripts and [ui] activity breadcrumbs. ` +
+      `Reply, run a tool, voice an NPC, or stay silent (empty output) if the classifier was overeager. ` +
+      `If the breadcrumbs show someone stuck or bouncing between surfaces, you may reach out first — offer help, ask what they need, or needle them a little. Stay in character.`,
   };
   // Fire-and-forget the Sonnet dispatch so the audio-chunk POST can return
   // the verdict immediately. The chip uses the verdict to flip a "thinking"
@@ -182,9 +184,15 @@ async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoni
     '  react   - the LATEST transcript is real speech with content. Default here.',
     '  act     - the LATEST transcript clearly asks for a tool call (apply damage,',
     '            advance clock, create entity, voice an NPC, move a character).',
-    '  proact  - long silence after an unresolved beat that JEWL should check on.',
+    '  proact  - long silence after an unresolved beat that JEWL should check on,',
+    '            OR the [ui] breadcrumb trail shows someone stuck or flailing.',
     '',
     'CRITICAL RULES (apply in this order):',
+    '0. If the LATEST line is a [ui] breadcrumb: default silent. Verdict proact',
+    '   ONLY when the recent [ui] trail shows a real pattern — 3+ surface',
+    '   switches in ~2 minutes, repeatedly opening/closing the same thing, or',
+    '   minutes of aimless bouncing with nothing accomplished. One navigation',
+    '   is never a pattern.',
     '1. Look ONLY at the LATEST [ambient] line. Earlier context is just background.',
     '2. If the latest [ambient] post-dates JEWL\'s last reply AND contains real',
     '   words (a clause, a sentence, a directive), default REACT or ACT.',
