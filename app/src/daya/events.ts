@@ -17,6 +17,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentCycleOf } from '@/services/history';
 import { ingestStimulus } from './memory';
+import type { DayaClientOverrides } from './model-client';
 
 // ── Trigger taxonomy ─────────────────────────────────────────────────────
 
@@ -44,9 +45,26 @@ export function isDayaEnabled(): boolean {
 
 export interface HandlerResult {
   memoryEntryId?: string;
+  /** What the entity actually did, when a handler resolved one (WP9
+   * ensemble) — optional so WP1-WP7 handlers that never set it stay valid.
+   * `content` carries plain-language detail specific to `kind` (spoken
+   * words, a physical intent, an attended subject, or a held/flagged
+   * gm_intervention phrase); absent for `rest`. */
+  action?: { kind: string; content?: string };
 }
 
-export type DayaTriggerHandler = (trigger: DayaTrigger) => Promise<HandlerResult | void>;
+/**
+ * `overrides` (DayaClientOverrides) is optional and threaded through for
+ * testability only — it lets a test drive a handler with mocked model
+ * transports without wake() reaching a real network. Production callers
+ * omit it. Handlers that don't need it (e.g. dream_tick's v0 stub) satisfy
+ * this type unchanged — TypeScript allows a function taking fewer
+ * parameters to stand in for one that takes more (optional) parameters.
+ */
+export type DayaTriggerHandler = (
+  trigger: DayaTrigger,
+  overrides?: DayaClientOverrides,
+) => Promise<HandlerResult | void>;
 
 const HANDLERS: Partial<Record<DayaTriggerKind, DayaTriggerHandler>> = {};
 
@@ -81,17 +99,21 @@ async function ensureDayaEntity(
 
 async function ingestHandler(
   trigger: Extract<DayaTrigger, { kind: 'stimulus' | 'gm_intervention' }>,
+  overrides: DayaClientOverrides = {},
 ): Promise<HandlerResult> {
   const { id: daId, campaignId } = await ensureDayaEntity(trigger.entityId);
   const cycle = campaignId ? await currentCycleOf(campaignId) : 0;
   const source = trigger.kind === 'gm_intervention' ? 'gm_intervention' : trigger.source;
 
-  const result = await ingestStimulus({
-    entityId: daId,
-    cycle,
-    source,
-    content: trigger.content,
-  });
+  const result = await ingestStimulus(
+    {
+      entityId: daId,
+      cycle,
+      source,
+      content: trigger.content,
+    },
+    overrides,
+  );
 
   if (!result.persisted) {
     console.log(`[daya/events] ${trigger.kind} classified OOC — not persisted for entity ${daId}`);
@@ -102,14 +124,21 @@ async function ingestHandler(
   return { memoryEntryId: result.memoryEntryId };
 }
 
-registerHandler('stimulus', (t) => ingestHandler(t as Extract<DayaTrigger, { kind: 'stimulus' }>));
-registerHandler('gm_intervention', (t) =>
-  ingestHandler(t as Extract<DayaTrigger, { kind: 'gm_intervention' }>),
+// v0 stubs — src/daya/ensemble.ts (WP9) registers its own handlers for
+// 'stimulus', 'gm_intervention', 'adjudication_result', and 'vine_tick' at
+// import time, which overwrite these (later registration wins — see
+// registerHandler's docstring). These remain as the safe fallback for any
+// caller that imports events.ts without importing ensemble.ts.
+registerHandler('stimulus', (t, overrides) =>
+  ingestHandler(t as Extract<DayaTrigger, { kind: 'stimulus' }>, overrides),
+);
+registerHandler('gm_intervention', (t, overrides) =>
+  ingestHandler(t as Extract<DayaTrigger, { kind: 'gm_intervention' }>, overrides),
 );
 
 // adjudication_result and vine_tick are log-only stubs in WP3 — their real
 // ingestion belongs to the systems that produce them (WP7 World Adjudicator,
-// WP8 mechanics integration / vine progress).
+// WP9 ensemble / WP8 mechanics integration).
 registerHandler('adjudication_result', async (trigger) => {
   if (trigger.kind !== 'adjudication_result') return;
   console.log(`[daya/events] adjudication_result stub — entity ${trigger.entityId}`, trigger.payload);
@@ -146,14 +175,20 @@ export interface WakeResult {
   ran: boolean; // true if a handler actually executed (vs. audit-only)
   auditId?: string; // set when DAYA is disabled — see writePendingAudit
   memoryEntryId?: string; // id of the DayaMemoryEntry written, if any
+  action?: HandlerResult['action']; // what the entity did, when the handler resolved one
 }
 
 /**
  * Entry point for every trigger. When DAYA_ENABLED !== 'enabled', wake()
  * writes a PENDING audit trail and returns without running any handler —
  * the safe default in dev/test, mirroring GODHEAD_DISPATCHER's gate.
+ *
+ * `overrides` (DayaClientOverrides) is optional and exists solely so tests
+ * can drive a full wake with mocked model transports; production callers
+ * omit it and the registered handler's real chat()/routeAndChat() calls run
+ * against the configured tiers.
  */
-export async function wake(trigger: DayaTrigger): Promise<WakeResult> {
+export async function wake(trigger: DayaTrigger, overrides?: DayaClientOverrides): Promise<WakeResult> {
   if (!isDayaEnabled()) {
     const auditId = writePendingAudit(trigger);
     return { trigger: trigger.kind, ran: false, auditId };
@@ -165,8 +200,8 @@ export async function wake(trigger: DayaTrigger): Promise<WakeResult> {
     return { trigger: trigger.kind, ran: false };
   }
 
-  const result = await handler(trigger);
-  return { trigger: trigger.kind, ran: true, memoryEntryId: result?.memoryEntryId };
+  const result = await handler(trigger, overrides);
+  return { trigger: trigger.kind, ran: true, memoryEntryId: result?.memoryEntryId, action: result?.action };
 }
 
 /**
@@ -177,6 +212,7 @@ export function deliverStimulus(
   entityId: string,
   source: string,
   content: string,
+  overrides?: DayaClientOverrides,
 ): Promise<WakeResult> {
-  return wake({ kind: 'stimulus', entityId, source, content });
+  return wake({ kind: 'stimulus', entityId, source, content }, overrides);
 }

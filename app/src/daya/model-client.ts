@@ -34,6 +34,13 @@ export interface DayaChatParams {
   temperature?: number;
   rationale?: string;  // audit trail for routing/sanitization decisions (Addendum A2)
   sanitized?: boolean; // true once this payload has passed the sanitization boundary (WP6)
+  /** Per-call override of the tier's default model — C-tier: passed straight
+   * through as the Anthropic model; L1/L2: overrides DAYA_*_MODEL for this
+   * call only. Absent = tier's env-configured default, unchanged. This is
+   * what lets a caller (router.ts's within-C ladder pick) select a model
+   * without mutating process.env, which would race under concurrent calls
+   * resolving to different models at once. */
+  model?: string;
 }
 
 export interface DayaChatResult {
@@ -129,7 +136,8 @@ async function callOpenAiCompatible(
   params: DayaChatParams,
   fetchImpl: DayaFetch,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number; model: string }> {
-  const { url, model } = resolveOpenAiTierConfig(tier);
+  const { url, model: tierModel } = resolveOpenAiTierConfig(tier);
+  const model = params.model || tierModel;
 
   const res = await fetchImpl(`${url.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
@@ -168,7 +176,7 @@ async function callAnthropic(
     throw new DayaTierUnavailableError('C', 'ANTHROPIC_API_KEY not configured');
   }
   const anthropic: AnthropicLike = client ?? (new Anthropic() as unknown as AnthropicLike);
-  const model = process.env.DAYA_C_MODEL || DEFAULT_C_MODEL;
+  const model = params.model || process.env.DAYA_C_MODEL || DEFAULT_C_MODEL;
 
   const system = params.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
   const nonSystem = params.messages

@@ -56,6 +56,19 @@ async function cleanupStale() {
     await prisma.worldFact.deleteMany({ where: { campaignId: campaign.id } });
     const chars = await prisma.character.findMany({ where: { name: TEST_CHAR_NAME, campaignId: campaign.id }, select: { id: true } });
     for (const c of chars) {
+      // WP9 FIX-2: resolveIntent now resolves (and upserts) a DayaEntity for
+      // the entity it's adjudicating on behalf of, so it can meter the
+      // adjudicator call's DayaModelCall row against the entity like every
+      // other subsystem. That row has no cascading delete from Character,
+      // so it (and its own dependents) must be cleared before the character
+      // itself can be deleted.
+      const entity = await prisma.dayaEntity.findUnique({ where: { characterId: c.id }, select: { id: true } });
+      if (entity) {
+        await prisma.dayaModelCall.deleteMany({ where: { entityId: entity.id } });
+        await prisma.dayaMemoryEntry.deleteMany({ where: { entityId: entity.id } });
+        await prisma.dayaAffect.deleteMany({ where: { entityId: entity.id } });
+        await prisma.dayaEntity.delete({ where: { id: entity.id } });
+      }
       await prisma.historyEntry.deleteMany({ where: { subjectId: c.id } });
       await prisma.character.delete({ where: { id: c.id } });
     }

@@ -113,6 +113,7 @@ export async function tagStimulusWithModel(
   source: string,
   roster: TaggerRosterEntry[] = [],
   overrides: DayaClientOverrides = {},
+  entityId?: string, // DayaEntity.id — metering FK (WP9 FIX-2); optional so existing callers keep compiling
 ): Promise<TaggerResult> {
   const tier = pickTaggerTier(overrides);
   const messages: DayaChatMessage[] = [
@@ -123,7 +124,7 @@ export async function tagStimulusWithModel(
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await chat(
-        { tier, subsystem: 'tagger', messages, maxTokens: 400, temperature: attempt === 0 ? 0.2 : 0 },
+        { tier, subsystem: 'tagger', entityId, messages, maxTokens: 400, temperature: attempt === 0 ? 0.2 : 0 },
         overrides,
       );
       const parsed = parseTaggerJson(result.text);
@@ -203,7 +204,7 @@ export async function ingestStimulus(
   params: IngestParams,
   overrides: DayaClientOverrides = {},
 ): Promise<IngestResult> {
-  const tags = await tagStimulusWithModel(params.content, params.source, params.roster ?? [], overrides);
+  const tags = await tagStimulusWithModel(params.content, params.source, params.roster ?? [], overrides, params.entityId);
 
   if (tags.classification.icOoc === 'OOC') {
     // Residency check (WP6 law): OOC content is processed in-flight only.

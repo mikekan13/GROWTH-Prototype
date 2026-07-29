@@ -34,11 +34,11 @@ export type SkillBracket = 'low' | 'mid' | 'high';
 
 export interface RouteRequest {
   // Forwarded verbatim to model-client's DayaChatParams.entityId, which is
-  // the DayaModelCall.entityId FK -> DayaEntity.id. NEEDS-FABLE: WP3's
-  // DayaTrigger.entityId convention is the Character id, which is a
-  // different id space than this field — callers must resolve/upsert the
-  // DayaEntity first (mirrors ensureDayaEntity in events.ts) and pass its
-  // id here, not the Character id.
+  // the DayaModelCall.entityId FK -> DayaEntity.id. WP3's DayaTrigger.entityId
+  // convention is the Character id, a different id space than this field —
+  // callers resolve Character id -> DayaEntity.id via entity.ts's
+  // resolveDayaEntityId() (the canonical, once-per-wake resolution point;
+  // see that file's docstring) and pass the result here, not the Character id.
   entityId: string;
   subsystem: string;
   taskKind: TaskKind;
@@ -259,25 +259,6 @@ export function decideRoute(req: RouteRequest): RoutingDecision {
 
 // ── Execution ────────────────────────────────────────────────────────────
 
-/**
- * model-client.ts's chat() has no per-call model override — it always
- * reads process.env.DAYA_C_MODEL for tier C. Rather than touch that file
- * (out of this WP's scope), the router honors its own within-C ladder pick
- * by toggling DAYA_C_MODEL for the duration of a single call and restoring
- * it in `finally`. NEEDS-FABLE: this races under truly concurrent C-tier
- * calls resolving to different ladder rungs at once — acceptable for
- * Phase 1's single-room test scale; a real per-call override param on
- * chat() would remove the need for this entirely.
- */
-function withTemporaryEnv<T>(key: string, value: string, fn: () => Promise<T>): Promise<T> {
-  const prev = process.env[key];
-  process.env[key] = value;
-  return fn().finally(() => {
-    if (prev === undefined) delete process.env[key];
-    else process.env[key] = prev;
-  });
-}
-
 async function executeDecision(
   req: RouteRequest,
   decision: RoutingDecision,
@@ -321,21 +302,22 @@ async function executeDecision(
     messages = stripped;
   }
 
-  const run = () =>
-    chat(
-      {
-        tier: decision.tier,
-        subsystem: req.subsystem,
-        entityId: req.entityId,
-        messages,
-        maxTokens: decision.maxTokens,
-        rationale: decision.rationale,
-        sanitized: decision.sanitize,
-      },
-      overrides,
-    );
-
-  const result = decision.tier === 'C' && decision.model ? await withTemporaryEnv('DAYA_C_MODEL', decision.model, run) : await run();
+  const result = await chat(
+    {
+      tier: decision.tier,
+      subsystem: req.subsystem,
+      entityId: req.entityId,
+      messages,
+      maxTokens: decision.maxTokens,
+      rationale: decision.rationale,
+      sanitized: decision.sanitize,
+      // Per-call override (model-client.ts FIX-1) — replaces the old
+      // temporary-env-var toggle, which raced under concurrent C-tier calls
+      // resolving to different within-C ladder rungs at once.
+      model: decision.tier === 'C' ? decision.model : undefined,
+    },
+    overrides,
+  );
 
   // Stage B clamp audit — sampled, non-blocking, never awaited by the
   // caller. Only meaningful on L1 (entity-voiced) output.

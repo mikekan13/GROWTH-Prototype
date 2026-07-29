@@ -17,6 +17,8 @@ import { unskilledCheck } from '@/lib/dice';
 import type { FateDie, GrowthCharacter } from '@/types/growth';
 import { chat, type DayaClientOverrides } from './model-client';
 import { currentFacts, establishFact, supersede, type WorldFactRecord } from './world-ledger';
+import { buildAdjudicatorPrompt } from './prompts/roles/adjudicator';
+import { resolveDayaEntityId } from './entity';
 
 // ── Contract (Ruling 19 — swappable behind this shape) ─────────────────────
 
@@ -54,28 +56,6 @@ export interface AdjudicationResult {
 export interface WorldResolver {
   resolveIntent(input: ResolveIntentInput, overrides?: DayaClientOverrides): Promise<AdjudicationResult>;
 }
-
-// ── v0 provisional adjudication prompt ──────────────────────────────────
-// v0 provisional — replaced by the DAYA role-prompt design pass (NEEDS-FABLE).
-// This prompt is a placeholder good enough to exercise the ledger/resolver
-// contract end-to-end; it is not the tuned Adjudicator role prompt (WP9).
-
-const ADJUDICATOR_SYSTEM_PROMPT = `You are the World Adjudicator for a grounded, room-scale simulation. You are given the CURRENT WORLD FACTS relevant to a location and an entity's stated intent. Determine the physically plausible outcome using Earth-baseline physics and common sense. Nothing physical may exist only in prose: every claim in your outcome must be grounded in one of the given facts or a new fact you establish.
-
-Respond with STRICT JSON only — no prose outside the JSON object — in exactly this shape:
-{
-  "outcome": string,
-  "factsToWrite": [{ "subjectKey": string, "fact": string }],
-  "factsToSupersede": [{ "id": string, "fact": string }],
-  "check": { "attribute": string, "dr": number } | null,
-  "experienceEvent": { "content": string, "valence": number, "salience": number }
-}
-
-Rules:
-- "factsToWrite" is for genuinely new subjects. "factsToSupersede" replaces an existing fact by its given id (use this when a fact you were given is now wrong).
-- "check" is set ONLY when the outcome truly depends on a contested skill/attribute — otherwise null. If set, "dr" is the difficulty the entity must clear and "attribute" names the attribute or skill being tested.
-- "experienceEvent.valence" is -1..1 (how good/bad this felt), "salience" is 0..1 (how memorable).
-- Never use dice, mechanics, or game-system vocabulary (roll, DR, pool, stat name as a game term) inside "outcome" or "experienceEvent.content" — those are the entity's lived experience, not a game log.`;
 
 interface AdjudicatorResponseShape {
   outcome: string;
@@ -164,12 +144,18 @@ export async function resolveIntent(
     intent,
   ].join('\n');
 
+  // FIX-2 (entityId convention): resolve Character id -> DayaEntity.id here,
+  // at the model-client boundary, so this call's DayaModelCall row meters
+  // against the entity like every other subsystem's does.
+  const entityDaId = await resolveDayaEntityId(entityCharacterId);
+
   const modelResult = await chat(
     {
       tier: 'C',
       subsystem: 'adjudicator',
+      entityId: entityDaId,
       messages: [
-        { role: 'system', content: ADJUDICATOR_SYSTEM_PROMPT },
+        { role: 'system', content: buildAdjudicatorPrompt() },
         { role: 'user', content: userMessage },
       ],
     },

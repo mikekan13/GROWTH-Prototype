@@ -38,6 +38,7 @@ import {
   type VoiceParams,
 } from './renderer-math';
 import { chat, type DayaClientOverrides } from './model-client';
+import { resolveDayaEntityId } from './entity';
 
 // ── Public contract (WP5 §1) ────────────────────────────────────────────
 
@@ -76,16 +77,9 @@ function formatRawTruth(trueData: unknown): string {
 }
 
 // ── Revision epoch lookup (DayaBelievedSheet.data._epochs) ─────────────
-
-async function ensureDayaEntityId(characterId: string): Promise<string> {
-  const entity = await prisma.dayaEntity.upsert({
-    where: { characterId },
-    create: { characterId },
-    update: {},
-    select: { id: true },
-  });
-  return entity.id;
-}
+// Character id -> DayaEntity.id resolution now lives in entity.ts
+// (resolveDayaEntityId) — the canonical, once-per-wake resolution point
+// (WP9 FIX-2). This module used to upsert locally; it now defers there.
 
 interface BelievedSheetData {
   _epochs?: Record<string, number>;
@@ -254,7 +248,7 @@ export async function render(
   }
 
   const level = computeFidelityLevel(req.subject, observer.attunement);
-  const entityDaId = await ensureDayaEntityId(observer.entityId);
+  const entityDaId = await resolveDayaEntityId(observer.entityId);
   const epoch = await currentRevisionEpoch(entityDaId, req.subjectKey);
   const rng = rngFor(observer.entityId, req.subjectKey, epoch);
 
@@ -293,7 +287,7 @@ export async function applyRevision(
   observer: Pick<Observer, 'attunement' | 'biasProfile' | 'mood'>,
   subject: RenderSubject = 'self-stat',
 ): Promise<RevisionResult> {
-  const entityDaId = await ensureDayaEntityId(characterId);
+  const entityDaId = await resolveDayaEntityId(characterId);
   const sheet = await prisma.dayaBelievedSheet.findUnique({ where: { entityId: entityDaId } });
   const data = parseBelievedData(sheet?.data);
 
@@ -340,7 +334,7 @@ export async function applyRevision(
  * revision has ever written one. Used by tests and the JEWL true-vs-believed
  * diff surface (WP11). */
 export async function getBelievedValue(characterId: string, subjectKey: string): Promise<number | undefined> {
-  const entityDaId = await ensureDayaEntityId(characterId);
+  const entityDaId = await resolveDayaEntityId(characterId);
   const sheet = await prisma.dayaBelievedSheet.findUnique({ where: { entityId: entityDaId } });
   const data = parseBelievedData(sheet?.data);
   const value = getAtPath(data, subjectKey);
