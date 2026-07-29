@@ -13,6 +13,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { applyDispositionEvent } from './daya-affect';
 import {
   applyAdvancements,
   AdvancementError,
@@ -74,6 +75,14 @@ export async function executeAdvancement(
       characterId: character.id,
       characterName: character.name,
       fields: ['attributes', 'skills'],
+    });
+  }
+
+  if (result.frequencySpent > 0) {
+    // Voluntary self-investment registers on the character's internal state.
+    void applyDispositionEvent(character.id, {
+      kind: 'advancement',
+      frequencySpent: result.frequencySpent,
     });
   }
 

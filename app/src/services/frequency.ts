@@ -22,6 +22,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { broadcastDeathSave } from './death-save';
+import { applyDispositionEvent } from './daya-affect';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const frequencyOpSchema = z.object({
@@ -79,6 +80,14 @@ export async function executeFrequencyOp(
   // T27: crossing into Frequency 0 = Death's Door — surface the Facing
   // Death trigger on the GM screen. The ROLL stays GM-enacted (Tara's
   // choice); this only announces the door opening.
+  // Real loss registers on the character's internal state (fire-and-forget).
+  void applyDispositionEvent(character.id, {
+    kind: 'frequency_depleted',
+    amount: validated.amount,
+    current: currentAfter,
+    max: maxBefore,
+  });
+
   if (currentBefore > 0 && currentAfter <= 0 && character.campaignId) {
     broadcastDeathSave(character.campaignId, {
       kind: 'death_save',

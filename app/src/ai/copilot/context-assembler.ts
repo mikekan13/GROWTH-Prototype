@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import type { EntityIndex, CopilotContext } from './types';
+import { getDisposition, renderDispositionLine } from '@/services/daya-affect';
 import { searchRules } from './rules-search';
 
 // Build a lightweight index of all entity names in the campaign
@@ -211,6 +212,12 @@ export async function buildTableState(campaignId: string): Promise<string> {
     const conditions = data.conditions as Record<string, boolean> | undefined;
     const active = conditions ? Object.entries(conditions).filter(([, v]) => v).map(([k]) => k) : [];
     if (active.length > 0) lines.push(`  conditions: ${active.join(', ')}`);
+
+    // Event-driven internal state (services/daya-affect.ts, DAYA persona
+    // harness) — how the character is actually doing, caused by real events.
+    // Voice from this.
+    const dispLine = renderDispositionLine(await getDisposition(c.id));
+    if (dispLine) lines.push(`  disposition: ${dispLine}`);
 
     const traits = (data.traits ?? []) as Array<{
       name?: string; type?: string; pillar?: string; description?: string;

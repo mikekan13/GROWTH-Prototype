@@ -56,6 +56,7 @@ import { canEditCharacter } from '@/lib/permissions';
 import { broadcast } from '@/lib/campaign-stream';
 import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
 import { gatherTraitModifiers, type TraitModifierResult } from '@/services/trait-modifiers';
+import { applyDispositionEvent } from '@/services/daya-affect';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
 import type { DeathSaveEvent } from '@/types/campaign-events';
@@ -254,6 +255,8 @@ export async function rollDeathSave(
       if (vital) restored.vitalPart = vital;
       if (restored.frequency || restored.vitalPart) outcome.restored = restored;
     }
+    // The brush with death marks the character's internal state.
+    void applyDispositionEvent(characterId, { kind: 'death_save_survived' });
   } else if (validated.door === 'FATED_AGE') {
     const failures = (data.fatedAgeFailures ?? 0) + 1;
     data.fatedAgeFailures = failures;

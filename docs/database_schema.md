@@ -71,7 +71,7 @@ Universal entity sheet — players, NPCs, creatures, and God-heads all use the s
 - `portrait`: Path to portrait image (null until generated)
 - `status`: DRAFT → SUBMITTED → APPROVED → ACTIVE → DEAD | RETIRED
 - Ownership: Player owns PCs, GM owns NPCs, Admin owns God-heads
-- Relations: backstory (optional), portraitGenerations[], personaLock (optional), godHead (optional), goals[]
+- Relations: backstory (optional), portraitGenerations[], personaLock (optional), godHead (optional), goals[], daya (optional — DayaEntity, see DAYA persona harness section)
 
 ### PortraitGeneration
 AI-generated portrait history for a character. One record per generation attempt.
@@ -416,6 +416,58 @@ Append-only audit log — one row per evaluation (INV-14 spirit).
 ### PenaltyAction
 Human-gated penalty pipeline. Every violation lands one PENDING_CONFIRMATION action (deduped); ADMIN confirm executes (Dissolution/status changes/KRMA transfers never run automatically), reject leaves the contract VIOLATED for review.
 - `kind` + `payload` (penalty frozen at violation time); `status`: PENDING_CONFIRMATION | EXECUTED | REJECTED; `resolvedBy/At`; `transactionId`: String? — KrmaTransaction pointer when execution moved KRMA (reason `CONTRACT_PENALTY`)
+
+### ManaResidue
+Lingering mana from casts (r-2026-07-23-02): spent mana's KV stays with the spell and fades back to the weave over ~`dr` cycles (sweep on advanceClock/setClock). Godhead-attraction + tapping hooks ride these rows later. Decay is bookkeeping-only until mana KV custody is ruled (no KRMA transfer — would mint).
+- `campaignId` (indexed), `characterId?`, `spellName?`, `method` wild|woven, `dr`, `manaInitial`, `manaRemaining`; migration `20260724012850_mana_residue`
+
+## DAYA persona harness (WP1, added 2026-07-28)
+
+DAYA is the persona harness beneath AI-controlled character sheets — permanency, presence, emotion, autonomy underneath the LLM. `Character.data` remains the TRUE SHEET (engine-owned, exact); the DAYA models below are the substrate that experiences, remembers, and (imperfectly) believes it. Migration `20260729031620_daya_wp1` (additive — also drops the throwaway prototype table `CharacterDisposition`, absorbed here as `DayaAffect`).
+
+### DayaEntity
+1:1 with Character (`characterId` unique, FK to Character). Root of the DAYA graph — every other DAYA model hangs off `entityId`.
+- `introspection`: Float (default 0.5, 0..1) — self-insight capacity; shapes true-vs-believed sheet divergence
+- `personaProfile`: JSON — bias/voice params
+- `status`: DORMANT (default) | ACTIVE | ARCHIVED
+- Relations: believedSheet (1:1), memories[], affect (1:1), relationships[], spiritTiesAsParent[]/spiritTiesAsChild[], modelCalls[]
+
+### DayaBelievedSheet
+1:1 with DayaEntity. The entity's own fuzzy/possibly-wrong mirror of its GrowthCharacter sheet — divergence from the true sheet is a FEATURE (Ruling 11), not a sync bug.
+- `data`: JSON mirror of GrowthCharacter shape, with fuzzy/wrong values; `lastRevisedAt`
+
+### DayaMemoryEntry
+The entity's private phenomenal ledger (Meta-Memory Ledger). Append-only. Distinct from `HistoryEntry`: HistoryEntry stays the campaign-visible history; a bridge writes a HistoryEntry beat only for campaign-relevant events. This table is never campaign-visible on its own.
+- `narrativeCycle`: Float — campaign clock at the moment experienced; `realTime`: DateTime
+- `source`: dialogue | perception | adjudication | gm_intervention | dream
+- `content`: String; `valence` (-1..1), `arousal` (0..1), `salience` (0..1, drives recall priority)
+- `entityRefs`: JSON ids referenced; `classification`: JSON (content category, sensitivity, IC/OOC)
+- `clusterId?`: dream-tick hierarchy grouping; `parentMemoryId?`: memories-of-memories
+- Indexes: (entityId, narrativeCycle), (entityId, salience)
+
+### DayaAffect
+1:1 with DayaEntity. Mood vector — event-driven internal state for AI-controlled characters (absorbs the uncommitted `CharacterDisposition` prototype). Drives move ONLY on real game events (frequency loss, death saves, goal outcomes, advancement) and decay toward baseline on the campaign clock. Read by prompt assembly (JEWL table state, npc_speak) so an AI-voiced character's condition shapes behavior. See `services/daya-affect.ts`.
+- `morale` (-1..1, confidence/anticipation of gain), `stress` (0..1, threat activation), `grief` (0..1, accumulated loss register), `lastCycle` (campaign clock at last update — decay anchor)
+
+### DayaRelationship
+Per-known-entity model: what a DayaEntity believes about another character (stance, trust, history). Revisable in place.
+- `aboutCharacterId`: the Character this belief concerns; `model`: JSON (stance, trust, history refs, bias)
+- Unique: (entityId, aboutCharacterId); indexed on entityId
+
+### DayaSpiritTie
+Fork lineage — record-only in Phase 1 (Ruling 17).
+- `parentEntityId` / `childEntityId` (both FK to DayaEntity), `forkedAtCycle`: Float
+
+### WorldFact
+The World Ledger — nothing physical exists only in prose (Ruling 19). Adjudicated facts about objects/positions/properties; superseded rather than mutated.
+- `campaignId`, `subjectKey` (object/position/property key), `fact`: String, `establishedAtCycle`: Float, `supersededById?`: points to the replacing WorldFact
+- Indexed: (campaignId, subjectKey)
+
+### DayaModelCall
+Cost meter — every DAYA model call (L1/L2/C tier) writes one row (Ruling 20: logged, throttle open).
+- `entityId?` (nullable — some calls aren't entity-scoped), `subsystem`, `tier`: L1 | L2 | C, `model`: model id actually served
+- `tokensIn`/`tokensOut`: Int, `usd`/`krma`: Float, `sanitized`: Boolean, `rationale?`: audit trail for routing/sanitization decisions
+- Indexes: (entityId, createdAt), (subsystem, tier)
 
 ## JSON Field Schemas
 

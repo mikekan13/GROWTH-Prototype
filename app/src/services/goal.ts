@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter, canViewCharacter, isWatcherOrAbove, isAdminRole } from '@/lib/permissions';
 import { emit as emitGodHeadEvent } from './godhead-dispatcher';
+import { applyDispositionEvent } from './daya-affect';
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -237,6 +238,7 @@ export async function abandonGoal(goalId: string, userId: string, userRole: stri
     // Custodian gets first crack at reacting; if none, Eth'erling triages.
     custodianName: updated.custodianName,
   }).catch(() => { /* swallow */ });
+  void applyDispositionEvent(updated.characterId, { kind: 'goal_abandoned' });
 
   return updated;
 }
@@ -281,6 +283,7 @@ export async function completeGoal(goalId: string, userId?: string, userRole?: s
     campaignId: updated.campaignId,
     custodianName: updated.custodianName,
   }).catch(() => { /* swallow */ });
+  void applyDispositionEvent(updated.characterId, { kind: 'goal_completed' });
 
   return updated;
 }
@@ -307,6 +310,7 @@ export async function failGoal(goalId: string, userId?: string, userRole?: strin
     campaignId: updated.campaignId,
     custodianName: updated.custodianName,
   }).catch(() => { /* swallow */ });
+  void applyDispositionEvent(updated.characterId, { kind: 'goal_failed' });
 
   return updated;
 }

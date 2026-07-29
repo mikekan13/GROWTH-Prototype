@@ -240,6 +240,7 @@ model Character {
   personaLock PersonaLock?
   godHead    GodHead?
   goals      Goal[]
+  daya        DayaEntity?
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 
@@ -920,4 +921,143 @@ model ManaResidue {
   updatedAt     DateTime @updatedAt
 
   @@index([campaignId])
+}
+
+// ============================================================
+// DAYA — persona harness for AI-controlled character sheets
+// (permanency, presence, emotion, autonomy beneath the LLM).
+// ============================================================
+
+// One DayaEntity per AI-controlled Character. The Character's `data` JSON
+// remains the TRUE SHEET (engine-owned, exact); DayaEntity is the substrate
+// that experiences, remembers, and (imperfectly) believes it.
+model DayaEntity {
+  id             String    @id @default(cuid())
+  character      Character @relation(fields: [characterId], references: [id])
+  characterId    String    @unique
+  introspection  Float     @default(0.5) // 0..1 self-insight capacity — shapes true-vs-believed divergence
+  personaProfile String    @default("{}") // JSON: bias/voice params
+  status         String    @default("DORMANT") // DORMANT | ACTIVE | ARCHIVED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  believedSheet      DayaBelievedSheet?
+  memories           DayaMemoryEntry[]
+  affect             DayaAffect?
+  relationships      DayaRelationship[]
+  spiritTiesAsParent DayaSpiritTie[]    @relation("DayaSpiritTieParent")
+  spiritTiesAsChild  DayaSpiritTie[]    @relation("DayaSpiritTieChild")
+  modelCalls         DayaModelCall[]
+}
+
+// The entity's own fuzzy/possibly-wrong mirror of its GrowthCharacter sheet.
+// Divergence from the true sheet is a FEATURE, not a bug.
+model DayaBelievedSheet {
+  id            String     @id @default(cuid())
+  entity        DayaEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId      String     @unique
+  data          String     // JSON mirror of GrowthCharacter shape, with fuzzy/wrong values
+  lastRevisedAt DateTime   @default(now())
+}
+
+// The entity's private phenomenal ledger (Meta-Memory Ledger). Append-only.
+// Distinct from HistoryEntry: HistoryEntry stays the campaign-visible
+// history; a bridge writes a HistoryEntry beat only for campaign-relevant
+// events. This table is never campaign-visible on its own.
+model DayaMemoryEntry {
+  id             String     @id @default(cuid())
+  entity         DayaEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId       String
+  narrativeCycle Float      // campaign clock (meta cycles) at the moment experienced
+  realTime       DateTime   @default(now())
+  source         String     // dialogue | perception | adjudication | gm_intervention | dream
+  content        String
+  valence        Float      @default(0) // -1..1
+  arousal        Float      @default(0) // 0..1
+  salience       Float      @default(0) // 0..1 — drives recall priority
+  entityRefs     String     @default("[]") // JSON: ids of entities referenced by this memory
+  classification String     @default("{}") // JSON: content category, sensitivity, IC/OOC
+  clusterId      String?    // dream-tick hierarchy grouping
+  parentMemoryId String?    // memories-of-memories (dream consolidation)
+
+  @@index([entityId, narrativeCycle])
+  @@index([entityId, salience])
+}
+
+// Mood vector — event-driven internal state for AI-controlled characters.
+// Drives move ONLY on real game events (frequency loss, death saves, goal
+// outcomes, advancement) and decay toward baseline on the campaign clock.
+// Read by prompt assembly (JEWL table state, npc-speak) so an AI-voiced
+// character's condition shapes its behavior. See services/daya-affect.ts.
+model DayaAffect {
+  id        String     @id @default(cuid())
+  entity    DayaEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId  String     @unique
+  morale    Float      @default(0) // -1..1 confidence / anticipation of gain
+  stress    Float      @default(0) // 0..1 threat activation
+  grief     Float      @default(0) // 0..1 accumulated loss register
+  lastCycle Float      @default(0) // campaign clock at last update (decay anchor)
+  updatedAt DateTime   @updatedAt
+}
+
+// Per-known-entity model: what this DayaEntity believes about another
+// character (stance, trust, history). Revisable in place.
+model DayaRelationship {
+  id               String     @id @default(cuid())
+  entity           DayaEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId         String
+  aboutCharacterId String     // the Character this belief is about
+  model            String     // JSON: stance, trust, history refs, bias
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([entityId, aboutCharacterId])
+  @@index([entityId])
+}
+
+// Fork lineage — record-only in Phase 1.
+model DayaSpiritTie {
+  id             String     @id @default(cuid())
+  parentEntity   DayaEntity @relation("DayaSpiritTieParent", fields: [parentEntityId], references: [id])
+  parentEntityId String
+  childEntity    DayaEntity @relation("DayaSpiritTieChild", fields: [childEntityId], references: [id])
+  childEntityId  String
+  forkedAtCycle  Float      // campaign clock at fork
+  createdAt      DateTime   @default(now())
+
+  @@index([parentEntityId])
+  @@index([childEntityId])
+}
+
+// The World Ledger — nothing physical exists only in prose. Adjudicated
+// facts about objects/positions/properties, superseded rather than mutated.
+model WorldFact {
+  id                 String   @id @default(cuid())
+  campaignId         String
+  subjectKey         String   // object/position/property key this fact concerns
+  fact               String   // the established fact
+  establishedAtCycle Float
+  supersededById     String?  // points to the WorldFact that replaced this one
+
+  @@index([campaignId, subjectKey])
+}
+
+// Cost meter — every model call (L1/L2/C) writes one row here.
+model DayaModelCall {
+  id         String      @id @default(cuid())
+  entity     DayaEntity? @relation(fields: [entityId], references: [id])
+  entityId   String?
+  subsystem  String      // which DAYA subsystem made the call
+  tier       String      // L1 | L2 | C
+  model      String      // model id actually served
+  tokensIn   Int         @default(0)
+  tokensOut  Int         @default(0)
+  usd        Float       @default(0)
+  krma       Float       @default(0) // logged only, throttle open
+  sanitized  Boolean     @default(false)
+  rationale  String?     // audit trail for routing/sanitization decisions
+  createdAt  DateTime    @default(now())
+
+  @@index([entityId, createdAt])
+  @@index([subsystem, tier])
 }

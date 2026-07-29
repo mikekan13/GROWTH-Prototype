@@ -45,7 +45,10 @@ export const npcSpeakTool: JewlTool = {
     'distinct utterance (back-to-back lines from the same NPC can each be ' +
     'their own call). The npcCharacterId must be an NPC (entityType=NPC), ' +
     'not a PC or GodHead. Tone is optional flavor ("whispered", "shouted", ' +
-    '"dryly"); keep it short.',
+    '"dryly"); keep it short. If TABLE STATE shows a `disposition:` line for ' +
+    'this NPC, voice them FROM that state — it is their real current ' +
+    'condition caused by recent events (losses, brushes with death, goal ' +
+    'outcomes), not styling. Never contradict it.',
   inputSchema: npcSpeakInputSchema,
   handler: async (input, ctx: JewlToolContext): Promise<JewlToolHandlerResult> => {
     const parsed = npcSpeakInputSchema.parse(input);
