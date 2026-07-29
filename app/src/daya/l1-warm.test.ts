@@ -16,12 +16,31 @@ describe('l1Status / warmL1 (WP14)', () => {
   beforeEach(() => {
     process.env.DAYA_L1_URL = 'http://mock-l1.local';
     process.env.DAYA_L1_MODEL = 'mock-model';
+    delete process.env.DAYA_L1_PROVIDER;
     delete process.env.DAYA_L1_API_KEY;
     delete process.env.DAYA_L1_STATUS_TIMEOUT_MS;
   });
 
   afterEach(() => {
     process.env = { ...savedEnv };
+  });
+
+  it('Claude-backed L1 (DAYA_L1_PROVIDER=anthropic) reports ready without probing — no cold start exists', async () => {
+    process.env.DAYA_L1_PROVIDER = 'anthropic';
+    process.env.ANTHROPIC_API_KEY = 'k';
+    let probed = false;
+    const fetchImpl: DayaFetch = async () => {
+      probed = true;
+      return okResponse();
+    };
+    expect(await l1Status({ fetchImpl })).toBe('ready');
+    expect(probed).toBe(false);
+  });
+
+  it('Claude-backed L1 without ANTHROPIC_API_KEY reports disabled', async () => {
+    process.env.DAYA_L1_PROVIDER = 'anthropic';
+    delete process.env.ANTHROPIC_API_KEY;
+    expect(await l1Status()).toBe('disabled');
   });
 
   it('reports disabled when DAYA_L1_URL is unset', async () => {

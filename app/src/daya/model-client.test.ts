@@ -6,7 +6,7 @@
  * the scripts/test-daya-wp*.ts acceptance scripts against a real DB instead.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { callOpenAiCompatible, DayaWarmingTimeoutError, type DayaFetch } from './model-client';
+import { callOpenAiCompatible, tierProvider, tierAvailability, DayaWarmingTimeoutError, type DayaFetch } from './model-client';
 
 const BASE_PARAMS = {
   tier: 'L1' as const,
@@ -104,5 +104,46 @@ describe('callOpenAiCompatible (WP14 auth header + timeout)', () => {
       throw boom;
     };
     await expect(callOpenAiCompatible('L1', BASE_PARAMS, fetchImpl)).rejects.toBe(boom);
+  });
+});
+
+describe('tierProvider / tierAvailability (Claude-backed persona tier)', () => {
+  const savedEnv = { ...process.env };
+
+  beforeEach(() => {
+    delete process.env.DAYA_L1_PROVIDER;
+    delete process.env.DAYA_L2_PROVIDER;
+    delete process.env.DAYA_L1_URL;
+    delete process.env.DAYA_L1_MODEL;
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  afterEach(() => {
+    process.env = { ...savedEnv };
+  });
+
+  it('defaults to openai transport when DAYA_L1_PROVIDER is unset', () => {
+    expect(tierProvider('L1')).toBe('openai');
+  });
+
+  it('reads anthropic transport from DAYA_L1_PROVIDER, per tier', () => {
+    process.env.DAYA_L1_PROVIDER = 'anthropic';
+    expect(tierProvider('L1')).toBe('anthropic');
+    expect(tierProvider('L2')).toBe('openai');
+  });
+
+  it('L1 availability follows ANTHROPIC_API_KEY when Claude-backed, even with no DAYA_L1_URL', () => {
+    process.env.DAYA_L1_PROVIDER = 'anthropic';
+    expect(tierAvailability().L1).toBe(false);
+    process.env.ANTHROPIC_API_KEY = 'k';
+    expect(tierAvailability().L1).toBe(true);
+  });
+
+  it('L1 availability still follows the self-hosted envs on the default transport', () => {
+    process.env.ANTHROPIC_API_KEY = 'k';
+    expect(tierAvailability().L1).toBe(false);
+    process.env.DAYA_L1_URL = 'http://mock-l1.local';
+    process.env.DAYA_L1_MODEL = 'mock-model';
+    expect(tierAvailability().L1).toBe(true);
   });
 });

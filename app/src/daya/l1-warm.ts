@@ -15,6 +15,7 @@
  * every canvas mount or poll tick.
  */
 import 'server-only';
+import { tierProvider } from './model-client';
 import type { DayaFetch, DayaFetchResponse } from './model-client';
 
 export type L1Status = 'ready' | 'warming' | 'offline' | 'disabled';
@@ -46,6 +47,12 @@ function isAbortError(err: unknown): boolean {
  * the same call. Never throws.
  */
 async function probeL1(overrides: L1WarmOverrides): Promise<L1Status> {
+  // A Claude-backed L1 (DAYA_L1_PROVIDER=anthropic) has no cold start to
+  // probe — the API is either configured or it isn't.
+  if (tierProvider('L1') === 'anthropic') {
+    return process.env.ANTHROPIC_API_KEY ? 'ready' : 'disabled';
+  }
+
   const url = process.env.DAYA_L1_URL;
   const model = process.env.DAYA_L1_MODEL;
   if (!url || !model) return 'disabled';

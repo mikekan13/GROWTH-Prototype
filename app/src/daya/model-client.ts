@@ -140,12 +140,38 @@ function estimateUsd(model: string, tokensIn: number, tokensOut: number): number
 
 // ── Tier registry ───────────────────────────────────────────────────────────
 
+export type DayaTierProvider = 'openai' | 'anthropic';
+
+/** Transport provider for a persona tier (L1/L2). 'anthropic' runs the
+ * tier over the Claude API instead of a self-hosted endpoint (dev /
+ * cost-saving mode — the pod stays parked). Routing, clamping, and
+ * metering are unchanged: the tier keeps its meaning everywhere; only the
+ * transport differs. Set DAYA_L1_PROVIDER=anthropic to enable. */
+export function tierProvider(tier: 'L1' | 'L2'): DayaTierProvider {
+  return process.env[`DAYA_${tier}_PROVIDER`] === 'anthropic' ? 'anthropic' : 'openai';
+}
+
+/** Model used when a persona tier is Claude-backed: per-tier override,
+ * else the C-tier default chain. */
+function anthropicModelForTier(tier: DayaTier, explicit?: string): string {
+  if (explicit) return explicit;
+  if (tier !== 'C') {
+    const perTier = process.env[`DAYA_${tier}_ANTHROPIC_MODEL`];
+    if (perTier) return perTier;
+  }
+  return process.env.DAYA_C_MODEL || DEFAULT_C_MODEL;
+}
+
 /** Which tiers are currently configured — used by tests + the JEWL
  * observation surface (WP11) to report tier health without attempting a call. */
 export function tierAvailability(): Record<DayaTier, boolean> {
   return {
-    L1: !!(process.env.DAYA_L1_URL && process.env.DAYA_L1_MODEL),
-    L2: !!(process.env.DAYA_L2_URL && process.env.DAYA_L2_MODEL),
+    L1: tierProvider('L1') === 'anthropic'
+      ? !!process.env.ANTHROPIC_API_KEY
+      : !!(process.env.DAYA_L1_URL && process.env.DAYA_L1_MODEL),
+    L2: tierProvider('L2') === 'anthropic'
+      ? !!process.env.ANTHROPIC_API_KEY
+      : !!(process.env.DAYA_L2_URL && process.env.DAYA_L2_MODEL),
     C: !!process.env.ANTHROPIC_API_KEY,
   };
 }
@@ -248,10 +274,10 @@ async function callAnthropic(
   client: AnthropicLike | undefined,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number; model: string }> {
   if (!client && !process.env.ANTHROPIC_API_KEY) {
-    throw new DayaTierUnavailableError('C', 'ANTHROPIC_API_KEY not configured');
+    throw new DayaTierUnavailableError(params.tier, 'ANTHROPIC_API_KEY not configured');
   }
   const anthropic: AnthropicLike = client ?? (new Anthropic() as unknown as AnthropicLike);
-  const model = params.model || process.env.DAYA_C_MODEL || DEFAULT_C_MODEL;
+  const model = anthropicModelForTier(params.tier, params.model);
 
   const system = params.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
   const nonSystem = params.messages
@@ -292,7 +318,7 @@ export async function chat(
   const fetchImpl: DayaFetch = overrides.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as Promise<DayaFetchResponse>);
 
   const { text, tokensIn, tokensOut, model } =
-    params.tier === 'C'
+    params.tier === 'C' || tierProvider(params.tier) === 'anthropic'
       ? await callAnthropic(params, overrides.anthropicClient)
       : await callOpenAiCompatible(params.tier, params, fetchImpl);
 
