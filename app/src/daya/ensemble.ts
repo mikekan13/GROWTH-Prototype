@@ -28,6 +28,7 @@ import { render, type Observer, type BiasProfile, type VoiceParams, type AffectV
 import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
+import { runJewlToolAction } from './jewl-action';
 import {
   buildSpiritPrompt,
   buildDesiresBlock,
@@ -56,6 +57,11 @@ interface PersonaProfileData {
   voiceNotes?: string;
   bias?: BiasProfile;
   voice?: VoiceParams;
+  /** WP13 elevated-access flag (JEWL-tier only): routes this entity's
+   * perception through the renderer's Terminal-truth bypass and its 'act'
+   * step through the unrestricted copilot tool dispatch, instead of the
+   * default self-only path every other entity uses. */
+  omniscient?: boolean;
 }
 
 function parsePersonaProfile(raw: string): PersonaProfileData {
@@ -272,13 +278,19 @@ async function renderAttention(ctx: EntityContext, attendContent: string, overri
     }
   }
 
-  const observer: Observer = {
-    entityId: ctx.characterId,
-    attunement: 0.5,
-    biasProfile: ctx.persona.bias ?? {},
-    mood: ctx.mood,
-    voice: ctx.persona.voice ?? {},
-  };
+  // Omniscient perception (WP13 spec §2-2): a JEWL-tier entity's ensemble
+  // uses the renderer's Terminal-truth bypass for ALL perception — he sees
+  // True Sheets, never a Believed/rendered view. Every other entity keeps
+  // its own attunement/bias/mood lens, unchanged.
+  const observer: Observer = ctx.persona.omniscient
+    ? { entityId: null, attunement: 1, biasProfile: {}, mood: ctx.mood, voice: ctx.persona.voice ?? {} }
+    : {
+        entityId: ctx.characterId,
+        attunement: 0.5,
+        biasProfile: ctx.persona.bias ?? {},
+        mood: ctx.mood,
+        voice: ctx.persona.voice ?? {},
+      };
 
   const rendered = await render(
     { subject: 'environment', subjectKey: best.subjectKey, trueData: best.fact, context: attendContent },
@@ -302,6 +314,10 @@ async function runStimulusPipeline(
   overrides: DayaClientOverrides,
 ): Promise<HandlerResult> {
   const ctx = await loadEntityContext(characterId);
+  // Seal inversion + unrestricted access gate (WP13): true for a JEWL-tier
+  // entity only — every other entity's pipeline below is byte-for-byte the
+  // pre-WP13 behavior.
+  const omniscient = ctx.persona.omniscient === true;
 
   // 1. Tagger: ingest + classify. OOC content is processed but never
   // persisted (WP6 residency law) — and never wakes Spirit, since it isn't
@@ -338,11 +354,17 @@ async function runStimulusPipeline(
   const rawRecallBlock = [recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
     .filter(Boolean)
     .join(' ');
-  const recallSealed = await enforceSeal(rawRecallBlock, {
-    entityId: ctx.entityDaId,
-    subsystem: 'recall',
-    fallback: 'Something stirs, but nothing clear enough to name.',
-  });
+  // Seal inversion (WP13 spec §2/§4-4): a JEWL-tier entity is allowed to
+  // hold mechanics in its OWN experience stream — the seal protects other
+  // entities from leakage, not JEWL from truth — so his recall content is
+  // never linted. Every other entity keeps the existing boundary check.
+  const recallSealed = omniscient
+    ? { text: rawRecallBlock, hits: [], usedFallback: false }
+    : await enforceSeal(rawRecallBlock, {
+        entityId: ctx.entityDaId,
+        subsystem: 'recall',
+        fallback: 'Something stirs, but nothing clear enough to name.',
+      });
 
   // 3. Soul Sim -> felt-state brief.
   const feltStateBrief = await runSoulSim(ctx, overrides);
@@ -363,34 +385,82 @@ async function runStimulusPipeline(
     stimulus: content,
   };
   const spiritRaw = await callSpiritOnce(ctx, spiritArgs, overrides);
-  const spiritSealed = await enforceSeal(spiritRaw, {
-    entityId: ctx.entityDaId,
-    subsystem: 'spirit',
-    fallback: `${ctx.name} pauses, unsure what to say, and lets the moment sit.`,
-    revoice: () => callSpiritOnce(ctx, spiritArgs, overrides, SPIRIT_REVOICE_HINT),
-  });
+  // Seal inversion (WP13): JEWL's own reasoning/directive line is never
+  // linted here — he is allowed to hold mechanics in his own context
+  // (Addendum C: he reads all streams). What he ultimately SPEAKS to
+  // another entity is still sealed, once parseSpiritOutput isolates the
+  // actual words (see the 'speak' branch below) — never the whole
+  // monologue. Every other entity keeps the original whole-text boundary.
+  const spiritSealed = omniscient
+    ? { text: spiritRaw, hits: [], usedFallback: false }
+    : await enforceSeal(spiritRaw, {
+        entityId: ctx.entityDaId,
+        subsystem: 'spirit',
+        fallback: `${ctx.name} pauses, unsure what to say, and lets the moment sit.`,
+        revoice: () => callSpiritOnce(ctx, spiritArgs, overrides, SPIRIT_REVOICE_HINT),
+      });
 
   const action = parseSpiritOutput(spiritSealed.text);
 
   switch (action.kind) {
     case 'speak': {
+      // Seal-inversion boundary (WP13 spec §4-4): JEWL's internal reasoning
+      // was exempt above, but anything he SPEAKS to a normal entity is
+      // still sealLint-checked right here — he must not leak mechanics
+      // into another entity's phenomenal stream. This is a no-op for
+      // every non-omniscient entity, whose speech already crossed the
+      // boundary upstream (spiritSealed).
+      const speakSealed = omniscient
+        ? await enforceSeal(action.content, {
+            entityId: ctx.entityDaId,
+            subsystem: 'jewl_speak',
+            fallback: `${ctx.name} answers plainly, keeping the particulars to itself.`,
+          })
+        : { text: action.content, hits: [], usedFallback: false };
+
       const memory = await writeMemoryEntry({
         entityId: ctx.entityDaId,
         narrativeCycle: ctx.cycle,
         source: 'dialogue',
-        content: action.content,
+        content: speakSealed.text,
         valence: 0,
         arousal: 0.1,
         salience: 0.2,
         classification: { contentCategory: 'dialogue', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'own words spoken' },
       });
-      return { memoryEntryId: memory.id, action: { kind: 'speak', content: action.content } };
+      return { memoryEntryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
     }
 
     case 'act': {
       if (!ctx.campaignId) {
         return { action: { kind: 'act', content: action.content } };
       }
+
+      // Unrestricted action (WP13 spec §2-3): a JEWL-tier entity's 'Do:'
+      // bypasses the self-only Body Interface/adjudicator path entirely —
+      // the intent dispatches straight to the existing copilot tool
+      // registry, on ANY character or the world, with GodHead-equivalent
+      // authority (jewl-action.ts). A normal entity never reaches this
+      // branch; its 'act' path below stays self-only, unchanged — that
+      // absence IS the gate, architecturally, not a runtime check.
+      if (omniscient) {
+        const toolResult = await runJewlToolAction(ctx.entityDaId, ctx.campaignId, action.content, overrides);
+        const summary = toolResult.toolName
+          ? `Acted: invoked ${toolResult.toolName}${toolResult.error ? ` — failed (${toolResult.error})` : ' — done'}.`
+          : `Weighed acting on "${action.content}" but no lever applied.`;
+        await writeMemoryEntry({
+          entityId: ctx.entityDaId,
+          narrativeCycle: ctx.cycle,
+          source: 'action',
+          content: summary,
+          valence: 0,
+          arousal: 0.1,
+          salience: 0.3,
+          classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'unrestricted action dispatch' },
+        });
+        return { action: { kind: 'act', content: action.content } };
+      }
+
       const facts = await currentFacts(ctx.campaignId);
       const outward = await runBodyOutward(ctx, action.content, facts, overrides);
 
