@@ -186,6 +186,23 @@ export function JewlChip() {
     return () => window.removeEventListener('keydown', onKey);
   }, [campaignId, open]);
 
+  // Canvas right-click → "Ask Jewl" fires this event with a context seed
+  // (the clicked spot / subject). One JEWL dialog, contextual payload —
+  // per [[one-contextual-jewl-dialog-2026-06-07]]. The seed lands as
+  // VISIBLE, editable text in the input, never hidden context.
+  useEffect(() => {
+    if (!campaignId) return;
+    function onJewlOpen(e: Event) {
+      const seed = (e as CustomEvent<{ seed?: string }>).detail?.seed;
+      setOpen(true);
+      if (seed) setInput(prev => (prev ? prev : seed));
+      // Panel may still be mounting this tick — focus after paint.
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    window.addEventListener('jewl:open', onJewlOpen);
+    return () => window.removeEventListener('jewl:open', onJewlOpen);
+  }, [campaignId]);
+
   // Lazy-load session + history when first opened
   useEffect(() => {
     if (!open || !campaignId) return;

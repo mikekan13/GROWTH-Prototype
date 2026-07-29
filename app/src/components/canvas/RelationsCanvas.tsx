@@ -284,9 +284,11 @@ export default function RelationsCanvas({
   const [canvasMenu, setCanvasMenu] = useState<{
     screenX: number; screenY: number; worldX: number; worldY: number;
     parentLocationId?: string;
-    /** chooser = right-clicked a Location folder (pick edit / create-inside /
-     *  delete); create = JEWL create dialog; edit = JEWL edit dialog. */
-    mode: 'chooser' | 'create' | 'edit';
+    /** menu = right-clicked empty canvas (ask JEWL anything / structured
+     *  create); chooser = right-clicked a Location folder (pick edit /
+     *  create-inside / delete); create = JEWL create dialog; edit = JEWL
+     *  edit dialog. */
+    mode: 'menu' | 'chooser' | 'create' | 'edit';
     editLocationId?: string;
   } | null>(null);
 
@@ -2616,9 +2618,9 @@ export default function RelationsCanvas({
             worldY: world.y,
             parentLocationId: folderLocationId,
             // Right-click ON a place → chooser (edit it / create inside /
-            // delete-or-dissolve). Right-click empty canvas → straight to
-            // the JEWL create dialogue.
-            mode: folderLocationId ? 'chooser' : 'create',
+            // delete-or-dissolve). Right-click empty canvas → open-ended
+            // menu (ask JEWL anything, or the structured create path).
+            mode: folderLocationId ? 'chooser' : 'menu',
             editLocationId: folderLocationId,
           });
         }}
@@ -3291,6 +3293,49 @@ export default function RelationsCanvas({
           })}
       </svg>
 
+      {/* ── Right-click on EMPTY canvas → open-ended menu. "Ask Jewl"
+          opens the one full JEWL chat (every tool, any request) seeded
+          with the click context — the GM could be asking him to do
+          ANYTHING, not just create. The structured create path stays as
+          a quick action. Per [[one-contextual-jewl-dialog-2026-06-07]]. */}
+      {canvasMenu?.mode === 'menu' && (() => {
+        const item = 'w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--terminal-prime)]/20 font-[Consolas,monospace] cursor-pointer';
+        return (
+          <div
+            className="fixed z-[100]"
+            style={{ left: canvasMenu.screenX, top: canvasMenu.screenY, width: 220 }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <CtxMenuPanel title="Jewl">
+              <button
+                className={item}
+                style={{ color: '#fff' }}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('jewl:open', {
+                    detail: { seed: `[canvas @ (${Math.round(canvasMenu.worldX)}, ${Math.round(canvasMenu.worldY)})] ` },
+                  }));
+                  setCanvasMenu(null);
+                }}
+              >
+                {ctxMenuStyle('Ask Jewl anything')}
+              </button>
+              {onCreateLocation && (
+                <button
+                  className={item}
+                  style={{ color: '#fff' }}
+                  onClick={() => setCanvasMenu({ ...canvasMenu, mode: 'create' })}
+                >
+                  {ctxMenuStyle('Create a place here')}
+                </button>
+              )}
+              <button className={item} style={{ color: 'rgba(255,255,255,0.4)' }} onClick={() => setCanvasMenu(null)}>
+                {ctxMenuStyle('Cancel')}
+              </button>
+            </CtxMenuPanel>
+          </div>
+        );
+      })()}
+
       {/* ── Right-click on a Location folder → chooser (edit / create
           inside / delete-or-dissolve). One JEWL dialog underneath either
           path — contextual payload decides create vs edit. */}
@@ -3306,6 +3351,18 @@ export default function RelationsCanvas({
             onMouseDown={(e) => e.stopPropagation()}
           >
             <CtxMenuPanel title={f?.name ?? 'Location'}>
+              <button
+                className={item}
+                style={{ color: '#fff' }}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('jewl:open', {
+                    detail: { seed: `[re: ${f?.name ?? 'this place'}] ` },
+                  }));
+                  setCanvasMenu(null);
+                }}
+              >
+                {ctxMenuStyle('Ask Jewl about this place')}
+              </button>
               <button
                 className={item}
                 style={{ color: '#fff' }}
