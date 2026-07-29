@@ -237,6 +237,15 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | CloudProvider | `ai/portraits/providers/cloud.ts` | Stub for future cloud-based generation | types |
 | ProviderFactory | `ai/portraits/providers/index.ts` | getPortraitProvider() factory with local/cloud fallback | local, cloud |
 
+## AI — DAYA Persona Harness (src/daya/)
+
+| Module | File | Purpose | Dependencies |
+|--------|------|---------|-------------|
+| DayaAffect service | `services/daya-affect.ts` | Event-driven mood vector (morale/stress/grief) for AI-controlled characters; decays toward baseline, writes first-person HistoryEntry beats | Prisma, services/history |
+| Model client | `daya/model-client.ts` | ONE uniform chat interface across tiers L1/L2 (self-hosted vLLM, OpenAI-compatible) and C (Anthropic); every call writes a DayaModelCall metering row; unavailable tier throws DayaTierUnavailableError, never silently falls back | Prisma, @anthropic-ai/sdk |
+| Event bus | `daya/events.ts` | WP3 wake-on-trigger lifecycle (plan Ruling 14: nothing runs between events). `DayaTrigger` union (stimulus/dream_tick/adjudication_result/vine_tick/gm_intervention) + `wake()` entry point, gated on `DAYA_ENABLED==='enabled'` (re-read live, not module-cached — mirrors services/godhead-dispatcher.ts's disabled-state audit convention but supports in-process test toggling). Handler registry (`registerHandler`) so scheduler.ts can self-register its dream_tick handler. stimulus/gm_intervention handlers create-if-missing the DayaEntity and write a DayaMemoryEntry ingest row via `tagStimulus` (v0 stub, zeroed valence/arousal/salience — WP4 Tagger replaces); adjudication_result/vine_tick are log-only stubs pending WP7/WP8. `deliverStimulus` convenience export for the future session loop | Prisma, services/history |
+| Dream-tick scheduler | `daya/scheduler.ts` | WP3 cadence scheduling, not a background daemon. `computeNextDreamTick`/`computeNextDreamTickFromState` derive next-due timestamp from `DAYA_DREAM_INTERVAL_MS` (default 6h) modulated by Frequency pool state read off the character sheet JSON (`dreamIntervalModulation` — drained pool -> longer interval, degraded cognition per plan Ruling 20, up to 2x at empty). `runDueDreamTicks()` manual sweep over existing DayaEntity rows, fires `wake({kind:'dream_tick'})` for due ones; self-registers the dream_tick handler (writes a source:'dream' DayaMemoryEntry, calls `runDreamConsolidation` v0 stub — WP10 replaces) | Prisma, services/history, daya/events |
+
 ## API Routes (80+ total)
 
 | Route | Methods | Service |
@@ -276,6 +285,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/krma/campaigns/[id]/crystallize | POST, GET | Crystallization (crystallize/dissolve entities, get ledger + crystallized IDs) |
 | /api/krma/metrics | GET | KRMA Wallet (global KRMA metrics, Admin-only) |
 | /api/krma/audit/verify | POST | KRMA Reconciliation (full ledger audit, Admin-only) |
+| /api/daya/tick | POST | daya/scheduler runDueDreamTicks (ADMIN-only manual sweep — no background daemon; fires any due dream ticks, returns fired/skipped) |
 | /api/dice/roll | POST | DiceService (quick roll — one or more dice, no DR/effort) |
 | /api/dice/check | POST | DiceService (full skill/unskilled check with DR, effort, modifiers) |
 | /api/dice/inject | GET, POST, DELETE | DiceInjection (Godhead-only — list/register/remove injections) |
