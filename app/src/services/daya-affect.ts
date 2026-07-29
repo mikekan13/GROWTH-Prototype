@@ -32,7 +32,16 @@ export type DispositionEvent =
   | { kind: 'goal_failed'; goalName?: string }
   | { kind: 'goal_abandoned'; goalName?: string }
   | { kind: 'advancement'; frequencySpent: number }
-  | { kind: 'dream_consolidation'; deltas: Drives; beat: string };
+  | { kind: 'dream_consolidation'; deltas: Drives; beat: string }
+  // WP8 mechanics coupling — effort/damage actually spending a pool, and the
+  // pool coming back on rest. Fires regardless of WHICH pool (not just
+  // Frequency): the caller supplies the attribute name for near-empty framing.
+  | { kind: 'pool_spent'; attribute: string; amount: number; current: number; max: number }
+  | { kind: 'pool_restored' }
+  // A Thorn firing (Ruling 7) — deltas/beat computed by src/daya/mechanics/thorns.ts
+  // from the trait's own text, already clamped; this case just threads them
+  // through the same decay/history pipeline every other event uses.
+  | { kind: 'thorn_fired'; deltas: Drives; beat: string };
 
 /** Launch defaults — tunable, not canon numbers (r-2026-07-23-09 pattern). */
 export const DISPOSITION_TUNING = {
@@ -96,6 +105,27 @@ export function evaluateEvent(ev: DispositionEvent, d: Drives): { deltas: Drives
       // computed by the dream subsystem itself (src/daya/dream.ts), already
       // clamped to its own T0 tunables; this case just threads them through
       // the same decay/history pipeline every other event uses.
+      return { deltas: ev.deltas, beat: ev.beat };
+    case 'pool_spent': {
+      // Ruling 7: heavy Willpower (Soul) damage gets a pronounced affect
+      // shift, not just a numeric drop — scaled by fraction of pool lost,
+      // sharpened further for Willpower specifically.
+      const frac = ev.max > 0 ? ev.amount / ev.max : 0;
+      const nearEmpty = ev.max > 0 ? 1 - ev.current / ev.max : 0;
+      const boost = ev.attribute === 'willpower' ? 1.5 : 1;
+      return {
+        deltas: { morale: -frac * 0.25 * boost, stress: frac * 0.35 * boost + nearEmpty * 0.25, grief: 0 },
+        beat: ev.current <= 0
+          ? 'Whatever I had left for that just ran out.'
+          : 'That cost me something — I can feel how much less there is now.',
+      };
+    }
+    case 'pool_restored':
+      return {
+        deltas: { morale: 0.15, stress: -0.25, grief: 0 },
+        beat: 'Rest found me. Some of what I spent came back.',
+      };
+    case 'thorn_fired':
       return { deltas: ev.deltas, beat: ev.beat };
   }
 }

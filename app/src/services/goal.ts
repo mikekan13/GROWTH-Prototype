@@ -519,10 +519,15 @@ export type ResolveOpportunityInput = z.infer<typeof resolveOpportunitySchema>;
  * GM resolves an open opportunity (T33): the moment resolved via a skill
  * check (run through the normal check flow — record its result here), a
  * KRMA spend, or narrative fiat. Logged as a campaign event.
+ *
+ * `userId`/`userRole` are optional (mirrors completeGoal/failGoal's system-
+ * caller convention) — persona-harness mechanics coupling (WP8) resolves an
+ * opportunity automatically when a check-driven adjudication outcome matches
+ * an EXISTING open opportunity, with no live GM in the loop for that beat.
  */
 export async function resolveOpportunity(
-  userId: string,
-  userRole: string,
+  userId: string | undefined,
+  userRole: string | undefined,
   input: ResolveOpportunityInput,
 ) {
   const validated = resolveOpportunitySchema.parse(input);
@@ -553,8 +558,8 @@ export async function resolveOpportunity(
       campaignId,
       type: 'game_event',
       actor: 'gm',
-      actorUserId: userId,
-      actorName: 'GM',
+      actorUserId: userId ?? 'system',
+      actorName: userId ? 'GM' : 'System',
       characterId: goal.characterId,
       characterName: goal.character.name,
       payload: {

@@ -26,7 +26,7 @@ import { ingestStimulus, writeMemoryEntry } from './memory';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
-import { resolveIntent, type AdjudicationResult } from './adjudicator';
+import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
 import {
   buildSpiritPrompt,
@@ -43,6 +43,9 @@ import {
   outcomeBandFor,
   type BodyOutwardResult,
 } from './prompts/roles/body';
+import { careScalarFrom } from './mechanics/effort';
+import { resolveEffortCheck, maybeAdvanceVine, restAndRecover } from './mechanics/resolve';
+import { detectAndFireThorns, loadActiveThornBlocks, isRuminationLockActive } from './mechanics/thorns';
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -125,6 +128,25 @@ async function buildDesiresBlockForCharacter(characterId: string): Promise<strin
   });
   const items: DesireSourceItem[] = goals.map((g) => ({ description: g.description }));
   return buildDesiresBlock(items);
+}
+
+// ── Effort's `care` scalar (Ruling 10 — WP8) ───────────────────────────────
+// vineSalience: the top active goal's priority (1-5) normalized to 0..1;
+// arousal: current stress as an arousal proxy (DayaAffect has no separate
+// arousal dimension — stress is the closest existing signal). Either alone
+// can drive care; a calm-but-deeply-wanted moment and a stressful-but-low-
+// stakes one both register (effort.ts's careScalarFrom blends them evenly).
+
+const MAX_GOAL_PRIORITY = 5;
+
+async function careScalarForCharacter(characterId: string, mood: AffectVector): Promise<number> {
+  const topGoal = await prisma.goal.findFirst({
+    where: { characterId, status: 'ACTIVE' },
+    orderBy: { priority: 'desc' },
+    select: { priority: true },
+  });
+  const vineSalience = topGoal ? topGoal.priority / MAX_GOAL_PRIORITY : 0;
+  return careScalarFrom({ vineSalience, arousal: mood.stress });
 }
 
 // ── Soul Sim ────────────────────────────────────────────────────────────
@@ -289,12 +311,33 @@ async function runStimulusPipeline(
     return {};
   }
 
+  // 1b. Thorn firing (Ruling 7, WP8): does this stimulus match an existing
+  // Thorn's trigger? Detection is code-only/deterministic (mechanics/thorns.ts)
+  // — any fire persists a WP4 ThornBlock and moves affect immediately; the
+  // felt line (never named "Thorn") is folded into the recall block below,
+  // the same phenomenal-zone boundary recall's own prose already crosses.
+  const [thornFire, activeThornBlocks, ruminationLockActive] = await Promise.all([
+    detectAndFireThorns({ characterId, entityDaId: ctx.entityDaId, cycle: ctx.cycle, stimulusContent: content }),
+    loadActiveThornBlocks(ctx.entityDaId),
+    isRuminationLockActive(ctx.entityDaId),
+  ]);
+
   // 2. Recall (stat-gated). Crosses into the phenomenal zone -> sealed.
   const recallResult = await recall(
-    { entityId: ctx.entityDaId, cue: content, mood: ctx.mood, soulState: ctx.soulState, thornBlocks: [], nowCycle: ctx.cycle },
+    {
+      entityId: ctx.entityDaId,
+      cue: content,
+      mood: ctx.mood,
+      soulState: ctx.soulState,
+      thornBlocks: activeThornBlocks,
+      nowCycle: ctx.cycle,
+      ruminationLockActive,
+    },
     overrides,
   );
-  const rawRecallBlock = recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.';
+  const rawRecallBlock = [recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
+    .filter(Boolean)
+    .join(' ');
   const recallSealed = await enforceSeal(rawRecallBlock, {
     entityId: ctx.entityDaId,
     subsystem: 'recall',
@@ -350,9 +393,30 @@ async function runStimulusPipeline(
       }
       const facts = await currentFacts(ctx.campaignId);
       const outward = await runBodyOutward(ctx, action.content, facts, overrides);
+
+      // WP8 mechanics coupling: motivated effort (Ruling 10) + skill-
+      // specificity DR fit (Ruling 9) replace the adjudicator's placeholder
+      // zero-effort roll whenever it calls for a check. `care` is resolved
+      // once per act so the same wager logic isn't re-derived per attempt.
+      const care = await careScalarForCharacter(characterId, ctx.mood);
+      const mechanicsHook: MechanicsRollHook = async (hookArgs) => {
+        const result = await resolveEffortCheck({
+          characterId: hookArgs.characterId,
+          intent: hookArgs.intent,
+          attribute: hookArgs.attribute,
+          dr: hookArgs.dr,
+          effortContext: outward.effortContext,
+          care,
+          overrides,
+        });
+        if (!result) return null;
+        return { total: result.total, success: result.success, drFinal: result.drFinal, governingAttribute: result.governingAttribute };
+      };
+
       const adjudication = await resolveIntent(
         { campaignId: ctx.campaignId, entityCharacterId: characterId, intent: outward.intent, cycle: ctx.cycle },
         overrides,
+        mechanicsHook,
       );
       await wake(
         { kind: 'adjudication_result', entityId: characterId, payload: adjudication as unknown as Record<string, unknown> },
@@ -371,12 +435,20 @@ async function runStimulusPipeline(
 
     case 'rest':
     default: {
+      // WP8 spec §7: Spirit choosing to rest actually restores pool (a Short
+      // Rest — the least disruptive recovery step); guarded the same way
+      // restShort itself is (Overwhelmed / Frequency-empty -> applied:false),
+      // so this never silently no-ops into a false sense of recovery.
+      const restResult = await restAndRecover(characterId, 'short').catch((err) => {
+        console.error('[daya/ensemble] restAndRecover failed (non-fatal):', err);
+        return { applied: false, changes: [] as string[] };
+      });
       await writeMemoryEntry({
         entityId: ctx.entityDaId,
         narrativeCycle: ctx.cycle,
         source: 'perception',
-        content: 'Nothing more right now — it passes.',
-        valence: 0,
+        content: restResult.applied ? 'A quiet stretch, and something in you eases.' : 'Nothing more right now — it passes.',
+        valence: restResult.applied ? 0.1 : 0,
         arousal: 0,
         salience: 0.05,
         classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'rest, no action' },
@@ -408,6 +480,15 @@ async function adjudicationResultHandler(
   const payload = trigger.payload as AdjudicationPayloadShape;
   const experienceEvent = payload.experienceEvent ?? { content: payload.outcome ?? '', valence: 0, salience: 0.1 };
   const roll = payload.roll;
+
+  // WP8 vine progress (Ruling 22): resolves an EXISTING open opportunity on
+  // an active goal when this check-driven outcome matches it — never
+  // creates or forces one. No-op (returns null) for pure-narrative outcomes
+  // (no roll) or when nothing matches.
+  await maybeAdvanceVine(trigger.entityId, { outcome: payload.outcome ?? '', experienceEvent, roll }).catch((err) => {
+    console.error('[daya/ensemble] maybeAdvanceVine failed (non-fatal):', err);
+    return null;
+  });
 
   const ingest = await ingestStimulus(
     { entityId: ctx.entityDaId, cycle: ctx.cycle, source: 'adjudication', content: experienceEvent.content },

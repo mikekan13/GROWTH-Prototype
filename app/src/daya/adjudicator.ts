@@ -57,6 +57,23 @@ export interface WorldResolver {
   resolveIntent(input: ResolveIntentInput, overrides?: DayaClientOverrides): Promise<AdjudicationResult>;
 }
 
+/**
+ * WP8 mechanics coupling: when the model calls for a check, resolveIntent
+ * defers the actual roll to this hook instead of its own placeholder
+ * `unskilledCheck(effort:0)` — the hook wagers real effort, judges skill
+ * specificity, persists the pool spend, and returns a fully-resolved roll.
+ * Optional and additive: omitting it (every pre-WP8 caller) keeps the
+ * original zero-effort unskilled-check behavior exactly as before.
+ */
+export interface MechanicsRollHook {
+  (args: { characterId: string; intent: string; attribute: string; dr: number; cycle: number }): Promise<{
+    total: number;
+    success: boolean;
+    drFinal: number;
+    governingAttribute: string;
+  } | null>;
+}
+
 interface AdjudicatorResponseShape {
   outcome: string;
   factsToWrite?: Array<{ subjectKey: string; fact: string }>;
@@ -110,6 +127,7 @@ function resolveFateDie(character: Partial<GrowthCharacter> | null): FateDie {
 export async function resolveIntent(
   input: ResolveIntentInput,
   overrides: DayaClientOverrides = {},
+  mechanicsHook?: MechanicsRollHook,
 ): Promise<AdjudicationResult> {
   const { campaignId, entityCharacterId, intent, cycle } = input;
 
@@ -197,17 +215,34 @@ export async function resolveIntent(
   let roll: RollOutcome | undefined;
 
   if (parsed.check) {
-    const fateDie = resolveFateDie(sheet);
-    const result = unskilledCheck({ fateDie, effort: 0, dr: parsed.check.dr });
-    roll = {
-      attribute: parsed.check.attribute,
-      dr: parsed.check.dr,
-      total: result.total,
-      success: result.success,
-    };
-    // v0 simple: append a plain-language success/failure note rather than
-    // round-tripping to the model for a second pass (WP9 will do this properly).
-    outcome = `${outcome} ${result.success ? 'It worked.' : "It didn't come together."}`.trim();
+    const hookResult = mechanicsHook
+      ? await mechanicsHook({ characterId: entityCharacterId, intent, attribute: parsed.check.attribute, dr: parsed.check.dr, cycle }).catch((err) => {
+          console.error('[daya/adjudicator] mechanicsHook failed (falling back to placeholder roll):', err);
+          return null;
+        })
+      : null;
+
+    if (hookResult) {
+      roll = {
+        attribute: hookResult.governingAttribute,
+        dr: hookResult.drFinal,
+        total: hookResult.total,
+        success: hookResult.success,
+      };
+      outcome = `${outcome} ${hookResult.success ? 'It worked.' : "It didn't come together."}`.trim();
+    } else {
+      const fateDie = resolveFateDie(sheet);
+      const result = unskilledCheck({ fateDie, effort: 0, dr: parsed.check.dr });
+      roll = {
+        attribute: parsed.check.attribute,
+        dr: parsed.check.dr,
+        total: result.total,
+        success: result.success,
+      };
+      // v0 simple fallback: append a plain-language success/failure note
+      // rather than round-tripping to the model for a second pass.
+      outcome = `${outcome} ${result.success ? 'It worked.' : "It didn't come together."}`.trim();
+    }
   }
 
   return {

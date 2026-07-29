@@ -42,6 +42,14 @@ export interface RecallRequest {
   thornBlocks: ThornBlock[];
   nowCycle: number;
   budget?: number;
+  /** WP8 connector: true when dream.ts (WP10) has an active rumination lock
+   * on any of this entity's memory clusters — suppresses the mood-repair
+   * congruence bonus in computeMoodCongruence (see that function's own
+   * ruminationLockActive param) so a locked entity isn't pulled toward
+   * positive memories to self-soothe mid-loop. Callers derive this via
+   * src/daya/mechanics/thorns.ts's isRuminationLockActive(); defaults false
+   * so every pre-WP8 caller/test keeps its existing behavior unchanged. */
+  ruminationLockActive?: boolean;
 }
 
 export interface SurfacedMemory {
@@ -281,10 +289,11 @@ export function scoreCandidate(
   mood: { morale: number; stress: number; grief: number },
   nowCycle: number,
   thornBlocks: ThornBlock[],
+  ruminationLockActive = false,
 ): ScoredCandidate {
   const relevance = computeRelevance(cue, cueRefs, memory.content, memory.entityRefs);
   const recency = computeRecency(Math.max(0, nowCycle - memory.narrativeCycle), memory.salience);
-  const moodCongruence = computeMoodCongruence(mood, { valence: memory.valence, arousal: memory.arousal });
+  const moodCongruence = computeMoodCongruence(mood, { valence: memory.valence, arousal: memory.arousal }, ruminationLockActive);
   const thornMatch = matchThornBlock(memory.content, memory.entityRefs, thornBlocks);
 
   let score =
@@ -403,7 +412,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
     narrativeCycle: r.narrativeCycle,
   }));
 
-  const scored = parsed.map((m) => scoreCandidate(m, req.cue, cueRefs, req.mood, req.nowCycle, req.thornBlocks));
+  const scored = parsed.map((m) => scoreCandidate(m, req.cue, cueRefs, req.mood, req.nowCycle, req.thornBlocks, req.ruminationLockActive ?? false));
 
   const theta = wisdomThreshold(req.soulState.wisdomMax);
   const budget = req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur);
