@@ -152,19 +152,22 @@ function modelForLadderIndex(idx: number): string {
 
 // ── Pool-state degradation (Ruling 20) ──────────────────────────────────────
 
-interface Degradation {
+export interface Degradation {
   contextDepth: number;
   maxTokensScale: number;
   noConsults: boolean;
   consultStepDown: boolean;
 }
 
-function poolFraction(poolState: RouteRequest['poolState']): number {
+export function poolFraction(poolState: { current: number; max: number }): number {
   if (poolState.max <= 0) return 0;
   return poolState.current / poolState.max;
 }
 
-function degradationForFraction(f: number): Degradation {
+/** Exported so WP10 (dream.ts) can derive the same contextDepth degradation
+ * lever from a pool fraction without duplicating the threshold table —
+ * "Depth = WP6 degradation contextDepth" (WP10 spec §1). */
+export function degradationForFraction(f: number): Degradation {
   const { pool, contextDepth: cd, maxTokens: mt } = ROUTER_TUNING;
   if (f >= pool.fullThreshold) return { contextDepth: cd.full, maxTokensScale: 1, noConsults: false, consultStepDown: false };
   if (f >= pool.degradedThreshold) return { contextDepth: cd.degraded, maxTokensScale: 1, noConsults: false, consultStepDown: true };

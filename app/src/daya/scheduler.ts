@@ -17,7 +17,15 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentCycleOf } from '@/services/history';
 import { wake, registerHandler, type DayaTrigger, type HandlerResult } from './events';
+import type { DayaClientOverrides } from './model-client';
+import { runDreamConsolidation } from './dream';
 import type { GrowthCharacter } from '@/types/growth';
+
+// Re-exported so any existing `from './scheduler'` import path keeps working
+// — the real dream-tick dynamics (clustering, retag, rumination/trauma
+// loop, meta-memory synthesis) live in ./dream (WP10); this module owns only
+// cadence (computeNextDreamTick / runDueDreamTicks) and the trigger handler.
+export { runDreamConsolidation };
 
 const DEFAULT_DREAM_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 
@@ -94,18 +102,12 @@ export async function computeNextDreamTick(characterId: string): Promise<Date> {
   return computeNextDreamTickFromState(anchor, frequency);
 }
 
-// ── Dream tick handler (v0 stub — WP10 replaces) ────────────────────────
+// ── Dream tick handler ───────────────────────────────────────────────────
+// Writes the tick-marker row first (dream.ts counts prior tick-marker rows
+// for its own tickIndex/spacing bookkeeping — see dream.ts's tickIndex
+// derivation), then runs the real consolidation (WP10, ./dream).
 
-/**
- * v0 stub — WP10 replaces. Real dream consolidation (clustering memories
- * into hierarchy links, re-tagging, memories-of-memories, rumination
- * dynamics) lands with the Dream Ticks work package.
- */
-export async function runDreamConsolidation(entityId: string): Promise<void> {
-  void entityId;
-}
-
-async function dreamTickHandler(trigger: DayaTrigger): Promise<HandlerResult> {
+async function dreamTickHandler(trigger: DayaTrigger, overrides?: DayaClientOverrides): Promise<HandlerResult> {
   if (trigger.kind !== 'dream_tick') {
     throw new Error(`dreamTickHandler received wrong trigger kind: ${trigger.kind}`);
   }
@@ -123,14 +125,17 @@ async function dreamTickHandler(trigger: DayaTrigger): Promise<HandlerResult> {
       entityId: entity.id,
       narrativeCycle: cycle,
       source: 'dream',
-      content: 'A dream tick ran.', // v0 marker — WP10 replaces with real consolidation narrative
+      content: 'A dream tick ran.', // machinery marker row — never recalled as her own content
       classification: JSON.stringify({ provisional: true, kind: 'tick_marker' }),
     },
   });
 
-  await runDreamConsolidation(trigger.entityId); // v0 stub — WP10 replaces
+  const report = await runDreamConsolidation(trigger.entityId, overrides);
 
-  console.log(`[daya/scheduler] dream_tick fired for entity ${entity.id} (memory ${row.id})`);
+  console.log(
+    `[daya/scheduler] dream_tick fired for entity ${entity.id} (memory ${row.id}, ` +
+      `clusters ${report.clustersSelected}/${report.clustersConsidered}, model calls ${report.modelCallsMade})`,
+  );
   return { memoryEntryId: row.id };
 }
 

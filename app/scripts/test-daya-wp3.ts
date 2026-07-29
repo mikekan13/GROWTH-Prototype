@@ -128,8 +128,8 @@ async function main() {
     check('enabled: stimulus memory row has source passed through', stimRow?.source === 'dialogue', stimRow?.source);
     check('enabled: stimulus memory row content matches', stimRow?.content === 'Hello, entity.');
     check(
-      'enabled: stimulus memory row has provisional zeroed valence/arousal/salience',
-      stimRow?.valence === 0 && stimRow?.arousal === 0 && stimRow?.salience === 0,
+      'enabled: stimulus memory row has neutral-fallback valence/arousal and the 0.1 salience floor (tagger unavailable in test, WP4 neutral fallback)',
+      stimRow?.valence === 0 && stimRow?.arousal === 0 && stimRow?.salience === 0.1,
     );
 
     const gmResult = await wake({ kind: 'gm_intervention', entityId: charA.id, content: 'The GM leans in.' });

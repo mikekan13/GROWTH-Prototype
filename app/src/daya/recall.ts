@@ -374,9 +374,24 @@ function parseEntityRefs(raw: string): string[] {
   }
 }
 
+/** Best-effort merge of a JSON patch into a classification string, preserving
+ * unknown keys — used to flag a surfaced memory `labileUntilNextDream` (T0
+ * §A2: recall re-opens a memory to reconsolidation) without a schema change;
+ * `classification` is already a free-form JSON string column. Never throws —
+ * an unparseable existing blob is replaced outright rather than blocking. */
+function mergeClassification(raw: string, patch: Record<string, unknown>): string {
+  try {
+    const existing = JSON.parse(raw) as Record<string, unknown>;
+    return JSON.stringify({ ...existing, ...patch });
+  } catch {
+    return JSON.stringify(patch);
+  }
+}
+
 export async function recall(req: RecallRequest, overrides: DayaClientOverrides = {}): Promise<RecallResult> {
   const cueRefs = req.cueRefs ?? [];
   const rows = await prisma.dayaMemoryEntry.findMany({ where: { entityId: req.entityId } });
+  const classificationById = new Map(rows.map((r) => [r.id, r.classification]));
 
   const parsed: ParsedMemory[] = rows.map((r) => ({
     id: r.id,
@@ -411,11 +426,16 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
     }
   }
 
-  // Rehearsal: every surfaced memory gets a salience touch (fire-and-forget-safe, awaited here for test determinism).
+  // Rehearsal: every surfaced memory gets a salience touch (fire-and-forget-safe, awaited here for test determinism),
+  // and is flagged labileUntilNextDream (T0 §A2: retrieval re-opens a memory to modification; WP10's dream tick is
+  // the only consumer of this flag and clears it once processed).
   await Promise.all(
     surfacedList.map((c) => {
       const next = clamp(c.memory.salience + RECALL_TUNING.rehearsalBoost, 0, RECALL_TUNING.rehearsalBoostCap);
-      return prisma.dayaMemoryEntry.update({ where: { id: c.memory.id }, data: { salience: next } }).catch(() => undefined);
+      const classification = mergeClassification(classificationById.get(c.memory.id) ?? '{}', { labileUntilNextDream: true });
+      return prisma.dayaMemoryEntry
+        .update({ where: { id: c.memory.id }, data: { salience: next, classification } })
+        .catch(() => undefined);
     }),
   );
 

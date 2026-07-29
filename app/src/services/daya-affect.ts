@@ -31,7 +31,8 @@ export type DispositionEvent =
   | { kind: 'goal_completed'; goalName?: string }
   | { kind: 'goal_failed'; goalName?: string }
   | { kind: 'goal_abandoned'; goalName?: string }
-  | { kind: 'advancement'; frequencySpent: number };
+  | { kind: 'advancement'; frequencySpent: number }
+  | { kind: 'dream_consolidation'; deltas: Drives; beat: string };
 
 /** Launch defaults — tunable, not canon numbers (r-2026-07-23-09 pattern). */
 export const DISPOSITION_TUNING = {
@@ -89,6 +90,13 @@ export function evaluateEvent(ev: DispositionEvent, d: Drives): { deltas: Drives
         deltas: { morale: 0.3, stress: 0.05, grief: 0 },
         beat: 'I traded a piece of what keeps me alive for what I can now do. Worth it.',
       };
+    case 'dream_consolidation':
+      // WP10: dream-tick affect drift (rumination deepening / reconsolidation
+      // healing / ordinary mood-repair overnight) — the deltas and beat are
+      // computed by the dream subsystem itself (src/daya/dream.ts), already
+      // clamped to its own T0 tunables; this case just threads them through
+      // the same decay/history pipeline every other event uses.
+      return { deltas: ev.deltas, beat: ev.beat };
   }
 }
 
