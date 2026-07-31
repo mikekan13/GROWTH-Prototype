@@ -37,7 +37,9 @@ const inputSchema = z.object({
   canvasY: z.number().optional().describe('Canvas world Y for the card. Omit to auto-place.'),
 });
 
-async function resolveParentLocation(
+/** Location ref resolver (id or name, campaign-scoped) — shared with
+ * place_item and any tool that names a place. */
+export async function resolveLocationRef(
   campaignId: string,
   ref: string,
 ): Promise<{ id: string; name: string } | null> {
@@ -76,7 +78,7 @@ export const createLocationTool: JewlTool = {
 
     let parent: { id: string; name: string } | null = null;
     if (parsed.parentLocation) {
-      parent = await resolveParentLocation(ctx.campaignId, parsed.parentLocation);
+      parent = await resolveLocationRef(ctx.campaignId, parsed.parentLocation);
       if (!parent) {
         const existing = await prisma.location.findMany({
           where: { campaignId: ctx.campaignId },

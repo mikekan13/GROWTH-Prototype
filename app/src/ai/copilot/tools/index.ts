@@ -14,6 +14,8 @@ import './attribute-set';
 import './condition';
 import './move-character';
 import './create-location';
+import './place-item';
+import './establish-world-facts';
 import './edit-character-sheet';
 import './forge-blueprint';
 import './memory';
