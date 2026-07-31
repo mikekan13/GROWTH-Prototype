@@ -36,6 +36,12 @@ const inputSchema = z.object({
     'JSON-encoded blueprint body. Must be valid JSON. Shape varies per type — ' +
       'follow the forge authoring schemas (e.g. skill needs name + governors + description).',
   ),
+  note: z.string().min(1).max(300).describe(
+    'GM-facing label: WHY you are proposing this and what it is for, in one ' +
+      'or two plain sentences (e.g. "For the tavern brawl scene — gives the ' +
+      'bouncer his signature grapple"). Shown on the draft in the Forge ' +
+      'panel so the GM remembers what they are approving.',
+  ),
 });
 // Note: campaignId is taken from the prompt context (the campaign JEWL is
 // operating in). Global-catalog promotion is the Forge chain's job — Kai
@@ -62,6 +68,14 @@ export const proposeForgeBlueprintTool: JewlTool = {
       throw new Error('dataJson must be a valid JSON string');
     }
 
+    // Stamp the proposer's note into the blueprint body under a reserved
+    // key — the Forge panel surfaces it on the draft row so the GM
+    // remembers what each queued proposal is for.
+    const dataWithNote = JSON.stringify({
+      ...(JSON.parse(parsed.dataJson) as Record<string, unknown>),
+      _proposalNote: parsed.note,
+    });
+
     const jewl = await getJewlGodHead();
     const campaignId = ctx.campaignId;
 
@@ -81,7 +95,7 @@ export const proposeForgeBlueprintTool: JewlTool = {
       data: {
         type: parsed.type,
         name: parsed.name,
-        data: parsed.dataJson,
+        data: dataWithNote,
         status: 'draft',
         campaignId,
         isGlobal: false,

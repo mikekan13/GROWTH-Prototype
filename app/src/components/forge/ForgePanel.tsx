@@ -575,6 +575,9 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
   const itemSubType = data.itemType as string | undefined;
   const material = data.material as string | undefined;
   const rarity = data.rarity as string | undefined;
+  // Proposer's label — set by JEWL (or any proposer) so the GM remembers
+  // what a queued draft is FOR when it comes up for approval.
+  const proposalNote = data._proposalNote as string | undefined;
 
   return (
     <div className="p-2.5 border transition-colors group" style={{
@@ -632,6 +635,14 @@ function ForgeItemRow({ item, isGM, onPublish, onUnpublish, onDelete, onPlace }:
             <span className="text-[14px] text-gray-500 truncate" style={{
               fontFamily: 'var(--font-terminal), Consolas, monospace',
             }}>{description}</span>
+          )}
+          {/* Proposer's note — why this draft exists, so the GM remembers
+              what they're approving. Gold to stand apart from lore text. */}
+          {proposalNote && (
+            <span className="text-[13px] truncate" title={proposalNote} style={{
+              fontFamily: 'var(--font-terminal), Consolas, monospace',
+              color: 'rgba(255,204,120,0.75)',
+            }}>✎ {proposalNote}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">

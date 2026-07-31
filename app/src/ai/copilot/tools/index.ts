@@ -14,6 +14,7 @@ import './attribute-set';
 import './condition';
 import './move-character';
 import './create-location';
+import './edit-character-sheet';
 import './forge-blueprint';
 import './memory';
 import './npc-speak';

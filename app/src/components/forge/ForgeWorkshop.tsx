@@ -127,9 +127,16 @@ function BlockDetail({ type, data }: { type: string; data: Record<string, unknow
   // Generic fallback for other types
   const description = data.description as string | undefined;
   const governors = data.governors as string[] | undefined;
+  const proposalNote = data._proposalNote as string | undefined;
 
   return (
     <div className="space-y-2">
+      {/* Proposer's label — why this draft exists (JEWL queues these) */}
+      {proposalNote && (
+        <p className="text-[12px] font-[Consolas,monospace]" style={{ color: 'rgba(255,204,120,0.8)' }}>
+          ✎ {proposalNote}
+        </p>
+      )}
       {description && (
         <p className="text-[12px] text-white/60 font-[Consolas,monospace]">{description}</p>
       )}
@@ -140,7 +147,7 @@ function BlockDetail({ type, data }: { type: string; data: Record<string, unknow
         </div>
       )}
       {/* Show all other data keys */}
-      {Object.entries(data).filter(([k]) => !['description', 'governors', 'name'].includes(k)).map(([k, v]) => (
+      {Object.entries(data).filter(([k]) => !['description', 'governors', 'name', '_proposalNote'].includes(k)).map(([k, v]) => (
         <div key={k} className="text-[10px] font-[Consolas,monospace]">
           <span className="text-white/30">{k.toUpperCase()}: </span>
           <span className="text-white/50">{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</span>
