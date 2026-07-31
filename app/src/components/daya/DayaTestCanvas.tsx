@@ -325,7 +325,9 @@ export default function DayaTestCanvas({
 
       {characterId && state && (
         <>
-          <section style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
+          {/* data-jewl-subject: right-clicking any panel summons JEWL with
+              this label as visible seed text — "help" then has context. */}
+          <section data-jewl-subject={`persona-harness Wrap panel for ${selectedCharacter?.name ?? 'character'}`} style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
             <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>1. Wrap</h2>
             {!state.wrapped ? (
               <button onClick={handleWrap}>Wrap {selectedCharacter?.name} as a persona-harness entity</button>
@@ -341,7 +343,7 @@ export default function DayaTestCanvas({
 
           {state.wrapped && (
             <>
-              <section style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
+              <section data-jewl-subject={`persona Authoring panel for ${selectedCharacter?.name ?? 'character'} — introspection, voice register/rhythm, bias sliders, identity narrative`} style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
                 <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>2. Author</h2>
                 <label style={{ display: 'block', marginBottom: 8 }}>
                   Introspection ({introspection.toFixed(2)})
@@ -391,7 +393,7 @@ export default function DayaTestCanvas({
                 <button onClick={handleSaveAuthoring}>Save authoring</button>
               </section>
 
-              <section style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
+              <section data-jewl-subject={`Vines (goals) & seeded-memories panel for ${selectedCharacter?.name ?? 'character'}`} style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
                 <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>3. Vines (goals) &amp; seeded memories</h2>
                 <div style={{ marginBottom: 12 }}>
                   <input
@@ -428,7 +430,7 @@ export default function DayaTestCanvas({
                 </div>
               </section>
 
-              <section style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
+              <section data-jewl-subject={`wake/sleep gate for ${selectedCharacter?.name ?? 'character'}`} style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
                 <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>4. Enable</h2>
                 <p>Status: <b>{state.status}</b></p>
                 {state.status === 'ACTIVE' ? (
@@ -438,7 +440,7 @@ export default function DayaTestCanvas({
                 )}
               </section>
 
-              <section style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
+              <section data-jewl-subject={`Converse panel — talking with ${selectedCharacter?.name ?? 'character'}`} style={{ border: '1px solid #ccc', padding: 16, marginBottom: 16 }}>
                 <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>5. Converse</h2>
                 {(coreStatus === 'warming' || (sending && coreStatus !== 'ready')) && (
                   <div style={{ background: '#ffcc7822', border: '1px solid #ffcc78', padding: 8, marginBottom: 8, borderRadius: 4 }}>

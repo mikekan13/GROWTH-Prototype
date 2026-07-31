@@ -129,6 +129,7 @@ function ApplicationsPanel({ campaignId }: { campaignId: string }) {
     return (
       <div
         key={member.id}
+        data-jewl-subject={`Tapestry member card — ${member.user.username} (status ${member.status})`}
         className="border p-4"
         style={{ borderColor: `${statusColor(member.status)}33`, background: 'rgba(0,0,0,0.3)' }}
       >

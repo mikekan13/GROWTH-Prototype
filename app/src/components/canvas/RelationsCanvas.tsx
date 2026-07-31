@@ -4290,6 +4290,7 @@ function CanvasCreateDialog({
     <div
       ref={ref}
       onMouseDown={(e) => e.stopPropagation()}
+      data-jewl-subject={existing ? `Location edit dialog — ${existing.name}` : 'Location create dialog'}
       className="fixed z-[100]"
       style={{ left, top, width: FORM_W }}
     >
