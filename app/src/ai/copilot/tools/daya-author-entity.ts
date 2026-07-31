@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { wrapCharacterAsDaya, updateDayaAuthoring } from '@/daya/authoring';
 import { registerJewlTool } from './registry';
+import { resolveCharacterRef } from './resolve-character';
 import type { JewlTool, JewlToolHandlerResult, JewlToolContext } from './types';
 
 const ROLE_REFUSAL = {
@@ -37,7 +38,8 @@ const voiceSchema = z.object({
 });
 
 const dayaAuthorEntityInputSchema = z.object({
-  characterId: z.string().min(1),
+  /** Character id — a name also works (resolved campaign-scoped). */
+  characterId: z.string().min(1).describe('Character id or name (e.g. "Violet").'),
   /** 0..1 self-insight capacity — how well she knows herself. */
   introspection: z.number().min(0).max(1).optional(),
   voice: voiceSchema.optional(),
@@ -65,6 +67,19 @@ export const dayaAuthorEntityTool: JewlTool = {
     }
 
     const parsed = dayaAuthorEntityInputSchema.parse(input);
+
+    // The model often passes a NAME where the schema says id — resolve
+    // either, campaign-scoped, before touching the substrate.
+    const resolved = await resolveCharacterRef(ctx.campaignId, parsed.characterId);
+    if (!resolved) {
+      return {
+        output: {
+          ok: false,
+          reason: `No character "${parsed.characterId}" in this campaign. Use list_canvas_characters or read_actors_state to find the right name/id.`,
+        },
+      };
+    }
+    parsed.characterId = resolved.id;
 
     const wrap = await wrapCharacterAsDaya(parsed.characterId, ctx.actorRole);
 

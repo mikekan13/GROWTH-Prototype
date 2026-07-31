@@ -24,8 +24,10 @@ const FORGE_TYPES = [
 
 const inputSchema = z.object({
   type: z.enum(FORGE_TYPES).describe(
-    'Blueprint type. seed/root/branch shape character creation; skill/item are ' +
-      'gameplay primitives; nectar/blossom/thorn are trait variants.',
+    'Blueprint type. A seed is a character HERITAGE template (what a being ' +
+      'is born as); root/branch also shape character creation; skill/item are ' +
+      'gameplay primitives; nectar/blossom/thorn are trait variants. There is ' +
+      'NO location type — places are not Forge content.',
   ),
   name: z.string().min(1).max(100).describe(
     'Unique within (campaign, type). Use a short, descriptive title.',
@@ -43,11 +45,12 @@ const inputSchema = z.object({
 export const proposeForgeBlueprintTool: JewlTool = {
   name: 'propose_forge_blueprint',
   description:
-    'Draft a Forge blueprint (NPC, skill, item, nectar, etc.) and submit it to Kai ' +
-    'for evaluation. Use when the GM asks you to create something the world needs to ' +
-    'contain. You are recorded as the author. Kai prices, the GM signs off, then it ' +
-    'goes live. Returns the draft id immediately so the GM can review it in the Forge ' +
-    'panel. Do NOT use this to apply existing items — only to propose NEW ones.',
+    'Draft a REUSABLE gameplay blueprint (character seed/root/branch, skill, item, ' +
+    'trait) and submit it to Kai for evaluation. You are recorded as the author. ' +
+    'Kai prices, the GM signs off, then it goes live. Returns the draft id so the ' +
+    'GM can review it in the Forge panel. Do NOT use this for world-building — ' +
+    'rooms, buildings, places of any kind are Locations: use create_location. ' +
+    'Do NOT use this to apply existing items — only to propose NEW blueprints.',
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);

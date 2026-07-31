@@ -13,6 +13,7 @@ import './time';
 import './attribute-set';
 import './condition';
 import './move-character';
+import './create-location';
 import './forge-blueprint';
 import './memory';
 import './npc-speak';

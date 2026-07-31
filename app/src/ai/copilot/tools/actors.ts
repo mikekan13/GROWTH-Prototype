@@ -20,6 +20,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { getJewlGodHead } from '@/ai/copilot/jewl-identity';
 import { registerJewlTool } from './registry';
+import { resolveCharacterRef } from './resolve-character';
 import type { JewlTool, JewlToolHandlerResult, JewlToolContext } from './types';
 import type { GrowthCharacter } from '@/types/growth';
 
@@ -28,7 +29,11 @@ import type { GrowthCharacter } from '@/types/growth';
 const READ_LIMIT = 50;
 
 const readActorsSchema = z.object({
-  actorCharacterIds: z.array(z.string().min(1)).min(1).max(READ_LIMIT),
+  actorCharacterIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(READ_LIMIT)
+    .describe('Character ids — names also work (resolved campaign-scoped).'),
 });
 
 interface ActorSnapshot {
@@ -57,9 +62,19 @@ export const readActorsStateTool: JewlTool = {
   handler: async (input, ctx: JewlToolContext): Promise<JewlToolHandlerResult> => {
     const parsed = readActorsSchema.parse(input);
 
+    // The model often passes NAMES where the schema says ids — resolve
+    // each ref (id or name, campaign-scoped) and remember the mapping so
+    // skipped entries still report under the ref JEWL used.
+    const resolvedByRef = new Map<string, string | null>();
+    for (const ref of parsed.actorCharacterIds) {
+      const r = await resolveCharacterRef(ctx.campaignId, ref);
+      resolvedByRef.set(ref, r?.id ?? null);
+    }
+    const resolvedIds = [...resolvedByRef.values()].filter((v): v is string => v !== null);
+
     const characters = await prisma.character.findMany({
       where: {
-        id: { in: parsed.actorCharacterIds },
+        id: { in: resolvedIds },
       },
       select: {
         id: true,
@@ -95,10 +110,11 @@ export const readActorsStateTool: JewlTool = {
     const snapshots: ActorSnapshot[] = [];
     const skipped: Array<{ characterId: string; reason: string }> = [];
 
-    for (const id of parsed.actorCharacterIds) {
-      const char = characters.find(c => c.id === id);
-      if (!char) {
-        skipped.push({ characterId: id, reason: 'not found' });
+    for (const ref of parsed.actorCharacterIds) {
+      const id = resolvedByRef.get(ref);
+      const char = id ? characters.find(c => c.id === id) : undefined;
+      if (!id || !char) {
+        skipped.push({ characterId: ref, reason: 'not found' });
         continue;
       }
       if (char.campaignId && char.campaignId !== ctx.campaignId) {
