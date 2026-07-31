@@ -275,6 +275,9 @@ export function JewlChip() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: `navigated ${surface(prev)} -> ${surface(pathname)}` }),
+      // Survive the very navigation that triggered the breadcrumb — an
+      // aborted send arrives server-side as an empty body.
+      keepalive: true,
     }).catch(() => { /* breadcrumbs are best-effort */ });
   }, [campaignId, pathname]);
 

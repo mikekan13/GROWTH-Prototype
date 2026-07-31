@@ -28,7 +28,14 @@ export async function POST(
     const session = await requireAuth();
     const { id: campaignId } = await params;
 
-    const body = (await request.json()) as { text?: string };
+    // Breadcrumb POSTs can arrive with an empty/truncated body when the
+    // sending fetch is aborted mid-navigation — tolerate, don't throw.
+    let body: { text?: string };
+    try {
+      body = (await request.json()) as { text?: string };
+    } catch {
+      return NextResponse.json({ error: 'text required' }, { status: 400 });
+    }
     const text = String(body.text ?? '').trim().slice(0, MAX_TEXT_LEN);
     if (!text) {
       return NextResponse.json({ error: 'text required' }, { status: 400 });
