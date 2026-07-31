@@ -15,6 +15,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { DieType, DieColor } from '@/types/dice';
 import { useDiceQueue } from '@/hooks/useDiceEvents';
 import { DiceAnimator } from './DiceAnimator';
@@ -56,6 +57,28 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
   const portalMounted = useRef(false);
   const initialized = useRef(false);
 
+  // B-1 fix: the overlay's DOM must NEVER be a direct React child of the
+  // persistent root layout while being reparented into the canvas — React
+  // computes sibling insertion anchors from its fiber tree, and a stolen
+  // node corrupts them on route transitions (canvas → settings crashed
+  // with insertBefore NotFoundError). Instead we portal into a host div
+  // that React does NOT own; moving the HOST imperatively is safe because
+  // React only manages the subtree INSIDE the portal.
+  const [hostEl] = useState<HTMLDivElement | null>(() => {
+    if (typeof document === 'undefined') return null;
+    const el = document.createElement('div');
+    el.setAttribute('data-dice-overlay-host', '');
+    el.style.position = 'absolute';
+    el.style.inset = '0';
+    el.style.zIndex = '50';
+    el.style.pointerEvents = 'none';
+    return el;
+  });
+  // Portals produce no SSR HTML; attach only after mount so hydration
+  // sees identical (empty) output on both sides.
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
+
   const [active, setActive] = useState(false);
   const [hasDice, setHasDice] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -79,31 +102,25 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
   // ── Mount/unmount ────────────────────────────────────────────────────
 
   const mountIntoContainer = useCallback((container: HTMLElement) => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper || portalMounted.current) return;
+    if (!hostEl || portalMounted.current) return;
 
     const style = getComputedStyle(container);
     if (style.position === 'static') {
       container.style.position = 'relative';
     }
 
-    container.appendChild(wrapper);
+    // hostEl is NOT React-owned — imperatively reparenting it is safe.
+    container.appendChild(hostEl);
     portalMounted.current = true;
     containerElRef.current = container;
-  }, []);
+  }, [hostEl]);
 
   const unmountFromContainer = useCallback(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper || !portalMounted.current) return;
-
-    try {
-      wrapper.parentElement?.removeChild(wrapper);
-    } catch {
-      // Already removed
-    }
+    if (!hostEl || !portalMounted.current) return;
+    hostEl.remove();
     portalMounted.current = false;
     containerElRef.current = null;
-  }, []);
+  }, [hostEl]);
 
   // ── Initialize the animator (once) ──────────────────────────────────
 
@@ -465,7 +482,9 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
 
   // ── Render ────────────────────────────────────────────────────────────
 
-  return (
+  if (!hostEl || !portalReady) return null;
+
+  return createPortal(
     <>
       <div
         ref={wrapperRef}
@@ -556,7 +575,8 @@ export function DiceOverlay({ onReady }: { onReady?: () => void } = {}) {
         )}
       </div>
 
-    </>
+    </>,
+    hostEl,
   );
 }
 
