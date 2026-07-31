@@ -13,6 +13,7 @@
 
 import { SYSTEM_PROMPT_V1 } from './v1';
 import { SYSTEM_PROMPT_V2 } from './v2';
+import { SYSTEM_PROMPT_V3 } from './v3';
 
 export type CampaignTone = 'adult' | 'all-ages';
 export type AccountAgeBand = 'adult' | 'minor' | 'unknown';
@@ -31,11 +32,12 @@ export const DEFAULT_REGISTER: RegisterInputs = {
 const VERSIONS: Record<string, string> = {
   v1: SYSTEM_PROMPT_V1,
   v2: SYSTEM_PROMPT_V2,
+  v3: SYSTEM_PROMPT_V3,
 };
 
 export function activePromptVersion(): string {
-  const v = process.env.JEWL_PROMPT_VERSION ?? 'v2';
-  return VERSIONS[v] ? v : 'v2';
+  const v = process.env.JEWL_PROMPT_VERSION ?? 'v3';
+  return VERSIONS[v] ? v : 'v3';
 }
 
 function registerBlock(reg: RegisterInputs): string {
