@@ -61,8 +61,18 @@ export async function POST(
         { status: 400 },
       );
     }
-    if (text.length > 4000) {
-      return NextResponse.json({ error: 'Prompt text too long (max 4000)' }, { status: 400 });
+    // Budgeted against the SMALLEST model in the finished route-by-job
+    // chain: the local pod core at 32k-token context (~128k chars) minus
+    // system prompt + context blocks + response headroom. 32k chars ≈ 8k
+    // tokens fits everything comfortably (a full environment-design spec
+    // is ~9k chars). Claude tiers (200k tokens) are never the binding
+    // constraint; the classifier truncates per-line and doesn't care.
+    const maxChars = Number(process.env.JEWL_PROMPT_MAX_CHARS ?? 32_000);
+    if (text.length > maxChars) {
+      return NextResponse.json(
+        { error: `Prompt text too long (max ${maxChars} characters)` },
+        { status: 400 },
+      );
     }
 
     const jewlPrompt: JewlPrompt = {
