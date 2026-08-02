@@ -24,6 +24,7 @@ import {
   type ClaudeMessageInput,
   type ClaudeToolSpec,
 } from '../providers/claude-tools';
+import { broadcastEvent } from '@/lib/campaign-stream';
 
 // System prompt is versioned (T18): src/ai/copilot/prompts/system/
 // v2 encodes the 15 behavioral laws from JEWL_Golden_Voice_Dataset_Seed.md.
@@ -36,7 +37,10 @@ import {
 } from './prompts/system';
 
 const MAX_HISTORY = 20;
-const MAX_TOOL_ITERATIONS = 6;
+// Environment builds (5 locations + a room's worth of items + fact
+// batches) legitimately need many rounds — the model batches multiple
+// tool calls per round, so this bounds API round-trips, not tool count.
+const MAX_TOOL_ITERATIONS = 12;
 
 /**
  * Build-state preamble for the Prime campaign ONLY (`name === '__PRIME__'`).
@@ -312,6 +316,16 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   let totalOutputTokens = 0;
   let model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
+  // F-2 construction-site feedback: surfaces (the canvas) show "JEWL is
+  // working here" live instead of silence until the reply lands. Best-
+  // effort — a broadcast failure never breaks the dispatch.
+  let announcedWorking = false;
+  const announceWorking = (data: { phase: 'started' | 'tool' | 'done'; tool?: string; label?: string }) => {
+    try {
+      broadcastEvent(prompt.campaignId, { kind: 'jewl_working', ...data });
+    } catch { /* best-effort */ }
+  };
+
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     const result = await callClaudeWithTools({
       systemPrompt: fullSystemPrompt,
@@ -344,6 +358,10 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     });
 
     // Dispatch each tool call.
+    if (!announcedWorking) {
+      announcedWorking = true;
+      announceWorking({ phase: 'started' });
+    }
     const userToolResults: ClaudeContentBlock[] = [];
     for (const tu of toolUseBlocks) {
       const tool = getJewlTool(tu.name);
@@ -377,6 +395,9 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
             tool_use_id: tu.id,
             content: JSON.stringify(handlerResult.output ?? {}),
           });
+          // Live tick with a human-readable line for the canvas badge.
+          const inputName = typeof tu.input.name === 'string' ? ` "${tu.input.name}"` : '';
+          announceWorking({ phase: 'tool', tool: tu.name, label: `${tu.name.replace(/_/g, ' ')}${inputName}` });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           tcRecord = { name: tu.name, input: tu.input, error: msg };
@@ -397,6 +418,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     // Add the tool results as a user turn so Claude can reason about them.
     messages.push({ role: 'user', content: userToolResults });
   }
+
+  if (announcedWorking) announceWorking({ phase: 'done' });
 
   const response: JewlResponse = {
     message: finalText,

@@ -152,10 +152,39 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   const streamEventsRef = useRef<TerminalEvent[]>([]);
   const [streamEventsTick, setStreamEventsTick] = useState(0);
 
+  // F-2 construction-site feedback: while JEWL runs a build dispatch, a
+  // visible badge shows what he's laying down; each committed tool
+  // refreshes the page data (throttled) so his work materializes AS he
+  // builds, not only when the reply lands.
+  const [jewlWorking, setJewlWorking] = useState<{ active: boolean; label: string } | null>(null);
+  const jewlRefreshAtRef = useRef(0);
+  const jewlDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const { connected, connectedUsers } = useCampaignStream({
     campaignId: campaign.id,
     onEvent: useCallback((event: CampaignStreamEvent) => {
       const { data } = event;
+
+      // JEWL live-work ticker
+      if (data.kind === 'jewl_working') {
+        if (data.phase === 'done') {
+          // Let the badge linger a beat so fast builds are still seen.
+          if (jewlDoneTimerRef.current) clearTimeout(jewlDoneTimerRef.current);
+          jewlDoneTimerRef.current = setTimeout(() => setJewlWorking(null), 1500);
+          router.refresh();
+        } else {
+          if (jewlDoneTimerRef.current) { clearTimeout(jewlDoneTimerRef.current); jewlDoneTimerRef.current = null; }
+          setJewlWorking({
+            active: true,
+            label: data.phase === 'tool' && data.label ? data.label : 'working…',
+          });
+          // Materialize committed work progressively, at most every 3s.
+          if (data.phase === 'tool' && Date.now() - jewlRefreshAtRef.current > 3000) {
+            jewlRefreshAtRef.current = Date.now();
+            router.refresh();
+          }
+        }
+      }
 
       // Handle terminal events — accumulate for the terminal to consume
       if (data.kind === 'terminal_event') {
@@ -1244,6 +1273,35 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
   return (
     <div className="h-screen bg-[var(--surface-dark)] flex flex-col overflow-hidden">
+      {/* ── JEWL construction site — visible while he lays work down (F-2).
+          The ⚒ badge names the last committed piece; page data refreshes
+          progressively underneath so his builds materialize live. */}
+      {jewlWorking?.active && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-[95] pointer-events-none"
+          style={{ top: 72 }}
+          aria-live="polite"
+        >
+          <div
+            style={{
+              background: '#000',
+              border: '1px solid rgba(208, 160, 48, 0.6)',
+              boxShadow: '0 0 18px rgba(208, 160, 48, 0.35)',
+              padding: '6px 14px',
+              fontFamily: 'Consolas, monospace',
+              fontSize: 12,
+              color: '#D0A030',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>⚒</span>
+            <span style={{ color: '#fff' }}>JEWL is building</span>
+            <span style={{ color: 'rgba(255,255,255,0.55)' }}>— {jewlWorking.label}</span>
+          </div>
+        </div>
+      )}
       {/* Compact header bar */}
       <header className="bg-[var(--surface-dark)] border-b border-[var(--accent-teal)]/30 flex-shrink-0 relative z-[60]">
         {/* Micro bar — window controls */}

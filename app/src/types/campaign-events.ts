@@ -174,6 +174,19 @@ export interface TerminalEventRelay {
   event: TerminalEvent;
 }
 
+// ── JEWL working (F-2 construction-site feedback) ─────────────────────────
+
+/** Live progress while JEWL runs a tool-using dispatch, so surfaces can
+ * show "he is building here" instead of silence until the reply lands. */
+export interface JewlWorkingEvent {
+  kind: 'jewl_working';
+  phase: 'started' | 'tool' | 'done';
+  /** Tool name, on phase 'tool'. */
+  tool?: string;
+  /** Human-readable line, e.g. `created "Main Room"`. */
+  label?: string;
+}
+
 // ── Heartbeat ─────────────────────────────────────────────────────────────
 
 export interface HeartbeatEvent {
@@ -194,6 +207,7 @@ export type StreamEventData =
   | DeathSaveEvent
   | CastResultEvent
   | TerminalEventRelay
+  | JewlWorkingEvent
   | HeartbeatEvent;
 
 /** The envelope sent over SSE */
