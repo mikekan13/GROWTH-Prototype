@@ -122,6 +122,23 @@ export const placeItemTool: JewlTool = {
       holderId,
     });
 
+    // Canvas folder membership is driven by located_at EDGES, not the
+    // locationId column — without this edge the object renders as a
+    // free-floating card instead of living inside its room.
+    if (locationId) {
+      await prisma.entityRelationship.create({
+        data: {
+          campaignId: ctx.campaignId,
+          sourceId: item.id,
+          sourceType: 'CAMPAIGN_ITEM',
+          targetId: locationId,
+          targetType: 'LOCATION',
+          relationshipType: 'located_at',
+          strength: 5,
+        },
+      });
+    }
+
     return {
       output: {
         ok: true,
