@@ -17,7 +17,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { CtxMenuBorder, CtxMenuScanlines, ctxMenuStyle } from '@/components/ui/ContextMenu';
 
 /**
@@ -102,6 +102,7 @@ function extractCampaignId(pathname: string): string | null {
 
 export function JewlChip() {
   const pathname = usePathname();
+  const router = useRouter();
   const campaignId = extractCampaignId(pathname);
 
   const [open, setOpen] = useState(false);
@@ -435,6 +436,29 @@ export function JewlChip() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
+
+  // Canvas refresh — JEWL's tool calls mutate the world server-side, but
+  // the page's server-component data doesn't know. When a NEW assistant
+  // message lands carrying toolCalls (direct reply, 5s poll, or burst),
+  // refresh the route so his builds appear without a manual reload.
+  const lastRefreshedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialHistoryLoadedRef.current) return;
+    const latestWithTools = [...messages]
+      .reverse()
+      .find(
+        m =>
+          m.role === 'assistant' &&
+          !m.id.startsWith('temp-') &&
+          !m.id.startsWith('resp-') &&
+          !m.id.startsWith('err-') &&
+          (parseAssistantActions(m.actions)?.length ?? 0) > 0,
+      );
+    if (!latestWithTools) return;
+    if (lastRefreshedIdRef.current === latestWithTools.id) return;
+    lastRefreshedIdRef.current = latestWithTools.id;
+    router.refresh();
+  }, [messages, router]);
 
   // TTS — speak each new assistant message via Web Speech API. The
   // browser's voice is robotic, which fits JEWL's Archon/Vegeta-pride
