@@ -332,6 +332,11 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       messages,
       tools,
       model,
+      // Full-spec environment payloads are BIG (a single update_location
+      // with a complete spec is ~2k tokens). The old 2048 default
+      // silently truncated multi-tool rounds — the partial tool block
+      // vanished and the dispatch ended on announcement text alone.
+      maxTokens: Number(process.env.JEWL_MAX_OUTPUT_TOKENS ?? 16_384),
     });
     totalInputTokens += result.usage.inputTokens;
     totalOutputTokens += result.usage.outputTokens;
@@ -345,8 +350,31 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     }
     if (textBlocks.length) finalText = textBlocks.join('\n').trim();
 
-    // If Claude is done OR didn't call any tools, exit.
-    if (result.stopReason !== 'tool_use' || toolUseBlocks.length === 0) {
+    // Truncated with NOTHING usable: tell the model what happened and let
+    // it retry in smaller batches instead of silently ending on its own
+    // announcement text (the "Running all four updates" → nothing bug).
+    if (result.stopReason === 'max_tokens' && toolUseBlocks.length === 0) {
+      messages.push({
+        role: 'assistant',
+        content: [{ type: 'text', text: finalText || '(response truncated)' }],
+      });
+      messages.push({
+        role: 'user',
+        content: [{
+          type: 'text',
+          text: '[SYSTEM: your response hit the output-token limit and NO tool calls were executed. Redo the work in SMALLER batches — one or two tool calls per round. Continue now.]',
+        }],
+      });
+      continue;
+    }
+
+    // If Claude is done OR didn't call any tools, exit. (A max_tokens stop
+    // WITH complete tool calls falls through — we execute what landed and
+    // the next round lets it continue the remainder.)
+    if (result.stopReason !== 'tool_use' && result.stopReason !== 'max_tokens') {
+      break;
+    }
+    if (toolUseBlocks.length === 0) {
       break;
     }
 
