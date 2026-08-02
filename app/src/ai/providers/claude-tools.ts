@@ -75,21 +75,30 @@ export async function callClaudeWithTools(
   // godhead-deep-reasoning tier that gets Opus. Override via env if needed.
   const model = opts.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: opts.maxTokens ?? 2048,
-    temperature: opts.temperature ?? 0.7,
-    system: opts.systemPrompt,
-    tools: opts.tools.map(t => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.inputSchema as Anthropic.Messages.Tool['input_schema'],
-    })),
-    messages: opts.messages.map(m => ({
-      role: m.role,
-      content: m.content as unknown as Anthropic.Messages.MessageParam['content'],
-    })),
-  });
+  const response = await client.messages.create(
+    {
+      model,
+      max_tokens: opts.maxTokens ?? 2048,
+      temperature: opts.temperature ?? 0.7,
+      system: opts.systemPrompt,
+      tools: opts.tools.map(t => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.inputSchema as Anthropic.Messages.Tool['input_schema'],
+      })),
+      messages: opts.messages.map(m => ({
+        role: m.role,
+        content: m.content as unknown as Anthropic.Messages.MessageParam['content'],
+      })),
+    },
+    {
+      // Explicit per-request timeout: large-max_tokens non-streaming calls
+      // otherwise trip the SDK's "streaming strongly recommended / may take
+      // longer than 10 minutes" guard and REFUSE to send — which surfaces
+      // as JEWL "thinking" forever with no reply and no error in the chat.
+      timeout: 9 * 60 * 1000,
+    },
+  );
 
   return {
     stopReason: response.stop_reason ?? 'end_turn',

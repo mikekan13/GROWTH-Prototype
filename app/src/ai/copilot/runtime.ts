@@ -336,7 +336,10 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       // with a complete spec is ~2k tokens). The old 2048 default
       // silently truncated multi-tool rounds — the partial tool block
       // vanished and the dispatch ended on announcement text alone.
-      maxTokens: Number(process.env.JEWL_MAX_OUTPUT_TOKENS ?? 16_384),
+      // 8192 ≈ 3-4 full payloads per round, and stays comfortably under
+      // the SDK's non-streaming long-request guard; the truncation
+      // continuation below handles anything bigger across rounds.
+      maxTokens: Number(process.env.JEWL_MAX_OUTPUT_TOKENS ?? 8_192),
     });
     totalInputTokens += result.usage.inputTokens;
     totalOutputTokens += result.usage.outputTokens;
