@@ -1244,14 +1244,20 @@ export default function RelationsCanvas({
   /** Convert client-space coords to SVG world coords */
   const clientToSvg = useCallback(
     (clientX: number, clientY: number) => {
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (!rect) return { x: 0, y: 0 };
-      return {
-        x: viewBox.x + ((clientX - rect.left) / rect.width) * viewBox.width,
-        y: viewBox.y + ((clientY - rect.top) / rect.height) * viewBox.height,
-      };
+      // Use the live screen CTM — the naive rect→viewBox linear map
+      // ignores preserveAspectRatio letterboxing, which shifted absolute
+      // coords (the marquee rendered far left of the cursor).
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return { x: 0, y: 0 };
+      const pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const p = pt.matrixTransform(ctm.inverse());
+      return { x: p.x, y: p.y };
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- CTM reflects camera+zoom
     [camera, zoom]
   );
 
@@ -1772,20 +1778,8 @@ export default function RelationsCanvas({
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      // OS-grade map (S-5): plain wheel / two-finger = PAN; Ctrl+wheel
-      // (and trackpad pinch, which browsers deliver as wheel+ctrlKey) =
-      // zoom at cursor. This is the Figma default — trackpad users get
-      // natural two-finger panning instead of accidental zoom.
-      if (!e.ctrlKey && !e.metaKey) {
-        const scaleX = viewBox.width / rect.width;
-        const scaleY = viewBox.height / rect.height;
-        setCamera(prev => ({
-          x: prev.x + e.deltaX * scaleX,
-          y: prev.y + e.deltaY * scaleY,
-        }));
-        return;
-      }
-
+      // Wheel = zoom at cursor (Mike's ruling 2026-08-03: scrollwheel
+      // zoom stays — the wheel-pan experiment is reverted).
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
       // Mouse position in SVG coordinates
@@ -3575,7 +3569,7 @@ export default function RelationsCanvas({
             boxShadow: '0 0 16px rgba(34,171,148,0.3)', padding: '8px 16px',
             fontFamily: 'Consolas, monospace', fontSize: 13, color: '#fff',
           }}>
-            Drag selects — hold <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>Space</span> (or middle-drag) to pan · wheel pans · <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>Ctrl+wheel</span> zooms
+            Drag selects — hold <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>Space</span> (or middle-drag) to pan · wheel zooms
           </div>
         </div>
       )}
