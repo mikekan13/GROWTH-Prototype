@@ -1044,9 +1044,76 @@ export default function RelationsCanvas({
     }
   }, [committedFolderRectById, addSubtreeOffsetInto]);
 
-  /** Land every transient physics offset as committed state, batched. */
+  // ── Fluid reaction layer (Mike 2026-08-03: "still too snappy, more
+  // fluid") ── The DRAGGED thing tracks the cursor 1:1 (gesture
+  // offsets); everything REACTING — pushed siblings, repacking contents
+  // — eases toward its target via a rAF lerp instead of teleporting.
+  const gestureOffsetsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const reactionTargetsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const reactionCurrentsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const physicsRafRef = useRef<number | null>(null);
+
+  const mergePhysicsFrame = useCallback(() => {
+    const merged = new Map(gestureOffsetsRef.current);
+    for (const [k, v] of reactionCurrentsRef.current) {
+      const g = merged.get(k);
+      merged.set(k, g ? { x: g.x + v.x, y: g.y + v.y } : v);
+    }
+    setDragOffsets(merged);
+  }, []);
+
+  const physicsTick = useCallback(() => {
+    const targets = reactionTargetsRef.current;
+    const currents = reactionCurrentsRef.current;
+    // Keys whose target vanished ease back to rest.
+    for (const k of [...currents.keys()]) {
+      if (!targets.has(k)) targets.set(k, { x: 0, y: 0 });
+    }
+    let animating = false;
+    for (const [k, t] of targets) {
+      const c = currents.get(k) ?? { x: 0, y: 0 };
+      const nx = c.x + (t.x - c.x) * 0.22;
+      const ny = c.y + (t.y - c.y) * 0.22;
+      if (Math.abs(t.x - nx) < 0.5 && Math.abs(t.y - ny) < 0.5) {
+        if (t.x === 0 && t.y === 0) { currents.delete(k); targets.delete(k); }
+        else currents.set(k, { x: t.x, y: t.y });
+      } else {
+        currents.set(k, { x: nx, y: ny });
+        animating = true;
+      }
+    }
+    mergePhysicsFrame();
+    const gestureLive = resizeActiveRef.current || gestureOffsetsRef.current.size > 0;
+    physicsRafRef.current = (animating || gestureLive) ? requestAnimationFrame(physicsTick) : null;
+  }, [mergePhysicsFrame]);
+
+  const ensurePhysicsLoop = useCallback(() => {
+    if (physicsRafRef.current == null) {
+      physicsRafRef.current = requestAnimationFrame(physicsTick);
+    }
+  }, [physicsTick]);
+
+  /** Land every transient physics offset as committed state, batched.
+   *  Commits the TARGETS (final resting places), not the mid-animation
+   *  currents — release lands exactly where the physics was headed. */
   const commitPhysicsOffsets = useCallback(() => {
-    const offs = dragOffsetsRef.current;
+    const offs = new Map(gestureOffsetsRef.current);
+    for (const [k, v] of reactionTargetsRef.current) {
+      const g = offs.get(k);
+      offs.set(k, g ? { x: g.x + v.x, y: g.y + v.y } : v);
+    }
+    // Fall back to raw dragOffsets when the fluid layer wasn't in play
+    // (e.g. legacy paths).
+    if (offs.size === 0) {
+      for (const [k, v] of dragOffsetsRef.current) offs.set(k, v);
+    }
+    gestureOffsetsRef.current = new Map();
+    reactionTargetsRef.current = new Map();
+    reactionCurrentsRef.current = new Map();
+    if (physicsRafRef.current != null) {
+      cancelAnimationFrame(physicsRafRef.current);
+      physicsRafRef.current = null;
+    }
     if (offs.size === 0) return;
     const folderMoves = new Map<string, { x: number; y: number }>();
     const nodeMoves = new Map<string, { x: number; y: number }>();
@@ -1738,7 +1805,7 @@ export default function RelationsCanvas({
       // â”€â”€ Folder drag (moves all member nodes together) â”€â”€
       if (dragFolderId && folderDragStartSvg) {
         const current = clientToSvg(e.clientX, e.clientY);
-        const dx = current.x - folderDragStartSvg.x;
+        let dx = current.x - folderDragStartSvg.x;
         let dy = current.y - folderDragStartSvg.y;
         const folder = foldersRef.current.find(f => f.id === dragFolderId);
         if (folder) {
@@ -1808,34 +1875,52 @@ export default function RelationsCanvas({
               }
             }
           }
-          setDragOffsets(() => {
-            // Fresh map every frame — offsets are absolute deltas from
-            // gesture start, and live pushes are recomputed against
-            // COMMITTED geometry, so nothing compounds.
-            const next = new Map<string, { x: number; y: number }>();
-            // Members that are CHILD FOLDERS (nested locations) carry
-            // their whole subtree so the entire tree moves live.
+          // Containment (Mike 2026-08-03: a child folder must never
+          // stick outside its parent): clamp the drag so the child's
+          // rect stays within the parent's interior.
+          const dragLocId = folder.locationInfo?.locationId;
+          if (dragLocId) {
+            const parentEntry = foldersRef.current.find(
+              ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(dragLocId),
+            );
+            const parentLocId = parentEntry?.id.slice('auto-'.length);
+            const childRect = committedFolderRectById.get(dragLocId);
+            const parentRect = parentLocId ? committedFolderRectById.get(parentLocId) : undefined;
+            if (childRect && parentRect) {
+              const PADC = 24, HEADERC = 96;
+              const minDx = (parentRect.x + PADC) - childRect.x;
+              const maxDx = (parentRect.x + parentRect.width - PADC) - (childRect.x + childRect.width);
+              const minDy = (parentRect.y + HEADERC) - childRect.y;
+              const maxDy = (parentRect.y + parentRect.height - PADC) - (childRect.y + childRect.height);
+              if (minDx <= maxDx) dx = Math.max(minDx, Math.min(maxDx, dx));
+              if (minDy <= maxDy) dy = Math.max(minDy, Math.min(maxDy, dy));
+            }
+          }
+          {
+            // GESTURE offsets: the dragged subtree tracks the cursor 1:1.
+            const gesture = new Map<string, { x: number; y: number }>();
             for (const nodeId of folder.nodeIds) {
-              next.set(nodeId, { x: dx, y: dy });
+              gesture.set(nodeId, { x: dx, y: dy });
               if (foldersRef.current.some(ff => ff.id === `auto-${nodeId}`)) {
-                addSubtreeOffsetInto(next, nodeId, dx, dy);
+                addSubtreeOffsetInto(gesture, nodeId, dx, dy);
               }
             }
-            // Always set folder pseudo-key so anchor translates with content
-            next.set(`__folder__${folder.id}`, { x: dx, y: dy });
-            // Live bumping (physicality): the dragged folder's live rect
-            // pushes overlapping siblings out of the way in real time.
-            const locId = folder.locationInfo?.locationId;
-            if (locId) {
-              const rect = committedFolderRectById.get(locId);
+            gesture.set(`__folder__${folder.id}`, { x: dx, y: dy });
+            gestureOffsetsRef.current = gesture;
+            // REACTIONS ease: bumped siblings glide out of the way.
+            const reactions = new Map<string, { x: number; y: number }>();
+            if (dragLocId) {
+              const rect = committedFolderRectById.get(dragLocId);
               if (rect) {
-                computeSiblingPushesInto(next, locId, {
+                computeSiblingPushesInto(reactions, dragLocId, {
                   x: rect.x + dx, y: rect.y + dy, width: rect.width, height: rect.height,
                 });
               }
             }
-            return next;
-          });
+            reactionTargetsRef.current = reactions;
+            mergePhysicsFrame();
+            ensurePhysicsLoop();
+          }
         }
         return;
       }
@@ -1935,7 +2020,7 @@ export default function RelationsCanvas({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
-    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee, addSubtreeOffsetInto, computeSiblingPushesInto, committedFolderRectById]
+    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee, addSubtreeOffsetInto, computeSiblingPushesInto, committedFolderRectById, mergePhysicsFrame, ensurePhysicsLoop]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -2111,6 +2196,11 @@ export default function RelationsCanvas({
           }
         }
       }
+      // Fluid-layer cleanup (idempotent — the location path's commit
+      // already cleared; the party/manual path needs it too).
+      gestureOffsetsRef.current = new Map();
+      reactionTargetsRef.current = new Map();
+      reactionCurrentsRef.current = new Map();
       // Sibling non-overlap: the folder just moved — after the commit
       // renders, nudge it clear of any sibling it landed on.
       {
@@ -3565,7 +3655,10 @@ export default function RelationsCanvas({
                     width,
                     height,
                   });
-                  setDragOffsets(next);
+                  // Fluid: reactions ease toward their slots instead of
+                  // teleporting.
+                  reactionTargetsRef.current = next;
+                  ensurePhysicsLoop();
                 }
                 const updated = foldersRef.current.map(f => {
                   if (f.id === folderId) {
