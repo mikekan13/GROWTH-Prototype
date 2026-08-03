@@ -46,6 +46,9 @@ interface FolderGroupProps {
   dragOffsets: Map<string, { x: number; y: number }>;
   nodeTypes: Map<string, string>;
   expandedNodes: Set<string>;
+  /** Child-folder footprints keyed by location id — lets a parent
+   *  folder's area encompass its nested sub-folders. */
+  childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>;
   characters: CharacterInfo[];
   campaignId: string;
   viewBox: { x: number; y: number; width: number; height: number };
@@ -108,11 +111,26 @@ export function calcContentBounds(
   dragOffsets: Map<string, { x: number; y: number }>,
   nodeTypes: Map<string, string>,
   expandedNodes: Set<string>,
+  /** Recursive containment: rects of CHILD FOLDERS keyed by their
+   *  location id. A member that is itself a container has no node
+   *  position (Locations render as folders, not cards) — its computed
+   *  folder rect is its footprint, so the parent's area encompasses the
+   *  sub-folder. World-recursive design: folders nest. */
+  childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>,
 ): ContentBounds | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let hasNodes = false;
 
   for (const nodeId of folder.nodeIds) {
+    const childRect = childFolderRects?.get(nodeId);
+    if (childRect) {
+      hasNodes = true;
+      minX = Math.min(minX, childRect.x);
+      minY = Math.min(minY, childRect.y);
+      maxX = Math.max(maxX, childRect.x + childRect.width);
+      maxY = Math.max(maxY, childRect.y + childRect.height);
+      continue;
+    }
     const pos = nodePositions.get(nodeId);
     if (!pos) continue;
     hasNodes = true;
@@ -163,6 +181,7 @@ export function FolderGroupRect({
   dragOffsets,
   nodeTypes,
   expandedNodes,
+  childFolderRects,
   characters,
   onFolderResize,
   onFolderDragStart,
@@ -179,6 +198,7 @@ export function FolderGroupRect({
   dragOffsets: Map<string, { x: number; y: number }>;
   nodeTypes: Map<string, string>;
   expandedNodes: Set<string>;
+  childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>;
   characters: CharacterInfo[];
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
@@ -200,8 +220,8 @@ export function FolderGroupRect({
   } | null>(null);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes),
-    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes]
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects),
+    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
   );
 
   const COLLAPSED_WIDTH = 680;
@@ -1021,6 +1041,7 @@ export default function FolderGroup({
   dragOffsets,
   nodeTypes,
   expandedNodes,
+  childFolderRects,
   characters,
   campaignId,
   viewBox,
@@ -1061,8 +1082,8 @@ export default function FolderGroup({
   }, [folder.id]);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes),
-    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes]
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects),
+    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
   );
 
   const bounds = useMemo(() => {

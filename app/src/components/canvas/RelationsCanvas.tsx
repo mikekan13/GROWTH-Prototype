@@ -312,6 +312,38 @@ export default function RelationsCanvas({
     return new Set(loadJSON<string[]>('expanded', []));
   });
 
+  // Recursive folder containment (world-recursive design): a parent
+  // folder's area must encompass its CHILD FOLDERS, whose location-
+  // members have no node positions (Locations render as folders, not
+  // cards). Compute every auto-folder's footprint bottom-up — three
+  // passes covers three nesting levels; deeper levels converge on
+  // later renders.
+  const folderRectById = useMemo(() => {
+    const rects = new Map<string, { x: number; y: number; width: number; height: number }>();
+    const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+    for (let pass = 0; pass < 3; pass++) {
+      for (const f of folders) {
+        if (!f.id.startsWith('auto-')) continue;
+        const locId = f.id.slice('auto-'.length);
+        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects);
+        let rect: { x: number; y: number; width: number; height: number };
+        if (!content) {
+          rect = {
+            x: f.posX ?? -360,
+            y: f.posY ?? 100,
+            width: Math.max(720, f.userWidth || 0),
+            height: Math.max(200, f.userHeight || 0),
+          };
+        } else {
+          const display = getDisplayBounds(content, f);
+          rect = f.collapsed ? { ...display, width: 680, height: 80 } : display;
+        }
+        rects.set(locId, rect);
+      }
+    }
+    return rects;
+  }, [folders, nodes, nodePositions, dragOffsets, expandedNodes]);
+
   // â”€â”€ Inventory sub-panel state â”€â”€
   // Highlights the drop-target character when an inventory ROW is being dragged
   // (separate from `draggingItemId` which tracks canvas-card drags).
@@ -2896,6 +2928,7 @@ export default function RelationsCanvas({
               dragOffsets={dragOffsets}
               nodeTypes={nodeTypes}
               expandedNodes={expandedNodes}
+              childFolderRects={folderRectById}
               characters={folderChars}
               svgRef={svgRef}
               viewBox={viewBox}
@@ -2948,8 +2981,21 @@ export default function RelationsCanvas({
                     }
                   }
                 }
+                // Pin the anchor to the folder's CURRENT footprint before
+                // toggling — otherwise a collapsing parent whose members
+                // are hidden loses its content bounds and the strip jumps
+                // to a stale fallback position ("minimized and it just
+                // disappeared").
+                const locId = folderId.startsWith('auto-') ? folderId.slice('auto-'.length) : null;
+                const currentRect = locId ? folderRectById.get(locId) : undefined;
                 const updated = foldersRef.current.map(ff =>
-                  ff.id === folderId ? { ...ff, collapsed: !ff.collapsed } : ff
+                  ff.id === folderId
+                    ? {
+                        ...ff,
+                        collapsed: !ff.collapsed,
+                        ...(currentRect ? { posX: currentRect.x, posY: currentRect.y } : {}),
+                      }
+                    : ff
                 );
                 onFoldersChange?.(updated);
               }}
@@ -3493,6 +3539,7 @@ export default function RelationsCanvas({
             dragOffsets={dragOffsets}
             nodeTypes={nodeTypes}
             expandedNodes={expandedNodes}
+            childFolderRects={folderRectById}
             characters={folderChars}
             campaignId={campaignId}
             viewBox={viewBox}
