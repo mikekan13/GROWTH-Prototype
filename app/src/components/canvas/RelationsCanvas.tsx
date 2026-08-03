@@ -1507,7 +1507,33 @@ export default function RelationsCanvas({
           const checkX = baseX + (lastNodeOffset?.x ?? 0) + 200; // ~middle of a typical header
           const checkY = baseY + (lastNodeOffset?.y ?? 0) + 40;  // ~middle of the chrome strip
           const newParentId = findContainingLocationFolder(checkX, checkY, folder.id);
-          if (newParentId && newParentId !== myLocId) {
+          // With real nesting, overlap is NORMAL: children sit inside
+          // their parent, and a dragged parent often covers its own
+          // children. Only re-parent on a REAL change, and never into a
+          // descendant (that wrote the Apartment ↔ Kitchen cycle).
+          const currentParentId =
+            foldersRef.current
+              .find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(myLocId))
+              ?.id.slice('auto-'.length) ?? null;
+          const descendantLocIds = new Set<string>();
+          {
+            const collect = (locId: string) => {
+              const cf = foldersRef.current.find(ff => ff.id === `auto-${locId}`);
+              for (const nid of cf?.nodeIds ?? []) {
+                if (!descendantLocIds.has(nid) && foldersRef.current.some(ff => ff.id === `auto-${nid}`)) {
+                  descendantLocIds.add(nid);
+                  collect(nid);
+                }
+              }
+            };
+            collect(myLocId);
+          }
+          if (
+            newParentId &&
+            newParentId !== myLocId &&
+            newParentId !== currentParentId &&
+            !descendantLocIds.has(newParentId)
+          ) {
             void fetch(`/api/campaigns/${campaignId}/locations/${myLocId}/parent`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

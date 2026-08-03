@@ -185,6 +185,25 @@ export async function setLocationParent(
     if (!parent || parent.campaignId !== campaignId) {
       throw new NotFoundError('Parent location not found in this campaign');
     }
+    // Cycle guard: never nest a Location inside its own descendant. The
+    // canvas drag gesture can aim anywhere — a parent dropped over one of
+    // its own children previously wrote a reverse edge and formed a
+    // 2-node cycle (Apartment ↔ Kitchen, 2026-08-02), which broke every
+    // ancestor walk downstream. Walk UP from the requested parent; if the
+    // chain reaches locationId, the request inverts existing ancestry.
+    const seen = new Set<string>();
+    let cursor: string | null = parentId;
+    while (cursor && !seen.has(cursor)) {
+      if (cursor === locationId) {
+        throw new Error('Cannot nest a Location inside its own descendant');
+      }
+      seen.add(cursor);
+      const edge: { targetId: string } | null = await prisma.entityRelationship.findFirst({
+        where: { sourceId: cursor, sourceType: 'LOCATION', relationshipType: 'located_at' },
+        select: { targetId: true },
+      });
+      cursor = edge?.targetId ?? null;
+    }
   }
 
   // Capture the old parent for the perspective log before the swap.

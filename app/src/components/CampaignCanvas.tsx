@@ -452,17 +452,30 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   // Auto-folders default to collapsed so the canvas reads calm by default —
   // GM expands when they want to look inside, per the world-design pillar.
   const allEffectiveFolders = useMemo(() => {
-    const storedIds = new Set(folders.map(f => f.id));
-    const merged = [...folders];
+    // For auto-folders, the SERVER is the source of truth for membership
+    // and location info — a cached folder object froze its nodeIds at
+    // whatever the graph looked like when first stored, silently
+    // discarding every later located_at change (bug-scout 2026-08-02:
+    // all four apartment folders cached with nodeIds:[]). Only the
+    // GM-authored layout fields persist from storage.
+    const storedById = new Map(folders.map(f => [f.id, f]));
+    const autoIds = new Set((autoFolders ?? []).map(af => af.id));
+    const merged = folders.filter(f => !autoIds.has(f.id));
     for (const af of autoFolders ?? []) {
-      if (!storedIds.has(af.id)) {
+      const stored = storedById.get(af.id);
+      merged.push({
+        // Server-fresh: nodeIds, locationInfo, name, type.
+        ...af,
+        // GM-authored overrides that should persist:
+        ...(stored?.posX != null ? { posX: stored.posX } : {}),
+        ...(stored?.posY != null ? { posY: stored.posY } : {}),
+        ...(stored?.userWidth != null ? { userWidth: stored.userWidth } : {}),
+        ...(stored?.userHeight != null ? { userHeight: stored.userHeight } : {}),
         // Every Location renders as a container per the world-recursive
         // design — and OPEN by default: a location folder is a real AREA
         // like the party folder (Mike 2026-08-02), not a collapsed strip.
-        // The GM can still collapse; that choice persists via stored
-        // folder overrides.
-        merged.push({ ...af, collapsed: af.collapsed ?? false });
-      }
+        collapsed: stored?.collapsed ?? af.collapsed ?? false,
+      });
     }
     // Deterministic fan-out for Location folders without stored coords.
     // Seeded/imported children often have no canvasX/Y — without this they
@@ -508,7 +521,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       const parentByChild = new Map(locatedAtEdges.map(e => [e.child, e.parent]));
       const hiddenByAncestorCollapse = (id: string): boolean => {
         let cur = parentByChild.get(id);
-        const seen = new Set<string>();
+        // Seed with the entity's own id: a corrupted/cyclic parent chain
+        // (e.g. Apartment ↔ Kitchen) must never let a folder hide ITSELF
+        // by walking back around to its own collapsed state — that was
+        // the collapse-makes-everything-vanish bug.
+        const seen = new Set<string>([id]);
         while (cur && !seen.has(cur)) {
           if (collapsedByLoc.get(cur)) return true;
           seen.add(cur);
