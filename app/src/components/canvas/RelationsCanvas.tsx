@@ -3476,6 +3476,12 @@ export default function RelationsCanvas({
                   setPendingLayoutPass({ locId: folderId.slice('auto-'.length), compact: false });
                 }
               }}
+              onToggleDetails={(folderId) => {
+                const updated = foldersRef.current.map(f =>
+                  f.id === folderId ? { ...f, detailsOpen: !f.detailsOpen } : f
+                );
+                onFoldersChange?.(updated);
+              }}
               isDropTarget={dropTargetFolderId === folder.id}
               onFolderDragStart={(folderId, startSvg) => {
                 if (resizeActiveRef.current) return; // resize is resize, never a drag

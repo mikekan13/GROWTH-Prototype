@@ -88,11 +88,16 @@ function locationDetailsPanelHeight(li: NonNullable<CanvasFolder['locationInfo']
 const SOUL_BLUE = '#002f6c';
 const HANDLE_SIZE = 36;
 
-/** Effective header height. Location folders fit their full details panel
- *  (no scroll). Estimated dynamically from content so sparse Locations
- *  stay compact and rich ones grow naturally. Plain folders keep 80px. */
+/** Compact details strip: one-line essence + the expand affordance. */
+const COMPACT_DETAILS_H = 44;
+
+/** Effective header height. Location folders default to a COMPACT
+ *  one-line details strip (A6: the always-full panel made every folder
+ *  header a billboard); folder.detailsOpen expands the full panel.
+ *  Plain folders keep 80px. */
 function locationHeaderHeight(folder: CanvasFolder): number {
   if (!folder.locationInfo) return HEADER_HEIGHT;
+  if (!folder.detailsOpen) return CHROME_HEIGHT + PANEL_GAP + COMPACT_DETAILS_H + 12;
   return CHROME_HEIGHT + PANEL_GAP + locationDetailsPanelHeight(folder.locationInfo) + 12;
 }
 
@@ -203,6 +208,7 @@ export function FolderGroupRect({
   characters,
   onFolderResize,
   onFolderResizeEnd,
+  onToggleDetails,
   onFolderDragStart,
   onActionsToggle,
   onToggleCollapsed,
@@ -222,6 +228,8 @@ export function FolderGroupRect({
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
   /** Fired once when a resize gesture ENDS — compaction/overlap pass. */
   onFolderResizeEnd?: (folderId: string) => void;
+  /** Toggle the location details panel (compact strip ↔ full panel). */
+  onToggleDetails?: (folderId: string) => void;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
   onActionsToggle: (folderId: string) => void;
   /** currentRect = the exact bounds this folder is RENDERED with right
@@ -746,12 +754,49 @@ export function FolderGroupRect({
             </foreignObject>
           )}
 
-          {/* Details panel — surfaces every Location field. Always renders
-              for Location folders so the GM sees the field structure;
-              missing fields show "(empty)" placeholders inviting fill.
-              Read-only for now; editing routes through the JEWL dialog
-              (right-click → edit, tracked separately). */}
-          {!folder.collapsed && (() => {
+          {/* Compact details strip (A6 default): one-line essence + the
+              expand affordance. The full always-on panel made every
+              folder header a billboard. */}
+          {!folder.collapsed && !folder.detailsOpen && folder.locationInfo && (
+            <foreignObject
+              x={bounds.x + 12}
+              y={bounds.y + 86}
+              width={Math.max(bounds.width - 24, 200)}
+              height={COMPACT_DETAILS_H}
+              style={{ pointerEvents: 'auto', overflow: 'visible' }}
+            >
+              <div
+                style={{
+                  fontFamily: 'Consolas, monospace',
+                  fontSize: 18,
+                  color: 'rgba(255,255,255,0.75)',
+                  background: 'rgba(0,0,0,0.45)',
+                  border: '1px solid rgba(34,171,148,0.2)',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); onToggleDetails?.(folder.id); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--terminal-prime, #22ab94)', cursor: 'pointer', fontFamily: 'Consolas, monospace', fontSize: 16, flexShrink: 0, padding: 0 }}
+                  title="Show full details"
+                >
+                  {'▸'} dETAILS
+                </button>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {folder.locationInfo.description || <span style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>(no description)</span>}
+                </span>
+              </div>
+            </foreignObject>
+          )}
+
+          {/* Full details panel — every Location field; opt-in via the
+              dETAILS toggle. Read-only; editing routes through JEWL. */}
+          {!folder.collapsed && !!folder.detailsOpen && (() => {
             const li = folder.locationInfo!;
             const emptyPlaceholder = (
               <span style={{ color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>(empty)</span>
@@ -777,6 +822,13 @@ export function FolderGroupRect({
                     gap: 10,
                   }}
                 >
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onToggleDetails?.(folder.id); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--terminal-prime, #22ab94)', cursor: 'pointer', fontFamily: 'Consolas, monospace', fontSize: 16, alignSelf: 'flex-start', padding: 0 }}
+                    title="Collapse details"
+                  >
+                    {'▾'} dETAILS
+                  </button>
                   <div style={{ fontSize: 22, lineHeight: 1.4, color: '#fdfdfd', whiteSpace: 'pre-wrap' }}>
                     {li.description || emptyPlaceholder}
                   </div>

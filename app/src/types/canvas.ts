@@ -16,6 +16,10 @@ export interface CanvasFolder {
   posY?: number;
   /** When true, folder collapses to just the header bar */
   collapsed?: boolean;
+  /** When true, the location details panel shows in full (description/
+   *  environment/tags/notes). Default = compact one-line essence — the
+   *  full panel made every folder header a billboard (A6, 2026-08-03). */
+  detailsOpen?: boolean;
   /**
    * Optional Location info, set by server-generated auto-folders so the
    * folder IS the location (no separate Location card). Renders a KRMA

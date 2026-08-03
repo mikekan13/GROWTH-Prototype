@@ -475,6 +475,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         // design — and OPEN by default: a location folder is a real AREA
         // like the party folder (Mike 2026-08-02), not a collapsed strip.
         collapsed: stored?.collapsed ?? af.collapsed ?? false,
+        // Details panel stays compact unless the GM opened it (A6).
+        ...(stored?.detailsOpen != null ? { detailsOpen: stored.detailsOpen } : {}),
       });
     }
     // Deterministic fan-out for Location folders without stored coords.
