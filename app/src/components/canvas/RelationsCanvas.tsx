@@ -298,6 +298,85 @@ export default function RelationsCanvas({
     return new Map(stored);
   });
   const [dragOffsets, setDragOffsets] = useState<Map<string, { x: number; y: number }>>(new Map());
+
+  // ── OS-grade selection (S-5, canvas-os-interaction-standard) ──
+  // Left-drag on empty canvas = marquee select; Space/middle-drag = pan;
+  // drag any selected card moves the whole selection.
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const selectedNodeIdsRef = useRef(selectedNodeIds);
+  selectedNodeIdsRef.current = selectedNodeIds;
+  const [marquee, setMarquee] = useState<{
+    startX: number; startY: number; curX: number; curY: number; additive: boolean;
+  } | null>(null);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const spaceHeldRef = useRef(false);
+  spaceHeldRef.current = spaceHeld;
+  const [showPanToast, setShowPanToast] = useState(false);
+
+  // Group-aware drag plumbing (S-5): cards report their own drag via
+  // onDragOffsetChange/onPositionChange — these helpers mirror the
+  // origin card's delta onto every other selected card, live and at
+  // commit. Dragging an UNSELECTED card replaces the selection with it
+  // (desktop convention).
+  const lastDragDeltaRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
+  const applyGroupDragOffset = useCallback((nodeId: string, offsetX: number, offsetY: number) => {
+    const sel = selectedNodeIdsRef.current;
+    if ((offsetX !== 0 || offsetY !== 0) && !sel.has(nodeId) && sel.size > 0) {
+      setSelectedNodeIds(new Set([nodeId]));
+    }
+    const group = sel.has(nodeId) && sel.size > 1 ? [...sel] : [nodeId];
+    if (offsetX !== 0 || offsetY !== 0) {
+      lastDragDeltaRef.current = { id: nodeId, dx: offsetX, dy: offsetY };
+    }
+    setDragOffsets((prev) => {
+      const next = new Map(prev);
+      for (const id of group) {
+        if (offsetX === 0 && offsetY === 0) next.delete(id);
+        else next.set(id, { x: offsetX, y: offsetY });
+      }
+      return next;
+    });
+  }, []);
+  const commitGroupDrag = useCallback((nodeId: string) => {
+    const d = lastDragDeltaRef.current;
+    if (!d || d.id !== nodeId) return;
+    lastDragDeltaRef.current = null;
+    const sel = selectedNodeIdsRef.current;
+    if (!(sel.has(nodeId) && sel.size > 1)) return;
+    setNodePositions((prev) => {
+      const next = new Map(prev);
+      for (const id of sel) {
+        if (id === nodeId) continue;
+        const base = prev.get(id);
+        if (!base) continue;
+        next.set(id, { x: base.x + d.dx, y: base.y + d.dy });
+        onNodePositionChange?.(id, base.x + d.dx, base.y + d.dy);
+      }
+      return next;
+    });
+  }, [onNodePositionChange]);
+
+  // Space = temporary hand tool (universal convention); Escape = deselect.
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (e.code === 'Space' && !typing) {
+        setSpaceHeld(true);
+        e.preventDefault(); // keep the page from scrolling
+      }
+      if (e.key === 'Escape') setSelectedNodeIds(new Set());
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
   const [nodeZIndices, setNodeZIndices] = useState<Map<string, number>>(() => {
     const stored = loadJSON<[string, number][]>('zIndices', []);
     return new Map(stored);
@@ -1228,18 +1307,43 @@ export default function RelationsCanvas({
         target.tagName === "svg";
 
       if (isBackground) {
-        setIsPanning(true);
-        setIsDragging(true);
-        setPanStart({ x: e.clientX, y: e.clientY, viewBoxX: camera.x, viewBoxY: camera.y });
-        e.preventDefault();
-        e.stopPropagation();
+        // OS-grade gesture map (S-5): middle-drag or Space+drag = pan;
+        // plain left-drag = marquee select (the desktop convention).
+        if (e.button === 1 || spaceHeldRef.current) {
+          setIsPanning(true);
+          setIsDragging(true);
+          setPanStart({ x: e.clientX, y: e.clientY, viewBoxX: camera.x, viewBoxY: camera.y });
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        if (e.button === 0) {
+          const pt = clientToSvg(e.clientX, e.clientY);
+          setMarquee({ startX: pt.x, startY: pt.y, curX: pt.x, curY: pt.y, additive: e.shiftKey });
+          // One-time teaching toast: the single retrained habit.
+          try {
+            if (!localStorage.getItem('growth-pan-toast-shown')) {
+              localStorage.setItem('growth-pan-toast-shown', '1');
+              setShowPanToast(true);
+              setTimeout(() => setShowPanToast(false), 7000);
+            }
+          } catch { /* storage unavailable — skip the toast */ }
+          e.preventDefault();
+          e.stopPropagation();
+        }
       }
     },
-    [camera.x, camera.y]
+    [camera.x, camera.y, clientToSvg]
   );
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
+      // Marquee select (S-5): live-track the band.
+      if (marquee) {
+        const cur = clientToSvg(e.clientX, e.clientY);
+        setMarquee((m) => (m ? { ...m, curX: cur.x, curY: cur.y } : m));
+        return;
+      }
       // â”€â”€ Folder drag (moves all member nodes together) â”€â”€
       if (dragFolderId && folderDragStartSvg) {
         const current = clientToSvg(e.clientX, e.clientY);
@@ -1335,7 +1439,14 @@ export default function RelationsCanvas({
 
         setDragOffsets((prev) => {
           const next = new Map(prev);
-          next.set(dragNodeId, { x: dx, y: dy });
+          // Group drag (S-5): dragging any selected card moves the whole
+          // selection, preserving relative offsets.
+          const sel = selectedNodeIdsRef.current;
+          if (sel.has(dragNodeId) && sel.size > 1) {
+            for (const id of sel) next.set(id, { x: dx, y: dy });
+          } else {
+            next.set(dragNodeId, { x: dx, y: dy });
+          }
           return next;
         });
 
@@ -1415,10 +1526,34 @@ export default function RelationsCanvas({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
-    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg]
+    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee]
   );
 
   const handleMouseUp = useCallback(() => {
+    // Marquee commit (S-5): touch-intersect selection; a sub-threshold
+    // drag counts as a background click = deselect.
+    if (marquee) {
+      const x1 = Math.min(marquee.startX, marquee.curX);
+      const x2 = Math.max(marquee.startX, marquee.curX);
+      const y1 = Math.min(marquee.startY, marquee.curY);
+      const y2 = Math.max(marquee.startY, marquee.curY);
+      const isClick = x2 - x1 < 5 && y2 - y1 < 5;
+      const hits = new Set<string>();
+      if (!isClick) {
+        for (const n of nodes) {
+          const pos = nodePositionsRef.current.get(n.id) ?? { x: n.x, y: n.y };
+          const dims = getNodeDimensions(n.type, expandedNodesRef.current.has(n.id));
+          const nx1 = pos.x - dims.width / 2;
+          const nx2 = pos.x + dims.width / 2;
+          const ny1 = pos.y - dims.topH;
+          const ny2 = pos.y + dims.bottomH;
+          if (nx1 < x2 && nx2 > x1 && ny1 < y2 && ny2 > y1) hits.add(n.id);
+        }
+      }
+      setSelectedNodeIds(prev => (marquee.additive ? new Set([...prev, ...hits]) : hits));
+      setMarquee(null);
+      return;
+    }
     // â”€â”€ Finish folder drag (moves all member nodes) â”€â”€
     if (dragFolderId) {
       const folder = foldersRef.current.find(f => f.id === dragFolderId);
@@ -1567,25 +1702,34 @@ export default function RelationsCanvas({
 
     // â”€â”€ Finish node drag â”€â”€
     if (dragNodeId) {
+      // Group drag (S-5): commit the whole selection when the dragged
+      // card is part of it.
+      const sel = selectedNodeIdsRef.current;
+      const groupIds = sel.has(dragNodeId) && sel.size > 1 ? [...sel] : [dragNodeId];
       const offset = dragOffsets.get(dragNodeId);
       if (offset && (offset.x !== 0 || offset.y !== 0)) {
-        const basePos = nodePositions.get(dragNodeId);
-        if (basePos) {
-          const newX = basePos.x + offset.x;
-          const newY = basePos.y + offset.y;
-          setNodePositions((prev) => {
-            const next = new Map(prev);
-            next.set(dragNodeId, { x: newX, y: newY });
-            return next;
-          });
-          onNodePositionChange?.(dragNodeId, newX, newY);
-        }
+        setNodePositions((prev) => {
+          const next = new Map(prev);
+          for (const id of groupIds) {
+            const o = dragOffsets.get(id);
+            const basePos = prev.get(id);
+            if (!o || !basePos) continue;
+            const newX = basePos.x + o.x;
+            const newY = basePos.y + o.y;
+            next.set(id, { x: newX, y: newY });
+            onNodePositionChange?.(id, newX, newY);
+          }
+          return next;
+        });
       }
-      // If dropped onto a folder, add the node to it
+      // If dropped onto a folder, the whole dragged group joins it
+      // (drop target = pointer position, standard convention).
       const dropTarget = dropTargetRef.current;
       if (dropTarget) {
         const updated = foldersRef.current.map(f =>
-          f.id === dropTarget ? { ...f, nodeIds: [...f.nodeIds, dragNodeId] } : f
+          f.id === dropTarget
+            ? { ...f, nodeIds: [...f.nodeIds, ...groupIds.filter(id => !f.nodeIds.includes(id))] }
+            : f
         );
         onFoldersChange?.(updated);
         setDropTargetFolderId(null);
@@ -1593,7 +1737,7 @@ export default function RelationsCanvas({
       }
       setDragOffsets((prev) => {
         const next = new Map(prev);
-        next.delete(dragNodeId);
+        for (const id of groupIds) next.delete(id);
         return next;
       });
       setDragNodeId(null);
@@ -1605,11 +1749,11 @@ export default function RelationsCanvas({
     dropTargetRef.current = null;
     setIsPanning(false);
     setIsDragging(false);
-  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange, onFoldersChange]);
+  }, [dragFolderId, folders, dragNodeId, dragOffsets, nodePositions, onNodePositionChange, onFoldersChange, marquee, nodes]);
 
   // Global mouse listeners for pan / drag
   useEffect(() => {
-    const needListeners = (isPanning && isDragging) || dragNodeId !== null || dragFolderId !== null;
+    const needListeners = (isPanning && isDragging) || dragNodeId !== null || dragFolderId !== null || marquee !== null;
     if (needListeners) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
@@ -1618,7 +1762,7 @@ export default function RelationsCanvas({
         document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [isPanning, isDragging, dragNodeId, dragFolderId, handleMouseMove, handleMouseUp]);
+  }, [isPanning, isDragging, dragNodeId, dragFolderId, marquee, handleMouseMove, handleMouseUp]);
 
   // â”€â”€ Zoom handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1627,6 +1771,20 @@ export default function RelationsCanvas({
       if (e.cancelable) e.preventDefault();
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
+
+      // OS-grade map (S-5): plain wheel / two-finger = PAN; Ctrl+wheel
+      // (and trackpad pinch, which browsers deliver as wheel+ctrlKey) =
+      // zoom at cursor. This is the Figma default — trackpad users get
+      // natural two-finger panning instead of accidental zoom.
+      if (!e.ctrlKey && !e.metaKey) {
+        const scaleX = viewBox.width / rect.width;
+        const scaleY = viewBox.height / rect.height;
+        setCamera(prev => ({
+          x: prev.x + e.deltaX * scaleX,
+          y: prev.y + e.deltaY * scaleY,
+        }));
+        return;
+      }
 
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -2124,6 +2282,7 @@ export default function RelationsCanvas({
             onInventoryToggle={toggleInventory}
             onPanelToggle={togglePanel}
             onPositionChange={(nodeId, x, y) => {
+              commitGroupDrag(nodeId);
               // Clamp party folder nodes above KRMA line
               let clampedY = y;
               const inParty = foldersRef.current.find(f => f.type === 'party' && f.nodeIds.includes(nodeId));
@@ -2190,15 +2349,7 @@ export default function RelationsCanvas({
             }}
             onDragOffsetChange={(nodeId, offsetX, offsetY) => {
               const clampedY = clampPartyDragY(nodeId, offsetY);
-              setDragOffsets((prev) => {
-                const next = new Map(prev);
-                if (offsetX === 0 && clampedY === 0) {
-                  next.delete(nodeId);
-                } else {
-                  next.set(nodeId, { x: offsetX, y: clampedY });
-                }
-                return next;
-              });
+              applyGroupDragOffset(nodeId, offsetX, clampedY);
               checkFolderDropTarget(nodeId, offsetX, clampedY);
             }}
             onCharacterUpdate={onCharacterUpdate}
@@ -2695,7 +2846,7 @@ export default function RelationsCanvas({
             setCanvasMenu(null);
           }
         }}
-        style={{ cursor: isPanning ? "grabbing" : "grab" }}
+        style={{ cursor: isPanning ? "grabbing" : spaceHeld ? "grab" : "default" }}
       >
         {/* â”€â”€ Definitions â”€â”€ */}
         <defs>
@@ -3137,6 +3288,7 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteLocation}
                     onPositionChange={(nodeId, x, y) => {
+                      commitGroupDrag(nodeId);
                       setNodePositions((prev) => {
                         const next = new Map(prev);
                         next.set(nodeId, { x, y });
@@ -3147,15 +3299,7 @@ export default function RelationsCanvas({
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
                       const clampedY = clampPartyDragY(nodeId, offsetY);
-                      setDragOffsets((prev) => {
-                        const next = new Map(prev);
-                        if (offsetX === 0 && clampedY === 0) {
-                          next.delete(nodeId);
-                        } else {
-                          next.set(nodeId, { x: offsetX, y: clampedY });
-                        }
-                        return next;
-                      });
+                      applyGroupDragOffset(nodeId, offsetX, clampedY);
                       checkFolderDropTarget(nodeId, offsetX, clampedY);
                     }}
                     onCreateChildCharacter={onCreateChildCharacterAtLocation}
@@ -3241,6 +3385,7 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteItem}
                     onPositionChange={(nodeId, x, y) => {
+                      commitGroupDrag(nodeId);
                       // ANY overlap between the dragged item and a target = droppable (Mike 2026-05-14)
                       const itemHalf = getCardHalfWidth(nodeId);
                       const dropTarget = nodes.find(n => {
@@ -3287,15 +3432,7 @@ export default function RelationsCanvas({
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
                       const clampedY = clampPartyDragY(nodeId, offsetY);
-                      setDragOffsets((prev) => {
-                        const next = new Map(prev);
-                        if (offsetX === 0 && clampedY === 0) {
-                          next.delete(nodeId);
-                        } else {
-                          next.set(nodeId, { x: offsetX, y: clampedY });
-                        }
-                        return next;
-                      });
+                      applyGroupDragOffset(nodeId, offsetX, clampedY);
                       checkFolderDropTarget(nodeId, offsetX, clampedY);
                       // Track which item is being dragged for drop-target highlighting
                       if (offsetX !== 0 || clampedY !== 0) {
@@ -3380,7 +3517,68 @@ export default function RelationsCanvas({
               </g>
             );
           })}
+
+        {/* ── Selection visuals (S-5): outline each selected card + one
+            combined bounding box; translucent teal marquee while banding. */}
+        {selectedNodeIds.size > 0 && (() => {
+          let bx1 = Infinity, by1 = Infinity, bx2 = -Infinity, by2 = -Infinity;
+          const rects: Array<{ id: string; x: number; y: number; w: number; h: number }> = [];
+          for (const n of nodes) {
+            if (!selectedNodeIds.has(n.id)) continue;
+            const pos = nodePositions.get(n.id) ?? { x: n.x, y: n.y };
+            const off = dragOffsets.get(n.id) ?? { x: 0, y: 0 };
+            const dims = getNodeDimensions(n.type, expandedNodes.has(n.id));
+            const rx = pos.x + off.x - dims.width / 2;
+            const ry = pos.y + off.y - dims.topH;
+            const rw = dims.width;
+            const rh = dims.topH + dims.bottomH;
+            rects.push({ id: n.id, x: rx, y: ry, w: rw, h: rh });
+            bx1 = Math.min(bx1, rx); by1 = Math.min(by1, ry);
+            bx2 = Math.max(bx2, rx + rw); by2 = Math.max(by2, ry + rh);
+          }
+          if (rects.length === 0) return null;
+          return (
+            <g className="pointer-events-none">
+              {rects.map(r => (
+                <rect key={`sel-${r.id}`} x={r.x - 4} y={r.y - 4} width={r.w + 8} height={r.h + 8}
+                  fill="none" stroke="var(--terminal-prime, #22ab94)" strokeWidth={2 * zoom} strokeDasharray={`${6 * zoom} ${4 * zoom}`} opacity="0.9" />
+              ))}
+              {rects.length > 1 && (
+                <rect x={bx1 - 14} y={by1 - 14} width={bx2 - bx1 + 28} height={by2 - by1 + 28}
+                  fill="none" stroke="var(--terminal-prime, #22ab94)" strokeWidth={1.5 * zoom} opacity="0.5" />
+              )}
+            </g>
+          );
+        })()}
+        {marquee && (
+          <rect
+            x={Math.min(marquee.startX, marquee.curX)}
+            y={Math.min(marquee.startY, marquee.curY)}
+            width={Math.abs(marquee.curX - marquee.startX)}
+            height={Math.abs(marquee.curY - marquee.startY)}
+            fill="rgba(34, 171, 148, 0.10)"
+            stroke="var(--terminal-prime, #22ab94)"
+            strokeWidth={1.5 * zoom}
+            className="pointer-events-none"
+          />
+        )}
       </svg>
+
+      {/* One-time teaching toast — the single retrained habit (S-5). */}
+      {showPanToast && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-[96] pointer-events-none"
+          style={{ bottom: 32 }}
+        >
+          <div style={{
+            background: '#000', border: '1px solid rgba(34,171,148,0.6)',
+            boxShadow: '0 0 16px rgba(34,171,148,0.3)', padding: '8px 16px',
+            fontFamily: 'Consolas, monospace', fontSize: 13, color: '#fff',
+          }}>
+            Drag selects — hold <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>Space</span> (or middle-drag) to pan · wheel pans · <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>Ctrl+wheel</span> zooms
+          </div>
+        </div>
+      )}
 
       {/* ── Right-click on a Location folder → chooser (edit / create
           inside / delete-or-dissolve). One JEWL dialog underneath either
