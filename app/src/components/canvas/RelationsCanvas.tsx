@@ -415,7 +415,7 @@ export default function RelationsCanvas({
           };
         } else {
           const display = getDisplayBounds(content, f);
-          rect = f.collapsed ? { ...display, width: 680, height: 80 } : display;
+          rect = f.collapsed ? { ...display, width: 340, height: 80 } : display;
         }
         rects.set(locId, rect);
       }
@@ -445,7 +445,7 @@ export default function RelationsCanvas({
           };
         } else {
           const display = getDisplayBounds(content, f);
-          rect = f.collapsed ? { ...display, width: 680, height: 80 } : display;
+          rect = f.collapsed ? { ...display, width: 340, height: 80 } : display;
         }
         rects.set(locId, rect);
       }

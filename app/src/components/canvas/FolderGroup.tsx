@@ -256,7 +256,9 @@ export function FolderGroupRect({
     [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
   );
 
-  const COLLAPSED_WIDTH = 680;
+  // Collapse chip — small (Mike 2026-08-03: much smaller), just enough
+  // for the name + counts.
+  const COLLAPSED_WIDTH = 340;
 
   // Much smaller floors (Mike 2026-08-03) — a room folder can be a tight
   // little box; the header still fits at 280 wide.
