@@ -144,7 +144,12 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     };
   });
 
-  // Transform items to CanvasNode format
+  // Transform items to CanvasNode format. Items without stored coords
+  // land in a tight grid INSIDE their room (near the room Location's
+  // anchor) instead of the global scatter — location folders are real
+  // AREAS (party-folder treatment) and their contents must sit in them.
+  const locPosById = new Map(locationNodes.map(n => [n.id, { x: n.x, y: n.y }]));
+  const perRoomItemIndex = new Map<string, number>();
   const itemNodes = campaign.campaignItems.map((item, index) => {
     let itemData = null;
     try {
@@ -154,12 +159,22 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     const storedX = typeof itemData?.x === 'number' ? itemData.x : null;
     const storedY = typeof itemData?.y === 'number' ? itemData.y : null;
 
+    let fallbackItemX = 600 + index * 280;
+    let fallbackItemY = 300 + index * 80;
+    if (storedX == null && item.locationId && locPosById.has(item.locationId)) {
+      const base = locPosById.get(item.locationId)!;
+      const idx = perRoomItemIndex.get(item.locationId) ?? 0;
+      perRoomItemIndex.set(item.locationId, idx + 1);
+      fallbackItemX = base.x - 250 + (idx % 3) * 260;
+      fallbackItemY = base.y + 160 + Math.floor(idx / 3) * 150;
+    }
+
     return {
       id: item.id,
       type: 'item' as const,
       name: item.name,
-      x: storedX ?? 600 + index * 280,
-      y: storedY ?? 300 + index * 80,
+      x: storedX ?? fallbackItemX,
+      y: storedY ?? fallbackItemY,
       status: item.status,
       itemType: item.type,
       itemData: itemData,

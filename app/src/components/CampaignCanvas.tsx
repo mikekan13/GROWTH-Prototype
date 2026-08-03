@@ -456,9 +456,12 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     const merged = [...folders];
     for (const af of autoFolders ?? []) {
       if (!storedIds.has(af.id)) {
-        // Empty folders are still folders — every Location renders as a
-        // container per the world-recursive design.
-        merged.push({ ...af, collapsed: af.collapsed ?? true });
+        // Every Location renders as a container per the world-recursive
+        // design — and OPEN by default: a location folder is a real AREA
+        // like the party folder (Mike 2026-08-02), not a collapsed strip.
+        // The GM can still collapse; that choice persists via stored
+        // folder overrides.
+        merged.push({ ...af, collapsed: af.collapsed ?? false });
       }
     }
     // Deterministic fan-out for Location folders without stored coords.
