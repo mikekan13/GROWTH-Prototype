@@ -929,19 +929,55 @@ export default function RelationsCanvas({
   /** Live reflow: shelf-pack a folder's members against a target width,
    *  emitted as offsets from committed positions. Runs every resize
    *  frame — contents move organically WITH the handle. */
-  const computeReflowOffsetsInto = useCallback((next: Map<string, { x: number; y: number }>, locId: string, targetW: number) => {
+  /** Resize-gesture baseline: geometry frozen at gesture start so
+   *  per-frame math is stable (idempotent deltas, no compounding) and
+   *  shrunk children RECOVER when the handle moves back out. `dirty`
+   *  latches once a reflow has run so recovery keeps recomputing. */
+  const resizeBaselineRef = useRef<{
+    parentW: number;
+    rects: Map<string, { x: number; y: number; width: number; height: number }>;
+    dirty: boolean;
+  } | null>(null);
+
+  const computeReflowOffsetsInto = useCallback((
+    next: Map<string, { x: number; y: number }>,
+    locId: string,
+    targetW: number,
+    folderSizes?: Map<string, { w: number; h: number }>,
+    depth: number = 0,
+  ): { width: number; height: number } | null => {
+    if (depth > 3) return null;
     const foldersList = foldersRef.current;
     const folder = foldersList.find(f => f.id === `auto-${locId}`);
-    if (!folder || folder.collapsed || folder.nodeIds.length === 0) return;
-    const rect = committedFolderRectById.get(locId);
-    const anchorX = folder.posX ?? rect?.x ?? 0;
-    const anchorY = folder.posY ?? rect?.y ?? 0;
+    if (!folder || folder.collapsed || folder.nodeIds.length === 0) return null;
+    const baseline = resizeBaselineRef.current;
+    const baseRect = (id: string) => baseline?.rects.get(id) ?? committedFolderRectById.get(id);
+    const selfRect = baseRect(locId);
+    const anchorX = folder.posX ?? selfRect?.x ?? 0;
+    const anchorY = folder.posY ?? selfRect?.y ?? 0;
+    // Cascade-shrink ratio (Mike 2026-08-03: "when I resize a parent it
+    // should also resize children as it shrinks"): children scale with
+    // the parent, floored at the minimum folder size, capped at their
+    // gesture-start size (growing past baseline never inflates them).
+    const ratio = Math.max(0.35, Math.min(1, targetW / Math.max(1, selfRect?.width ?? targetW)));
+
     type Member = { id: string; w: number; h: number; kind: 'node' | 'folder'; oldX: number; oldY: number; topH: number };
     const members: Member[] = [];
     for (const id of folder.nodeIds) {
       if (foldersList.some(ff => ff.id === `auto-${id}`)) {
-        const r = committedFolderRectById.get(id);
-        if (r) members.push({ id, w: r.width, h: r.height, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
+        const r = baseRect(id);
+        if (!r) continue;
+        const childF = foldersList.find(ff => ff.id === `auto-${id}`);
+        if (childF?.collapsed) {
+          members.push({ id, w: r.width, h: r.height, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
+          continue;
+        }
+        const childTargetW = Math.max(280, Math.min(r.width, Math.round(r.width * ratio)));
+        const packed = computeReflowOffsetsInto(next, id, childTargetW, folderSizes, depth + 1);
+        const childW = childTargetW;
+        const childH = packed?.height ?? r.height;
+        folderSizes?.set(id, { w: childW, h: childH });
+        members.push({ id, w: childW, h: childH, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
         continue;
       }
       const pos = nodePositionsRef.current.get(id);
@@ -953,16 +989,17 @@ export default function RelationsCanvas({
         oldX: pos.x - dims.width / 2, oldY: pos.y - dims.topH, topH: dims.topH,
       });
     }
-    if (!members.length) return;
-    // Reflow ONLY when contents genuinely overflow the live width —
-    // reflowing on every resize frame teleported everything into shelf
-    // rows the instant a handle moved (audit 2026-08-03: "violent
-    // starburst"). Growing a folder, or shrinking whitespace, moves
-    // nothing.
-    const fitLeft = anchorX + 4;
-    const fitRight = anchorX + targetW - 24;
-    const overflows = members.some(m => m.oldX < fitLeft || m.oldX + m.w > fitRight);
-    if (!overflows) return;
+    if (!members.length) return null;
+    // Reflow only when contents overflow the live width (starburst
+    // guard) — but once a reflow has run this gesture, keep recomputing
+    // so growing back RECOVERS the layout toward baseline.
+    if (!(baseline?.dirty)) {
+      const fitLeft = anchorX + 4;
+      const fitRight = anchorX + targetW - 24;
+      const overflows = members.some(m => m.oldX < fitLeft || m.oldX + m.w > fitRight);
+      if (!overflows) return null;
+      if (baseline) baseline.dirty = true;
+    }
     members.sort((a, b) => (a.oldY - b.oldY) || (a.oldX - b.oldX));
     const PAD = 24, GAP = 20, HEADER = 96;
     let cx = anchorX + PAD, cy = anchorY + HEADER, rowH = 0;
@@ -978,6 +1015,7 @@ export default function RelationsCanvas({
       }
       cx += m.w + GAP; rowH = Math.max(rowH, m.h);
     }
+    return { width: targetW, height: (cy + rowH + PAD) - anchorY };
   }, [nodes, committedFolderRectById, addSubtreeOffsetInto]);
 
   /** Live bumping: the actor's live rect pushes overlapping sibling
@@ -3500,19 +3538,27 @@ export default function RelationsCanvas({
               showActionsMenu={false}
               onDrillIn={onDrillIn}
               onFolderResize={(folderId, width, height, posX) => {
-                const updated = foldersRef.current.map(f =>
-                  f.id === folderId ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}) } : f
-                );
-                onFoldersChange?.(updated);
                 // LIVE physics: every resize frame, contents reflow into
-                // the live width and overlapped siblings get bumped —
-                // things move organically WITH the handle, not on release.
+                // the live width, children scale down with the parent,
+                // and overlapped siblings get bumped — all organically
+                // WITH the handle, not on release.
+                if (!resizeActiveRef.current) {
+                  // Freeze gesture-start geometry: stable per-frame math
+                  // + shrunk children recover when the handle backs out.
+                  const locId0 = folderId.startsWith('auto-') ? folderId.slice('auto-'.length) : null;
+                  resizeBaselineRef.current = {
+                    parentW: (locId0 ? committedFolderRectById.get(locId0)?.width : undefined) ?? width,
+                    rects: new Map(committedFolderRectById),
+                    dirty: false,
+                  };
+                }
                 resizeActiveRef.current = true;
+                const childSizes = new Map<string, { w: number; h: number }>();
                 if (folderId.startsWith('auto-')) {
                   const locId = folderId.slice('auto-'.length);
-                  const rect = committedFolderRectById.get(locId);
+                  const rect = resizeBaselineRef.current?.rects.get(locId) ?? committedFolderRectById.get(locId);
                   const next = new Map<string, { x: number; y: number }>();
-                  computeReflowOffsetsInto(next, locId, width);
+                  computeReflowOffsetsInto(next, locId, width, childSizes);
                   computeSiblingPushesInto(next, locId, {
                     x: posX ?? rect?.x ?? 0,
                     y: rect?.y ?? 0,
@@ -3521,12 +3567,22 @@ export default function RelationsCanvas({
                   });
                   setDragOffsets(next);
                 }
+                const updated = foldersRef.current.map(f => {
+                  if (f.id === folderId) {
+                    return { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}) };
+                  }
+                  const l = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
+                  const s = l ? childSizes.get(l) : undefined;
+                  return s ? { ...f, userWidth: s.w, userHeight: s.h } : f;
+                });
+                onFoldersChange?.(updated);
               }}
               onFolderResizeEnd={(folderId) => {
                 // Land the live-physics offsets; a safety overlap pass
                 // runs one render later against fresh geometry.
                 commitPhysicsOffsets();
                 resizeActiveRef.current = false;
+                resizeBaselineRef.current = null;
                 if (folderId.startsWith('auto-')) {
                   setPendingLayoutPass({ locId: folderId.slice('auto-'.length), compact: false });
                 }
