@@ -833,6 +833,10 @@ export default function RelationsCanvas({
   expandedNodesRef.current = expandedNodes;
   const dragOffsetsRef = useRef(dragOffsets);
   dragOffsetsRef.current = dragOffsets;
+  // True while a folder-resize gesture is in progress — hierarchy
+  // side-effects (drop capture, reparenting, folder drags) are inert
+  // until release so a resize can only ever be a resize.
+  const resizeActiveRef = useRef(false);
 
   // ── Folder layout engine (S-5, Mike 2026-08-03) ──
   // Rules: location folders can shrink far below content (release
@@ -950,6 +954,15 @@ export default function RelationsCanvas({
       });
     }
     if (!members.length) return;
+    // Reflow ONLY when contents genuinely overflow the live width —
+    // reflowing on every resize frame teleported everything into shelf
+    // rows the instant a handle moved (audit 2026-08-03: "violent
+    // starburst"). Growing a folder, or shrinking whitespace, moves
+    // nothing.
+    const fitLeft = anchorX + 4;
+    const fitRight = anchorX + targetW - 24;
+    const overflows = members.some(m => m.oldX < fitLeft || m.oldX + m.w > fitRight);
+    if (!overflows) return;
     members.sort((a, b) => (a.oldY - b.oldY) || (a.oldX - b.oldX));
     const PAD = 24, GAP = 20, HEADER = 96;
     let cx = anchorX + PAD, cy = anchorY + HEADER, rowH = 0;
@@ -1230,6 +1243,10 @@ export default function RelationsCanvas({
   }, [nodes]);
 
   const checkFolderDropTarget = useCallback((nodeId: string, offsetX: number, offsetY: number) => {
+    // A folder RESIZE must never produce membership/hierarchy writes —
+    // the live reflow moves cards around, but that is layout, not intent
+    // (audit 2026-08-03: a resize gesture silently wrote located_at).
+    if (resizeActiveRef.current) return;
     const basePos = nodePositionsRef.current.get(nodeId);
     if (!basePos) { setDropTargetFolderId(null); dropTargetRef.current = null; return; }
     const dropX = basePos.x + offsetX;
@@ -2080,8 +2097,7 @@ export default function RelationsCanvas({
   // â”€â”€ Zoom handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      if (e.cancelable) e.preventDefault();
+    (e: React.WheelEvent | WheelEvent) => {
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
 
@@ -2111,6 +2127,23 @@ export default function RelationsCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
     [camera, zoom]
   );
+
+  // Native non-passive wheel listener: React attaches onWheel as passive,
+  // so preventDefault was a silent no-op that spammed a console error on
+  // every zoom tick (audit 2026-08-03). The native listener actually
+  // cancels the default scroll.
+  const handleWheelRef = useRef(handleWheel);
+  handleWheelRef.current = handleWheel;
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      handleWheelRef.current(e);
+    };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheel);
+  }, []);
 
   // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -3103,7 +3136,6 @@ export default function RelationsCanvas({
         className="w-full h-full"
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
         onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
         onContextMenu={(e) => {
           // Only fire for clicks on the empty canvas or a folder background
           // — let cards keep their own right-click menus.
@@ -3420,6 +3452,7 @@ export default function RelationsCanvas({
                 // LIVE physics: every resize frame, contents reflow into
                 // the live width and overlapped siblings get bumped —
                 // things move organically WITH the handle, not on release.
+                resizeActiveRef.current = true;
                 if (folderId.startsWith('auto-')) {
                   const locId = folderId.slice('auto-'.length);
                   const rect = committedFolderRectById.get(locId);
@@ -3438,12 +3471,14 @@ export default function RelationsCanvas({
                 // Land the live-physics offsets; a safety overlap pass
                 // runs one render later against fresh geometry.
                 commitPhysicsOffsets();
+                resizeActiveRef.current = false;
                 if (folderId.startsWith('auto-')) {
                   setPendingLayoutPass({ locId: folderId.slice('auto-'.length), compact: false });
                 }
               }}
               isDropTarget={dropTargetFolderId === folder.id}
               onFolderDragStart={(folderId, startSvg) => {
+                if (resizeActiveRef.current) return; // resize is resize, never a drag
                 setDragFolderId(folderId);
                 setFolderDragStartSvg(startSvg);
               }}
