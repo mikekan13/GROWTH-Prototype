@@ -1040,6 +1040,16 @@ export default function RelationsCanvas({
       let dx = 0, dy = 0;
       if (overlapX < overlapY) dx = rs.x + rs.width / 2 < liveRect.x + liveRect.width / 2 ? -(overlapX + GAP) : overlapX + GAP;
       else dy = rs.y + rs.height / 2 < liveRect.y + liveRect.height / 2 ? -(overlapY + GAP) : overlapY + GAP;
+      // A physics push must NEVER shove a drafting folder across the
+      // crystallization line — crossing is the OWNER's gesture (with its
+      // KRMA consequence), not collateral of someone else's drag (bug
+      // 2026-08-03: pushed items stranded above the line after a
+      // declined crystallize prompt). Deflect horizontally instead.
+      const sibDrafting = f.locationInfo && f.locationInfo.status !== 'ACTIVE';
+      if (sibDrafting && dy < 0 && rs.y + dy < 0) {
+        dy = 0;
+        dx = rs.x + rs.width / 2 < liveRect.x + liveRect.width / 2 ? -(overlapX + GAP) : overlapX + GAP;
+      }
       addSubtreeOffsetInto(next, sib, dx, dy);
     }
   }, [committedFolderRectById, addSubtreeOffsetInto]);
