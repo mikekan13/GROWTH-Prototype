@@ -16,6 +16,8 @@ import './move-character';
 import './create-location';
 import './read-location';
 import './update-location';
+import './arrange-canvas';
+import './focus-view';
 import './place-item';
 import './establish-world-facts';
 import './edit-character-sheet';

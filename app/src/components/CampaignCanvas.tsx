@@ -214,6 +214,12 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       if (data.kind === 'character_update') {
         router.refresh();
       }
+
+      // JEWL stage direction — relay to the canvas layer, which alone
+      // knows live geometry (folder rects, fan-out positions).
+      if (data.kind === 'jewl_focus' || data.kind === 'jewl_highlight') {
+        window.dispatchEvent(new CustomEvent('growth:jewl-stage', { detail: data }));
+      }
     }, [router]),
   });
 

@@ -1081,6 +1081,61 @@ export default function RelationsCanvas({
     }
   }, [committedFolderRectById, shiftFolderTree, onFoldersChange]);
 
+  // ── JEWL stage direction (C2/C3): camera focus + transient highlights ──
+  const [jewlHighlights, setJewlHighlights] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { kind: 'jewl_focus'; targetType: 'location' | 'node'; targetId: string; zoom?: number }
+        | { kind: 'jewl_highlight'; targetType: 'location' | 'node'; targetId: string; durationMs: number };
+      // Resolve the target's live center from real geometry.
+      let cx: number | null = null, cy: number | null = null, key: string | null = null;
+      if (detail.targetType === 'location') {
+        const rect = committedFolderRectById.get(detail.targetId);
+        if (rect) { cx = rect.x + rect.width / 2; cy = rect.y + rect.height / 2; }
+        key = `loc:${detail.targetId}`;
+      } else {
+        const n = nodes.find(nn => nn.id === detail.targetId);
+        const pos = nodePositionsRef.current.get(detail.targetId) ?? (n ? { x: n.x, y: n.y } : null);
+        if (pos) { cx = pos.x; cy = pos.y; }
+        key = `node:${detail.targetId}`;
+      }
+      if (detail.kind === 'jewl_focus') {
+        if (cx == null || cy == null) return;
+        if (detail.zoom != null) setZoom(clampZoom(detail.zoom));
+        const z = detail.zoom != null ? clampZoom(detail.zoom) : zoom;
+        setCamera({ x: cx - (BASE_WIDTH * z) / 2, y: cy - (BASE_HEIGHT * z) / 2 });
+        // A focus implies attention — give the target a brief glow too.
+        if (key) {
+          setJewlHighlights(prev => new Map(prev).set(key!, Date.now() + 2500));
+        }
+      } else {
+        if (!key) return;
+        setJewlHighlights(prev => new Map(prev).set(key!, Date.now() + detail.durationMs));
+      }
+    };
+    window.addEventListener('growth:jewl-stage', handler);
+    return () => window.removeEventListener('growth:jewl-stage', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- zoom read live is fine
+  }, [committedFolderRectById, nodes, zoom]);
+
+  // Expire highlights.
+  useEffect(() => {
+    if (jewlHighlights.size === 0) return;
+    const t = setInterval(() => {
+      const now = Date.now();
+      setJewlHighlights(prev => {
+        let changed = false;
+        const next = new Map(prev);
+        for (const [k, until] of next) {
+          if (until <= now) { next.delete(k); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }, 500);
+    return () => clearInterval(t);
+  }, [jewlHighlights.size]);
+
   // Layout pass runs one render AFTER a commit so folderRectById is fresh.
   useEffect(() => {
     if (!pendingLayoutPass) return;
@@ -3913,6 +3968,39 @@ export default function RelationsCanvas({
                 <rect x={bx1 - 14} y={by1 - 14} width={bx2 - bx1 + 28} height={by2 - by1 + 28}
                   fill="none" stroke="var(--terminal-prime, #22ab94)" strokeWidth={1.5 * zoom} opacity="0.5" />
               )}
+            </g>
+          );
+        })()}
+        {/* ── JEWL's pointer (C3): pulsing glow on whatever he's talking
+            about — the stage light follows the narrator. */}
+        {jewlHighlights.size > 0 && (() => {
+          const rects: Array<{ key: string; x: number; y: number; w: number; h: number }> = [];
+          for (const key of jewlHighlights.keys()) {
+            if (key.startsWith('loc:')) {
+              const r = folderRectById.get(key.slice(4));
+              if (r) rects.push({ key, x: r.x - 6, y: r.y - 6, w: r.width + 12, h: r.height + 12 });
+            } else {
+              const id = key.slice(5);
+              const n = nodes.find(nn => nn.id === id);
+              if (!n) continue;
+              const pos = nodePositions.get(id) ?? { x: n.x, y: n.y };
+              const dims = getNodeDimensions(n.type, expandedNodes.has(id));
+              rects.push({ key, x: pos.x - dims.width / 2 - 8, y: pos.y - dims.topH - 8, w: dims.width + 16, h: dims.topH + dims.bottomH + 16 });
+            }
+          }
+          return (
+            <g className="pointer-events-none">
+              {rects.map(r => (
+                <rect
+                  key={`jhl-${r.key}`}
+                  x={r.x} y={r.y} width={r.w} height={r.h}
+                  fill="none"
+                  stroke="var(--terminal-prime, #22ab94)"
+                  strokeWidth={3 * zoom}
+                  opacity="0.85"
+                  style={{ filter: 'drop-shadow(0 0 14px rgba(34,171,148,0.8))' }}
+                />
+              ))}
             </g>
           );
         })()}

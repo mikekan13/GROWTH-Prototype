@@ -187,6 +187,24 @@ export interface JewlWorkingEvent {
   label?: string;
 }
 
+// ── JEWL stage direction (C2/C3 — the storytelling-OS gestures) ──────────
+
+/** JEWL pans the GM's camera to an entity ("let me show you..."). */
+export interface JewlFocusEvent {
+  kind: 'jewl_focus';
+  targetType: 'location' | 'node';
+  targetId: string;
+  zoom?: number;
+}
+
+/** JEWL puts a transient glow on an entity while talking about it. */
+export interface JewlHighlightEvent {
+  kind: 'jewl_highlight';
+  targetType: 'location' | 'node';
+  targetId: string;
+  durationMs: number;
+}
+
 // ── Heartbeat ─────────────────────────────────────────────────────────────
 
 export interface HeartbeatEvent {
@@ -208,6 +226,8 @@ export type StreamEventData =
   | CastResultEvent
   | TerminalEventRelay
   | JewlWorkingEvent
+  | JewlFocusEvent
+  | JewlHighlightEvent
   | HeartbeatEvent;
 
 /** The envelope sent over SSE */
