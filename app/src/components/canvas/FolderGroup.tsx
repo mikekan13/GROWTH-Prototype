@@ -161,6 +161,24 @@ export function calcContentBounds(
   };
 }
 
+/** Drafting (non-ACTIVE) location folders live BELOW the crystallization
+ * line (y=0). Crossing above is the crystallize gesture's job — never a
+ * side effect of expanding, resizing, or chrome height. Party folders
+ * have the inverse clamp (bottom stays above the line). Applied at the
+ * render-bounds level so the invariant holds regardless of which code
+ * path produced the rect. */
+export function clampDraftingRect<T extends { y: number; height: number }>(
+  folder: CanvasFolder,
+  rect: T,
+): T {
+  const isDraftingLocation =
+    !!folder.locationInfo && folder.locationInfo.status !== 'ACTIVE';
+  if (isDraftingLocation && rect.y < 0) {
+    return { ...rect, y: 0, height: Math.max(0, rect.height + rect.y) };
+  }
+  return rect;
+}
+
 export function getDisplayBounds(content: ContentBounds, folder: CanvasFolder) {
   const width = Math.max(content.minWidth, folder.userWidth || 0);
   let height = Math.max(content.minHeight, folder.userHeight || 0);
@@ -203,7 +221,10 @@ export function FolderGroupRect({
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
   onActionsToggle: (folderId: string) => void;
-  onToggleCollapsed: (folderId: string) => void;
+  /** currentRect = the exact bounds this folder is RENDERED with right
+   *  now — the toggle handler pins the anchor to it, so collapse can
+   *  never jump to a divergently-recomputed position. */
+  onToggleCollapsed: (folderId: string, currentRect?: { x: number; y: number; width: number; height: number }) => void;
   showActionsMenu: boolean;
   svgRef?: React.RefObject<SVGSVGElement | null>;
   viewBox?: { x: number; y: number; width: number; height: number };
@@ -238,11 +259,11 @@ export function FolderGroupRect({
       const baseY = folder.posY ?? (folder.type === 'party' ? -(MIN_FOLDER_H + 40) : 100);
       // Apply drag offset for visual feedback during drag
       const folderOffset = dragOffsets.get(`__folder__${folder.id}`) || { x: 0, y: 0 };
-      return { x: baseX + folderOffset.x, y: baseY + folderOffset.y, width: w, height: h };
+      return clampDraftingRect(folder, { x: baseX + folderOffset.x, y: baseY + folderOffset.y, width: w, height: h });
     }
     if (folder.collapsed) {
       const display = getDisplayBounds(content, folder);
-      return { ...display, width: COLLAPSED_WIDTH };
+      return clampDraftingRect(folder, { ...display, width: COLLAPSED_WIDTH });
     }
     // Folder always encompasses its members visually — membership = visual
     // containment. The GM can shrink the empty whitespace between userWidth
@@ -266,7 +287,9 @@ export function FolderGroupRect({
       const maxH = -anchorY;
       if (maxH > 0 && height > maxH) height = maxH;
     }
-    return { x: anchorX, y: anchorY, width, height };
+    // Drafting location folders: chrome/top edge never crosses ABOVE the
+    // line — crystallization is a gesture, not a resize side effect.
+    return clampDraftingRect(folder, { x: anchorX, y: anchorY, width, height });
   }, [content, folder, dragOffsets]);
 
   // Resize mouse handlers
@@ -935,7 +958,7 @@ export function FolderGroupRect({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggleCollapsed(folder.id);
+            onToggleCollapsed(folder.id, bounds);
           }}
           style={{
             width: toggleSize,
@@ -1088,7 +1111,7 @@ export default function FolderGroup({
 
   const bounds = useMemo(() => {
     if (!content) return null;
-    const display = getDisplayBounds(content, folder);
+    const display = clampDraftingRect(folder, getDisplayBounds(content, folder));
     return { x: display.x, y: display.y, width: display.width };
   }, [content, folder]);
 

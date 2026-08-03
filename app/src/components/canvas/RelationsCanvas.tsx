@@ -2974,7 +2974,7 @@ export default function RelationsCanvas({
               onActionsToggle={(folderId) => {
                 window.dispatchEvent(new CustomEvent('folder-actions-toggle', { detail: { folderId } }));
               }}
-              onToggleCollapsed={(folderId) => {
+              onToggleCollapsed={(folderId, currentRectFromRender) => {
                 const f = foldersRef.current.find(ff => ff.id === folderId);
                 // When expanding a party folder, push nodes up if expanded size would cross KRMA line
                 if (f && f.type === 'party' && f.collapsed) {
@@ -3011,9 +3011,13 @@ export default function RelationsCanvas({
                 // toggling — otherwise a collapsing parent whose members
                 // are hidden loses its content bounds and the strip jumps
                 // to a stale fallback position ("minimized and it just
-                // disappeared").
+                // disappeared"). Prefer the rect the folder is RENDERED
+                // with (passed up from FolderGroupRect) — recomputing here
+                // raced live data churn and pinned a divergent position
+                // (scout 2026-08-02: 798-unit jump).
                 const locId = folderId.startsWith('auto-') ? folderId.slice('auto-'.length) : null;
-                const currentRect = locId ? folderRectById.get(locId) : undefined;
+                const currentRect =
+                  currentRectFromRender ?? (locId ? folderRectById.get(locId) : undefined);
                 const updated = foldersRef.current.map(ff =>
                   ff.id === folderId
                     ? {
