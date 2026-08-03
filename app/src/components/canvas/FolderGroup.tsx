@@ -202,6 +202,7 @@ export function FolderGroupRect({
   childFolderRects,
   characters,
   onFolderResize,
+  onFolderResizeEnd,
   onFolderDragStart,
   onActionsToggle,
   onToggleCollapsed,
@@ -219,6 +220,8 @@ export function FolderGroupRect({
   childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>;
   characters: CharacterInfo[];
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
+  /** Fired once when a resize gesture ENDS — compaction/overlap pass. */
+  onFolderResizeEnd?: (folderId: string) => void;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
   onActionsToggle: (folderId: string) => void;
   /** currentRect = the exact bounds this folder is RENDERED with right
@@ -247,8 +250,10 @@ export function FolderGroupRect({
 
   const COLLAPSED_WIDTH = 680;
 
-  const MIN_FOLDER_W = 720;
-  const MIN_FOLDER_H = 200;
+  // Much smaller floors (Mike 2026-08-03) — a room folder can be a tight
+  // little box; the header still fits at 280 wide.
+  const MIN_FOLDER_W = 280;
+  const MIN_FOLDER_H = 120;
 
   const bounds = useMemo(() => {
     if (!content) {
@@ -319,12 +324,13 @@ export function FolderGroupRect({
   useEffect(() => {
     if (!resizing) return;
 
-    // Min size enforces both the absolute floor (MIN_FOLDER_W/H) and the
-    // content extent — folder must always encompass its members. The GM can
-    // shrink whitespace (userWidth/userHeight beyond content) but not push
-    // the visual edges into the content itself.
-    const minW = Math.max(content ? content.minWidth : 0, MIN_FOLDER_W);
-    const minH = Math.max(content ? content.minHeight : 0, MIN_FOLDER_H);
+    // Location folders may shrink BELOW their content extent — release
+    // triggers content compaction (contents reflow to fit, Mike
+    // 2026-08-03). Party/manual folders keep the encompass-your-members
+    // floor.
+    const isLocation = !!folder.locationInfo;
+    const minW = isLocation ? MIN_FOLDER_W : Math.max(content ? content.minWidth : 0, MIN_FOLDER_W);
+    const minH = isLocation ? MIN_FOLDER_H : Math.max(content ? content.minHeight : 0, MIN_FOLDER_H);
     const boundsY = content ? Math.min(folder.posY ?? content.y, content.y) : (folder.posY ?? (folder.type === 'party' ? -(MIN_FOLDER_H + 40) : 100));
 
     const handleMove = (e: MouseEvent) => {
@@ -353,7 +359,7 @@ export function FolderGroupRect({
         // intent to that limit so the drag stops where the visual stops,
         // instead of silently writing an unreachable posX that breaks the
         // next drag's start values.
-        if (content && newPosX > content.x) {
+        if (!isLocation && content && newPosX > content.x) {
           newPosX = content.x;
           newW = startRight - newPosX;
         }
@@ -370,7 +376,12 @@ export function FolderGroupRect({
       onFolderResize?.(folder.id, newW, newH, newPosX);
     };
 
-    const handleUp = () => setResizing(null);
+    const handleUp = () => {
+      setResizing(null);
+      // Release hook: the parent runs content compaction + sibling
+      // overlap resolution against the final size.
+      onFolderResizeEnd?.(folder.id);
+    };
 
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleUp);

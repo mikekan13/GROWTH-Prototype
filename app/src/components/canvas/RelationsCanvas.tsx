@@ -802,6 +802,181 @@ export default function RelationsCanvas({
   const expandedNodesRef = useRef(expandedNodes);
   expandedNodesRef.current = expandedNodes;
 
+  // ── Folder layout engine (S-5, Mike 2026-08-03) ──
+  // Rules: location folders can shrink far below content (release
+  // triggers compaction — contents reflow into the new bounds, cascading
+  // down the tree), and sibling location folders never overlap (the
+  // moved/resized one yields, nudged to the nearest free spot).
+  const [pendingLayoutPass, setPendingLayoutPass] = useState<{ locId: string; compact: boolean } | null>(null);
+
+  /** All descendant node ids (cards) under a location, walking nested
+   *  location folders. */
+  const walkDescendantNodeIds = useCallback((locId: string): string[] => {
+    const out: string[] = [];
+    const visit = (id: string, seen: Set<string>) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const f = foldersRef.current.find(ff => ff.id === `auto-${id}`);
+      for (const nid of f?.nodeIds ?? []) {
+        if (foldersRef.current.some(ff => ff.id === `auto-${nid}`)) visit(nid, seen);
+        else out.push(nid);
+      }
+    };
+    visit(locId, new Set());
+    return out;
+  }, []);
+
+  /** Move a location folder AND everything under it by (dx, dy).
+   *  Returns the updated folders list (caller batches onFoldersChange). */
+  const shiftFolderTree = useCallback((locId: string, dx: number, dy: number, foldersList: CanvasFolder[]): CanvasFolder[] => {
+    const affectedLocIds = new Set<string>([locId]);
+    const collect = (id: string) => {
+      const f = foldersList.find(ff => ff.id === `auto-${id}`);
+      for (const nid of f?.nodeIds ?? []) {
+        if (foldersList.some(ff => ff.id === `auto-${nid}`) && !affectedLocIds.has(nid)) {
+          affectedLocIds.add(nid);
+          collect(nid);
+        }
+      }
+    };
+    collect(locId);
+    const nodeIds = walkDescendantNodeIds(locId);
+    if (nodeIds.length) {
+      setNodePositions(prev => {
+        const next = new Map(prev);
+        for (const nid of nodeIds) {
+          const p = prev.get(nid);
+          if (!p) continue;
+          next.set(nid, { x: p.x + dx, y: p.y + dy });
+          onNodePositionChange?.(nid, p.x + dx, p.y + dy);
+        }
+        return next;
+      });
+    }
+    return foldersList.map(f => {
+      const fLocId = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
+      if (!fLocId || !affectedLocIds.has(fLocId)) return f;
+      return { ...f, posX: (f.posX ?? folderRectById.get(fLocId)?.x ?? 0) + dx, posY: (f.posY ?? folderRectById.get(fLocId)?.y ?? 0) + dy };
+    });
+  }, [walkDescendantNodeIds, onNodePositionChange, folderRectById]);
+
+  /** Shelf-pack a location folder's direct members (cards + child
+   *  folders) into its user-set width — the cascade-shrink reflow. */
+  const compactFolderContents = useCallback((locId: string) => {
+    let foldersList = foldersRef.current;
+    const folder = foldersList.find(f => f.id === `auto-${locId}`);
+    if (!folder || folder.collapsed || folder.nodeIds.length === 0) return;
+    const rect = folderRectById.get(locId);
+    const anchorX = folder.posX ?? rect?.x ?? 0;
+    const anchorY = folder.posY ?? rect?.y ?? 0;
+    const targetW = Math.max(280, folder.userWidth ?? rect?.width ?? 280);
+
+    type Member = { id: string; w: number; h: number; kind: 'node' | 'folder'; oldX: number; oldY: number; topH: number };
+    const members: Member[] = [];
+    for (const id of folder.nodeIds) {
+      if (foldersList.some(ff => ff.id === `auto-${id}`)) {
+        const r = folderRectById.get(id);
+        if (r) members.push({ id, w: r.width, h: r.height, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
+        continue;
+      }
+      const pos = nodePositionsRef.current.get(id);
+      if (!pos) continue;
+      const n = nodes.find(nn => nn.id === id);
+      const dims = getNodeDimensions(n?.type || 'character', expandedNodesRef.current.has(id));
+      members.push({
+        id, kind: 'node', w: dims.width, h: dims.topH + dims.bottomH,
+        oldX: pos.x - dims.width / 2, oldY: pos.y - dims.topH, topH: dims.topH,
+      });
+    }
+    if (!members.length) return;
+
+    // Skip when everything already fits inside the target rect.
+    const targetRight = anchorX + targetW - 20;
+    const overflows = members.some(m => m.oldX < anchorX || m.oldX + m.w > targetRight);
+    if (!overflows) return;
+
+    // Reflow in reading order.
+    members.sort((a, b) => (a.oldY - b.oldY) || (a.oldX - b.oldX));
+    const PAD = 24, GAP = 20, HEADER = 96;
+    let cx = anchorX + PAD, cy = anchorY + HEADER, rowH = 0;
+    const nodeUpdates = new Map<string, { x: number; y: number }>();
+    const folderShifts: Array<{ locId: string; dx: number; dy: number }> = [];
+    for (const m of members) {
+      if (cx + m.w > anchorX + targetW - PAD && cx > anchorX + PAD) {
+        cx = anchorX + PAD; cy += rowH + GAP; rowH = 0;
+      }
+      if (m.kind === 'node') {
+        nodeUpdates.set(m.id, { x: cx + m.w / 2, y: cy + m.topH });
+      } else {
+        folderShifts.push({ locId: m.id, dx: cx - m.oldX, dy: cy - m.oldY });
+      }
+      cx += m.w + GAP; rowH = Math.max(rowH, m.h);
+    }
+    if (nodeUpdates.size) {
+      setNodePositions(prev => {
+        const next = new Map(prev);
+        for (const [id, p] of nodeUpdates) {
+          next.set(id, p);
+          onNodePositionChange?.(id, p.x, p.y);
+        }
+        return next;
+      });
+    }
+    for (const s of folderShifts) {
+      if (s.dx !== 0 || s.dy !== 0) foldersList = shiftFolderTree(s.locId, s.dx, s.dy, foldersList);
+    }
+    if (folderShifts.length) onFoldersChange?.(foldersList);
+  }, [nodes, folderRectById, shiftFolderTree, onNodePositionChange, onFoldersChange]);
+
+  /** Nudge a moved/resized location folder out of its siblings — the
+   *  disturbed folder yields. */
+  const resolveSiblingOverlaps = useCallback((locId: string) => {
+    const foldersList = foldersRef.current;
+    const parentOf = (id: string): string | null =>
+      foldersList.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(id))?.id.slice('auto-'.length) ?? null;
+    const myParent = parentOf(locId);
+    const siblings = foldersList
+      .filter(f => f.id.startsWith('auto-') && f.id !== `auto-${locId}`)
+      .map(f => f.id.slice('auto-'.length))
+      .filter(id => parentOf(id) === myParent);
+    let rect = folderRectById.get(locId);
+    if (!rect) return;
+    let totalDx = 0, totalDy = 0;
+    for (let iter = 0; iter < 8; iter++) {
+      let pushed = false;
+      for (const sib of siblings) {
+        const rs = folderRectById.get(sib);
+        if (!rs) continue;
+        const cur = { x: rect.x + totalDx, y: rect.y + totalDy, width: rect.width, height: rect.height };
+        const overlapX = Math.min(cur.x + cur.width, rs.x + rs.width) - Math.max(cur.x, rs.x);
+        const overlapY = Math.min(cur.y + cur.height, rs.y + rs.height) - Math.max(cur.y, rs.y);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        const GAP = 24;
+        if (overlapX < overlapY) {
+          totalDx += (cur.x + cur.width / 2 < rs.x + rs.width / 2 ? -(overlapX + GAP) : overlapX + GAP);
+        } else {
+          totalDy += (cur.y + cur.height / 2 < rs.y + rs.height / 2 ? -(overlapY + GAP) : overlapY + GAP);
+        }
+        pushed = true;
+      }
+      if (!pushed) break;
+    }
+    if (totalDx !== 0 || totalDy !== 0) {
+      const updated = shiftFolderTree(locId, totalDx, totalDy, foldersList);
+      onFoldersChange?.(updated);
+    }
+  }, [folderRectById, shiftFolderTree, onFoldersChange]);
+
+  // Layout pass runs one render AFTER a commit so folderRectById is fresh.
+  useEffect(() => {
+    if (!pendingLayoutPass) return;
+    const { locId, compact } = pendingLayoutPass;
+    setPendingLayoutPass(null);
+    if (compact) compactFolderContents(locId);
+    resolveSiblingOverlaps(locId);
+  }, [pendingLayoutPass, compactFolderContents, resolveSiblingOverlaps]);
+
+
   // Refs for RAF throttling
   const animationRafRef = useRef<number>(0);
   const panRafRef = useRef<number>(0);
@@ -1700,6 +1875,13 @@ export default function RelationsCanvas({
               .catch(err => console.error('[reparent] fetch failed', err));
           }
         }
+      }
+      // Sibling non-overlap: the folder just moved — after the commit
+      // renders, nudge it clear of any sibling it landed on.
+      {
+        const movedFolder = foldersRef.current.find(f => f.id === dragFolderId);
+        const movedLocId = movedFolder?.locationInfo?.locationId;
+        if (movedLocId) setPendingLayoutPass({ locId: movedLocId, compact: false });
       }
       setDragFolderId(null);
       setFolderDragStartSvg(null);
@@ -3110,6 +3292,14 @@ export default function RelationsCanvas({
                   f.id === folderId ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}) } : f
                 );
                 onFoldersChange?.(updated);
+              }}
+              onFolderResizeEnd={(folderId) => {
+                // Cascade-shrink + sibling non-overlap (Mike 2026-08-03):
+                // contents reflow into the final size, then the folder
+                // yields out of any sibling it now collides with.
+                if (folderId.startsWith('auto-')) {
+                  setPendingLayoutPass({ locId: folderId.slice('auto-'.length), compact: true });
+                }
               }}
               isDropTarget={dropTargetFolderId === folder.id}
               onFolderDragStart={(folderId, startSvg) => {
