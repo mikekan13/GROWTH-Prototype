@@ -137,6 +137,9 @@ interface RelationsCanvasProps {
    *  — the canvas writes the located_at edge server-side and the parent
    *  surface should refresh so the new hierarchy renders. */
   onLocationReparented?: (locationId: string, parentId: string | null) => void;
+  /** A card was dropped into (locationId) or out of (null) a location
+   *  folder — the parent persists it server-side (located_at edges). */
+  onDropIntoLocation?: (nodeId: string, nodeType: 'character' | 'item', locationId: string | null) => void;
   onSkillCheck?: (characterId: string, skillName: string | undefined, attributeName: string | undefined, dr: number, revealDR: boolean) => void;
   onContestedCheck?: (characterId: string, characterName: string, skillName: string, governors: string[], revealDR: boolean) => void;
   /** When set, canvas is in contested check mode â€” waiting for defender click */
@@ -189,6 +192,7 @@ export default function RelationsCanvas({
   onFoldersChange,
   onRestComplete,
   onLocationReparented,
+  onDropIntoLocation,
   onSkillCheck,
   onContestedCheck,
   contestedAttackerId,
@@ -1250,6 +1254,26 @@ export default function RelationsCanvas({
     }, 500);
     return () => clearInterval(t);
   }, [jewlHighlights.size]);
+
+  /** Smallest AUTO (location) folder whose interior contains the point —
+   *  dropping into a room inside an apartment targets the ROOM. Interior
+   *  excludes the header band so hovering the title doesn't capture. */
+  const pickAutoDropTarget = useCallback((px: number, py: number, nodeId: string): string | null => {
+    let best: { locId: string; area: number } | null = null;
+    for (const f of foldersRef.current) {
+      if (!f.id.startsWith('auto-') || f.collapsed) continue;
+      if (f.nodeIds.includes(nodeId)) continue;
+      const locId = f.id.slice('auto-'.length);
+      const r = folderRectById.get(locId);
+      if (!r) continue;
+      const inset = 12;
+      if (px >= r.x + inset && px <= r.x + r.width - inset && py >= r.y + 96 && py <= r.y + r.height - inset) {
+        const area = r.width * r.height;
+        if (!best || area < best.area) best = { locId, area };
+      }
+    }
+    return best?.locId ?? null;
+  }, [folderRectById]);
 
   // Layout pass runs one render AFTER a commit so folderRectById is fresh.
   useEffect(() => {
@@ -2829,48 +2853,40 @@ export default function RelationsCanvas({
               // explicit resize handles and folder drag â€” card movement within the folder
               // is handled by auto-sizing in the bounds computation (content.x/content.y).
 
-              // Check if dropped onto a folder â€” add to it
-              const curFolders = foldersRef.current;
-              const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
-              const MIN_FW = 620;
-              const MIN_FH = 120;
-              for (const f of curFolders) {
-                if (f.nodeIds.includes(nodeId)) continue;
-                if (f.collapsed) continue;
-                const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
-                let bounds: { x: number; y: number; width: number; height: number };
-                if (content) {
-                  const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
-                  const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
-                  const bpX = f.posX ?? content.x;
-                  const bpY = f.posY ?? content.y;
-                  const cRight = content.x + content.minWidth;
-                  const cBottom = content.y + content.minHeight;
-                  const rEdge = Math.max(bpX + MIN_FW, bpX + (f.userWidth || 0), cRight);
-                  const bEdge = Math.max(bpY + MIN_FH, bpY + (f.userHeight || 0), cBottom);
-                  let w = rEdge - anchorX;
-                  let h = bEdge - anchorY;
-                  if (f.type === 'party') {
-                    const maxH = -anchorY;
-                    if (maxH > 0 && h > maxH) h = maxH;
+              // Drop-into-location (SERVER-side — client nodeIds edits on
+              // auto folders were silently clobbered by the server merge;
+              // "unsure if that even works" was correct, it didn't):
+              const autoHit = pickAutoDropTarget(x, clampedY, nodeId);
+              if (autoHit) {
+                onDropIntoLocation?.(nodeId, 'character', autoHit);
+              } else {
+                // Left its previous room entirely? Detach (OS convention:
+                // dragging out of a container removes it).
+                const prevAuto = foldersRef.current.find(f => f.id.startsWith('auto-') && f.nodeIds.includes(nodeId));
+                if (prevAuto) {
+                  const prevLocId = prevAuto.id.slice('auto-'.length);
+                  const pr = folderRectById.get(prevLocId);
+                  if (pr && !(x >= pr.x && x <= pr.x + pr.width && clampedY >= pr.y && clampedY <= pr.y + pr.height)) {
+                    onDropIntoLocation?.(nodeId, 'character', null);
                   }
-                  bounds = { x: anchorX, y: anchorY, width: w, height: h };
-                } else {
-                  const w = Math.max(MIN_FW, f.userWidth || 0);
-                  const h = Math.max(MIN_FH, f.userHeight || 0);
-                  const fx = f.posX ?? -w / 2;
-                  const defaultY = f.type === 'party' ? -(h + 40) : 100;
-                  bounds = { x: fx, y: defaultY, width: w, height: h };
                 }
-                const insetX2 = Math.min(30, bounds.width * 0.1);
-                const insetY2 = Math.min(30, bounds.height * 0.1);
-                if (x >= bounds.x + insetX2 && x <= bounds.x + bounds.width - insetX2 &&
-                    clampedY >= bounds.y + insetY2 && clampedY <= bounds.y + bounds.height - insetY2) {
-                  const updated = curFolders.map(ff =>
-                    ff.id === f.id ? { ...ff, nodeIds: [...ff.nodeIds, nodeId] } : ff
-                  );
-                  onFoldersChange?.(updated);
-                  break;
+                // Party/manual folders keep client-side membership.
+                const curFolders = foldersRef.current;
+                const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
+                for (const f of curFolders) {
+                  if (f.id.startsWith('auto-')) continue;
+                  if (f.nodeIds.includes(nodeId) || f.collapsed) continue;
+                  const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
+                  if (!content) continue;
+                  const w = Math.max(content.minWidth, f.userWidth || 0);
+                  const h = Math.max(content.minHeight, f.userHeight || 0);
+                  if (x >= content.x && x <= content.x + w && clampedY >= content.y && clampedY <= content.y + h) {
+                    const updated = curFolders.map(ff =>
+                      ff.id === f.id ? { ...ff, nodeIds: [...ff.nodeIds, nodeId] } : ff
+                    );
+                    onFoldersChange?.(updated);
+                    break;
+                  }
                 }
               }
             }}
@@ -4007,6 +4023,21 @@ export default function RelationsCanvas({
                         });
                         onNodePositionChange?.(nodeId, x, y);
                         bringNodeToFront(nodeId);
+                        // Drop-into-room for items (server-side: locationId +
+                        // located_at edge stay in sync via the service).
+                        const itemAutoHit = pickAutoDropTarget(x, y, nodeId);
+                        if (itemAutoHit) {
+                          onDropIntoLocation?.(nodeId, 'item', itemAutoHit);
+                        } else {
+                          const prevAuto = foldersRef.current.find(f => f.id.startsWith('auto-') && f.nodeIds.includes(nodeId));
+                          if (prevAuto) {
+                            const prevLocId = prevAuto.id.slice('auto-'.length);
+                            const pr = folderRectById.get(prevLocId);
+                            if (pr && !(x >= pr.x && x <= pr.x + pr.width && y >= pr.y && y <= pr.y + pr.height)) {
+                              onDropIntoLocation?.(nodeId, 'item', null);
+                            }
+                          }
+                        }
                       }
                       setDraggingItemId(null);
                     }}

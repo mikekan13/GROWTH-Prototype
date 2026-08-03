@@ -469,6 +469,33 @@ export function FolderGroupRect({
         style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
         onMouseDown={handleHeaderDrag}
       />
+      {/* Drop affordance: unmistakable "this is where it lands" pill —
+          the tint alone read as "strange highlight" (Mike 2026-08-03). */}
+      {isDropTarget && (
+        <foreignObject
+          x={bounds.x + bounds.width / 2 - 150}
+          y={bounds.y - 44}
+          width={300}
+          height={40}
+          style={{ pointerEvents: 'none', overflow: 'visible' }}
+        >
+          <div style={{
+            background: '#000',
+            border: '1px solid var(--terminal-prime, #22ab94)',
+            boxShadow: '0 0 14px rgba(34,171,148,0.5)',
+            color: '#fff',
+            fontFamily: 'Consolas, monospace',
+            fontSize: 15,
+            padding: '6px 12px',
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            ⤵ dROP iNTO <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>{folder.name}</span>
+          </div>
+        </foreignObject>
+      )}
       {/* Bottom corners square off where header meets body */}
       {!collapsed && (
         <rect

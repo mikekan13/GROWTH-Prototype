@@ -100,7 +100,7 @@ export async function updateCampaignItem(
     throw new NotFoundError('Item not found');
   }
 
-  return prisma.campaignItem.update({
+  const updated = await prisma.campaignItem.update({
     where: { id: itemId },
     data: {
       ...(input.name !== undefined && { name: input.name }),
@@ -111,6 +111,30 @@ export async function updateCampaignItem(
       ...(input.status !== undefined && { status: input.status }),
     },
   });
+
+  // Keep the located_at edge in sync with the locationId column — canvas
+  // folder membership reads EDGES, so a location change that only writes
+  // the column leaves the item visually stuck in its old room.
+  if (input.locationId !== undefined && input.locationId !== item.locationId) {
+    await prisma.entityRelationship.deleteMany({
+      where: { campaignId, sourceId: itemId, sourceType: 'CAMPAIGN_ITEM', relationshipType: 'located_at' },
+    });
+    if (input.locationId) {
+      await prisma.entityRelationship.create({
+        data: {
+          campaignId,
+          sourceId: itemId,
+          sourceType: 'CAMPAIGN_ITEM',
+          targetId: input.locationId,
+          targetType: 'LOCATION',
+          relationshipType: 'located_at',
+          strength: 5,
+        },
+      });
+    }
+  }
+
+  return updated;
 }
 
 export async function deleteCampaignItem(

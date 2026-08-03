@@ -1719,6 +1719,26 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             onFoldersChange={handleFoldersChange}
             onRestComplete={() => router.refresh()}
             onLocationReparented={() => router.refresh()}
+            onDropIntoLocation={async (nodeId, nodeType, locationId) => {
+              // Persist the drop server-side — located_at edges are the
+              // membership truth for location folders.
+              try {
+                if (nodeType === 'character') {
+                  await fetch(`/api/characters/${nodeId}/location`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ locationId }),
+                  });
+                } else {
+                  await fetch(`/api/campaigns/${campaign.id}/items/${nodeId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ locationId }),
+                  });
+                }
+                router.refresh();
+              } catch { /* drop persist failed — next refresh shows truth */ }
+            }}
             isGM={isGM}
             contestedAttackerId={contestedState?.phase === 'selecting_defender' ? contestedState.attackerId : undefined}
             onContestedCheck={isGM ? (characterId, characterName, skillName, governors, revealDR) => {
