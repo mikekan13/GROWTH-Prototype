@@ -1600,9 +1600,28 @@ export default function RelationsCanvas({
           }
           setDragOffsets((prev) => {
             const next = new Map(prev);
-            // Set individual node offsets for non-empty folders
+            // Set individual node offsets for non-empty folders. Members
+            // that are CHILD FOLDERS (nested locations) carry their whole
+            // subtree: offset every descendant card + each descendant
+            // folder's pseudo-key so the entire tree moves live —
+            // without this, dragging a parent moved only its loose cards
+            // while the rooms stayed pinned ("can't move folders").
             for (const nodeId of folder.nodeIds) {
               next.set(nodeId, { x: dx, y: dy });
+              if (foldersRef.current.some(ff => ff.id === `auto-${nodeId}`)) {
+                for (const nid of walkDescendantNodeIds(nodeId)) {
+                  next.set(nid, { x: dx, y: dy });
+                }
+                const stack = [nodeId];
+                while (stack.length) {
+                  const cur = stack.pop()!;
+                  next.set(`__folder__auto-${cur}`, { x: dx, y: dy });
+                  const cf = foldersRef.current.find(ff => ff.id === `auto-${cur}`);
+                  for (const nid of cf?.nodeIds ?? []) {
+                    if (foldersRef.current.some(ff => ff.id === `auto-${nid}`)) stack.push(nid);
+                  }
+                }
+              }
             }
             // Always set folder pseudo-key so anchor translates with content
             next.set(`__folder__${folder.id}`, { x: dx, y: dy });
@@ -1759,10 +1778,33 @@ export default function RelationsCanvas({
             }
             return next;
           });
+          // Child-folder members commit through shiftFolderTree — anchors
+          // AND descendant cards move once, together.
+          let foldersList = foldersRef.current;
+          const childLocMembers = folder.nodeIds.filter(id => foldersList.some(ff => ff.id === `auto-${id}`));
+          if (firstOffset && (firstOffset.x !== 0 || firstOffset.y !== 0)) {
+            for (const locId of childLocMembers) {
+              foldersList = shiftFolderTree(locId, firstOffset.x, firstOffset.y, foldersList);
+            }
+          }
           setDragOffsets((prev) => {
             const next = new Map(prev);
             for (const nodeId of folder.nodeIds) {
               next.delete(nodeId);
+            }
+            // Clear the expanded subtree offsets (descendant cards +
+            // descendant folder pseudo-keys) set during the live drag.
+            for (const locId of childLocMembers) {
+              for (const nid of walkDescendantNodeIds(locId)) next.delete(nid);
+              const stack = [locId];
+              while (stack.length) {
+                const cur = stack.pop()!;
+                next.delete(`__folder__auto-${cur}`);
+                const cf = foldersList.find(ff => ff.id === `auto-${cur}`);
+                for (const nid of cf?.nodeIds ?? []) {
+                  if (foldersList.some(ff => ff.id === `auto-${nid}`)) stack.push(nid);
+                }
+              }
             }
             next.delete(`__folder__${folder.id}`);
             return next;
@@ -1772,11 +1814,11 @@ export default function RelationsCanvas({
             const curPosX = folder.posX;
             const curPosY = folder.posY;
             if (curPosX != null && curPosY != null) {
-              const updated = foldersRef.current.map(f =>
+              foldersList = foldersList.map(f =>
                 f.id === folder.id ? { ...f, posX: curPosX + firstOffset.x, posY: curPosY + firstOffset.y } : f
               );
-              onFoldersChange?.(updated);
             }
+            onFoldersChange?.(foldersList);
           }
         } else {
           // Empty folder: commit position from pseudo-key offset
