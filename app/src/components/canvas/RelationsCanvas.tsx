@@ -1257,12 +1257,15 @@ export default function RelationsCanvas({
 
   /** Smallest AUTO (location) folder whose interior contains the point —
    *  dropping into a room inside an apartment targets the ROOM. Interior
-   *  excludes the header band so hovering the title doesn't capture. */
-  const pickAutoDropTarget = useCallback((px: number, py: number, nodeId: string): string | null => {
+   *  excludes the header band so hovering the title doesn't capture.
+   *  Membership is NOT excluded here — callers compare against the
+   *  node's current parent and no-op on a same-room move (excluding it
+   *  made every within-room drag fall through to the enclosing
+   *  apartment and silently re-parent, 2026-08-03). */
+  const pickAutoDropTarget = useCallback((px: number, py: number): string | null => {
     let best: { locId: string; area: number } | null = null;
     for (const f of foldersRef.current) {
       if (!f.id.startsWith('auto-') || f.collapsed) continue;
-      if (f.nodeIds.includes(nodeId)) continue;
       const locId = f.id.slice('auto-'.length);
       const r = folderRectById.get(locId);
       if (!r) continue;
@@ -1274,6 +1277,34 @@ export default function RelationsCanvas({
     }
     return best?.locId ?? null;
   }, [folderRectById]);
+
+  /** The location the node currently lives in (its auto-folder parent). */
+  const currentAutoParentOf = useCallback((nodeId: string): string | null => {
+    return (
+      foldersRef.current
+        .find(f => f.id.startsWith('auto-') && f.nodeIds.includes(nodeId))
+        ?.id.slice('auto-'.length) ?? null
+    );
+  }, []);
+
+  // "Take out" (Mike 2026-08-03): a right-click context action that
+  // moves a card ONE level up the hierarchy — room → apartment,
+  // apartment-level → loose on the canvas. Cards dispatch the event
+  // from their context menus; the drag gesture never detaches.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { nodeId } = (e as CustomEvent).detail as { nodeId: string };
+      const n = nodes.find(nn => nn.id === nodeId);
+      if (!n) return;
+      const nodeType = n.type === 'item' ? ('item' as const) : ('character' as const);
+      const curParent = currentAutoParentOf(nodeId);
+      if (!curParent) return; // already loose
+      const grandParent = currentAutoParentOf(curParent);
+      onDropIntoLocation?.(nodeId, nodeType, grandParent);
+    };
+    window.addEventListener('growth:take-out', handler);
+    return () => window.removeEventListener('growth:take-out', handler);
+  }, [nodes, currentAutoParentOf, onDropIntoLocation]);
 
   // Layout pass runs one render AFTER a commit so folderRectById is fresh.
   useEffect(() => {
@@ -2856,20 +2887,13 @@ export default function RelationsCanvas({
               // Drop-into-location (SERVER-side — client nodeIds edits on
               // auto folders were silently clobbered by the server merge;
               // "unsure if that even works" was correct, it didn't):
-              const autoHit = pickAutoDropTarget(x, clampedY, nodeId);
-              if (autoHit) {
+              // Drop-in adds; taking OUT is the right-click "take out"
+              // action, never a drag side-effect (Mike 2026-08-03).
+              const autoHit = pickAutoDropTarget(x, clampedY);
+              const curParent = currentAutoParentOf(nodeId);
+              if (autoHit && autoHit !== curParent) {
                 onDropIntoLocation?.(nodeId, 'character', autoHit);
-              } else {
-                // Left its previous room entirely? Detach (OS convention:
-                // dragging out of a container removes it).
-                const prevAuto = foldersRef.current.find(f => f.id.startsWith('auto-') && f.nodeIds.includes(nodeId));
-                if (prevAuto) {
-                  const prevLocId = prevAuto.id.slice('auto-'.length);
-                  const pr = folderRectById.get(prevLocId);
-                  if (pr && !(x >= pr.x && x <= pr.x + pr.width && clampedY >= pr.y && clampedY <= pr.y + pr.height)) {
-                    onDropIntoLocation?.(nodeId, 'character', null);
-                  }
-                }
+              } else if (!autoHit) {
                 // Party/manual folders keep client-side membership.
                 const curFolders = foldersRef.current;
                 const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
@@ -4025,18 +4049,12 @@ export default function RelationsCanvas({
                         bringNodeToFront(nodeId);
                         // Drop-into-room for items (server-side: locationId +
                         // located_at edge stay in sync via the service).
-                        const itemAutoHit = pickAutoDropTarget(x, y, nodeId);
-                        if (itemAutoHit) {
+                        // Drop-in adds; taking OUT is the right-click "take
+                        // out" action, never a drag side-effect (Mike 2026-08-03).
+                        const itemAutoHit = pickAutoDropTarget(x, y);
+                        const itemCurParent = currentAutoParentOf(nodeId);
+                        if (itemAutoHit && itemAutoHit !== itemCurParent) {
                           onDropIntoLocation?.(nodeId, 'item', itemAutoHit);
-                        } else {
-                          const prevAuto = foldersRef.current.find(f => f.id.startsWith('auto-') && f.nodeIds.includes(nodeId));
-                          if (prevAuto) {
-                            const prevLocId = prevAuto.id.slice('auto-'.length);
-                            const pr = folderRectById.get(prevLocId);
-                            if (pr && !(x >= pr.x && x <= pr.x + pr.width && y >= pr.y && y <= pr.y + pr.height)) {
-                              onDropIntoLocation?.(nodeId, 'item', null);
-                            }
-                          }
                         }
                       }
                       setDraggingItemId(null);

@@ -670,6 +670,22 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             aSK jEWL
           </button>
         )}
+        {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
+          /* Take out — moves the card one level up the location
+             hierarchy (room → apartment → loose). The drag gesture
+             never detaches; this is THE way out (Mike 2026-08-03). */
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('growth:take-out', { detail: { nodeId: node.id } }));
+              setShowContextMenu(false);
+            }}
+            className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
+          >
+            <span>{'⬆'}</span>
+            tAKE oUT
+          </button>
+        )}
         {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
           <>
             {/* Die menu retired 2026-06-07 — dice rolling is moving to its

@@ -116,6 +116,19 @@ export default function WorldItemCard({ node, isExpanded, onToggleExpand, onDele
       className="fixed bg-gray-800 border border-gray-700 rounded-lg shadow-2xl py-1 z-50"
       style={{ left: `${contextMenuPos.x}px`, top: `${contextMenuPos.y}px`, minWidth: '160px' }}
     >
+      {/* Take out — one level up the location hierarchy; dragging never
+          detaches (Mike 2026-08-03). */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowContextMenu(false);
+          window.dispatchEvent(new CustomEvent('growth:take-out', { detail: { nodeId: node.id } }));
+        }}
+        className="w-full px-4 py-2 text-left text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+      >
+        <span>{'⬆'}</span>
+        Take Out
+      </button>
       <button
         onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete?.(node.id); }}
         className="w-full px-4 py-2 text-left text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
