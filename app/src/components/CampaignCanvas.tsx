@@ -148,6 +148,31 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
   const router = useRouter();
 
+  // ── Refresh discipline (audit 2026-08-03) ──
+  // Unthrottled router.refresh() calls (JEWL working events, drop
+  // persists, chip watchers) remounted the canvas every ~3-4s and yanked
+  // gestures out from under the pointer. ALL background refreshes go
+  // through this gate: min 4s apart, and NEVER while a canvas gesture is
+  // live (RelationsCanvas stamps window.__growthLastGestureAt).
+  const lastRefreshAtRef = useRef(0);
+  const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRefresh = useCallback(() => {
+    const attempt = () => {
+      const lastGesture = (window as unknown as { __growthLastGestureAt?: number }).__growthLastGestureAt ?? 0;
+      const gestureLive = Date.now() - lastGesture < 600;
+      const since = Date.now() - lastRefreshAtRef.current;
+      if (gestureLive || since < 4000) {
+        if (pendingRefreshRef.current) clearTimeout(pendingRefreshRef.current);
+        pendingRefreshRef.current = setTimeout(attempt, gestureLive ? 800 : Math.max(500, 4000 - since));
+        return;
+      }
+      lastRefreshAtRef.current = Date.now();
+      pendingRefreshRef.current = null;
+      router.refresh();
+    };
+    attempt();
+  }, [router]);
+
   // ── Real-time SSE stream ──
   const streamEventsRef = useRef<TerminalEvent[]>([]);
   const [streamEventsTick, setStreamEventsTick] = useState(0);
@@ -171,18 +196,15 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           // Let the badge linger a beat so fast builds are still seen.
           if (jewlDoneTimerRef.current) clearTimeout(jewlDoneTimerRef.current);
           jewlDoneTimerRef.current = setTimeout(() => setJewlWorking(null), 1500);
-          router.refresh();
+          requestRefresh();
         } else {
           if (jewlDoneTimerRef.current) { clearTimeout(jewlDoneTimerRef.current); jewlDoneTimerRef.current = null; }
           setJewlWorking({
             active: true,
             label: data.phase === 'tool' && data.label ? data.label : 'working…',
           });
-          // Materialize committed work progressively, at most every 3s.
-          if (data.phase === 'tool' && Date.now() - jewlRefreshAtRef.current > 3000) {
-            jewlRefreshAtRef.current = Date.now();
-            router.refresh();
-          }
+          // Materialize committed work progressively (gated).
+          if (data.phase === 'tool') requestRefresh();
         }
       }
 
@@ -212,7 +234,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
       // Handle character updates — refresh the page data
       if (data.kind === 'character_update') {
-        router.refresh();
+        requestRefresh();
       }
 
       // JEWL stage direction — relay to the canvas layer, which alone
@@ -220,7 +242,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       if (data.kind === 'jewl_focus' || data.kind === 'jewl_highlight') {
         window.dispatchEvent(new CustomEvent('growth:jewl-stage', { detail: data }));
       }
-    }, [router]),
+    }, [requestRefresh]),
   });
 
   // ── Post skill check result to terminal after die settles ──
@@ -1736,7 +1758,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                     body: JSON.stringify({ locationId }),
                   });
                 }
-                router.refresh();
+                requestRefresh();
               } catch { /* drop persist failed — next refresh shows truth */ }
             }}
             isGM={isGM}

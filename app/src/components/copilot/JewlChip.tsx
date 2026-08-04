@@ -457,7 +457,17 @@ export function JewlChip() {
     if (!latestWithTools) return;
     if (lastRefreshedIdRef.current === latestWithTools.id) return;
     lastRefreshedIdRef.current = latestWithTools.id;
-    router.refresh();
+    // Never refresh out from under a live canvas gesture (remount-storm
+    // audit 2026-08-03) — RelationsCanvas stamps the timestamp.
+    const doRefresh = () => {
+      const lastGesture = (window as unknown as { __growthLastGestureAt?: number }).__growthLastGestureAt ?? 0;
+      if (Date.now() - lastGesture < 600) {
+        setTimeout(doRefresh, 800);
+        return;
+      }
+      router.refresh();
+    };
+    doRefresh();
   }, [messages, router]);
 
   // TTS — speak each new assistant message via Web Speech API. The

@@ -303,6 +303,14 @@ export default function RelationsCanvas({
   });
   const [dragOffsets, setDragOffsets] = useState<Map<string, { x: number; y: number }>>(new Map());
 
+  // Stamp every live gesture frame — CampaignCanvas's refresh gate
+  // defers background router.refresh() while this is fresh, so the
+  // canvas is never yanked out from under the pointer (audit finding
+  // 2026-08-03: remount storm mid-drag).
+  const stampGesture = () => {
+    (window as unknown as { __growthLastGestureAt?: number }).__growthLastGestureAt = Date.now();
+  };
+
   // ── OS-grade selection (S-5, canvas-os-interaction-standard) ──
   // Left-drag on empty canvas = marquee select; Space/middle-drag = pan;
   // drag any selected card moves the whole selection.
@@ -324,6 +332,7 @@ export default function RelationsCanvas({
   // (desktop convention).
   const lastDragDeltaRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
   const applyGroupDragOffset = useCallback((nodeId: string, offsetX: number, offsetY: number) => {
+    stampGesture();
     const sel = selectedNodeIdsRef.current;
     if ((offsetX !== 0 || offsetY !== 0) && !sel.has(nodeId) && sel.size > 0) {
       setSelectedNodeIds(new Set([nodeId]));
@@ -341,24 +350,6 @@ export default function RelationsCanvas({
       return next;
     });
   }, []);
-  const commitGroupDrag = useCallback((nodeId: string) => {
-    const d = lastDragDeltaRef.current;
-    if (!d || d.id !== nodeId) return;
-    lastDragDeltaRef.current = null;
-    const sel = selectedNodeIdsRef.current;
-    if (!(sel.has(nodeId) && sel.size > 1)) return;
-    setNodePositions((prev) => {
-      const next = new Map(prev);
-      for (const id of sel) {
-        if (id === nodeId) continue;
-        const base = prev.get(id);
-        if (!base) continue;
-        next.set(id, { x: base.x + d.dx, y: base.y + d.dy });
-        onNodePositionChange?.(id, base.x + d.dx, base.y + d.dy);
-      }
-      return next;
-    });
-  }, [onNodePositionChange]);
 
   // Space = temporary hand tool (universal convention); Escape = deselect.
   useEffect(() => {
@@ -1306,6 +1297,45 @@ export default function RelationsCanvas({
     return () => window.removeEventListener('growth:take-out', handler);
   }, [nodes, currentAutoParentOf, onDropIntoLocation]);
 
+  /** Commit a group drag: move every OTHER selected member by the same
+   *  delta AND persist their room membership by final position — the
+   *  origin card's own closure handles itself. Without this, group
+   *  drops only re-parented the card under the cursor (audit finding 2,
+   *  2026-08-03) and the rest desynced from the server. */
+  const commitGroupDrag = useCallback((nodeId: string) => {
+    const d = lastDragDeltaRef.current;
+    if (!d || d.id !== nodeId) return;
+    lastDragDeltaRef.current = null;
+    const sel = selectedNodeIdsRef.current;
+    if (!(sel.has(nodeId) && sel.size > 1)) return;
+    const finals: Array<{ id: string; fx: number; fy: number }> = [];
+    for (const id of sel) {
+      if (id === nodeId) continue;
+      const base = nodePositionsRef.current.get(id);
+      if (base) finals.push({ id, fx: base.x + d.dx, fy: base.y + d.dy });
+    }
+    setNodePositions((prev) => {
+      const next = new Map(prev);
+      for (const m of finals) {
+        next.set(m.id, { x: m.fx, y: m.fy });
+        onNodePositionChange?.(m.id, m.fx, m.fy);
+      }
+      return next;
+    });
+    // Per-member room persistence — same rules as a solo drop: smallest
+    // containing room, no-op on same-room, no detach-by-drag.
+    for (const m of finals) {
+      const n = nodes.find(nn => nn.id === m.id);
+      if (!n || n.type === 'location') continue;
+      const hit = pickAutoDropTarget(m.fx, m.fy);
+      const cur = currentAutoParentOf(m.id);
+      if (hit && hit !== cur) {
+        onDropIntoLocation?.(m.id, n.type === 'item' ? 'item' : 'character', hit);
+      }
+    }
+  }, [nodes, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, onNodePositionChange]);
+
+
   // Layout pass runs one render AFTER a commit so folderRectById is fresh.
   useEffect(() => {
     if (!pendingLayoutPass) return;
@@ -1861,6 +1891,7 @@ export default function RelationsCanvas({
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
+      stampGesture();
       // Marquee select (S-5): live-track the band.
       if (marquee) {
         const cur = clientToSvg(e.clientX, e.clientY);
@@ -3693,6 +3724,7 @@ export default function RelationsCanvas({
                   };
                 }
                 resizeActiveRef.current = true;
+                stampGesture();
                 const childSizes = new Map<string, { w: number; h: number }>();
                 if (folderId.startsWith('auto-')) {
                   const locId = folderId.slice('auto-'.length);
