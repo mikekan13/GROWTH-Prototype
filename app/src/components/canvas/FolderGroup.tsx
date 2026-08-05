@@ -55,7 +55,7 @@ interface FolderGroupProps {
   zoom: number;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
   onRemoveFromFolder: (folderId: string, nodeId: string) => void;
-  onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
+  onFolderResize?: (folderId: string, width: number, height: number, posX?: number, posY?: number) => void;
   onRestComplete: () => void;
   isDropTarget?: boolean;
   /** Drill-in callback for the focal-entity navigation. Receives the
@@ -63,7 +63,7 @@ interface FolderGroupProps {
   onDrillIn?: (entityId: string | null) => void;
 }
 
-const FOLDER_PADDING = 30;
+export const FOLDER_PADDING = 30;
 const HEADER_HEIGHT = 80;
 const CHROME_HEIGHT = 80; // top chrome strip with portrait/name/KRMA/counts
 const PANEL_GAP = 6; // gap between chrome and panel
@@ -95,7 +95,7 @@ const COMPACT_DETAILS_H = 44;
  *  one-line details strip (A6: the always-full panel made every folder
  *  header a billboard); folder.detailsOpen expands the full panel.
  *  Plain folders keep 80px. */
-function locationHeaderHeight(folder: CanvasFolder): number {
+export function locationHeaderHeight(folder: CanvasFolder): number {
   if (!folder.locationInfo) return HEADER_HEIGHT;
   if (!folder.detailsOpen) return CHROME_HEIGHT + PANEL_GAP + COMPACT_DETAILS_H + 12;
   return CHROME_HEIGHT + PANEL_GAP + locationDetailsPanelHeight(folder.locationInfo) + 12;
@@ -225,7 +225,7 @@ export function FolderGroupRect({
   expandedNodes: Set<string>;
   childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>;
   characters: CharacterInfo[];
-  onFolderResize?: (folderId: string, width: number, height: number, posX?: number) => void;
+  onFolderResize?: (folderId: string, width: number, height: number, posX?: number, posY?: number) => void;
   /** Fired once when a resize gesture ENDS — compaction/overlap pass. */
   onFolderResizeEnd?: (folderId: string) => void;
   /** Toggle the location details panel (compact strip ↔ full panel). */
@@ -243,12 +243,13 @@ export function FolderGroupRect({
   onDrillIn?: (entityId: string | null) => void;
 }) {
   const [resizing, setResizing] = useState<{
-    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner';
+    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner';
     startX: number;
     startY: number;
     startW: number;
     startH: number;
     startPosX: number;
+    startPosY: number;
   } | null>(null);
 
   const content = useMemo(
@@ -310,7 +311,7 @@ export function FolderGroupRect({
   // Resize mouse handlers
   const handleResizeStart = useCallback((
     e: React.MouseEvent,
-    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner',
+    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner',
   ) => {
     e.stopPropagation();
     e.preventDefault();
@@ -328,8 +329,9 @@ export function FolderGroupRect({
       startW: folder.userWidth ?? bounds.width,
       startH: folder.userHeight ?? bounds.height,
       startPosX: folder.posX ?? bounds.x,
+      startPosY: folder.posY ?? bounds.y,
     });
-  }, [bounds, folder.posX, folder.userWidth, folder.userHeight]);
+  }, [bounds, folder.posX, folder.posY, folder.userWidth, folder.userHeight]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -354,11 +356,12 @@ export function FolderGroupRect({
       let newW = resizing.startW;
       let newH = resizing.startH;
       let newPosX: number | undefined;
+      let newPosY: number | undefined;
 
-      if (resizing.edge === 'right' || resizing.edge === 'corner') {
+      if (resizing.edge === 'right' || resizing.edge === 'corner' || resizing.edge === 'top-corner') {
         newW = Math.max(minW, resizing.startW + dx);
       }
-      if (resizing.edge === 'left' || resizing.edge === 'left-corner') {
+      if (resizing.edge === 'left' || resizing.edge === 'left-corner' || resizing.edge === 'top-left-corner') {
         // Left edge: dragging left increases width, dragging right decreases.
         // The right edge must stay anchored at startPosX + startW.
         const startRight = resizing.startPosX + resizing.startW;
@@ -382,8 +385,28 @@ export function FolderGroupRect({
           if (maxH > 0 && newH > maxH) newH = maxH;
         }
       }
+      if (resizing.edge === 'top' || resizing.edge === 'top-corner' || resizing.edge === 'top-left-corner') {
+        // Top edge: dragging up grows the folder upward, dragging down
+        // shrinks it. The bottom edge stays anchored at startPosY + startH.
+        const startBottom = resizing.startPosY + resizing.startH;
+        newH = Math.max(minH, resizing.startH - dy);
+        newPosY = startBottom - newH;
+        // Encompass clamp (mirror of the left edge): non-location folders
+        // can't push their top edge below the topmost member.
+        if (!isLocation && content && newPosY > content.y) {
+          newPosY = content.y;
+          newH = startBottom - newPosY;
+        }
+        // Drafting locations live BELOW the crystallization line — the top
+        // edge never crosses above y=0 as a resize side effect.
+        const isDrafting = !!folder.locationInfo && folder.locationInfo.status !== 'ACTIVE';
+        if (isDrafting && newPosY < 0) {
+          newPosY = 0;
+          newH = startBottom;
+        }
+      }
 
-      onFolderResize?.(folder.id, newW, newH, newPosX);
+      onFolderResize?.(folder.id, newW, newH, newPosX, newPosY);
     };
 
     const handleUp = () => {
@@ -1139,6 +1162,46 @@ export function FolderGroupRect({
             strokeWidth={1}
             style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
             onMouseDown={(e) => handleResizeStart(e, 'left-corner')}
+          />
+          {/* Top edge — straddles the boundary so it never fights the
+              title-bar drag inside the header chrome */}
+          <rect
+            x={bounds.x + bounds.width / 2 - 40}
+            y={bounds.y - HANDLE_SIZE / 2}
+            width={80}
+            height={HANDLE_SIZE}
+            rx={3}
+            fill={`${color}${resizing?.edge === 'top' ? 'aa' : '66'}`}
+            stroke={`${color}44`}
+            strokeWidth={1}
+            style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => handleResizeStart(e, 'top')}
+          />
+          {/* Top-right corner */}
+          <rect
+            x={bounds.x + bounds.width - HANDLE_SIZE / 2}
+            y={bounds.y - HANDLE_SIZE / 2}
+            width={HANDLE_SIZE}
+            height={HANDLE_SIZE}
+            rx={3}
+            fill={`${color}${resizing?.edge === 'top-corner' ? 'aa' : '66'}`}
+            stroke={`${color}44`}
+            strokeWidth={1}
+            style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => handleResizeStart(e, 'top-corner')}
+          />
+          {/* Top-left corner */}
+          <rect
+            x={bounds.x - HANDLE_SIZE / 2}
+            y={bounds.y - HANDLE_SIZE / 2}
+            width={HANDLE_SIZE}
+            height={HANDLE_SIZE}
+            rx={3}
+            fill={`${color}${resizing?.edge === 'top-left-corner' ? 'aa' : '66'}`}
+            stroke={`${color}44`}
+            strokeWidth={1}
+            style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
+            onMouseDown={(e) => handleResizeStart(e, 'top-left-corner')}
           />
         </>
       )}

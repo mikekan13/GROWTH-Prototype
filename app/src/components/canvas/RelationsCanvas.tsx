@@ -29,7 +29,7 @@ import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
-import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions } from "./FolderGroup";
+import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
 import FolderGroup from "./FolderGroup";
 
 // â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -938,6 +938,7 @@ export default function RelationsCanvas({
     next: Map<string, { x: number; y: number }>,
     locId: string,
     targetW: number,
+    targetH?: number,
     folderSizes?: Map<string, { w: number; h: number }>,
     depth: number = 0,
   ): { width: number; height: number } | null => {
@@ -954,7 +955,9 @@ export default function RelationsCanvas({
     // should also resize children as it shrinks"): children scale with
     // the parent, floored at the minimum folder size, capped at their
     // gesture-start size (growing past baseline never inflates them).
-    const ratio = Math.max(0.35, Math.min(1, targetW / Math.max(1, selfRect?.width ?? targetW)));
+    const wRatio = targetW / Math.max(1, selfRect?.width ?? targetW);
+    const hRatio = targetH != null ? targetH / Math.max(1, selfRect?.height ?? targetH) : 1;
+    const ratio = Math.max(0.35, Math.min(1, Math.min(wRatio, hRatio)));
 
     type Member = { id: string; w: number; h: number; kind: 'node' | 'folder'; oldX: number; oldY: number; topH: number };
     const members: Member[] = [];
@@ -968,7 +971,7 @@ export default function RelationsCanvas({
           continue;
         }
         const childTargetW = Math.max(280, Math.min(r.width, Math.round(r.width * ratio)));
-        const packed = computeReflowOffsetsInto(next, id, childTargetW, folderSizes, depth + 1);
+        const packed = computeReflowOffsetsInto(next, id, childTargetW, undefined, folderSizes, depth + 1);
         const childW = childTargetW;
         const childH = packed?.height ?? r.height;
         folderSizes?.set(id, { w: childW, h: childH });
@@ -988,16 +991,21 @@ export default function RelationsCanvas({
     // Reflow only when contents overflow the live width (starburst
     // guard) — but once a reflow has run this gesture, keep recomputing
     // so growing back RECOVERS the layout toward baseline.
+    const hh = locationHeaderHeight(folder);
     if (!(baseline?.dirty)) {
       const fitLeft = anchorX + 4;
       const fitRight = anchorX + targetW - 24;
-      const overflows = members.some(m => m.oldX < fitLeft || m.oldX + m.w > fitRight);
+      const fitTop = anchorY + hh - 8;
+      const fitBottom = targetH != null ? anchorY + targetH - 8 : Infinity;
+      const overflows = members.some(m =>
+        m.oldX < fitLeft || m.oldX + m.w > fitRight ||
+        m.oldY < fitTop || m.oldY + m.h > fitBottom);
       if (!overflows) return null;
       if (baseline) baseline.dirty = true;
     }
     members.sort((a, b) => (a.oldY - b.oldY) || (a.oldX - b.oldX));
-    const PAD = 24, GAP = 20, HEADER = 96;
-    let cx = anchorX + PAD, cy = anchorY + HEADER, rowH = 0;
+    const PAD = FOLDER_PADDING, GAP = 20;
+    let cx = anchorX + PAD, cy = anchorY + hh + PAD, rowH = 0;
     for (const m of members) {
       if (cx + m.w > anchorX + targetW - PAD && cx > anchorX + PAD) {
         cx = anchorX + PAD; cy += rowH + GAP; rowH = 0;
@@ -1984,7 +1992,7 @@ export default function RelationsCanvas({
             const childRect = committedFolderRectById.get(dragLocId);
             const parentRect = parentLocId ? committedFolderRectById.get(parentLocId) : undefined;
             if (childRect && parentRect) {
-              const PADC = 24, HEADERC = 96;
+              const PADC = FOLDER_PADDING, HEADERC = parentEntry ? locationHeaderHeight(parentEntry) : 96;
               const minDx = (parentRect.x + PADC) - childRect.x;
               const maxDx = (parentRect.x + parentRect.width - PADC) - (childRect.x + childRect.width);
               const minDy = (parentRect.y + HEADERC) - childRect.y;
@@ -3709,7 +3717,7 @@ export default function RelationsCanvas({
               viewBox={viewBox}
               showActionsMenu={false}
               onDrillIn={onDrillIn}
-              onFolderResize={(folderId, width, height, posX) => {
+              onFolderResize={(folderId, width, height, posX, posY) => {
                 // LIVE physics: every resize frame, contents reflow into
                 // the live width, children scale down with the parent,
                 // and overlapped siblings get bumped — all organically
@@ -3731,10 +3739,10 @@ export default function RelationsCanvas({
                   const locId = folderId.slice('auto-'.length);
                   const rect = resizeBaselineRef.current?.rects.get(locId) ?? committedFolderRectById.get(locId);
                   const next = new Map<string, { x: number; y: number }>();
-                  computeReflowOffsetsInto(next, locId, width, childSizes);
+                  computeReflowOffsetsInto(next, locId, width, height, childSizes);
                   computeSiblingPushesInto(next, locId, {
                     x: posX ?? rect?.x ?? 0,
-                    y: rect?.y ?? 0,
+                    y: posY ?? rect?.y ?? 0,
                     width,
                     height,
                   });
@@ -3745,7 +3753,7 @@ export default function RelationsCanvas({
                 }
                 const updated = foldersRef.current.map(f => {
                   if (f.id === folderId) {
-                    return { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}) };
+                    return { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}), ...(posY != null ? { posY } : {}) };
                   }
                   const l = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
                   const s = l ? childSizes.get(l) : undefined;
