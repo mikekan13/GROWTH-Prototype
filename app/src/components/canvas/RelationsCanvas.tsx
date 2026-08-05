@@ -1502,48 +1502,49 @@ export default function RelationsCanvas({
     // the live reflow moves cards around, but that is layout, not intent
     // (audit 2026-08-03: a resize gesture silently wrote located_at).
     if (resizeActiveRef.current) return;
+    // Zero offset = the drag is over (cards reset offsets on release) —
+    // clear immediately so the highlight can't linger or re-appear over
+    // a parent folder after the drop (Mike 2026-08-04).
+    if (offsetX === 0 && offsetY === 0) {
+      setDropTargetFolderId(null);
+      dropTargetRef.current = null;
+      return;
+    }
     const basePos = nodePositionsRef.current.get(nodeId);
     if (!basePos) { setDropTargetFolderId(null); dropTargetRef.current = null; return; }
     const dropX = basePos.x + offsetX;
     const dropY = basePos.y + offsetY;
+    // AUTO (location) folders: mirror the REAL drop semantics — smallest
+    // containing room, and no highlight when the drop would be a no-op
+    // (same room). The old first-match loop lit up the enclosing
+    // apartment while you hovered a room.
+    const autoHit = pickAutoDropTarget(dropX, dropY);
+    const curParent = currentAutoParentOf(nodeId);
+    if (autoHit && autoHit !== curParent) {
+      const id = `auto-${autoHit}`;
+      setDropTargetFolderId(id);
+      dropTargetRef.current = id;
+      return;
+    }
+    // Party/manual folders keep the legacy containment check.
     const curFolders = foldersRef.current;
     const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
-    const MIN_FW = 620, MIN_FH = 120;
     let hitFolder: string | null = null;
     for (const f of curFolders) {
-      if (f.nodeIds.includes(nodeId)) continue;
-      if (f.collapsed) continue;
+      if (f.id.startsWith('auto-')) continue;
+      if (f.nodeIds.includes(nodeId) || f.collapsed) continue;
       const content = calcContentBounds(f, nodePositionsRef.current, new Map(), nodeTypesMap, expandedNodesRef.current);
-      let bounds: { x: number; y: number; width: number; height: number };
-      if (content) {
-        const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
-        const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
-        const bpX = f.posX ?? content.x;
-        const bpY = f.posY ?? content.y;
-        const cRight = content.x + content.minWidth;
-        const cBottom = content.y + content.minHeight;
-        const rEdge = Math.max(bpX + MIN_FW, bpX + (f.userWidth || 0), cRight);
-        const bEdge = Math.max(bpY + MIN_FH, bpY + (f.userHeight || 0), cBottom);
-        let w = rEdge - anchorX;
-        let h = bEdge - anchorY;
-        if (f.type === 'party') { const maxH = -anchorY; if (maxH > 0 && h > maxH) h = maxH; }
-        bounds = { x: anchorX, y: anchorY, width: w, height: h };
-      } else {
-        const w = Math.max(MIN_FW, f.userWidth || 0);
-        const h = Math.max(MIN_FH, f.userHeight || 0);
-        bounds = { x: f.posX ?? -w / 2, y: f.posY ?? (f.type === 'party' ? -(h + 40) : 100), width: w, height: h };
-      }
-      const insetX = Math.min(30, bounds.width * 0.1);
-      const insetY = Math.min(30, bounds.height * 0.1);
-      if (dropX >= bounds.x + insetX && dropX <= bounds.x + bounds.width - insetX &&
-          dropY >= bounds.y + insetY && dropY <= bounds.y + bounds.height - insetY) {
+      if (!content) continue;
+      const w = Math.max(content.minWidth, f.userWidth || 0);
+      const h = Math.max(content.minHeight, f.userHeight || 0);
+      if (dropX >= content.x && dropX <= content.x + w && dropY >= content.y && dropY <= content.y + h) {
         hitFolder = f.id;
         break;
       }
     }
     setDropTargetFolderId(hitFolder);
     dropTargetRef.current = hitFolder;
-  }, [nodes]);
+  }, [nodes, pickAutoDropTarget, currentAutoParentOf]);
 
   // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card.
   // For crystallized panels (above line), the BOTTOM edge (panelY + panelHeight) must not cross below the line.
