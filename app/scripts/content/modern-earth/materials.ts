@@ -74,4 +74,42 @@ export const MATERIALS: ItemTemplate[] = [
   // ── Electronic stock ──
   stock('Circuit Components (Kit)', 'Resistors, boards, chips: a junk drawer with a future.', 'Hard', 5, 3, 4, { primaryMaterial: 'Silicon', properties: ['Fragile', 'Electric Vulnerable'] }),
   stock('Solder & Flux Kit', 'The metal glue of the information age.', 'Hard', 2, 1, 1, { primaryMaterial: 'Solder' }),
+
+  // ── Coverage completions (every item material must exist as stock) ──
+  stock('Polymer (Resin Stock)', 'Pellets and sheet of the plastic age; half the modern world is this.', 'Hard', 20, 1, 2, { primaryMaterial: 'Polymer' }),
+  stock('Cast Iron (Stock)', 'Heavy, brittle-hearted, heat-loving metal of skillets and stoves.', 'Hard', 60, 2, 3, { primaryMaterial: 'Cast Iron', baseResist: 28, properties: ['Strong', 'Heat Proof', 'Brittle'] }),
+  stock('Hardwood (Board Stock)', 'Oak, maple, walnut, hickory: the woods furniture and tool handles trust.', 'Hard', 45, 2, 3, { primaryMaterial: 'Hardwood', baseResist: 12, properties: ['Strong', 'Flammable'] }),
+  stock('Polyester (Bolt)', 'The tireless synthetic: athletic wear, luggage, upholstery.', 'Soft', 15, 1, 1, { primaryMaterial: 'Polyester', baseResist: 2, properties: ['Flexible'] }),
+  stock('Paper (Ream & Board)', 'Sheets and cardstock; civilization\'s cheapest memory.', 'Soft', 10, 1, 1, { primaryMaterial: 'Paper', properties: ['Flammable', 'Absorbent'] }),
+  stock('Down (Fill Stock)', 'Loft in a bag: the warmth-to-weight champion.', 'Soft', 3, 2, 2, { primaryMaterial: 'Down', properties: ['Cold Resistant', 'Flammable'] }),
+  stock('Foodstuffs (Pantry Staples)', 'Flour, oil, salt, beans: the raw material of every meal.', 'Soft', 30, 1, 1, { primaryMaterial: 'Foodstuffs' }),
 ];
+
+/**
+ * Alias map: item material names → the canonical stock material that
+ * covers them. Wood species collapse to Hardwood; plastic variants to
+ * Polymer; composites to Carbon Fiber. The seeder validates every item's
+ * materials against MATERIALS ∪ these keys — an unknown material fails
+ * the seed loudly (Mike ruling 2026-08-05: every item's materials must
+ * already exist as generated stock).
+ */
+export const MATERIAL_ALIASES: Record<string, string> = {
+  'Wood': 'Hardwood',
+  'Log Timber': 'Hardwood',
+  'Hickory': 'Hardwood',
+  'Walnut': 'Hardwood',
+  'Maple': 'Hardwood',
+  'Alder': 'Hardwood',
+  'Spruce': 'Hardwood',
+  'Oak': 'Hardwood',
+  'Fabric': 'Cotton',
+  'Synthetic Leather': 'Polyester',
+  'Polyethylene': 'Polymer',
+  'Graphite': 'Carbon Fiber',
+  'Concrete': 'Concrete Mix',
+  'Brick': 'Bricks',
+  'Asphalt Shingle': 'Asphalt Shingles',
+  'Mixed Goods': 'Foodstuffs',
+  'Glass': 'Window Glass',
+  'Cardboard': 'Paper',
+};

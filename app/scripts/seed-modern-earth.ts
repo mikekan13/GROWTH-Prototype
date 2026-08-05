@@ -43,7 +43,7 @@ import { WAVE2_TRAITS } from './content/modern-earth/traits-wave2';
 import { HOUSEHOLD_ITEMS_2 } from './content/modern-earth/items-household-2';
 import { CONSUMABLE_HOBBY_ITEMS } from './content/modern-earth/items-consumables-hobby';
 import { BUILDINGS } from './content/modern-earth/buildings';
-import { MATERIALS } from './content/modern-earth/materials';
+import { MATERIALS, MATERIAL_ALIASES } from './content/modern-earth/materials';
 import { WAVE3_TOOLS_YARD } from './content/modern-earth/items-wave3-tools-yard';
 import { WAVE3_MEDICAL_SECURITY } from './content/modern-earth/items-wave3-medical-security';
 
@@ -189,6 +189,28 @@ async function main() {
     validateForgeData('branch', data);
     track(await upsertGlobalItem({ type: 'branch', name: b.name, data, karmicValue: BigInt(kv), adminId: admin.id }));
     rows.push({ type: 'branch', name: b.name, kv, freq: frequency });
+  }
+
+  // ── Material coverage gate (Mike ruling 2026-08-05): every material an
+  // item is made of must itself exist as generated stock in the catalog. ──
+  {
+    const known = new Set(MATERIALS.map(m => m.primaryMaterial));
+    const resolves = (m: string) => known.has(m) || known.has(MATERIAL_ALIASES[m] ?? '');
+    const unknowns = new Set<string>();
+    const walk = (it: ItemTemplate) => {
+      if (!resolves(it.primaryMaterial)) unknowns.add(it.primaryMaterial);
+      for (const s of it.subordinateMaterials ?? []) if (!resolves(s)) unknowns.add(s);
+      for (const c of it.contains ?? []) walk(c);
+    };
+    for (const it of [
+      ...EVERYDAY_ITEMS, ...TECH_ITEMS, ...MEDICAL_ITEMS, ...WEAPON_ITEMS, ...VEHICLES,
+      ...HOUSEHOLD_ITEMS_2, ...CONSUMABLE_HOBBY_ITEMS, ...BUILDINGS,
+      ...MATERIALS, ...WAVE3_TOOLS_YARD, ...WAVE3_MEDICAL_SECURITY,
+    ]) walk(it);
+    if (unknowns.size) {
+      throw new Error(`Items reference materials with no catalog stock: ${[...unknowns].join(', ')}`);
+    }
+    console.log(`Material coverage gate: PASS (${known.size} stock materials cover all item references)`);
   }
 
   // ── Items + vehicles ──
