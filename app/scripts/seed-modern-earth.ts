@@ -43,6 +43,9 @@ import { WAVE2_TRAITS } from './content/modern-earth/traits-wave2';
 import { HOUSEHOLD_ITEMS_2 } from './content/modern-earth/items-household-2';
 import { CONSUMABLE_HOBBY_ITEMS } from './content/modern-earth/items-consumables-hobby';
 import { BUILDINGS } from './content/modern-earth/buildings';
+import { MATERIALS } from './content/modern-earth/materials';
+import { WAVE3_TOOLS_YARD } from './content/modern-earth/items-wave3-tools-yard';
+import { WAVE3_MEDICAL_SECURITY } from './content/modern-earth/items-wave3-medical-security';
 
 const ALL_TRAITS: TraitTemplate[] = [...ALL_THORNS, ...MODERN_NECTARS, ...ALL_BLOSSOMS, ...WAVE2_TRAITS];
 const TRAIT_KV = new Map(ALL_TRAITS.map(t => [t.name, t.kv]));
@@ -192,6 +195,7 @@ async function main() {
   const allItems = [
     ...EVERYDAY_ITEMS, ...TECH_ITEMS, ...MEDICAL_ITEMS, ...WEAPON_ITEMS, ...VEHICLES,
     ...HOUSEHOLD_ITEMS_2, ...CONSUMABLE_HOBBY_ITEMS, ...BUILDINGS,
+    ...MATERIALS, ...WAVE3_TOOLS_YARD, ...WAVE3_MEDICAL_SECURITY,
   ];
   for (const it of allItems) {
     const data = itemPayload(it);
