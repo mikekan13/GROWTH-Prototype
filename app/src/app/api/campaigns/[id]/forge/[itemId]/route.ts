@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { getForgeItem, updateForgeItem, deleteForgeItem, updateForgeItemSchema } from '@/services/forge';
+import { maybeNotifyJewlForgeBatchResolved } from '@/ai/copilot/forge-batch-watch';
 
 export async function GET(
   _request: NextRequest,
@@ -39,8 +40,15 @@ export async function DELETE(
 ) {
   try {
     const session = await requireAuth();
-    const { itemId } = await params;
+    const { id: campaignId, itemId } = await params;
+    // Capture identity before deletion for the Forge watch.
+    const item = await getForgeItem(itemId, session.user.id, session.user.role);
     await deleteForgeItem(itemId, session.user.id, session.user.role);
+    void maybeNotifyJewlForgeBatchResolved(
+      campaignId,
+      { name: item.name, createdBy: item.createdBy },
+      'deleted',
+    );
     return NextResponse.json({ deleted: true });
   } catch (error) {
     return errorResponse(error);

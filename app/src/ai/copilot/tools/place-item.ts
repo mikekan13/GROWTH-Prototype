@@ -41,10 +41,11 @@ export const placeItemTool: JewlTool = {
   name: 'place_item',
   description:
     'Place a physical object in the world: create a campaign item, optionally ' +
-    'located in a room (location) or carried by a character (holder). Use for ' +
-    'scene dressing and mundane objects directly. For NEW mechanical designs, ' +
-    'propose_forge_blueprint first; once the GM approves, instantiate it here ' +
-    'via fromForgeItem.',
+    'located in a room (location) or carried by a character (holder). Items ' +
+    'are AUTHORED: propose_forge_blueprint the batch first (full item schema ' +
+    '+ notes), let the GM review, then instantiate approved designs here via ' +
+    'fromForgeItem. Direct placement without fromForgeItem is ONLY for when ' +
+    'the GM explicitly says to skip authoring.',
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);
