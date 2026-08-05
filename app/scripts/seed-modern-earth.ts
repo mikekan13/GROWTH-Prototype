@@ -39,8 +39,12 @@ import { MODERN_SKILLS } from './content/modern-earth/skills';
 import { EVERYDAY_ITEMS } from './content/modern-earth/items-everyday';
 import { TECH_ITEMS, MEDICAL_ITEMS, WEAPON_ITEMS } from './content/modern-earth/items-tech-medical-weapons';
 import { VEHICLES } from './content/modern-earth/vehicles';
+import { WAVE2_TRAITS } from './content/modern-earth/traits-wave2';
+import { HOUSEHOLD_ITEMS_2 } from './content/modern-earth/items-household-2';
+import { CONSUMABLE_HOBBY_ITEMS } from './content/modern-earth/items-consumables-hobby';
+import { BUILDINGS } from './content/modern-earth/buildings';
 
-const ALL_TRAITS: TraitTemplate[] = [...ALL_THORNS, ...MODERN_NECTARS, ...ALL_BLOSSOMS];
+const ALL_TRAITS: TraitTemplate[] = [...ALL_THORNS, ...MODERN_NECTARS, ...ALL_BLOSSOMS, ...WAVE2_TRAITS];
 const TRAIT_KV = new Map(ALL_TRAITS.map(t => [t.name, t.kv]));
 
 function netTraitKV(nectars: string[], thorns: string[]): number {
@@ -185,7 +189,10 @@ async function main() {
   }
 
   // ── Items + vehicles ──
-  const allItems = [...EVERYDAY_ITEMS, ...TECH_ITEMS, ...MEDICAL_ITEMS, ...WEAPON_ITEMS, ...VEHICLES];
+  const allItems = [
+    ...EVERYDAY_ITEMS, ...TECH_ITEMS, ...MEDICAL_ITEMS, ...WEAPON_ITEMS, ...VEHICLES,
+    ...HOUSEHOLD_ITEMS_2, ...CONSUMABLE_HOBBY_ITEMS, ...BUILDINGS,
+  ];
   for (const it of allItems) {
     const data = itemPayload(it);
     validateForgeData('item', data);
