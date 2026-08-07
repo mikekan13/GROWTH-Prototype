@@ -415,6 +415,51 @@ export async function listGlobalCatalog(
   }));
 }
 
+/**
+ * Catalog search for JEWL: matches the query against name OR data text,
+ * so "kitchen" finds items whose description mentions kitchens, not just
+ * name matches. Stock in the global catalog is public and KRMA-free
+ * (Mike ruling 2026-08-06) — pulling never debits anything.
+ */
+export async function searchGlobalCatalog(opts: {
+  type?: string;
+  query?: string;
+  limit?: number;
+} = {}) {
+  const take = Math.min(Math.max(opts.limit ?? 20, 1), 50);
+  const where: Record<string, unknown> = {
+    isGlobal: true,
+    status: { in: ['published', 'global'] },
+  };
+  if (opts.type) where.type = opts.type;
+  if (opts.query) {
+    where.OR = [
+      { name: { contains: opts.query } },
+      { data: { contains: opts.query } },
+    ];
+  }
+
+  const items = await prisma.forgeItem.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      data: true,
+      useCount: true,
+      karmicValue: true,
+    },
+    orderBy: [{ useCount: 'desc' }, { name: 'asc' }],
+    take,
+  });
+
+  return items.map(item => ({
+    ...item,
+    karmicValue: item.karmicValue != null ? Number(item.karmicValue) : null,
+    data: JSON.parse(item.data) as Record<string, unknown>,
+  }));
+}
+
 export async function pullFromGlobalCatalog(
   globalItemId: string,
   campaignId: string,

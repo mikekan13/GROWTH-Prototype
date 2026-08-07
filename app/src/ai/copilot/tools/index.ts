@@ -22,6 +22,7 @@ import './place-item';
 import './establish-world-facts';
 import './edit-character-sheet';
 import './forge-blueprint';
+import './catalog';
 import './memory';
 import './npc-speak';
 import './mistake-corpus';

@@ -72,6 +72,8 @@ async function upsertGlobalItem(opts: {
       createdBy: opts.adminId,
       authorUserId: opts.adminId,
       karmicValue: opts.karmicValue,
+      // ADMIN stock is public + KRMA-free (Mike ruling 2026-08-06) — no royalty.
+      royaltyRate: 0,
     },
     select: { id: true },
   });
