@@ -844,6 +844,30 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               </div>
             </div>
 
+            {/* Likeness — lifted out of the HEAD body-part section while the
+                full part system is hidden (SHOW_BODY_PARTS=false). Same data
+                path: writes to bodyParts.HEAD, so nothing downstream changes
+                and this block retires itself when the part system returns. */}
+            {!SHOW_BODY_PARTS && (() => {
+              const head = pd.bodyParts?.HEAD || {};
+              return (
+                <div className="mb-4">
+                  <SectionLabel text="Likeness" />
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    <FieldSelect label="Face Shape" value={head.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart('HEAD', 'faceShape', v)} />
+                    <FieldInput label="Facial Hair" value={head.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'facialHair', v)} />
+                    <FieldSelect label="Eye Shape" value={head.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart('HEAD', 'eyeShape', v)} />
+                    <FieldInput label="Eye Color" value={head.eyeColor} placeholder="green, hazel, amber" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'eyeColor', v)} />
+                    <FieldInput label="Hair Color" value={head.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairColor', v)} />
+                    <FieldSelect label="Hair Length" value={head.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairLength', v)} />
+                    <FieldInput label="Hair Texture" value={head.hairTexture} placeholder="thick wavy, fine straight, curly" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairTexture', v)} />
+                    <FieldInput label="Hair Style" value={head.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairStyle', v)} />
+                  </div>
+                  <FieldTextarea label="Distinguishing Features" value={head.description} placeholder="Scars, pointed ears, piercings, birthmarks, glowing runes..." editable={isEditable} onChange={v => updateBodyPart('HEAD', 'description', v)} />
+                </div>
+              );
+            })()}
+
             {/* Body part sections from seed — collapsible */}
             <div className="space-y-1">
               {(SHOW_BODY_PARTS ? (selectedSeed.data.bodyStructure?.parts || []) : []).map(part => {
