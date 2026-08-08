@@ -408,6 +408,11 @@ export interface PhysicalDescription {
   // (GROWTH is any genre, even all at once: the time-traveler wears modern
   // briefs in a medieval world). User-set now; genesis-authored later.
   underclothing?: string;
+  // Freeform body measurements for render precision (e.g. `bust 36" /
+  // waist 27" / hips 38"`). Proportional data the face ref can't carry;
+  // absolute height stays EXCLUDED from prompts (it wrecks proportions).
+  // Precursor to per-part measurements in the full body-part system.
+  measurements?: string;
   // Per-body-part descriptions keyed by part name (HEAD, TORSO, LEFT_UPPER_ARM, etc.)
   bodyParts?: Record<string, BodyPartDescription>;
 }

@@ -1386,6 +1386,10 @@ export class LocalProvider implements ImageGenerationProvider {
     // stripped (it threw proportions off).
     const buildOnly = id?.bodyType?.split(',')[0]?.trim();
     const physClause = buildOnly ? ` with a ${buildOnly} build` : '';
+    // Concrete measurements sharpen proportions where the face ref is
+    // silent (Mike 2026-08-08). Absolute height stays excluded.
+    const measurements = id?.measurements?.trim();
+    const measurementSentence = measurements ? ` Body measurements: ${measurements}.` : '';
 
     // Garment = CHARACTER data, never a hard-coded era (Mike 2026-08-08:
     // "GROWTH is any genre or even all of them at once" — the time-traveler
@@ -1410,7 +1414,7 @@ export class LocalProvider implements ImageGenerationProvider {
     // pull, now fixed at the source (SCALE_REF1 → 0.25MP). Stating the
     // framing once and letting the model do anatomy beats micromanaging it.
     return (
-      `A full-length painted illustration of the ${subject} from image reference 1${physClause}. Match the exact facial identity, hair, and skin from image reference 1 with high fidelity. Full body visible head to toe with natural realistic proportions, standing straight in a relaxed A-pose facing the camera, arms at the sides, neutral expression, with clear backdrop margin above the head and below the feet.\n\n` +
+      `A full-length painted illustration of the ${subject} from image reference 1${physClause}. Match the exact facial identity, hair, and skin from image reference 1 with high fidelity.${measurementSentence} Full body visible head to toe with natural realistic proportions, standing straight in a relaxed A-pose facing the camera, arms at the sides, neutral expression, with clear backdrop margin above the head and below the feet.\n\n` +
       `${underwearPhrase}\n\n` +
       `Plain mid-grey studio backdrop. Soft Rembrandt lighting.\n\n` +
       `Painterly semi-realistic digital illustration with visible brushwork and a glossy CGI sheen — subtle subsurface scattering, polished highlights. Muted desaturated color palette, moody atmospheric lighting. The painterly style applies to the rendering only — it does not change what the person wears or how objects are designed.${styleSentence}`

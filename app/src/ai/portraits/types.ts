@@ -145,6 +145,7 @@ export interface PortraitCharacterData {
     physicalDescription?: string;          // Free-text description
     skinTone?: string;
     underclothing?: string;
+    measurements?: string;
     hairColor?: string;
     hairLength?: string;
     hairTexture?: string;

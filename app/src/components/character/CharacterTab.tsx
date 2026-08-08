@@ -292,10 +292,35 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     }
   }, [effectiveCharacter, campaignId]);
 
-  const updateField = useCallback((field: 'build' | 'skinTone' | 'gender' | 'underclothing', value: string) => {
+  const updateField = useCallback((field: 'build' | 'skinTone' | 'gender' | 'underclothing' | 'measurements', value: string) => {
     setPhysicalDescription(prev => ({ ...prev, [field]: value }));
     setDirty(true);
   }, []);
+
+  // Genome-first staging (Mike ruling 2026-08-08): the creator is STORY-
+  // FIRST — physical-look sections stay hidden until JEWL's gestation has
+  // produced the genome. Stage comes from /api/characters/[id]/genome;
+  // polled while a genesis session is working.
+  const [genomeInfo, setGenomeInfo] = useState<{
+    stage: 'story' | 'gestating' | 'ready';
+    session?: { status: string; cycleCount: number; blockedReason?: string | null; lastNote?: string | null } | null;
+    genome?: { memoryCount: number; identityNarrative?: string | null; voiceNotes?: string | null; introspection?: number } | null;
+  } | null>(null);
+
+  const fetchGenome = useCallback(async () => {
+    if (!effectiveCharacter?.id) { setGenomeInfo(null); return; }
+    try {
+      const res = await fetch(`/api/characters/${effectiveCharacter.id}/genome`);
+      if (res.ok) setGenomeInfo(await res.json());
+    } catch { /* strip keeps last known state */ }
+  }, [effectiveCharacter?.id]);
+
+  useEffect(() => { fetchGenome(); }, [fetchGenome]);
+  useEffect(() => {
+    if (genomeInfo?.stage !== 'gestating') return;
+    const timer = setInterval(fetchGenome, 6000);
+    return () => clearInterval(timer);
+  }, [genomeInfo?.stage, fetchGenome]);
 
   const updateHeight = useCallback((value: number) => {
     setPhysicalDescription(prev => ({ ...prev, height: value }));
@@ -419,6 +444,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         sex: physicalDescription.gender,
         skinTone: physicalDescription.skinTone,
         underclothing: physicalDescription.underclothing,
+        measurements: physicalDescription.measurements,
         hairColor: head?.hairColor,
         hairLength: head?.hairLength,
         hairTexture: head?.hairTexture,
@@ -551,6 +577,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
       setGenesisMsg(data.alreadyRunning
         ? 'Genesis already in progress — JEWL is on it.'
         : 'Submitted — JEWL has opened a genesis session and is working.');
+      fetchGenome();
     } catch (err) {
       setGenesisMsg(err instanceof Error ? err.message : 'Genesis submission failed');
     } finally {
@@ -593,6 +620,63 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           )}
         </div>
 
+        {/* GENOME PIPELINE STATUS — story → gestation → ready */}
+        {effectiveCharacter?.id && (
+          <div className="border p-3" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              {(['story', 'gestating', 'ready'] as const).map((s, i) => (
+                <span key={s} className="flex items-center gap-2">
+                  {i > 0 && <span style={{ color: '#555' }}>→</span>}
+                  <span style={{ color: (genomeInfo?.stage ?? 'story') === s ? 'var(--krma-gold)' : '#555' }}>
+                    {s === 'story' ? 'sTORY' : s === 'gestating' ? 'gESTATION' : 'gENOME rEADY'}
+                  </span>
+                </span>
+              ))}
+              {genomeInfo?.stage === 'gestating' && genomeInfo.session && (
+                <span className="ml-2" style={{ color: 'var(--terminal-prime)' }}>
+                  ⚒ cycle {genomeInfo.session.cycleCount}
+                  {genomeInfo.session.status === 'blocked' ? ` — blocked: ${genomeInfo.session.blockedReason ?? 'awaiting GM'}` : ''}
+                  {genomeInfo.session.lastNote ? ` — ${genomeInfo.session.lastNote.slice(0, 90)}` : ''}
+                </span>
+              )}
+              {(genomeInfo?.stage ?? 'story') === 'story' && (
+                <span className="ml-2 normal-case" style={{ color: '#8e7cc3' }}>write the story below — everything else grows from it</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* GENOME — the gestated dossier, viewable once ready */}
+        {genomeInfo?.stage === 'ready' && genomeInfo.genome && (
+          <div className="border p-4" style={{ borderColor: 'var(--krma-gold)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+            <div className="text-base uppercase mb-1" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+              Genome
+            </div>
+            <div className="text-xs mb-3" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              {genomeInfo.genome.memoryCount} seeded memories · introspection {typeof genomeInfo.genome.introspection === 'number' ? genomeInfo.genome.introspection.toFixed(2) : '—'}
+            </div>
+            {genomeInfo.genome.identityNarrative ? (
+              <div className="text-sm whitespace-pre-wrap overflow-y-auto p-3" style={{ maxHeight: 320, color: '#ccc', backgroundColor: '#2a2a3e', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                {genomeInfo.genome.identityNarrative}
+              </div>
+            ) : (
+              <div className="text-sm" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                Memory ledger seeded — narrative dossier pending.
+              </div>
+            )}
+            {genomeInfo.genome.voiceNotes && (
+              <div className="text-xs mt-2 whitespace-pre-wrap" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                VOICE: {genomeInfo.genome.voiceNotes}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Post-genome only: seed, photos, physical identity, portraits.
+            Pre-genome the creator is STORY-FIRST (ruling 2026-08-08) —
+            the player writes, submits to the GM, the GM sends to JEWL,
+            and the physical-look tooling unlocks when gestation completes. */}
+        {genomeInfo?.stage === 'ready' && (<>
         {/* SEED SELECTOR */}
         <div className="max-w-lg mx-auto">
           <label className="text-xs uppercase block mb-1 tracking-wider" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
@@ -865,6 +949,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     <FieldInput label="Hair Texture" value={head.hairTexture} placeholder="thick wavy, fine straight, curly" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairTexture', v)} />
                     <FieldInput label="Hair Style" value={head.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairStyle', v)} />
                     <FieldInput label="Underclothing" value={pd.underclothing} placeholder="plain modern cotton, linen shift, seamless synthweave" editable={isEditable} onChange={v => updateField('underclothing', v)} />
+                    <FieldInput label="Measurements" value={pd.measurements} placeholder={'bust 36" / waist 27" / hips 38"'} editable={isEditable} onChange={v => updateField('measurements', v)} />
                   </div>
                   <FieldTextarea label="Distinguishing Features" value={head.description} placeholder="Scars, pointed ears, piercings, birthmarks, glowing runes..." editable={isEditable} onChange={v => updateBodyPart('HEAD', 'description', v)} />
                 </div>
@@ -1141,6 +1226,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           </div>
         </div>
         )}
+
+        </>)}
 
         {/* BACKSTORY */}
         <div className="border p-4 flex flex-col" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
