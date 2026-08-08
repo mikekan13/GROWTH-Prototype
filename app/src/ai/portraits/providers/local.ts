@@ -198,7 +198,7 @@ export class LocalProvider implements ImageGenerationProvider {
       const params: ComfyUIWorkflowParams = {
         clipL: promptOutput.clipL,
         t5xxl: promptOutput.t5xxl,
-        negativePrompt: promptOutput.negativePrompt,
+        negativePrompt: '', // FLUX.2 has no negative path (CFG 1.0 + BasicGuider) — never sent; keep debug honest
         seed,
         // T10 recipe values — locked 2026-04-22 before the Klein/Turbo detour:
         // Dev 32B at 20 steps, 1280×1280 face, 1024×1536 body. FLUX.2 is
@@ -1177,7 +1177,7 @@ export class LocalProvider implements ImageGenerationProvider {
           prompt: finalPrompt,
           pass2Prompt: pass2Status === 'ok' ? actualPass2Prompt : null,
           clipL: promptOutput.clipL,
-          negativePrompt: promptOutput.negativePrompt,
+          negativePrompt: '', // FLUX.2 has no negative path (CFG 1.0 + BasicGuider) — never sent; keep debug honest
           seed: params.seed,
           model: 'flux2-dev-fp8mixed',
           steps,
@@ -1319,7 +1319,7 @@ export class LocalProvider implements ImageGenerationProvider {
         metadata: {
           prompt: finalPrompt,
           clipL: promptOutput.clipL,
-          negativePrompt: promptOutput.negativePrompt,
+          negativePrompt: '', // FLUX.2 has no negative path (CFG 1.0 + BasicGuider) — never sent; keep debug honest
           seed: params.seed,
           model: 'flux2-dev-fp8mixed',
           steps,
