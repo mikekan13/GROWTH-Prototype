@@ -133,6 +133,9 @@ export interface PortraitMetadata {
 export interface PortraitCharacterData {
   characterId: string;
   campaignId: string | null;
+  /** The genome — image generation is HARD-GATED on this existing (era,
+   *  culture, and garments are inferred from who the character is). */
+  backstory?: string;
 
   // T1: Core Identity (always included)
   identity: {
@@ -141,6 +144,7 @@ export interface PortraitCharacterData {
     sex?: string;                          // From backstory or description
     physicalDescription?: string;          // Free-text description
     skinTone?: string;
+    underclothing?: string;
     hairColor?: string;
     hairLength?: string;
     hairTexture?: string;

@@ -1301,6 +1301,14 @@ export class LocalProvider implements ImageGenerationProvider {
       if (styleName && wf.SCALE_REF2?.inputs) {
         (wf.SCALE_REF2.inputs as Record<string, unknown>).megapixels = 0.1;
       }
+      // Identity ref at full 1MP exerts the SAME square head-and-shoulders
+      // composition pressure on the tall body canvas that the style ref did
+      // (head/upper-body dominance = off proportions). Encode smaller:
+      // facial identity survives the downscale, the framing pull doesn't.
+      // (2026-08-08 A/B lever — raise back toward 0.5 if identity drifts.)
+      if (wf.SCALE_REF1?.inputs) {
+        (wf.SCALE_REF1.inputs as Record<string, unknown>).megapixels = 0.25;
+      }
 
       // 5. Inject parameters.
       for (const node of Object.values(wf)) {
@@ -1370,52 +1378,42 @@ export class LocalProvider implements ImageGenerationProvider {
     const sexRaw = (id?.sex || '').toString().toLowerCase();
     const subject = sexRaw === 'female' ? 'woman' : sexRaw === 'male' ? 'man' : 'person';
 
-    // Physical attributes (skin / hair / eyes / build).
-    const segs: string[] = [];
-    if (id?.skinTone) segs.push(`${id.skinTone.trim()} skin`);
-
-    const hairLen = id?.hairLength?.trim();
-    const hairTex = id?.hairTexture?.trim();
-    const hairCol = id?.hairColor?.trim();
-    const hairSty = id?.hairStyle?.trim();
-    if (hairLen || hairTex || hairCol || hairSty) {
-      const hairBits = [hairLen, hairTex, hairCol].filter(Boolean).join(' ');
-      let hair = hairBits ? `${hairBits} hair` : 'hair';
-      if (hairSty) hair += ` styled in a ${hairSty}`;
-      segs.push(hair);
-    }
-    if (id?.eyeColor) segs.push(`${id.eyeColor.trim()} eyes`);
-    // Strip the height suffix the adapter bakes into bodyType (e.g.,
-    // "slim, 5'7\"") — height was throwing the proportions off. Use just
-    // the build descriptor.
+    // The locked face image is the appearance authority — face, hair,
+    // skin, eyes all come FROM the reference, never re-prompted (Mike
+    // 2026-08-08: "it should be using the face gened image and not
+    // prompting"). The only descriptor the face ref can't supply is the
+    // BUILD, so that's the only one that rides in text. Height stays
+    // stripped (it threw proportions off).
     const buildOnly = id?.bodyType?.split(',')[0]?.trim();
-    if (buildOnly) segs.push(`a ${buildOnly} body`);
+    const physClause = buildOnly ? ` with a ${buildOnly} build` : '';
 
-    let physClause = '';
-    if (segs.length === 1) physClause = ` with ${segs[0]}`;
-    else if (segs.length === 2) physClause = ` with ${segs[0]} and ${segs[1]}`;
-    else if (segs.length >= 3) physClause = ` with ${segs.slice(0, -1).join(', ')}, and ${segs[segs.length - 1]}`;
-
-    // Underwear: aesthetic descriptors + secondary style color (FLUX.2 reads hex directly).
-    const aesthetics = (id?.styleAesthetics || []).filter(Boolean).map(a => a.toLowerCase());
-    const aestheticPhrase = aesthetics.length === 0 ? '' :
-      aesthetics.length === 1 ? aesthetics[0] :
-      `${aesthetics[0]} and ${aesthetics[1]}`;
+    // Garment = CHARACTER data, never a hard-coded era (Mike 2026-08-08:
+    // "GROWTH is any genre or even all of them at once" — the time-traveler
+    // wears modern briefs in a medieval world). The underclothing field is
+    // user-set in the Likeness group now, genesis-authored later. A bare
+    // "underwear" noun is underspecified and style-block genre words rush
+    // to decorate it — so the fallback stays concrete and unornamented.
     const secondaryHex = normalizeHex(id?.styleColors?.secondary);
     const colorPhrase = secondaryHex || 'neutral';
-    const underwearPhrase = aestheticPhrase
-      ? `Wearing ${aestheticPhrase} ${colorPhrase} underwear.`
-      : `Wearing ${colorPhrase} underwear.`;
+    const underDesc = id?.underclothing?.trim();
+    const underwearPhrase = underDesc
+      ? `Wearing ${underDesc}.`
+      : `Wearing simple ${colorPhrase} underclothing with a clean minimal cut, smooth plain fabric, no ornamentation.`;
 
     const styleSentence = hasStyle
       ? ` Pull only the painterly brushwork, atmospheric grunge texture, and color rendering style from image reference 2 — nothing else. Do not use the body, pose, anatomy, framing, composition, clothing, underwear, face, hair, skin, or background from image reference 2.`
       : '';
 
+    // Deliberately spare (Mike 2026-08-08: "we are over working it").
+    // The old prompt commanded "8.5 heads tall / notably small head /
+    // elongated limbs" — compensation for the 1MP face-ref composition
+    // pull, now fixed at the source (SCALE_REF1 → 0.25MP). Stating the
+    // framing once and letting the model do anatomy beats micromanaging it.
     return (
-      `A full-length painted illustration of the ${subject} from image reference 1${physClause}, full body visible from the top of the head to the toes with the figure occupying about 80% of the frame height — clear empty grey space above the head and below the feet, the figure does NOT touch the top or bottom edges of the frame. Tall fashion-model proportions, approximately 8.5 heads tall, with a notably small head relative to the body and long elongated limbs. Match the exact facial identity, hair, and skin tone from image reference 1 with high fidelity. Slight A-pose, arms relaxed at the sides, standing straight facing the camera, neutral expression, looking forward.\n\n` +
+      `A full-length painted illustration of the ${subject} from image reference 1${physClause}. Match the exact facial identity, hair, and skin from image reference 1 with high fidelity. Full body visible head to toe with natural realistic proportions, standing straight in a relaxed A-pose facing the camera, arms at the sides, neutral expression, with clear backdrop margin above the head and below the feet.\n\n` +
       `${underwearPhrase}\n\n` +
       `Plain mid-grey studio backdrop. Soft Rembrandt lighting.\n\n` +
-      `Rendered as a painterly semi-realistic digital illustration with visible brushwork, soft painted edges, and a glossy CGI sheen on skin and surfaces — subtle subsurface scattering, polished highlights, smooth rendered textures. Muted desaturated color palette, dark-fantasy mood, atmospheric and slightly stylized — not a photograph, not photorealistic.${styleSentence}`
+      `Painterly semi-realistic digital illustration with visible brushwork and a glossy CGI sheen — subtle subsurface scattering, polished highlights. Muted desaturated color palette, moody atmospheric lighting. The painterly style applies to the rendering only — it does not change what the person wears or how objects are designed.${styleSentence}`
     );
   }
 

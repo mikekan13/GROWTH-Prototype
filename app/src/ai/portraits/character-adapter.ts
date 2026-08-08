@@ -107,6 +107,7 @@ function extractIdentity(
     sex: pd?.gender,
     physicalDescription: physicalDesc,
     skinTone: pd?.skinTone,
+    underclothing: pd?.underclothing,
     hairColor: head?.hairColor,
     hairLength: head?.hairLength,
     hairTexture: head?.hairTexture,

@@ -404,6 +404,10 @@ export interface PhysicalDescription {
   height?: number;              // Height in inches, constrained by seed min/max
   build?: string;
   skinTone?: string;            // Selected from seed-specific options
+  // Reference-garment description — CHARACTER data, never hard-coded era
+  // (GROWTH is any genre, even all at once: the time-traveler wears modern
+  // briefs in a medieval world). User-set now; genesis-authored later.
+  underclothing?: string;
   // Per-body-part descriptions keyed by part name (HEAD, TORSO, LEFT_UPPER_ARM, etc.)
   bodyParts?: Record<string, BodyPartDescription>;
 }

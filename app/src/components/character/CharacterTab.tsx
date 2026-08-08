@@ -292,7 +292,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     }
   }, [effectiveCharacter, campaignId]);
 
-  const updateField = useCallback((field: 'build' | 'skinTone' | 'gender', value: string) => {
+  const updateField = useCallback((field: 'build' | 'skinTone' | 'gender' | 'underclothing', value: string) => {
     setPhysicalDescription(prev => ({ ...prev, [field]: value }));
     setDirty(true);
   }, []);
@@ -412,11 +412,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     return {
       characterId: effectiveCharacter?.id || 'creation-preview',
       campaignId,
+      backstory: backstoryText,
       identity: {
         name: characterName || 'Unnamed',
         age: desiredAge,
         sex: physicalDescription.gender,
         skinTone: physicalDescription.skinTone,
+        underclothing: physicalDescription.underclothing,
         hairColor: head?.hairColor,
         hairLength: head?.hairLength,
         hairTexture: head?.hairTexture,
@@ -862,6 +864,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     <FieldSelect label="Hair Length" value={head.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairLength', v)} />
                     <FieldInput label="Hair Texture" value={head.hairTexture} placeholder="thick wavy, fine straight, curly" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairTexture', v)} />
                     <FieldInput label="Hair Style" value={head.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'hairStyle', v)} />
+                    <FieldInput label="Underclothing" value={pd.underclothing} placeholder="plain modern cotton, linen shift, seamless synthweave" editable={isEditable} onChange={v => updateField('underclothing', v)} />
                   </div>
                   <FieldTextarea label="Distinguishing Features" value={head.description} placeholder="Scars, pointed ears, piercings, birthmarks, glowing runes..." editable={isEditable} onChange={v => updateBodyPart('HEAD', 'description', v)} />
                 </div>
