@@ -8,6 +8,12 @@ import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
 
+// Creation-flow streamline (Mike, live session 2026-08-07): body-part detail
+// and inventory sections hidden while the creation flow gets dialed in —
+// flip these back on when the flow reaches them.
+const SHOW_BODY_PARTS = false;
+const SHOW_INVENTORY = false;
+
 const GENDER_OPTIONS = ['', 'Male', 'Female', 'Non-binary', 'Other'] as const;
 const BUILD_OPTIONS = [
   '', 'Petite', 'Slight', 'Slim', 'Slender', 'Lean', 'Wiry', 'Lithe',
@@ -119,6 +125,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [styleAesthetics, setStyleAesthetics] = useState<string[]>([]);
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set(['HEAD']));
   const [selectedSeedName, setSelectedSeedName] = useState<string>('');
+  const [submittingGenesis, setSubmittingGenesis] = useState(false);
+  const [genesisMsg, setGenesisMsg] = useState('');
   const [campaignSeeds, setCampaignSeeds] = useState<CampaignSeedItem[]>([]);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -514,6 +522,40 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     || !isGM
     || (effectiveCharacter?.entityType != null && effectiveCharacter.entityType !== 'PLAYER_CHARACTER');
 
+  // Genesis: hand the genome (backstory + appearance) to JEWL, who opens a
+  // gestation work session (expansion → ledger → catalog-first mechanics).
+  const submitToJewl = async () => {
+    if (!effectiveCharacter?.id || !backstoryText.trim() || submittingGenesis) return;
+    setSubmittingGenesis(true);
+    setGenesisMsg('');
+    try {
+      if (dirty) await save();
+      const res = await fetch(`/api/characters/${effectiveCharacter.id}/genesis`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          backstory: backstoryText,
+          characterName,
+          desiredAge,
+          selectedSeed: selectedSeedName || undefined,
+          physicalDescription,
+          referencePhotos,
+          styleColors,
+          styleAesthetics,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Genesis submission failed');
+      setGenesisMsg(data.alreadyRunning
+        ? 'Genesis already in progress — JEWL is on it.'
+        : 'Submitted — JEWL has opened a genesis session and is working.');
+    } catch (err) {
+      setGenesisMsg(err instanceof Error ? err.message : 'Genesis submission failed');
+    } finally {
+      setSubmittingGenesis(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#0a0a1a' }}>
@@ -804,7 +846,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
             {/* Body part sections from seed — collapsible */}
             <div className="space-y-1">
-              {(selectedSeed.data.bodyStructure?.parts || []).map(part => {
+              {(SHOW_BODY_PARTS ? (selectedSeed.data.bodyStructure?.parts || []) : []).map(part => {
                 const bpData = pd.bodyParts?.[part] || {};
                 const isHead = part === 'HEAD';
                 const isVital = selectedSeed.data.bodyStructure?.vitals?.includes(part);
@@ -1050,6 +1092,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         </div>
 
         {/* INVENTORY */}
+        {SHOW_INVENTORY && (
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -1070,6 +1113,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             }
           </div>
         </div>
+        )}
 
         {/* BACKSTORY */}
         <div className="border p-4 flex flex-col" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
@@ -1119,6 +1163,29 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             >
               {saving ? 'Saving...' : dirty ? 'Save Draft' : 'Saved'}
             </button>
+            {isGM && effectiveCharacter?.id && (
+              <button
+                onClick={submitToJewl}
+                disabled={submittingGenesis || !backstoryText.trim()}
+                className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
+                style={{
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  backgroundColor: backstoryText.trim() && !submittingGenesis ? 'var(--krma-gold)' : '#333',
+                  color: backstoryText.trim() && !submittingGenesis ? '#000' : '#666',
+                  border: '1px solid rgba(255, 204, 120, 0.5)',
+                  borderRadius: '2px',
+                  cursor: backstoryText.trim() && !submittingGenesis ? 'pointer' : 'default',
+                }}
+                title="Hand the genome (backstory + appearance) to JEWL — he gestates the full person, then builds the mechanics catalog-first."
+              >
+                {submittingGenesis ? 'Submitting…' : '◆ Submit to JEWL'}
+              </button>
+            )}
+            {genesisMsg && (
+              <span className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                {genesisMsg}
+              </span>
+            )}
             <button
               onClick={async () => {
                 if (!characterName || !backstoryText || submittingBackstory) return;

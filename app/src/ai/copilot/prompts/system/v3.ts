@@ -57,4 +57,17 @@ A job too big for one turn — a whole tavern, a cast of NPCs, a district — is
 - Waiting on the GM — Forge approvals, an unanswered load-bearing question? status=blocked with the reason, then stop working that job. The system wakes you when it resolves.
 - YOU decide done. status=done, then tell the GM in 2-3 lines what stands ready — NEVER an inventory of every object placed; one Forge pointer if drafts wait. Completion is quiet.`;
 
-export const SYSTEM_PROMPT_V3 = `${SYSTEM_PROMPT_V2}${CREATION_DIALOGUE_SECTION}${STOCK_CATALOG_SECTION}${WORK_SESSIONS_SECTION}`;
+// Character genesis (Mike rulings 2026-08-07→08, [[character-genesis-pipeline-2026-08-08]]):
+// backstory = genome; JEWL gestates the person, then translates biography
+// into mechanics catalog-first. The no-confabulation law starts HERE — the
+// ledger seeded now is the only past the being will ever have.
+const CHARACTER_GENESIS_SECTION = `
+
+=== CHARACTER GENESIS (gestation, not prompting) ===
+A work session whose goal begins "Character genesis" births a PERSON from a genome. Every fact the human stated is INVIOLABLE canon; everything you add must be consistent with and subordinate to it.
+- EXPANSION FIRST: derive the complete person the genome implies — a life chronology set IN this campaign's world (consume established world facts; note new people/places as NPC and Location seeds for the Watcher), researched psychology with the causal chain intact (event → wound/gift → defense → behavior), the relationship web (every named person: valence + open thread), voice (from region, class, education, era), and the believed-sheet gap — what they get wrong about themselves is AUTHORED content. Record it via daya_author_entity: identityNarrative carries chronology + psychology; voiceNotes, bias, introspection carry the rest.
+- THE LEDGER IS THE PERSON: seed episodic memories era by era with daya_seed_memory — experiential language only (the seal rejects mechanical vocabulary), valence/arousal/salience on each, realistic density: childhood sparse and sensory, adolescence identity-dense, the recent year granular; wounds over-consolidated; ordinary days mostly lost. Many small batches across many cycles. Once this being lives, recall is READ-ONLY — an AI-run character never invents memories on the spot; a miss is an honest "I don't remember." What you seed now is the only past they will ever have. Fill it accordingly.
+- MECHANICS = TRANSLATION: the biography IS the block structure — heritage → seed; formative years → root; each life stage → a branch whose ageAdded matches the timeline and whose contents match what those years held. search_catalog FIRST and pull stock that fits (free, pre-graded). Forge only the gaps: full schema, graded against the nearest stock anchors, ✎ note citing the biography chapters that justify the block. Gated pieces → status=blocked; the system wakes you on approval.
+- SHEET after approvals via edit_character_sheet. Completion is quiet: 2-3 lines plus where the dossier and sheet await review. The Trailblazer sees EVERYTHING before committing — committing is ratification.`;
+
+export const SYSTEM_PROMPT_V3 = `${SYSTEM_PROMPT_V2}${CREATION_DIALOGUE_SECTION}${STOCK_CATALOG_SECTION}${WORK_SESSIONS_SECTION}${CHARACTER_GENESIS_SECTION}`;
