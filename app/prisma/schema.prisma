@@ -441,6 +441,32 @@ model ForgeItem {
   @@index([decayStatus])
 }
 
+// ── DayaWorkSession: DAYA v0.x walking version of "keep existing" (F-3).
+// A durable job JEWL works across message boundaries — the outer loop
+// fires work cycles while status='active'; HE closes it when done
+// (self-deactivation bounds the run: no caps/TTLs, ruling 2026-08-07).
+// blocked = waiting on the GM (Forge approvals, answers); batch-watch
+// reactivates. Attended by default; continueUnattended = the GM answered
+// JEWL's spoken hand-off question with yes.
+model DayaWorkSession {
+  id                 String    @id @default(cuid())
+  campaignId         String
+  status             String    @default("active") // active | blocked | done | cancelled
+  goal               String
+  plan               String? // his own plan, revisable as he works
+  progress           String    @default("[]") // JSON string[] — his cycle notes, append-only
+  blockedReason      String?
+  continueUnattended Boolean   @default(false)
+  cycleCount         Int       @default(0)
+  lastCycleAt        DateTime?
+  startedAt          DateTime  @default(now())
+  endedAt            DateTime?
+  createdBy          String // actor that opened it (JEWL's user id)
+
+  @@index([status, lastCycleAt])
+  @@index([campaignId, status])
+}
+
 model PlayerRequest {
   id          String     @id @default(cuid())
   campaign    Campaign   @relation(fields: [campaignId], references: [id])

@@ -22,7 +22,8 @@ export type JewlPromptSource =
   | 'PLAYER_VOICE'         // Player spoke (STT) — not wired yet
   | 'TABLE_AMBIENT'        // ambient audio capture — not wired yet
   | 'UI_ACTIVITY'          // UI navigation/behavior breadcrumb — JEWL watches the whole session, not just chat
-  | 'JEWL_AUTONOMOUS_TICK' // self-triggered tick — not wired yet
+  | 'JEWL_AUTONOMOUS_TICK' // system-triggered wake (forge-batch-watch, autonomous-tick route)
+  | 'JEWL_WORK_CYCLE'      // outer-loop work cycle for an open DayaWorkSession (F-3)
   | 'AI_AGENT';            // another AI prompted JEWL — not wired yet
 
 /** Structured "this is what the GM physically did on the canvas." */

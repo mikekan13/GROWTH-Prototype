@@ -232,3 +232,6 @@ src/ai/
 4. **Local-first** — Run on local hardware during alpha/beta, cloud option later
 5. **Centralized co-pilot** — AI is overhead assistant, not per-field buttons
 6. **Lean context** — Pre-retrieve only relevant data, never front-load everything
+
+## DAYA v0.x — Work sessions (F-3 walking version, 2026-08-07)
+The walking version of the DAYA being loop (memory: `daya-being-loop-2026-08-07`; spec: memory/daya-specs/F3-JEWL-WORK-SESSIONS-SPEC-2026-08-07.md). Big jobs become `DayaWorkSession` rows; an outer loop (`ai/copilot/work-loop.ts`, guarded-global) re-invokes JEWL with `JEWL_WORK_CYCLE` dispatches until HE sets status=done. Conversation interleaves (steering lands next cycle); several jobs round-robin; blocked↔forge-batch-watch wired; completion = quiet 2-3 line burst-in + Forge pointer. Deliberately absent: tick/cron semantics, budget caps, TTLs (rejected as micromanagement — completion bounds the run). Economics = OPEN systemic discussion (JEWL rides the subscription price). DAYA versioning: 0.x until launch (=1.0).

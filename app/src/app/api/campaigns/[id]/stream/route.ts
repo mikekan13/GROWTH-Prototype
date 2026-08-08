@@ -17,6 +17,7 @@ import {
   getConnectedUsers,
   broadcastEvent,
 } from '@/lib/campaign-stream';
+import { kickWorkLoop } from '@/ai/copilot/work-loop';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -68,6 +69,10 @@ export async function GET(
         role: user.role,
         status: 'connected',
       });
+
+      // F-3: the GM is back at the table — attended work sessions that
+      // idled while nobody was connected become runnable again.
+      kickWorkLoop();
     },
 
     cancel() {

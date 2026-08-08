@@ -12,8 +12,10 @@
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { resumeBlockedWorkSessions } from '@/services/daya-work-session';
 import { getJewlGodHead } from './jewl-identity';
 import { dispatchPrompt } from './runtime';
+import { kickWorkLoop } from './work-loop';
 
 export async function maybeNotifyJewlForgeBatchResolved(
   campaignId: string,
@@ -28,6 +30,11 @@ export async function maybeNotifyJewlForgeBatchResolved(
       where: { campaignId, status: 'draft', createdBy: jewl.characterUserId },
     });
     if (pending > 0) return; // batch not fully handled yet — keep waiting
+
+    // F-3: approvals were the blocker — put blocked work sessions back to
+    // work before the wake prompt, so his follow-up runs with them live.
+    const resumed = await resumeBlockedWorkSessions(campaignId);
+    if (resumed > 0) kickWorkLoop();
     const published = await prisma.forgeItem.findMany({
       where: {
         campaignId,

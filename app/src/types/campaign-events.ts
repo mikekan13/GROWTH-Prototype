@@ -187,6 +187,18 @@ export interface JewlWorkingEvent {
   label?: string;
 }
 
+// ── DAYA work sessions (F-3 walking version) ─────────────────────────────
+
+/** Lifecycle of a durable JEWL job — feeds the live job/status surface. */
+export interface DayaWorkSessionEvent {
+  kind: 'daya_work_session';
+  phase: 'opened' | 'progress' | 'blocked' | 'done' | 'cancelled';
+  sessionId: string;
+  goal: string;
+  /** Latest progress note, blocked reason, or completion line. */
+  note?: string;
+}
+
 // ── JEWL stage direction (C2/C3 — the storytelling-OS gestures) ──────────
 
 /** JEWL pans the GM's camera to an entity ("let me show you..."). */
@@ -226,6 +238,7 @@ export type StreamEventData =
   | CastResultEvent
   | TerminalEventRelay
   | JewlWorkingEvent
+  | DayaWorkSessionEvent
   | JewlFocusEvent
   | JewlHighlightEvent
   | HeartbeatEvent;

@@ -178,7 +178,8 @@ async function saveUserPrompt(prompt: JewlPrompt): Promise<string> {
   const isSystemTrigger =
     prompt.source === 'TABLE_AMBIENT' ||
     prompt.source === 'UI_ACTIVITY' ||
-    prompt.source === 'JEWL_AUTONOMOUS_TICK';
+    prompt.source === 'JEWL_AUTONOMOUS_TICK' ||
+    prompt.source === 'JEWL_WORK_CYCLE';
   const displayName = isSystemTrigger ? '[system]' : prompt.actorName;
   const row = await prisma.copilotMessage.create({
     data: {

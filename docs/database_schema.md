@@ -494,3 +494,11 @@ See `types/growth.ts` for full interface. Key sections:
 ```json
 ["Are you part of the King's Dominion?", "What is your relationship with magic?"]
 ```
+
+## DayaWorkSession (F-3 "keep existing" — DAYA v0.x, 2026-08-07)
+Durable JEWL job worked across message boundaries; the work-loop fires cycles while `status='active'`; JEWL closes it himself (self-deactivation — no caps/TTLs by ruling).
+- `status`: `active | blocked | done | cancelled` (blocked = waiting on GM; forge-batch-watch reactivates)
+- `goal` (the job), `plan` (his own, revisable), `progress` (JSON `string[]` — append-only cycle notes, capped 200)
+- `continueUnattended`: GM answered the spoken hand-off question yes → cycles run with no client connected
+- `cycleCount`/`lastCycleAt` (loop bookkeeping; round-robin ordering), `startedAt`/`endedAt`, `createdBy`, `blockedReason`
+- Indexes: `[status, lastCycleAt]`, `[campaignId, status]`. No Campaign relation field (scalar campaignId only).

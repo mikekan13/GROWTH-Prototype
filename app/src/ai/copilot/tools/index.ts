@@ -23,6 +23,7 @@ import './establish-world-facts';
 import './edit-character-sheet';
 import './forge-blueprint';
 import './catalog';
+import './work-session';
 import './memory';
 import './npc-speak';
 import './mistake-corpus';
