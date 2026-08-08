@@ -276,7 +276,7 @@ export class LocalProvider implements ImageGenerationProvider {
   // ComfyUI Communication
   // ============================================================
 
-  private async queuePrompt(workflow: object, clientId: string): Promise<ComfyUIQueueResponse> {
+  protected async queuePrompt(workflow: object, clientId: string): Promise<ComfyUIQueueResponse> {
     // Temporary diagnostic — dump every submission so we can replay user's
     // failing requests directly against ComfyUI. Remove once the multi-ref
     // failure mode is identified.
@@ -309,7 +309,7 @@ export class LocalProvider implements ImageGenerationProvider {
     return res.json();
   }
 
-  private async waitForCompletion(promptId: string): Promise<{
+  protected async waitForCompletion(promptId: string): Promise<{
     filename: string;
     subfolder: string;
     type: string;
@@ -364,7 +364,7 @@ export class LocalProvider implements ImageGenerationProvider {
     throw new Error(`ComfyUI generation timed out after ${MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS / 1000}s`);
   }
 
-  private async downloadImage(filename: string, subfolder: string, type: string): Promise<Buffer> {
+  protected async downloadImage(filename: string, subfolder: string, type: string): Promise<Buffer> {
     const params = new URLSearchParams({ filename, subfolder, type });
     const res = await fetch(`${COMFYUI_URL}/view?${params}`);
 
@@ -375,7 +375,7 @@ export class LocalProvider implements ImageGenerationProvider {
     return Buffer.from(await res.arrayBuffer());
   }
 
-  private async uploadReferenceImage(imagePath: string): Promise<string> {
+  protected async uploadReferenceImage(imagePath: string): Promise<string> {
     const absolutePath = path.join(process.cwd(), 'public', imagePath.replace(/^\//, ''));
     const imageBuffer = await fs.readFile(absolutePath);
     const filename = path.basename(imagePath);
@@ -479,7 +479,7 @@ export class LocalProvider implements ImageGenerationProvider {
    * Ensure ComfyUI is running. If not, start it as a child process.
    * The process persists across requests (singleton) and is cleaned up on app exit.
    */
-  private async ensureRunning(): Promise<void> {
+  protected async ensureRunning(): Promise<void> {
     // Remote ComfyUI (cloud pod): hand off to the warm-keeper. markUsed() bumps
     // the idle timer AND resumes the pod if it's currently hibernated (no-op
     // if already running). The watcher auto-hibernates after 2 min of no calls.
@@ -588,7 +588,7 @@ export class LocalProvider implements ImageGenerationProvider {
   }
 
   /** Tell ComfyUI to free VRAM after generation */
-  private async releaseVram(): Promise<void> {
+  protected async releaseVram(): Promise<void> {
     try {
       await fetch(`${COMFYUI_URL}/free`, {
         method: 'POST',
@@ -1397,7 +1397,7 @@ export class LocalProvider implements ImageGenerationProvider {
     );
   }
 
-  private async uploadBuffer(buffer: Buffer, filename: string): Promise<string> {
+  protected async uploadBuffer(buffer: Buffer, filename: string): Promise<string> {
     const formData = new FormData();
     formData.append('image', new Blob([new Uint8Array(buffer)]), filename);
     const res = await fetch(`${COMFYUI_URL}/upload/image`, {

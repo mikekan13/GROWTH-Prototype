@@ -10,6 +10,7 @@ import 'server-only';
 import type { ImageGenerationProvider } from '../types';
 import { LocalProvider } from './local';
 import { CloudProvider } from './cloud';
+import { ServerlessProvider } from './serverless';
 
 let cachedLocal: LocalProvider | null = null;
 let cachedCloud: CloudProvider | null = null;
@@ -68,7 +69,14 @@ export async function getProviderStatuses() {
 }
 
 export function getLocalProvider(): LocalProvider {
-  if (!cachedLocal) cachedLocal = new LocalProvider();
+  // RUNPOD_ENDPOINT_ID set → RunPod Serverless (scale-to-zero, no pod to
+  // manage). ServerlessProvider IS a LocalProvider — same templating,
+  // saving, and edit paths; only the ComfyUI transport differs.
+  if (!cachedLocal) {
+    cachedLocal = process.env.RUNPOD_ENDPOINT_ID
+      ? new ServerlessProvider()
+      : new LocalProvider();
+  }
   return cachedLocal;
 }
 
