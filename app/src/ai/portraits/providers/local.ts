@@ -956,25 +956,40 @@ export class LocalProvider implements ImageGenerationProvider {
         const sexRaw = (id?.sex || '').toString().toLowerCase();
         const subject = sexRaw === 'female' ? 'woman' : sexRaw === 'male' ? 'man' : 'person';
 
+        // The wizard's "Detailed prompt" toggle decides how much of the
+        // written Likeness fields ride along:
+        //   OFF → pure reference pull — "the person in image references…"
+        //   ON  → weave the described features in, and DROP those features
+        //         from the match-from-references list so the description
+        //         wins (e.g. violet-dyed hair the photos don't have).
+        // (Dead plumbing until 2026-08-08: the clause built whenever fields
+        // were filled, and described hair fought the refs' hair.)
+        const detailed = input.overrides?.useDetailedPrompt === true;
+
         // Build the descriptive clause. Each segment is a natural noun phrase.
         const segments: string[] = [];
-        if (id?.skinTone) segments.push(`${id.skinTone.trim()} skin`);
+        let hairDescribed = false;
+        let skinDescribed = false;
+        if (detailed) {
+          if (id?.skinTone) { segments.push(`${id.skinTone.trim()} skin`); skinDescribed = true; }
 
-        const hairColor = id?.hairColor?.trim();
-        const hairTexture = id?.hairTexture?.trim();
-        const hairStyle = id?.hairStyle?.trim();
-        if (hairColor || hairTexture || hairStyle) {
-          const hairBits = [hairTexture, hairColor].filter(Boolean).join(' ');
-          let hair = hairBits ? `${hairBits} hair` : 'hair';
-          if (hairStyle) hair += ` styled in a ${hairStyle}`;
-          segments.push(hair);
+          const hairColor = id?.hairColor?.trim();
+          const hairTexture = id?.hairTexture?.trim();
+          const hairStyle = id?.hairStyle?.trim();
+          if (hairColor || hairTexture || hairStyle) {
+            const hairBits = [hairTexture, hairColor].filter(Boolean).join(' ');
+            let hair = hairBits ? `${hairBits} hair` : 'hair';
+            if (hairStyle) hair += ` styled in a ${hairStyle}`;
+            segments.push(hair);
+            hairDescribed = true;
+          }
+          if (id?.eyeColor) segments.push(`${id.eyeColor.trim()} eyes`);
+
+          const facial = id?.facialHair?.trim();
+          const facialLower = (facial || '').toLowerCase();
+          const noFacial = !facial || facialLower === 'none' || facialLower === 'clean-shaven' || facialLower === 'clean shaven' || facialLower === 'no';
+          if (!noFacial) segments.push(`a ${facial}`);
         }
-        if (id?.eyeColor) segments.push(`${id.eyeColor.trim()} eyes`);
-
-        const facial = id?.facialHair?.trim();
-        const facialLower = (facial || '').toLowerCase();
-        const noFacial = !facial || facialLower === 'none' || facialLower === 'clean-shaven' || facialLower === 'clean shaven' || facialLower === 'no';
-        if (!noFacial) segments.push(`a ${facial}`);
 
         // Join into "with A, B, and C"
         let physClause = '';
@@ -982,8 +997,15 @@ export class LocalProvider implements ImageGenerationProvider {
         else if (segments.length === 2) physClause = ` with ${segments[0]} and ${segments[1]}`;
         else if (segments.length >= 3) physClause = ` with ${segments.slice(0, -1).join(', ')}, and ${segments[segments.length - 1]}`;
 
+        // Described features are excluded from the match-from-references
+        // list so prompt and description never contradict each other.
+        const matchParts = ['face shape', 'skin tone', 'eyes', 'nose', 'lips', 'brows', 'hair']
+          .filter(p => !(p === 'hair' && hairDescribed) && !(p === 'skin tone' && skinDescribed));
+        const matchList = `${matchParts.slice(0, -1).join(', ')}, and ${matchParts[matchParts.length - 1]}`;
+        const subjectPhrase = detailed ? `a ${subject}${physClause}` : 'the person';
+
         let base =
-          `A photograph of a ${subject}${physClause} in ${idRefsPhrase}. Match their exact facial identity — face shape, skin tone, eyes, nose, lips, brows, and hair — from the references with high fidelity. Do not invent, average, or embellish features.\n` +
+          `A photograph of ${subjectPhrase} in ${idRefsPhrase}. Match their exact facial identity — ${matchList} — from the references with high fidelity. Do not invent, average, or embellish features.\n` +
           `Head-and-shoulders portrait, shoulders-up, straight-on front view, eye-level, looking directly at the camera, neutral expression with closed mouth. Nude, bare shoulders. No clothing.\n\n` +
           `Plain mid-grey studio backdrop, completely flat and minimal. Soft, even, diffused studio lighting. No dramatic shadows.`;
         if (anglePoseActive) {

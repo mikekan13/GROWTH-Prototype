@@ -55,6 +55,10 @@ export interface PortraitInput {
 
 export interface PortraitOverrides {
   // ── Active on the FLUX.2 path ───────────────────────────────
+  /** Wizard "Detailed prompt" toggle: weave written Likeness fields into
+   *  the face prompt (described features drop out of the match-from-refs
+   *  list). Off = pure reference pull. */
+  useDetailedPrompt?: boolean;
   steeringWords?: string[];                 // Extra descriptors ("hooded", "smiling")
   seed?: number;                            // Reproducibility
   composition?: 'bust' | 'half_body' | 'full_body' | 'action';
