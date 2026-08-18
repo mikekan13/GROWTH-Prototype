@@ -119,40 +119,273 @@ function SeedDetail({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-// ── Generic Detail Renderer ───────────────────────────────────────────────
+// ── Human-first Detail Renderer ───────────────────────────────────────────
+//
+// Redesign (Mike 2026-08-17): JEWL's genesis drafts carry nested
+// mechanicalEffects JSON; the old renderer dumped every key as a raw
+// JSON string. Now: the ✎ note leads, prose reads as prose, attribute
+// mods and skills render as game language, and anything unrecognized
+// collapses into an expandable RAW DATA drawer instead of flooding.
+
+/** Attribute → pillar color, matching the SeedDetail palette. */
+const ATTR_META: Record<string, { label: string; color: string }> = {
+  clout: { label: 'Clout', color: '#E8585A' },
+  celerity: { label: 'Celerity', color: '#E8585A' },
+  constitution: { label: 'Constitution', color: '#E8585A' },
+  flow: { label: 'Flow', color: '#8e7cc3' },
+  frequency: { label: 'Frequency', color: '#8e7cc3' },
+  focus: { label: 'Focus', color: '#8e7cc3' },
+  willpower: { label: 'Willpower', color: '#4080D0' },
+  wisdom: { label: 'Wisdom', color: '#4080D0' },
+  wit: { label: 'Wit', color: '#4080D0' },
+};
+
+function attrMeta(key: string) {
+  return ATTR_META[key.toLowerCase()] ?? { label: titleCase(key), color: '#ccc' };
+}
+
+/** "kvPerYear" → "Kv Per Year"; "baseResist" → "Base Resist". */
+function titleCase(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function SectionLabel({ children, color }: { children: React.ReactNode; color?: string }) {
+  return (
+    <div className="text-[9px] uppercase tracking-[0.2em] font-[Consolas,monospace] mb-1" style={{ color: color ?? 'rgba(255,255,255,0.3)' }}>
+      {children}
+    </div>
+  );
+}
+
+function Chip({ children, color = '#aaa' }: { children: React.ReactNode; color?: string }) {
+  return (
+    <span
+      className="text-[10px] px-1.5 py-0.5 font-[Consolas,monospace] whitespace-nowrap"
+      style={{ color, backgroundColor: `${color}12`, border: `1px solid ${color}35` }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** {"willpower":2,"wisdom":1} → "+2 Willpower  +1 Wisdom" pillar-colored chips. */
+function AttributeMods({ mods }: { mods: Record<string, number> }) {
+  const entries = Object.entries(mods).filter(([, v]) => typeof v === 'number' && v !== 0);
+  if (entries.length === 0) return null;
+  return (
+    <div>
+      <SectionLabel>Attributes</SectionLabel>
+      <div className="flex flex-wrap gap-1.5">
+        {entries.map(([k, v]) => {
+          const meta = attrMeta(k);
+          return <Chip key={k} color={meta.color}>{v > 0 ? `+${v}` : v} {meta.label}</Chip>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface SkillGrant {
+  name?: string;
+  governors?: string[];
+  level?: number | string;
+  description?: string;
+}
+
+/** Skills granted by a root/branch — name, level, governors, then what it means. */
+function SkillGrants({ skills }: { skills: SkillGrant[] }) {
+  const valid = skills.filter(s => s && typeof s.name === 'string');
+  if (valid.length === 0) return null;
+  return (
+    <div>
+      <SectionLabel>Skills Granted</SectionLabel>
+      <div className="space-y-2">
+        {valid.map((s, i) => (
+          <div key={i}>
+            <div className="text-[12px] font-[Consolas,monospace] text-white/85">
+              {s.name}
+              {s.level != null && <span style={{ color: '#D0A030' }}> · level {String(s.level)}</span>}
+              {Array.isArray(s.governors) && s.governors.length > 0 && (
+                <span className="text-white/35"> · {s.governors.map(g => attrMeta(g).label).join(' / ')}</span>
+              )}
+            </div>
+            {s.description && (
+              <div className="text-[11px] text-white/45 font-[Consolas,monospace] leading-relaxed">{s.description}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Nested mechanicalEffects object → recognized sections + leftovers. */
+function MechanicalEffects({ effects }: { effects: Record<string, unknown> }) {
+  const mods = effects.attributeModifiers as Record<string, number> | undefined;
+  const skills = effects.skills as SkillGrant[] | undefined;
+  const leftovers = Object.entries(effects).filter(
+    ([k, v]) => !['attributeModifiers', 'skills'].includes(k) && v != null,
+  );
+  return (
+    <div className="space-y-3">
+      {mods && <AttributeMods mods={mods} />}
+      {Array.isArray(skills) && <SkillGrants skills={skills} />}
+      {leftovers.map(([k, v]) => (
+        <div key={k}>
+          <SectionLabel>{titleCase(k)}</SectionLabel>
+          <div className="text-[11px] text-white/60 font-[Consolas,monospace] leading-relaxed">
+            {typeof v === 'string' ? v : <PrettyValue value={v} />}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Last-resort renderer for unrecognized values — readable, never a JSON wall. */
+function PrettyValue({ value }: { value: unknown }) {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    if (value.every(v => typeof v === 'string' || typeof v === 'number')) {
+      return <>{value.join(', ')}</>;
+    }
+    return (
+      <div className="space-y-1">
+        {value.map((v, i) => <div key={i}><PrettyValue value={v} /></div>)}
+      </div>
+    );
+  }
+  if (typeof value === 'object') {
+    return (
+      <div className="space-y-0.5">
+        {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
+          <div key={k}>
+            <span className="text-white/35">{titleCase(k)}: </span>
+            <span className="text-white/60"><PrettyValue value={v} /></span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <>{String(value)}</>;
+}
+
+/** Keys the structured sections already display — everything else goes to the drawer. */
+const HANDLED_KEYS = new Set([
+  'name', 'type', 'description', 'flavorText', '_proposalNote',
+  'mechanicalEffects', 'mechanicalEffect', 'governors', 'ageAdded',
+  'pillar', 'category', 'itemType', 'primaryMaterial', 'materialClass',
+  'weightLbs', 'rarity', 'kv', 'seedKV', 'karmicValue', 'baseResist',
+  'properties', 'condition', 'tags',
+]);
 
 function BlockDetail({ type, data }: { type: string; data: Record<string, unknown> }) {
   if (type === 'seed') return <SeedDetail data={data} />;
 
-  // Generic fallback for other types
-  const description = data.description as string | undefined;
-  const governors = data.governors as string[] | undefined;
   const proposalNote = data._proposalNote as string | undefined;
+  const description = data.description as string | undefined;
+  const flavorText = data.flavorText as string | undefined;
+  const mechanicalEffects = data.mechanicalEffects as Record<string, unknown> | undefined;
+  const mechanicalEffect = data.mechanicalEffect as string | undefined;
+  const governors = data.governors as string[] | undefined;
+
+  // Facts row: the at-a-glance chips (age, pillar, item stats...).
+  const facts: Array<{ label: string; color?: string }> = [];
+  if (data.ageAdded != null) facts.push({ label: `age ${String(data.ageAdded)}+`, color: '#6fa8dc' });
+  if (typeof data.pillar === 'string') {
+    const p = data.pillar.toLowerCase();
+    facts.push({ label: data.pillar, color: p === 'body' ? '#E8585A' : p === 'spirit' ? '#8e7cc3' : p === 'soul' ? '#4080D0' : undefined });
+  }
+  if (typeof data.category === 'string') facts.push({ label: data.category });
+  if (typeof data.itemType === 'string') facts.push({ label: data.itemType, color: '#22ab94' });
+  if (typeof data.primaryMaterial === 'string') {
+    facts.push({ label: `${data.primaryMaterial}${typeof data.materialClass === 'string' ? ` (${data.materialClass})` : ''}`, color: '#8B7355' });
+  }
+  if (typeof data.rarity === 'number') facts.push({ label: `rarity ${data.rarity}`, color: '#D0A030' });
+  if (typeof data.weightLbs === 'number') facts.push({ label: `${data.weightLbs} lbs` });
+  if (typeof data.baseResist === 'number') facts.push({ label: `resist ${data.baseResist}`, color: '#E8585A' });
+  if (typeof data.condition === 'string') facts.push({ label: data.condition });
+
+  const properties = Array.isArray(data.properties) ? (data.properties as unknown[]).map(String) : null;
+  const leftovers = Object.entries(data).filter(([k, v]) => !HANDLED_KEYS.has(k) && v != null);
 
   return (
-    <div className="space-y-2">
-      {/* Proposer's label — why this draft exists (JEWL queues these) */}
+    <div className="space-y-4">
+      {/* ✎ Why this exists — JEWL's pitch to the GM, first thing read. */}
       {proposalNote && (
-        <p className="text-[12px] font-[Consolas,monospace]" style={{ color: 'rgba(255,204,120,0.8)' }}>
-          ✎ {proposalNote}
+        <div className="p-2.5" style={{ backgroundColor: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.25)' }}>
+          <SectionLabel color="rgba(255,204,120,0.7)">✎ Proposed because</SectionLabel>
+          <p className="text-[12px] font-[Consolas,monospace] leading-relaxed" style={{ color: 'rgba(255,204,120,0.85)' }}>
+            {proposalNote}
+          </p>
+        </div>
+      )}
+
+      {description && (
+        <p className="text-[12px] text-white/70 font-[Consolas,monospace] leading-relaxed">{description}</p>
+      )}
+
+      {flavorText && (
+        <p className="text-[11px] italic text-white/40 leading-relaxed" style={{ fontFamily: "'Inknut Antiqua', serif" }}>
+          “{flavorText}”
         </p>
       )}
-      {description && (
-        <p className="text-[12px] text-white/60 font-[Consolas,monospace]">{description}</p>
-      )}
-      {governors && (
-        <div className="text-[11px] font-[Consolas,monospace]">
-          <span className="text-white/30">GOVERNORS: </span>
-          <span className="text-white/60">{governors.join(', ')}</span>
+
+      {facts.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {facts.map((f, i) => <Chip key={i} color={f.color}>{f.label}</Chip>)}
         </div>
       )}
-      {/* Show all other data keys */}
-      {Object.entries(data).filter(([k]) => !['description', 'governors', 'name', '_proposalNote'].includes(k)).map(([k, v]) => (
-        <div key={k} className="text-[10px] font-[Consolas,monospace]">
-          <span className="text-white/30">{k.toUpperCase()}: </span>
-          <span className="text-white/50">{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</span>
+
+      {/* The rule, in game language */}
+      {mechanicalEffect && (
+        <div>
+          <SectionLabel color="#22ab94">Rule</SectionLabel>
+          <p className="text-[12px] text-white/70 font-[Consolas,monospace] leading-relaxed">{mechanicalEffect}</p>
         </div>
-      ))}
+      )}
+      {mechanicalEffects && <MechanicalEffects effects={mechanicalEffects} />}
+
+      {Array.isArray(governors) && governors.length > 0 && (
+        <div>
+          <SectionLabel>Governors</SectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {governors.map(g => {
+              const meta = attrMeta(g);
+              return <Chip key={g} color={meta.color}>{meta.label}</Chip>;
+            })}
+          </div>
+        </div>
+      )}
+
+      {properties && properties.length > 0 && (
+        <div>
+          <SectionLabel>Properties</SectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {properties.map(p => <Chip key={p}>{p}</Chip>)}
+          </div>
+        </div>
+      )}
+
+      {/* Anything unrecognized: tucked away, never a JSON wall */}
+      {leftovers.length > 0 && (
+        <details className="pt-1">
+          <summary className="text-[9px] uppercase tracking-[0.2em] text-white/25 font-[Consolas,monospace] cursor-pointer hover:text-white/40">
+            Raw data ({leftovers.length})
+          </summary>
+          <div className="mt-2 space-y-2 pl-2 border-l border-white/10">
+            {leftovers.map(([k, v]) => (
+              <div key={k} className="text-[10px] font-[Consolas,monospace]">
+                <span className="text-white/35">{titleCase(k)}: </span>
+                <span className="text-white/55"><PrettyValue value={v} /></span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -171,7 +404,11 @@ function BlueprintCard({
   onClick: () => void;
 }) {
   const data = blueprint.data;
-  const kvLabel = String(data.seedKV || data.karmicValue || blueprint.karmicValue || '');
+  const kvLabel = String(data.seedKV || data.karmicValue || data.kv || blueprint.karmicValue || '');
+  const isDraft = blueprint.status === 'draft';
+  const proposalNote = typeof data._proposalNote === 'string' ? data._proposalNote : null;
+  // Drafts are triaged by the proposer's ✎ note; published entries by description.
+  const preview = isDraft && proposalNote ? `✎ ${proposalNote}` : (typeof data.description === 'string' ? data.description : null);
 
   return (
     <button
@@ -179,18 +416,32 @@ function BlueprintCard({
       className="w-full text-left p-3 border transition-all hover:border-opacity-60"
       style={{
         backgroundColor: isSelected ? `${typeConfig.color}15` : '#0a0a1a',
-        borderColor: isSelected ? typeConfig.color : '#ffffff15',
+        borderColor: isSelected ? typeConfig.color : isDraft ? 'rgba(255,204,120,0.3)' : '#ffffff15',
         borderWidth: '1px',
+        borderLeftWidth: isDraft ? '3px' : '1px',
+        borderLeftColor: isDraft ? '#ffcc78' : undefined,
       }}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-sm font-bold text-white" style={{ fontFamily: 'var(--font-header), Bebas Neue, sans-serif' }}>
-            {blueprint.name}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-bold text-white" style={{ fontFamily: 'var(--font-header), Bebas Neue, sans-serif' }}>
+              {blueprint.name}
+            </div>
+            {isDraft && (
+              <span className="text-[8px] px-1 py-px uppercase tracking-[0.15em] font-[Consolas,monospace] shrink-0" style={{
+                color: '#ffcc78', backgroundColor: 'rgba(255,204,120,0.1)', border: '1px solid rgba(255,204,120,0.35)',
+              }}>
+                {proposalNote ? 'draft · JEWL' : 'draft'}
+              </span>
+            )}
           </div>
-          {typeof data.description === 'string' && (
-            <div className="text-[10px] text-white/40 font-[Consolas,monospace] mt-0.5 line-clamp-2">
-              {data.description.slice(0, 100)}
+          {preview && (
+            <div
+              className="text-[10px] font-[Consolas,monospace] mt-0.5 line-clamp-2"
+              style={{ color: isDraft && proposalNote ? 'rgba(255,204,120,0.55)' : 'rgba(255,255,255,0.4)' }}
+            >
+              {preview.slice(0, 140)}
             </div>
           )}
         </div>
@@ -330,9 +581,12 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
   // ── Filter items ────────────────────────────────────────────────────────
 
   const items = view === 'campaign' ? campaignItems : globalItems;
-  const filtered = search
+  const searched = search
     ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
     : items;
+  // Drafts float to the top — they're the ones waiting on the GM.
+  const filtered = [...searched].sort((a, b) =>
+    (a.status === 'draft' ? 0 : 1) - (b.status === 'draft' ? 0 : 1));
 
   const selected = filtered.find(i => i.id === selectedId);
 
@@ -488,12 +742,13 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
                 </div>
                 <div className="text-[10px] font-[Consolas,monospace] mt-0.5" style={{ color: typeConfig.color }}>
                   {typeConfig.label.slice(0, -1).toUpperCase()}
+                  {selected.status === 'draft' && <span className="ml-2" style={{ color: '#ffcc78' }}>DRAFT — AWAITING YOUR CALL</span>}
                   {selected.isGlobal && <span className="text-white/30 ml-2">GLOBAL</span>}
                 </div>
               </div>
 
-              {/* Description */}
-              {typeof selected.data.description === 'string' && (
+              {/* Description — seeds only; BlockDetail renders it for the rest */}
+              {activeType === 'seed' && typeof selected.data.description === 'string' && (
                 <p className="text-[12px] text-white/60 font-[Consolas,monospace] leading-relaxed">
                   {selected.data.description}
                 </p>
@@ -522,20 +777,24 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
                     className="px-3 py-1.5 text-[11px] uppercase font-[Consolas,monospace] border transition-colors"
                     style={{ borderColor: 'var(--terminal-prime)', color: 'var(--terminal-prime)' }}
                   >
-                    PUBLISH
+                    ✓ APPROVE & PUBLISH
                   </button>
                 )}
                 {view === 'campaign' && isGM && (
                   <button
                     onClick={async () => {
-                      if (!confirm(`Remove ${selected.name} from this campaign?`)) return;
+                      const verb = selected.status === 'draft' ? 'Deny' : 'Remove';
+                      if (!confirm(`${verb} ${selected.name}?`)) return;
                       await fetch(`/api/campaigns/${campaignId}/forge/${selected.id}`, { method: 'DELETE' });
                       setSelectedId(null);
                       fetchCampaignItems();
                     }}
-                    className="px-3 py-1.5 text-[11px] uppercase font-[Consolas,monospace] text-white/40 border border-white/20 hover:bg-white/5"
+                    className="px-3 py-1.5 text-[11px] uppercase font-[Consolas,monospace] border hover:bg-white/5"
+                    style={selected.status === 'draft'
+                      ? { borderColor: 'rgba(231,76,60,0.5)', color: 'rgba(231,76,60,0.85)' }
+                      : { borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)' }}
                   >
-                    REMOVE
+                    {selected.status === 'draft' ? '✗ DENY' : 'REMOVE'}
                   </button>
                 )}
               </div>
