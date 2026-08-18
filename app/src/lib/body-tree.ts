@@ -18,6 +18,10 @@ export interface BodyRegion {
   depth: number;
   baseResist: number;
   condition: number;
+  /** Vital part — destruction trips the Facing Death door. */
+  isVital?: boolean;
+  materialClass?: 'Soft' | 'Hard';
+  primaryMaterial?: string;
 }
 
 /**
@@ -36,6 +40,9 @@ export function deriveRegions(root: GrowthWorldItem): BodyRegion[] {
       depth,
       baseResist: node.baseResist ?? 0,
       condition: node.condition ?? 3,
+      isVital: node.isVital,
+      materialClass: node.materialClass,
+      primaryMaterial: node.primaryMaterial,
     });
     for (const child of node.contains ?? []) {
       walk(child, path, depth + 1);
