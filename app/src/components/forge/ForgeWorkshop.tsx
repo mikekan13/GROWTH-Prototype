@@ -228,12 +228,12 @@ function Chip({ children, color = '#aaa' }: { children: React.ReactNode; color?:
 }
 
 /** {"willpower":2,"wisdom":1} → "+2 Willpower  +1 Wisdom" pillar-colored chips. */
-function AttributeMods({ mods }: { mods: Record<string, number> }) {
+function AttributeMods({ mods, label = 'Attributes' }: { mods: Record<string, number>; label?: string }) {
   const entries = Object.entries(mods).filter(([, v]) => typeof v === 'number' && v !== 0);
   if (entries.length === 0) return null;
   return (
     <div>
-      <SectionLabel>Attributes</SectionLabel>
+      <SectionLabel>{label}</SectionLabel>
       <div className="flex flex-wrap gap-1.5">
         {entries.map(([k, v]) => {
           const meta = attrMeta(k);
@@ -251,28 +251,47 @@ interface SkillGrant {
   description?: string;
 }
 
-/** Skills granted by a root/branch — name, level, governors, then what it means. */
-function SkillGrants({ skills }: { skills: SkillGrant[] }) {
-  const valid = skills.filter(s => s && typeof s.name === 'string');
+/** Level → die ladder (Skill_Level_Progression.md #validated):
+ *  1-3 flat bonus, 4-5 d4, 6-7 d6, 8-11 d8, 12-19 d12, 20 d20. */
+function skillDie(level: number): string {
+  if (level >= 20) return 'd20';
+  if (level >= 12) return 'd12';
+  if (level >= 8) return 'd8';
+  if (level >= 6) return 'd6';
+  if (level >= 4) return 'd4';
+  return `+${level} flat`;
+}
+
+/** Skills granted by a root/branch — name, level with its die tier,
+ *  governors, then what it means. Accepts bare strings too. */
+function SkillGrants({ skills }: { skills: Array<SkillGrant | string> }) {
+  const valid = skills
+    .map(s => (typeof s === 'string' ? { name: s } : s))
+    .filter(s => s && typeof s.name === 'string');
   if (valid.length === 0) return null;
   return (
     <div>
       <SectionLabel>Skills Granted</SectionLabel>
       <div className="space-y-2">
-        {valid.map((s, i) => (
-          <div key={i}>
-            <div className="text-[12px] font-[Consolas,monospace] text-white/85">
-              {s.name}
-              {s.level != null && <span style={{ color: '#D0A030' }}> · level {String(s.level)}</span>}
-              {Array.isArray(s.governors) && s.governors.length > 0 && (
-                <span className="text-white/35"> · {s.governors.map(g => attrMeta(g).label).join(' / ')}</span>
+        {valid.map((s, i) => {
+          const lvl = typeof s.level === 'number' ? s.level : Number(s.level);
+          return (
+            <div key={i}>
+              <div className="text-[12px] font-[Consolas,monospace] text-white/85">
+                {s.name}
+                {Number.isFinite(lvl) && (
+                  <span style={{ color: '#D0A030' }}> · level {lvl} ({skillDie(lvl)})</span>
+                )}
+                {Array.isArray(s.governors) && s.governors.length > 0 && (
+                  <span className="text-white/35"> · {s.governors.map(g => attrMeta(g).label).join(' / ')}</span>
+                )}
+              </div>
+              {s.description && (
+                <div className="text-[11px] text-white/45 font-[Consolas,monospace] leading-relaxed">{s.description}</div>
               )}
             </div>
-            {s.description && (
-              <div className="text-[11px] text-white/45 font-[Consolas,monospace] leading-relaxed">{s.description}</div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -337,6 +356,8 @@ const HANDLED_KEYS = new Set([
   'weightLbs', 'rarity', 'kv', 'seedKV', 'karmicValue', 'baseResist',
   'properties', 'condition', 'tags', 'quality', 'armorCategory', 'attacks',
   'school', 'schools', 'dr', 'manaCost', 'castingMethod', 'betaDraft', 'source',
+  'attributes', 'skills', 'nectars', 'thorns', 'requirements', 'seedRequirement',
+  'itemAbilities', 'contains', 'frequency', 'subordinateMaterials', 'value', 'notes',
 ]);
 
 const CONDITION_NAMES = ['Destroyed', 'Broken', 'Worn', 'Undamaged', 'Indestructible'];
@@ -355,6 +376,12 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
   // Facts row: the at-a-glance chips (age, pillar, item stats...).
   const facts: Array<{ label: string; color?: string }> = [];
   if (data.ageAdded != null) facts.push({ label: `age ${String(data.ageAdded)}+`, color: '#6fa8dc' });
+  if (typeof data.frequency === 'number' && data.frequency !== 0 && (type === 'root' || type === 'branch')) {
+    facts.push({ label: `frequency cost ${data.frequency}`, color: '#8e7cc3' });
+  }
+  if (typeof data.seedRequirement === 'string' && data.seedRequirement) facts.push({ label: `requires: ${data.seedRequirement}` });
+  if (typeof data.requirements === 'string' && data.requirements) facts.push({ label: `requires: ${data.requirements}` });
+  if (typeof data.value === 'number' && data.value > 0) facts.push({ label: `value ${data.value}`, color: '#D0A030' });
   if (typeof data.pillar === 'string') {
     const p = data.pillar.toLowerCase();
     facts.push({ label: data.pillar, color: p === 'body' ? '#E8585A' : p === 'spirit' ? '#8e7cc3' : p === 'soul' ? '#4080D0' : undefined });
@@ -429,6 +456,79 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
         </div>
       )}
       {mechanicalEffects && <MechanicalEffects effects={mechanicalEffects} />}
+
+      {/* Canonical root/branch shape: top-level attribute LEVELS + skills */}
+      {(() => {
+        const attrs = data.attributes && typeof data.attributes === 'object'
+          ? data.attributes as Record<string, number>
+          : null;
+        return attrs ? (
+          <AttributeMods
+            mods={attrs}
+            label={type === 'root' || type === 'branch' ? 'Attribute Levels (1 KRMA each)' : 'Attributes'}
+          />
+        ) : null;
+      })()}
+      {Array.isArray(data.skills) && (data.skills as Array<SkillGrant | string>).length > 0 && (
+        <SkillGrants skills={data.skills as Array<SkillGrant | string>} />
+      )}
+      {(traitNames(data.nectars).length > 0 || traitNames(data.thorns).length > 0) && (
+        <div className="flex gap-6">
+          {traitNames(data.nectars).length > 0 && (
+            <div>
+              <SectionLabel color="#3EB89A">Nectars</SectionLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {traitNames(data.nectars).map(n => <Chip key={n} color="#3EB89A">{n}</Chip>)}
+              </div>
+            </div>
+          )}
+          {traitNames(data.thorns).length > 0 && (
+            <div>
+              <SectionLabel color="#E8585A">Thorns (liens)</SectionLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {traitNames(data.thorns).map(t => <Chip key={t} color="#E8585A">{t}</Chip>)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Item abilities — each individually KV'd (item-fields canon #8) */}
+      {Array.isArray(data.itemAbilities) && (data.itemAbilities as Array<Record<string, unknown>>).length > 0 && (
+        <div>
+          <SectionLabel color="#D0A030">Abilities</SectionLabel>
+          <div className="space-y-1.5">
+            {(data.itemAbilities as Array<Record<string, unknown>>).map((a, i) => (
+              <div key={i} className="text-[11px] font-[Consolas,monospace]">
+                <span className="text-white/85">{String(a.name ?? `ability ${i + 1}`)}</span>
+                {typeof a.kv === 'number' && <span style={{ color: '#D0A030' }}> · KV {a.kv}</span>}
+                {typeof a.description === 'string' && <div className="text-white/45">{a.description}</div>}
+                {typeof a.mechanicalEffect === 'string' && <div className="text-white/55">{a.mechanicalEffect}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Possession components (vehicles/buildings — contains chain) */}
+      {Array.isArray(data.contains) && (data.contains as Array<Record<string, unknown>>).length > 0 && (
+        <div>
+          <SectionLabel>Components ({(data.contains as unknown[]).length})</SectionLabel>
+          <div className="space-y-0.5 pl-2 border-l border-white/10">
+            {(data.contains as Array<Record<string, unknown>>).map((c, i) => (
+              <div key={i} className="text-[11px] font-[Consolas,monospace] text-white/60">
+                {String(c.name ?? `component ${i + 1}`)}
+                {typeof c.itemType === 'string' && <span className="text-white/30"> · {c.itemType}</span>}
+                {typeof c.primaryMaterial === 'string' && <span className="text-white/30"> · {c.primaryMaterial}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {typeof data.notes === 'string' && data.notes && (
+        <p className="text-[10px] text-white/35 font-[Consolas,monospace]">{data.notes}</p>
+      )}
 
       {/* Weapon attacks (item-fields canon: named attacks, each with target attribute) */}
       {Array.isArray(data.attacks) && (data.attacks as Array<Record<string, unknown>>).length > 0 && (
