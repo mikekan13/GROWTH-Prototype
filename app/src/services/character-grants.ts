@@ -8,9 +8,10 @@
  */
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import type { GrowthCharacter, FateDie, SkillGovernor } from '@/types/growth';
+import type { GrowthCharacter, FateDie, SkillGovernor, SeedBodyStructure } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
 import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
+import { spawnBodyFromStructure, hasSpawnedBody } from '@/services/body-spawn';
 import type { GrowthWorldItem } from '@/types/item';
 
 type AttrKey = 'clout' | 'celerity' | 'constitution' | 'focus' | 'flow' | 'willpower' | 'wisdom' | 'wit';
@@ -27,12 +28,19 @@ interface SeedData {
   nectars: string[];
   thorns: string[];
   /**
-   * Optional per-seed anatomy declaration. If absent, the character gets
-   * HUMAN_BASELINE_ANATOMY (the default). Each seed should eventually
-   * declare its own — Human eyes and Elven eyes are distinct items, no
-   * inheritance from a shared base (per Mike 2026-05-19).
+   * Optional per-seed anatomy declaration (a full body-part item tree).
+   * Wins over the bodyStructure template when present — Human eyes and
+   * Elven eyes are distinct items, no inheritance from a shared base
+   * (per Mike 2026-05-19).
    */
   bodyAnatomy?: GrowthWorldItem;
+  /**
+   * The anatomy TEMPLATE (Mike 2026-08-17): at mechanics-assembly time it
+   * spawns REAL body-part items (see services/body-spawn.ts). Used when no
+   * explicit bodyAnatomy tree is declared; HUMAN_BASELINE_ANATOMY remains
+   * the last-resort fallback.
+   */
+  bodyStructure?: SeedBodyStructure;
 }
 
 interface RootBranchData {
@@ -93,11 +101,23 @@ export function applyCreationGrants(
   };
   next.vitals.baseResist = seed.data.baseResist;
 
-  // Body anatomy — seed declares its own; fall back to Human baseline.
-  // The tree is a deep copy so per-character damage doesn't mutate the
-  // shared baseline.
-  const baseline = (seed.data.bodyAnatomy ?? HUMAN_BASELINE_ANATOMY) as GrowthWorldItem;
-  next.bodyAnatomy = JSON.parse(JSON.stringify(baseline));
+  // Body anatomy — spawn REAL body-part items when the seed lands
+  // (Mike 2026-08-17). Precedence: explicit seed bodyAnatomy tree >
+  // spawned from the bodyStructure template > Human baseline.
+  // Idempotent: a body already spawned from THIS seed is kept as-is
+  // (re-running assignment must not double-spawn or wipe damage state /
+  // lazy-spawned organs). Assigning a DIFFERENT seed rebuilds the body.
+  const keepExistingBody =
+    hasSpawnedBody(character.bodyAnatomy) &&
+    character.creation?.seedForgeItemId === seed.id;
+  if (!keepExistingBody) {
+    const spawned = seed.data.bodyAnatomy
+      ? null
+      : spawnBodyFromStructure(seed.data.bodyStructure, { baseResist: seed.data.baseResist });
+    const baseline = (seed.data.bodyAnatomy ?? spawned ?? HUMAN_BASELINE_ANATOMY) as GrowthWorldItem;
+    // Deep copy so per-character damage doesn't mutate a shared tree.
+    next.bodyAnatomy = JSON.parse(JSON.stringify(baseline));
+  }
 
   // Seed augments (positive only by canon; thorns drive negatives)
   for (const k of ATTR_KEYS) {
