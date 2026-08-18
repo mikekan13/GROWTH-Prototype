@@ -14,6 +14,8 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { emit } from '@/services/godhead-dispatcher';
+import { validateForgeData } from '@/services/forge-schemas';
+import { priceBlueprintByType } from '@/services/forge-pricing';
 import { getJewlGodHead } from '../jewl-identity';
 import { registerJewlTool } from './registry';
 import type { JewlTool, JewlToolHandlerResult } from './types';
@@ -64,10 +66,27 @@ export const proposeForgeBlueprintTool: JewlTool = {
     const parsed = inputSchema.parse(input);
 
     // Validate dataJson parses — fail fast rather than storing garbage.
+    let body: Record<string, unknown>;
     try {
-      JSON.parse(parsed.dataJson);
+      body = JSON.parse(parsed.dataJson) as Record<string, unknown>;
     } catch {
       throw new Error('dataJson must be a valid JSON string');
+    }
+
+    // Canonical-shape gate (audit X1, 2026-08-17): drafts must validate
+    // against the SAME Zod schemas the Forge chain and seeders use — no
+    // more freeform shapes (mechanicalEffects blobs etc.). Violations go
+    // back to JEWL with the field list so he can re-author in-shape.
+    try {
+      validateForgeData(parsed.type, body);
+    } catch (e) {
+      const issues = e instanceof z.ZodError
+        ? e.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')
+        : e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Blueprint body does not match the canonical ${parsed.type} schema — ${issues}. ` +
+        'Re-author using the schema fields for this type (see CHARACTER GENESIS / BUILDING laws).',
+      );
     }
 
     // Stamp the proposer's note into the blueprint body under a reserved
@@ -93,6 +112,12 @@ export const proposeForgeBlueprintTool: JewlTool = {
       );
     }
 
+    // Pre-price with the locked formulas (audit X2) so the draft reaches
+    // the GM with a number on it. This is the SUGGESTION — Kai's
+    // evaluate_blueprint supersedes it when the chain runs
+    // ([[jewl-suggests-godheads-decide-2026-08-17]]).
+    const priced = priceBlueprintByType(parsed.type, body);
+
     const item = await prisma.forgeItem.create({
       data: {
         type: parsed.type,
@@ -103,6 +128,17 @@ export const proposeForgeBlueprintTool: JewlTool = {
         isGlobal: false,
         createdBy: jewl.characterUserId,
         authorUserId: jewl.characterUserId,
+        ...(priced ? { karmicValue: BigInt(Math.round(priced.kv)) } : {}),
+        ...(priced ? {
+          relationshipTags: JSON.stringify({
+            evaluation: {
+              evaluator: 'formula (pre-Kai)',
+              price: priced.kv,
+              breakdown: priced.breakdown,
+              frequencyCost: priced.frequencyCost ?? null,
+            },
+          }),
+        } : {}),
       },
     });
 
@@ -127,6 +163,7 @@ export const proposeForgeBlueprintTool: JewlTool = {
         campaignId: item.campaignId,
         isGlobal: item.isGlobal,
         proposedBy: 'JEWL',
+        ...(priced ? { suggestedKV: priced.kv, kvBreakdown: priced.breakdown } : {}),
         dispatcherEnqueued: dispatchResult.enqueued,
         dispatcherSkipped: dispatchResult.skipped,
       },

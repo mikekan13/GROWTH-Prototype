@@ -81,6 +81,20 @@ function applyTypeFilter(where: Record<string, unknown>, type?: string) {
   }
 }
 
+/**
+ * Row → API shape. karmicValue is a Prisma BigInt — returning it raw makes
+ * NextResponse.json throw ("Do not know how to serialize a BigInt") AFTER
+ * the DB write already happened (bug hunt 2026-08-17, C2/C10/C11). Every
+ * mutation path returns through here now.
+ */
+function serializeForgeItem<T extends { data: string; karmicValue: bigint | null }>(item: T) {
+  return {
+    ...item,
+    karmicValue: item.karmicValue != null ? Number(item.karmicValue) : null,
+    data: JSON.parse(item.data) as Record<string, unknown>,
+  };
+}
+
 export async function listForgeItems(
   campaignId: string,
   userId: string,
@@ -172,7 +186,13 @@ export async function updateForgeItem(
   if (input.name) updateData.name = input.name;
   if (input.data) {
     const validatedData = validateForgeData(item.type, input.data);
-    updateData.data = JSON.stringify(validatedData);
+    // Merge over the stored row: Zod strip-mode drops keys it doesn't know
+    // (_proposalNote, betaDraft, provenance stamps) — a plain overwrite was
+    // silently deleting them on every GM edit (bug hunt L13).
+    const original = (() => {
+      try { return JSON.parse(item.data) as Record<string, unknown>; } catch { return {}; }
+    })();
+    updateData.data = JSON.stringify({ ...original, ...validatedData });
   }
 
   const updated = await prisma.forgeItem.update({
@@ -180,7 +200,7 @@ export async function updateForgeItem(
     data: updateData,
   });
 
-  return { ...updated, data: JSON.parse(updated.data) };
+  return serializeForgeItem(updated);
 }
 
 export async function publishForgeItem(itemId: string, userId: string, userRole: string) {
@@ -203,7 +223,7 @@ export async function publishForgeItem(itemId: string, userId: string, userRole:
     campaignId: updated.campaignId,
   });
 
-  return { ...updated, data: JSON.parse(updated.data) };
+  return serializeForgeItem(updated);
 }
 
 /**
@@ -221,6 +241,10 @@ export async function sweepUnusedBlueprints(
       useCount: 0,
       decayStatus: 'ACTIVE',
       updatedAt: { lt: cutoff },
+      // Stock is free forever (Mike 2026-08-06) — the ADMIN library must
+      // never decay. Without this, all 460+ untouched stock rows were one
+      // sweep away from Lady Death (bug hunt C6).
+      isGlobal: false,
     },
     select: { id: true, name: true, type: true, campaignId: true },
   });
@@ -251,7 +275,7 @@ export async function unpublishForgeItem(itemId: string, userId: string, userRol
     data: { status: 'draft' },
   });
 
-  return { ...updated, data: JSON.parse(updated.data) };
+  return serializeForgeItem(updated);
 }
 
 export async function deleteForgeItem(itemId: string, userId: string, userRole: string) {
@@ -368,34 +392,47 @@ export async function resolvePlayerRequest(
     gmNotes: input.gmNotes || null,
   };
 
-  // On approve or modify: create a ForgeItem from the request
-  if (input.status === 'approved' || input.status === 'modified') {
-    const requestData = JSON.parse(request.data);
-    const finalName = input.modifiedName || request.name;
-    const finalData = input.modifiedData
-      ? validateForgeData(request.type, input.modifiedData)
-      : requestData;
+  // On approve or modify: create a ForgeItem from the request. One
+  // transaction — the old two-write shape could approve the request while
+  // the item create failed on @@unique([campaignId,name,type]) (bug hunt C8).
+  try {
+    const updated = await prisma.$transaction(async tx => {
+      if (input.status === 'approved' || input.status === 'modified') {
+        const requestData = JSON.parse(request.data);
+        const finalName = input.modifiedName || request.name;
+        const finalData = input.modifiedData
+          ? validateForgeData(request.type, input.modifiedData)
+          : requestData;
 
-    const forgeItem = await prisma.forgeItem.create({
-      data: {
-        campaignId: request.campaignId,
-        type: request.type,
-        name: finalName,
-        status: 'draft', // GM still needs to publish
-        data: JSON.stringify(finalData),
-        createdBy: userId,
-      },
+        const forgeItem = await tx.forgeItem.create({
+          data: {
+            campaignId: request.campaignId,
+            type: request.type,
+            name: finalName,
+            status: 'draft', // GM still needs to publish
+            data: JSON.stringify(finalData),
+            createdBy: userId,
+          },
+        });
+
+        updateData.forgeItemId = forgeItem.id;
+      }
+
+      return tx.playerRequest.update({
+        where: { id: requestId },
+        data: updateData,
+      });
     });
 
-    updateData.forgeItemId = forgeItem.id;
+    return { ...updated, data: JSON.parse(updated.data) };
+  } catch (e) {
+    if ((e as { code?: string }).code === 'P2002') {
+      throw new ValidationError(
+        `A ${request.type} named "${input.modifiedName || request.name}" already exists in this campaign — modify the name to approve.`,
+      );
+    }
+    throw e;
   }
-
-  const updated = await prisma.playerRequest.update({
-    where: { id: requestId },
-    data: updateData,
-  });
-
-  return { ...updated, data: JSON.parse(updated.data) };
 }
 
 // ── Global Catalog ──────────────────────────────────────────────────────
@@ -404,7 +441,12 @@ export async function listGlobalCatalog(
   type?: string,
   search?: string,
 ) {
-  const where: Record<string, unknown> = { isGlobal: true };
+  const where: Record<string, unknown> = {
+    isGlobal: true,
+    // Match searchGlobalCatalog: drafts never surface in the public catalog
+    // (bug hunt L2/L4).
+    status: { in: ['published', 'global'] },
+  };
   applyTypeFilter(where, type);
   if (search) {
     where.name = { contains: search };
@@ -420,6 +462,10 @@ export async function listGlobalCatalog(
       useCount: true,
       authorUserId: true,
       karmicValue: true,
+      relationshipTags: true,
+      isGlobal: true,
+      status: true,
+      createdAt: true,
     },
     orderBy: { useCount: 'desc' },
     take: 50,
@@ -498,22 +544,47 @@ export async function pullFromGlobalCatalog(
     where: { campaignId, sourceGlobalId: globalItemId },
   });
   if (existing) {
-    return { ...existing, data: JSON.parse(existing.data), alreadyExists: true };
+    return { ...serializeForgeItem(existing), alreadyExists: true };
   }
 
-  // Create campaign-scoped copy
-  const copy = await prisma.forgeItem.create({
-    data: {
-      campaignId,
-      type: globalItem.type,
-      name: globalItem.name,
-      status: 'published',
-      data: globalItem.data,
-      createdBy: userId,
-      sourceGlobalId: globalItemId,
-      isGlobal: false,
-    },
-  });
+  // Create campaign-scoped copy. The graded stamps travel with the copy —
+  // dropping them left every pulled blueprint with NULL KV and broke royalty
+  // attribution (bug hunt C3).
+  let copy;
+  try {
+    copy = await prisma.forgeItem.create({
+      data: {
+        campaignId,
+        type: globalItem.type,
+        name: globalItem.name,
+        status: 'published',
+        data: globalItem.data,
+        createdBy: userId,
+        sourceGlobalId: globalItemId,
+        isGlobal: false,
+        karmicValue: globalItem.karmicValue,
+        evaluatedAt: globalItem.evaluatedAt,
+        authorUserId: globalItem.authorUserId ?? globalItem.createdBy,
+        royaltyRate: globalItem.royaltyRate,
+      },
+    });
+  } catch (e) {
+    // @@unique([campaignId, name, type]): a concurrent pull, or a campaign
+    // item that already uses this name — surface it readably, not as a 500
+    // (bug hunt C5/C12).
+    if ((e as { code?: string }).code === 'P2002') {
+      const collided = await prisma.forgeItem.findFirst({
+        where: { campaignId, name: globalItem.name, type: globalItem.type },
+      });
+      if (collided?.sourceGlobalId === globalItemId) {
+        return { ...serializeForgeItem(collided), alreadyExists: true };
+      }
+      throw new ValidationError(
+        `This campaign already has a ${globalItem.type} named "${globalItem.name}" — rename or remove it before pulling the stock version.`,
+      );
+    }
+    throw e;
+  }
 
   // Increment use count on global source
   await prisma.forgeItem.update({
@@ -521,5 +592,5 @@ export async function pullFromGlobalCatalog(
     data: { useCount: { increment: 1 } },
   });
 
-  return { ...copy, data: JSON.parse(copy.data), alreadyExists: false };
+  return { ...serializeForgeItem(copy), alreadyExists: false };
 }

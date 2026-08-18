@@ -5,6 +5,7 @@ import { ValidationError, NotFoundError, ForbiddenError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { GodHeadAgent } from '@/godhead/agent';
 import { executeTransaction } from '@/services/krma/ledger';
+import { FORGE_ITEM_TYPES, validateForgeData } from '@/services/forge-schemas';
 import type { ForgeItemType } from './forge';
 
 // ── Chain economics ─────────────────────────────────────────────────────
@@ -21,7 +22,8 @@ const KAI_TO_ETHERLING_REFORGE = BigInt(5);
 // ── Input Schema ─────────────────────────────────────────────────────────
 
 export const forgeAuthorInputSchema = z.object({
-  type: z.enum(['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn']),
+  // 'spell' included since the schema sign-off r-2026-07-23-01 (bug hunt L5).
+  type: z.enum(['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn', 'spell']),
   name: z.string().min(1, 'Name required').max(100),
   description: z.string().min(10, 'Describe what you want the chain to build (at least 10 characters)').max(2000),
   campaignContext: z.string().max(500).optional(),
@@ -447,6 +449,13 @@ export async function authorForgeItem(
     worldContext: campaign.worldContext,
   };
 
+  // From here the GM's chain fund is spent — if any stage throws, refund it
+  // (bug hunt C7: the debit landed before any stage ran, with no refund, and
+  // the Date.now() idempotency key made every retry a fresh charge).
+  // Godhead-to-godhead handoffs already made stay where they landed — the
+  // chain keeps its internal economy; only the GM's charge is made whole.
+  try {
+
   // ── Stage 1: Creator drafts ──────────────────────────────────────────
   const creatorStage = await runStage<CreatorOutput>(
     creator.name,
@@ -490,6 +499,18 @@ export async function authorForgeItem(
     (text) => extractJson<BalanceOutput>(text, 'Kai'),
   );
   balanceStage.record.reasoning = balanceStage.parsed.reasoning;
+
+  // Gate the chain's own output (bug hunt C1): Kai's balanced draft must
+  // pass the same schema the Forge persists with — catching it here fails
+  // the run (and refunds) instead of handing the GM unconfirmable data.
+  try {
+    validateForgeData(input.type, balanceStage.parsed.data);
+  } catch (e) {
+    const detail = e instanceof z.ZodError
+      ? e.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')
+      : e instanceof Error ? e.message : String(e);
+    throw new ValidationError(`The chain returned an invalid ${input.type} draft — ${detail}`);
+  }
 
   // Kai pays Et'herling for the KV grading stage.
   await transferBetweenGodheads({
@@ -544,6 +565,26 @@ export async function authorForgeItem(
     summary,
     suggestedKV: kvStage.parsed.suggestedKV,
   };
+
+  } catch (chainError) {
+    // Refund the GM's chain fund — best-effort, never masks the real error.
+    try {
+      await executeTransaction({
+        fromWalletId: creator.walletId,
+        toWalletId: campaignWallet.id,
+        amount: chainFund,
+        state: 'FLUID',
+        reason: 'BLUEPRINT_AUTHOR',
+        description: `Chain fund refund — ${input.type} "${input.name}" (stage failed)`,
+        metadata: { fundIdem, refund: true },
+        campaignId,
+        actorId: userId,
+        actorType: 'GM',
+        idempotencyKey: `${fundIdem}:refund`,
+      });
+    } catch { /* refund failure is logged by the ledger; surface the stage error */ }
+    throw chainError;
+  }
 }
 
 // ── Private chain audit trail (server-only; not exposed to GM) ───────────
@@ -593,17 +634,45 @@ export async function confirmForgeAuthoring(
   if (!campaign) throw new NotFoundError('Campaign');
   if (campaign.gmUserId !== userId) throw new ForbiddenError('Only the campaign GM can confirm forge items');
 
-  const item = await prisma.forgeItem.create({
-    data: {
-      campaignId,
-      type: input.type,
-      name: input.name,
-      status: 'draft',
-      data: JSON.stringify(input.data),
-      createdBy: userId,
-      ...(input.karmicValue != null ? { karmicValue: BigInt(input.karmicValue) } : {}),
-    },
-  });
+  // Content gate (bug hunt C1/C9): the PUT is an independent request — it
+  // must pass the SAME validation as createForgeItem, or chain output with
+  // a bogus type/missing fields persists verbatim and the row can never be
+  // edited again ("Unknown forge item type").
+  if (!FORGE_ITEM_TYPES.includes(input.type)) {
+    throw new ValidationError(`Unknown forge item type: ${String(input.type)}`);
+  }
+  const validatedData = validateForgeData(input.type, input.data);
+  // Preserve chain-authored keys the schema doesn't know (strip-mode).
+  const dataToStore = { ...input.data, ...validatedData };
 
-  return { ...item, data: JSON.parse(item.data) };
+  let item;
+  try {
+    item = await prisma.forgeItem.create({
+      data: {
+        campaignId,
+        type: input.type,
+        name: input.name,
+        status: 'draft',
+        data: JSON.stringify(dataToStore),
+        createdBy: userId,
+        // Math.round: Et'herling's suggestedKV is LLM output — BigInt() on a
+        // non-integer throws RangeError → 500 (bug hunt C4).
+        ...(input.karmicValue != null ? { karmicValue: BigInt(Math.round(input.karmicValue)) } : {}),
+      },
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === 'P2002') {
+      throw new ValidationError(
+        `A ${input.type} named "${input.name}" already exists in this campaign.`,
+      );
+    }
+    throw e;
+  }
+
+  // BigInt → Number before the row crosses NextResponse.json (bug hunt C2).
+  return {
+    ...item,
+    karmicValue: item.karmicValue != null ? Number(item.karmicValue) : null,
+    data: JSON.parse(item.data),
+  };
 }

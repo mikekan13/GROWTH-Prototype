@@ -26,7 +26,7 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { registerTool } from './registry';
-import { FATE_DIE_KV } from '@/lib/kv-calculator';
+import { priceBlueprintByType } from '@/services/forge-pricing';
 
 const inputSchema = z.object({
   forgeItemId: z.string().describe('The ForgeItem to evaluate'),
@@ -47,32 +47,36 @@ interface SeedData extends RootBranchData {
   baseResist?: number;
 }
 
-function priceBlueprint(type: string, data: SeedData & RootBranchData): number {
-  let kv = 0;
-  const attrs = data.attributes ?? {};
-  for (const v of Object.values(attrs)) kv += Math.max(0, v);
-  for (const s of data.skills ?? []) kv += Math.max(0, s.level ?? 0);
-  kv += (data.nectars?.length ?? 0) * 5;
-  kv += (data.thorns?.length ?? 0) * 5;
-  if (type === 'seed') {
-    if (data.baseFateDie && FATE_DIE_KV[data.baseFateDie]) kv += FATE_DIE_KV[data.baseFateDie];
-    if (typeof data.fatedAge === 'number' && data.fatedAge > 0) kv += Math.ceil(data.fatedAge * 0.5);
-    if (typeof data.baseResist === 'number' && data.baseResist > 0) kv += data.baseResist * 2;
-  }
-  return kv;
-}
-
-function autoScore(type: string, data: SeedData & RootBranchData): { score: number; reason: string } {
-  // Simple heuristic — penalize obviously overpowered grants. The
-  // intent is to flag stuff that needs human review, not to make a
-  // definitive call.
+/**
+ * Balance heuristic v2 (audit S10, 2026-08-17). Canon: seed aug totals VARY
+ * by seed identity — balance lives at the TKV-tier level (Low 130-220,
+ * Medium 220-350, High 350-550, Premium 550+), so a lone big aug is only a
+ * flag when it dwarfs the rest. Root/branch: creation soft caps (skills
+ * ~10-12, r-2026-04-22-02) are the flag lines. Intent unchanged: surface
+ * stuff needing human review, never a definitive call.
+ */
+function autoScore(type: string, data: SeedData & RootBranchData, kv: number): { score: number; reason: string } {
   const attrs = data.attributes ?? {};
   const attrValues = Object.values(attrs);
+  const attrTotal = attrValues.reduce((a, b) => a + Math.max(0, b), 0);
   const maxAttr = attrValues.length ? Math.max(...attrValues) : 0;
-  const avgAttr = attrValues.length ? attrValues.reduce((a, b) => a + b, 0) / attrValues.length : 0;
-  if (maxAttr >= 6) return { score: 4, reason: `Single attribute grant ${maxAttr} is high (>5)` };
-  if (avgAttr > 3) return { score: 5, reason: `Average attribute grant ${avgAttr.toFixed(1)} is high (>3)` };
-  if (type === 'seed' && (data.fatedAge ?? 0) >= 200) return { score: 6, reason: 'Fated Age ≥ 200y — long-lived seed' };
+
+  if (type === 'seed') {
+    if (kv > 0 && kv < 130) return { score: 5, reason: `seedKV ${kv} lands below the Low tier band (130-220) — check for missing components` };
+    if (kv > 550) return { score: 6, reason: `seedKV ${kv} is Premium tier (550+) — confirm the seed earns it` };
+    if (attrTotal > 0 && maxAttr > attrTotal / 2) {
+      return { score: 5, reason: `One attribute aug (${maxAttr}) carries over half the aug total (${attrTotal}) — concentration check` };
+    }
+    return { score: 7, reason: 'Within tier expectations' };
+  }
+
+  if (type === 'root' || type === 'branch') {
+    const maxSkill = Math.max(0, ...(data.skills ?? []).map(s => s.level ?? 0));
+    if (maxSkill > 12) return { score: 4, reason: `Skill level ${maxSkill} exceeds the creation cap (~10-12, hard 20 lifetime)` };
+    if (maxAttr > 10) return { score: 5, reason: `Attribute level ${maxAttr} is very high for a single block` };
+    return { score: 7, reason: 'Balanced within expected envelope' };
+  }
+
   return { score: 7, reason: 'Balanced within expected envelope' };
 }
 
@@ -92,8 +96,13 @@ registerTool({
       throw new Error(`Blueprint data is not valid JSON: ${forgeItemId}`);
     }
 
-    const price = priceBlueprint(item.type, data);
-    const auto = autoScore(item.type, data);
+    // LOCKED formulas via the shared pricer (audit X3): seed gets the
+    // frequency-budget component, thorns come out as NEGATIVE liens, roots
+    // get the breakeven frequency-cost line. Items/skills/spells return
+    // null — Kai grades those case-by-case (r-2026-04-22-15).
+    const priced = priceBlueprintByType(item.type, data as Record<string, unknown>);
+    const price = priced?.kv ?? 0;
+    const auto = autoScore(item.type, data, price);
     const score = manualScore ?? auto.score;
     const reason = manualScore ? `Manual score override (${manualScore}); auto would be ${auto.score}: ${auto.reason}` : auto.reason;
 
@@ -105,7 +114,12 @@ registerTool({
     })();
     const newTags = {
       ...existingTags,
-      evaluation: { evaluator: 'Kai', score, price, reason, notes: notes ?? null, at: new Date().toISOString() },
+      evaluation: {
+        evaluator: 'Kai', score, price, reason, notes: notes ?? null,
+        breakdown: priced?.breakdown ?? null,
+        frequencyCost: priced?.frequencyCost ?? null,
+        at: new Date().toISOString(),
+      },
     };
 
     await prisma.forgeItem.update({

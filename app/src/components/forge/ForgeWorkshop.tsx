@@ -17,6 +17,26 @@ interface Blueprint {
   authorUserId?: string;
   useCount?: number;
   karmicValue?: number | null;
+  /** JSON blob; `.evaluation` carries Kai's (or the pre-Kai formula's) grade. */
+  relationshipTags?: string | null;
+}
+
+interface BlueprintEvaluation {
+  evaluator?: string;
+  score?: number;
+  price?: number;
+  reason?: string;
+  notes?: string | null;
+  breakdown?: string[] | null;
+  frequencyCost?: number | null;
+}
+
+function parseEvaluation(tags?: string | null): BlueprintEvaluation | null {
+  if (!tags) return null;
+  try {
+    const parsed = JSON.parse(tags) as { evaluation?: BlueprintEvaluation };
+    return parsed.evaluation ?? null;
+  } catch { return null; }
 }
 
 interface ForgeWorkshopProps {
@@ -37,24 +57,41 @@ const BLOCK_TYPES = [
   { key: 'nectar', label: 'Nectars', icon: '✦', color: '#3EB89A', desc: 'Permanent boons' },
   { key: 'thorn', label: 'Thorns', icon: '✧', color: '#E8585A', desc: 'Permanent penalties' },
   { key: 'blossom', label: 'Blossoms', icon: '❀', color: '#D0A030', desc: 'Temporary buffs' },
+  { key: 'spell', label: 'Spells', icon: '⌘', color: '#8e7cc3', desc: 'Woven magic' },
 ] as const;
 
 type BlockType = typeof BLOCK_TYPES[number]['key'];
 
 // ── Seed Detail Renderer ──────────────────────────────────────────────────
 
-function SeedDetail({ data }: { data: Record<string, unknown> }) {
-  const attrs = data.attributes as Record<string, number> | undefined;
-  const skills = data.skills as Array<{ name: string }> | undefined;
-  const nectars = data.nectars as Array<{ name: string }> | undefined;
-  const thorns = data.thorns as Array<{ name: string }> | undefined;
+// Fate die value = the seed's nectar+thorn slot cap (canon §4).
+const FATE_DIE_SLOTS: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
 
+/** Seed traits are stored as name-strings in current data; older shapes used
+ *  {name} objects. Normalize for display. */
+function traitNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(v => (typeof v === 'string' ? v : (v as { name?: string })?.name ?? '')).filter(Boolean);
+}
+
+function SeedDetail({ data, kv }: { data: Record<string, unknown>; kv: number | null }) {
+  const attrs = data.attributes as Record<string, number> | undefined;
+  const skills = traitNames(data.skills);
+  const nectars = traitNames(data.nectars);
+  const thorns = traitNames(data.thorns);
+  const body = data.bodyStructure as { parts?: string[]; vitals?: string[] } | undefined;
+  const size = data.size as { width?: number; length?: number; height?: string } | undefined;
+  const fateDie = String(data.baseFateDie || 'd8');
+  const slotCap = FATE_DIE_SLOTS[fateDie] ?? 8;
+  const freq = typeof data.frequency === 'number' ? data.frequency : null;
+
+  // Canon: seeds grant AUGS on the 8 attributes — Frequency is never augged
+  // (it's the starting budget, shown with the seed stats instead).
   const PILLAR_ATTRS: Array<{ label: string; key: string; color: string }> = [
     { label: 'CLO', key: 'clout', color: '#E8585A' },
     { label: 'CEL', key: 'celerity', color: '#E8585A' },
     { label: 'CON', key: 'constitution', color: '#E8585A' },
     { label: 'FLO', key: 'flow', color: '#8e7cc3' },
-    { label: 'FRQ', key: 'frequency', color: '#8e7cc3' },
     { label: 'FOC', key: 'focus', color: '#8e7cc3' },
     { label: 'WIL', key: 'willpower', color: '#4080D0' },
     { label: 'WIS', key: 'wisdom', color: '#4080D0' },
@@ -64,57 +101,76 @@ function SeedDetail({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="space-y-3">
       {/* Key stats row */}
-      <div className="flex gap-4 text-[11px] font-[Consolas,monospace]">
-        <span style={{ color: '#D0A030' }}>FD: {String(data.baseFateDie || 'd6').toUpperCase()}</span>
-        <span style={{ color: '#aaa' }}>AGE: {String(data.fatedAge || '?')}</span>
-        <span style={{ color: '#aaa' }}>RESIST: {String(data.baseResist || '?')}</span>
-        <span style={{ color: '#D0A030' }}>KV: {String(data.seedKV || '?')}</span>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-[Consolas,monospace]">
+        <span style={{ color: '#D0A030' }}>FATE DIE: {fateDie.toUpperCase()}</span>
+        <span style={{ color: '#aaa' }}>FATED AGE: {String(data.fatedAge ?? '?')}</span>
+        <span style={{ color: '#aaa' }}>BASE RESIST: {String(data.baseResist ?? '?')}</span>
+        {freq != null && <span style={{ color: '#8e7cc3' }}>STARTING FREQUENCY: {freq}</span>}
+        <span style={{ color: '#D0A030' }}>KV: {kv ?? String(data.seedKV ?? '?')}</span>
+        {size && <span style={{ color: '#aaa' }}>SIZE: {size.width ?? '?'}×{size.length ?? '?'}{size.height ? ` · ${size.height}` : ''}</span>}
       </div>
 
-      {/* Attributes grid */}
+      {/* Attribute AUGMENTS — augs only; levels come from roots/branches */}
       {attrs && (
         <div>
-          <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-1">ATTRIBUTES</div>
+          <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-1">
+            ATTRIBUTE AUGMENTS <span className="text-white/20">(levels come from roots & branches)</span>
+          </div>
           <div className="grid grid-cols-3 gap-x-4 gap-y-0.5">
             {PILLAR_ATTRS.map(a => (
               <div key={a.key} className="flex justify-between text-[11px] font-[Consolas,monospace]">
                 <span style={{ color: a.color }}>{a.label}</span>
-                <span style={{ color: '#ccc' }}>{attrs[a.key] ?? '—'}</span>
+                <span style={{ color: (attrs[a.key] ?? 0) > 0 ? '#ccc' : '#555' }}>
+                  {(attrs[a.key] ?? 0) > 0 ? `+${attrs[a.key]}` : '—'}
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Skills */}
-      {skills && skills.length > 0 && (
+      {/* Starting skills (rare by canon — cap d4) */}
+      {skills.length > 0 && (
         <div>
-          <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-0.5">STARTING SKILLS</div>
-          <div className="text-[11px] text-white/60 font-[Consolas,monospace]">
-            {skills.map(s => s.name).join(', ')}
+          <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-0.5">STARTING SKILLS (rare · cap d4)</div>
+          <div className="text-[11px] text-white/60 font-[Consolas,monospace]">{skills.join(', ')}</div>
+        </div>
+      )}
+
+      {/* Traits with the fate-die slot cap */}
+      {(nectars.length > 0 || thorns.length > 0) && (
+        <div>
+          <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-0.5">
+            TRAITS · {nectars.length + thorns.length}/{slotCap} slots ({fateDie})
+          </div>
+          <div className="flex gap-4">
+            {nectars.length > 0 && (
+              <div>
+                <div className="text-[9px] font-[Consolas,monospace] mb-0.5" style={{ color: '#3EB89A' }}>NECTARS</div>
+                <div className="text-[10px] text-white/50 font-[Consolas,monospace]">{nectars.join(', ')}</div>
+              </div>
+            )}
+            {thorns.length > 0 && (
+              <div>
+                <div className="text-[9px] font-[Consolas,monospace] mb-0.5" style={{ color: '#E8585A' }}>THORNS (liens)</div>
+                <div className="text-[10px] text-white/50 font-[Consolas,monospace]">{thorns.join(', ')}</div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Nectars / Thorns */}
-      <div className="flex gap-4">
-        {nectars && nectars.length > 0 && (
-          <div>
-            <div className="text-[9px] font-[Consolas,monospace] mb-0.5" style={{ color: '#3EB89A' }}>NECTARS</div>
-            <div className="text-[10px] text-white/50 font-[Consolas,monospace]">
-              {nectars.map(n => n.name).join(', ')}
-            </div>
+      {/* Body structure */}
+      {body?.parts && body.parts.length > 0 && (
+        <div>
+          <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-0.5">
+            BODY · {body.parts.length} parts{body.vitals?.length ? ` · vitals: ${body.vitals.join(', ').toLowerCase()}` : ''}
           </div>
-        )}
-        {thorns && thorns.length > 0 && (
-          <div>
-            <div className="text-[9px] font-[Consolas,monospace] mb-0.5" style={{ color: '#E8585A' }}>THORNS</div>
-            <div className="text-[10px] text-white/50 font-[Consolas,monospace]">
-              {thorns.map(t => t.name).join(', ')}
-            </div>
+          <div className="text-[10px] text-white/40 font-[Consolas,monospace]">
+            {body.parts.join(' · ').toLowerCase().replace(/_/g, ' ')}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -279,11 +335,15 @@ const HANDLED_KEYS = new Set([
   'mechanicalEffects', 'mechanicalEffect', 'governors', 'ageAdded',
   'pillar', 'category', 'itemType', 'primaryMaterial', 'materialClass',
   'weightLbs', 'rarity', 'kv', 'seedKV', 'karmicValue', 'baseResist',
-  'properties', 'condition', 'tags',
+  'properties', 'condition', 'tags', 'quality', 'armorCategory', 'attacks',
+  'school', 'schools', 'dr', 'manaCost', 'castingMethod', 'betaDraft', 'source',
 ]);
 
-function BlockDetail({ type, data }: { type: string; data: Record<string, unknown> }) {
-  if (type === 'seed') return <SeedDetail data={data} />;
+const CONDITION_NAMES = ['Destroyed', 'Broken', 'Worn', 'Undamaged', 'Indestructible'];
+const ARMOR_MULT: Record<string, number> = { Clothing: 0.5, Light: 1, Heavy: 1.5 };
+
+function BlockDetail({ type, data, kv }: { type: string; data: Record<string, unknown>; kv: number | null }) {
+  if (type === 'seed') return <SeedDetail data={data} kv={kv} />;
 
   const proposalNote = data._proposalNote as string | undefined;
   const description = data.description as string | undefined;
@@ -305,9 +365,30 @@ function BlockDetail({ type, data }: { type: string; data: Record<string, unknow
     facts.push({ label: `${data.primaryMaterial}${typeof data.materialClass === 'string' ? ` (${data.materialClass})` : ''}`, color: '#8B7355' });
   }
   if (typeof data.rarity === 'number') facts.push({ label: `rarity ${data.rarity}`, color: '#D0A030' });
+  if (typeof data.quality === 'number') facts.push({ label: `quality ${data.quality}/10` });
   if (typeof data.weightLbs === 'number') facts.push({ label: `${data.weightLbs} lbs` });
-  if (typeof data.baseResist === 'number') facts.push({ label: `resist ${data.baseResist}`, color: '#E8585A' });
-  if (typeof data.condition === 'string') facts.push({ label: data.condition });
+  if (typeof data.baseResist === 'number') {
+    // Armor category multiplies resist (r-2026-04-22-14): 0.5×/1×/1.5×.
+    const cat = typeof data.armorCategory === 'string' ? data.armorCategory : null;
+    const mult = cat ? ARMOR_MULT[cat] : null;
+    facts.push({
+      label: mult != null && mult !== 1
+        ? `resist ${data.baseResist}×${mult} (${cat}) = ${Math.floor((data.baseResist as number) * mult)}`
+        : `resist ${data.baseResist}${cat ? ` (${cat})` : ''}`,
+      color: '#E8585A',
+    });
+  }
+  // Condition: 0-4 five-level track (r-2026-04-22-12).
+  if (typeof data.condition === 'number') {
+    facts.push({ label: `condition ${data.condition} · ${CONDITION_NAMES[data.condition] ?? '?'}` });
+  } else if (typeof data.condition === 'string') {
+    facts.push({ label: data.condition });
+  }
+  // Spell facts (schema r-2026-07-23-01)
+  if (typeof data.school === 'string') facts.push({ label: data.school, color: '#8e7cc3' });
+  const dr = data.dr as { total?: number } | undefined;
+  if (dr?.total != null) facts.push({ label: `DR ${dr.total}`, color: '#D0A030' });
+  if (typeof data.manaCost === 'number') facts.push({ label: `${data.manaCost} mana`, color: '#8e7cc3' });
 
   const properties = Array.isArray(data.properties) ? (data.properties as unknown[]).map(String) : null;
   const leftovers = Object.entries(data).filter(([k, v]) => !HANDLED_KEYS.has(k) && v != null);
@@ -348,6 +429,31 @@ function BlockDetail({ type, data }: { type: string; data: Record<string, unknow
         </div>
       )}
       {mechanicalEffects && <MechanicalEffects effects={mechanicalEffects} />}
+
+      {/* Weapon attacks (item-fields canon: named attacks, each with target attribute) */}
+      {Array.isArray(data.attacks) && (data.attacks as Array<Record<string, unknown>>).length > 0 && (
+        <div>
+          <SectionLabel color="#E8585A">Attacks</SectionLabel>
+          <div className="space-y-1.5">
+            {(data.attacks as Array<Record<string, unknown>>).map((a, i) => {
+              const dmg = a.damage as Record<string, number> | undefined;
+              const dmgStr = dmg
+                ? Object.entries(dmg).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k}`).join(', ')
+                : null;
+              return (
+                <div key={i} className="text-[11px] font-[Consolas,monospace]">
+                  <span className="text-white/85">{String(a.name ?? `attack ${i + 1}`)}</span>
+                  {dmgStr && <span className="text-white/50"> — {dmgStr}</span>}
+                  {typeof a.targetAttribute === 'string' && (
+                    <span style={{ color: attrMeta(a.targetAttribute).color }}> vs {attrMeta(a.targetAttribute).label}</span>
+                  )}
+                  {typeof a.range === 'string' && <span className="text-white/35"> · {a.range}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {Array.isArray(governors) && governors.length > 0 && (
         <div>
@@ -455,9 +561,12 @@ function BlueprintCard({
           </span>
         )}
       </div>
-      {blueprint.isGlobal && blueprint.useCount != null && (
-        <div className="text-[9px] text-white/20 font-[Consolas,monospace] mt-1">
-          {blueprint.useCount} campaigns
+      {blueprint.isGlobal && (
+        <div className="flex items-center gap-2 text-[9px] font-[Consolas,monospace] mt-1">
+          <span style={{ color: '#22ab94' }}>STOCK · free · pre-graded</span>
+          {blueprint.useCount != null && blueprint.useCount > 0 && (
+            <span className="text-white/20">{blueprint.useCount} campaigns</span>
+          )}
         </div>
       )}
     </button>
@@ -487,12 +596,14 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
 
   const fetchCampaignItems = useCallback(async () => {
     try {
+      setLoading(true);
       const res = await fetch(`/api/campaigns/${campaignId}/forge?type=${activeType}`);
       if (res.ok) {
         const data = await res.json();
         setCampaignItems(data.items || []);
       }
     } catch { /* silent */ }
+    finally { setLoading(false); }
   }, [campaignId, activeType]);
 
   // ── Fetch global catalog ────────────────────────────────────────────────
@@ -524,6 +635,9 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
         body: JSON.stringify({ globalItemId }),
       });
       if (res.ok) {
+        // The pulled copy has a NEW id — a stale selectedId from the global
+        // list would point at nothing (or the wrong item) in campaign view.
+        setSelectedId(null);
         fetchCampaignItems();
         setView('campaign');
       }
@@ -688,7 +802,7 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
             </button>
             <button
               onClick={handleCreate}
-              disabled={creating || !createName.trim()}
+              disabled={creating || !createName.trim() || !createDesc.trim()}
               className="px-3 py-1 text-[10px] uppercase font-[Consolas,monospace] border transition-colors"
               style={{
                 borderColor: typeConfig.color,
@@ -755,7 +869,34 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
               )}
 
               {/* Type-specific detail */}
-              <BlockDetail type={activeType} data={selected.data} />
+              <BlockDetail type={activeType} data={selected.data} kv={selected.karmicValue ?? null} />
+
+              {/* Chain grade — Kai's evaluation (or the pre-Kai formula price
+                  on JEWL drafts). The chain's numbers are the law; a draft's
+                  are the pitch. */}
+              {(() => {
+                const ev = parseEvaluation(selected.relationshipTags);
+                if (!ev) return null;
+                const isKai = ev.evaluator === 'Kai';
+                return (
+                  <div className="p-2.5" style={{ backgroundColor: 'rgba(34,171,148,0.05)', border: '1px solid rgba(34,171,148,0.25)' }}>
+                    <div className="text-[9px] uppercase tracking-[0.2em] font-[Consolas,monospace] mb-1" style={{ color: 'rgba(34,171,148,0.7)' }}>
+                      {isKai ? "Kai's grade" : 'Formula price (awaiting Kai)'}
+                      {ev.score != null && <span> · balance {ev.score}/10</span>}
+                      {ev.price != null && <span> · KV {ev.price}</span>}
+                    </div>
+                    {ev.reason && <div className="text-[10px] text-white/50 font-[Consolas,monospace]">{ev.reason}</div>}
+                    {Array.isArray(ev.breakdown) && ev.breakdown.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {ev.breakdown.map((line, i) => (
+                          <div key={i} className="text-[10px] text-white/40 font-[Consolas,monospace]">· {line}</div>
+                        ))}
+                      </div>
+                    )}
+                    {ev.notes && <div className="mt-1 text-[10px] italic text-white/40 font-[Consolas,monospace]">{ev.notes}</div>}
+                  </div>
+                );
+              })()}
 
               {/* Actions */}
               <div className="flex gap-2 pt-2 border-t" style={{ borderColor: '#ffffff10' }}>

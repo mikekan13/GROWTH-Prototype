@@ -10,7 +10,11 @@ export async function POST(
   try {
     const session = await requireAuth();
     const { id } = await params;
-    const { globalItemId } = await request.json();
+    const body = await request.json().catch(() => null);
+    const globalItemId = body?.globalItemId;
+    if (typeof globalItemId !== 'string' || !globalItemId) {
+      return NextResponse.json({ error: 'globalItemId is required' }, { status: 400 });
+    }
     const result = await pullFromGlobalCatalog(globalItemId, id, session.user.id, session.user.role);
     return NextResponse.json(result, { status: result.alreadyExists ? 200 : 201 });
   } catch (error) {

@@ -17,7 +17,9 @@ export type ForgeItemType = typeof FORGE_ITEM_TYPES[number];
 const skillGovernorSchema = z.enum(SKILL_GOVERNORS as unknown as [string, ...string[]]);
 
 const forgeSkillDataSchema = z.object({
-  governors: z.array(skillGovernorSchema).min(1, 'At least one governor required'),
+  // 1-3 governors per CANON_CORE §5 (supersedes the old "as many as you
+  // wish" archive text). Frequency is excluded from SKILL_GOVERNORS.
+  governors: z.array(skillGovernorSchema).min(1, 'At least one governor required').max(3, 'Skills take 1-3 governors (CANON_CORE §5)'),
   description: z.string().max(500).optional(),
 });
 
@@ -50,7 +52,10 @@ const forgeItemDataSchema = z.object({
   description: z.string().max(500).optional(),
   material: z.string().max(100).optional(),
   weightLevel: z.number().int().min(0).max(10).optional(),
-  condition: z.number().int().min(1).max(4).optional(),
+  // Condition is the FIVE-level 0-4 track (r-2026-04-22-12): 4 Indestructible,
+  // 3 Undamaged (normal max), 2 Worn, 1 Broken (resist halved), 0 Destroyed.
+  // Was 1-4 (audit I1) — 0 Destroyed was unrepresentable.
+  condition: z.number().int().min(0).max(4).optional(),
   // Rarity canon is 1-10 (Material_System.md); old 6-bucket enum kept for back-compat.
   rarity: z.union([
     z.enum(['common', 'uncommon', 'rare', 'very_rare', 'legendary', 'artifact']),
@@ -78,6 +83,17 @@ const forgeItemDataSchema = z.object({
   contains: z.array(z.record(z.string(), z.unknown())).max(40).optional(),
   // Weapon fields
   damage: forgeDamageSchema,
+  // Canon weapon shape (item-fields corrections 2026-05-14, audit I3):
+  // multiple NAMED attacks, each with its own damage breakdown and a
+  // REQUIRED target attribute. The single `damage` field stays as the
+  // legacy read for old rows.
+  attacks: z.array(z.object({
+    name: z.string().max(100),
+    damage: forgeDamageSchema,
+    targetAttribute: z.string().max(50),
+    range: z.enum(['melee', 'short', 'medium', 'long']).optional(),
+    notes: z.string().max(300).optional(),
+  })).max(10).optional(),
   range: z.enum(['melee', 'short', 'medium', 'long']).optional(),
   weaponProperties: z.array(z.string().max(100)).max(20).optional(),
   targetAttribute: z.string().max(50).optional(),
@@ -104,11 +120,12 @@ const rollModifierSchema = z.object({
 
 const forgeTraitDataSchema = z.object({
   description: z.string().max(500),
-  mechanicalEffect: z.string().max(300).optional(),
+  mechanicalEffect: z.string().max(600).optional(),
   source: z.string().max(200).optional(),
-  // Canon trait fields (GrowthTrait parity; pillar required at authoring
-  // per r-2026-05-19-03 — optional here for legacy rows, default 'spirit').
-  pillar: z.enum(['body', 'spirit', 'soul']).optional(),
+  // pillar REQUIRED at authoring per r-2026-05-19-03 (drives death-engine
+  // routing). Hardened 2026-08-17 (audit): new content must carry it;
+  // legacy un-tagged rows in the DB are read, not re-validated.
+  pillar: z.enum(['body', 'spirit', 'soul']),
   category: z.string().max(100).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
@@ -180,6 +197,9 @@ const forgeSkillEntrySchema = z.object({
   level: z.number().int().min(1).max(20),
 });
 
+// Fate die value caps the seed's nectar+thorn slot count (canon §4).
+const FATE_DIE_SLOTS: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
+
 const forgeSeedDataSchema = z.object({
   description: z.string().max(2000),
   baseFateDie: z.enum(['d4', 'd6', 'd8', 'd12', 'd20']),
@@ -190,11 +210,38 @@ const forgeSeedDataSchema = z.object({
   skills: z.array(z.string().max(100)).max(10).default([]),
   nectars: z.array(z.string().max(100)).max(10).default([]),
   thorns: z.array(z.string().max(100)).max(10).default([]),
+  // Audit S1 (2026-08-17): the published Human carries bodyStructure but the
+  // schema didn't know it — z.object strips unknown keys, so chain re-authoring
+  // silently DROPPED anatomy. Current parts/vitals shape; the body-as-items
+  // migration (audit S2) is a separate open question.
+  bodyStructure: z.object({
+    parts: z.array(z.string().max(50)).max(60),
+    vitals: z.array(z.string().max(50)).max(20).default([]),
+  }).optional(),
+  // Audit S3: numeric grid footprint + descriptive height, no size
+  // categories (r-2026-05-19-05). Optional until existing seeds backfill.
+  size: z.object({
+    width: z.number().int().min(1).max(20),
+    length: z.number().int().min(1).max(20),
+    height: z.string().max(50).optional(),
+  }).optional(),
+}).superRefine((data, ctx) => {
+  const slots = (data.nectars?.length ?? 0) + (data.thorns?.length ?? 0);
+  const cap = FATE_DIE_SLOTS[data.baseFateDie] ?? 8;
+  if (slots > cap) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['nectars'],
+      message: `Nectars+thorns (${slots}) exceed the ${data.baseFateDie} trait-slot cap of ${cap}`,
+    });
+  }
 });
 
 const forgeRootDataSchema = z.object({
   description: z.string().max(2000),
-  frequency: z.number().int(),
+  // Frequency COST is computed by the chain (breakeven rule,
+  // r-2026-04-22-10) — authors don't guess it. Default 0.
+  frequency: z.number().int().default(0),
   ageAdded: z.number().int().min(0),
   attributes: attributeLevelsSchema,
   skills: z.array(forgeSkillEntrySchema).max(20).default([]),
@@ -205,7 +252,7 @@ const forgeRootDataSchema = z.object({
 
 const forgeBranchDataSchema = z.object({
   description: z.string().max(2000),
-  frequency: z.number().int(),
+  frequency: z.number().int().default(0),
   ageAdded: z.number().int().min(0),
   attributes: attributeLevelsSchema,
   skills: z.array(forgeSkillEntrySchema).max(20).default([]),
