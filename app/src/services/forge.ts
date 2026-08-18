@@ -64,6 +64,23 @@ async function assertCampaignMember(campaignId: string, userId: string) {
 
 // ── ForgeItem Service ─────────────────────────────────────────────────────
 
+/**
+ * 'material' is a VIEW over the catalog, not a stored type: raw material
+ * stock is seeded as type 'item' tagged 'raw-stock' (canon: "materials are
+ * potential, items are purpose" — stock quantities price the crafting floor
+ * and satisfy item material-coverage gating). The Workshop's Materials tab
+ * and JEWL queries still ask for type=material; map it here.
+ */
+function applyTypeFilter(where: Record<string, unknown>, type?: string) {
+  if (!type) return;
+  if (type === 'material') {
+    where.type = 'item';
+    where.data = { contains: '"raw-stock"' };
+  } else {
+    where.type = type;
+  }
+}
+
 export async function listForgeItems(
   campaignId: string,
   userId: string,
@@ -76,7 +93,7 @@ export async function listForgeItems(
   const isGM = campaign?.gmUserId === userId;
 
   const where: Record<string, unknown> = { campaignId };
-  if (filters?.type) where.type = filters.type;
+  applyTypeFilter(where, filters?.type);
 
   // Players only see published items
   if (!isGM) {
@@ -388,7 +405,7 @@ export async function listGlobalCatalog(
   search?: string,
 ) {
   const where: Record<string, unknown> = { isGlobal: true };
-  if (type) where.type = type;
+  applyTypeFilter(where, type);
   if (search) {
     where.name = { contains: search };
   }
@@ -431,7 +448,7 @@ export async function searchGlobalCatalog(opts: {
     isGlobal: true,
     status: { in: ['published', 'global'] },
   };
-  if (opts.type) where.type = opts.type;
+  applyTypeFilter(where, opts.type);
   if (opts.query) {
     where.OR = [
       { name: { contains: opts.query } },
