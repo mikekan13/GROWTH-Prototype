@@ -2,16 +2,21 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { PhysicalDescription, BodyPartDescription } from '@/types/growth';
-import type { HeldItemData } from '@/types/item';
+import type { HeldItemData, GrowthWorldItem } from '@/types/item';
+import { getConditionLabel, getConditionColor } from '@/types/item';
+import { deriveRegions } from '@/lib/body-tree';
+import { partTokenFromName } from '@/services/body-spawn';
 import { safeJsonParse } from '@/lib/safe-json';
 import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
 
-// Creation-flow streamline (Mike, live session 2026-08-07): body-part detail
-// and inventory sections hidden while the creation flow gets dialed in —
-// flip these back on when the flow reaches them.
-const SHOW_BODY_PARTS = false;
+// Body-part section re-enabled (Mike 2026-08-17 body-spawn ruling): it now
+// reads the SPAWNED body-part items (character.bodyAnatomy) — per-part
+// condition, material, coverage — falling back to the seed's bodyStructure
+// template before mechanics land. Likeness stays in its own section.
+// Inventory remains hidden from the creation-flow streamline (2026-08-07).
+const SHOW_BODY_PARTS = true;
 const SHOW_INVENTORY = false;
 
 const GENDER_OPTIONS = ['', 'Male', 'Female', 'Non-binary', 'Other'] as const;
@@ -142,6 +147,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [heldItems, setHeldItems] = useState<HeldItemData[]>([]);
+  // Spawned body-part item tree (character.bodyAnatomy) — mechanical paperdoll source.
+  const [bodyAnatomy, setBodyAnatomy] = useState<GrowthWorldItem | null>(null);
   // T28 — member-stage backstory submission (player → Watcher approval signal).
   const [backstorySubmitted, setBackstorySubmitted] = useState(false);
   const [submittingBackstory, setSubmittingBackstory] = useState(false);
@@ -149,6 +156,12 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const selectedSeed = useMemo(
     () => campaignSeeds.find(s => s.name === selectedSeedName),
     [selectedSeedName, campaignSeeds],
+  );
+
+  // Flattened regions of the spawned body-part tree (null before mechanics land).
+  const bodyRegions = useMemo(
+    () => (bodyAnatomy?.isBodyPart ? deriveRegions(bodyAnatomy) : null),
+    [bodyAnatomy],
   );
 
   // The character we actually render — selectedCharacterId override beats the
@@ -250,10 +263,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     if (hydratedIdRef.current === charId) return; // already hydrated for this character
     hydratedIdRef.current = charId;
 
+    setBodyAnatomy(null); // reset — repopulated below when this character has a spawned body
+
     if (effectiveCharacter?.data) {
       try {
         const parsed = JSON.parse(effectiveCharacter.data);
         if (parsed.identity?.physicalDescription) setPhysicalDescription(parsed.identity.physicalDescription);
+        if (parsed.bodyAnatomy?.isBodyPart) setBodyAnatomy(parsed.bodyAnatomy as GrowthWorldItem);
         if (parsed.identity?.referencePhotos) setReferencePhotos(parsed.identity.referencePhotos);
         if (parsed.identity?.generatedBust) setGeneratedBust(parsed.identity.generatedBust);
         if (parsed.identity?.generatedFullBody) setGeneratedFullBody(parsed.identity.generatedFullBody);
@@ -930,11 +946,11 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               </div>
             </div>
 
-            {/* Likeness — lifted out of the HEAD body-part section while the
-                full part system is hidden (SHOW_BODY_PARTS=false). Same data
-                path: writes to bodyParts.HEAD, so nothing downstream changes
-                and this block retires itself when the part system returns. */}
-            {!SHOW_BODY_PARTS && (() => {
+            {/* Likeness — STAYS as its own section (Mike 2026-08-17: likeness
+                fields keep their current home even with the body-part system
+                back on). Same data path: writes to bodyParts.HEAD; the HEAD
+                row below shows mechanical state only, no duplicate fields. */}
+            {(() => {
               const head = pd.bodyParts?.HEAD || {};
               return (
                 <div className="mb-4">
@@ -956,9 +972,79 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               );
             })()}
 
-            {/* Body part sections from seed — collapsible */}
+            {/* Body parts — the SPAWNED body-part items (character.bodyAnatomy):
+                per-part condition, material, resist, and what covers it. Falls
+                back to the seed's bodyStructure template (description authoring
+                only) until mechanics-assembly spawns the real body. */}
             <div className="space-y-1">
-              {(SHOW_BODY_PARTS ? (selectedSeed.data.bodyStructure?.parts || []) : []).map(part => {
+              {SHOW_BODY_PARTS && bodyRegions && bodyRegions.map(region => {
+                const token = partTokenFromName(region.partName);
+                const bpData = pd.bodyParts?.[token] || {};
+                const isHead = token === 'HEAD';
+                const isExpanded = expandedParts.has(token);
+                const coveredBy = heldItems.filter(
+                  h => (h.data as GrowthWorldItem & { equippedTo?: string })?.equippedTo === region.key,
+                );
+                const togglePart = () => setExpandedParts(prev => {
+                  const next = new Set(prev);
+                  if (next.has(token)) next.delete(token); else next.add(token);
+                  return next;
+                });
+                return (
+                  <div key={region.key} style={{ marginLeft: `${region.depth * 12}px` }}>
+                    <button onClick={togglePart} className="w-full flex items-center justify-between py-1.5 px-2 transition-colors"
+                      style={{ backgroundColor: isExpanded ? '#1a1a2e' : 'transparent', borderRadius: '2px' }}>
+                      <div className="flex items-center gap-2">
+                        <span style={{ color: '#8e7cc3', fontSize: '10px' }}>{isExpanded ? '▾' : '▸'}</span>
+                        <span className="text-xs uppercase tracking-wider" style={{
+                          color: region.isVital ? '#E8585A' : '#8e7cc3',
+                          fontFamily: 'var(--font-terminal), Consolas, monospace',
+                        }}>
+                          {region.partName}{region.isVital ? ' ●' : ''}
+                        </span>
+                        <span className="text-xs uppercase" style={{
+                          color: getConditionColor(region.condition),
+                          fontFamily: 'var(--font-terminal), Consolas, monospace',
+                          fontSize: '9px',
+                        }}>
+                          {getConditionLabel(region.condition)}
+                        </span>
+                      </div>
+                      <span className="text-xs truncate max-w-[260px]" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>
+                        {[
+                          region.primaryMaterial ? `${region.primaryMaterial}${region.materialClass ? ` (${region.materialClass})` : ''}` : null,
+                          `Resist ${region.baseResist}`,
+                          coveredBy.length ? `Covered: ${coveredBy.map(c => c.name).join(', ')}` : 'Uncovered',
+                        ].filter(Boolean).join(' · ')}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="pl-4 pb-2 mt-1 space-y-2">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                          <span><span style={{ color: '#8e7cc3' }}>CONDITION </span><span style={{ color: getConditionColor(region.condition) }}>{getConditionLabel(region.condition)} ({region.condition}/4)</span></span>
+                          <span><span style={{ color: '#8e7cc3' }}>MATERIAL </span><span style={{ color: '#ccc' }}>{region.primaryMaterial || '—'}{region.materialClass ? ` / ${region.materialClass}` : ''}</span></span>
+                          <span><span style={{ color: '#8e7cc3' }}>RESIST </span><span style={{ color: '#22ab94' }}>{region.baseResist}</span></span>
+                          <span><span style={{ color: '#8e7cc3' }}>COVERED BY </span><span style={{ color: coveredBy.length ? '#ccc' : '#555' }}>{coveredBy.length ? coveredBy.map(c => c.name).join(', ') : 'nothing'}</span></span>
+                        </div>
+                        {isHead ? (
+                          <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                            Likeness fields live in the Likeness section above.
+                          </div>
+                        ) : (
+                          <FieldTextarea
+                            label="Description"
+                            value={bpData.description}
+                            placeholder={getPartPlaceholder(token)}
+                            editable={isEditable}
+                            onChange={v => updateBodyPart(token, 'description', v)}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {(SHOW_BODY_PARTS && !bodyRegions ? (selectedSeed.data.bodyStructure?.parts || []) : []).map(part => {
                 const bpData = pd.bodyParts?.[part] || {};
                 const isHead = part === 'HEAD';
                 const isVital = selectedSeed.data.bodyStructure?.vitals?.includes(part);
@@ -992,43 +1078,10 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     {isExpanded && (
                       <div className="pl-4 pb-2">
                         {isHead ? (
-                          <div className="space-y-3 mt-1">
-                            {/* Face */}
-                            <div>
-                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Face</div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <FieldSelect label="Shape" value={bpData.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'faceShape', v)} />
-                                <FieldInput label="Facial Hair" value={bpData.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart(part, 'facialHair', v)} />
-                              </div>
-                            </div>
-                            {/* Eyes */}
-                            <div>
-                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Eyes</div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <FieldSelect label="Shape" value={bpData.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'eyeShape', v)} />
-                                <FieldInput label="Color" value={bpData.eyeColor} placeholder="green, hazel, amber" editable={isEditable} onChange={v => updateBodyPart(part, 'eyeColor', v)} />
-                              </div>
-                            </div>
-                            {/* Hair */}
-                            <div>
-                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Hair</div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <FieldInput label="Color" value={bpData.hairColor} placeholder="black, auburn, silver" editable={isEditable} onChange={v => updateBodyPart(part, 'hairColor', v)} />
-                                <FieldSelect label="Length" value={bpData.hairLength} options={HAIR_LENGTH_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hairLength', v)} />
-                                <FieldInput label="Texture" value={bpData.hairTexture} placeholder="thick wavy, fine straight, curly" editable={isEditable} onChange={v => updateBodyPart(part, 'hairTexture', v)} />
-                                <FieldInput label="Style" value={bpData.hairStyle} placeholder="braided, ponytail, loose, pinned up" editable={isEditable} onChange={v => updateBodyPart(part, 'hairStyle', v)} />
-                              </div>
-                            </div>
-                            {/* Grooming */}
-                            <div>
-                              <div className="text-xs uppercase mb-1" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '9px' }}>Grooming</div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <FieldInput label="Cosmetics" value={bpData.cosmetics} placeholder="kohl eyeliner, war paint, none" editable={isEditable} onChange={v => updateBodyPart(part, 'cosmetics', v)} />
-                                <FieldSelect label="Hygiene" value={bpData.hygiene} options={HYGIENE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart(part, 'hygiene', v)} />
-                              </div>
-                            </div>
-                            {/* Distinguishing Features */}
-                            <FieldTextarea label="Distinguishing Features" value={bpData.description} placeholder="Scars, pointed ears, piercings, birthmarks, glowing runes..." editable={isEditable} onChange={v => updateBodyPart(part, 'description', v)} />
+                          // Likeness fields keep their own section above (Mike
+                          // 2026-08-17) — no duplicate HEAD inputs here.
+                          <div className="mt-1 text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                            Likeness fields live in the Likeness section above.
                           </div>
                         ) : (
                           <div className="mt-1">

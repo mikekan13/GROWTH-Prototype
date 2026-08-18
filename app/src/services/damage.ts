@@ -25,6 +25,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
 import { routeDamage, HUMAN_BASELINE_ANATOMY, type DamageType, type DamageEvent, type WornDamageResult } from '@/lib/body-damage';
+import { ensureInternalPath } from '@/services/body-spawn';
 import { buildWornLayers } from '@/services/inventory';
 import { broadcastDeathSave } from '@/services/death-save';
 
@@ -86,6 +87,17 @@ export async function applyDamageToCharacter(
   const currentAnatomy =
     (charData.bodyAnatomy as GrowthWorldItem | undefined) ??
     (JSON.parse(JSON.stringify(HUMAN_BASELINE_ANATOMY)) as GrowthWorldItem);
+
+  // Lazy organs (canon 2026-05-19: finer anatomy lazy-spawns when a scene
+  // demands it): a piercing designation naming an internal that doesn't
+  // exist yet spawns it on demand under its parent, then routing proceeds
+  // normally. Path segments are partNames BELOW the root — the same shape
+  // routeDamage consumes. New parts get the bearer's baseResist.
+  if (input.damageType === 'piercing' && input.piercingTargetPath && input.piercingTargetPath.length > 0) {
+    ensureInternalPath(currentAnatomy, input.piercingTargetPath, {
+      baseResist: charData.vitals?.baseResist ?? currentAnatomy.baseResist ?? 0,
+    });
+  }
 
   // T26: equipped items are the outer damage layers — armor absorbs before
   // the body part it covers (outer-absorbs-first, INV-52 layer rules).
