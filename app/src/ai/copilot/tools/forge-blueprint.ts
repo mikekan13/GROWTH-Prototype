@@ -36,7 +36,9 @@ const inputSchema = z.object({
     'JSON-encoded blueprint body. Must be valid JSON. Shape varies per type — ' +
       'follow the forge authoring schemas (e.g. skill needs name + governors + description).',
   ),
-  note: z.string().min(1).max(300).describe(
+  // 600 not 300: the genesis law asks JEWL to cite biography chapters in
+  // the ✎ note; 300 rejected his first genesis batch mid-flight (2026-08-17).
+  note: z.string().min(1).max(600).describe(
     'GM-facing label: WHY you are proposing this and what it is for, in one ' +
       'or two plain sentences (e.g. "For the tavern brawl scene — gives the ' +
       'bouncer his signature grapple"). Shown on the draft in the Forge ' +

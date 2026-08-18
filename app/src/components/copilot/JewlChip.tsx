@@ -19,6 +19,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { CtxMenuBorder, CtxMenuScanlines, ctxMenuStyle } from '@/components/ui/ContextMenu';
+import { useCampaignStream } from '@/hooks/useCampaignStream';
 
 /**
  * JEWL's name is private canon ([[jewl-identity-and-wallet-private]]). All
@@ -90,6 +91,22 @@ interface SessionUser {
   id: string;
   username: string;
   role: string;
+}
+
+/** One of JEWL's open jobs, as served by GET /campaigns/[id]/work-sessions. */
+interface WorkSessionView {
+  id: string;
+  status: string;
+  goal: string;
+  cycleCount: number;
+  blockedReason: string | null;
+  lastNote: string | null;
+}
+
+/** Goals carry entity ids for dedup (`Violet [cms60...]`) — not for eyes. */
+function formatGoal(goal: string): string {
+  const clean = goal.replace(/\s*\[[a-z0-9]+\]/gi, '');
+  return clean.length > 72 ? `${clean.slice(0, 72)}…` : clean;
 }
 
 function extractCampaignId(pathname: string): string | null {
@@ -861,6 +878,56 @@ export function JewlChip() {
     });
   }, [audioMuted]);
 
+  // ── NOW strip — the always-there answer to "what is JEWL doing?"
+  // (Mike 2026-08-17). Two feeds: jewl_working SSE ticks show the
+  // in-flight dispatch tool-by-tool; open work sessions show the longer
+  // arc (goal + latest heartbeat note, or what he's blocked on). The SSE
+  // subscription only lives while the panel is open.
+  const [nowTick, setNowTick] = useState<{ label: string } | null>(null);
+  const nowTickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [workSessions, setWorkSessions] = useState<WorkSessionView[]>([]);
+
+  const fetchWorkSessions = useCallback(async () => {
+    if (!campaignId) return;
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/work-sessions`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkSessions(Array.isArray(data.sessions) ? data.sessions : []);
+      }
+    } catch { /* strip is best-effort */ }
+  }, [campaignId]);
+
+  const { on: onStreamEvent } = useCampaignStream({
+    campaignId: campaignId ?? '',
+    enabled: open && !!campaignId,
+  });
+
+  useEffect(() => onStreamEvent('jewl_working', data => {
+    if (data.phase === 'done') {
+      // Linger a beat so fast dispatches are still seen, then refresh the
+      // session list — the finished turn may have moved a job's state.
+      if (nowTickTimerRef.current) clearTimeout(nowTickTimerRef.current);
+      nowTickTimerRef.current = setTimeout(() => setNowTick(null), 1500);
+      void fetchWorkSessions();
+    } else {
+      if (nowTickTimerRef.current) { clearTimeout(nowTickTimerRef.current); nowTickTimerRef.current = null; }
+      setNowTick({ label: data.phase === 'tool' && data.label ? data.label : 'working…' });
+    }
+  }), [onStreamEvent, fetchWorkSessions]);
+
+  useEffect(() => onStreamEvent('daya_work_session', () => {
+    void fetchWorkSessions();
+  }), [onStreamEvent, fetchWorkSessions]);
+
+  useEffect(() => {
+    if (!open || !campaignId) return;
+    void fetchWorkSessions();
+    // Slow fallback poll — SSE covers the live path.
+    const t = setInterval(() => { void fetchWorkSessions(); }, 15000);
+    return () => clearInterval(t);
+  }, [open, campaignId, fetchWorkSessions]);
+
   if (!campaignId) return null;
 
   // Anchored placement: JEWL materializes AT the click point, clamped so
@@ -1015,6 +1082,69 @@ export function JewlChip() {
                 ⊗
               </button>
             </div>
+          </div>
+
+          {/* NOW — live view of what JEWL is doing right now: in-flight
+              dispatch ticks + his open jobs. Always rendered so the GM can
+              right-click any time and see where his hands are. */}
+          <div
+            style={{
+              padding: '6px 14px 7px',
+              borderBottom: '1px solid #222',
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 3,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 8,
+                letterSpacing: '0.25em',
+                textTransform: 'uppercase',
+                color: 'rgba(34, 171, 148, 0.65)',
+              }}
+            >
+              now
+            </div>
+            {nowTick && (
+              <div style={{ fontSize: 9, color: '#ffcc78', lineHeight: 1.5 }}>
+                ⟳ {nowTick.label}
+              </div>
+            )}
+            {workSessions.map(s => (
+              <div key={s.id} style={{ lineHeight: 1.5 }}>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: s.status === 'blocked' ? 'rgba(231, 76, 60, 0.85)' : 'rgba(34, 171, 148, 0.85)',
+                  }}
+                >
+                  {s.status === 'blocked' ? '◼' : '⟳'} {formatGoal(s.goal)}
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · cycle {s.cycleCount}</span>
+                </div>
+                {(s.status === 'blocked' ? s.blockedReason : s.lastNote) && (
+                  <div
+                    style={{
+                      fontSize: 8.5,
+                      color: 'rgba(255,255,255,0.45)',
+                      paddingLeft: 12,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {s.status === 'blocked' ? `waiting on you — ${s.blockedReason}` : s.lastNote}
+                  </div>
+                )}
+              </div>
+            ))}
+            {!nowTick && workSessions.length === 0 && (
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
+                ◦ idle — watching
+              </div>
+            )}
           </div>
 
           {/* Messages */}
