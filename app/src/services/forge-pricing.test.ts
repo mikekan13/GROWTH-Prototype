@@ -68,6 +68,20 @@ describe('forge-pricing (locked formulas, Seed_KV_Formulas.md)', () => {
     expect(nectar.kv).toBe(5);
   });
 
+  it('seed traits with carried grades fold into seedKV (ruling 2026-08-18)', () => {
+    // Human anchor: components 180 + Ambitious − Bounded Potential = 225.
+    const { kv } = priceSeed({
+      baseFateDie: 'd8',
+      fatedAge: 80,
+      frequency: 40,
+      baseResist: 15,
+      attributes: { clout: 5, celerity: 5, constitution: 5, focus: 7, flow: 5, willpower: 13, wisdom: 5, wit: 5 },
+      nectars: [{ name: 'Ambitious', kv: 60 }],
+      thorns: [{ name: 'Bounded Potential', kv: 15 }],
+    });
+    expect(kv).toBe(180 + 60 - 15);
+  });
+
   it('trait with no structured modifiers returns 0 for Kai to grade', () => {
     const { kv, breakdown } = priceTrait('nectar', {});
     expect(kv).toBe(0);

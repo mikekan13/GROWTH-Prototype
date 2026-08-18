@@ -200,6 +200,21 @@ const forgeSkillEntrySchema = z.object({
 // Fate die value caps the seed's nectar+thorn slot count (canon §4).
 const FATE_DIE_SLOTS: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
 
+// Seed traits are ACCOUNTED-FOR line items (Mike ruling 2026-08-18): a seed's
+// nectars/thorns carry their Kai grade so seedKV's ledger closes — no more
+// phantom trait names with invisible KV. Bare strings remain readable for
+// legacy rows; new authoring should use the object form.
+const seedTraitRefSchema = z.union([
+  z.string().max(100),
+  z.object({
+    name: z.string().min(1).max(100),
+    /** Kai's grade. Nectars positive; thorns are lien MAGNITUDE (stored
+     *  positive or negative — the pricer folds thorns in as negative). */
+    kv: z.number().int(),
+    forgeItemId: z.string().max(64).optional(),
+  }),
+]);
+
 const forgeSeedDataSchema = z.object({
   description: z.string().max(2000),
   baseFateDie: z.enum(['d4', 'd6', 'd8', 'd12', 'd20']),
@@ -208,8 +223,8 @@ const forgeSeedDataSchema = z.object({
   baseResist: z.number().int().min(0).max(50),
   attributes: attributeAugmentsSchema,
   skills: z.array(z.string().max(100)).max(10).default([]),
-  nectars: z.array(z.string().max(100)).max(10).default([]),
-  thorns: z.array(z.string().max(100)).max(10).default([]),
+  nectars: z.array(seedTraitRefSchema).max(10).default([]),
+  thorns: z.array(seedTraitRefSchema).max(10).default([]),
   // Audit S1 (2026-08-17): the published Human carries bodyStructure but the
   // schema didn't know it — z.object strips unknown keys, so chain re-authoring
   // silently DROPPED anatomy. Current parts/vitals shape; the body-as-items

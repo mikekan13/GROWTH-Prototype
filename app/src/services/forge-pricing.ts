@@ -31,6 +31,10 @@ export interface PricedBlueprint {
   frequencyCost?: number;
 }
 
+/** Seed trait entry: legacy bare name, or the accounted-for form with its
+ *  Kai grade (Mike ruling 2026-08-18: seed traits fold into seedKV). */
+type SeedTraitRef = string | { name: string; kv?: number };
+
 interface SeedShape {
   attributes?: Record<string, number>;
   frequency?: number;
@@ -38,8 +42,16 @@ interface SeedShape {
   fatedAge?: number;
   baseResist?: number;
   skills?: unknown[];
-  nectars?: string[];
-  thorns?: string[];
+  nectars?: SeedTraitRef[];
+  thorns?: SeedTraitRef[];
+}
+
+function normalizeTraitRefs(refs: SeedTraitRef[] | undefined): Array<{ name: string; kv: number | null }> {
+  return (refs ?? []).map(r =>
+    typeof r === 'string'
+      ? { name: r, kv: null }
+      : { name: r.name, kv: typeof r.kv === 'number' ? r.kv : null },
+  );
 }
 
 interface RootBranchShape {
@@ -85,11 +97,22 @@ export function priceSeed(data: SeedShape): PricedBlueprint {
   // can't price them — Kai grades manually when present.
   if ((data.skills?.length ?? 0) > 0) breakdown.push(`${data.skills!.length} starting skill(s) — Kai grades manually`);
 
-  const nectarKv = (data.nectars?.length ?? 0) * TRAIT_ANCHOR_KV;
-  if (nectarKv) { kv += nectarKv; breakdown.push(`${data.nectars!.length} nectar(s) anchor +${nectarKv} (Kai re-grades)`); }
-
-  const thornKv = (data.thorns?.length ?? 0) * TRAIT_ANCHOR_KV;
-  if (thornKv) { kv -= thornKv; breakdown.push(`${data.thorns!.length} thorn lien(s) anchor −${thornKv} (Kai re-grades)`); }
+  // Traits are accounted-for line items: use the carried grade when present,
+  // fall back to the ±5 anchor for ungraded legacy names.
+  for (const n of normalizeTraitRefs(data.nectars)) {
+    const grade = n.kv ?? TRAIT_ANCHOR_KV;
+    kv += Math.abs(grade);
+    breakdown.push(n.kv != null
+      ? `nectar "${n.name}" +${Math.abs(grade)}`
+      : `nectar "${n.name}" anchor +${TRAIT_ANCHOR_KV} (UNGRADED — Kai must grade)`);
+  }
+  for (const t of normalizeTraitRefs(data.thorns)) {
+    const grade = t.kv ?? TRAIT_ANCHOR_KV;
+    kv -= Math.abs(grade);
+    breakdown.push(t.kv != null
+      ? `thorn lien "${t.name}" −${Math.abs(grade)}`
+      : `thorn lien "${t.name}" anchor −${TRAIT_ANCHOR_KV} (UNGRADED — Kai must grade)`);
+  }
 
   return { kv, breakdown };
 }

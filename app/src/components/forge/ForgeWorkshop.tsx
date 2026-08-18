@@ -74,11 +74,22 @@ function traitNames(value: unknown): string[] {
   return value.map(v => (typeof v === 'string' ? v : (v as { name?: string })?.name ?? '')).filter(Boolean);
 }
 
+/** Accounted-for form (ruling 2026-08-18): trait refs may carry their Kai
+ *  grade, which folds into seedKV. */
+function seedTraitRefs(value: unknown): Array<{ name: string; kv: number | null }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(v => typeof v === 'string'
+      ? { name: v, kv: null }
+      : { name: (v as { name?: string })?.name ?? '', kv: typeof (v as { kv?: number })?.kv === 'number' ? (v as { kv: number }).kv : null })
+    .filter(t => t.name);
+}
+
 function SeedDetail({ data, kv }: { data: Record<string, unknown>; kv: number | null }) {
   const attrs = data.attributes as Record<string, number> | undefined;
   const skills = traitNames(data.skills);
-  const nectars = traitNames(data.nectars);
-  const thorns = traitNames(data.thorns);
+  const nectarRefs = seedTraitRefs(data.nectars);
+  const thornRefs = seedTraitRefs(data.thorns);
   const body = data.bodyStructure as { parts?: string[]; vitals?: string[] } | undefined;
   const size = data.size as { width?: number; length?: number; height?: string } | undefined;
   const fateDie = String(data.baseFateDie || 'd8');
@@ -137,25 +148,24 @@ function SeedDetail({ data, kv }: { data: Record<string, unknown>; kv: number | 
         </div>
       )}
 
-      {/* Traits with the fate-die slot cap */}
-      {(nectars.length > 0 || thorns.length > 0) && (
+      {/* Traits with the fate-die slot cap — each with its grade when known
+          (ruling 2026-08-18: seed traits are accounted-for line items). */}
+      {(nectarRefs.length > 0 || thornRefs.length > 0) && (
         <div>
           <div className="text-[9px] text-white/30 font-[Consolas,monospace] mb-0.5">
-            TRAITS · {nectars.length + thorns.length}/{slotCap} slots ({fateDie})
+            TRAITS · {nectarRefs.length + thornRefs.length}/{slotCap} slots ({fateDie})
           </div>
-          <div className="flex gap-4">
-            {nectars.length > 0 && (
-              <div>
-                <div className="text-[9px] font-[Consolas,monospace] mb-0.5" style={{ color: '#3EB89A' }}>NECTARS</div>
-                <div className="text-[10px] text-white/50 font-[Consolas,monospace]">{nectars.join(', ')}</div>
-              </div>
-            )}
-            {thorns.length > 0 && (
-              <div>
-                <div className="text-[9px] font-[Consolas,monospace] mb-0.5" style={{ color: '#E8585A' }}>THORNS (liens)</div>
-                <div className="text-[10px] text-white/50 font-[Consolas,monospace]">{thorns.join(', ')}</div>
-              </div>
-            )}
+          <div className="flex flex-wrap gap-1.5">
+            {nectarRefs.map(n => (
+              <span key={n.name} className="text-[10px] px-1.5 py-0.5 font-[Consolas,monospace]" style={{ color: '#3EB89A', backgroundColor: '#3EB89A12', border: '1px solid #3EB89A35' }}>
+                {n.name}{n.kv != null ? ` +${Math.abs(n.kv)}` : ' (ungraded)'}
+              </span>
+            ))}
+            {thornRefs.map(t => (
+              <span key={t.name} className="text-[10px] px-1.5 py-0.5 font-[Consolas,monospace]" style={{ color: '#E8585A', backgroundColor: '#E8585A12', border: '1px solid #E8585A35' }}>
+                {t.name}{t.kv != null ? ` −${Math.abs(t.kv)}` : ' (ungraded lien)'}
+              </span>
+            ))}
           </div>
         </div>
       )}
