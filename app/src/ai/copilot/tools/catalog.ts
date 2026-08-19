@@ -28,6 +28,9 @@ const searchSchema = z.object({
   type: z.enum(CATALOG_TYPES).optional().describe(
     'Materials, vehicles, and buildings are all type "item".',
   ),
+  category: z.string().max(50).optional().describe(
+    'Trait-category filter (controlled vocabulary: combat, learning, magic, social, utility, supernatural, supertech, natural, physical, mental-health, resolve, art, athletics; blossom states: boost, illness, injury, fatigue). Use to pull same-category anchors when grading.',
+  ),
   limit: z.number().int().min(1).max(50).optional().describe('Default 20.'),
   full: z.boolean().optional().describe(
     'Return complete data blocks instead of summaries. Use on a SMALL result set when you need full stats — e.g. grading anchors for a new design.',
@@ -69,6 +72,7 @@ export const searchCatalogTool: JewlTool = {
     const entries = await searchGlobalCatalog({
       type: parsed.type,
       query: parsed.query,
+      category: parsed.category,
       limit: parsed.limit,
     });
     return {

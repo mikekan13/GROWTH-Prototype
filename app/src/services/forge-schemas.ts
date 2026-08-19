@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import { ValidationError } from '@/lib/errors';
-import { SKILL_GOVERNORS, MAGIC_SCHOOLS } from '@/types/growth';
+import { SKILL_GOVERNORS, MAGIC_SCHOOLS, TRAIT_CATEGORIES } from '@/types/growth';
 // ── Forge Item Types ──────────────────────────────────────────────────────
 
 export const FORGE_ITEM_TYPES = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn', 'spell'] as const;
@@ -158,7 +158,10 @@ const forgeTraitDataSchema = z.object({
   // routing). Hardened 2026-08-17 (audit): new content must carry it;
   // legacy un-tagged rows in the DB are read, not re-validated.
   pillar: z.enum(['body', 'spirit', 'soul']),
-  category: z.string().max(100).optional(),
+  // Controlled vocabulary (ruled 2026-08-19) — free strings fragmented the
+  // index (19 variants in the wild). Conditions and Et'herling's balance
+  // cross-referencing depend on this being stable.
+  category: z.enum(TRAIT_CATEGORIES as unknown as [string, ...string[]]).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   ...blockConditionFields,

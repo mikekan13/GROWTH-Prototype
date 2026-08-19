@@ -240,9 +240,22 @@ export interface GrowthMagic {
 }
 
 // Nectars (permanent), Blossoms (temporary), Thorns (permanent negative)
-export type TraitCategory =
-  | 'combat' | 'learning' | 'magic' | 'social' | 'utility'
-  | 'supernatural' | 'supertech' | 'natural';
+// Controlled vocabulary (Mike ruling 2026-08-19): organization that
+// Et'herling cross-references for balance anchors and humans search by,
+// and a stable dimension block CONDITIONS can gate on (paper precedent:
+// supernatural/supertech access gating; Altered Human's pay-KRMA-to-pick
+// nectar). Blessed = the original eight + everything live content uses.
+// Blossom-state categories (boost/illness/injury/fatigue) are legal on
+// temporary traits. art/athletics/resolve flagged for possible
+// consolidation in the Kai content sweep — do not add NEW categories
+// without a ruling.
+export const TRAIT_CATEGORIES = [
+  'combat', 'learning', 'magic', 'social', 'utility',
+  'supernatural', 'supertech', 'natural',
+  'physical', 'mental-health', 'resolve', 'art', 'athletics',
+  'boost', 'illness', 'injury', 'fatigue',
+] as const;
+export type TraitCategory = typeof TRAIT_CATEGORIES[number];
 
 export type TraitPillar = 'body' | 'spirit' | 'soul';
 

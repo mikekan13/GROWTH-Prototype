@@ -487,6 +487,9 @@ export async function listGlobalCatalog(
 export async function searchGlobalCatalog(opts: {
   type?: string;
   query?: string;
+  /** Controlled trait-category filter (ruled 2026-08-19) — lets Et'herling
+   *  and JEWL pull same-category anchors when grading. */
+  category?: string;
   limit?: number;
 } = {}) {
   const take = Math.min(Math.max(opts.limit ?? 20, 1), 50);
@@ -495,6 +498,9 @@ export async function searchGlobalCatalog(opts: {
     status: { in: ['published', 'global'] },
   };
   applyTypeFilter(where, opts.type);
+  if (opts.category) {
+    where.AND = [{ data: { contains: `"category":"${opts.category}"` } }];
+  }
   if (opts.query) {
     where.OR = [
       { name: { contains: opts.query } },
