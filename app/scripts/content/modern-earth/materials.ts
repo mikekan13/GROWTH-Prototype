@@ -27,8 +27,13 @@ export const MATERIALS: ItemTemplate[] = [
   // ── Construction ──
   stock('Lumber (2x4 Stack)', 'Twenty straight boards of potential.', 'Hard', 60, 1, 2, { baseResist: 10, properties: ['Flammable', 'Strong'] }),
   stock('Plywood (Sheet)', 'Four by eight feet of instant wall.', 'Hard', 50, 1, 1, { baseResist: 8, properties: ['Flammable'] }),
-  stock('Concrete Mix (80lb Bag)', 'Stone in powdered, patient form.', 'Hard', 80, 1, 1, { baseResist: 25, properties: ['Strong'] }),
-  stock('Bricks (Stack of 50)', 'Civilization\'s oldest pixel.', 'Hard', 250, 1, 2, { baseResist: 20, properties: ['Strong', 'Heat Resistant'] }),
+  // Masonry re-graded to physics 2026-08-19 (Mike): material resist = the
+  // SUBSTANCE (a lone brick snaps under a hammer); the wall's toughness is
+  // deployed-mass FORM FACTOR carried at ITEM level (see buildings.ts —
+  // Foundation & Frame baseResist 20, Unit Shell 15). Old values 25/20
+  // priced the wall into the bag/stack. Derivation: docs/material-physics.md.
+  stock('Concrete Mix (80lb Bag)', 'Stone in powdered, patient form.', 'Hard', 80, 1, 1, { baseResist: 6, properties: ['Strong'] }),
+  stock('Bricks (Stack of 50)', 'Civilization\'s oldest pixel.', 'Hard', 250, 1, 2, { baseResist: 4, properties: ['Strong', 'Heat Resistant'] }),
   stock('Rebar (Bundle)', 'Concrete\'s hidden skeleton.', 'Hard', 100, 2, 3, { primaryMaterial: 'Steel', baseResist: 30, properties: ['Strong'] }),
   stock('Drywall (Sheet)', 'The wall you can punch through and usually shouldn\'t.', 'Hard', 55, 1, 1, { baseResist: 3, properties: ['Fragile'] }),
   stock('Insulation (Roll)', 'Itchy pink silence and warmth.', 'Soft', 30, 1, 1, { baseResist: 1, properties: ['Flammable'] }),

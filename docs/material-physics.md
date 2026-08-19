@@ -85,8 +85,8 @@ Result rounded, clamped [1, 50].
 | Drywall | 3 | 1 | −2 | PASS | Fragile |
 | Window glass | 2 | 9 | +7 | TRAIT | Fragile/Brittle + pane form (see outliers) |
 | Stone, common (granite) | 16 | 16 | 0 | PASS | Fragile, Heat Resistant |
-| Brick | 20 | 4 | −16 | TRAIT | deployed masonry mass (see outliers) |
-| Concrete | 25 | 6 | −19 | TRAIT | deployed mass + rebar partnership (see outliers) |
+| Brick | ~~20~~ **4** | 4 | 0 | PASS (re-graded 2026-08-19) | Strong, Heat Resistant |
+| Concrete | ~~25~~ **6** | 6 | 0 | PASS (re-graded 2026-08-19) | Strong |
 | Obsidian | 20 | 5 | −15 | TRAIT | Sharp edge lore; physically volcanic glass |
 | Quartz | 20 | 15 | −5 | TRAIT | gem lore premium; Brittle |
 | Diamond | 23 | 50 | +27 | TRAIT | Brittle caps gems in play (see outliers) |
@@ -136,7 +136,7 @@ The bio ladder is physically coherent: brain/fat/organ/muscle 1 → flesh 3 → 
 All ten residuals have a trait/form story — none required fudging property data:
 
 1. **Window glass (canon 2, bulk physics ~9)** — the canonical trait-carried case (Mike ruling). K_IC 0.75 already strips 63% of its hardness credit via the gate; the rest is the *thin pane* form. Bulk glass block would honestly sit ~9 with Brittle.
-2. **Brick (20 vs 4) & Concrete (25 vs 6)** — the biggest systematic finding. Canon prices **deployed masonry** (a mortared, massive wall — concrete with rebar partnership), not a hand sample; a single brick snaps under a hammer tap, but you don't punch through a wall. Recommendation: keep the canon numbers for stock (they encode the play experience of walls) and treat the gap as a **structure/form factor** at item level, not a material property. Worth a Mike ruling if raw-chunk masonry ever matters.
+2. **Brick & Concrete — RESOLVED (Mike ruling 2026-08-19).** The old canon 20/25 priced **deployed masonry** (a mortared, massive wall), not the substance; a single brick snaps under a hammer tap. Ruled: material number = the substance's physics (**Brick 4, Concrete 6** — stock catalog, DB, and the anchors above updated), and the wall's toughness is **item-level form factor**, which the buildings content already carries (House "Foundation & Frame" baseResist 20, Apartment "Unit Shell" 15, etc.). No structure trait needed — the item layer is the form factor, per the one-scalar+traits principle.
 3. **Obsidian (20 vs 5)** — physically volcanic glass. Canon 20 prices the legendary knapped *edge* (Sharp, Unrepairable), not bulk resist.
 4. **Diamond (23 vs clamp 50)** — Mohs 10 dominates any hardness model, but K_IC 3.4 means a hammer beats a diamond; canon caps all gems ~20–23 because **Brittle dominates play**. Deliberately trait-carried; same story for quartz (20 vs 15).
 5. **Copper (12 vs 19)** — the old repo valued copper **22**; physics agrees with the repo (~19–22). The 2026 stock re-ruling to 12 reflects annealed plumbing/wire grade (yield ~70 MPa — it bends long before it breaks): a **Malleable** discount. Brass (18 vs 21) is the same copper-alloy discount at Δ3.
