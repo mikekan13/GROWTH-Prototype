@@ -257,7 +257,11 @@ const forgeRootDataSchema = z.object({
   // Frequency COST is computed by the chain (breakeven rule,
   // r-2026-04-22-10) — authors don't guess it. Default 0.
   frequency: z.number().int().default(0),
-  ageAdded: z.number().int().min(0),
+  // ageAdded = DURATION: calendar years this block adds (Mike ruling
+  // 2026-08-19: starting age = Σ ageAdded over roots+branches; seeds add
+  // none). Roots run from birth, so a root's duration is the age it
+  // reaches — capped 25 (max-root-age, r-2026-04-22-11).
+  ageAdded: z.number().int().min(0).max(25),
   attributes: attributeLevelsSchema,
   skills: z.array(forgeSkillEntrySchema).max(20).default([]),
   nectars: z.array(z.string().max(100)).max(10).default([]),
@@ -268,6 +272,8 @@ const forgeRootDataSchema = z.object({
 const forgeBranchDataSchema = z.object({
   description: z.string().max(2000),
   frequency: z.number().int().default(0),
+  // Duration in calendar years (see root comment). Kai gauge: KV/ageAdded
+  // should land 3-15.
   ageAdded: z.number().int().min(0),
   attributes: attributeLevelsSchema,
   skills: z.array(forgeSkillEntrySchema).max(20).default([]),

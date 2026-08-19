@@ -385,7 +385,18 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
 
   // Facts row: the at-a-glance chips (age, pillar, item stats...).
   const facts: Array<{ label: string; color?: string }> = [];
-  if (data.ageAdded != null) facts.push({ label: `age ${String(data.ageAdded)}+`, color: '#6fa8dc' });
+  // ageAdded = duration (ruling 2026-08-19): show the years the block adds
+  // and, when priced, Kai's KV/yr gauge with an out-of-band tint (3-15 ok).
+  if (typeof data.ageAdded === 'number' && data.ageAdded > 0) {
+    facts.push({ label: `adds ${data.ageAdded} yr${data.ageAdded === 1 ? '' : 's'}`, color: '#6fa8dc' });
+    if (kv != null && kv > 0 && (type === 'root' || type === 'branch')) {
+      const perYear = Math.round((kv / data.ageAdded) * 10) / 10;
+      facts.push({
+        label: `${perYear} KV/yr`,
+        color: perYear >= 3 && perYear <= 15 ? '#22ab94' : '#D0A030',
+      });
+    }
+  }
   if (typeof data.frequency === 'number' && data.frequency !== 0 && (type === 'root' || type === 'branch')) {
     facts.push({ label: `frequency cost ${data.frequency}`, color: '#8e7cc3' });
   }
