@@ -368,9 +368,23 @@ const HANDLED_KEYS = new Set([
   'school', 'schools', 'dr', 'manaCost', 'castingMethod', 'betaDraft', 'source',
   'attributes', 'skills', 'nectars', 'thorns', 'requirements', 'seedRequirement',
   'itemAbilities', 'contains', 'frequency', 'subordinateMaterials', 'value', 'notes',
+  'requires', 'restricted',
 ]);
 
 const CONDITION_NAMES = ['Destroyed', 'Broken', 'Worn', 'Undamaged', 'Indestructible'];
+
+/** Structured block conditions (ruled 2026-08-19) → human chips. */
+function describeBlockCondition(c: Record<string, unknown>): string {
+  switch (c.type) {
+    case 'seed': return `seed ${c.name}`;
+    case 'block': return `${c.blockType ?? 'block'} "${c.name}"`;
+    case 'minAge': return `age ${c.years}+`;
+    case 'attribute': return `${c.name} ${c.min}+`;
+    case 'skill': return `${c.name} level ${c.min}+`;
+    case 'custom': return `${c.text} (JEWL adjudicates)`;
+    default: return JSON.stringify(c);
+  }
+}
 const ARMOR_MULT: Record<string, number> = { Clothing: 0.5, Light: 1, Heavy: 1.5 };
 
 function BlockDetail({ type, data, kv }: { type: string; data: Record<string, unknown>; kv: number | null }) {
@@ -544,6 +558,18 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Enforced conditions — system-checked at assembly, never GM homework */}
+      {(Array.isArray(data.requires) || Array.isArray(data.restricted)) && (
+        <div className="flex flex-wrap gap-1.5">
+          {(data.requires as Array<Record<string, unknown>> ?? []).map((c, i) => (
+            <Chip key={`rq${i}`} color="#6fa8dc">requires: {describeBlockCondition(c)}</Chip>
+          ))}
+          {(data.restricted as Array<Record<string, unknown>> ?? []).map((c, i) => (
+            <Chip key={`rs${i}`} color="#E8585A">restricted: {describeBlockCondition(c)}</Chip>
+          ))}
         </div>
       )}
 

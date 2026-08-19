@@ -13,6 +13,12 @@ import { SKILL_GOVERNORS } from '@/types/growth';
 import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
 import { spawnBodyFromStructure, hasSpawnedBody } from '@/services/body-spawn';
 import type { GrowthWorldItem } from '@/types/item';
+import type { BlockCondition } from '@/services/forge-schemas';
+import {
+  buildConditionContext,
+  evaluateBlockConditions,
+  type PendingAdjudication,
+} from '@/services/block-conditions';
 
 type AttrKey = 'clout' | 'celerity' | 'constitution' | 'focus' | 'flow' | 'willpower' | 'wisdom' | 'wit';
 const ATTR_KEYS: AttrKey[] = ['clout', 'celerity', 'constitution', 'focus', 'flow', 'willpower', 'wisdom', 'wit'];
@@ -51,6 +57,8 @@ interface RootBranchData {
   skills: Array<{ name: string; level: number; governors?: SkillGovernor[] }>;
   nectars: string[];
   thorns: string[];
+  requires?: BlockCondition[];
+  restricted?: BlockCondition[];
 }
 
 export interface AssignMechanicsInput {
@@ -69,6 +77,26 @@ export function applyCreationGrants(
   roots: Array<{ id: string; name: string; data: RootBranchData }>,
   branches: Array<{ id: string; name: string; data: RootBranchData }>,
 ): GrowthCharacter {
+  // Block conditions are ENFORCED here, not GM-adjudicated (Mike ruling
+  // 2026-08-19). Context is the FULL set, so ordering never matters.
+  // Deterministic failures throw; custom (prose) conditions fail CLOSED —
+  // they stamp onto creation.pendingConditionAdjudications for JEWL to
+  // adjudicate against the character's actual state before crystallization.
+  const conditionCtx = buildConditionContext(seed, roots, branches);
+  const conditionFailures: string[] = [];
+  const pendingAdjudications: PendingAdjudication[] = [];
+  const seedData = seed.data as SeedData & { requires?: BlockCondition[]; restricted?: BlockCondition[] };
+  const collect = (name: string, data: { requires?: BlockCondition[]; restricted?: BlockCondition[] }) => {
+    const r = evaluateBlockConditions(name, data, conditionCtx);
+    conditionFailures.push(...r.failures);
+    pendingAdjudications.push(...r.pendingAdjudications);
+  };
+  collect(seed.name, seedData);
+  for (const blk of [...roots, ...branches]) collect(blk.name, blk.data);
+  if (conditionFailures.length > 0) {
+    throw new ValidationError(`Block conditions not met: ${conditionFailures.join('; ')}`);
+  }
+
   // Deep-ish clone — JSON round-trip is fine for our shape.
   const next: GrowthCharacter = JSON.parse(JSON.stringify(character));
 
@@ -81,6 +109,10 @@ export function applyCreationGrants(
   };
   next.creation.seedForgeItemId = seed.id;
   next.creation.fatedAge = seed.data.fatedAge;
+  // Custom (prose) conditions fail closed: recorded here for JEWL to
+  // adjudicate; crystallization must not proceed while any remain.
+  (next.creation as unknown as Record<string, unknown>).pendingConditionAdjudications =
+    pendingAdjudications.length > 0 ? pendingAdjudications : undefined;
   // Persist seed aug contributions so they survive recomputeAugments on canvas load.
   next.creation.seed.augments = { ...seed.data.attributes };
 

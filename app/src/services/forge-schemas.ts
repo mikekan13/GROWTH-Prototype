@@ -16,11 +16,42 @@ export type ForgeItemType = typeof FORGE_ITEM_TYPES[number];
 
 const skillGovernorSchema = z.enum(SKILL_GOVERNORS as unknown as [string, ...string[]]);
 
+// ── Block conditions (Mike ruling 2026-08-19) ─────────────────────────────
+// "Any block can have requirements or even restrictions. These have to be
+// enforced for balance sake across the meta — it can't be left up to a GM."
+// Structured, binary, machine-checked at character assembly
+// (services/block-conditions.ts). `requires`: ALL must hold. `restricted`:
+// NONE may hold. Legacy free-text `requirements`/`seedRequirement` fields
+// remain readable but are display-only.
+export const blockConditionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('seed'), name: z.string().min(1).max(100) }),
+  z.object({
+    type: z.literal('block'),
+    blockType: z.enum(['root', 'branch', 'nectar', 'thorn', 'blossom']).optional(),
+    name: z.string().min(1).max(100),
+  }),
+  z.object({ type: z.literal('minAge'), years: z.number().int().min(0) }),
+  // Checks POOL MAX (levels + seed augs), so "Wit 30+" is legal.
+  z.object({ type: z.literal('attribute'), name: skillGovernorSchema, min: z.number().int().min(1).max(100) }),
+  z.object({ type: z.literal('skill'), name: z.string().min(1).max(100), min: z.number().int().min(1).max(20) }),
+  // The "almost anything" clause (Mike 2026-08-19): arbitrary prose,
+  // adjudicated by JEWL against the character's actual state — NOT the GM.
+  // Fails closed: unadjudicated customs block crystallization.
+  z.object({ type: z.literal('custom'), text: z.string().min(1).max(300) }),
+]);
+export type BlockCondition = z.infer<typeof blockConditionSchema>;
+
+const blockConditionFields = {
+  requires: z.array(blockConditionSchema).max(10).optional(),
+  restricted: z.array(blockConditionSchema).max(10).optional(),
+};
+
 const forgeSkillDataSchema = z.object({
   // 1-3 governors per CANON_CORE §5 (supersedes the old "as many as you
   // wish" archive text). Frequency is excluded from SKILL_GOVERNORS.
   governors: z.array(skillGovernorSchema).min(1, 'At least one governor required').max(3, 'Skills take 1-3 governors (CANON_CORE §5)'),
   description: z.string().max(500).optional(),
+  ...blockConditionFields,
 });
 
 const forgeDamageSchema = z.object({
@@ -109,6 +140,7 @@ const forgeItemDataSchema = z.object({
   tags: z.array(z.string().max(50)).max(20).optional(),
   // Legacy field
   properties: z.array(z.string().max(100)).max(20).optional(),
+  ...blockConditionFields,
 });
 
 const rollModifierSchema = z.object({
@@ -129,6 +161,7 @@ const forgeTraitDataSchema = z.object({
   category: z.string().max(100).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
+  ...blockConditionFields,
 });
 
 // Woven spell (r-2026-07-22-01 #4/#5, schema signed off r-2026-07-23-01).
@@ -166,6 +199,7 @@ export const forgeSpellDataSchema = z.object({
     kind: z.enum(['trait', 'item', 'other']),
     description: z.string().max(500),
   })).max(10).optional(),
+  ...blockConditionFields,
 });
 
 // Root/Branch attribute schema — starting levels (not augments)
@@ -240,6 +274,7 @@ const forgeSeedDataSchema = z.object({
     length: z.number().int().min(1).max(20),
     height: z.string().max(50).optional(),
   }).optional(),
+  ...blockConditionFields,
 }).superRefine((data, ctx) => {
   const slots = (data.nectars?.length ?? 0) + (data.thorns?.length ?? 0);
   const cap = FATE_DIE_SLOTS[data.baseFateDie] ?? 8;
@@ -267,6 +302,7 @@ const forgeRootDataSchema = z.object({
   nectars: z.array(z.string().max(100)).max(10).default([]),
   thorns: z.array(z.string().max(100)).max(10).default([]),
   seedRequirement: z.string().max(100).default(''),
+  ...blockConditionFields,
 });
 
 const forgeBranchDataSchema = z.object({
@@ -280,6 +316,7 @@ const forgeBranchDataSchema = z.object({
   nectars: z.array(z.string().max(100)).max(10).default([]),
   thorns: z.array(z.string().max(100)).max(10).default([]),
   requirements: z.string().max(200).default(''),
+  ...blockConditionFields,
 });
 
 // Data schema depends on type
