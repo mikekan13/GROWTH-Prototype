@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isAdminRole } from '@/lib/permissions';
+import { calculateTKV } from '@/services/krma/evaluator';
+import { calculateItemKV, calculateLocationKV } from '@/lib/kv-calculator';
+import type { GrowthCharacter } from '@/types/growth';
+import type { GrowthWorldItem } from '@/types/item';
+import type { GrowthLocation } from '@/types/location';
 
 // ── Schemas ──────────────────────────────────────────────────────────────
 
@@ -175,9 +180,73 @@ export async function listResistanceEntities(goalId: string) {
         name,
         custodianName,
         note,
+        kv: await entityKV(rel.targetType, rel.targetId),
       };
     }),
   );
 
   return entities;
+}
+
+/**
+ * An entity's KV for resistance purposes. Canon (SC-0276, restored
+ * 2026-08-19): resistance is "the counter cumulative KV of that Goal" — the
+ * summed KRMA of everything the GM stacked against it. Characters/NPCs/
+ * creatures compute TKV from their sheet; locations and items from their
+ * data. Unparseable/ungraded → null (surfaced, never silently zero).
+ */
+async function entityKV(targetType: string, targetId: string): Promise<number | null> {
+  try {
+    if (['CHARACTER', 'NPC', 'CREATURE', 'GODHEAD'].includes(targetType)) {
+      const char = await prisma.character.findUnique({
+        where: { id: targetId },
+        select: { data: true },
+      });
+      if (!char?.data) return null;
+      const parsed = JSON.parse(char.data) as GrowthCharacter;
+      return calculateTKV(parsed).total;
+    }
+    if (targetType === 'LOCATION') {
+      const loc = await prisma.location.findUnique({
+        where: { id: targetId },
+        select: { data: true },
+      });
+      if (!loc?.data) return null;
+      return calculateLocationKV(JSON.parse(loc.data) as GrowthLocation);
+    }
+    if (targetType === 'ITEM') {
+      const item = await prisma.campaignItem.findUnique({
+        where: { id: targetId },
+        select: { data: true },
+      });
+      if (!item?.data) return null;
+      return calculateItemKV(JSON.parse(item.data) as GrowthWorldItem);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export interface GoalResistanceKV {
+  /** The resistance number: Σ KV of all linked resistance entities. */
+  totalKV: number;
+  entityCount: number;
+  /** Entities whose KV couldn't be computed — they contribute 0 to the
+   *  total but are counted here so nobody mistakes a grading debt for
+   *  weak opposition. */
+  ungraded: number;
+  entities: Array<{ entityId: string; entityType: string; name: string; kv: number | null }>;
+}
+
+/** "How much resistance was against this particular goal?" — the number. */
+export async function computeGoalResistanceKV(goalId: string): Promise<GoalResistanceKV> {
+  const entities = await listResistanceEntities(goalId);
+  const totalKV = entities.reduce((a, e) => a + (e.kv ?? 0), 0);
+  return {
+    totalKV,
+    entityCount: entities.length,
+    ungraded: entities.filter(e => e.kv == null).length,
+    entities: entities.map(e => ({ entityId: e.entityId, entityType: e.entityType, name: e.name, kv: e.kv })),
+  };
 }

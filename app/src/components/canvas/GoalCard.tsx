@@ -9,6 +9,9 @@ interface ResistanceEntity {
   name: string;
   custodianName?: string | null;
   note?: string;
+  /** Entity KV — resistance is the counter cumulative KV of the goal
+   *  (canon SC-0276). null = ungraded (grading debt, not weak opposition). */
+  kv?: number | null;
 }
 
 interface GoalData {
@@ -444,11 +447,15 @@ export default function GoalCard({ characterId, campaignId, isGM, onClose }: Goa
                               {'\u2726'} {goal.custodianName}
                             </span>
                           )}
-                          {resistance.length > 0 && (
-                            <span className="text-[9px]" style={{ color: '#E8585A' }}>
-                              {'\u2694'} {resistance.length} resistance
-                            </span>
-                          )}
+                          {resistance.length > 0 && (() => {
+                            const totalKV = resistance.reduce((a, r) => a + (r.kv ?? 0), 0);
+                            const ungraded = resistance.filter(r => r.kv == null).length;
+                            return (
+                              <span className="text-[9px]" style={{ color: '#E8585A' }} title={ungraded ? `${ungraded} ungraded entit${ungraded === 1 ? 'y' : 'ies'} not counted` : undefined}>
+                                {'\u2694'} {resistance.length} resistance \u00b7 {totalKV} KV{ungraded ? '+?' : ''}
+                              </span>
+                            );
+                          })()}
                           {openOpps.length > 0 && (
                             <span className="text-[9px]" style={{ color: 'var(--krma-gold)' }}>
                               {'\u26a1'} {openOpps.length} open opportunit{openOpps.length === 1 ? 'y' : 'ies'}

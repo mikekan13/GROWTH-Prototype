@@ -38,10 +38,13 @@ registerTool({
       }
     }
 
-    // Incoming resistance edges
+    // Incoming resistance edges + THE resistance number (canon SC-0276:
+    // resistance = the counter cumulative KV stacked against the goal).
     const resistance = await prisma.entityRelationship.findMany({
       where: { sourceId: goalId, relationshipType: 'resisted_by' },
     });
+    const { computeGoalResistanceKV } = await import('@/services/goal-resistance');
+    const resistanceKV = await computeGoalResistanceKV(goalId);
 
     return {
       id: goal.id,
@@ -72,6 +75,9 @@ registerTool({
         targetType: r.targetType,
         strength: r.strength,
       })),
+      /** Σ KV of linked resistance entities; ungraded entities counted but
+       *  contributing 0 — a grading debt, not weak opposition. */
+      resistanceKV,
     };
   },
 });
