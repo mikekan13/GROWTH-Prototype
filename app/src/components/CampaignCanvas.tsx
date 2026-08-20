@@ -1820,6 +1820,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             isGM={isGM}
             userCharacter={userCharacter}
             selectedCharacterId={selectedCharacterId}
+            // The canvas IS the Watcher Console — the GM's explicit edit
+            // surface. Without this the entities→edit path opened PLAYER_
+            // CHARACTER sheets read-only (B: pair-session 2026-08-07).
+            // Server-side updateCharacter still owns the real permission gate.
+            canEdit={isGM}
           />
         )}
 

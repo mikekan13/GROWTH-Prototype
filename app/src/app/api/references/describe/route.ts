@@ -8,7 +8,9 @@ import sharp from 'sharp';
 
 const CLAUDE_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CLAUDE_API_URL = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com';
-const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+// Same env knob + fallback as the JEWL runtime (runtime.ts) — the old
+// claude-sonnet-4-20250514 fallback was retired 2026-06-15 and 404s.
+const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
 /**
