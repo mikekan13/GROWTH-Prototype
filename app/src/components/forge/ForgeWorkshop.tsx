@@ -368,7 +368,7 @@ const HANDLED_KEYS = new Set([
   'school', 'schools', 'dr', 'manaCost', 'castingMethod', 'betaDraft', 'source',
   'attributes', 'skills', 'nectars', 'thorns', 'requirements', 'seedRequirement',
   'itemAbilities', 'contains', 'frequency', 'subordinateMaterials', 'value', 'notes',
-  'requires', 'restricted',
+  'requires', 'restricted', 'maturityFlags',
 ]);
 
 const CONDITION_NAMES = ['Destroyed', 'Broken', 'Worn', 'Undamaged', 'Indestructible'];
@@ -558,6 +558,16 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Maturity flags — audience control metadata (never content avoidance);
+          also the future model-router signal. */}
+      {Array.isArray(data.maturityFlags) && (data.maturityFlags as string[]).length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {(data.maturityFlags as string[]).map(f => (
+            <Chip key={f} color="#D0A030">⚠ {f}</Chip>
+          ))}
         </div>
       )}
 

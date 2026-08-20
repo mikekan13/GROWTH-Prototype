@@ -46,12 +46,26 @@ const blockConditionFields = {
   restricted: z.array(blockConditionSchema).max(10).optional(),
 };
 
+// ── Maturity flags (Mike rulings 2026-08-04 + 2026-08-19) ────────────────
+// Audience control = flags, never content avoidance. Metadata today
+// (display + honest authoring); tomorrow the signal for BOTH campaign
+// audience filtering AND the model router (mature-flagged generation
+// routes to the local lane; cloud does the unflagged heavy lifting).
+// Controlled vocabulary — extend by ruling only.
+export const MATURITY_FLAGS = [
+  'mental-health', 'violence', 'substance', 'trauma', 'illness-detail',
+] as const;
+const maturityFlagsField = {
+  maturityFlags: z.array(z.enum(MATURITY_FLAGS)).max(5).optional(),
+};
+
 const forgeSkillDataSchema = z.object({
   // 1-3 governors per CANON_CORE §5 (supersedes the old "as many as you
   // wish" archive text). Frequency is excluded from SKILL_GOVERNORS.
   governors: z.array(skillGovernorSchema).min(1, 'At least one governor required').max(3, 'Skills take 1-3 governors (CANON_CORE §5)'),
   description: z.string().max(500).optional(),
   ...blockConditionFields,
+  ...maturityFlagsField,
 });
 
 const forgeDamageSchema = z.object({
@@ -141,6 +155,7 @@ const forgeItemDataSchema = z.object({
   // Legacy field
   properties: z.array(z.string().max(100)).max(20).optional(),
   ...blockConditionFields,
+  ...maturityFlagsField,
 });
 
 const rollModifierSchema = z.object({
@@ -165,6 +180,7 @@ const forgeTraitDataSchema = z.object({
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   ...blockConditionFields,
+  ...maturityFlagsField,
 });
 
 // Woven spell (r-2026-07-22-01 #4/#5, schema signed off r-2026-07-23-01).
@@ -203,6 +219,7 @@ export const forgeSpellDataSchema = z.object({
     description: z.string().max(500),
   })).max(10).optional(),
   ...blockConditionFields,
+  ...maturityFlagsField,
 });
 
 // Root/Branch attribute schema — starting levels (not augments)
@@ -278,6 +295,7 @@ const forgeSeedDataSchema = z.object({
     height: z.string().max(50).optional(),
   }).optional(),
   ...blockConditionFields,
+  ...maturityFlagsField,
 }).superRefine((data, ctx) => {
   const slots = (data.nectars?.length ?? 0) + (data.thorns?.length ?? 0);
   const cap = FATE_DIE_SLOTS[data.baseFateDie] ?? 8;
@@ -306,6 +324,7 @@ const forgeRootDataSchema = z.object({
   thorns: z.array(z.string().max(100)).max(10).default([]),
   seedRequirement: z.string().max(100).default(''),
   ...blockConditionFields,
+  ...maturityFlagsField,
 });
 
 const forgeBranchDataSchema = z.object({
@@ -320,6 +339,7 @@ const forgeBranchDataSchema = z.object({
   thorns: z.array(z.string().max(100)).max(10).default([]),
   requirements: z.string().max(200).default(''),
   ...blockConditionFields,
+  ...maturityFlagsField,
 });
 
 // Data schema depends on type
