@@ -41,6 +41,7 @@ import './tools/process-death';
 import './tools/decay-blueprint';
 import './tools/route-to-godhead';
 import './tools/propose-nectar-bestowal';
+import './tools/propose-thorn-imposition';
 import './tools/rule-jewl-mistake';
 
 // ── Constants ─────────────────────────────────────────────────────────────

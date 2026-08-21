@@ -314,7 +314,33 @@ export interface GrowthTrait {
   kv?: number;                  // The borrowed KRMA (returned in full on expiry/death)
   durationCycles?: number;      // Lifetime in meta cycles (granter-set); expiry = T23 clock
   expiresAtCycle?: number;      // Campaign-clock cycle at which it auto-expires
+
+  // ── Thorn lien (lock model, Mike rulings 2026-08-19/21) ──
+  // A lien is a CLAIM held by a godhead against the bearer — KRMA locked in
+  // the character, never transferred to the holder at imposition (thorn-krma-
+  // mechanics: authority, not possession). Sized at imposition by the staked-
+  // claims law: lien = min(Kai's grade of the wound, the winner's attested
+  // stake). Settles through death by the thorn's PILLAR (thorn-liens-death-
+  // routing-2026-08-19): body → holder paid full; soul → holder paid half +
+  // a faded successor rides the ghost; spirit → rides whole, no payment;
+  // 'fated-age' (Tara's claim markers) → removed, no payment — her claim IS
+  // the collection. Only set on type === 'thorn'. Liens attach at the
+  // character layer ONLY — blueprints stay generic (no holder fields in
+  // forgeTraitDataSchema).
+  lienHolderGodHeadId?: string; // The godhead holding the claim
+  lienHolderName?: string;      // Cached for display/audit
+  lienKV?: number;              // Positive magnitude of the claim
+  lienOrigin?: LienOrigin;      // How the claim arose
+  lienStakeNote?: string;       // How the stake was attested (verbatim, pre-opportunity-economy)
 }
+
+/**
+ * How a thorn lien arose. 'opposition-win' = won proxy wager (staked-claims
+ * law); 'fated-age' = Tara's claim markers (custom, not contract — removed
+ * unpaid when she collects); 'bestowed' = imposed as a grant/curse outside
+ * an opposition; 'other' = anything Kai/GM attests manually.
+ */
+export type LienOrigin = 'opposition-win' | 'fated-age' | 'bestowed' | 'other';
 
 // GRO.vine - Character narrative thread
 export interface GROvine {

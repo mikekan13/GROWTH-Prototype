@@ -15,6 +15,10 @@ export interface TraitItem {
   durationCycles?: number;
   /** Blossom only: campaign-clock cycle at which it auto-expires (T23 sweep). */
   expiresAtCycle?: number;
+  /** Thorn only: positive magnitude of the lien claim held against the bearer. */
+  lienKV?: number;
+  /** Thorn only: the godhead holding the claim (cached name for display). */
+  lienHolderName?: string;
 }
 
 interface TraitsCardProps {
@@ -254,6 +258,7 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                     ...(trait.mechanicalEffect ? [{ name: trait.mechanicalEffect, value: 0 }] : []),
                     ...(trait.type === 'blossom' && trait.expiresAtCycle !== undefined ? [{ name: `Expires at cycle ${trait.expiresAtCycle}`, value: 0 }] : []),
                     ...(trait.type === 'blossom' && trait.expiresAtCycle === undefined && trait.durationCycles ? [{ name: `Duration: ${trait.durationCycles} cycles`, value: 0 }] : []),
+                    ...(trait.type === 'thorn' && (trait.lienKV ?? 0) > 0 ? [{ name: `Lien −${trait.lienKV} · held by ${trait.lienHolderName ?? 'unknown godhead'}`, value: 0 }] : []),
                     ...(trait.source ? [{ name: `Source: ${trait.source}`, value: 0, source: { name: trait.source, type: trait.type, description: trait.description } }] : []),
                   ]} totalValue={0}>
                   <div className="p-2 border transition-colors cursor-pointer group" onMouseDown={e => e.stopPropagation()}
@@ -267,6 +272,12 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
                           {trait.type === 'blossom' && (trait.expiresAtCycle !== undefined || trait.durationCycles) && (
                             <span className="text-[8px] px-1" style={{ color: 'var(--terminal-prime)', border: '1px solid rgba(34,171,148,0.35)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                               {trait.expiresAtCycle !== undefined ? `⏳ exp @ ${trait.expiresAtCycle}` : `⏳ ${trait.durationCycles} cyc`}
+                            </span>
+                          )}
+                          {trait.type === 'thorn' && (trait.lienKV ?? 0) > 0 && (
+                            <span className="text-[8px] px-1" style={{ color: '#E84040', border: '1px solid rgba(232,64,64,0.35)', borderRadius: '2px', fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+                              title={`Lien held by ${trait.lienHolderName ?? 'unknown godhead'}`}>
+                              lien −{trait.lienKV}{trait.lienHolderName ? ` · ${trait.lienHolderName}` : ''}
                             </span>
                           )}
                         </div>

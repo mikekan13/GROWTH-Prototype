@@ -62,6 +62,11 @@ export type TransactionReason =
   // expiry/death (character → Godhead, UNLOCK). Net-zero, fully attributed.
   | 'BLOSSOM_BESTOW'
   | 'BLOSSOM_RETURN'
+  // Thorn liens (Mike 2026-08-19/21). A lien is LOCKED in the character, not
+  // transferred (thorn-krma-mechanics) — no ledger row fires at imposition;
+  // the claim lives on the trait. Settlement fires at death by pillar:
+  // campaign wallet → holder godhead (body = full lienKV, soul = floor half).
+  | 'THORN_LIEN_SETTLEMENT'
   // Harvest
   | 'HARVEST_REWARD'
   | 'HARVEST_WEALTH'

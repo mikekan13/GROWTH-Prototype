@@ -37,6 +37,32 @@ function parseBestowal(content: string): NectarBestowal | null {
   return null;
 }
 
+interface ThornImposition {
+  kind: 'thorn_imposition';
+  characterId: string;
+  goalId?: string;
+  thorn: {
+    name: string;
+    pillar: string;
+    mechanicalEffect: string;
+    rollModifiers?: Array<{ flat: number; skillNamePattern?: string; governorAttribute?: string; label?: string }>;
+  };
+  kaiGradeKV: number;
+  stakeKV: number;
+  stakeNote: string;
+  lienOrigin: string;
+  reason: string;
+  resolved?: { action: 'accept' | 'decline'; at: string; by: string };
+}
+
+function parseImposition(content: string): ThornImposition | null {
+  try {
+    const obj = JSON.parse(content);
+    if (obj && obj.kind === 'thorn_imposition') return obj as ThornImposition;
+  } catch { /* not JSON */ }
+  return null;
+}
+
 const NECTAR_PILLAR_COLOR: Record<string, string> = {
   body:   'var(--pillar-body)',
   spirit: 'var(--pillar-spirit)',
@@ -125,12 +151,12 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
     }
   };
 
-  const resolveBestowal = async (messageId: string, action: 'accept' | 'decline') => {
+  const resolveBestowal = async (messageId: string, action: 'accept' | 'decline', endpoint = 'resolve-bestowal') => {
     setResolving(prev => ({ ...prev, [messageId]: true }));
     setResolveError(prev => ({ ...prev, [messageId]: '' }));
     try {
       const res = await fetch(
-        `/api/campaigns/${campaignId}/godhead-messages/${messageId}/resolve-bestowal`,
+        `/api/campaigns/${campaignId}/godhead-messages/${messageId}/${endpoint}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -286,6 +312,85 @@ export default function GodHeadMessagesPanel({ campaignId, onClose }: Props) {
                                   border: '1px solid #3a3a4e',
                                 }}>
                                 DECLINE → RAW KRMA
+                              </button>
+                              {resolveError[m.id] && (
+                                <span style={{ color: '#e85858', fontSize: '9px' }}>{resolveError[m.id]}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const imposition = parseImposition(m.content);
+                  if (imposition) {
+                    const tColor = '#E84040';
+                    const lienKV = Math.max(0, Math.min(Math.floor(imposition.kaiGradeKV), Math.floor(imposition.stakeKV)));
+                    const mods = imposition.thorn.rollModifiers;
+                    return (
+                      <div style={{ border: `1px solid ${tColor}`, borderRadius: '2px', overflow: 'hidden', marginTop: '2px' }}>
+                        {/* Imposition header */}
+                        <div style={{ backgroundColor: `${tColor}22`, padding: '4px 6px', borderBottom: `1px solid ${tColor}44`, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: tColor, fontSize: '10px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
+                            ✷ THORN PROPOSED — {imposition.thorn.name}
+                          </span>
+                          {pillarChip(imposition.thorn.pillar)}
+                        </div>
+                        {/* Body */}
+                        <div style={{ padding: '6px 7px', backgroundColor: 'rgba(26,26,46,0.6)' }}>
+                          <p style={{ color: '#ccc', fontSize: '11px', lineHeight: 1.45, marginBottom: '5px' }}>{imposition.reason}</p>
+                          <div style={{ background: '#12122a', border: '1px solid #3a3a4e', borderRadius: '2px', padding: '4px 6px', marginBottom: '5px' }}>
+                            <div style={{ color: '#888', fontSize: '8px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em', marginBottom: '2px' }}>MECHANICAL EFFECT</div>
+                            <p style={{ color: '#e8e0ff', fontSize: '10px', lineHeight: 1.4 }}>{imposition.thorn.mechanicalEffect}</p>
+                          </div>
+                          {mods && mods.length > 0 && (
+                            <div style={{ marginBottom: '4px' }}>
+                              {mods.map((mod, mi) => (
+                                <span key={mi} style={{ display: 'inline-block', marginRight: '6px', color: '#e85858', fontSize: '10px' }}>
+                                  {mod.flat} to {mod.label ?? mod.skillNamePattern ?? mod.governorAttribute ?? 'all rolls'}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Lien sizing — min(Kai's grade, attested stake) */}
+                          <div style={{ color: tColor, fontSize: '10px', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                            LIEN: {lienKV} — min(grade {imposition.kaiGradeKV}, stake {imposition.stakeKV}){lienKV === 0 ? ' — scar, no creditor' : ` · held by ${m.godHeadName}`}
+                          </div>
+                          <p style={{ color: '#888', fontSize: '9px', lineHeight: 1.4, marginBottom: '5px' }}>Stake: {imposition.stakeNote} · origin: {imposition.lienOrigin}</p>
+                          {/* Resolved / Actions */}
+                          {imposition.resolved ? (
+                            <div style={{
+                              display: 'inline-block', fontSize: '9px', padding: '1px 6px', borderRadius: '2px',
+                              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em',
+                              color: imposition.resolved.action === 'accept' ? tColor : '#888',
+                              border: `1px solid ${imposition.resolved.action === 'accept' ? `${tColor}44` : '#3a3a4e'}`,
+                              backgroundColor: imposition.resolved.action === 'accept' ? 'rgba(232,64,64,0.08)' : 'rgba(255,255,255,0.03)',
+                            }}>
+                              {imposition.resolved.action === 'accept' ? 'IMPOSED' : 'DECLINED'}
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <button
+                                disabled={!!resolving[m.id]}
+                                onClick={() => resolveBestowal(m.id, 'accept', 'resolve-imposition')}
+                                style={{
+                                  padding: '2px 8px', fontSize: '9px', borderRadius: '2px', cursor: resolving[m.id] ? 'wait' : 'pointer',
+                                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em',
+                                  backgroundColor: resolving[m.id] ? '#1a1a2e' : tColor,
+                                  color: resolving[m.id] ? tColor : '#1a0d0d',
+                                  border: `1px solid ${tColor}`,
+                                }}>
+                                IMPOSE
+                              </button>
+                              <button
+                                disabled={!!resolving[m.id]}
+                                onClick={() => resolveBestowal(m.id, 'decline', 'resolve-imposition')}
+                                style={{
+                                  padding: '2px 8px', fontSize: '9px', borderRadius: '2px', cursor: resolving[m.id] ? 'wait' : 'pointer',
+                                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.06em',
+                                  backgroundColor: '#2a2a3e', color: '#888', border: '1px solid #3a3a4e',
+                                }}>
+                                DECLINE
                               </button>
                               {resolveError[m.id] && (
                                 <span style={{ color: '#e85858', fontSize: '9px' }}>{resolveError[m.id]}</span>

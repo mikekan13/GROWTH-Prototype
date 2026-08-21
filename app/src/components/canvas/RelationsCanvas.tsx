@@ -3191,7 +3191,7 @@ export default function RelationsCanvas({
                 return <VitalsCard vitals={(charData.vitals as Record<string, unknown>) || {}} onClose={() => togglePanel(node.id, panelKey)} />;
               case 'traits':
                 return <TraitsCard
-                  traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string; durationCycles?: number; expiresAtCycle?: number }>) || []}
+                  traits={(charData.traits as Array<{ name: string; type: 'nectar' | 'blossom' | 'thorn'; category?: string; description?: string; source?: string; mechanicalEffect?: string; durationCycles?: number; expiresAtCycle?: number; lienKV?: number; lienHolderName?: string }>) || []}
                   fateDie={(charData.creation as Record<string, unknown>)?.seed ? ((charData.creation as Record<string, unknown>).seed as Record<string, unknown>)?.baseFateDie as string : undefined}
                   characterName={node.name}
                   onClose={() => togglePanel(node.id, panelKey)}

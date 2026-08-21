@@ -7,10 +7,11 @@
  */
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { executeBatch, type CreateTransactionInput } from './ledger';
+import { executeBatch, executeTransaction, type CreateTransactionInput } from './ledger';
 import { getWalletByOwner, getWalletByCampaign, getWalletByCharacter, getSystemWallet } from './wallet';
 import { calculateTKV, calculateDeathSplit, hashEvaluator, splitSkillShares } from './evaluator';
 import { returnAllBlossoms } from '@/services/blossom';
+import { computeThornLienDeathRouting, applyThornLienRouting, type LienDeathOrder } from '@/services/thorn-imposition';
 import { emit as emitGodHeadEvent } from '../godhead-dispatcher';
 import type { GrowthCharacter } from '@/types/growth';
 import type { TransactionRecord, DeathSplitManifest } from '@/types/krma';
@@ -21,6 +22,8 @@ export interface DeathSplitResult {
   manifest: DeathSplitManifest;
   characterId: string;
   spiritPackageKV: number;
+  /** Thorn-lien settlements paid to holder godheads at this death. */
+  lienSettlements: Array<{ holderGodHeadId: string; holderName?: string; thornName: string; paidKV: number; shortfallKV: number }>;
 }
 
 export async function executeDeathSplit(
@@ -155,12 +158,36 @@ export async function executeDeathSplit(
   // Mike 2026-07-13. transformCharacterToGhost then drops the blossom traits.
   const blossomReturns = await returnAllBlossoms(charData, characterId, campaignId, 'death');
 
+  // ── Thorn-lien settlement (Mike 2026-08-19, thorn-liens-death-routing) ──
+  // "Thorns are handled just like everything else in death" — each lien
+  // follows its thorn's pillar. body → holder paid the FULL lienKV; soul →
+  // holder paid floor(half), a faded successor rides the ghost; spirit →
+  // rides whole, no payment; fated-age (Tara's claim markers) → removed
+  // unpaid, her claim IS the collection. Payment source order: the death
+  // payout first — the body/soul harvest has just landed in the campaign
+  // wallet via the batch above — with the GM's campaign wallet backstopping
+  // any shortfall (they are the same pool here; if IT runs dry the payment
+  // caps at the available balance and the shortfall is recorded).
+  const lienOrders = computeThornLienDeathRouting(charData.traits ?? []);
+  const lienSettlements = await settleThornLiens(lienOrders, {
+    characterId,
+    campaignId,
+    campaignWalletId: campaignWallet.id,
+    batchId,
+    actorId,
+  });
+
   // ── Character transformation (locked Mike 2026-05-19) ──
   // The character is NOT destroyed; they become a ghost. Mutate their data
   // blob in place: zero body attributes/skills, halve soul attributes/skills,
   // strip body-pillared traits, zero max Frequency, keep Spirit + non-body.
   // status moves to 'GHOST'.
   const ghostData = transformCharacterToGhost(charData);
+
+  // Apply the lien trait routing on top of the transform: fated-age markers
+  // come off, settled soul thorns are replaced by their "(faded)" residue
+  // (body thorns are already stripped by the transform; spirit liens ride).
+  ghostData.traits = applyThornLienRouting(ghostData.traits ?? [], lienOrders);
   await prisma.character.update({
     where: { id: characterId },
     data: {
@@ -179,6 +206,7 @@ export async function executeDeathSplit(
     spiritPackageKV: manifest.toPlayer,
     blossomsReturnedKV: blossomReturns.total,
     blossomReturns: blossomReturns.returns,
+    lienSettlements,
     batchId,
   }).catch(() => { /* swallow */ });
 
@@ -187,7 +215,70 @@ export async function executeDeathSplit(
     manifest,
     characterId,
     spiritPackageKV: manifest.toPlayer,
+    lienSettlements,
   };
+}
+
+/**
+ * Execute the payment side of the lien death routing: campaign wallet →
+ * holder godhead wallets (FLUID, THORN_LIEN_SETTLEMENT). Per-lien failures
+ * are isolated (a missing holder wallet must not block the death); a payment
+ * caps at the campaign wallet's available balance and records the shortfall.
+ */
+async function settleThornLiens(
+  orders: LienDeathOrder[],
+  ctx: { characterId: string; campaignId: string; campaignWalletId: string; batchId: string; actorId: string },
+): Promise<Array<{ holderGodHeadId: string; holderName?: string; thornName: string; paidKV: number; shortfallKV: number }>> {
+  const settlements: Array<{ holderGodHeadId: string; holderName?: string; thornName: string; paidKV: number; shortfallKV: number }> = [];
+  const payable = orders.filter(o => o.payKV > 0);
+  if (payable.length === 0) return settlements;
+
+  for (const order of payable) {
+    try {
+      const holder = await prisma.godHead.findUnique({
+        where: { id: order.holderGodHeadId },
+        select: { id: true, name: true, walletId: true },
+      });
+      if (!holder?.walletId) {
+        settlements.push({ holderGodHeadId: order.holderGodHeadId, holderName: order.holderName, thornName: order.thornName, paidKV: 0, shortfallKV: order.payKV });
+        continue;
+      }
+      // Re-read the campaign wallet each pass — the death batch and earlier
+      // settlements have moved its balance.
+      const wallet = await prisma.wallet.findUnique({ where: { id: ctx.campaignWalletId }, select: { balance: true } });
+      const available = wallet?.balance ?? BigInt(0);
+      const amount = capAmount(BigInt(order.payKV), available);
+      const shortfall = order.payKV - Number(amount);
+      if (amount > BigInt(0)) {
+        await executeTransaction({
+          fromWalletId: ctx.campaignWalletId,
+          toWalletId: holder.walletId,
+          amount,
+          state: 'FLUID',
+          reason: 'THORN_LIEN_SETTLEMENT',
+          description: `Death: thorn lien settled (${order.pillar}) — "${order.thornName}" → ${holder.name}${shortfall > 0 ? ` (shortfall ${shortfall})` : ''}`,
+          metadata: {
+            characterId: ctx.characterId,
+            thornName: order.thornName,
+            pillar: order.pillar,
+            lienOrigin: order.origin,
+            owedKV: order.payKV,
+            shortfallKV: shortfall,
+            batchId: ctx.batchId,
+          },
+          campaignId: ctx.campaignId,
+          actorId: ctx.actorId,
+          actorType: 'SYSTEM',
+          idempotencyKey: `thorn-lien:${ctx.characterId}:${order.holderGodHeadId}:${order.thornName}:${ctx.batchId}`,
+        });
+      }
+      settlements.push({ holderGodHeadId: holder.id, holderName: holder.name, thornName: order.thornName, paidKV: Number(amount), shortfallKV: shortfall });
+    } catch {
+      // Isolated: a failed settlement (race, missing wallet) must not block the death.
+      settlements.push({ holderGodHeadId: order.holderGodHeadId, holderName: order.holderName, thornName: order.thornName, paidKV: 0, shortfallKV: order.payKV });
+    }
+  }
+  return settlements;
 }
 
 /** Cap an amount to not exceed available balance (can't go negative) */
