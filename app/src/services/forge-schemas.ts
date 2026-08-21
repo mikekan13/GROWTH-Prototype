@@ -179,6 +179,20 @@ const forgeTraitDataSchema = z.object({
   category: z.enum(TRAIT_CATEGORIES as unknown as [string, ...string[]]).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
+  // Blossom expiry (Mike ruling 2026-08-21): blossoms are THE
+  // temporary-effects system — blessings, colds, intoxication — and "they
+  // can't be held forever." Expiry is TIME (1 cycle = 1 earth year
+  // baseline) or a TRIGGER condition (prose, adjudicated at the JEWL
+  // layer). REQUIRED for new blossoms (enforced in validateForgeData);
+  // meaningless on nectars/thorns.
+  expiry: z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('time'),
+      amount: z.number().positive(),
+      unit: z.enum(['hours', 'days', 'cycles']),
+    }),
+    z.object({ kind: z.literal('trigger'), text: z.string().min(1).max(300) }),
+  ]).optional(),
   ...blockConditionFields,
   ...maturityFlagsField,
 });
@@ -351,8 +365,16 @@ export function validateForgeData(type: string, data: unknown) {
     case 'skill': return forgeSkillDataSchema.parse(data);
     case 'item': return forgeItemDataSchema.parse(data);
     case 'nectar':
-    case 'blossom':
     case 'thorn': return forgeTraitDataSchema.parse(data);
+    case 'blossom': {
+      const parsed = forgeTraitDataSchema.parse(data);
+      if (!parsed.expiry) {
+        throw new ValidationError(
+          'Blossoms are temporary by law (ruled 2026-08-21) — expiry is required: {kind:"time", amount, unit} or {kind:"trigger", text}.',
+        );
+      }
+      return parsed;
+    }
     case 'spell': return forgeSpellDataSchema.parse(data);
     default: throw new ValidationError(`Unknown forge item type: ${type}`);
   }

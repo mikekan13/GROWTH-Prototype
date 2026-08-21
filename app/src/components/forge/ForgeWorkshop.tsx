@@ -368,7 +368,7 @@ const HANDLED_KEYS = new Set([
   'school', 'schools', 'dr', 'manaCost', 'castingMethod', 'betaDraft', 'source',
   'attributes', 'skills', 'nectars', 'thorns', 'requirements', 'seedRequirement',
   'itemAbilities', 'contains', 'frequency', 'subordinateMaterials', 'value', 'notes',
-  'requires', 'restricted', 'maturityFlags',
+  'requires', 'restricted', 'maturityFlags', 'expiry',
 ]);
 
 const CONDITION_NAMES = ['Destroyed', 'Broken', 'Worn', 'Undamaged', 'Indestructible'];
@@ -445,6 +445,13 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
     facts.push({ label: `condition ${data.condition} · ${CONDITION_NAMES[data.condition] ?? '?'}` });
   } else if (typeof data.condition === 'string') {
     facts.push({ label: data.condition });
+  }
+  // Blossom expiry (ruled 2026-08-21: temporary by law — time or trigger)
+  const expiry = data.expiry as { kind?: string; amount?: number; unit?: string; text?: string } | undefined;
+  if (expiry?.kind === 'time' && expiry.amount != null) {
+    facts.push({ label: `expires: ${expiry.amount} ${expiry.unit ?? ''}`.trim(), color: '#D0A030' });
+  } else if (expiry?.kind === 'trigger' && expiry.text) {
+    facts.push({ label: `expires when: ${expiry.text}`, color: '#D0A030' });
   }
   // Spell facts (schema r-2026-07-23-01)
   if (typeof data.school === 'string') facts.push({ label: data.school, color: '#8e7cc3' });
