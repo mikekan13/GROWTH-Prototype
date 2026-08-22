@@ -34,16 +34,27 @@ const BREATHER_MS = 4_000;
  *  yields to the GM. Not a budget cap — a "nothing actionable" detector;
  *  in a WORK session a cycle with no action means the job needs input. */
 const STALL_CYCLES = 3;
+/** Consecutive DISPATCH CRASHES (provider down, out of credits, context
+ *  blowout) before the session auto-blocks with the real error instead of
+ *  burning cycles against a dead API (found live 2026-08-21: out-of-credit
+ *  400s racked six silent cycles). */
+const MAX_DISPATCH_FAILURES = 3;
 
 interface WorkLoopState {
   running: boolean;
   /** sessionId → consecutive cycles with zero tool calls. */
   stalls: Map<string, number>;
+  /** sessionId → consecutive dispatch crashes. */
+  dispatchFailures: Map<string, number>;
 }
 
 const g = globalThis as unknown as { __dayaWorkLoop?: WorkLoopState };
 if (!g.__dayaWorkLoop) {
-  g.__dayaWorkLoop = { running: false, stalls: new Map() };
+  g.__dayaWorkLoop = { running: false, stalls: new Map(), dispatchFailures: new Map() };
+}
+if (!g.__dayaWorkLoop.dispatchFailures) {
+  // HMR-survivor state from before this field existed.
+  g.__dayaWorkLoop.dispatchFailures = new Map();
 }
 const state = g.__dayaWorkLoop!;
 
@@ -108,14 +119,36 @@ async function runCycle(session: {
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
   const { dispatchPrompt } = await import('./runtime');
-  const response = await dispatchPrompt({
-    source: 'JEWL_WORK_CYCLE',
-    campaignId: session.campaignId,
-    actorId: jewl.characterUserId,
-    actorName: 'JEWL',
-    actorRole: 'GODHEAD',
-    text,
-  });
+  let response;
+  try {
+    response = await dispatchPrompt({
+      source: 'JEWL_WORK_CYCLE',
+      campaignId: session.campaignId,
+      actorId: jewl.characterUserId,
+      actorName: 'JEWL',
+      actorRole: 'GODHEAD',
+      text,
+    });
+    state.dispatchFailures.delete(session.id);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const fails = (state.dispatchFailures.get(session.id) ?? 0) + 1;
+    state.dispatchFailures.set(session.id, fails);
+    // eslint-disable-next-line no-console
+    console.error(`[daya-work-loop] dispatch failed (${fails}/${MAX_DISPATCH_FAILURES}) for ${session.id}: ${msg.slice(0, 200)}`);
+    if (fails >= MAX_DISPATCH_FAILURES) {
+      state.dispatchFailures.delete(session.id);
+      try {
+        await updateWorkSession({
+          sessionId: session.id,
+          status: 'blocked',
+          blockedReason: `AI provider failing — ${msg.slice(0, 240)}`,
+          progressNote: '[system] auto-blocked: repeated dispatch failures (provider down or out of credits)',
+        });
+      } catch { /* session may have been closed mid-cycle */ }
+    }
+    return; // never rethrow — one sick session must not kill the loop
+  }
 
   // Stall detection — "nothing actionable" yields to the GM.
   if (response.toolCalls.length > 0) {
