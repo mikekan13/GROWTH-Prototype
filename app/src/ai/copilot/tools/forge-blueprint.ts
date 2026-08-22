@@ -142,17 +142,33 @@ export const proposeForgeBlueprintTool: JewlTool = {
       },
     });
 
-    // Submit to Kai via the godhead dispatcher. In dev (DISPATCHER_ENABLED
-    // off) this just enqueues a PENDING GodHeadInvocation for replay /
-    // observability. In prod the dispatcher routes to Kai's agent runtime.
-    const dispatchResult = await emit('blueprint.submitted', {
-      forgeItemId: item.id,
-      type: item.type,
-      name: item.name,
-      campaignId: item.campaignId,
-      proposedBy: 'JEWL',
-      proposingGodHeadId: jewl.godHeadId,
-    });
+    // Chain submission is a PAID step (godhead evaluation costs KRMA), so
+    // it's opt-in per campaign (Mike 2026-08-21): aiSettings.forge
+    // .autoChainSubmit === true enables auto-dispatch to Kai. Default OFF —
+    // drafts sit with their formula price and the GM decides what's worth
+    // the chain's fee.
+    let autoChainSubmit = false;
+    try {
+      const campaignSettings = await prisma.campaign.findUnique({
+        where: { id: campaignId },
+        select: { aiSettings: true },
+      });
+      if (campaignSettings?.aiSettings) {
+        const parsed = JSON.parse(campaignSettings.aiSettings) as { forge?: { autoChainSubmit?: boolean } };
+        autoChainSubmit = parsed.forge?.autoChainSubmit === true;
+      }
+    } catch { /* malformed settings → default off */ }
+
+    const dispatchResult = autoChainSubmit
+      ? await emit('blueprint.submitted', {
+          forgeItemId: item.id,
+          type: item.type,
+          name: item.name,
+          campaignId: item.campaignId,
+          proposedBy: 'JEWL',
+          proposingGodHeadId: jewl.godHeadId,
+        })
+      : { enqueued: 0, skipped: 1 };
 
     return {
       output: {
@@ -166,6 +182,9 @@ export const proposeForgeBlueprintTool: JewlTool = {
         ...(priced ? { suggestedKV: priced.kv, kvBreakdown: priced.breakdown } : {}),
         dispatcherEnqueued: dispatchResult.enqueued,
         dispatcherSkipped: dispatchResult.skipped,
+        ...(autoChainSubmit ? {} : {
+          chainSubmission: 'deferred — auto chain submission is off for this campaign (it costs KRMA); the draft carries the formula price and awaits the GM',
+        }),
       },
     };
   },
