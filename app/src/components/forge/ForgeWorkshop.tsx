@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ function seedTraitRefs(value: unknown): Array<{ name: string; kv: number | null 
     .filter(t => t.name);
 }
 
-function SeedDetail({ data, kv }: { data: Record<string, unknown>; kv: number | null }) {
+function SeedDetail({ data, kv, traitLookup = {} }: { data: Record<string, unknown>; kv: number | null; traitLookup?: Record<string, TraitInfo> }) {
   const attrs = data.attributes as Record<string, number> | undefined;
   const skills = traitNames(data.skills);
   const nectarRefs = seedTraitRefs(data.nectars);
@@ -157,14 +158,10 @@ function SeedDetail({ data, kv }: { data: Record<string, unknown>; kv: number | 
           </div>
           <div className="flex flex-wrap gap-1.5">
             {nectarRefs.map(n => (
-              <span key={n.name} className="text-[10px] px-1.5 py-0.5 font-[Consolas,monospace]" style={{ color: '#3EB89A', backgroundColor: '#3EB89A12', border: '1px solid #3EB89A35' }}>
-                {n.name}{n.kv != null ? ` +${Math.abs(n.kv)}` : ' (ungraded)'}
-              </span>
+              <TraitRefChip key={n.name} name={n.name} kind="nectar" kv={n.kv} info={traitLookup[n.name.toLowerCase()]} />
             ))}
             {thornRefs.map(t => (
-              <span key={t.name} className="text-[10px] px-1.5 py-0.5 font-[Consolas,monospace]" style={{ color: '#E8585A', backgroundColor: '#E8585A12', border: '1px solid #E8585A35' }}>
-                {t.name}{t.kv != null ? ` −${Math.abs(t.kv)}` : ' (ungraded lien)'}
-              </span>
+              <TraitRefChip key={t.name} name={t.name} kind="thorn" kv={t.kv} info={traitLookup[t.name.toLowerCase()]} />
             ))}
           </div>
         </div>
@@ -237,20 +234,84 @@ function Chip({ children, color = '#aaa' }: { children: React.ReactNode; color?:
   );
 }
 
-/** {"willpower":2,"wisdom":1} → "+2 Willpower  +1 Wisdom" pillar-colored chips. */
-function AttributeMods({ mods, label = 'Attributes' }: { mods: Record<string, number>; label?: string }) {
-  const entries = Object.entries(mods).filter(([, v]) => typeof v === 'number' && v !== 0);
-  if (entries.length === 0) return null;
+/** Full attribute grid — ALL eight numbers visible (Mike 2026-08-21:
+ *  "I should be able to see the numbers for all attributes"), zeros
+ *  dimmed, pillar-colored, matching the seed grid's layout. `signed`
+ *  renders +N (augs/mods); unsigned renders plain levels. */
+const ATTR_GRID_KEYS = ['clout', 'celerity', 'constitution', 'flow', 'focus', 'willpower', 'wisdom', 'wit'];
+
+function AttributeMods({ mods, label = 'Attributes', signed = true }: { mods: Record<string, number>; label?: string; signed?: boolean }) {
+  const extras = Object.entries(mods).filter(([k, v]) => !ATTR_GRID_KEYS.includes(k.toLowerCase()) && typeof v === 'number' && v !== 0);
   return (
     <div>
       <SectionLabel>{label}</SectionLabel>
-      <div className="flex flex-wrap gap-1.5">
-        {entries.map(([k, v]) => {
+      <div className="grid grid-cols-3 gap-x-4 gap-y-0.5" style={{ maxWidth: 300 }}>
+        {ATTR_GRID_KEYS.map(k => {
+          const v = mods[k] ?? mods[k.toUpperCase()] ?? 0;
           const meta = attrMeta(k);
-          return <Chip key={k} color={meta.color}>{v > 0 ? `+${v}` : v} {meta.label}</Chip>;
+          return (
+            <div key={k} className="flex justify-between text-[11px] font-[Consolas,monospace]">
+              <span style={{ color: meta.color }}>{meta.label.slice(0, 3).toUpperCase()}</span>
+              <span style={{ color: v !== 0 ? '#ccc' : '#555' }}>
+                {v > 0 && signed ? `+${v}` : v}
+              </span>
+            </div>
+          );
+        })}
+        {extras.map(([k, v]) => {
+          const meta = attrMeta(k);
+          return (
+            <div key={k} className="flex justify-between text-[11px] font-[Consolas,monospace]">
+              <span style={{ color: meta.color }}>{meta.label.slice(0, 3).toUpperCase()}</span>
+              <span style={{ color: '#ccc' }}>{v > 0 && signed ? `+${v}` : v}</span>
+            </div>
+          );
         })}
       </div>
     </div>
+  );
+}
+
+/** Resolved trait info for popup display (fetched from campaign+global catalogs). */
+interface TraitInfo {
+  name: string;
+  type: string;
+  kv: number | null;
+  description?: string;
+  mechanicalEffect?: string;
+  pillar?: string;
+  category?: string;
+}
+
+/** A referenced nectar/thorn chip that pops the FULL trait via the house
+ *  dynamic-popup system (Mike 2026-08-21: "utilize our dynamic popup
+ *  system... especially for things like Nectars added from a root"). */
+function TraitRefChip({ name, kind, kv, info }: { name: string; kind: 'nectar' | 'thorn'; kv?: number | null; info?: TraitInfo }) {
+  const color = kind === 'nectar' ? '#3EB89A' : '#E8585A';
+  const grade = kv ?? info?.kv ?? null;
+  const chip = (
+    <span
+      className="text-[10px] px-1.5 py-0.5 font-[Consolas,monospace] cursor-help"
+      style={{ color, backgroundColor: `${color}12`, border: `1px solid ${color}35` }}
+    >
+      {name}{grade != null ? ` ${kind === 'thorn' ? '−' : '+'}${Math.abs(grade)}` : ''}
+    </span>
+  );
+  return (
+    <ComplexTooltip
+      title={`${kind === 'nectar' ? '✦' : '✧'} ${name}`}
+      modifiers={info ? [
+        ...(info.description ? [{ name: info.description, value: 0 }] : []),
+        ...(info.mechanicalEffect ? [{ name: info.mechanicalEffect, value: 0 }] : []),
+        ...(info.pillar ? [{ name: `Pillar: ${info.pillar}`, value: 0 }] : []),
+        ...(info.category ? [{ name: `Category: ${info.category}`, value: 0 }] : []),
+      ] : [
+        { name: 'Not found in this campaign or the global catalog — the block references a trait that does not exist yet.', value: 0 },
+      ]}
+      totalValue={grade ?? 0}
+    >
+      {chip}
+    </ComplexTooltip>
   );
 }
 
@@ -387,8 +448,8 @@ function describeBlockCondition(c: Record<string, unknown>): string {
 }
 const ARMOR_MULT: Record<string, number> = { Clothing: 0.5, Light: 1, Heavy: 1.5 };
 
-function BlockDetail({ type, data, kv }: { type: string; data: Record<string, unknown>; kv: number | null }) {
-  if (type === 'seed') return <SeedDetail data={data} kv={kv} />;
+function BlockDetail({ type, data, kv, traitLookup = {} }: { type: string; data: Record<string, unknown>; kv: number | null; traitLookup?: Record<string, TraitInfo> }) {
+  if (type === 'seed') return <SeedDetail data={data} kv={kv} traitLookup={traitLookup} />;
 
   const proposalNote = data._proposalNote as string | undefined;
   const description = data.description as string | undefined;
@@ -498,6 +559,7 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
           <AttributeMods
             mods={attrs}
             label={type === 'root' || type === 'branch' ? 'Attribute Levels (1 KRMA each)' : 'Attributes'}
+            signed={false}
           />
         ) : null;
       })()}
@@ -510,7 +572,9 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
             <div>
               <SectionLabel color="#3EB89A">Nectars</SectionLabel>
               <div className="flex flex-wrap gap-1.5">
-                {traitNames(data.nectars).map(n => <Chip key={n} color="#3EB89A">{n}</Chip>)}
+                {seedTraitRefs(data.nectars).map(n => (
+                  <TraitRefChip key={n.name} name={n.name} kind="nectar" kv={n.kv} info={traitLookup[n.name.toLowerCase()]} />
+                ))}
               </div>
             </div>
           )}
@@ -518,7 +582,9 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
             <div>
               <SectionLabel color="#E8585A">Thorns (liens)</SectionLabel>
               <div className="flex flex-wrap gap-1.5">
-                {traitNames(data.thorns).map(t => <Chip key={t} color="#E8585A">{t}</Chip>)}
+                {seedTraitRefs(data.thorns).map(t => (
+                  <TraitRefChip key={t.name} name={t.name} kind="thorn" kv={t.kv} info={traitLookup[t.name.toLowerCase()]} />
+                ))}
               </div>
             </div>
           )}
@@ -756,6 +822,40 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
   const [creating, setCreating] = useState(false);
 
   const typeConfig = BLOCK_TYPES.find(t => t.key === activeType)!;
+
+  // Trait lookup for the dynamic popups on referenced nectars/thorns
+  // (Mike 2026-08-21). Campaign entries override global; keyed by lowercase
+  // name. Fetched once per block-type visit, best-effort.
+  const [traitLookup, setTraitLookup] = useState<Record<string, TraitInfo>>({});
+  useEffect(() => {
+    if (!['seed', 'root', 'branch'].includes(activeType)) return;
+    let alive = true;
+    (async () => {
+      const results: Record<string, TraitInfo> = {};
+      for (const scope of ['&global=true', '']) {
+        for (const t of ['nectar', 'thorn', 'blossom']) {
+          try {
+            const r = await fetch(`/api/campaigns/${campaignId}/forge?type=${t}${scope}`);
+            if (!r.ok) continue;
+            const d = await r.json();
+            for (const it of (d.items || []) as Blueprint[]) {
+              results[it.name.toLowerCase()] = {
+                name: it.name,
+                type: it.type,
+                kv: it.karmicValue ?? null,
+                description: typeof it.data?.description === 'string' ? it.data.description : undefined,
+                mechanicalEffect: typeof it.data?.mechanicalEffect === 'string' ? it.data.mechanicalEffect : undefined,
+                pillar: typeof it.data?.pillar === 'string' ? it.data.pillar : undefined,
+                category: typeof it.data?.category === 'string' ? it.data.category : undefined,
+              };
+            }
+          } catch { /* popup data is best-effort */ }
+        }
+      }
+      if (alive) setTraitLookup(results);
+    })();
+    return () => { alive = false; };
+  }, [campaignId, activeType]);
 
   // ── Fetch campaign items ────────────────────────────────────────────────
 
@@ -1034,7 +1134,7 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
               )}
 
               {/* Type-specific detail */}
-              <BlockDetail type={activeType} data={selected.data} kv={selected.karmicValue ?? null} />
+              <BlockDetail type={activeType} data={selected.data} kv={selected.karmicValue ?? null} traitLookup={traitLookup} />
 
               {/* Chain grade — Kai's evaluation (or the pre-Kai formula price
                   on JEWL drafts). The chain's numbers are the law; a draft's
