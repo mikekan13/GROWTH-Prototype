@@ -309,6 +309,8 @@ function TraitRefChip({ name, kind, kv, info }: { name: string; kind: 'nectar' |
         { name: 'Not found in this campaign or the global catalog — the block references a trait that does not exist yet.', value: 0 },
       ]}
       totalValue={grade ?? 0}
+      totalLabel="KV:"
+      totalText={grade != null ? `${kind === 'thorn' ? '−' : '+'}${Math.abs(grade)}` : 'ungraded'}
     >
       {chip}
     </ComplexTooltip>

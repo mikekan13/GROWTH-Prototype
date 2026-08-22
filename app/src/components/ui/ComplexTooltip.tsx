@@ -23,6 +23,11 @@ interface ComplexTooltipProps {
   modifiers: TooltipModifier[];
   totalValue: number;
   disabled?: boolean;
+  /** Footer label. Default 'Total:' ('Max Pool:' when currentValue set).
+   *  Trait popups pass 'KV:' (Mike 2026-08-21). */
+  totalLabel?: string;
+  /** Override the footer VALUE text (e.g. 'ungraded' when there is no number). */
+  totalText?: string;
 }
 
 export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
@@ -33,6 +38,8 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   modifiers,
   totalValue,
   disabled = false,
+  totalLabel,
+  totalText,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -167,9 +174,13 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
         {mod.source && <span className="text-yellow-500" style={{ fontSize: '8px' }}>&#x25B6;</span>}
         {mod.name}
       </span>
-      <span className={`font-bold ${mod.value > 0 ? 'text-green-400' : mod.value < 0 ? 'text-red-400' : 'text-gray-400'}`}>
-        {mod.value > 0 ? '+' : ''}{mod.value}
-      </span>
+      {/* value 0 = an INFO row (description, rule text...) — a "0" on the
+          right is noise (Mike 2026-08-21). Numbers only when they mean one. */}
+      {mod.value !== 0 && (
+        <span className={`font-bold ${mod.value > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          {mod.value > 0 ? '+' : ''}{mod.value}
+        </span>
+      )}
     </div>
   );
 
@@ -268,19 +279,15 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
               </div>
             )}
 
-            {/* No augments - flat display for non-attribute tooltips */}
-            {!hasAugments && baseValue === undefined && modifiers.length > 0 && (
-              <div className="space-y-0.5 mb-2">
-                {modifiers.map((mod, i) => renderModifier(mod, i))}
-              </div>
-            )}
+            {/* (Legacy flat block removed 2026-08-21 — it double-rendered
+                every row of info-only tooltips alongside the neutral block.) */}
 
             {/* Total / Max */}
             <div className="flex justify-between text-sm font-bold border-t border-yellow-600/40 pt-2">
               <span className="text-yellow-400" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.03em' }}>
-                {currentValue !== undefined ? 'Max Pool:' : 'Total:'}
+                {totalLabel ?? (currentValue !== undefined ? 'Max Pool:' : 'Total:')}
               </span>
-              <span className="text-white">{totalValue}</span>
+              <span className="text-white">{totalText ?? totalValue}</span>
             </div>
           </div>
         </div>,
