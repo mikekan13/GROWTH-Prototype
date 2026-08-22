@@ -464,16 +464,6 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
 
   return (
     <div className="space-y-4">
-      {/* ✎ Why this exists — JEWL's pitch to the GM, first thing read. */}
-      {proposalNote && (
-        <div className="p-2.5" style={{ backgroundColor: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.25)' }}>
-          <SectionLabel color="rgba(255,204,120,0.7)">✎ Proposed because</SectionLabel>
-          <p className="text-[12px] font-[Consolas,monospace] leading-relaxed" style={{ color: 'rgba(255,204,120,0.85)' }}>
-            {proposalNote}
-          </p>
-        </div>
-      )}
-
       {description && (
         <p className="text-[12px] text-white/70 font-[Consolas,monospace] leading-relaxed">{description}</p>
       )}
@@ -592,6 +582,17 @@ function BlockDetail({ type, data, kv }: { type: string; data: Record<string, un
 
       {typeof data.notes === 'string' && data.notes && (
         <p className="text-[10px] text-white/35 font-[Consolas,monospace]">{data.notes}</p>
+      )}
+
+      {/* ✎ Proposer's note — AFTER the mechanics (review order: what it IS,
+          what it DOES, then why it's proposed — Mike 2026-08-21). */}
+      {proposalNote && (
+        <div className="p-2.5" style={{ backgroundColor: 'rgba(255,204,120,0.06)', border: '1px solid rgba(255,204,120,0.25)' }}>
+          <SectionLabel color="rgba(255,204,120,0.7)">✎ Proposer&apos;s note</SectionLabel>
+          <p className="text-[12px] font-[Consolas,monospace] leading-relaxed" style={{ color: 'rgba(255,204,120,0.85)' }}>
+            {proposalNote}
+          </p>
+        </div>
       )}
 
       {/* Weapon attacks (item-fields canon: named attacks, each with target attribute) */}
@@ -1043,13 +1044,16 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
                 if (!ev) return null;
                 const isKai = ev.evaluator === 'Kai';
                 return (
-                  <div className="p-2.5" style={{ backgroundColor: 'rgba(34,171,148,0.05)', border: '1px solid rgba(34,171,148,0.25)' }}>
-                    <div className="text-[9px] uppercase tracking-[0.2em] font-[Consolas,monospace] mb-1" style={{ color: 'rgba(34,171,148,0.7)' }}>
-                      {isKai ? "Kai's grade" : 'Formula price (awaiting Kai)'}
-                      {ev.score != null && <span> · balance {ev.score}/10</span>}
-                      {ev.price != null && <span> · KV {ev.price}</span>}
-                    </div>
-                    {ev.reason && <div className="text-[10px] text-white/50 font-[Consolas,monospace]">{ev.reason}</div>}
+                  <details className="p-2.5" style={{ backgroundColor: 'rgba(34,171,148,0.05)', border: '1px solid rgba(34,171,148,0.25)' }}>
+                    <summary className="cursor-pointer text-[9px] uppercase tracking-[0.2em] font-[Consolas,monospace]" style={{ color: 'rgba(34,171,148,0.7)', listStyle: 'none' }}>
+                      {/* Plain words (Mike 2026-08-21): one line says where the
+                          number came from; the math is a click away. */}
+                      {isKai
+                        ? `Priced by the chain · KV ${ev.price ?? '?'}${ev.score != null ? ` · balance ${ev.score}/10` : ''}`
+                        : `Suggested price · KV ${ev.price ?? '?'} (chain not run — costs KRMA)`}
+                      <span className="text-white/25"> · math ▾</span>
+                    </summary>
+                    {ev.reason && <div className="mt-1 text-[10px] text-white/50 font-[Consolas,monospace]">{ev.reason}</div>}
                     {Array.isArray(ev.breakdown) && ev.breakdown.length > 0 && (
                       <div className="mt-1 space-y-0.5">
                         {ev.breakdown.map((line, i) => (
@@ -1058,7 +1062,7 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
                       </div>
                     )}
                     {ev.notes && <div className="mt-1 text-[10px] italic text-white/40 font-[Consolas,monospace]">{ev.notes}</div>}
-                  </div>
+                  </details>
                 );
               })()}
 
