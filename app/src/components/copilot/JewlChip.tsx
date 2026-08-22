@@ -421,7 +421,15 @@ export function JewlChip() {
             const seen = new Set(prev.map(m => m.id));
             const additions = fetched.filter(m => !seen.has(m.id));
             if (additions.length === 0) return prev;
-            return [...prev, ...additions];
+            // The server persists the user prompt at dispatch START, so the
+            // poll can fetch it (real CUID) while the optimistic temp- row is
+            // still on screen waiting for the long reply — that was the
+            // double-message bug (Mike 2026-08-21). When a persisted copy
+            // arrives, drop the matching temp row.
+            const withoutEchoedTemps = prev.filter(m =>
+              !(m.id.startsWith('temp-') &&
+                additions.some(a => a.role === m.role && a.content === m.content)));
+            return [...withoutEchoedTemps, ...additions];
           });
         }
         if (mr.ok) {
@@ -1241,36 +1249,54 @@ export function JewlChip() {
                       </div>
                     )}
                     {m.content}
+                    {/* Collapsed by default (Mike 2026-08-21): the action log
+                        is a click away, never a wall in the chat. Errors are
+                        flagged in the summary so failures stay visible. */}
                     {toolCalls && toolCalls.length > 0 && (
-                      <div
+                      <details
                         style={{
                           marginTop: 6,
                           paddingTop: 6,
                           borderTop: '1px dashed rgba(208, 160, 48, 0.2)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 3,
                         }}
                       >
-                        {toolCalls.map((tc, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              fontSize: 9,
-                              color: tc.error
-                                ? 'rgba(231, 76, 60, 0.85)'
-                                : 'rgba(208, 160, 48, 0.75)',
-                              fontFamily: 'Consolas, monospace',
-                            }}
-                          >
-                            {tc.error ? '✗' : '→'} {tc.name}
-                            {tc.input ? `(${Object.entries(tc.input)
-                              .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-                              .join(', ')})` : '()'}
-                            {tc.error ? ` — ${tc.error}` : ''}
-                          </div>
-                        ))}
-                      </div>
+                        <summary
+                          style={{
+                            cursor: 'pointer',
+                            fontSize: 9,
+                            fontFamily: 'Consolas, monospace',
+                            color: toolCalls.some(tc => tc.error)
+                              ? 'rgba(231, 76, 60, 0.85)'
+                              : 'rgba(208, 160, 48, 0.55)',
+                            listStyle: 'none',
+                          }}
+                        >
+                          ⚙ {toolCalls.length} action{toolCalls.length === 1 ? '' : 's'}
+                          {toolCalls.some(tc => tc.error)
+                            ? ` · ${toolCalls.filter(tc => tc.error).length} failed`
+                            : ''}
+                        </summary>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
+                          {toolCalls.map((tc, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: 9,
+                                color: tc.error
+                                  ? 'rgba(231, 76, 60, 0.85)'
+                                  : 'rgba(208, 160, 48, 0.75)',
+                                fontFamily: 'Consolas, monospace',
+                              }}
+                            >
+                              {tc.error ? '✗' : '→'} {tc.name}
+                              {tc.input ? `(${Object.entries(tc.input)
+                                .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+                                .join(', ')})` : '()'}
+                              {tc.error ? ` — ${tc.error}` : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     )}
                     {/* Mistake-bounty: flag affordance on persisted assistant
                         messages. Temp ids (temp-/resp-/err-) get skipped — they
@@ -1483,7 +1509,12 @@ export function JewlChip() {
                 <span
                   style={{ animation: 'jewlchip-pulse 1.4s ease-in-out infinite' }}
                 >
-                  {loading ? 'Thinking...' : 'Reasoning on what you said...'}
+                  {/* Snappy ack (Mike 2026-08-21): instant "On it", then the
+                      live jewl_working tick narrates what he's actually doing
+                      tool-by-tool until the real reply replaces this bubble. */}
+                  {loading
+                    ? (nowTick?.label ? `On it — ${nowTick.label}` : 'On it.')
+                    : 'Reasoning on what you said...'}
                 </span>
               </div>
             )}

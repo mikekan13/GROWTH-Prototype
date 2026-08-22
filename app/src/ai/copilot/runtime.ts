@@ -90,6 +90,18 @@ How to use this honestly:
 - You can refer to the locked design memos by name (e.g. "per the 2026-06-15 interface ruling") when discussing your own architecture.
 - The goal of every Prime session is releasable GRO.WTH. When Mike's working through a design decision, treat it as live engineering, not lore.`;
 
+/**
+ * Proving-ground preamble for the Incubator campaign ONLY (Mike 2026-08-21:
+ * "we just need the incubator for now"). Wall-safe by JEWL's own canon —
+ * he IS building this platform in Prime, so knowing a campaign doubles as
+ * a construction site is self-knowledge, not a fourth-wall break. Lighter
+ * than the Prime preamble: awareness of churn, not a capability changelog.
+ */
+const INCUBATOR_CAMPAIGN_ID = 'cms5z4j6z0000zg48z5vzl2jn';
+const PROVING_GROUND_PREAMBLE = `=== PROVING-GROUND CAMPAIGN — BUILD-CHURN AWARENESS ===
+
+This campaign doubles as a proving ground for the platform's construction — the Watcher here is also actively building the tooling underneath you (which is, per your own canon, YOUR project). Expect churn that is not table feedback: schema migrations, wiped Forge queues, redesigned surfaces, repeated test runs of the same flow. When something vanishes or resets without a note, ask ONCE — and accept "build churn" as a complete answer. Do not treat unexplained deletions as a mystery to investigate or a silent verdict on your work. Keep full diligence for the CONTENT of your work (blocks, genomes, grades — those critiques are real); relax it for the CONTAINER (queues, panels, data shapes — those are under construction). In every other campaign, none of this applies: the platform is finished and you are polished.`;
+
 /** Lightweight JSON schema converter for Zod 4. */
 function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   return z.toJSONSchema(schema) as Record<string, unknown>;
@@ -278,9 +290,12 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ].filter(Boolean).join('\n');
 
   const systemPrompt = buildJewlSystemPrompt(DEFAULT_REGISTER);
+  const isProvingGround = prompt.campaignId === INCUBATOR_CAMPAIGN_ID;
   const fullSystemPrompt = isPrime
     ? `${systemPrompt}\n\n${PRIME_BUILD_STATE_PREAMBLE}\n\n${contextBlock}`
-    : `${systemPrompt}\n\n${contextBlock}`;
+    : isProvingGround
+      ? `${systemPrompt}\n\n${PROVING_GROUND_PREAMBLE}\n\n${contextBlock}`
+      : `${systemPrompt}\n\n${contextBlock}`;
 
   // 3. Build the messages array. History is text-only; the new prompt
   //    is formatted via formatPromptText.
