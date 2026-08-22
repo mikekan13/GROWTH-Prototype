@@ -41,7 +41,14 @@ export type ClaudeContentBlock =
 export interface ClaudeToolUseResult {
   stopReason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | string;
   blocks: ClaudeContentBlock[];
-  usage: { inputTokens: number; outputTokens: number };
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    /** Prompt-cache stats (2026-08-22 cost fix): cache reads bill at 10%
+     *  of input price. inputTokens here counts only UNCACHED input. */
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
 }
 
 let cachedClient: Anthropic | null = null;
@@ -75,21 +82,44 @@ export async function callClaudeWithTools(
   // godhead-deep-reasoning tier that gets Opus. Override via env if needed.
   const model = opts.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
+  // PROMPT CACHING (2026-08-22 — the credit burn was 3.78M input tokens in
+  // 73 dispatches, avg 52K/dispatch, because every tool-loop round resent
+  // the full prefix at full price). Two ephemeral breakpoints:
+  //   1. The system block — tools + system are byte-identical every round
+  //      AND across work cycles (4s apart), so this prefix is nearly always
+  //      a 90%-discount cache read.
+  //   2. The last block of the last message — a moving breakpoint: each
+  //      round's new tail becomes the next round's cached prefix, so a
+  //      10-round dispatch pays full price for each token roughly ONCE.
+  const lastIdx = opts.messages.length - 1;
+  const messagesWithCache = opts.messages.map((m, mi) => {
+    if (mi !== lastIdx || m.content.length === 0) {
+      return { role: m.role, content: m.content as unknown as Anthropic.Messages.MessageParam['content'] };
+    }
+    const content = m.content.map((block, bi) =>
+      bi === m.content.length - 1
+        ? { ...block, cache_control: { type: 'ephemeral' as const } }
+        : block,
+    );
+    return { role: m.role, content: content as unknown as Anthropic.Messages.MessageParam['content'] };
+  });
+
   const response = await client.messages.create(
     {
       model,
       max_tokens: opts.maxTokens ?? 2048,
       temperature: opts.temperature ?? 0.7,
-      system: opts.systemPrompt,
+      system: [{
+        type: 'text' as const,
+        text: opts.systemPrompt,
+        cache_control: { type: 'ephemeral' as const },
+      }],
       tools: opts.tools.map(t => ({
         name: t.name,
         description: t.description,
         input_schema: t.inputSchema as Anthropic.Messages.Tool['input_schema'],
       })),
-      messages: opts.messages.map(m => ({
-        role: m.role,
-        content: m.content as unknown as Anthropic.Messages.MessageParam['content'],
-      })),
+      messages: messagesWithCache,
     },
     {
       // Explicit per-request timeout: large-max_tokens non-streaming calls
@@ -106,6 +136,8 @@ export async function callClaudeWithTools(
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
     },
   };
 }

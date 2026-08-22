@@ -330,6 +330,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   let finalText = '';
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCacheReadTokens = 0;
+  let totalCacheWriteTokens = 0;
   let model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
   // F-2 construction-site feedback: surfaces (the canvas) show "JEWL is
@@ -359,6 +361,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     });
     totalInputTokens += result.usage.inputTokens;
     totalOutputTokens += result.usage.outputTokens;
+    totalCacheReadTokens += result.usage.cacheReadTokens;
+    totalCacheWriteTokens += result.usage.cacheWriteTokens;
 
     // Collect text + tool_use blocks from this round.
     const textBlocks: string[] = [];
@@ -475,6 +479,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       model,
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
+      cacheReadTokens: totalCacheReadTokens,
+      cacheWriteTokens: totalCacheWriteTokens,
     },
   };
 
