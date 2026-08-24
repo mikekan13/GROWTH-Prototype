@@ -17,6 +17,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
+import { recordAiCall } from '@/ai/network';
 
 export type DayaTier = 'L1' | 'L2' | 'C';
 
@@ -101,11 +102,16 @@ export interface AnthropicLike {
       model: string;
       max_tokens: number;
       temperature?: number;
-      system?: string;
+      system?: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }>;
       messages: Array<{ role: 'user' | 'assistant'; content: string }>;
     }) => Promise<{
       content: Array<{ type: string; text?: string }>;
-      usage: { input_tokens: number; output_tokens: number };
+      usage: {
+        input_tokens: number;
+        output_tokens: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+      };
     }>;
   };
 }
@@ -272,7 +278,7 @@ export async function callOpenAiCompatible(
 async function callAnthropic(
   params: DayaChatParams,
   client: AnthropicLike | undefined,
-): Promise<{ text: string; tokensIn: number; tokensOut: number; model: string }> {
+): Promise<{ text: string; tokensIn: number; tokensOut: number; cacheRead: number; cacheWrite: number; model: string }> {
   if (!client && !process.env.ANTHROPIC_API_KEY) {
     throw new DayaTierUnavailableError(params.tier, 'ANTHROPIC_API_KEY not configured');
   }
@@ -287,7 +293,11 @@ async function callAnthropic(
     model,
     max_tokens: params.maxTokens ?? 1024,
     temperature: params.temperature ?? 0.7,
-    system: system || undefined,
+    // Prompt caching (2026-08-23 network build): DAYA's Claude consults were
+    // the one path still paying full price for stable system prefixes.
+    system: system
+      ? [{ type: 'text' as const, text: system, cache_control: { type: 'ephemeral' as const } }]
+      : undefined,
     messages: nonSystem,
   });
 
@@ -300,6 +310,8 @@ async function callAnthropic(
     text,
     tokensIn: response.usage.input_tokens,
     tokensOut: response.usage.output_tokens,
+    cacheRead: response.usage.cache_read_input_tokens ?? 0,
+    cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
     model,
   };
 }
@@ -317,12 +329,25 @@ export async function chat(
 ): Promise<DayaChatResult> {
   const fetchImpl: DayaFetch = overrides.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as Promise<DayaFetchResponse>);
 
-  const { text, tokensIn, tokensOut, model } =
-    params.tier === 'C' || tierProvider(params.tier) === 'anthropic'
-      ? await callAnthropic(params, overrides.anthropicClient)
-      : await callOpenAiCompatible(params.tier, params, fetchImpl);
+  const viaAnthropic = params.tier === 'C' || tierProvider(params.tier) === 'anthropic';
+  const { text, tokensIn, tokensOut, model, ...cacheStats } = viaAnthropic
+    ? await callAnthropic(params, overrides.anthropicClient)
+    : { ...(await callOpenAiCompatible(params.tier as 'L1' | 'L2', params, fetchImpl)), cacheRead: 0, cacheWrite: 0 };
+  const cacheRead = cacheStats.cacheRead ?? 0;
+  const cacheWrite = cacheStats.cacheWrite ?? 0;
 
   const usd = estimateUsd(model, tokensIn, tokensOut);
+
+  // Unified ai/network ledger — cache columns + lane rollup that the
+  // DAYA-local DayaModelCall table lacks. Fire-and-forget.
+  recordAiCall({
+    lane: `daya-${params.tier.toLowerCase()}`,
+    provider: viaAnthropic ? 'anthropic' : 'openai-compat',
+    model,
+    caller: `daya:${params.subsystem}`,
+    usage: { inputTokens: tokensIn, outputTokens: tokensOut, cacheReadTokens: cacheRead, cacheWriteTokens: cacheWrite },
+    sanitized: params.sanitized ?? false,
+  });
 
   await prisma.dayaModelCall.create({
     data: {

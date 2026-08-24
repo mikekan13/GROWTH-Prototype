@@ -9,7 +9,9 @@
  */
 
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '@/ai/network/transports/anthropic';
+import { judgmentModel } from '@/ai/network/config';
 
 /** A simplified tool spec the runtime feeds in. */
 export interface ClaudeToolSpec {
@@ -51,15 +53,8 @@ export interface ClaudeToolUseResult {
   };
 }
 
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
-  const baseURL = process.env.ANTHROPIC_API_URL || undefined;
-  cachedClient = new Anthropic({ apiKey, baseURL });
-  return cachedClient;
-}
+// Client is shared with every other Anthropic lane via ai/network.
+const getClient = getAnthropicClient;
 
 export interface CallClaudeWithToolsOptions {
   systemPrompt: string;
@@ -80,7 +75,7 @@ export async function callClaudeWithTools(
   const client = getClient();
   // Default: Sonnet 4.6 — JEWL is copilot tier (tool-use + reasoning), not the
   // godhead-deep-reasoning tier that gets Opus. Override via env if needed.
-  const model = opts.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+  const model = opts.model || judgmentModel();
 
   // PROMPT CACHING (2026-08-22 — the credit burn was 3.78M input tokens in
   // 73 dispatches, avg 52K/dispatch, because every tool-loop round resent

@@ -1087,3 +1087,28 @@ model DayaModelCall {
   @@index([entityId, createdAt])
   @@index([subsystem, tier])
 }
+
+// ai/network unified metering ledger — EVERY lane logs here (JEWL dispatches,
+// classifier, grunt cycles, godhead text, local lane). Cache columns are what
+// DayaModelCall lacks; campaignId is what makes per-GM cost attribution (tier
+// metering, margin tracking) possible. See AI-ECONOMICS-2026-08-23.md §5.
+model AiCall {
+  id               String   @id @default(cuid())
+  lane             String   // judgment | classify | grunt | local | godhead | daya-*
+  provider         String   // anthropic | openai-compat | ollama
+  model            String   // model id actually served
+  caller           String   // jewl-dispatch | classifier | godhead-text | ...
+  campaignId       String?
+  tokensIn         Int      @default(0) // UNCACHED input tokens
+  tokensOut        Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  estUsd           Float    @default(0) // list-price estimate incl. cache rates
+  sanitized        Boolean  @default(false)
+  meta             String?  // JSON: source, rounds, etc.
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([campaignId, createdAt])
+  @@index([lane, createdAt])
+}

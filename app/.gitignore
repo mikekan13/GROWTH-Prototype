@@ -55,3 +55,6 @@ next-env.d.ts
 
 # local-only, user-owned data (T15 client-store stub — Addendum B3, never committed)
 /.local/
+
+# ai/network fine-tune trace corpus (data, not code)
+/traces/

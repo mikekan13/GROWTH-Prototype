@@ -24,31 +24,19 @@
  */
 
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@/lib/db';
 import { dispatchPrompt } from './runtime';
 import type { JewlPrompt } from './prompts/types';
+import { resolveLane, anthropicChatText, recordAiCall } from '@/ai/network';
 
 const CLASSIFIER_MIN_INTERVAL_MS = 1_500;
 const CONTEXT_WINDOW_MS = 90_000; // last 90s of activity feeds the classifier
 const MAX_CONTEXT_MESSAGES = 25;
 
-const CLASSIFIER_MODEL =
-  process.env.ANTHROPIC_CLASSIFIER_MODEL || 'claude-haiku-4-5-20251001';
-
 // In-process throttle keyed by campaign id. Resets when the Next.js process
 // restarts, which is fine — over-firing once during a dev hot reload is
 // cheap. Production with multiple instances will lean on this loosely.
 const lastFireByCampaign = new Map<string, number>();
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
-  cachedClient = new Anthropic({ apiKey, baseURL: process.env.ANTHROPIC_API_URL || undefined });
-  return cachedClient;
-}
 
 export interface ClassifierActorContext {
   campaignId: string;
@@ -221,19 +209,26 @@ async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoni
     'Verdict?',
   ].join('\n');
 
-  const client = getClient();
-  const res = await client.messages.create({
-    model: CLASSIFIER_MODEL,
-    max_tokens: 96,
-    temperature: 0,
+  const laneCfg = resolveLane('classify');
+  const res = await anthropicChatText({
+    model: laneCfg.model,
     system,
+    // The classifier system prompt is stable across fires — cache it so the
+    // 8s-cadence ambient gate reads the prefix at 10% price.
+    cacheSystem: true,
+    maxTokens: 96,
+    temperature: 0,
     messages: [{ role: 'user', content: user }],
   });
-  const text = res.content
-    .filter(b => b.type === 'text')
-    .map(b => (b as { type: 'text'; text: string }).text)
-    .join('')
-    .trim();
+  recordAiCall({
+    lane: 'classify',
+    provider: laneCfg.provider,
+    model: res.model,
+    caller: 'ambient-classifier',
+    campaignId,
+    usage: res.usage,
+  });
+  const text = res.text.trim();
   const lower = text.toLowerCase();
   // Capture the optional reason — everything after the first colon.
   const reasonMatch = text.match(/:\s*(.+)$/);

@@ -46,7 +46,12 @@ function mockAnthropicCapture(responseText = 'Acknowledged.') {
   const client: AnthropicLike = {
     messages: {
       create: async (params) => {
-        calls.push({ model: params.model, system: params.system, messages: params.messages });
+        // system may arrive as cache_control block array (2026-08-23 network
+        // build) — normalize to plain text so assertions keep working.
+        const systemText = typeof params.system === 'string'
+          ? params.system
+          : params.system?.map(b => b.text).join('\n\n');
+        calls.push({ model: params.model, system: systemText, messages: params.messages });
         return {
           content: [{ type: 'text', text: responseText }],
           usage: { input_tokens: 10, output_tokens: 10 },

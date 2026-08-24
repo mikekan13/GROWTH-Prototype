@@ -25,6 +25,7 @@ import {
   type ClaudeToolSpec,
 } from '../providers/claude-tools';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { resolveLane, workCycleLane, recordAiCall, recordTrace } from '@/ai/network';
 
 // System prompt is versioned (T18): src/ai/copilot/prompts/system/
 // v2 encodes the 15 behavioral laws from JEWL_Golden_Voice_Dataset_Seed.md.
@@ -37,6 +38,10 @@ import {
 } from './prompts/system';
 
 const MAX_HISTORY = 20;
+// Work cycles carry their own work-session context — they don't need the
+// full 20-message chat history (credit-burn post-mortem lever #2). Slimmer
+// history = smaller uncached tail per cycle.
+const MAX_HISTORY_WORK_CYCLE = 6;
 // Environment builds (5 locations + a room's worth of items + fact
 // batches) legitimately need many rounds — the model batches multiple
 // tool calls per round, so this bounds API round-trips, not tool count.
@@ -260,12 +265,19 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ]);
   const isPrime = campaignRow?.name === '__PRIME__';
 
+  // Lane resolution (ai/network): work cycles route through workCycleLane()
+  // — 'judgment' (Sonnet) by default, flippable to 'grunt' (Haiku) via
+  // JEWL_WORK_CYCLE_LANE once the cheap lane is proven on cycle chores.
+  const isWorkCycle = prompt.source === 'JEWL_WORK_CYCLE';
+  const lane = isWorkCycle ? workCycleLane() : ('judgment' as const);
+  const resolvedLane = resolveLane(lane);
+
   // 2. Conversation history — now timestamped. Each row carries createdAt
   //    so JEWL can reason about pacing without having to ask.
   const history = await prisma.copilotMessage.findMany({
     where: { campaignId: prompt.campaignId },
     orderBy: { createdAt: 'desc' },
-    take: MAX_HISTORY + 1,
+    take: (isWorkCycle ? MAX_HISTORY_WORK_CYCLE : MAX_HISTORY) + 1,
     select: { role: true, content: true, username: true, createdAt: true },
   });
   const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
@@ -332,7 +344,9 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   let totalOutputTokens = 0;
   let totalCacheReadTokens = 0;
   let totalCacheWriteTokens = 0;
-  let model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+  let model = resolvedLane.model;
+  let rounds = 0;
+  let lastStopReason: string | undefined;
 
   // F-2 construction-site feedback: surfaces (the canvas) show "JEWL is
   // working here" live instead of silence until the reply lands. Best-
@@ -363,6 +377,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     totalOutputTokens += result.usage.outputTokens;
     totalCacheReadTokens += result.usage.cacheReadTokens;
     totalCacheWriteTokens += result.usage.cacheWriteTokens;
+    rounds++;
+    lastStopReason = result.stopReason;
 
     // Collect text + tool_use blocks from this round.
     const textBlocks: string[] = [];
@@ -485,6 +501,45 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   };
 
   await saveAssistantResponse(prompt.campaignId, response);
+
+  // ai/network: unified metering (per-GM cost attribution) + fine-tune trace
+  // capture (Mike 2026-08-23: dev-era dispatches ARE the distillation corpus
+  // for the GROWTH-native local model). Both fire-and-forget.
+  const totalUsage = {
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    cacheReadTokens: totalCacheReadTokens,
+    cacheWriteTokens: totalCacheWriteTokens,
+  };
+  recordAiCall({
+    lane,
+    provider: resolvedLane.provider,
+    model,
+    caller: 'jewl-dispatch',
+    campaignId: prompt.campaignId,
+    usage: totalUsage,
+    meta: { source: prompt.source, rounds, toolCalls: toolCallsMade.length },
+  });
+  recordTrace({
+    caller: 'jewl-dispatch',
+    source: prompt.source,
+    lane,
+    model,
+    campaignId: prompt.campaignId,
+    systemPrompt: fullSystemPrompt,
+    toolNames: tools.map(t => t.name),
+    messages,
+    outcome: {
+      finalText,
+      stopReason: lastStopReason,
+      toolCallCount: toolCallsMade.length,
+      rounds,
+      usage: totalUsage,
+    },
+    // Dev-era JEWL runs trusted-dev privacy (Mike's ruling: the boundary is
+    // player-sensitive DATA); tag rides along so the corpus filter can act.
+    flags: { privacy: 'trusted-dev' },
+  });
 
   return response;
 }
