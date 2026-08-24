@@ -178,6 +178,17 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | useDiceQueue | `hooks/useDiceEvents.ts` | Accumulate roll results in a queue for sequential 3D animation |
 | useCampaignStream | `hooks/useCampaignStream.ts` | SSE connection to campaign stream. Provides: connection status, connected users, typed event subscriptions via `on()` |
 
+## AI — Network Routing Layer (ai/network/) — 2026-08-23
+
+| Module | File | Purpose |
+|--------|------|---------|
+| Config | `ai/network/config.ts` | THE one env surface for every AI lane (judgment/classify/grunt/godhead/local); legacy vars honored as fallbacks |
+| Route | `ai/network/route.ts` | `route(task)` picks lane from task weight + maturity flags + privacy class; `enforceWall()` = strip+assertClean seam; sensitive NEVER crosses to cloud (fail-closed) |
+| AnthropicTransport | `ai/network/transports/anthropic.ts` | Shared Anthropic client + `anthropicChatText` (optional system caching, full usage incl. cache stats) |
+| OpenAiCompatTransport | `ai/network/transports/openai-compat.ts` | Local-lane chat (RunPod serverless vLLM `growth-text` / any OpenAI-compatible) |
+| Metering | `ai/network/metering.ts` | `recordAiCall` → unified `AiCall` ledger (tokens, cacheRead/Write, est. USD, campaignId); report via `scripts/ai-costs.ts` |
+| Traces | `ai/network/traces.ts` | Fine-tune corpus capture: full JEWL tool-loop JSONL per dispatch (`app/traces/`, system prompts deduped by hash, flag-tagged) |
+
 ## AI — JEWL Copilot (ai/copilot/)
 
 | Module | File | Purpose |

@@ -209,6 +209,7 @@ Next.js 16 App Router with layered architecture adapted for the framework:
 Interface Layer     →  app/ (pages + API routes)
 Service Layer       →  services/ (business logic, Zod validation)
 Infrastructure      →  lib/ (auth, database, utilities, permissions, errors)
+AI — Network Layer →  ai/network/ (lane routing, transports, sanitize wall, AiCall metering, trace capture) — every AI call's chokepoint
 AI — JEWL Copilot  →  ai/copilot/ (classifier, runtime, context-assembler, tools)
 AI — GodHead Agent →  godhead/ (agent loop, tool registry, 20+ tools)
 AI — Portraits      →  ai/portraits/ (ComfyUI + FLUX.2 Dev + PuLID pipeline)
