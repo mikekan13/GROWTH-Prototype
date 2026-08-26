@@ -38,13 +38,18 @@ const inputSchema = z.object({
     'JSON-encoded blueprint body. Must be valid JSON. Shape varies per type — ' +
       'follow the forge authoring schemas (e.g. skill needs name + governors + description).',
   ),
-  // 600 not 300: the genesis law asks JEWL to cite biography chapters in
-  // the ✎ note; 300 rejected his first genesis batch mid-flight (2026-08-17).
-  note: z.string().min(1).max(600).describe(
-    'GM-facing label: WHY you are proposing this and what it is for, in one ' +
-      'or two plain sentences (e.g. "For the tavern brawl scene — gives the ' +
-      'bouncer his signature grapple"). Shown on the draft in the Forge ' +
-      'panel so the GM remembers what they are approving.',
+  // Two notes, two audiences (Mike ruling 2026-08-25): the GM note is
+  // NARRATIVE rationale; balance math goes in the chain note for Kai.
+  gmNote: z.string().min(1).max(600).describe(
+    'GM-facing note — TABLE CRAFT ONLY: why this draft serves the campaign ' +
+      '(genre fit, story hooks, how it plays against the other characters). ' +
+      'NO KV numbers, anchors, or balance accounting here. Shown on the ' +
+      'draft in the Forge panel.',
+  ),
+  chainNote: z.string().max(600).optional().describe(
+    'Godhead-chain note for Kai: grading rationale — anchors compared, KV ' +
+      'targets, balance levers, declared-KV justification. Never shown as ' +
+      'the primary GM note.',
   ),
 });
 // Note: campaignId is taken from the prompt context (the campaign JEWL is
@@ -89,12 +94,13 @@ export const proposeForgeBlueprintTool: JewlTool = {
       );
     }
 
-    // Stamp the proposer's note into the blueprint body under a reserved
-    // key — the Forge panel surfaces it on the draft row so the GM
-    // remembers what each queued proposal is for.
+    // Stamp both notes into the blueprint body under reserved keys.
+    // _proposalNote stays the GM-facing key (Workshop/Panel read it);
+    // _chainNote rides to Kai's evaluator with the row.
     const dataWithNote = JSON.stringify({
       ...(JSON.parse(parsed.dataJson) as Record<string, unknown>),
-      _proposalNote: parsed.note,
+      _proposalNote: parsed.gmNote,
+      ...(parsed.chainNote ? { _chainNote: parsed.chainNote } : {}),
     });
 
     const jewl = await getJewlGodHead();

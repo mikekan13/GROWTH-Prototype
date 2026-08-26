@@ -163,7 +163,54 @@ const rollModifierSchema = z.object({
   skillNamePattern: z.string().max(100).optional(),
   governorAttribute: z.string().max(50).optional(),
   label: z.string().max(100).optional(),
+  // Lexicon scope (Mike ruling 2026-08-24): "raw" = attribute checks only;
+  // "governed" = every roll whose skill has this governor. Ambiguous prose
+  // is a defect — structured entries say which they mean.
+  scope: z.enum(['raw', 'governed']).optional(),
 });
+
+// ── Structured trait effects (Mike rulings 2026-08-24, #5/#9) ─────────────
+// One effect, one entry — no effect may exist only in prose. Two kinds:
+// persistent (condition-gated modifiers, evaluated lazily at roll time —
+// no state) and triggered (fires on an adjudicated trigger; the aftermath
+// spawns a BLOSSOM template and/or a condition with a tangible duration).
+export const traitEffectSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('persistent'),
+    name: z.string().min(1).max(60),
+    /** State check evaluated at roll time (e.g. "in a space the bearer has
+     *  not personally secured"). No ongoing tracking. */
+    condition: z.string().max(200).optional(),
+    modifiers: z.array(rollModifierSchema).min(1).max(5),
+  }),
+  z.object({
+    kind: z.literal('triggered'),
+    name: z.string().min(1).max(60),
+    /** Adjudicated by JEWL/GM against real state — binary, trackable. */
+    trigger: z.string().min(1).max(300),
+    /** Gate check in Lexicon phrasing, e.g. "raw Willpower check DR 6". */
+    check: z.string().max(200).optional(),
+    /** Name of the blossom (forge blossom template) the firing spawns —
+     *  blossom pricing is INTERNAL (ruled 2026-08-25): its KV is reflected
+     *  in THIS trait's grade, never bought standalone. */
+    spawnsBlossom: z.string().max(100).optional(),
+    appliesCondition: z.string().max(100).optional(),
+    /** Tangible time only — there is no "scene" in GROWTH. */
+    duration: z.object({
+      amount: z.number().positive(),
+      unit: z.enum(['hours', 'days', 'cycles']),
+    }).optional(),
+  }),
+]);
+export type TraitEffect = z.infer<typeof traitEffectSchema>;
+
+// Author-declared KV for effects the formula cannot price (dice-adds,
+// checks, information grants). Kai grades from the rationale — never leave
+// a valuable trait at 0 (Mike review 2026-08-25).
+const declaredKvFields = {
+  declaredKv: z.number().int().optional(),
+  declaredKvRationale: z.string().max(300).optional(),
+};
 
 const forgeTraitDataSchema = z.object({
   description: z.string().max(500),
@@ -178,6 +225,10 @@ const forgeTraitDataSchema = z.object({
   // cross-referencing depend on this being stable.
   category: z.enum(TRAIT_CATEGORIES as unknown as [string, ...string[]]).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
+  /** Structured effects (rulings 2026-08-24 #5/#9): preferred over prose
+   *  mechanicalEffect + loose rollModifiers for NEW authoring. */
+  effects: z.array(traitEffectSchema).max(6).optional(),
+  ...declaredKvFields,
   tags: z.array(z.string().max(50)).max(20).optional(),
   // Blossom expiry (Mike ruling 2026-08-21): blossoms are THE
   // temporary-effects system — blessings, colds, intoxication — and "they
@@ -263,7 +314,44 @@ const attributeAugmentsSchema = z.object({
 const forgeSkillEntrySchema = z.object({
   name: z.string().min(1).max(100),
   level: z.number().int().min(1).max(20),
+  // Governors on block skill grants (JEWL's 2026-08-25 addition, approved):
+  // feeds the DR sim + allocatable-grant constraints. 1-3 per CANON_CORE §5.
+  governors: z.array(skillGovernorSchema).max(3).optional(),
 });
+
+// ── Block grants (Mike rulings 2026-08-24/25, #13/#15/#16) ────────────────
+// Blocks can grant the BIG things that belong to those years. Possessions
+// are crystallization stubs ("boxes") JEWL unpacks on the canvas when play
+// needs them; kits carry a KV budget that plausible contents draw down
+// from; allocatable skills are player-choice levels under a governor or
+// domain constraint (choice recorded on the block-instance at attach).
+const blockGrantFields = {
+  possessions: z.array(z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(300),
+    kv: z.number().int().min(0),
+    /** Unpack hint for the canvas build (own traits, inventory, layout). */
+    unpackNote: z.string().max(200).optional(),
+  })).max(5).optional(),
+  kits: z.array(z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(300),
+    /** Draw-down budget: plausible, needed contents are pulled FROM this —
+     *  never pre-itemized (ruled 2026-08-25; plausibility gate applies). */
+    kvBudget: z.number().int().min(1).max(100),
+  })).max(3).optional(),
+  allocatableSkills: z.array(z.object({
+    levels: z.number().int().min(1).max(5),
+    constraint: z.object({
+      governor: skillGovernorSchema.optional(),
+      /** Generalized field, e.g. "arts", "narrative-craft" — membership is
+       *  semantic adjudication (loose skill naming is by design). */
+      domain: z.string().max(60).optional(),
+    }).refine(c => c.governor || c.domain, {
+      message: 'Allocatable grant needs a governor or domain constraint',
+    }),
+  })).max(5).optional(),
+};
 
 // Fate die value caps the seed's nectar+thorn slot count (canon §4).
 const FATE_DIE_SLOTS: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
@@ -337,6 +425,7 @@ const forgeRootDataSchema = z.object({
   nectars: z.array(z.string().max(100)).max(10).default([]),
   thorns: z.array(z.string().max(100)).max(10).default([]),
   seedRequirement: z.string().max(100).default(''),
+  ...blockGrantFields,
   ...blockConditionFields,
   ...maturityFlagsField,
 });
@@ -352,6 +441,7 @@ const forgeBranchDataSchema = z.object({
   nectars: z.array(z.string().max(100)).max(10).default([]),
   thorns: z.array(z.string().max(100)).max(10).default([]),
   requirements: z.string().max(200).default(''),
+  ...blockGrantFields,
   ...blockConditionFields,
   ...maturityFlagsField,
 });

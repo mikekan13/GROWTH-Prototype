@@ -60,6 +60,10 @@ interface RootBranchShape {
   nectars?: string[];
   thorns?: string[];
   ageAdded?: number;
+  frequency?: number;
+  possessions?: Array<{ name?: string; kv?: number }>;
+  kits?: Array<{ name?: string; kvBudget?: number }>;
+  allocatableSkills?: Array<{ levels?: number }>;
 }
 
 function sumPositive(values: Record<string, number> | undefined): number {
@@ -137,7 +141,36 @@ export function priceRootBranch(type: 'root' | 'branch', data: RootBranchShape):
   const thornKv = (data.thorns?.length ?? 0) * TRAIT_ANCHOR_KV;
   if (thornKv) { kv -= thornKv; breakdown.push(`${data.thorns!.length} thorn lien(s) anchor −${thornKv} (Kai re-grades)`); }
 
+  // Block grants (rulings 2026-08-24/25 #13/#15/#16): possessions at their
+  // stated KV; kits at their draw-down budget; allocatable skill levels at
+  // the 1 KRMA/level rate (Kai may add a flexibility premium).
+  const possKv = (data.possessions ?? []).reduce((a, p) => a + Math.max(0, p.kv ?? 0), 0);
+  if (possKv) { kv += possKv; breakdown.push(`possession grant(s) +${possKv}`); }
+  const kitKv = (data.kits ?? []).reduce((a, k) => a + Math.max(0, k.kvBudget ?? 0), 0);
+  if (kitKv) { kv += kitKv; breakdown.push(`kit budget(s) +${kitKv}`); }
+  const allocKv = (data.allocatableSkills ?? []).reduce((a, g) => a + Math.max(0, g.levels ?? 0), 0);
+  if (allocKv) { kv += allocKv; breakdown.push(`allocatable skill level(s) +${allocKv} (Kai may premium)`); }
+
+  // Negative frequency is a LEVER (Mike ruling 2026-08-24 #1/#14): it
+  // reduces the block's net price, which forces the author to service the
+  // debt with compensating content to stay in the 3-15 KV/yr band — "the
+  // block is stronger for bearing it."
+  const freq = data.frequency ?? 0;
+  if (freq < 0) {
+    kv += freq;
+    breakdown.push(`frequency ${freq} lever — service with ~${Math.abs(freq)} KV of compensating content (block stronger for bearing the debt)`);
+  }
+
   const result: PricedBlueprint = { kv, breakdown };
+
+  // Density gauge (net price per year — ruling 2026-08-25 #14: the band
+  // applies to the NET, blocks balance internally).
+  if (typeof data.ageAdded === 'number' && data.ageAdded > 0) {
+    const perYear = kv / data.ageAdded;
+    if (perYear < 3 || perYear > 15) {
+      breakdown.push(`⚠ density ${perYear.toFixed(1)} KV/yr is outside the 3-15 band — balance the block's levers`);
+    }
+  }
 
   // Root frequency-cost rule (r-2026-04-22-10/-11). ageAdded semantics for
   // branches are still under review (audit R2) — only roots get this.
@@ -151,27 +184,76 @@ export function priceRootBranch(type: 'root' | 'branch', data: RootBranchShape):
   return result;
 }
 
-/** Traits have NO formula — Kai grades. This returns the anchor default from
- *  structured rollModifiers when present (±5 per flat point), else 0 with a
- *  grade-me note. Thorns come out negative (liens). */
-export function priceTrait(
-  type: 'nectar' | 'thorn' | 'blossom',
-  data: { rollModifiers?: Array<{ flat?: number }> },
-): PricedBlueprint {
-  const flats = (data.rollModifiers ?? [])
-    .reduce((a, m) => a + Math.abs(m.flat ?? 0), 0);
-  const magnitude = flats * TRAIT_ANCHOR_KV;
-  const sign = type === 'thorn' ? -1 : 1;
-  const kv = sign * magnitude;
-  return {
-    kv,
-    breakdown: magnitude
-      ? [`anchor: ${flats} flat mod point(s) × ${TRAIT_ANCHOR_KV} = ${sign < 0 ? '−' : '+'}${magnitude} (Kai re-grades with synergies)`]
-      : ['no structured modifiers — Kai grades from rule text'],
-  };
+interface TraitPriceShape {
+  rollModifiers?: Array<{ flat?: number }>;
+  effects?: Array<{
+    kind?: string;
+    name?: string;
+    modifiers?: Array<{ flat?: number }>;
+    spawnsBlossom?: string;
+  }>;
+  declaredKv?: number;
+  declaredKvRationale?: string;
 }
 
-/** Items are graded, never formulaic (r-2026-04-22-15) — no auto price. */
+/** Traits have NO formula — Kai grades. This anchors from structured
+ *  modifiers at ±5 KV per NET flat point (2026-08-25 fix: penalties
+ *  subtract — the old abs-sum priced a +2/+2/−1/−1 blossom at +30).
+ *  Signs come from the modifiers themselves; a thorn prices negative
+ *  because its mods are negative. Blossom KV is a MEASUREMENT only —
+ *  internal pricing (Mike ruling 2026-08-25): reflected in the spawner's
+ *  grade, never a standalone purchase. declaredKv covers effects the
+ *  formula cannot see (dice-adds, checks, information grants). */
+export function priceTrait(
+  type: 'nectar' | 'thorn' | 'blossom',
+  data: TraitPriceShape,
+): PricedBlueprint {
+  const breakdown: string[] = [];
+
+  const legacyNet = (data.rollModifiers ?? []).reduce((a, m) => a + (m.flat ?? 0), 0);
+  let effectsNet = 0;
+  let unpriceable = 0;
+  for (const e of data.effects ?? []) {
+    const mods = e.modifiers ?? [];
+    if (mods.length) effectsNet += mods.reduce((a, m) => a + (m.flat ?? 0), 0);
+    else unpriceable++;
+    if (e.spawnsBlossom) {
+      breakdown.push(`spawns blossom "${e.spawnsBlossom}" — its measured KV folds into THIS grade (internal pricing)`);
+    }
+  }
+  const netPoints = legacyNet + effectsNet;
+  let kv = netPoints * TRAIT_ANCHOR_KV;
+
+  if (netPoints !== 0) {
+    breakdown.unshift(`anchor: net ${netPoints > 0 ? '+' : ''}${netPoints} flat point(s) × ${TRAIT_ANCHOR_KV} = ${kv > 0 ? '+' : ''}${kv} (Kai re-grades with synergies)`);
+  }
+  if (type === 'thorn' && kv > 0) {
+    breakdown.push('⚠ thorn priced net-POSITIVE — thorns are liens (negatives-only); Kai must review');
+  }
+  if (type === 'nectar' && kv < 0) {
+    breakdown.push('⚠ nectar priced net-NEGATIVE — negatives belong in thorns; Kai must review');
+  }
+
+  // Author-declared value for what the formula can't see.
+  if (typeof data.declaredKv === 'number' && (netPoints === 0 || unpriceable > 0)) {
+    if (netPoints === 0) kv = data.declaredKv;
+    else { kv += data.declaredKv; }
+    breakdown.push(`author-declared ${data.declaredKv > 0 ? '+' : ''}${data.declaredKv} KV${data.declaredKvRationale ? ` (${data.declaredKvRationale})` : ''} — Kai must grade`);
+  } else if (netPoints === 0 && (data.effects?.length || data.rollModifiers?.length)) {
+    breakdown.push('modifiers net to zero — Kai grades from rule text');
+  } else if (netPoints === 0) {
+    breakdown.push('no structured modifiers — declare an intended KV with rationale (never leave a valuable trait at 0); Kai grades');
+  }
+
+  if (type === 'blossom') {
+    breakdown.push('blossom KV = measurement only — INTERNAL pricing, reflected in the spawner’s grade, not a standalone purchase');
+  }
+
+  return { kv, breakdown };
+}
+
+/** Items are graded, never formulaic (r-2026-04-22-15) — no auto price,
+ *  but an author-declared KV rides along for Kai when present. */
 export function priceBlueprintByType(type: string, data: Record<string, unknown>): PricedBlueprint | null {
   switch (type) {
     case 'seed': return priceSeed(data as SeedShape);
@@ -179,7 +261,17 @@ export function priceBlueprintByType(type: string, data: Record<string, unknown>
     case 'branch': return priceRootBranch(type, data as RootBranchShape);
     case 'nectar':
     case 'thorn':
-    case 'blossom': return priceTrait(type, data as { rollModifiers?: Array<{ flat?: number }> });
-    default: return null; // item/skill/spell: Kai/chain grades case-by-case
+    case 'blossom': return priceTrait(type, data as TraitPriceShape);
+    default: {
+      // item/skill/spell: Kai/chain grades case-by-case.
+      const declared = (data as { declaredKv?: number; declaredKvRationale?: string });
+      if (typeof declared.declaredKv === 'number') {
+        return {
+          kv: declared.declaredKv,
+          breakdown: [`author-declared ${declared.declaredKv} KV${declared.declaredKvRationale ? ` (${declared.declaredKvRationale})` : ''} — Kai must grade`],
+        };
+      }
+      return null;
+    }
   }
 }
