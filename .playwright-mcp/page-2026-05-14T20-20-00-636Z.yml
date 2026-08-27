@@ -1,0 +1,92 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e31]: TERMINAL://reality.layer.0
+        - generic [ref=e32]: ⊘ ⊕
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - link "GRO.WTH" [ref=e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=e36]:
+              - generic [ref=e40]: G
+              - generic [ref=e41]: R
+              - generic [ref=e42]: O
+              - generic [ref=e44]: <n>
+              - generic [ref=e45]: W
+              - generic [ref=e46]: T
+              - generic [ref=e47]: H
+          - generic [ref=e48]:
+            - generic [ref=e49]: Trailblazer Portal
+            - generic [ref=e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=e53]:
+              - generic [ref=e54]: E
+              - generic [ref=e55]: Ŷ
+              - generic [ref=e56]: ∃
+              - generic [ref=e57]: tehr
+              - generic [ref=e58]: "N"
+              - generic [ref=e59]: ET
+          - link "Portal" [ref=e60] [cursor=pointer]:
+            - /url: /trailblazer
+        - 'button "ClaudePlayer CONSCIOUSNESS: INTERFACED ▾" [ref=e62]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: ClaudePlayer
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=e65]: ▾
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]: Trailblazer Portal
+        - generic [ref=e70]:
+          - generic [ref=e71]: Your Characters (2)
+          - generic [ref=e72]:
+            - generic [ref=e73]:
+              - generic [ref=e74]:
+                - link "ClaudePlayer's Character" [ref=e75] [cursor=pointer]:
+                  - /url: /character/cmp5xmb4200077s48m4w3zyfj
+                - generic [ref=e76]: in The Prime Campaign
+                - generic [ref=e77]: "Backstory: DRAFT"
+              - generic [ref=e78]:
+                - link "Edit Backstory" [ref=e79] [cursor=pointer]:
+                  - /url: /character/cmp5xmb4200077s48m4w3zyfj/backstory
+                - generic [ref=e80]: DRAFT
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - link "Vex Thornwood" [ref=e83] [cursor=pointer]:
+                  - /url: /character/cmo5z1xmo0001zw48zhjpos51
+                - generic [ref=e84]: in The Prime Campaign
+              - generic [ref=e85]:
+                - link "Write Backstory" [ref=e86] [cursor=pointer]:
+                  - /url: /character/cmo5z1xmo0001zw48zhjpos51/backstory
+                - generic [ref=e87]: RETIRED
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic [ref=e91]:
+              - generic [ref=e92]: E
+              - generic [ref=e93]: Ŷ
+              - generic [ref=e94]: ∃
+              - generic [ref=e95]: tehr
+              - generic [ref=e96]: "N"
+              - generic [ref=e97]: ET
+            - generic [ref=e98]: Browse open campaigns and apply
+          - link "Browse Campaigns" [ref=e99] [cursor=pointer]:
+            - /url: /hub
+        - generic [ref=e100]:
+          - generic [ref=e101]: Join a Campaign
+          - generic [ref=e102]:
+            - textbox "Enter invite code" [ref=e103]
+            - button "Join" [ref=e104]
+        - generic [ref=e105]:
+          - generic [ref=e106]: Have a Rulebook Access Code?
+          - paragraph [ref=e107]: Enter the code from your physical rulebook to unlock Watcher (GM) access.
+          - generic [ref=e108]:
+            - textbox "Enter access code" [ref=e109]
+            - button "Redeem" [ref=e110]
+    - contentinfo [ref=e111]:
+      - generic [ref=e112]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=e113]: ====================
+      - generic [ref=e114]: "REALITY LEVEL: Primary Translation"
+  - button "Open Next.js Dev Tools" [ref=e120] [cursor=pointer]:
+    - img [ref=e121]

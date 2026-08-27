@@ -1,0 +1,51 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - banner [ref=f4e25]:
+      - generic [ref=f4e26]:
+        - generic [ref=f4e31]: TERMINAL://reality.layer.0
+        - generic [ref=f4e32]: ⊘ ⊕
+      - generic [ref=f4e33]:
+        - generic [ref=f4e34]:
+          - link "GRO.WTH" [ref=f4e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=f4e36]:
+              - generic [ref=f4e40]: G
+              - generic [ref=f4e41]: R
+              - generic [ref=f4e42]: O
+              - generic [ref=f4e44]: <n>
+              - generic [ref=f4e45]: W
+              - generic [ref=f4e46]: T
+              - generic [ref=f4e47]: H
+          - generic [ref=f4e48]:
+            - generic [ref=f4e49]: Terminal Admin
+            - generic [ref=f4e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=f4e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=f4e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=f4e53]:
+              - generic [ref=f4e54]: E
+              - generic [ref=f4e55]: Ŷ
+              - generic [ref=f4e56]: ∃
+              - generic [ref=f4e57]: tehr
+              - generic [ref=f4e58]: "N"
+              - generic [ref=f4e59]: ET
+          - link "Terminal" [ref=f4e60] [cursor=pointer]:
+            - /url: /terminal
+        - 'button "Mikekan13 CONSCIOUSNESS: INTERFACED ▾" [ref=f4e62]':
+          - generic [ref=f4e63]:
+            - generic [ref=f4e64]: Mikekan13
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=f4e65]: ▾
+    - main [ref=f4e67]:
+      - generic [ref=f4e68]: The Fraying | APPROVED
+      - button "☠ Mark Dead" [ref=f4e70]
+      - generic [ref=f4e72]: Loading...
+    - contentinfo [ref=f4e73]:
+      - generic [ref=f4e74]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=f4e75]: ====================
+      - generic [ref=f4e76]: "REALITY LEVEL: Primary Translation"
+    - button "◎ View As" [ref=f4e78]:
+      - generic [ref=f4e79]: ◎
+      - text: View As
+  - button "Open Next.js Dev Tools" [ref=f4e85] [cursor=pointer]:
+    - img [ref=f4e86]

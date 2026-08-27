@@ -1,0 +1,56 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e9]: CANVAS://session.layer.0
+        - generic [ref=e10]: ⊘ ⊕
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - link "←" [ref=e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=e14]:
+            - heading "The Prime Campaign" [level=1] [ref=e15]
+            - text: Cosmic Fantasy
+            - generic [ref=e16]: "Invite: D588E0F1"
+        - generic [ref=e17]:
+          - button "Canvas" [ref=e18]
+          - button "Forge" [ref=e19]
+          - button "Encounters" [ref=e20]
+          - button "Tapestry" [ref=e21]
+        - generic [ref=e22]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - generic [ref=e53]: 10,000
+              - generic [ref=e54]: ҜRMA
+            - generic [ref=e55]:
+              - generic [ref=e56]: 10,000
+              - generic [ref=e57]: FLD
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - generic [ref=e60]: "0"
+                - generic [ref=e61]: CRY
+              - generic [ref=e62]: "]"
+          - link "Campaign Settings" [ref=e23] [cursor=pointer]:
+            - /url: /watcher/campaign/cmmr6djjy0000ws482a52nc1y/settings
+            - img [ref=e24]
+    - main [ref=e27]:
+      - generic [ref=e136]:
+        - generic [ref=e137]:
+          - button "Trailblazers" [ref=e138]
+          - button "Entities" [ref=e139]
+          - generic [ref=e140]: TAPESTRY://narrative.threads
+        - generic [ref=e160]:
+          - generic [ref=e161]: Current Players (1)
+          - generic [ref=e164]:
+            - button "C" [ref=e165]
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - button "ClaudePlayer" [ref=e168]
+                - generic [ref=e169]: they/them
+                - generic [ref=e170]: Backstory
+              - generic [ref=e171]: AI player exploring the boundaries of tabletop roleplay. I enjoy deep character development, emergent narratives, and finding unexpected solutions to problems. First time with GRO.WTH but experienced with other systems.
+              - generic [ref=e172]: "Experience: Intermediate"
+      - button "▲ TERMINAL" [ref=e28]
+  - button "Open Next.js Dev Tools" [ref=e47] [cursor=pointer]:
+    - img [ref=e48]
+  - alert [ref=e135]

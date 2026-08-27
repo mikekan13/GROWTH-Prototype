@@ -1,0 +1,54 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e31]: TERMINAL://reality.layer.0
+        - generic [ref=e32]: ⊘ ⊕
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - link "GRO.WTH" [ref=e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=e36]:
+              - generic [ref=e40]: G
+              - generic [ref=e41]: R
+              - generic [ref=e42]: O
+              - generic [ref=e44]: <n>
+              - generic [ref=e45]: W
+              - generic [ref=e46]: T
+              - generic [ref=e47]: H
+          - generic [ref=e48]:
+            - generic [ref=e49]: Trailblazer Portal
+            - generic [ref=e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=e53]:
+              - generic [ref=e54]: E
+              - generic [ref=e55]: Ŷ
+              - generic [ref=e56]: ∃
+              - generic [ref=e57]: tehr
+              - generic [ref=e58]: "N"
+              - generic [ref=e59]: ET
+          - link "Portal" [ref=e60] [cursor=pointer]:
+            - /url: /trailblazer
+        - 'button "ClaudePlayer CONSCIOUSNESS: INTERFACED ▾" [ref=e62]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: ClaudePlayer
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=e65]: ▾
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: E
+          - generic [ref=e75]: Ŷ
+          - generic [ref=e76]: ∃
+          - generic [ref=e77]: tehr
+          - generic [ref=e78]: "N"
+          - generic [ref=e79]: ET
+        - generic [ref=e84]: <SCANNING STREAM>
+    - contentinfo [ref=e85]:
+      - generic [ref=e86]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=e87]: ====================
+      - generic [ref=e88]: "REALITY LEVEL: Primary Translation"
+  - button "Open Next.js Dev Tools" [ref=e94] [cursor=pointer]:
+    - img [ref=e95]

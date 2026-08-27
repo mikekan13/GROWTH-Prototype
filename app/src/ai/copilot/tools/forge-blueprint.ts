@@ -107,15 +107,24 @@ export const proposeForgeBlueprintTool: JewlTool = {
     const campaignId = ctx.campaignId;
 
     // Uniqueness guard — ForgeItem has @@unique([campaignId, name, type]).
+    // Superseded tombstones don't get to hold name slots (round-5 review,
+    // 2026-08-25): rename the tombstone out of the way and proceed.
     const existing = await prisma.forgeItem.findFirst({
       where: { campaignId, name: parsed.name, type: parsed.type },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (existing) {
-      throw new Error(
-        `Blueprint already exists for (campaign=${campaignId}, ` +
-          `type=${parsed.type}, name=${parsed.name}): ${existing.id}`,
-      );
+      if (existing.status === 'superseded') {
+        await prisma.forgeItem.update({
+          where: { id: existing.id },
+          data: { name: `${parsed.name} [w:${existing.id.slice(-4)}]` },
+        });
+      } else {
+        throw new Error(
+          `Blueprint already exists for (campaign=${campaignId}, ` +
+            `type=${parsed.type}, name=${parsed.name}): ${existing.id}`,
+        );
+      }
     }
 
     // Pre-price with the locked formulas (audit X2) so the draft reaches

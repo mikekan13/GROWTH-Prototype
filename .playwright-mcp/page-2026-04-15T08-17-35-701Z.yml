@@ -1,0 +1,12 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: GRO.WTH Character Creator
+      - generic [ref=e5]: Not Logged In
+      - paragraph [ref=e6]: This standalone shares session with the main GRO.WTH app. Log in there first.
+      - link "Go to GRO.WTH Login →" [ref=e7] [cursor=pointer]:
+        - /url: http://localhost:3000/
+      - generic [ref=e8]: Once logged in, return to this page.
+  - button "Open Next.js Dev Tools" [ref=e14] [cursor=pointer]:
+    - img [ref=e15]
+  - alert [ref=e18]

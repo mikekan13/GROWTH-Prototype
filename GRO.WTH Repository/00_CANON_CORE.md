@@ -1,7 +1,7 @@
 # 00 — CANON CORE
 
 **Status:** #validated · condensed canonical core · **RUNTIME COMPONENT**
-**Last synced:** 2026-06-26 (incorporates all rulings through r-2026-06-11-08)
+**Last synced:** 2026-08-26 (incorporates all rulings through r-2026-08-26-01)
 **Security:** PUBLIC (rules) — the Founder-Only 10-year arc is NOT in this file by design.
 
 > **What this is.** The single condensed source of truth every AI internalizes —
@@ -22,7 +22,7 @@
 
 A digital-first TTRPG platform. The app **is** the game, not an accessory. Name
 stylized **GRO<n>WTH**: `G/R/O` = Body (red), `<n>` = bridge (gold, near-invisible),
-`W/T/H` = Spirit (blue), the whole governed by Soul (purple). The dot in GRO.WTH is
+`W/T/H` = Spirit (purple), the whole governed by Soul (blue). The dot in GRO.WTH is
 the threshold between what changes *within* a story (GRO) and what persists *across*
 stories (WTH).
 
@@ -198,9 +198,11 @@ mercy** (r-2026-07-11-02): after a failed roll she may still decline to reap
    **Third fail after fated age = death.**
 3. **Death = transformation, not destruction** (r-2026-05-19-02). Character becomes a
    **GHOST**, persists on canvas. Split:
-   - Body attrs/skills/Nectars/Thorns/baseResist → 0; KRMA → GM.
-   - Soul attrs + soul-only skills → halved; lost half → Lady Death.
-   - Frequency `level` → 0; its KRMA value → Lady Death.
+   - Body attrs, body-governed skill shares, body Nectars/Thorns, baseResist → 0; KRMA → GM.
+   - Soul attrs + soul-governed skill shares → halved: **floor(½) KRMA → GM; the MAJORITY (ceil ½) stays on the ghost** (corrected 2026-07-13 — was "→ Lady Death").
+   - Multi-governor skills split their levels evenly per governor, each share by its pillar; uneven division favors the Spirit package.
+   - Frequency `level` → 0; its KRMA value → Lady Death. **Frequency is the ONLY thing Lady Death takes.**
+   - Blossoms vanish on death; their KRMA returns to the **bestowing Godhead**.
    - Spirit attrs (Flow, Focus), pure-Spirit skills, all 10 magic schools, Spirit-
      pillared traits → **kept unchanged**.
    - Lady Death **is** Tara Almswood (one Godhead, two names).
@@ -291,6 +293,43 @@ content but routes through the Forge chain — never bypasses.
 (Focus: Force/Alteration/Conjuration), Balance (Flow+Focus: Divination/Dissolution/
 Abjuration/Illusion). 10 schools total. Magic comes down from the Godheads via the
 Terminal; per-table GM defines its in-fiction nature.
+
+### Forge authoring law (rulings r-2026-08-24-01…19, r-2026-08-25-01/-02, r-2026-08-26-01)
+
+- **Catalog blocks are AGNOSTIC ARCHETYPES — the STRANGER TEST** (r-2026-08-24-02): a GM
+  who never met the character must know what the block is and when to pick it. Personal
+  story attaches to the block-INSTANCE on the character, with MORE description there.
+  **Names must paint a predictive mental picture** (r-2026-08-25-02) — poetic is legal
+  only if a stranger can predict the stat skew from the name; since a block's numbers
+  commit to ONE developmental outcome, the name names that outcome.
+- **One effect = one discrete entry** (r-2026-08-24-09): structured `effects[]` —
+  persistent (condition-gated modifiers, lazy) vs triggered (adjudicated trigger →
+  spawns a blossom and/or applies a condition). No mechanic may exist only in prose.
+- **Durations must be TABLE-TRACKABLE** (r-2026-08-24-07, r-2026-08-26-01): units are
+  rounds (6 s, encounter mode only) | hours | days | cycles. No "scene" primitive, no
+  minutes. Outside encounters, short-lived states are phrased as conditions.
+- **Blocks BALANCE INTERNALLY** (r-2026-08-24-14): the 3–15 KV/yr density band applies
+  to the NET price; thorn debt is serviced by the block's other levers. Extreme designs
+  legal. **Negative frequency is a 1:1 KV lever** (r-2026-08-24-01, r-2026-08-25-01):
+  frequency −N credits exactly N KV — never attribute rate.
+- **Blossoms are the temporary-effects surface**: expiry mandatory; **pricing is
+  INTERNAL** (r-2026-08-24-17) — the spawner (trait-trigger, spell-cast, or persistent
+  emitter/aura) carries the cost; a blossom's KV is measurement only.
+- **Block grants** (r-2026-08-24-13/-15/-16): possessions = crystallization stubs
+  (big things unpack on observation); kits = KV-budget draw-down (plausibility-gated,
+  consciously fun-chosen); allocatable skills = player-choice levels under governor/
+  domain constraints.
+- **Skill names stay deliberately LOOSE** (r-2026-08-24-11): no canonical registry;
+  specificity skews DR in the bearer's favor (cloud-lane simulation). Emotions are not
+  skills; practices of managing them are (r-2026-08-24-19).
+- **Randomness law** (r-2026-08-24-18): random parameters never establish severity
+  without a counterbalance (fixed count, or KV scales with the roll).
+- **Dual proposal notes** (r-2026-08-24-04): gmNote = narrative rationale (genre, hooks,
+  table dynamics — no KRMA math); chainNote = anchors/KV/balance for Kai.
+- **Root age is unconstrained** (r-2026-08-24-05); attribute skew should eventually come
+  from a Godhead developmental consult (r-2026-08-24-03, queued build).
+- **Modifier breadth anchors** (compliance pass 2026-08-26): flat-point anchor 5 KV ×
+  breadth — single attribute/skill ×1, pillar ×2, all-checks ×3. Kai re-grades.
 
 ---
 

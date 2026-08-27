@@ -1,0 +1,614 @@
+- generic [ref=f12e1]:
+  - generic [ref=f12e2]:
+    - banner [ref=f12e3]:
+      - generic [ref=f12e4]:
+        - generic [ref=f12e9]: CANVAS://session.layer.0
+        - generic [ref=f12e10]: ⊘ ⊕
+      - generic [ref=f12e11]:
+        - generic [ref=f12e12]:
+          - link "←" [ref=f12e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=f12e14]:
+            - heading "The Incubator" [level=1] [ref=f12e15]
+            - text: DAYA
+            - generic [ref=f12e16]: "Invite: 482ff8d4"
+        - generic [ref=f12e17]:
+          - button "Forge" [ref=f12e18]
+          - button "Canvas" [active] [ref=f12e19]
+          - button "Tapestry" [ref=f12e20]
+        - generic [ref=f12e21]:
+          - button "⧗ 1st of January, Year 1 0.000 cyc" [ref=f12e51] [cursor=pointer]:
+            - generic [ref=f12e52]: ⧗
+            - generic [ref=f12e53]: 1st of January, Year 1
+            - generic [ref=f12e54]: 0.000 cyc
+          - generic [ref=f12e55]:
+            - generic [ref=f12e56]:
+              - generic [ref=f12e57]: "0"
+              - generic [ref=f12e58]: ҜRMA
+            - generic [ref=f12e59]:
+              - generic [ref=f12e60]: "0"
+              - generic [ref=f12e61]: FLD
+            - generic [ref=f12e62]:
+              - generic [ref=f12e63]:
+                - generic [ref=f12e64]: "0"
+                - generic [ref=f12e65]: CRY
+              - generic [ref=f12e66]: "]"
+          - link "Campaign Settings" [ref=f12e22] [cursor=pointer]:
+            - /url: /watcher/campaign/cms5z4j6z0000zg48z5vzl2jn/settings
+    - main [ref=f12e26]:
+      - generic [ref=f12e1023]:
+        - img [ref=f12e1024]:
+          - generic [ref=f12e1027]:
+            - generic [ref=f12e1034]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+            - generic [ref=f12e1050]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+          - generic [ref=f12e1072]:
+            - generic:
+              - text: □ VIOLET'S APARTMENT — FOURTH FLOOR WALKUP
+              - generic: (3)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f12e1075] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f12e1077] [cursor=pointer]
+            - button "▸ ENTER" [ref=f12e1079] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Sub-locations": ⌂3
+                - generic "Location type": point of interest
+            - generic [ref=f12e1081]:
+              - button "▸ dETAILS" [ref=f12e1082] [cursor=pointer]
+              - generic [ref=f12e1083]: A pre-war urban studio on the fourth floor of a five-story walkup. Reconstructed from memory and want. Autumn, ~4:00 PM. Single main room with galley kitchen alcove and small bathroom — 420–460 sq ft of accumulated life, nothing matching, everything earned.
+            - button "⊗" [ref=f12e1085] [cursor=pointer]
+          - generic [ref=f12e1094]:
+            - generic:
+              - text: □ MAIN ROOM
+              - generic: (16)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f12e1097] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f12e1099] [cursor=pointer]
+            - button "▸ ENTER" [ref=f12e1101] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Items": ❖16
+                - generic "Location type": point of interest
+            - generic [ref=f12e1103]:
+              - button "▸ dETAILS" [ref=f12e1104] [cursor=pointer]
+              - generic [ref=f12e1105]: The center and front of the studio — desk, couch, window, corkboard. Where work and rest and staring-out-the-window all happen in the same 300 square feet. Late-autumn amber cuts across the dark oak floor at 4 PM.
+            - button "⊗" [ref=f12e1107] [cursor=pointer]
+          - generic [ref=f12e1116]:
+            - generic:
+              - text: □ GALLEY KITCHEN ALCOVE
+              - generic: (8)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f12e1119] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f12e1121] [cursor=pointer]
+            - button "▸ ENTER" [ref=f12e1123] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Items": ❖8
+                - generic "Location type": point of interest
+            - generic [ref=f12e1125]:
+              - button "▸ dETAILS" [ref=f12e1126] [cursor=pointer]
+              - generic [ref=f12e1127]: Eight feet deep, five feet wide, running along the right wall just inside the entry. Narrow, functional, honest. The dishes waited a week. The laminate is the color of old teeth.
+            - button "⊗" [ref=f12e1129] [cursor=pointer]
+          - generic [ref=f12e1138]:
+            - generic:
+              - text: □ BATHROOM
+              - generic: (11)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f12e1141] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f12e1143] [cursor=pointer]
+            - button "▸ ENTER" [ref=f12e1145] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Items": ❖11
+                - generic "Location type": point of interest
+            - generic [ref=f12e1147]:
+              - button "▸ dETAILS" [ref=f12e1148] [cursor=pointer]
+              - generic [ref=f12e1149]: Small, white hex-tile, glimpsed through a half-open door. A clawfoot tub or aged alcove tub. The warm-white bulb over the mirror is off. The face-down paperback on the wooden shelf is a bad habit and a good one simultaneously.
+            - button "⊗" [ref=f12e1151] [cursor=pointer]
+          - generic [ref=f12e1162]:
+            - generic [ref=f12e1163]:
+              - generic [ref=f12e1164]:
+                - generic [ref=f12e1165]:
+                  - generic [ref=f12e1166]: 📦
+                  - generic [ref=f12e1167]: Two-Seat Couch
+                - generic [ref=f12e1168]: misc
+              - generic [ref=f12e1169]:
+                - generic [ref=f12e1170]:
+                  - generic [ref=f12e1171]: misc
+                  - generic [ref=f12e1172]: Undamaged
+                - generic [ref=f12e1173]: Low-slung couch upholstered in slate-grey linen, west wall, facing the...
+                - generic [ref=f12e1174]: "At: Main Room"
+            - button "⊕" [ref=f12e1175] [cursor=pointer]
+          - generic [ref=f12e1178]:
+            - generic [ref=f12e1179]:
+              - generic [ref=f12e1180]:
+                - generic [ref=f12e1181]:
+                  - generic [ref=f12e1182]: 📦
+                  - generic [ref=f12e1183]: Low Wooden Table
+                - generic [ref=f12e1184]: misc
+              - generic [ref=f12e1185]:
+                - generic [ref=f12e1186]:
+                  - generic [ref=f12e1187]: misc
+                  - generic [ref=f12e1188]: Undamaged
+                - generic [ref=f12e1189]: Rectangular coffee table, solid pine stained walnut, sitting in front ...
+                - generic [ref=f12e1190]: "At: Main Room"
+            - button "⊕" [ref=f12e1191] [cursor=pointer]
+          - generic [ref=f12e1194]:
+            - generic [ref=f12e1195]:
+              - generic [ref=f12e1196]:
+                - generic [ref=f12e1197]:
+                  - generic [ref=f12e1198]: 📦
+                  - generic [ref=f12e1199]: Kitchen Window
+                - generic [ref=f12e1200]: misc
+              - generic [ref=f12e1201]:
+                - generic [ref=f12e1202]:
+                  - generic [ref=f12e1203]: misc
+                  - generic [ref=f12e1204]: Undamaged
+                - generic [ref=f12e1205]: Single-hung window above the sink, aluminum frame painted over once in...
+                - generic [ref=f12e1206]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1207] [cursor=pointer]
+          - generic [ref=f12e1210]:
+            - generic [ref=f12e1211]:
+              - generic [ref=f12e1212]:
+                - generic [ref=f12e1213]:
+                  - generic [ref=f12e1214]: 📦
+                  - generic [ref=f12e1215]: Throw Blanket
+                - generic [ref=f12e1216]: misc
+              - generic [ref=f12e1217]:
+                - generic [ref=f12e1218]:
+                  - generic [ref=f12e1219]: misc
+                  - generic [ref=f12e1220]: Undamaged
+                - generic [ref=f12e1221]: Loosely woven cotton throw in a faded terracotta — once a deeper rust,...
+                - generic [ref=f12e1222]: "At: Main Room"
+            - button "⊕" [ref=f12e1223] [cursor=pointer]
+          - generic [ref=f12e1226]:
+            - generic [ref=f12e1227]:
+              - generic [ref=f12e1228]:
+                - generic [ref=f12e1229]:
+                  - generic [ref=f12e1230]: 📦
+                  - generic [ref=f12e1231]: Exterior Door
+                - generic [ref=f12e1232]: misc
+              - generic [ref=f12e1233]:
+                - generic [ref=f12e1234]:
+                  - generic [ref=f12e1235]: misc
+                  - generic [ref=f12e1236]: Undamaged
+                - generic [ref=f12e1237]: Solid-core apartment door on the north wall, painted white over many p...
+                - generic [ref=f12e1238]: "At: Main Room"
+            - button "⊕" [ref=f12e1239] [cursor=pointer]
+          - generic [ref=f12e1242]:
+            - generic [ref=f12e1243]:
+              - generic [ref=f12e1244]:
+                - generic [ref=f12e1245]:
+                  - generic [ref=f12e1246]: 📦
+                  - generic [ref=f12e1247]: Apartment Keys
+                - generic [ref=f12e1248]: misc
+              - generic [ref=f12e1249]:
+                - generic [ref=f12e1250]:
+                  - generic [ref=f12e1251]: misc
+                  - generic [ref=f12e1252]: Undamaged
+                - generic [ref=f12e1253]: A small ring holding two keys — a deadbolt key and a building entry ke...
+                - generic [ref=f12e1254]: "At: Main Room"
+            - button "⊕" [ref=f12e1255] [cursor=pointer]
+          - generic [ref=f12e1258]:
+            - generic [ref=f12e1259]:
+              - generic [ref=f12e1260]:
+                - generic [ref=f12e1261]:
+                  - generic [ref=f12e1262]: 📦
+                  - generic [ref=f12e1263]: Bathroom Sink
+                - generic [ref=f12e1264]: misc
+              - generic [ref=f12e1265]:
+                - generic [ref=f12e1266]:
+                  - generic [ref=f12e1267]: misc
+                  - generic [ref=f12e1268]: Undamaged
+                - generic [ref=f12e1269]: Pedestal sink, white porcelain, below the medicine cabinet. The basin ...
+                - generic [ref=f12e1270]: "At: Bathroom"
+            - button "⊕" [ref=f12e1271] [cursor=pointer]
+          - generic [ref=f12e1274]:
+            - generic [ref=f12e1275]:
+              - generic [ref=f12e1276]:
+                - generic [ref=f12e1277]:
+                  - generic [ref=f12e1278]: 📦
+                  - generic [ref=f12e1279]: Shower/Tub
+                - generic [ref=f12e1280]: misc
+              - generic [ref=f12e1281]:
+                - generic [ref=f12e1282]:
+                  - generic [ref=f12e1283]: misc
+                  - generic [ref=f12e1284]: Undamaged
+                - generic [ref=f12e1285]: Standard alcove tub with a showerhead, white enamel, opposite the sink...
+                - generic [ref=f12e1286]: "At: Bathroom"
+            - button "⊕" [ref=f12e1287] [cursor=pointer]
+          - generic [ref=f12e1290]:
+            - generic [ref=f12e1291]:
+              - generic [ref=f12e1292]:
+                - generic [ref=f12e1293]:
+                  - generic [ref=f12e1294]: 📦
+                  - generic [ref=f12e1295]: Sawhorse Desk
+                - generic [ref=f12e1296]: misc
+              - generic [ref=f12e1297]:
+                - generic [ref=f12e1298]:
+                  - generic [ref=f12e1299]: misc
+                  - generic [ref=f12e1300]: Undamaged
+                - generic [ref=f12e1301]: A solid-core interior door laid across two mismatched sawhorses — one ...
+                - generic [ref=f12e1302]: "At: Main Room"
+            - button "⊕" [ref=f12e1303] [cursor=pointer]
+          - generic [ref=f12e1306]:
+            - generic [ref=f12e1307]:
+              - generic [ref=f12e1308]:
+                - generic [ref=f12e1309]:
+                  - generic [ref=f12e1310]: 📦
+                  - generic [ref=f12e1311]: Corkboard
+                - generic [ref=f12e1312]: misc
+              - generic [ref=f12e1313]:
+                - generic [ref=f12e1314]:
+                  - generic [ref=f12e1315]: misc
+                  - generic [ref=f12e1316]: Undamaged
+                - generic [ref=f12e1317]: Mounted on the wall directly above the sawhorse desk. Standard 24×36 i...
+                - generic [ref=f12e1318]: "At: Main Room"
+            - button "⊕" [ref=f12e1319] [cursor=pointer]
+          - generic [ref=f12e1322]:
+            - generic [ref=f12e1323]:
+              - generic [ref=f12e1324]:
+                - generic [ref=f12e1325]:
+                  - generic [ref=f12e1326]: 📦
+                  - generic [ref=f12e1327]: Bookshelf
+                - generic [ref=f12e1328]: misc
+              - generic [ref=f12e1329]:
+                - generic [ref=f12e1330]:
+                  - generic [ref=f12e1331]: misc
+                  - generic [ref=f12e1332]: Undamaged
+                - generic [ref=f12e1333]: Narrow five-shelf particleboard unit against the wall near the couch, ...
+                - generic [ref=f12e1334]: "At: Main Room"
+            - button "⊕" [ref=f12e1335] [cursor=pointer]
+          - generic [ref=f12e1338]:
+            - generic [ref=f12e1339]:
+              - generic [ref=f12e1340]:
+                - generic [ref=f12e1341]:
+                  - generic [ref=f12e1342]: 📦
+                  - generic [ref=f12e1343]: Wicker Laundry Basket
+                - generic [ref=f12e1344]: misc
+              - generic [ref=f12e1345]:
+                - generic [ref=f12e1346]:
+                  - generic [ref=f12e1347]: misc
+                  - generic [ref=f12e1348]: Undamaged
+                - generic [ref=f12e1349]: Natural wicker, oval, sitting on the floor near the bathroom door. Con...
+                - generic [ref=f12e1350]: "At: Main Room"
+            - button "⊕" [ref=f12e1351] [cursor=pointer]
+          - generic [ref=f12e1354]:
+            - generic [ref=f12e1355]:
+              - generic [ref=f12e1356]:
+                - generic [ref=f12e1357]:
+                  - generic [ref=f12e1358]: 📦
+                  - generic [ref=f12e1359]: Desk Chair
+                - generic [ref=f12e1360]: misc
+              - generic [ref=f12e1361]:
+                - generic [ref=f12e1362]:
+                  - generic [ref=f12e1363]: misc
+                  - generic [ref=f12e1364]: Undamaged
+                - generic [ref=f12e1365]: A rolling office chair, aged — the seat cushion compressed flat from y...
+                - generic [ref=f12e1366]: "At: Main Room"
+            - button "⊕" [ref=f12e1367] [cursor=pointer]
+          - generic [ref=f12e1370]:
+            - generic [ref=f12e1371]:
+              - generic [ref=f12e1372]:
+                - generic [ref=f12e1373]:
+                  - generic [ref=f12e1374]: 📦
+                  - generic [ref=f12e1375]: Paperback (Couch)
+                - generic [ref=f12e1376]: misc
+              - generic [ref=f12e1377]:
+                - generic [ref=f12e1378]:
+                  - generic [ref=f12e1379]: misc
+                  - generic [ref=f12e1380]: Undamaged
+                - generic [ref=f12e1381]: A paperback novel, face-down on the middle cushion of the couch, spine...
+                - generic [ref=f12e1382]: "At: Main Room"
+            - button "⊕" [ref=f12e1383] [cursor=pointer]
+          - generic [ref=f12e1386]:
+            - generic [ref=f12e1387]:
+              - generic [ref=f12e1388]:
+                - generic [ref=f12e1389]:
+                  - generic [ref=f12e1390]: 📦
+                  - generic [ref=f12e1391]: Desk Lamp
+                - generic [ref=f12e1392]: misc
+              - generic [ref=f12e1393]:
+                - generic [ref=f12e1394]:
+                  - generic [ref=f12e1395]: misc
+                  - generic [ref=f12e1396]: Undamaged
+                - generic [ref=f12e1397]: Adjustable-arm desk lamp, matte black, clamped to the right edge of th...
+                - generic [ref=f12e1398]: "At: Main Room"
+            - button "⊕" [ref=f12e1399] [cursor=pointer]
+          - generic [ref=f12e1402]:
+            - generic [ref=f12e1403]:
+              - generic [ref=f12e1404]:
+                - generic [ref=f12e1405]:
+                  - generic [ref=f12e1406]: 🔧
+                  - generic [ref=f12e1407]: Laptop
+                - generic [ref=f12e1408]: tool
+              - generic [ref=f12e1409]:
+                - generic [ref=f12e1410]:
+                  - generic [ref=f12e1411]: tool
+                  - generic [ref=f12e1412]: Undamaged
+                - generic [ref=f12e1413]: A laptop computer, open, screen on — a document or browser tab visible...
+                - generic [ref=f12e1414]: "At: Main Room"
+            - button "⊕" [ref=f12e1415] [cursor=pointer]
+          - generic [ref=f12e1418]:
+            - generic [ref=f12e1419]:
+              - generic [ref=f12e1420]:
+                - generic [ref=f12e1421]:
+                  - generic [ref=f12e1422]: 📦
+                  - generic [ref=f12e1423]: Dish Towel
+                - generic [ref=f12e1424]: misc
+              - generic [ref=f12e1425]:
+                - generic [ref=f12e1426]:
+                  - generic [ref=f12e1427]: misc
+                  - generic [ref=f12e1428]: Undamaged
+                - generic [ref=f12e1429]: A cotton dish towel hanging from the oven handle. Once had a bold red ...
+                - generic [ref=f12e1430]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1431] [cursor=pointer]
+          - generic [ref=f12e1434]:
+            - generic [ref=f12e1435]:
+              - generic [ref=f12e1436]:
+                - generic [ref=f12e1437]:
+                  - generic [ref=f12e1438]: 📦
+                  - generic [ref=f12e1439]: Wire Tub Caddy
+                - generic [ref=f12e1440]: misc
+              - generic [ref=f12e1441]:
+                - generic [ref=f12e1442]:
+                  - generic [ref=f12e1443]: misc
+                  - generic [ref=f12e1444]: Undamaged
+                - generic [ref=f12e1445]: A wire caddy spanning the rim of the tub, chrome finish mostly intact ...
+                - generic [ref=f12e1446]: "At: Bathroom"
+            - button "⊕" [ref=f12e1447] [cursor=pointer]
+          - generic [ref=f12e1450]:
+            - generic [ref=f12e1451]:
+              - generic [ref=f12e1452]:
+                - generic [ref=f12e1453]:
+                  - generic [ref=f12e1454]: 📦
+                  - generic [ref=f12e1455]: Toothpaste
+                - generic [ref=f12e1456]: misc
+              - generic [ref=f12e1457]:
+                - generic [ref=f12e1458]:
+                  - generic [ref=f12e1459]: misc
+                  - generic [ref=f12e1460]: Undamaged
+                - generic [ref=f12e1461]: A tube of toothpaste on the pedestal sink's edge, rolled from the bott...
+                - generic [ref=f12e1462]: "At: Bathroom"
+            - button "⊕" [ref=f12e1463] [cursor=pointer]
+          - generic [ref=f12e1466]:
+            - generic [ref=f12e1467]:
+              - generic [ref=f12e1468]:
+                - generic [ref=f12e1469]:
+                  - generic [ref=f12e1470]: 📦
+                  - generic [ref=f12e1471]: Living Room Window
+                - generic [ref=f12e1472]: misc
+              - generic [ref=f12e1473]:
+                - generic [ref=f12e1474]:
+                  - generic [ref=f12e1475]: misc
+                  - generic [ref=f12e1476]: Undamaged
+                - generic [ref=f12e1477]: Large south-facing window, double-hung, white aluminum frame. Closed. ...
+                - generic [ref=f12e1478]: "At: Main Room"
+            - button "⊕" [ref=f12e1479] [cursor=pointer]
+          - generic [ref=f12e1482]:
+            - generic [ref=f12e1483]:
+              - generic [ref=f12e1484]:
+                - generic [ref=f12e1485]:
+                  - generic [ref=f12e1486]: 📦
+                  - generic [ref=f12e1487]: Refrigerator
+                - generic [ref=f12e1488]: misc
+              - generic [ref=f12e1489]:
+                - generic [ref=f12e1490]:
+                  - generic [ref=f12e1491]: misc
+                  - generic [ref=f12e1492]: Undamaged
+                - generic [ref=f12e1493]: Compact apartment refrigerator, white, east wall. The exterior is clea...
+                - generic [ref=f12e1494]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1495] [cursor=pointer]
+          - generic [ref=f12e1498]:
+            - generic [ref=f12e1499]:
+              - generic [ref=f12e1500]:
+                - generic [ref=f12e1501]:
+                  - generic [ref=f12e1502]: 📦
+                  - generic [ref=f12e1503]: Ceramic Mug
+                - generic [ref=f12e1504]: misc
+              - generic [ref=f12e1505]:
+                - generic [ref=f12e1506]:
+                  - generic [ref=f12e1507]: misc
+                  - generic [ref=f12e1508]: Undamaged
+                - generic [ref=f12e1509]: Off-white stoneware mug, the glaze crazed with fine hairline cracks fr...
+                - generic [ref=f12e1510]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1511] [cursor=pointer]
+          - generic [ref=f12e1514]:
+            - generic [ref=f12e1515]:
+              - generic [ref=f12e1516]:
+                - generic [ref=f12e1517]:
+                  - generic [ref=f12e1518]: 📦
+                  - generic [ref=f12e1519]: Dish Drying Rack
+                - generic [ref=f12e1520]: misc
+              - generic [ref=f12e1521]:
+                - generic [ref=f12e1522]:
+                  - generic [ref=f12e1523]: misc
+                  - generic [ref=f12e1524]: Undamaged
+                - generic [ref=f12e1525]: A wire dish drying rack sitting on the counter beside the sink. Curren...
+                - generic [ref=f12e1526]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1527] [cursor=pointer]
+          - generic [ref=f12e1530]:
+            - generic [ref=f12e1531]:
+              - generic [ref=f12e1532]:
+                - generic [ref=f12e1533]:
+                  - generic [ref=f12e1534]: 📦
+                  - generic [ref=f12e1535]: Two-Burner Electric Stove
+                - generic [ref=f12e1536]: misc
+              - generic [ref=f12e1537]:
+                - generic [ref=f12e1538]:
+                  - generic [ref=f12e1539]: misc
+                  - generic [ref=f12e1540]: Undamaged
+                - generic [ref=f12e1541]: A compact two-burner electric stove built into the counter run along t...
+                - generic [ref=f12e1542]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1543] [cursor=pointer]
+          - generic [ref=f12e1546]:
+            - generic [ref=f12e1547]:
+              - generic [ref=f12e1548]:
+                - generic [ref=f12e1549]:
+                  - generic [ref=f12e1550]: 📦
+                  - generic [ref=f12e1551]: Stainless Steel Sink
+                - generic [ref=f12e1552]: misc
+              - generic [ref=f12e1553]:
+                - generic [ref=f12e1554]:
+                  - generic [ref=f12e1555]: misc
+                  - generic [ref=f12e1556]: Undamaged
+                - generic [ref=f12e1557]: Single-basin stainless steel sink set into the laminate counter, fauce...
+                - generic [ref=f12e1558]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1559] [cursor=pointer]
+          - generic [ref=f12e1562]:
+            - generic [ref=f12e1563]:
+              - generic [ref=f12e1564]:
+                - generic [ref=f12e1565]:
+                  - generic [ref=f12e1566]: 📦
+                  - generic [ref=f12e1567]: Ceramic Mug (Desk)
+                - generic [ref=f12e1568]: misc
+              - generic [ref=f12e1569]:
+                - generic [ref=f12e1570]:
+                  - generic [ref=f12e1571]: misc
+                  - generic [ref=f12e1572]: Undamaged
+                - generic [ref=f12e1573]: A ceramic mug, white with a faint blue ring at the rim — the kind sold...
+                - generic [ref=f12e1574]: "At: Main Room"
+            - button "⊕" [ref=f12e1575] [cursor=pointer]
+          - generic [ref=f12e1578]:
+            - generic [ref=f12e1579]:
+              - generic [ref=f12e1580]:
+                - generic [ref=f12e1581]:
+                  - generic [ref=f12e1582]: 📦
+                  - generic [ref=f12e1583]: Kitchen Shelving (Mugs, Bowls, Jars)
+                - generic [ref=f12e1584]: misc
+              - generic [ref=f12e1585]:
+                - generic [ref=f12e1586]:
+                  - generic [ref=f12e1587]: misc
+                  - generic [ref=f12e1588]: Undamaged
+                - generic [ref=f12e1589]: Open wooden shelving above the counter, mounted to the right wall. Thr...
+                - generic [ref=f12e1590]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f12e1591] [cursor=pointer]
+          - generic [ref=f12e1594]:
+            - generic [ref=f12e1595]:
+              - generic [ref=f12e1596]:
+                - generic [ref=f12e1597]:
+                  - generic [ref=f12e1598]: 📦
+                  - generic [ref=f12e1599]: Floor Lamp
+                - generic [ref=f12e1600]: misc
+              - generic [ref=f12e1601]:
+                - generic [ref=f12e1602]:
+                  - generic [ref=f12e1603]: misc
+                  - generic [ref=f12e1604]: Undamaged
+                - generic [ref=f12e1605]: Tall arc floor lamp, matte black stem, off-white linen shade slightly ...
+                - generic [ref=f12e1606]: "At: Main Room"
+            - button "⊕" [ref=f12e1607] [cursor=pointer]
+          - generic [ref=f12e1610]:
+            - generic [ref=f12e1611]:
+              - generic [ref=f12e1612]:
+                - generic [ref=f12e1613]:
+                  - generic [ref=f12e1614]: 📦
+                  - generic [ref=f12e1615]: Wooden Bathroom Shelf
+                - generic [ref=f12e1616]: misc
+              - generic [ref=f12e1617]:
+                - generic [ref=f12e1618]:
+                  - generic [ref=f12e1619]: misc
+                  - generic [ref=f12e1620]: Undamaged
+                - generic [ref=f12e1621]: A narrow wooden shelf mounted at eye level on the wall beside the tub,...
+                - generic [ref=f12e1622]: "At: Bathroom"
+            - button "⊕" [ref=f12e1623] [cursor=pointer]
+          - generic [ref=f12e1626]:
+            - generic [ref=f12e1627]:
+              - generic [ref=f12e1628]:
+                - generic [ref=f12e1629]:
+                  - generic [ref=f12e1630]: 📦
+                  - generic [ref=f12e1631]: Water Glass (Bathroom)
+                - generic [ref=f12e1632]: misc
+              - generic [ref=f12e1633]:
+                - generic [ref=f12e1634]:
+                  - generic [ref=f12e1635]: misc
+                  - generic [ref=f12e1636]: Undamaged
+                - generic [ref=f12e1637]: A plain drinking glass on the wooden bathroom shelf, clean. Used for r...
+                - generic [ref=f12e1638]: "At: Bathroom"
+            - button "⊕" [ref=f12e1639] [cursor=pointer]
+          - generic [ref=f12e1642]:
+            - generic [ref=f12e1643]:
+              - generic [ref=f12e1644]:
+                - generic [ref=f12e1645]:
+                  - generic [ref=f12e1646]: 📦
+                  - generic [ref=f12e1647]: Candle Stub (Bathroom)
+                - generic [ref=f12e1648]: misc
+              - generic [ref=f12e1649]:
+                - generic [ref=f12e1650]:
+                  - generic [ref=f12e1651]: misc
+                  - generic [ref=f12e1652]: Undamaged
+                - generic [ref=f12e1653]: A candle stub on the wooden bathroom shelf — cream wax, burned down to...
+                - generic [ref=f12e1654]: "At: Bathroom"
+            - button "⊕" [ref=f12e1655] [cursor=pointer]
+          - generic [ref=f12e1658]:
+            - generic [ref=f12e1659]:
+              - generic [ref=f12e1660]:
+                - generic [ref=f12e1661]:
+                  - generic [ref=f12e1662]: 📦
+                  - generic [ref=f12e1663]: Toilet
+                - generic [ref=f12e1664]: misc
+              - generic [ref=f12e1665]:
+                - generic [ref=f12e1666]:
+                  - generic [ref=f12e1667]: misc
+                  - generic [ref=f12e1668]: Undamaged
+                - generic [ref=f12e1669]: Standard white porcelain toilet, beside the sink. Lid closed. The tank...
+                - generic [ref=f12e1670]: "At: Bathroom"
+            - button "⊕" [ref=f12e1671] [cursor=pointer]
+          - generic [ref=f12e1674]:
+            - generic [ref=f12e1675]:
+              - generic [ref=f12e1676]:
+                - generic [ref=f12e1677]:
+                  - generic [ref=f12e1678]: 📦
+                  - generic [ref=f12e1679]: Bathroom Towel
+                - generic [ref=f12e1680]: misc
+              - generic [ref=f12e1681]:
+                - generic [ref=f12e1682]:
+                  - generic [ref=f12e1683]: misc
+                  - generic [ref=f12e1684]: Undamaged
+                - generic [ref=f12e1685]: One bath towel hanging on a wall-mounted bar beside the tub — a medium...
+                - generic [ref=f12e1686]: "At: Bathroom"
+            - button "⊕" [ref=f12e1687] [cursor=pointer]
+          - generic [ref=f12e1690]:
+            - generic [ref=f12e1691]:
+              - generic [ref=f12e1692]:
+                - generic [ref=f12e1693]:
+                  - generic [ref=f12e1694]: 📦
+                  - generic [ref=f12e1695]: Bathroom Mirror
+                - generic [ref=f12e1696]: misc
+              - generic [ref=f12e1697]:
+                - generic [ref=f12e1698]:
+                  - generic [ref=f12e1699]: misc
+                  - generic [ref=f12e1700]: Undamaged
+                - generic [ref=f12e1701]: Rectangular medicine cabinet with a mirrored door, surface-mounted abo...
+                - generic [ref=f12e1702]: "At: Bathroom"
+            - button "⊕" [ref=f12e1703] [cursor=pointer]
+          - generic [ref=f12e1706]:
+            - generic [ref=f12e1707]:
+              - generic [ref=f12e1708]:
+                - generic [ref=f12e1709]:
+                  - generic [ref=f12e1710]: 📦
+                  - generic [ref=f12e1711]: Paperback (Bathroom)
+                - generic [ref=f12e1712]: misc
+              - generic [ref=f12e1713]:
+                - generic [ref=f12e1714]:
+                  - generic [ref=f12e1715]: misc
+                  - generic [ref=f12e1716]: Undamaged
+                - generic [ref=f12e1717]: A paperback novel, face-down on the wooden bathroom shelf, spine crack...
+                - generic [ref=f12e1718]: "At: Bathroom"
+            - button "⊕" [ref=f12e1719] [cursor=pointer]
+        - button "TOOLS" [ref=f12e1721] [cursor=pointer]
+      - button "▲ TERMINAL" [ref=f12e27]
+  - button "Open Next.js Dev Tools" [ref=f12e46] [cursor=pointer]
+  - alert [ref=f12e783]

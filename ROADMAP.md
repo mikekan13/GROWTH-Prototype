@@ -1,6 +1,12 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-07-10
+Last updated: 2026-08-26
+
+> 2026-08-26: stock-catalog structure+balance compliance pass (487 items: structured
+> effects[]/expiry across all traits, scene/minutes purged per r-2026-08-26-01,
+> campaign-trait KV placeholders repriced, 2 legacy betaDraft roots flagged);
+> forge authoring law folded into 00_CANON_CORE.md; round-5 Violet review in
+> progress (rulings r-2026-08-24-01..19 + 08-25/08-26 landed in rulebook/rulings.md).
 
 ## Status (2026-07-10) — BUILD PHASE (GROWTH_BUILD_PLAN.md is the active task list)
 

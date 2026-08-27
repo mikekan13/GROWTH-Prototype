@@ -1,0 +1,62 @@
+- generic [active] [ref=f8e1]:
+  - generic [ref=f8e2]:
+    - banner [ref=f8e3]:
+      - generic [ref=f8e4]:
+        - generic [ref=f8e9]: CANVAS://session.layer.0
+        - generic [ref=f8e10]: ⊘ ⊕
+      - generic [ref=f8e11]:
+        - generic [ref=f8e12]:
+          - link "←" [ref=f8e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=f8e14]:
+            - heading "The Incubator" [level=1] [ref=f8e15]
+            - text: DAYA
+        - generic [ref=f8e16]:
+          - button "Forge" [ref=f8e17]
+          - button "Canvas" [ref=f8e18]
+          - button "Tapestry" [ref=f8e19]
+        - generic [ref=f8e20]:
+          - button "⧗ 1st of January, Year 1 0.000 cyc" [ref=f8e71] [cursor=pointer]:
+            - generic [ref=f8e72]: ⧗
+            - generic [ref=f8e73]: 1st of January, Year 1
+            - generic [ref=f8e74]: 0.000 cyc
+          - generic [ref=f8e40]:
+            - generic [ref=f8e41]:
+              - generic [ref=f8e42]: "0"
+              - generic [ref=f8e43]: ҜRMA
+            - generic [ref=f8e44]:
+              - generic [ref=f8e45]: "0"
+              - generic [ref=f8e46]: FLD
+            - generic [ref=f8e47]:
+              - generic [ref=f8e48]:
+                - generic [ref=f8e49]: "0"
+                - generic [ref=f8e50]: CRY
+              - generic [ref=f8e51]: "]"
+          - link "Campaign Settings" [ref=f8e21] [cursor=pointer]:
+            - /url: /watcher/campaign/cms5z4j6z0000zg48z5vzl2jn/settings
+    - main [ref=f8e25]:
+      - generic [ref=f8e75]:
+        - img [ref=f8e76]:
+          - generic [ref=f8e79]:
+            - generic [ref=f8e86]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+            - generic [ref=f8e102]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+        - button "TOOLS" [ref=f8e125] [cursor=pointer]
+      - button "▲ TERMINAL" [ref=f8e26]
+  - generic [ref=f8e35]:
+    - generic [ref=f8e36]: "[ Initializing physics... ]"
+    - generic [ref=f8e37]: THREE.js + CANNON-es
+  - button "Open Next.js Dev Tools" [ref=f8e57] [cursor=pointer]
+  - alert [ref=f8e61]

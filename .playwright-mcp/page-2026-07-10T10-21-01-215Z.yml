@@ -1,0 +1,148 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - banner [ref=f7e25]:
+      - generic [ref=f7e26]:
+        - generic [ref=f7e31]: TERMINAL://reality.layer.0
+        - generic [ref=f7e32]: ⊘ ⊕
+      - generic [ref=f7e33]:
+        - generic [ref=f7e34]:
+          - link "GRO.WTH" [ref=f7e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=f7e36]:
+              - generic [ref=f7e40]: G
+              - generic [ref=f7e41]: R
+              - generic [ref=f7e42]: O
+              - generic [ref=f7e44]: <n>
+              - generic [ref=f7e45]: W
+              - generic [ref=f7e46]: T
+              - generic [ref=f7e47]: H
+          - generic [ref=f7e48]:
+            - generic [ref=f7e49]: Terminal Admin
+            - generic [ref=f7e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=f7e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=f7e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=f7e53]:
+              - generic [ref=f7e54]: E
+              - generic [ref=f7e55]: Ŷ
+              - generic [ref=f7e56]: ∃
+              - generic [ref=f7e57]: tehr
+              - generic [ref=f7e58]: "N"
+              - generic [ref=f7e59]: ET
+          - link "Terminal" [ref=f7e60] [cursor=pointer]:
+            - /url: /terminal
+        - 'button "Mikekan13 CONSCIOUSNESS: INTERFACED ▾" [ref=f7e62]':
+          - generic [ref=f7e63]:
+            - generic [ref=f7e64]: Mikekan13
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=f7e65]: ▾
+    - main [ref=f7e67]:
+      - generic [ref=f7e68]: __PRIME__ | ACTIVE
+      - generic [ref=f7e70]:
+        - textbox "Character Name" [ref=f7e88]: Tara Almswood
+        - generic [ref=f7e89]:
+          - generic [ref=f7e90]: Seed
+          - combobox [ref=f7e92]:
+            - option "— Select a Seed —" [selected]
+            - option "Human"
+        - generic [ref=f7e93]:
+          - generic [ref=f7e94]:
+            - generic [ref=f7e95]:
+              - generic [ref=f7e96]: Reference Photos
+              - generic [ref=f7e97]: Upload photos of your character inspiration. Used for face identity and auto-description.
+            - generic [ref=f7e99] [cursor=pointer]: + Upload
+          - generic [ref=f7e101] [cursor=pointer]:
+            - generic [ref=f7e102]: +
+            - generic [ref=f7e103]: Add Photo
+        - generic [ref=f7e105]: Select a seed above to define your physical identity.
+        - generic [ref=f7e106]:
+          - generic [ref=f7e107]: Style Preferences
+          - generic [ref=f7e108]: Your character's visual style. Colors and aesthetic shape how equipment and clothing appear.
+          - generic [ref=f7e109]:
+            - generic [ref=f7e110]:
+              - generic [ref=f7e111]: primary
+              - textbox [ref=f7e112] [cursor=pointer]: "#582a72"
+              - generic [ref=f7e113]: "#582a72"
+            - generic [ref=f7e114]:
+              - generic [ref=f7e115]: secondary
+              - textbox [ref=f7e116] [cursor=pointer]: "#d0a030"
+              - generic [ref=f7e117]: "#D0A030"
+            - generic [ref=f7e118]:
+              - generic [ref=f7e119]: tertiary
+              - textbox [ref=f7e120] [cursor=pointer]: "#22ab94"
+              - generic [ref=f7e121]: "#22ab94"
+          - generic [ref=f7e122]:
+            - generic [ref=f7e123]: Aesthetic (choose up to 2)
+            - generic [ref=f7e124]:
+              - button "Ornate" [ref=f7e125] [cursor=pointer]
+              - button "Practical" [ref=f7e126] [cursor=pointer]
+              - button "Rugged" [ref=f7e127] [cursor=pointer]
+              - button "Elegant" [ref=f7e128] [cursor=pointer]
+              - button "Minimal" [ref=f7e129] [cursor=pointer]
+              - button "Wild" [ref=f7e130] [cursor=pointer]
+              - button "Military" [ref=f7e131] [cursor=pointer]
+              - button "Scholarly" [ref=f7e132] [cursor=pointer]
+              - button "Noble" [ref=f7e133] [cursor=pointer]
+              - button "Street" [ref=f7e134] [cursor=pointer]
+              - button "Ceremonial" [ref=f7e135] [cursor=pointer]
+              - button "Artisan" [ref=f7e136] [cursor=pointer]
+              - button "Nomadic" [ref=f7e137] [cursor=pointer]
+              - button "Mystic" [ref=f7e138] [cursor=pointer]
+              - button "Mercenary" [ref=f7e139] [cursor=pointer]
+              - button "Courtly" [ref=f7e140] [cursor=pointer]
+              - button "Tribal" [ref=f7e141] [cursor=pointer]
+              - button "Anarchic" [ref=f7e142] [cursor=pointer]
+              - button "Maritime" [ref=f7e143] [cursor=pointer]
+              - button "Monastic" [ref=f7e144] [cursor=pointer]
+              - button "Gothic" [ref=f7e145] [cursor=pointer]
+              - button "Theatrical" [ref=f7e146] [cursor=pointer]
+              - button "Pastoral" [ref=f7e147] [cursor=pointer]
+              - button "Ascetic" [ref=f7e148] [cursor=pointer]
+              - button "Industrial" [ref=f7e149] [cursor=pointer]
+              - button "Diplomatic" [ref=f7e150] [cursor=pointer]
+              - button "Predatory" [ref=f7e151] [cursor=pointer]
+              - button "Festive" [ref=f7e152] [cursor=pointer]
+              - button "Ancient" [ref=f7e153] [cursor=pointer]
+              - button "Biomantic" [ref=f7e154] [cursor=pointer]
+        - generic [ref=f7e155]:
+          - generic [ref=f7e156]:
+            - generic [ref=f7e157]:
+              - generic [ref=f7e158]: Visual Identity
+              - generic [ref=f7e159]: Lock your character's appearance. This defines how they look across all portraits, tokens, and 3D renders.
+            - button "Lock Identity" [disabled] [ref=f7e160]
+          - generic [ref=f7e161]:
+            - generic [ref=f7e162]:
+              - generic [ref=f7e163]: Portrait
+              - img "Portrait — not yet generated" [ref=f7e165]
+            - generic [ref=f7e166]:
+              - generic [ref=f7e167]: Token
+              - img "Token — not yet generated" [ref=f7e169]
+            - generic [ref=f7e170]:
+              - generic [ref=f7e171]: 3D View
+              - generic [ref=f7e173]:
+                - generic [ref=f7e174]: ▱
+                - generic [ref=f7e175]: Coming Soon
+        - generic [ref=f7e176]:
+          - generic [ref=f7e178]:
+            - generic [ref=f7e179]: Inventory
+            - generic [ref=f7e180]: Items held by this character. Drag items from the canvas onto this character to add; remove on the canvas card.
+          - generic [ref=f7e182]:
+            - generic [ref=f7e183]: Inventory
+            - generic [ref=f7e184]: No items.
+        - generic [ref=f7e185]:
+          - generic [ref=f7e186]: Backstory
+          - generic [ref=f7e187]: Trailblazer-submitted backstory. Use to inform seed, root, and branch creation.
+          - textbox "Write your character's story here..." [ref=f7e188]
+        - generic [ref=f7e189]:
+          - button "Saved" [disabled] [ref=f7e190]
+          - button "Submit to Watcher" [disabled] [ref=f7e191]
+    - contentinfo [ref=f7e71]:
+      - generic [ref=f7e72]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=f7e73]: ====================
+      - generic [ref=f7e74]: "REALITY LEVEL: Primary Translation"
+    - button "◎ View As" [ref=f7e76]:
+      - generic [ref=f7e77]: ◎
+      - text: View As
+  - button "Open Next.js Dev Tools" [ref=f7e83] [cursor=pointer]:
+    - img [ref=f7e84]
+  - alert [ref=f7e192]

@@ -1,0 +1,29 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e9]: CANVAS://session.layer.0
+        - generic [ref=e10]: ⊘ ⊕
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - link "←" [ref=e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=e14]:
+            - heading "The Prime Campaign" [level=1] [ref=e15]
+            - text: Cosmic Fantasy
+            - generic [ref=e16]: "Invite: D588E0F1"
+        - generic [ref=e17]:
+          - button "Canvas" [ref=e18]
+          - button "Forge" [ref=e19]
+          - button "Encounters" [ref=e20]
+          - button "Tapestry" [ref=e21]
+          - button "Character" [ref=e22]
+    - main [ref=e23]:
+      - button "▲ TERMINAL" [ref=e24]
+  - generic [ref=e25]:
+    - img [ref=e27]
+    - generic [ref=e33]:
+      - generic [ref=e34]: "[ Downloading dice engine... ]"
+      - generic [ref=e35]: THREE.js + CANNON-es
+  - button "Open Next.js Dev Tools" [ref=e43] [cursor=pointer]:
+    - img [ref=e44]

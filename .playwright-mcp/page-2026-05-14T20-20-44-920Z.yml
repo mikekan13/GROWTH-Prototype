@@ -1,0 +1,83 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e31]: TERMINAL://reality.layer.0
+        - generic [ref=e32]: ⊘ ⊕
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - link "GRO.WTH" [ref=e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=e36]:
+              - generic [ref=e40]: G
+              - generic [ref=e41]: R
+              - generic [ref=e42]: O
+              - generic [ref=e44]: <n>
+              - generic [ref=e45]: W
+              - generic [ref=e46]: T
+              - generic [ref=e47]: H
+          - generic [ref=e48]:
+            - generic [ref=e49]: Trailblazer Portal
+            - generic [ref=e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=e53]:
+              - generic [ref=e54]: E
+              - generic [ref=e55]: Ŷ
+              - generic [ref=e56]: ∃
+              - generic [ref=e57]: tehr
+              - generic [ref=e58]: "N"
+              - generic [ref=e59]: ET
+          - link "Portal" [ref=e60] [cursor=pointer]:
+            - /url: /trailblazer
+        - 'button "ClaudePlayer CONSCIOUSNESS: INTERFACED ▾" [ref=e62]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: ClaudePlayer
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=e65]: ▾
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]: The Prime Campaign
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: "Backstory: ClaudePlayer's Character"
+            - generic [ref=e73]: SUBMITTED
+          - paragraph [ref=e74]: Answer the prompts below to build your character's backstory. You don't need to answer every question — focus on what feels important. Your Watcher will use this to craft the mechanical character.
+          - generic [ref=e75]: 8 of 8 prompts answered
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e78]: Where did you grow up? Describe your childhood.
+              - textbox [ref=e79]: I grew up in the river-port town of Old Hollow, where every dock smelled of tar and lamp oil.
+            - generic [ref=e80]:
+              - generic [ref=e81]: Who raised you? What was your relationship with them?
+              - textbox [ref=e82]: My grandmother raised me. She kept a small apothecary and taught me to read tincture labels before I could read my own name.
+            - generic [ref=e83]:
+              - generic [ref=e84]: What cultural or social group do you belong to?
+              - textbox [ref=e85]: I belong to the Tideborn — a loose guild of barge-folk who move trade along the Saltwheel river.
+            - generic [ref=e86]:
+              - generic [ref=e87]: Describe your physical appearance — what do people notice first?
+              - textbox [ref=e88]: Lean, weather-bitten, with a fresh nick above the left eyebrow that did not have time to scar before it scarred someone else first.
+            - generic [ref=e89]:
+              - generic [ref=e90]: What formative event shaped who you are today?
+              - textbox [ref=e91]: The night the Reach Riders rode through Old Hollow and burned the south wharf. I was thirteen. I learned that some fires were never meant to go out.
+            - generic [ref=e92]:
+              - generic [ref=e93]: What drives you? What do you want more than anything?
+              - textbox [ref=e94]: Reach Rider gold, returned by force, to the families it was stripped from. I want my grandmother to die under a quiet roof.
+            - generic [ref=e95]:
+              - generic [ref=e96]: What are you afraid of? What do you avoid?
+              - textbox [ref=e97]: I am afraid of standing still — of being still long enough to be found by the things I left behind.
+            - generic [ref=e98]:
+              - generic [ref=e99]: Is there anything else your Watcher should know?
+              - textbox [ref=e100]: I do not pray, but I am not unwilling to be prayed for.
+          - paragraph [ref=e118]: Saved.
+          - generic [ref=e101]:
+            - button "Save Draft" [ref=e102]
+            - button "Submit for Review" [ref=e103]
+    - contentinfo [ref=e104]:
+      - generic [ref=e105]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=e106]: ====================
+      - generic [ref=e107]: "REALITY LEVEL: Primary Translation"
+  - button "Open Next.js Dev Tools" [ref=e113] [cursor=pointer]:
+    - img [ref=e114]
+  - alert [ref=e117]

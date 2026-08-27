@@ -1,0 +1,436 @@
+- generic [active] [ref=f20e1]:
+  - generic [ref=f20e2]:
+    - banner [ref=f20e3]:
+      - generic [ref=f20e4]:
+        - generic [ref=f20e9]: CANVAS://session.layer.0
+        - generic [ref=f20e10]: ⊘ ⊕
+      - generic [ref=f20e11]:
+        - generic [ref=f20e12]:
+          - link "←" [ref=f20e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=f20e14]:
+            - heading "The Incubator" [level=1] [ref=f20e15]
+            - text: DAYA
+            - generic [ref=f20e16]: "Invite: 482ff8d4"
+        - generic [ref=f20e17]:
+          - button "Forge" [ref=f20e18]
+          - button "Canvas" [ref=f20e19]
+          - button "Tapestry" [ref=f20e20]
+        - generic [ref=f20e21]:
+          - button "⧗ 1st of January, Year 1 0.000 cyc" [ref=f20e51] [cursor=pointer]:
+            - generic [ref=f20e52]: ⧗
+            - generic [ref=f20e53]: 1st of January, Year 1
+            - generic [ref=f20e54]: 0.000 cyc
+          - generic [ref=f20e55]:
+            - generic [ref=f20e56]:
+              - generic [ref=f20e57]: "0"
+              - generic [ref=f20e58]: ҜRMA
+            - generic [ref=f20e59]:
+              - generic [ref=f20e60]: "0"
+              - generic [ref=f20e61]: FLD
+            - generic [ref=f20e62]:
+              - generic [ref=f20e63]:
+                - generic [ref=f20e64]: "0"
+                - generic [ref=f20e65]: CRY
+              - generic [ref=f20e66]: "]"
+          - link "Campaign Settings" [ref=f20e22] [cursor=pointer]:
+            - /url: /watcher/campaign/cms5z4j6z0000zg48z5vzl2jn/settings
+    - main [ref=f20e26]:
+      - generic [ref=f20e67]:
+        - img [ref=f20e68]:
+          - generic [ref=f20e71]:
+            - generic [ref=f20e78]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+            - generic [ref=f20e94]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+          - generic [ref=f20e116]:
+            - generic:
+              - text: □ VIOLET'S APARTMENT — FOURTH FLOOR WALKUP
+              - generic: (0)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f20e119] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f20e121] [cursor=pointer]
+            - button "▸ ENTER" [ref=f20e123] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Sub-locations": ⌂3
+                - generic "Location type": point of interest
+            - generic [ref=f20e125]:
+              - generic [ref=f20e126]: "A pre-war studio on the fourth floor of a five-story walkup. ~440 sq ft, 9.5 ft ceilings. Single main room with galley kitchen alcove and small bathroom. Autumn, ~4:00 PM. The kind of room assembled from want and necessity over time — nothing matches, everything has a reason. Hero composition: from the entry door, the eye travels across scarred oak floor toward the large street-facing window, the sunbeam landing on the desk, the corkboard above it. The couch anchors the left third. One empty pushpin on the corkboard is the room's open question."
+              - generic [ref=f20e127]:
+                - generic [ref=f20e128]:
+                  - generic [ref=f20e129]: ENVIRONMENT
+                  - generic [ref=f20e130]: "Urban, fourth floor, autumn afternoon. Street noise bleeds through a permanent half-inch gap in the lower window sash — traffic hiss, distant sirens, a dog somewhere. Radiator ticks. Air near the window is cooler than the rest of the room. The sunbeam is warm enough to nap in. Scent: cold coffee, ink, ghost of vanilla candle, clean laundry underneath it all. Color palette: eggshell walls (#E8E2D5), dark scarred oak floor (#4A3728), deep forest green couch (#2E4A3B), rust herringbone blanket (#B5651D / #EFE6D8), dying autumn amber sunbeam (#F5B942), cool desaturated shadow (#8C8A85)."
+                - generic [ref=f20e131]:
+                  - generic [ref=f20e132]: POPULATION
+                  - generic [ref=f20e133]: One. Violet.
+                - generic [ref=f20e134]:
+                  - generic [ref=f20e135]: DANGER
+                  - generic [ref=f20e136]: (empty)
+                - generic [ref=f20e137]:
+                  - generic [ref=f20e138]: CONTROLLED BY
+                  - generic [ref=f20e139]: (empty)
+              - generic [ref=f20e140]:
+                - generic [ref=f20e141]: TAGS
+                - generic [ref=f20e142]:
+                  - generic [ref=f20e143]: studio
+                  - generic [ref=f20e144]: pre-war
+                  - generic [ref=f20e145]: walkup
+                  - generic [ref=f20e146]: fourth-floor
+                  - generic [ref=f20e147]: DAYA
+                  - generic [ref=f20e148]: Violet
+                  - generic [ref=f20e149]: intimate
+                  - generic [ref=f20e150]: autumn
+              - generic [ref=f20e151]:
+                - generic [ref=f20e152]: GM NOTES
+                - generic [ref=f20e153]: "Camera-favored angle: entry door looking toward the window. Nothing matches — furniture accumulated, not purchased as a set. Wear is specific and story-bearing. One empty pushpin on corkboard is mandatory."
+            - button "⊗" [ref=f20e155] [cursor=pointer]
+          - generic [ref=f20e161]:
+            - generic:
+              - text: □ MAIN ROOM
+              - generic: (0)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f20e164] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f20e166] [cursor=pointer]
+            - button "▸ ENTER" [ref=f20e168] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Location type": point of interest
+            - generic [ref=f20e170]:
+              - generic [ref=f20e171]: "The center and front of the studio. Dark-stained oak plank floor (3.5 in boards, front-to-back), heavily scarred. Gaps between boards hold dust and a stray bobby pin. Scratches radiate from the desk chair's range. A pale water ring near the couch. Two cream candle-wax droplets fused near the bathroom door. A two-note creak on the path between couch and bathroom — the floor worn subtly lighter along that walking line. Walls eggshell (#E8E2D5), slight sheen under direct light, matte in shadow. Hairline crack radiating from upper-left corner of the window frame. Ghost rectangles where previous tenants' frames hung. One scuff at chair-height near the desk. Ceiling: same eggshell, one original plaster medallion (painted over) around a bare-bulb fixture with a paper globe shade, dented on one side. Exposed steam pipe in the far corner, floor-to-ceiling, painted over many times, paint slightly cracked at the joints."
+              - generic [ref=f20e172]:
+                - generic [ref=f20e173]:
+                  - generic [ref=f20e174]: ENVIRONMENT
+                  - generic [ref=f20e175]: Autumn afternoon. Sunbeam from the street-facing window cuts amber across the desk and floor. Radiator ticks in the corner. Street bleed constant through the window gap. Messy but not squalid — lived-in, not neglected.
+                - generic [ref=f20e176]:
+                  - generic [ref=f20e177]: POPULATION
+                  - generic [ref=f20e178]: (empty)
+                - generic [ref=f20e179]:
+                  - generic [ref=f20e180]: DANGER
+                  - generic [ref=f20e181]: (empty)
+                - generic [ref=f20e182]:
+                  - generic [ref=f20e183]: CONTROLLED BY
+                  - generic [ref=f20e184]: (empty)
+              - generic [ref=f20e185]:
+                - generic [ref=f20e186]: TAGS
+                - generic [ref=f20e187]:
+                  - generic [ref=f20e188]: main-room
+                  - generic [ref=f20e189]: studio
+                  - generic [ref=f20e190]: Violet
+              - generic [ref=f20e191]:
+                - generic [ref=f20e192]: GM NOTES
+                - generic [ref=f20e193]: (empty)
+            - button "⊗" [ref=f20e195] [cursor=pointer]
+          - generic [ref=f20e201]:
+            - generic:
+              - text: □ GALLEY KITCHEN ALCOVE
+              - generic: (0)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f20e204] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f20e206] [cursor=pointer]
+            - button "▸ ENTER" [ref=f20e208] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Location type": point of interest
+            - generic [ref=f20e210]:
+              - generic [ref=f20e211]: "Immediately to the right of the entry door, running along the right wall. Approximately 8 ft deep, 5 ft wide. Ceiling eggshell, slightly yellowed here from old cooking heat. Upper cabinets: one door slightly ajar, revealing mismatched mugs and one glass. Lower cabinets: one knob missing, replaced by a small bolt. Counter: laminate, chipped at the corner nearest the sink. The sink holds dishes — a bowl, a mug, a single plate — waiting. Not a crisis, just a system that got paused. A drying rack to one side, currently empty. Small two-burner stove. A jar of pens on the counter that has nothing to do with cooking. A coffee maker, the carafe holding maybe an inch of cold coffee from this morning."
+              - generic [ref=f20e212]:
+                - generic [ref=f20e213]:
+                  - generic [ref=f20e214]: ENVIRONMENT
+                  - generic [ref=f20e215]: Slightly warmer than the main room. Smells of old coffee and dish soap. The yellowed ceiling tells the story of many meals.
+                - generic [ref=f20e216]:
+                  - generic [ref=f20e217]: POPULATION
+                  - generic [ref=f20e218]: (empty)
+                - generic [ref=f20e219]:
+                  - generic [ref=f20e220]: DANGER
+                  - generic [ref=f20e221]: (empty)
+                - generic [ref=f20e222]:
+                  - generic [ref=f20e223]: CONTROLLED BY
+                  - generic [ref=f20e224]: (empty)
+              - generic [ref=f20e225]:
+                - generic [ref=f20e226]: TAGS
+                - generic [ref=f20e227]:
+                  - generic [ref=f20e228]: kitchen
+                  - generic [ref=f20e229]: alcove
+                  - generic [ref=f20e230]: Violet
+              - generic [ref=f20e231]:
+                - generic [ref=f20e232]: GM NOTES
+                - generic [ref=f20e233]: (empty)
+            - button "⊗" [ref=f20e235] [cursor=pointer]
+          - generic [ref=f20e241]:
+            - generic:
+              - text: □ BATHROOM
+              - generic: (0)
+            - generic: ❖
+            - button "✨ GENERATE" [ref=f20e244] [cursor=pointer]
+            - button "✦ CRYSTALLIZE" [ref=f20e246] [cursor=pointer]
+            - button "▸ ENTER" [ref=f20e248] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Location type": point of interest
+            - generic [ref=f20e250]:
+              - generic [ref=f20e251]: "Small. Glimpsed through a half-open door. White hex-tile floor — a few tiles cracked, grout gray with age. Aged alcove tub with a wire caddy across it. Wooden shelf at eye level: a face-down paperback, a stub of candle, a water glass. Pedestal sink, toothpaste tube rolled from the bottom. Warm-white bulb over the mirror — currently off. The room holds the scent of whatever soap she uses, faint under everything else."
+              - generic [ref=f20e252]:
+                - generic [ref=f20e253]:
+                  - generic [ref=f20e254]: ENVIRONMENT
+                  - generic [ref=f20e255]: Small and still. Warm-white bulb off. The hex tile is cold underfoot.
+                - generic [ref=f20e256]:
+                  - generic [ref=f20e257]: POPULATION
+                  - generic [ref=f20e258]: (empty)
+                - generic [ref=f20e259]:
+                  - generic [ref=f20e260]: DANGER
+                  - generic [ref=f20e261]: (empty)
+                - generic [ref=f20e262]:
+                  - generic [ref=f20e263]: CONTROLLED BY
+                  - generic [ref=f20e264]: (empty)
+              - generic [ref=f20e265]:
+                - generic [ref=f20e266]: TAGS
+                - generic [ref=f20e267]:
+                  - generic [ref=f20e268]: bathroom
+                  - generic [ref=f20e269]: Violet
+              - generic [ref=f20e270]:
+                - generic [ref=f20e271]: GM NOTES
+                - generic [ref=f20e272]: (empty)
+            - button "⊗" [ref=f20e274] [cursor=pointer]
+          - generic [ref=f20e282]:
+            - generic [ref=f20e283]:
+              - generic [ref=f20e284]:
+                - generic [ref=f20e285]:
+                  - generic [ref=f20e286]: 📦
+                  - generic [ref=f20e287]: Ceramic Mug
+                - generic [ref=f20e288]: misc
+              - generic [ref=f20e289]:
+                - generic [ref=f20e290]:
+                  - generic [ref=f20e291]: misc
+                  - generic [ref=f20e292]: Undamaged
+                - generic [ref=f20e293]: Off-white stoneware mug, the glaze crazed with fine hairline cracks fr...
+                - generic [ref=f20e294]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f20e295] [cursor=pointer]
+          - generic [ref=f20e298]:
+            - generic [ref=f20e299]:
+              - generic [ref=f20e300]:
+                - generic [ref=f20e301]:
+                  - generic [ref=f20e302]: 📦
+                  - generic [ref=f20e303]: Two-Seat Couch
+                - generic [ref=f20e304]: misc
+              - generic [ref=f20e305]:
+                - generic [ref=f20e306]:
+                  - generic [ref=f20e307]: misc
+                  - generic [ref=f20e308]: Undamaged
+                - generic [ref=f20e309]: Low-slung couch upholstered in slate-grey linen, west wall, facing the...
+                - generic [ref=f20e310]: "At: Main Room"
+            - button "⊕" [ref=f20e311] [cursor=pointer]
+          - generic [ref=f20e314]:
+            - generic [ref=f20e315]:
+              - generic [ref=f20e316]:
+                - generic [ref=f20e317]:
+                  - generic [ref=f20e318]: 📦
+                  - generic [ref=f20e319]: Stainless Steel Sink
+                - generic [ref=f20e320]: misc
+              - generic [ref=f20e321]:
+                - generic [ref=f20e322]:
+                  - generic [ref=f20e323]: misc
+                  - generic [ref=f20e324]: Undamaged
+                - generic [ref=f20e325]: Single-basin stainless steel sink set into the laminate counter, fauce...
+                - generic [ref=f20e326]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f20e327] [cursor=pointer]
+          - generic [ref=f20e330]:
+            - generic [ref=f20e331]:
+              - generic [ref=f20e332]:
+                - generic [ref=f20e333]:
+                  - generic [ref=f20e334]: 📦
+                  - generic [ref=f20e335]: Low Wooden Table
+                - generic [ref=f20e336]: misc
+              - generic [ref=f20e337]:
+                - generic [ref=f20e338]:
+                  - generic [ref=f20e339]: misc
+                  - generic [ref=f20e340]: Undamaged
+                - generic [ref=f20e341]: Rectangular coffee table, solid pine stained walnut, sitting in front ...
+                - generic [ref=f20e342]: "At: Main Room"
+            - button "⊕" [ref=f20e343] [cursor=pointer]
+          - generic [ref=f20e346]:
+            - generic [ref=f20e347]:
+              - generic [ref=f20e348]:
+                - generic [ref=f20e349]:
+                  - generic [ref=f20e350]: 📦
+                  - generic [ref=f20e351]: Refrigerator
+                - generic [ref=f20e352]: misc
+              - generic [ref=f20e353]:
+                - generic [ref=f20e354]:
+                  - generic [ref=f20e355]: misc
+                  - generic [ref=f20e356]: Undamaged
+                - generic [ref=f20e357]: Compact apartment refrigerator, white, east wall. The exterior is clea...
+                - generic [ref=f20e358]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f20e359] [cursor=pointer]
+          - generic [ref=f20e362]:
+            - generic [ref=f20e363]:
+              - generic [ref=f20e364]:
+                - generic [ref=f20e365]:
+                  - generic [ref=f20e366]: 📦
+                  - generic [ref=f20e367]: Floor Lamp
+                - generic [ref=f20e368]: misc
+              - generic [ref=f20e369]:
+                - generic [ref=f20e370]:
+                  - generic [ref=f20e371]: misc
+                  - generic [ref=f20e372]: Undamaged
+                - generic [ref=f20e373]: Tall arc floor lamp, matte black stem, off-white linen shade slightly ...
+                - generic [ref=f20e374]: "At: Main Room"
+            - button "⊕" [ref=f20e375] [cursor=pointer]
+          - generic [ref=f20e378]:
+            - generic [ref=f20e379]:
+              - generic [ref=f20e380]:
+                - generic [ref=f20e381]:
+                  - generic [ref=f20e382]: 📦
+                  - generic [ref=f20e383]: Kitchen Window
+                - generic [ref=f20e384]: misc
+              - generic [ref=f20e385]:
+                - generic [ref=f20e386]:
+                  - generic [ref=f20e387]: misc
+                  - generic [ref=f20e388]: Undamaged
+                - generic [ref=f20e389]: Single-hung window above the sink, aluminum frame painted over once in...
+                - generic [ref=f20e390]: "At: Galley Kitchen Alcove"
+            - button "⊕" [ref=f20e391] [cursor=pointer]
+          - generic [ref=f20e394]:
+            - generic [ref=f20e395]:
+              - generic [ref=f20e396]:
+                - generic [ref=f20e397]:
+                  - generic [ref=f20e398]: 📦
+                  - generic [ref=f20e399]: Living Room Window
+                - generic [ref=f20e400]: misc
+              - generic [ref=f20e401]:
+                - generic [ref=f20e402]:
+                  - generic [ref=f20e403]: misc
+                  - generic [ref=f20e404]: Undamaged
+                - generic [ref=f20e405]: Large south-facing window, double-hung, white aluminum frame. Closed. ...
+                - generic [ref=f20e406]: "At: Main Room"
+            - button "⊕" [ref=f20e407] [cursor=pointer]
+          - generic [ref=f20e410]:
+            - generic [ref=f20e411]:
+              - generic [ref=f20e412]:
+                - generic [ref=f20e413]:
+                  - generic [ref=f20e414]: 📦
+                  - generic [ref=f20e415]: Throw Blanket
+                - generic [ref=f20e416]: misc
+              - generic [ref=f20e417]:
+                - generic [ref=f20e418]:
+                  - generic [ref=f20e419]: misc
+                  - generic [ref=f20e420]: Undamaged
+                - generic [ref=f20e421]: Loosely woven cotton throw in a faded terracotta — once a deeper rust,...
+                - generic [ref=f20e422]: "At: Main Room"
+            - button "⊕" [ref=f20e423] [cursor=pointer]
+          - generic [ref=f20e426]:
+            - generic [ref=f20e427]:
+              - generic [ref=f20e428]:
+                - generic [ref=f20e429]:
+                  - generic [ref=f20e430]: 📦
+                  - generic [ref=f20e431]: Exterior Door
+                - generic [ref=f20e432]: misc
+              - generic [ref=f20e433]:
+                - generic [ref=f20e434]:
+                  - generic [ref=f20e435]: misc
+                  - generic [ref=f20e436]: Undamaged
+                - generic [ref=f20e437]: Solid-core apartment door on the north wall, painted white over many p...
+                - generic [ref=f20e438]: "At: Main Room"
+            - button "⊕" [ref=f20e439] [cursor=pointer]
+          - generic [ref=f20e442]:
+            - generic [ref=f20e443]:
+              - generic [ref=f20e444]:
+                - generic [ref=f20e445]:
+                  - generic [ref=f20e446]: 📦
+                  - generic [ref=f20e447]: Apartment Keys
+                - generic [ref=f20e448]: misc
+              - generic [ref=f20e449]:
+                - generic [ref=f20e450]:
+                  - generic [ref=f20e451]: misc
+                  - generic [ref=f20e452]: Undamaged
+                - generic [ref=f20e453]: A small ring holding two keys — a deadbolt key and a building entry ke...
+                - generic [ref=f20e454]: "At: Main Room"
+            - button "⊕" [ref=f20e455] [cursor=pointer]
+          - generic [ref=f20e458]:
+            - generic [ref=f20e459]:
+              - generic [ref=f20e460]:
+                - generic [ref=f20e461]:
+                  - generic [ref=f20e462]: 📦
+                  - generic [ref=f20e463]: Bathroom Mirror
+                - generic [ref=f20e464]: misc
+              - generic [ref=f20e465]:
+                - generic [ref=f20e466]:
+                  - generic [ref=f20e467]: misc
+                  - generic [ref=f20e468]: Undamaged
+                - generic [ref=f20e469]: Rectangular medicine cabinet with a mirrored door, surface-mounted abo...
+                - generic [ref=f20e470]: "At: Bathroom"
+            - button "⊕" [ref=f20e471] [cursor=pointer]
+          - generic [ref=f20e474]:
+            - generic [ref=f20e475]:
+              - generic [ref=f20e476]:
+                - generic [ref=f20e477]:
+                  - generic [ref=f20e478]: 📦
+                  - generic [ref=f20e479]: Bathroom Sink
+                - generic [ref=f20e480]: misc
+              - generic [ref=f20e481]:
+                - generic [ref=f20e482]:
+                  - generic [ref=f20e483]: misc
+                  - generic [ref=f20e484]: Undamaged
+                - generic [ref=f20e485]: Pedestal sink, white porcelain, below the medicine cabinet. The basin ...
+                - generic [ref=f20e486]: "At: Bathroom"
+            - button "⊕" [ref=f20e487] [cursor=pointer]
+          - generic [ref=f20e490]:
+            - generic [ref=f20e491]:
+              - generic [ref=f20e492]:
+                - generic [ref=f20e493]:
+                  - generic [ref=f20e494]: 📦
+                  - generic [ref=f20e495]: Toilet
+                - generic [ref=f20e496]: misc
+              - generic [ref=f20e497]:
+                - generic [ref=f20e498]:
+                  - generic [ref=f20e499]: misc
+                  - generic [ref=f20e500]: Undamaged
+                - generic [ref=f20e501]: Standard white porcelain toilet, beside the sink. Lid closed. The tank...
+                - generic [ref=f20e502]: "At: Bathroom"
+            - button "⊕" [ref=f20e503] [cursor=pointer]
+          - generic [ref=f20e506]:
+            - generic [ref=f20e507]:
+              - generic [ref=f20e508]:
+                - generic [ref=f20e509]:
+                  - generic [ref=f20e510]: 📦
+                  - generic [ref=f20e511]: Shower/Tub
+                - generic [ref=f20e512]: misc
+              - generic [ref=f20e513]:
+                - generic [ref=f20e514]:
+                  - generic [ref=f20e515]: misc
+                  - generic [ref=f20e516]: Undamaged
+                - generic [ref=f20e517]: Standard alcove tub with a showerhead, white enamel, opposite the sink...
+                - generic [ref=f20e518]: "At: Bathroom"
+            - button "⊕" [ref=f20e519] [cursor=pointer]
+          - generic [ref=f20e522]:
+            - generic [ref=f20e523]:
+              - generic [ref=f20e524]:
+                - generic [ref=f20e525]:
+                  - generic [ref=f20e526]: 📦
+                  - generic [ref=f20e527]: Bathroom Towel
+                - generic [ref=f20e528]: misc
+              - generic [ref=f20e529]:
+                - generic [ref=f20e530]:
+                  - generic [ref=f20e531]: misc
+                  - generic [ref=f20e532]: Undamaged
+                - generic [ref=f20e533]: One bath towel hanging on a wall-mounted bar beside the tub — a medium...
+                - generic [ref=f20e534]: "At: Bathroom"
+            - button "⊕" [ref=f20e535] [cursor=pointer]
+        - button "TOOLS" [ref=f20e537] [cursor=pointer]
+      - button "▲ TERMINAL" [ref=f20e27]
+  - generic [ref=f20e36]:
+    - generic [ref=f20e37]: "[ Initializing physics... ]"
+    - generic [ref=f20e38]: THREE.js + CANNON-es
+  - button "Open Next.js Dev Tools" [ref=f20e46] [cursor=pointer]
+  - alert [ref=f20e542]

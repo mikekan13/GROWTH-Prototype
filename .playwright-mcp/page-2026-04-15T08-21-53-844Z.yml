@@ -1,0 +1,7 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "← All characters" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e7]: Loading...
+  - button "Open Next.js Dev Tools" [ref=e13] [cursor=pointer]:
+    - img [ref=e14]

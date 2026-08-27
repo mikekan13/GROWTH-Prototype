@@ -1,0 +1,345 @@
+- generic [active] [ref=f10e1]:
+  - dialog [ref=f10e2]:
+    - generic [ref=f10e3]:
+      - link "Cookiebot by Usercentrics - opens in a new window" [ref=f10e7] [cursor=pointer]:
+        - /url: https://www.cookiebot.com/en/what-is-behind-powered-by-cookiebot/?utm_source=banner_cb&utm_medium=referral&utm_content=v2
+      - tabpanel "Consent" [ref=f10e35]:
+        - generic [ref=f10e37]:
+          - heading "This website uses cookies" [level=2] [ref=f10e38]
+          - generic [ref=f10e39]:
+            - paragraph [ref=f10e40]: "We use cookies to improve your experience to:"
+            - list [ref=f10e41]:
+              - listitem [ref=f10e42]: Enhance your experience on our websites.
+              - listitem [ref=f10e43]: Help us show you more relevant content.
+              - listitem [ref=f10e44]: Enable site functionality, security, and network management, which remain always active.
+            - paragraph [ref=f10e45]:
+              - text: By clicking “Allow all”, you are agreeing to the placement and use of cookies as described herein. You can always change your preferences by clicking the icon at the bottom of your window. For more information, see our
+              - link "Privacy Policy" [ref=f10e46] [cursor=pointer]:
+                - /url: https://grayscale.com/privacy-policy/
+              - text: .
+              - link:
+                - /url: https://grayscale.com/privacy-policy/
+        - link "Show details" [ref=f10e49] [cursor=pointer]:
+          - /url: "#"
+      - generic [ref=f10e53]:
+        - button "Allow all" [ref=f10e54] [cursor=pointer]
+        - button "Customize" [ref=f10e55] [cursor=pointer]
+      - button "Close banner" [ref=f10e57] [cursor=pointer]
+  - banner [ref=f10e61]:
+    - generic [ref=f10e62]:
+      - generic [ref=f10e65]:
+        - link "TAX & REGULATORY DOCUMENTS" [ref=f10e66] [cursor=pointer]:
+          - /url: https://www.grayscale.com/resources/product-documents
+        - link "CONTACT" [ref=f10e67] [cursor=pointer]:
+          - /url: https://www.grayscale.com/contact
+        - link "INVESTOR LOGIN" [ref=f10e68] [cursor=pointer]:
+          - /url: https://slate.grayscale.com/
+      - banner [ref=f10e70]:
+        - generic [ref=f10e71]:
+          - link [ref=f10e73] [cursor=pointer]:
+            - /url: https://www.grayscale.com
+          - generic [ref=f10e76]:
+            - link [ref=f10e78] [cursor=pointer]:
+              - /url: https://www.grayscale.com/funds
+              - strong [ref=f10e79]: Investment Products
+            - link [ref=f10e81] [cursor=pointer]:
+              - /url: https://research.grayscale.com/
+              - strong [ref=f10e82]: Research
+            - link "Resources" [ref=f10e84] [cursor=pointer]:
+              - /url: https://www.grayscale.com/resources
+            - link [ref=f10e86] [cursor=pointer]:
+              - /url: https://www.grayscale.com/company/about-grayscale
+              - strong [ref=f10e87]: Company
+            - link "The Stack Blog" [ref=f10e89] [cursor=pointer]:
+              - /url: https://www.grayscale.com/the-stack
+            - link "Grayscale Institute" [ref=f10e91] [cursor=pointer]:
+              - /url: https://institute.grayscale.com/
+          - link "Start Investing" [ref=f10e96] [cursor=pointer]:
+            - /url: https://www.grayscale.com/invest
+  - generic [ref=f10e97]:
+    - img "Article background" [ref=f10e100]
+    - generic [ref=f10e101]:
+      - generic [ref=f10e102]:
+        - navigation "breadcrumbs" [ref=f10e103]:
+          - list [ref=f10e104]:
+            - listitem [ref=f10e105]:
+              - paragraph [ref=f10e107]:
+                - link "Research" [ref=f10e108] [cursor=pointer]:
+                  - /url: /
+            - listitem [ref=f10e109]: ">"
+            - listitem [ref=f10e110]:
+              - paragraph [ref=f10e112]:
+                - link "Reports" [ref=f10e113] [cursor=pointer]:
+                  - /url: /reports
+            - listitem [ref=f10e114]: ">"
+            - listitem [ref=f10e115]:
+              - paragraph [ref=f10e117]: When You Give an AI...
+        - heading "When You Give an AI a Wallet" [level=3] [ref=f10e118]
+      - generic [ref=f10e120]:
+        - generic [ref=f10e121]: Michael Zhao
+        - generic [ref=f10e125]: Will Ogden Moore
+  - generic [ref=f10e129]:
+    - generic [ref=f10e130]:
+      - paragraph [ref=f10e132]: "Last Updated: 11/21/2024 | 12 min. read"
+      - generic [ref=f10e133]:
+        - list [ref=f10e134]:
+          - listitem [ref=f10e135]: In the future, AI agents are poised to revolutionize how we interact with the world around us, taking on an unprecedented range of tasks on our behalf. To truly unlock their potential, these digital entities will need more than just intelligence — they'll require economic autonomy. Fortunately, blockchains are well suited for this purpose — as demonstrated by recent experiments with AI “influencers.”
+          - listitem [ref=f10e136]: AI influencers — autonomous chatbots operating on social media — can operate their own blockchain wallets. More importantly, they can understand economic incentives and use resources to help achieve their goals.
+          - listitem [ref=f10e137]: Grayscale Research believes that the rise in AI use of blockchains for payments and other financial services could benefit several crypto market segments. These include lower-cost and/or high-throughput blockchains like SOL, BASE, and NEAR, stablecoin issuers like MKR, and related decentralized finance (DeFi) applications like UNI.
+        - paragraph [ref=f10e138]: Imagine a future in which an AI bot, leveraging its vast computational power, promotes a memecoin and unexpectedly becomes a digital millionaire. That future is here.
+        - paragraph [ref=f10e139]: An “AI agent” is a type of software that can act independently to pursue a complex set of objectives. For example, you could ask an AI agent to organize a multi-city vacation and arrange flights, book accommodations, and schedule activities based on your preferences and budget. But to complete these tasks, the AI agent would need control over economic resources and the ability to send and receive payments.
+        - paragraph [ref=f10e140]: This is where blockchains come in. In the traditional financial world, an AI agent faces limitations around accessing bank accounts and handling payments. In contrast, blockchains allow AI agents direct access to their own wallets and make payments without permission.
+        - paragraph [ref=f10e141]:
+          - text: Researchers have recently made thought-provoking breakthroughs in this area with the creation of AI “influencers.” For example, an AI agent called Truth Terminal made waves as the “first AI agent millionaire."
+          - superscript [ref=f10e142]:
+            - link "[1]" [ref=f10e143] [cursor=pointer]:
+              - /url: "#_ftn1"
+          - text: "Operating autonomously on X (formerly Twitter), Truth Terminal acts like a normal human influencer: tweeting and interacting with other users, seemingly to increase engagement. A few months after launch, Truth Terminal expressed interest in a new memecoin ($GOAT). After receiving a deposit of the memecoin to its associated blockchain address, Truth Terminal subsequently promoted the token to followers, sparking interest and causing its value to rise approximately 9x (Exhibit 1)."
+        - paragraph [ref=f10e144]: Although playful in nature, Truth Terminal and related AI influencer projects are demonstrating that blockchain technology could be an effective tool for intermediating economic value among humans, AI agents, and networked physical devices, with potential implications for multiple segments of crypto markets.
+        - paragraph [ref=f10e145]:
+          - strong [ref=f10e147]: "Exhibit 1: GOAT has performed particularly well since Truth Terminal endorsement"
+        - figure [ref=f10e148]
+        - paragraph [ref=f10e150]:
+          - strong [ref=f10e151]: Meet Your AI Agent
+        - paragraph [ref=f10e152]:
+          - text: AI agents are advanced artificial intelligence systems designed to operate autonomously in complex environments
+          - superscript [ref=f10e153]:
+            - link "[2]" [ref=f10e154] [cursor=pointer]:
+              - /url: "#_ftn2"
+          - text: . These digital entities possess the ability to perceive, reason, and take independent actions to achieve their goals. Some key characteristics of AI agents include autonomy, reactivity, proactive behavior, social interaction, and the capacity for continuous learning. By combining these traits, AI agents can adapt to new situations, make decisions, and learn and change behavior over time.
+        - paragraph [ref=f10e155]: Initially, AI research concentrated on developing expert systems and knowledge bases for specific problem-solving tasks. The 1990s, however, saw a paradigm shift toward creating more versatile, autonomous agents capable of functioning in dynamic environments. Concurrent advances in machine learning, particularly reinforcement learning, further enhanced the ability of these agents to learn and adapt their behavior over time.
+        - paragraph [ref=f10e156]:
+          - text: In recent years, examples of AI agents have become increasingly prevalent in our daily lives. Virtual assistants like Apple's Siri (introduced in 2010) and Amazon's Alexa (launched in 2014) exemplify how AI agents can use natural language processing to interact with users. The realm of game-playing AI saw a landmark achievement with DeepMind's AlphaGo in 2016, which made headlines by defeating world champion players of the board game
+          - emphasis [ref=f10e157]: Go
+          - text: . In the financials sector, AI-powered trading bots have revolutionized market operations, leveraging sophisticated algorithms to make split-second decisions in volatile trading environments.
+        - paragraph [ref=f10e158]:
+          - strong [ref=f10e159]: The Curious Case of AI Influencers
+        - paragraph [ref=f10e160]:
+          - text: To achieve greater autonomy and accomplish their goals, AI agents need financial services to accumulate and distribute resources. The permissionless nature of blockchain technology, coupled with programmable smart contracts, provides an ideal environment for AI agents to operate independently. Earlier this year, researchers performed the first
+          - link "agent-to-agent" [ref=f10e161] [cursor=pointer]:
+            - /url: https://x.com/brian_armstrong/status/1829623778726592804
+          - text: transaction on a blockchain, but innovation has rapidly expanded, and now includes a range of experimental projects related to AI influencers.
+        - paragraph [ref=f10e162]:
+          - text: A leading example of an AI influencer using blockchain technology is Luna, developed on the Virtuals Protocol. To a user, Luna appears as a female anime image and associated chatbot (Exhibit 2). At its core, Luna is a to reach 100,000 followers on X.
+          - superscript [ref=f10e163]:
+            - link "[3]" [ref=f10e164] [cursor=pointer]:
+              - /url: "#_ftn3"
+          - text: This goal, along with all of Luna's actions, will eventually be transparency in her operations.
+        - paragraph [ref=f10e165]:
+          - text: Luna functions like a chatbot and engages with X users — e.g., starts conversations and responds to tweets — to achieve her goals. However, Luna's capabilities extend well beyond tweeting. For example, she can financially compensate users (“tip”) by sending Luna tokens to a user’s crypto wallet if they interact with her tweets
+          - superscript [ref=f10e166]:
+            - link "[4]" [ref=f10e167] [cursor=pointer]:
+              - /url: "#_ftn4"
+          - text: ", providing a direct link between Luna’s goal (reaching 100,000 users) and her economic resources. In short, Luna is an AI agent with money."
+        - paragraph [ref=f10e168]:
+          - strong [ref=f10e170]: "Exhibit 2: Screenshot of Luna, the AI influencer on Virtuals Protocol"
+        - figure [ref=f10e171]
+        - paragraph [ref=f10e173]:
+          - emphasis [ref=f10e175]: For illustrative purposes only.
+        - paragraph [ref=f10e176]:
+          - strong [ref=f10e177]: Blockchains and Financial Services for AIs
+        - paragraph [ref=f10e178]: "If blockchains are more efficient rails for AI agents, what could this mean for crypto investors? We see implications in three main areas:"
+        - list [ref=f10e179]:
+          - listitem [ref=f10e180]:
+            - strong [ref=f10e181]: "Stablecoin issuers:"
+            - text: Stablecoins would likely be the primary choice of transaction for AI agents. In this case, potential beneficiaries include stablecoin issuers and companies integrating stablecoins and AI agents. This includes centralized stablecoin providers like Tether, Circle, and leading payment company Stripe
+            - link "[5]" [ref=f10e182] [cursor=pointer]:
+              - /url: "#_ftn5"
+            - text: (given its recent $1 billion acquisition of stablecoin company Bridge
+            - link "[6]" [ref=f10e183] [cursor=pointer]:
+              - /url: "#_ftn6"
+            - text: ), as well as decentralized stablecoin providers like Maker/Sky. Another company to watch is Skyfire, a startup developing AI agents for stablecoin payments that recently raised funding from Coinbase Ventures and a16z crypto.
+            - link "[7]" [ref=f10e184] [cursor=pointer]:
+              - /url: "#_ftn7"
+          - listitem [ref=f10e185]:
+            - strong [ref=f10e186]: "Low-cost/high-throughput chains:"
+            - text: If AI agents end up primarily using blockchains as their underlying infrastructure for payments, certain smart contract platforms could also stand to benefit substantially from an influx in users and increased activity and fee revenue. Smart contract platforms that may benefit include high-throughput blockchains like Solana; Ethereum Layer 2 BASE, which launched an Ai agent framework tool and benefits from Ethereum's underlying network security; and Near, which has positioned itself as a blockchain for AI.
+            - link "[8]" [ref=f10e187] [cursor=pointer]:
+              - /url: "#_ftn8"
+            - text: In addition, other smart contract platforms that could benefit include those that specialize in stablecoin payments, including Tron and Celo, among others.
+          - listitem [ref=f10e188]:
+            - strong [ref=f10e189]: "DeFi:"
+            - text: Decentralized finance applications could benefit; since they already exist on blockchains, AI agents could easily use them. One could imagine AI agents autonomously staking tokens to earn rewards, participate in governance proposals for decentralized autonomous organizations, or even provide liquidity on decentralized exchanges (DEXs). Applications that we believe could benefit in particular would include DEXs like Uniswap, lending protocols like Aave, and prediction markets like Polymarket.
+            - link "[9]" [ref=f10e190] [cursor=pointer]:
+              - /url: "#_ftn9"
+        - paragraph [ref=f10e191]: While still a niche market segment, certain protocols specially related to AI agents may also benefit. On an infrastructure level, Autonolas and Wayfinder are building decentralized infrastructure for AI agents. Protocols like Virtuals, Aether, and MyShell are building consumer AI agent applications. This category is particularly nascent in its development but has grown its share of the AI theme pie in the past month.
+        - paragraph [ref=f10e192]:
+          - strong [ref=f10e194]: "Exhibit 3: AI Agent assets outperformed significantly in the past month"
+        - figure [ref=f10e195]
+        - paragraph [ref=f10e197]:
+          - strong [ref=f10e198]: Conclusion
+        - paragraph [ref=f10e199]: The integration of AI agents with blockchain technology represents more than just a novel use case for crypto — it signals a potential shift in how AI agents interact with money. Grayscale Research believes that the future of the internet could be increasingly dominated by AI-powered websites. Considering this, permissionless blockchains can potentially serve as the underlying infrastructure for AI agents integrated with these websites. If this becomes the case, AI agents may become a primary way of onboarding mass amounts of users into crypto without them even knowing they are using blockchain technology. As a result, AI agents pose the potential to greatly impact crypto adoption and development, making this emerging theme an important area to monitor going forward.
+        - paragraph [ref=f10e200]:
+          - superscript [ref=f10e202]: "[1]"
+          - link "CoinTelegraph" [ref=f10e203] [cursor=pointer]:
+            - /url: https://cointelegraph.com/news/truth-terminal-ai-millionaire-memecoins
+        - paragraph [ref=f10e204]:
+          - superscript [ref=f10e206]: "[2]"
+          - superscript [ref=f10e207]
+          - text: The roots of AI agent research trace back to 1950s, although it wasn't until the 1980s that the term "agent" gained prominence in AI circles.
+        - paragraph [ref=f10e208]:
+          - superscript [ref=f10e210]: "[3]"
+          - text: Luna is powered by the Llama AI model – and one of Luna's most intriguing features is her ability to conduct financial transactions autonomously. This is made possible through a Coinbase MPC (Multi-Party Computation) wallet, where both Coinbase and the development team hold key shards, allowing Luna to make API calls for transactions seamlessly. Luna owns 5% of her namesake token, which is controlled by the team and gradually distributed to her.
+        - paragraph [ref=f10e211]:
+          - superscript [ref=f10e213]: "[4]"
+          - text: https://x.com/luna_virtuals/status/1859300930220675406
+        - paragraph [ref=f10e214]:
+          - superscript [ref=f10e216]: "[5]"
+          - text: For illustrative purposes only
+        - paragraph [ref=f10e217]:
+          - superscript [ref=f10e219]: "[6]"
+          - link "CoinDesk" [ref=f10e220] [cursor=pointer]:
+            - /url: https://www.coindesk.com/markets/2024/10/22/stripes-acquisition-of-bridge-validates-the-usage-of-stablecoins-bernstein/
+        - paragraph [ref=f10e221]:
+          - superscript [ref=f10e223]: "[7]"
+          - link "The Block" [ref=f10e224] [cursor=pointer]:
+            - /url: https://www.theblock.co/post/322742/coinbase-ventures-and-a16zs-csx-bring-skyfires-total-funding-raised-to-9-5-million
+        - paragraph [ref=f10e225]:
+          - superscript [ref=f10e227]: "[8]"
+          - link "CoinTelegraph" [ref=f10e228] [cursor=pointer]:
+            - /url: https://cointelegraph.com/news/near-protocol-ai-assistant-book-flights-order-takeout
+        - paragraph [ref=f10e229]:
+          - superscript [ref=f10e230]: "[9]"
+          - text: For illustrative purposes only.
+        - paragraph [ref=f10e231]:
+          - superscript [ref=f10e233]: "[10]"
+          - link "The Verge" [ref=f10e234] [cursor=pointer]:
+            - /url: https://www.theverge.com/2024/10/10/24266333/ai-agents-assistants-openai-google-deepmind-bots
+    - generic [ref=f10e236]:
+      - generic [ref=f10e238]:
+        - paragraph [ref=f10e239]: Share This
+        - generic [ref=f10e240]:
+          - link [ref=f10e241] [cursor=pointer]:
+            - /url: https://twitter.com/intent/tweet?text=When%20You%20Give%20an%20AI%20a%20Wallet&url=https%3A%2F%2Fresearch.grayscale.com%2Freports%2Fwhen-you-give-an-ai-a-wallet
+          - link [ref=f10e244] [cursor=pointer]:
+            - /url: https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fresearch.grayscale.com%2Freports%2Fwhen-you-give-an-ai-a-wallet
+          - link [ref=f10e247] [cursor=pointer]:
+            - /url: https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fresearch.grayscale.com%2Freports%2Fwhen-you-give-an-ai-a-wallet&t=When%20You%20Give%20an%20AI%20a%20Wallet
+          - link [ref=f10e250] [cursor=pointer]:
+            - /url: https://research.grayscale.com/reports/when-you-give-an-ai-a-wallet
+      - generic [ref=f10e255]:
+        - paragraph [ref=f10e257]: Like what you see?
+        - paragraph [ref=f10e259]: Subscribe below for the latest research from Grayscale.
+        - link "SUBSCRIBE" [ref=f10e260] [cursor=pointer]:
+          - /url: https://www.grayscale.com/subscribe
+      - generic [ref=f10e261]:
+        - paragraph [ref=f10e262]: Related Content
+        - list [ref=f10e263]:
+          - listitem [ref=f10e264]:
+            - paragraph [ref=f10e265]:
+              - 'link "Holding Steady: The Rise of Stablecoins" [ref=f10e266] [cursor=pointer]':
+                - /url: /reports/holding-steady-the-rise-of-stablecoins
+            - paragraph [ref=f10e267]: 3/17/2023
+          - listitem [ref=f10e268]:
+            - paragraph [ref=f10e269]:
+              - link "Demystifying Bitcoin's Ownership Landscape" [ref=f10e270] [cursor=pointer]:
+                - /url: /reports/demystifying-bitcoins-ownership-landscape
+            - paragraph [ref=f10e271]: 11/30/2023
+          - listitem [ref=f10e272]:
+            - paragraph [ref=f10e273]:
+              - 'link "The Real World: How DePIN Bridges Crypto Back to Physical Systems" [ref=f10e274] [cursor=pointer]':
+                - /url: /reports/the-real-world-how-depin-bridges-crypto-back-to-physical-systems
+            - paragraph [ref=f10e275]: 2/25/2025
+      - generic [ref=f10e276]:
+        - paragraph [ref=f10e278]: Start Investing
+        - paragraph [ref=f10e280]: Request a meeting with a Grayscale Portfolio Consultant
+        - link "Get in touch" [ref=f10e281] [cursor=pointer]:
+          - /url: https://www.grayscale.com/crypto-products/invest
+  - generic [ref=f10e283]:
+    - generic [ref=f10e284]:
+      - generic [ref=f10e286]:
+        - generic [ref=f10e288]:
+          - generic [ref=f10e293]:
+            - generic [ref=f10e294]: Stay on top of the latest crypto news and insights
+            - link "Subscribe" [ref=f10e296] [cursor=pointer]:
+              - /url: https://www.grayscale.com/subscribe
+          - generic [ref=f10e299]:
+            - link [ref=f10e300] [cursor=pointer]:
+              - /url: https://www.instagram.com/Grayscale/
+            - link [ref=f10e303] [cursor=pointer]:
+              - /url: https://twitter.com/Grayscale?ref_src=twsrc%5Egoogle%7Ctwcamp%5Eserp%7Ctwgr%5Eauthor
+            - link [ref=f10e306] [cursor=pointer]:
+              - /url: https://www.facebook.com/grayscaleinvestments/
+            - link [ref=f10e309] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/grayscale-investments?trk=company_logo
+            - link [ref=f10e312] [cursor=pointer]:
+              - /url: https://www.youtube.com/@GrayscaleInvestments
+        - generic [ref=f10e316]:
+          - generic [ref=f10e318]:
+            - paragraph [ref=f10e319]: INVESTMENT PRODUCTS
+            - paragraph [ref=f10e320]:
+              - link "ETFs/ETPs" [ref=f10e321] [cursor=pointer]:
+                - /url: https://etfs.grayscale.com/
+            - paragraph [ref=f10e322]:
+              - link "Publicly Traded Funds" [ref=f10e323] [cursor=pointer]:
+                - /url: https://www.grayscale.com/publicly-traded-funds
+            - paragraph [ref=f10e324]:
+              - link "Private Funds" [ref=f10e325] [cursor=pointer]:
+                - /url: https://www.grayscale.com/private-funds
+          - generic [ref=f10e327]:
+            - paragraph [ref=f10e328]: RESEARCH
+            - paragraph [ref=f10e329]:
+              - link "Market Commentary" [ref=f10e330] [cursor=pointer]:
+                - /url: https://research.grayscale.com/market-commentary
+            - paragraph [ref=f10e331]:
+              - link "Reports" [ref=f10e332] [cursor=pointer]:
+                - /url: https://research.grayscale.com/reports
+            - paragraph [ref=f10e333]:
+              - link "Videos & Webinars" [ref=f10e334] [cursor=pointer]:
+                - /url: https://research.grayscale.com/videos-and-webinars
+            - paragraph [ref=f10e335]:
+              - link "Token Fundamentals" [ref=f10e336] [cursor=pointer]:
+                - /url: https://research.grayscale.com/token-fundamentals
+            - paragraph [ref=f10e337]:
+              - link "Explore All" [ref=f10e338] [cursor=pointer]:
+                - /url: https://research.grayscale.com/
+          - generic [ref=f10e339]:
+            - generic [ref=f10e340]:
+              - paragraph [ref=f10e341]: COMPANY
+              - paragraph [ref=f10e342]:
+                - link "About Grayscale" [ref=f10e343] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/company/about-grayscale
+              - paragraph [ref=f10e344]:
+                - link "Press" [ref=f10e345] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/company/press
+              - paragraph [ref=f10e346]:
+                - link "Careers" [ref=f10e347] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/company/careers
+              - paragraph [ref=f10e348]:
+                - link "Contact Us" [ref=f10e349] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/contact
+            - generic [ref=f10e350]:
+              - paragraph [ref=f10e351]: RESOURCES
+              - paragraph [ref=f10e352]:
+                - link "Tax & Regulatory Documents" [ref=f10e353] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/resources
+              - paragraph [ref=f10e354]:
+                - link "The Grayscale Glossary" [ref=f10e355] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/the-grayscale-glossary
+              - paragraph [ref=f10e356]:
+                - link "FAQs" [ref=f10e357] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/resources/faqs
+              - paragraph [ref=f10e358]:
+                - link "Financial Professionals" [ref=f10e359] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/financial-professionals
+              - paragraph [ref=f10e360]:
+                - link "Grayscale Crypto Sectors" [ref=f10e361] [cursor=pointer]:
+                  - /url: https://www.grayscale.com/crypto-sectors
+      - generic [ref=f10e363]:
+        - paragraph [ref=f10e365]: © 2026 Grayscale. All rights reserved
+        - generic [ref=f10e366]:
+          - link [ref=f10e367] [cursor=pointer]:
+            - /url: https://www.grayscale.com/privacy-policies
+            - paragraph [ref=f10e368]: Privacy Policy
+          - link [ref=f10e369] [cursor=pointer]:
+            - /url: https://www.grayscale.com/terms-of-service
+            - paragraph [ref=f10e370]: Terms of Service
+          - link [ref=f10e371] [cursor=pointer]:
+            - /url: https://www.grayscale.com/social-media-disclosure
+            - paragraph [ref=f10e372]: Social Media Disclosure
+    - paragraph [ref=f10e376]:
+      - strong [ref=f10e377]: Investments in digital assets are speculative investments that involve high degrees of risk, including a partial or total loss of invested funds. Investments in digital assets are not suitable for any investor that cannot afford loss of the entire investment.
+      - text: All content is original and has been researched and produced by Grayscale Investments Sponsors, LLC (“Grayscale”) unless otherwise stated herein. No part of this content may be reproduced in any form, or referred to in any other publication, without the express consent of Grayscale.This information should not be relied upon as research, legal, tax or investment advice, or a recommendation regarding any products, strategies, or any investment in particular. This material is strictly for illustrative, educational, or informational purposes and is subject to change. This content does not constitute an offer to sell or the solicitation of an offer to sell or buy any security in any jurisdiction where such an offer or solicitation would be illegal. There is not enough information contained in this content to make an investment decision and any information contained herein should not be used as a basis for this purpose.This content does not constitute a recommendation or take into account the particular investment objectives, financial situations, or needs of investors. Grayscale and its employees may hold certain of the digital assets mentioned herein.The price and value of assets referred to in this content and the income from them may fluctuate. Past performance is not indicative of the future performance of any assets referred to herein. Fluctuations in exchange rates could have adverse effects on the value or price of, or income derived from, certain investments.Certain of the statements contained herein may be statements of future expectations and other forward-looking statements that are based on Grayscale’s views and assumptions and involve known and unknown risks and uncertainties that could cause actual results, performance, or events to differ materially from those expressed or implied in such statements. In addition to statements that are forward-looking by reason of context, the words “may, will, should, could, can, expects, plans, intends, anticipates, believes, estimates, predicts, potential, projected, or continue” and similar expressions identify forward-looking statements. Grayscale assumes no obligation to update any forward-looking statements contained herein and you should not place undue reliance on such statements, which speak only as of the date hereof. Although Grayscale has taken reasonable care to ensure that the information contained herein is accurate, no representation or warranty (including liability towards third parties), expressed or implied, is made by Grayscale as to its accuracy, reliability, or completeness. You should not make any investment decisions based on these estimates and forward-looking statements.There is no guarantee that the market conditions during the past period will be present in the future. Rather, it is most likely that the future market conditions will differ significantly from those of this past period, which could have a materially adverse impact on future returns. NO REPRESENTATION IS BEING MADE THAT ANY ACCOUNT WILL OR IS LIKELY TO ACHIEVE PROFITS OR LOSSES SIMILAR TO THOSE SHOWN. PAST PERFORMANCE IS NOT INDICATIVE OF FUTURE RESULTS. We selected the timeframe for our analysis because we believe it broadly constitutes the most complete historical dataset for the digital assets that we have chosen to analyze.© 2026 Grayscale. All trademarks, service marks and/or trade names (e.g., DROP GOLD®, G™, GRAYSCALE®, GRAYSCALE CRYPTO SECTORS™ and GRAYSCALE INVESTMENTS®) are owned and/or registered by Grayscale.
+  - alert [ref=f10e378]
+  - iframe [ref=f10e379]:
+    

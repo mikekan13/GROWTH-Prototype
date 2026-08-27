@@ -1,0 +1,142 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e31]: TERMINAL://reality.layer.0
+        - generic [ref=e32]: ⊘ ⊕
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - link "GRO.WTH" [ref=e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=e36]
+          - generic [ref=e48]:
+            - generic [ref=e49]: Trailblazer Portal
+            - generic [ref=e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=e53]
+          - link "Portal" [ref=e60] [cursor=pointer]:
+            - /url: /trailblazer
+        - 'button "ClaudePlayer CONSCIOUSNESS: INTERFACED ▾" [ref=e62]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: ClaudePlayer
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=e65]: ▾
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: E
+          - generic [ref=e75]: Ŷ
+          - generic [ref=e76]: ∃
+          - generic [ref=e77]: tehr
+          - generic [ref=e78]: "N"
+          - generic [ref=e79]: ET
+        - generic [ref=e82]:
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e84] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e85]
+            - generic [ref=e98]
+            - generic [ref=e147]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e164] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e165]
+            - generic [ref=e178]
+            - generic [ref=e227]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e244] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e245]
+            - generic [ref=e258]
+            - generic [ref=e307]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e324] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e325]
+            - generic [ref=e338]
+            - generic [ref=e387]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e404] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e405]
+            - generic [ref=e418]
+            - generic [ref=e467]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e484] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e485]
+            - generic [ref=e498]
+            - generic [ref=e547]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e564] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e565]
+            - generic [ref=e578]
+            - generic [ref=e627]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e644] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e645]
+            - generic [ref=e658]
+            - generic [ref=e707]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e724] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e725]
+            - generic [ref=e738]
+            - generic [ref=e787]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e804] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e805]
+            - generic [ref=e818]
+            - generic [ref=e867]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e884] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e885]
+            - generic [ref=e898]
+            - generic [ref=e947]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e964] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e965]
+            - generic [ref=e978]
+            - generic [ref=e1027]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1044] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1045]
+            - generic [ref=e1058]
+            - generic [ref=e1107]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1124] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1125]
+            - generic [ref=e1138]
+            - generic [ref=e1187]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1204] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1205]
+            - generic [ref=e1218]
+            - generic [ref=e1267]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1284] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1285]
+            - generic [ref=e1298]
+            - generic [ref=e1347]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1364] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1365]
+            - generic [ref=e1378]
+            - generic [ref=e1427]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1444] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1445]
+            - generic [ref=e1458]
+            - generic [ref=e1507]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1524] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1525]
+            - generic [ref=e1538]
+            - generic [ref=e1587]
+          - link "Cosmic Fantasy 4 OPEN 1/5 The Prime Campaign M Watcher Mikekan13 C ҜV 0 Trailblazer ClaudePlayer Open slot Open open Open slot Open open Open slot Open open Open slot Open open The original campaign — where the patterns were first recognized. A world where magic and technology are not separate forces, but the same patterns viewed through different lenses of consciousness. Watcher Mikekan13 Est 1mo ago No sessions yet philosophical long-campaign cosmic theological" [ref=e1604] [cursor=pointer]:
+            - /url: /hub/cmmr6djjy0000ws482a52nc1y
+            - generic [ref=e1605]
+            - generic [ref=e1618]
+            - generic [ref=e1667]
+    - contentinfo [ref=e1683]:
+      - generic [ref=e1684]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=e1685]: ====================
+      - generic [ref=e1686]: "REALITY LEVEL: Primary Translation"
+  - button "Open Next.js Dev Tools" [ref=e1692] [cursor=pointer]:
+    - img [ref=e1693]
+  - alert [ref=e1696]

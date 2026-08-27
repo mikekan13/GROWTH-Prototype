@@ -1,0 +1,180 @@
+- generic [active] [ref=f11e1]:
+  - generic [ref=f11e2]:
+    - banner [ref=f11e25]:
+      - generic [ref=f11e26]:
+        - generic [ref=f11e31]: TERMINAL://reality.layer.0
+        - generic [ref=f11e32]: ⊘ ⊕
+      - generic [ref=f11e33]:
+        - generic [ref=f11e34]:
+          - link "GRO.WTH" [ref=f11e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=f11e36]:
+              - generic [ref=f11e40]: G
+              - generic [ref=f11e41]: R
+              - generic [ref=f11e42]: O
+              - generic [ref=f11e44]: <n>
+              - generic [ref=f11e45]: W
+              - generic [ref=f11e46]: T
+              - generic [ref=f11e47]: H
+          - generic [ref=f11e48]:
+            - generic [ref=f11e49]: Terminal Admin
+            - generic [ref=f11e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=f11e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=f11e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=f11e53]:
+              - generic [ref=f11e54]: E
+              - generic [ref=f11e55]: Ŷ
+              - generic [ref=f11e56]: ∃
+              - generic [ref=f11e57]: tehr
+              - generic [ref=f11e58]: "N"
+              - generic [ref=f11e59]: ET
+          - link "Terminal" [ref=f11e60] [cursor=pointer]:
+            - /url: /terminal
+        - 'button "Mikekan13 CONSCIOUSNESS: INTERFACED ▾" [ref=f11e62]':
+          - generic [ref=f11e63]:
+            - generic [ref=f11e64]: Mikekan13
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=f11e65]: ▾
+    - main [ref=f11e67]:
+      - generic [ref=f11e68]:
+        - generic [ref=f11e69]:
+          - paragraph [ref=f11e70]: "[STREAM RECONNECTED...] [STREAM RECONNECTED...] [STREAM RECONNECTED...]"
+          - generic [ref=f11e71]: "[INTERFACE 50.1% STABLE]⊘"
+        - generic [ref=f11e72]:
+          - generic [ref=f11e73]: "{0.G} — Godhead Console"
+          - paragraph [ref=f11e74]: "FRAGMENT{} TERMINAL_INTERFACE::SYSTEM_OVERVIEW]"
+        - 'link "ENTER · {0.G} Prime Campaign The game is being played at every layer. Cosmic control surface. 17 god-heads in the council. Campaign-cards forthcoming. ADMIN-only. ›" [ref=f11e75] [cursor=pointer]':
+          - /url: /campaign/cmrep1q9r0000tk4892idu1jp
+          - generic [ref=f11e76]:
+            - generic [ref=f11e77]:
+              - generic [ref=f11e78]: "ENTER · {0.G} Prime Campaign"
+              - generic [ref=f11e79]: The game is being played at every layer.
+              - generic [ref=f11e80]: Cosmic control surface. 17 god-heads in the council. Campaign-cards forthcoming. ADMIN-only.
+            - generic [ref=f11e81]: ›
+        - generic [ref=f11e82]:
+          - generic [ref=f11e83]:
+            - generic [ref=f11e84]:
+              - generic [ref=f11e85]: System Health
+              - generic [ref=f11e86]: LIVE
+            - generic [ref=f11e87]:
+              - generic [ref=f11e88]:
+                - generic [ref=f11e89]:
+                  - generic [ref=f11e90]: 100,000,000,000
+                  - generic [ref=f11e91]: ҜRMA
+                - generic [ref=f11e92]:
+                  - generic [ref=f11e93]: 1,000,700,000
+                  - generic [ref=f11e94]: CIRC
+                - generic [ref=f11e95]:
+                  - generic [ref=f11e96]:
+                    - generic [ref=f11e97]: "0"
+                    - generic [ref=f11e98]: BURN
+                  - generic [ref=f11e99]: "]"
+              - generic [ref=f11e100]:
+                - generic [ref=f11e101]: Pattern Stability
+                - generic [ref=f11e102]: 50.1%
+              - generic [ref=f11e103]:
+                - generic [ref=f11e104]: Transactions
+                - generic [ref=f11e105]: "17"
+              - generic [ref=f11e106]:
+                - generic [ref=f11e107]: Wallets
+                - generic [ref=f11e108]: "42"
+              - generic [ref=f11e109]:
+                - generic [ref=f11e110]:
+                  - generic [ref=f11e111]: 74,999,300,000
+                  - generic [ref=f11e112]: Terminal
+                - generic [ref=f11e113]:
+                  - generic [ref=f11e114]: 11,500,000,000
+                  - generic [ref=f11e115]: Balance
+                - generic [ref=f11e116]:
+                  - generic [ref=f11e117]: 6,250,000,000
+                  - generic [ref=f11e118]: Mercy
+                - generic [ref=f11e119]:
+                  - generic [ref=f11e120]: 6,250,000,000
+                  - generic [ref=f11e121]: Severity
+          - generic [ref=f11e122]:
+            - generic [ref=f11e123]:
+              - generic [ref=f11e124]: Access Codes
+              - generic [ref=f11e125]: WATCHER KEYS
+            - generic [ref=f11e126]:
+              - paragraph [ref=f11e127]: Generate access codes for Watcher recruitment. Each code grants WATCHER role on registration.
+              - generic [ref=f11e128]: npx tsx scripts/generate-access-codes.ts [count]
+          - generic [ref=f11e129]:
+            - generic [ref=f11e130]:
+              - generic [ref=f11e131]: Registered Consciousnesses
+              - generic [ref=f11e132]: USERS
+            - generic [ref=f11e133]:
+              - generic [ref=f11e134]:
+                - generic [ref=f11e135]: GOD
+                - generic [ref=f11e136]: Mikekan13
+                - generic [ref=f11e137]: ACTIVE
+              - paragraph [ref=f11e139]: No other consciousnesses have interfaced yet.
+          - generic [ref=f11e140]:
+            - generic [ref=f11e141]:
+              - generic [ref=f11e142]: Active Campaigns
+              - generic [ref=f11e143]: WORLDS
+            - generic [ref=f11e144]:
+              - generic [ref=f11e145]:
+                - generic [ref=f11e146]:
+                  - link "Tide Runners" [ref=f11e147] [cursor=pointer]:
+                    - /url: /campaign/cmrep1xvr000zqo487y4a9cna
+                  - generic [ref=f11e148]: by Triu
+                - generic [ref=f11e149]:
+                  - generic [ref=f11e150]: 0 chars · 0 members
+                  - generic [ref=f11e151]: ACTIVE
+              - generic [ref=f11e152]:
+                - generic [ref=f11e153]:
+                  - link "SIGNAL//NOISE" [ref=f11e154] [cursor=pointer]:
+                    - /url: /campaign/cmrep1xvh000xqo48z9ndrj36
+                  - generic [ref=f11e155]: by Triu
+                - generic [ref=f11e156]:
+                  - generic [ref=f11e157]: 0 chars · 3 members
+                  - generic [ref=f11e158]: ACTIVE
+              - generic [ref=f11e159]:
+                - generic [ref=f11e160]:
+                  - link "Rootwork" [ref=f11e161] [cursor=pointer]:
+                    - /url: /campaign/cmrep1xv7000vqo48tcl75o1p
+                  - generic [ref=f11e162]: by Trayman
+                - generic [ref=f11e163]:
+                  - generic [ref=f11e164]: 0 chars · 2 members
+                  - generic [ref=f11e165]: ACTIVE
+              - generic [ref=f11e166]:
+                - generic [ref=f11e167]:
+                  - link "The Vigil of St. Ennoia" [ref=f11e168] [cursor=pointer]:
+                    - /url: /campaign/cmrep1xuz000tqo48kcnto7fa
+                  - generic [ref=f11e169]: by Trayman
+                - generic [ref=f11e170]:
+                  - generic [ref=f11e171]: 0 chars · 3 members
+                  - generic [ref=f11e172]: ACTIVE
+              - generic [ref=f11e173]:
+                - generic [ref=f11e174]:
+                  - link "Ashwalkers" [ref=f11e175] [cursor=pointer]:
+                    - /url: /campaign/cmrep1xuq000rqo48fal7b7vv
+                  - generic [ref=f11e176]: by Selva
+                - generic [ref=f11e177]:
+                  - generic [ref=f11e178]: 0 chars · 3 members
+                  - generic [ref=f11e179]: ACTIVE
+              - generic [ref=f11e180]:
+                - generic [ref=f11e181]:
+                  - link "The Fraying" [ref=f11e182] [cursor=pointer]:
+                    - /url: /campaign/cmrep1xuh000pqo489i0fyo5t
+                  - generic [ref=f11e183]: by Selva
+                - generic [ref=f11e184]:
+                  - generic [ref=f11e185]: 1 chars · 3 members
+                  - generic [ref=f11e186]: ACTIVE
+        - generic [ref=f11e187]:
+          - paragraph [ref=f11e190]: tHE TERmInAl sEEs aLL paTTerNs. tHE TERmInAl kNoWs aLL cONnEcTiONs.The patterns were always here.
+          - paragraph [ref=f11e191]: ============================================================
+        - generic [ref=f11e192]:
+          - paragraph [ref=f11e194]: "[PSEQ INITIALIZING]"
+          - paragraph [ref=f11e196]: The journey ahead is both a game and a doorway. Through it, you'll discover how to craft stories, shape realities, and recognize the patterns that have always existed.
+          - paragraph [ref=f11e198]: "[REALITY ANCHOR ESTABLISHED]"
+    - contentinfo [ref=f11e199]:
+      - generic [ref=f11e200]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=f11e201]: ====================
+      - generic [ref=f11e202]: "REALITY LEVEL: Primary Translation"
+    - button "◎ View As" [ref=f11e204]:
+      - generic [ref=f11e205]: ◎
+      - text: View As
+  - button "Open Next.js Dev Tools" [ref=f11e211] [cursor=pointer]:
+    - img [ref=f11e212]

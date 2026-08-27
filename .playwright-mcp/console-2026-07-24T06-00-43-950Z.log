@@ -1,0 +1,6 @@
+[     807ms] [WARNING] The default export of @sanity/image-url has been deprecated. Use the named export `createImageUrlBuilder` instead. @ https://research.grayscale.com/_next/static/chunks/4683-682edd37f35ae404.js:507
+[     809ms] [WARNING] [@portabletext/react] Unknown mark type "sup", specify a component for it in the `components.marks` prop @ https://research.grayscale.com/_next/static/chunks/4683-682edd37f35ae404.js:507
+[     809ms] [WARNING] [@portabletext/react] Unknown mark type "sup", specify a component for it in the `components.marks` prop @ https://research.grayscale.com/_next/static/chunks/4683-682edd37f35ae404.js:507
+[     809ms] [WARNING] [@portabletext/react] Unknown mark type "sup", specify a component for it in the `components.marks` prop @ https://research.grayscale.com/_next/static/chunks/4683-682edd37f35ae404.js:507
+[     810ms] [WARNING] [@portabletext/react] Unknown mark type "sup", specify a component for it in the `components.marks` prop @ https://research.grayscale.com/_next/static/chunks/4683-682edd37f35ae404.js:507
+[     810ms] [WARNING] [@portabletext/react] Unknown mark type "sup", specify a component for it in the `components.marks` prop @ https://research.grayscale.com/_next/static/chunks/4683-682edd37f35ae404.js:507

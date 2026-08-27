@@ -1,0 +1,153 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e9]: CANVAS://session.layer.0
+        - generic [ref=e10]: ⊘ ⊕
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - link "←" [ref=e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=e14]:
+            - heading "The Prime Campaign" [level=1] [ref=e15]
+            - text: Cosmic Fantasy
+            - generic [ref=e16]: "Invite: D588E0F1"
+        - generic [ref=e17]:
+          - button "Canvas" [ref=e18]
+          - button "Forge" [ref=e19]
+          - button "Encounters" [ref=e20]
+          - button "Tapestry" [ref=e21]
+        - generic [ref=e22]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - generic [ref=e53]: 10,000
+              - generic [ref=e54]: ҜRMA
+            - generic [ref=e55]:
+              - generic [ref=e56]: 10,000
+              - generic [ref=e57]: FLD
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - generic [ref=e60]: "0"
+                - generic [ref=e61]: CRY
+              - generic [ref=e62]: "]"
+          - link "Campaign Settings" [ref=e23] [cursor=pointer]:
+            - /url: /watcher/campaign/cmmr6djjy0000ws482a52nc1y/settings
+            - img [ref=e24]
+    - main [ref=e27]:
+      - generic [ref=e63]:
+        - img [ref=e64]:
+          - generic [ref=e67]:
+            - generic [ref=e74]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+            - generic [ref=e90]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+          - generic [ref=e115]:
+            - img "Empty Portrait" [ref=e118]
+            - generic [ref=e119]:
+              - generic [ref=e121]: ClaudePlayer's Character
+              - generic [ref=e122]:
+                - generic [ref=e123]:
+                  - text: T
+                  - generic [ref=e124]: Ҝ
+                  - text: V
+                - generic [ref=e125]: "213"
+              - generic [ref=e126]:
+                - generic [ref=e127]:
+                  - generic [ref=e128]: 🜔 BODY
+                  - generic [ref=e129]:
+                    - generic [ref=e133]: CLT
+                    - generic [ref=e137]: CEL
+                    - generic [ref=e141]: CON
+                - generic [ref=e142]:
+                  - generic [ref=e143]: 🜎 SPIRIT
+                  - generic [ref=e144]:
+                    - generic [ref=e148]: FLO
+                    - generic [ref=e152]: FRE
+                    - generic [ref=e156]: FOC
+                - generic [ref=e157]:
+                  - generic [ref=e158]: 🜍 SOUL
+                  - generic [ref=e159]:
+                    - generic [ref=e163]: WIL
+                    - generic [ref=e167]: WIS
+                    - generic [ref=e171]: WIT
+            - button "⊕" [ref=e172] [cursor=pointer]
+          - generic [ref=e176]:
+            - img "Empty Portrait" [ref=e179]
+            - generic [ref=e180]:
+              - generic [ref=e182]: Tara
+              - generic [ref=e183]:
+                - generic [ref=e184]:
+                  - text: T
+                  - generic [ref=e185]: Ҝ
+                  - text: V
+                - generic [ref=e186]: "114"
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - generic [ref=e189]: 🜔 BODY
+                  - generic [ref=e190]:
+                    - generic [ref=e194]: CLT
+                    - generic [ref=e198]: CEL
+                    - generic [ref=e202]: CON
+                - generic [ref=e203]:
+                  - generic [ref=e204]: 🜎 SPIRIT
+                  - generic [ref=e205]:
+                    - generic [ref=e209]: FLO
+                    - generic [ref=e213]: FRE
+                    - generic [ref=e217]: FOC
+                - generic [ref=e218]:
+                  - generic [ref=e219]: 🜍 SOUL
+                  - generic [ref=e220]:
+                    - generic [ref=e224]: WIL
+                    - generic [ref=e228]: WIS
+                    - generic [ref=e232]: WIT
+            - button "⊕" [ref=e233] [cursor=pointer]
+          - generic [ref=e236]:
+            - generic [ref=e237]:
+              - generic [ref=e238]:
+                - generic [ref=e239]:
+                  - generic [ref=e240]: ⚔️
+                  - generic [ref=e241]: Iron Sword
+                - generic [ref=e242]: common
+              - generic [ref=e243]:
+                - generic [ref=e244]:
+                  - generic [ref=e245]: weapon
+                  - generic [ref=e246]: Undamaged
+                - generic [ref=e247]: Iron · 2:5:0/0\0:1:0
+                - generic [ref=e248]: A reliable iron longsword. Plain hilt, well-balanced edge.
+                - generic [ref=e249]: Unassigned
+            - button "⊕" [ref=e250] [cursor=pointer]
+        - generic [ref=e252]:
+          - generic [ref=e253]:
+            - generic [ref=e254]:
+              - img [ref=e255]
+              - generic [ref=e257]: TOOLS
+              - img [ref=e258]
+            - button "⊗" [ref=e260] [cursor=pointer]
+          - generic [ref=e261]:
+            - button "CHARACTER" [ref=e262] [cursor=pointer]:
+              - img [ref=e263]
+              - text: CHARACTER
+            - button "LOCATION" [ref=e265] [cursor=pointer]:
+              - img [ref=e266]
+              - text: LOCATION
+            - button "ITEM" [ref=e268] [cursor=pointer]:
+              - img [ref=e269]
+              - text: ITEM
+          - button "⚔ CREATE PARTY" [ref=e273] [cursor=pointer]:
+            - generic [ref=e274]: ⚔
+            - text: CREATE PARTY
+      - button "▲ TERMINAL" [ref=e28]
+  - button "Open Next.js Dev Tools" [ref=e47] [cursor=pointer]:
+    - img [ref=e48]
+  - alert [ref=e275]

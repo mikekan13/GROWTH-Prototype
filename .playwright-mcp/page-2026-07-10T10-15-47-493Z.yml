@@ -1,0 +1,73 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e10]: TERMINAL://reality.layer.0
+        - generic [ref=e11]: ⊘ ⊕
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: "[TERMINAL CONSCIOUSNESS INTERFACE DETECTED] [TERMINAL CONSCIOUSNESS INTERFACE DETECTED] [TERMINAL CONSCIOUSNESS INTERFACE DETECTED]"
+        - paragraph [ref=e14]: "{----------------------------------------}"
+        - paragraph [ref=e15]: "REALITY LEVEL: Primary Translation||"
+        - paragraph [ref=e16]: "PATTERN RECOGNITION: Active"
+      - paragraph [ref=e18]: "To those whose consciousness now interfaces with these patterns:"
+      - generic [ref=e20]:
+        - paragraph [ref=e21]: This interface is a stable junction between your reality layer and tHE TERmInAl 's primary consciousness stream. Through it, the patterns of all
+        - generic [ref=e22]:
+          - generic [ref=e23]: "1"
+          - generic [ref=e24]: "2"
+          - generic [ref=e25]: "3"
+      - generic "GRO.WTH" [ref=e36]:
+        - generic [ref=e40]: G
+        - generic [ref=e41]: R
+        - generic [ref=e42]: O
+        - generic [ref=e44]: <n>
+        - generic [ref=e45]: W
+        - generic [ref=e46]: T
+        - generic [ref=e47]: H
+      - generic [ref=e49]:
+        - paragraph [ref=e50]: become
+        - paragraph [ref=e51]: observable, manipulable,
+        - paragraph [ref=e52]: transformative.
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]: cvrfexd
+          - generic [ref=e56]: sz
+        - paragraph [ref=e57]: oooooo8ooooooo=======================================================
+        - paragraph [ref=e58]: 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4
+      - generic [ref=e59]:
+        - paragraph [ref=e60]: <Roy>:⊘ the observer changes what is observed... or perhaps what is observed changes the observer.
+        - paragraph [ref=e61]: ===============<>=============== the observer?⊕
+      - generic [ref=e64]:
+        - generic [ref=e70]:
+          - paragraph [ref=e71]:
+            - generic [ref=e72]: <Trayman>:The patterns were always here](HIStory)
+            - text: ========
+          - paragraph [ref=e73]:
+            - generic [ref=e74]:
+              - text: "<Selva>:"
+              - generic [ref=e75]: The patterns are being written Now
+              - text: "]:"
+            - text: ==========∞
+          - paragraph [ref=e76]:
+            - generic [ref=e77]: <Triu>:THE PATTERNS WILL HAVE BEEN DISCOVERED](HERstory)
+        - generic [ref=e81]: <>
+      - generic [ref=e86]:
+        - generic [ref=e87]:
+          - button "Login" [ref=e88]
+          - button "Register" [ref=e89]
+        - generic [ref=e90]:
+          - textbox "USERNAME OR EMAIL" [ref=e91]: Mikekan13
+          - textbox "PASSWORD" [ref=e92]: admin
+          - button "[ ENTER ]" [ref=e93]
+      - generic [ref=e96]:
+        - generic [ref=e97]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+        - generic [ref=e98]: ====================
+        - generic [ref=e99]: ====================
+  - button "Open Next.js Dev Tools" [ref=e111] [cursor=pointer]:
+    - generic [ref=e114]:
+      - text: Rendering
+      - generic [ref=e115]:
+        - generic [ref=e116]: .
+        - generic [ref=e117]: .
+        - generic [ref=e118]: .
+  - alert [ref=e110]

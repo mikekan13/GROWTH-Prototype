@@ -489,3 +489,127 @@ entry that references the old.
 - **Confirms**: the shipped ManaResidue implementation (bookkeeping decay, no transfers) is the CORRECT shape, not an interim.
 - **Lands in rulebook**: §magic (mana lifecycle), §economy (containers)
 - **Files**: none — shipped shape confirmed. Future: count mana pools/residues in campaign-economy metrics for the tuner.
+
+### r-2026-08-24-01: Negative frequency on roots is LEGAL but must be compensated in stats
+- **Ruling (Mike, verbal — Violet root review)**: a root may carry negative frequency, but the debt funds power: a root at frequency −N must be ~N KV STRONGER elsewhere ("it should have 5 krma worth of stats or something"). Frequency debt is a balance lever, not a discount.
+- **Consequences**: the formula pricer must CREDIT negative frequency as purchasable KV (the old breakdown only charged positive overage and ignored negatives). JEWL's authoring law carries the same rule.
+- **Lands in rulebook**: §seeds (root pricing)
+- **Files**: services/forge/forge-pricing.ts (negative-frequency lever — BUILT db569db).
+
+### r-2026-08-24-02: Catalog blocks are AGNOSTIC ARCHETYPES; instances carry the story — the STRANGER TEST
+- **Ruling (Mike, verbal)**: catalog descriptions must be campaign/person-agnostic AND legible — a GM who never met the character must know what the block represents and when to pick it (the way "College Degree" or "Suburban Childhood" read). "The Fault Line Years" failed BOTH ways: too specific (Rosemary, the lease at 19) and too vague (poetic fragments, no archetype). "I don't even know what it is."
+- **Consequences**: personal specifics attach to the block-INSTANCE on the character, with MORE description there, not less (pairs with the two-ledgers story-attachment model). JEWL authoring law: archetypal + legible at catalog level; rich + personal at instance level.
+- **Lands in rulebook**: §forge (catalog standards)
+- **Files**: JEWL authoring law prompt; forge review checklist.
+
+### r-2026-08-24-03: Root attribute skew should derive from a Godhead DEVELOPMENTAL CONSULT
+- **Ruling (Mike, verbal)**: attribute values on genesis roots are currently anchor-relative judgment; they should eventually come from "a detailed question about cognitive and physical development" for the upbringing the root describes — the Claude heavy-cognition lane (psychology profiling).
+- **Consequences**: QUEUED build item — genesis roots route through a Godhead developmental-profile consult that outputs the attribute skew. Until built, anchor-relative judgment + narrative rationale in the note stands.
+- **Lands in rulebook**: §forge (genesis pipeline), §godheads (consult duties)
+- **Files (future build)**: godhead consult in the genesis pipeline.
+
+### r-2026-08-24-04: Proposal notes have TWO audiences — gmNote (narrative) vs chainNote (balance math)
+- **Ruling (Mike, verbal; sharpened 2026-08-25)**: the GM-facing note must be NARRATIVE rationale — genre service, hooks, table dynamics — "Not KRMA numbers and balance and crap." Balance/anchor/KV math is a SEPARATE register for the godhead chain (Kai).
+- **Consequences**: propose tool carries two fields: gmNote (required, narrative-only, Workshop/Panel UI) + chainNote (optional, Kai's math, rides the forge chain).
+- **Lands in rulebook**: §forge (proposal flow)
+- **Files**: forge propose tool `gmNote`/`chainNote` (BUILT db569db).
+
+### r-2026-08-24-05: Root age is UNCONSTRAINED — ~18 is a norm, not a rule
+- **Ruling (Mike, verbal)**: roots can be ANY ageAdded. Meta note: high age costs can effectively push mortal races out of certain roots/branches — a WANTED emergent lever; watch how the meta develops.
+- **Lands in rulebook**: §seeds (root structure)
+- **Files**: none (no validation cap to add).
+
+### r-2026-08-24-06: GROWTH Lexicon — rule-text ambiguity is itself the defect
+- **Ruling (Mike, verbal)**: on "−2 to all focus and willpower rolls": "I didn't know what it meant so it is ambiguous." Rule text must be written in canonical Lexicon phrases where each scope has exactly ONE phrasing (e.g. "raw Focus checks" vs "all rolls governed by Focus"). Authors pick a phrase; readers never guess.
+- **Consequences**: long-game, Lexicon phrases become machine-readable — the modifier-gather applies them mechanically without per-roll LLM interpretation. Lexicon as a growable system (Godheads add entries) is discussed, NOT yet designed.
+- **Lands in rulebook**: §authoring (language standards)
+- **Files**: rollModifier `scope: raw|governed` (BUILT db569db); full Lexicon design OPEN.
+
+### r-2026-08-24-07: Durations must be TANGIBLE — no scene primitive exists
+- **Ruling (Mike, verbal)**: "remainder of the scene" is not a GROWTH time period. Durations = concrete clock time (hours, a day) or a trackable trigger.
+- **Lands in rulebook**: §effects (durations)
+- **Files**: trait effects duration units hours|days|cycles (BUILT db569db).
+
+### r-2026-08-24-08: Trust-the-Lock pillar = SOUL
+- **Ruling (Mike, verbal)**: the Trust the Lock wound is sense-of-self (Willpower governor) → SOUL pillar, not Spirit.
+- **Lands in rulebook**: §traits (pillar assignment example)
+- **Files**: Violet draft correction (instance-level).
+
+### r-2026-08-24-09: Multiple effects = multiple DISCRETE entries
+- **Ruling (Mike, verbal)**: a trait with several effects lists each as an independent, trackable, priceable entry — never bundled prose. One effect = one entry (the hallucination firewall).
+- **Lands in rulebook**: §traits (effect structure)
+- **Files**: trait `effects[]` discriminated union (BUILT db569db).
+
+### r-2026-08-24-10: Triggered durational aftermath SPAWNS A BLOSSOM; persistent modifiers stay trait-native
+- **Ruling (Mike, verbal — blessed the split)**: persistent condition-gated rollModifiers live on the trait; triggered, duration-carrying outcomes (e.g. "Overwhelmed for N hours" when a thorn fires) are a blossom TEMPLATE on the trait that spawns an instance on fire — one temporary-effects surface for spells, conditions, and trait firings alike (mandatory expiry; fits effects-route-through-ONE-layer).
+- **Lands in rulebook**: §effects (blossom routing)
+- **Files**: triggered effects `spawnsBlossom` (BUILT db569db).
+
+### r-2026-08-24-11: Skill names stay deliberately LOOSE; specificity mechanically skews DR
+- **Ruling (Mike, verbal — rigid canonical skill registry REJECTED)**: looseness is purposeful. More-specific skills skew DR in the bearer's favor at matching tasks (illustrative: Rock Climbing ≈ −3 DR at a rockface, Climbing ≈ −2, Athletics ≈ 0/+1). The skew is part of the physics/game simulation the CLOUD lane runs to set acceptable DR range. Structure may come eventually, but not a registry now.
+- **Lands in rulebook**: §skills (naming + DR)
+- **Files**: cloud-lane simulation consult (future).
+
+### r-2026-08-24-12: Blocks must EXPRESS THEIR YEARS fully — depth is a craft requirement
+- **Ruling (Mike, verbal — The Holding Pattern verdict: "not a good one imo")**: a multi-year block must express what those years do to a person ("wow that has to do more than those skills"). Years like a 6-year shut-in stretch likely carry their OWN thorn AND nectar (isolation wounds and gifts). Depth-of-expression is required craft, not garnish.
+- **Lands in rulebook**: §forge (catalog standards)
+- **Files**: JEWL authoring law prompt.
+
+### r-2026-08-24-13: Blocks may grant ALLOCATABLE player-choice skill levels with domain/governor constraints
+- **Ruling (Mike, verbal — extends M-1)**: e.g. "+1 to any Wit-governed skill", "+1 to any Arts-based skill". NOT rollModifiers — they manifest through the skill list, which feeds DR calculation. Domain membership ("is Watercolor Painting Arts-based?") is semantic adjudication, pairing with loose skill naming (r-2026-08-24-11).
+- **Lands in rulebook**: §forge (block grants)
+- **Files**: block grants `allocatableSkills` (BUILT db569db).
+
+### r-2026-08-24-14: Blocks BALANCE INTERNALLY — the density floor applies to the NET price
+- **Ruling (Mike, verbal)**: "It is meant to balance. Really bad Thorn? Maybe a decent nectar and some good attributes. They are essentially levers you want to find a balance on." A thorn's negative is debt the block itself services with other levers until the final price nets into the ~3-15 KV/yr band. Extreme designs are legal (multi-thorn, low-stat, many-year roots financing one powerful nectar).
+- **Consequences**: resolves the open lien-vs-floor question; pricer sums NET (abs-sum bug dead), warns on cross-sign bundles.
+- **Lands in rulebook**: §forge (pricing)
+- **Files**: services/forge/forge-pricing.ts NET sum + density gauge (BUILT db569db).
+
+### r-2026-08-24-15: Roots/branches may grant POSSESSIONS — big things as crystallization stubs
+- **Ruling (Mike, verbal, 2026-08-25)**: blocks can grant the BIG possessions that relate to them (the house, the manuscript) — not exhaustive inventory. Another lever on the block's balance sheet. Big possessions are crystallization STUBS ("boxes"): JEWL unpacks them on the canvas when play needs it (own traits, vast inventory, layout-as-location; Vehicles, Buildings, Titles) — same lazy pattern as recursive-location crystallization and organ lazy-spawn.
+- **Lands in rulebook**: §forge (block grants), §possessions
+- **Files**: block grants `possessions` w/ unpackNote (BUILT db569db).
+
+### r-2026-08-24-16: KITS — a possession with a KV budget, drawn down on plausible demand
+- **Ruling (Mike, verbal — marked CONTROVERSIAL, fun consciously chosen)**: a kit is an item/possession with a KV BUDGET; anything plausibly in the kit and needed is pulled FROM that budget on demand (draw-down, never pre-itemized). Profession archetypes carry their obvious kit. Not simulation-pure ("Batman utility belts with a KRMA tank") but "extremely fun for players and actually helps roleplaying." Mitigations inherent: plausibility gate + finite budget; ontology-consistent with crystallization (the world resolves on observation). Tightening dials exist if the meta abuses it.
+- **Lands in rulebook**: §items (kits), §forge (block grants)
+- **Files**: block grants `kits` kvBudget draw-down (BUILT db569db); kit as STANDALONE item type NOT yet built.
+
+### r-2026-08-24-17: Blossom pricing is INTERNAL — the spawner carries the cost
+- **Ruling (Mike, verbal)**: a blossom is the expulsion of something already paid for (fired trigger / cast spell / bestowed aura). The blossom row carries a KV as MEASUREMENT of its effect; the value is reflected in the spawner's grade — never a standalone purchase. Spawner taxonomy: trait-trigger, spell-cast, and persistent EMITTERS (auras — e.g. a Godhead boon bestowing blossoms on others under criteria; the emitter carries the cost).
+- **Lands in rulebook**: §effects (blossom pricing)
+- **Files**: forge-pricing blossom internal-measurement note (BUILT db569db).
+
+### r-2026-08-24-18: Randomness law — random severity requires a counterbalance
+- **Ruling (Mike, verbal)**: random parameters are legal, but never for severity-establishing values without a counterbalance. 1d4-rituals-style designs (equal KV, unequal thorn) must become fixed/chosen count, or KV must scale with the roll.
+- **Lands in rulebook**: §authoring (randomness)
+- **Files**: JEWL authoring law prompt; forge review checklist.
+
+### r-2026-08-24-19: Grief Navigation APPROVED as a practice-form skill
+- **Ruling (Mike, verbal)**: resolves the round-3 Grief-as-skill ban — emotions/states aren't skills; PRACTICES of managing them are. "Grief Navigation" as a practice-form is legal.
+- **Lands in rulebook**: §skills (what qualifies)
+- **Files**: Violet draft (instance-level).
+
+### r-2026-08-25-01: Negative-frequency compensation is 1:1 KRMA
+- **Ruling (Mike, verbal — round-5 Violet review)**: "it should be a 1 to 1 krma balance." A block carrying frequency −N credits/costs exactly N KV in its net price — never the attribute rate (5 KV/level). Sharpens r-2026-08-24-01.
+- **Consequences**: forge-pricing already implements 1:1 (`kv += freq`); JEWL's authoring law must state the rate so chain notes and formula agree.
+- **Lands in rulebook**: §seeds (pricing)
+- **Files**: services/forge-pricing.ts (already correct); JEWL authoring law prompt.
+
+### r-2026-08-25-02: Block names must paint a PREDICTIVE mental picture
+- **Ruling (Mike, verbal — round-5 Violet review, R11 + B3-R4)**: on "Raised by Grandmother": "The description is pretty specific about things so it makes me think the name of this root is almost wrong." On "The Fault Line Years": "a little too hard to predict. Poetic isn't bad but it should paint a mental picture." Name-scope match: since a block's numbers commit to ONE developmental outcome, the name must name that outcome-archetype — as specific as what the block prices. Poetic names are legal when the poetry still lets a stranger predict the stat skew and when to pick the block. Applies to roots AND branches.
+- **Lands in rulebook**: §forge (catalog standards — extends the stranger test, r-2026-08-24-02)
+- **Files**: JEWL authoring law prompt; forge review checklist.
+
+### r-2026-08-26-01: `minutes` is a legal duration unit
+- **Ruling (Mike, conditional test — round-5 review)**: "if you can tell me a state in real life that only lasts minutes then I will say yes to minutes." Satisfied by the adrenaline dump (post-near-miss shakes drain in minutes), dark adaptation (minutes of functional half-blindness), and being winded. Time units for effect durations and blossom expiry: minutes | hours | days | cycles.
+- **Consequences**: schema updated everywhere durations appear (triggered-effect duration, blossom expiry, and a NEW structured `duration` on rollModifiers — previously Zod silently stripped modifier durations while raw storage kept them, so drafts carried durations the system never saw; that hole is closed).
+- **Lands in rulebook**: §effects (durations — extends r-2026-08-24-07)
+- **Files**: services/forge-schemas.ts (effectDurationSchema shared).
+
+### r-2026-08-26-01: Sub-hour durations = ROUNDS (encounter mode), never minutes
+- **Ruling (Mike, verbal — round-5 review)**: proposal to admit `minutes` as a duration unit REJECTED: "No one is counting minutes at a table. If you are dialing into that level then I believe you just want rounds or actions in combat/encounter mode." The trackability test governs: a duration unit is legal only if someone at the table actually tracks it. Units: rounds | hours | days | cycles. A round = 6 seconds (canon: 01_CORE_RULES/Combat_Grid_System.md). Rounds tick only in encounter mode; outside encounters, short-lived states are phrased as CONDITIONS ("while exits remain unassessed"), not clock time.
+- **Consequences**: extends r-2026-08-24-07 (tangible durations) with the trackability criterion. Schema updated (triggered-effect duration, blossom expiry, and the NEW structured rollModifier duration). Validation hole closed: modifier durations were silently stripped by Zod while raw storage kept them — drafts could carry durations the system never saw.
+- **Lands in rulebook**: §effects (durations)
+- **Files**: services/forge-schemas.ts (shared effectDurationSchema).

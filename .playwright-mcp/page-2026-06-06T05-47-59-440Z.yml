@@ -1,0 +1,493 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e9]: CANVAS://session.layer.0
+        - generic [ref=e10]: ⊘ ⊕
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - link "←" [ref=e13] [cursor=pointer]:
+            - /url: /terminal
+          - heading "__PRIME__" [level=1] [ref=e15]
+        - generic [ref=e16]:
+          - button "Forge" [ref=e17]
+          - button "Canvas" [ref=e18]
+          - button "Tapestry" [ref=e19]
+        - generic [ref=e20]:
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - generic [ref=e51]: "0"
+              - generic [ref=e52]: ҜRMA
+            - generic [ref=e53]:
+              - generic [ref=e54]: "0"
+              - generic [ref=e55]: FLD
+            - generic [ref=e56]:
+              - generic [ref=e57]:
+                - generic [ref=e58]: "0"
+                - generic [ref=e59]: CRY
+              - generic [ref=e60]: "]"
+          - link "Campaign Settings" [ref=e21] [cursor=pointer]:
+            - /url: /watcher/campaign/cmpll9z3p0000j048aqbgx3vi/settings
+            - img [ref=e22]
+    - main [ref=e25]:
+      - generic [ref=e61]:
+        - img [ref=e62]:
+          - generic [ref=e65]:
+            - generic [ref=e72]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+            - generic [ref=e88]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+          - generic [ref=e110]:
+            - generic:
+              - text: □ TREE OF LIFE
+              - generic: (10)
+            - generic:
+              - generic:
+                - generic: ❖
+            - button "✨ GENERATE" [ref=e113] [cursor=pointer]
+            - button "▸ ENTER" [ref=e115] [cursor=pointer]
+            - generic:
+              - generic:
+                - generic "Sub-locations": ⌂10
+                - generic "Location type": cosmic landmark
+            - generic:
+              - generic "50,000,000,000 Ҝ — KRMA Reserve":
+                - generic: KRMA
+                - generic: 50.00B Ҝ
+            - button "⊕" [ref=e117] [cursor=pointer]
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e220]: Tara Almswood
+              - generic [ref=e226]: ⬢20
+              - button "[AI]" [ref=e231] [cursor=pointer]
+            - generic [ref=e134]: FATE DIE
+            - generic [ref=e235]:
+              - img "Empty Portrait" [ref=e238]
+              - generic [ref=e247]:
+                - generic [ref=e248]:
+                  - generic [ref=e249]:
+                    - generic [ref=e250]:
+                      - generic [ref=e251]: Altered Human (Tara Hybrid)
+                      - generic [ref=e252]: SEED
+                    - generic [ref=e253]:
+                      - generic [ref=e254]: Miller's Child
+                      - generic [ref=e255]: ROOT
+                  - generic [ref=e256]:
+                    - generic [ref=e257]:
+                      - generic [ref=e258]: POSSESSIONS
+                      - generic [ref=e260]: No possessions yet
+                    - generic [ref=e261]:
+                      - generic [ref=e262]:
+                        - generic [ref=e263]:
+                          - generic [ref=e264]:
+                            - generic [ref=e265]: ⚙️
+                            - generic [ref=e266]: "1"
+                          - generic [ref=e267]: DOWNTIME TASK
+                          - generic [ref=e269]: Empty
+                        - generic [ref=e270]:
+                          - generic [ref=e271]:
+                            - generic [ref=e272]: ⚙️
+                            - generic [ref=e273]: "2"
+                          - generic [ref=e274]: DOWNTIME TASK
+                          - generic [ref=e276]: Empty
+                      - generic [ref=e277]:
+                        - generic [ref=e278]:
+                          - generic [ref=e279]: AGE
+                          - generic [ref=e280]: "0"
+                        - generic [ref=e281]:
+                          - generic [ref=e282]: BIRTHDAY
+                          - generic [ref=e283]: 00/00/0000
+                - generic [ref=e284]:
+                  - generic [ref=e285]:
+                    - generic [ref=e286]: GRO.VINES
+                    - generic [ref=e288]: OPPORTUNITIES
+                  - generic [ref=e289]:
+                    - generic [ref=e292]:
+                      - generic [ref=e293]:
+                        - generic [ref=e294]: "1"
+                        - generic [ref=e295]: I will find what is causing the anomalies in the Weave
+                      - generic [ref=e296]:
+                        - generic [ref=e297]: "2"
+                        - generic [ref=e298]: I will find a safe way out of The Terminal
+                      - generic [ref=e299]:
+                        - generic [ref=e300]: "3"
+                        - generic [ref=e301]: I will always be compassionate for the ones I reap
+                      - generic [ref=e302]:
+                        - generic [ref=e303]: "4"
+                        - generic [ref=e304]: I will find a way to make death obsolete
+                    - generic [ref=e306]:
+                      - generic [ref=e308]: Inspect the frozen domains
+                      - generic [ref=e310]: Research the door
+                      - generic [ref=e312]: Grant a dying wish
+                      - generic [ref=e314]: Talk to Selva about The Terminal's backend
+              - generic [ref=e315]:
+                - generic [ref=e317]:
+                  - generic [ref=e318]: "[∴]"
+                  - generic [ref=e320]: "3"
+                - generic [ref=e322]:
+                  - generic [ref=e323]: "[∴]"
+                  - generic [ref=e325]: "3"
+                - generic [ref=e327]:
+                  - generic [ref=e328]: "[∴]"
+                  - generic [ref=e330]: "7"
+                - generic [ref=e331]:
+                  - generic [ref=e333]: ⊕
+                  - generic [ref=e334]: ⊕
+                  - generic [ref=e335]: ⊕
+                  - generic [ref=e336]: ⊕
+                  - generic [ref=e337]: ⊕
+                - generic [ref=e338]:
+                  - generic [ref=e340]: ⊕
+                  - generic [ref=e341]: ⊕
+                  - generic [ref=e342]: ⊕
+                  - generic [ref=e343]: ⊕
+                  - generic [ref=e344]: ⊕
+                - generic [ref=e345]:
+                  - generic [ref=e347]: ⊕
+                  - generic [ref=e348]: ⊕
+                  - generic [ref=e349]: ⊕
+                  - generic [ref=e350]: ⊕
+                  - generic [ref=e351]: ⊕
+                - generic [ref=e352]:
+                  - generic [ref=e354]: ⊕
+                  - generic [ref=e355]: ⊕
+                  - generic [ref=e356]: ⊕
+                  - generic [ref=e357]: ⊕
+                  - generic [ref=e358]: ⊕
+              - generic [ref=e378]:
+                - generic [ref=e379]:
+                  - text: T
+                  - generic [ref=e380]: Ҝ
+                  - text: V
+                - generic [ref=e381]: "2275"
+              - generic [ref=e382]:
+                - generic [ref=e385]: ATTRIBUTES
+                - generic [ref=e386]:
+                  - generic [ref=e387]:
+                    - generic [ref=e388]: 🜔 BODY
+                    - generic [ref=e391]:
+                      - generic [ref=e392]: "10"
+                      - generic [ref=e397]: "10"
+                      - generic [ref=e398]: CLT
+                    - generic [ref=e401]:
+                      - generic [ref=e402]: "15"
+                      - generic [ref=e407]: "15"
+                      - generic [ref=e408]: CEL
+                    - generic [ref=e411]:
+                      - generic [ref=e412]: "50"
+                      - generic [ref=e417]: "50"
+                      - generic [ref=e418]: CON
+                  - generic [ref=e419]:
+                    - generic [ref=e420]: 🜎 SPIRIT
+                    - generic [ref=e423]:
+                      - generic [ref=e424]: "40"
+                      - generic [ref=e429]: "40"
+                      - generic [ref=e430]: FLO
+                    - generic [ref=e433]:
+                      - generic [ref=e434]: "1200"
+                      - generic [ref=e439]: "1500"
+                      - generic [ref=e440]: FREQ
+                    - generic [ref=e443]:
+                      - generic [ref=e444]: "40"
+                      - generic [ref=e449]: "40"
+                      - generic [ref=e450]: FOC
+                  - generic [ref=e451]:
+                    - generic [ref=e452]: 🜍 SOUL
+                    - generic [ref=e455]:
+                      - generic [ref=e456]: "70"
+                      - generic [ref=e461]: "70"
+                      - generic [ref=e462]: WIL
+                    - generic [ref=e465]:
+                      - generic [ref=e466]: "50"
+                      - generic [ref=e471]: "65"
+                      - generic [ref=e472]: WIS
+                    - generic [ref=e475]:
+                      - generic [ref=e476]: "55"
+                      - generic [ref=e481]: "55"
+                      - generic [ref=e482]: WIT
+            - generic [ref=e483]:
+              - button "🎒 INVENTORY" [ref=e517] [cursor=pointer]:
+                - generic [ref=e518]: 🎒
+                - generic [ref=e519]: INVENTORY
+              - button "⚕ VITALS" [ref=e521] [cursor=pointer]:
+                - generic [ref=e522]: ⚕
+                - generic [ref=e523]: VITALS
+              - button "✶ TRAITS" [ref=e525] [cursor=pointer]:
+                - generic [ref=e526]: ✶
+                - generic [ref=e527]: TRAITS
+              - button "★ SKILLS" [ref=e529] [cursor=pointer]:
+                - generic [ref=e530]: ★
+                - generic [ref=e531]: SKILLS
+              - button "✨ MAGIC" [ref=e533] [cursor=pointer]:
+                - generic [ref=e534]: ✨
+                - generic [ref=e535]: MAGIC
+              - button "✎ BACKSTORY" [ref=e537] [cursor=pointer]:
+                - generic [ref=e538]: ✎
+                - generic [ref=e539]: BACKSTORY
+              - button "☘ HARVESTS" [ref=e541] [cursor=pointer]:
+                - generic [ref=e542]: ☘
+                - generic [ref=e543]: HARVESTS
+              - button "❖ POSSESSIONS" [ref=e545] [cursor=pointer]:
+                - generic [ref=e546]: ❖
+                - generic [ref=e547]: POSSESSIONS
+            - button "⊗" [ref=e516] [cursor=pointer]
+          - generic [ref=e182]:
+            - generic [ref=e183]:
+              - generic [ref=e184]:
+                - generic [ref=e185]:
+                  - generic [ref=e186]: ✴
+                  - generic [ref=e187]: River Styx
+                - generic [ref=e188]: cosmic landmark
+              - generic [ref=e189]:
+                - generic [ref=e190]: The river of erasure. Banishment-tier mechanic distinct from death. Souls that pass here lose contin...
+                - 'generic "KRMA Reserve: 25,000,000,000 Ҝ (continental)" [ref=e192]': 25.00B Ҝ
+            - button "⊕" [ref=e193] [cursor=pointer]
+          - generic [ref=e196]:
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - generic [ref=e199]:
+                  - generic [ref=e200]: ⚔️
+                  - generic [ref=e201]: Undead Army
+                - generic [ref=e202]: force
+              - generic [ref=e203]:
+                - generic [ref=e204]: A massive standing army of the undead under Lady Death's command. Mostly dormant in current Prime; a...
+                - 'generic "KRMA Reserve: 10,000,000,000 Ҝ (continental)" [ref=e206]': 10.00B Ҝ
+            - button "⊕" [ref=e207] [cursor=pointer]
+        - button "TOOLS" [ref=e209] [cursor=pointer]:
+          - img [ref=e210]
+          - text: TOOLS
+          - img [ref=e212]
+      - button "▲ TERMINAL" [ref=e26]
+  - button "Open co-pilot" [ref=e38] [cursor=pointer]:
+    - generic [ref=e39]: ">_"
+  - button "Open Next.js Dev Tools" [ref=e45] [cursor=pointer]:
+    - img [ref=e46]
+  - alert [ref=e216]
+  - generic [ref=e549]:
+    - generic: "[STREAM INPUT INTERRUPTED]"
+    - generic [ref=e550]:
+      - generic:
+        - generic:
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+        - generic:
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+        - generic:
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+        - generic:
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+          - generic: ^
+          - generic: v
+      - button "sKILL cHECK" [ref=e551]:
+        - img [ref=e552]
+        - text: sKILL cHECK
+      - button "cONTESTED" [ref=e554]:
+        - img [ref=e555]
+        - text: cONTESTED
+      - button "dELETE cHARACTER" [ref=e557]:
+        - img [ref=e558]
+        - text: dELETE cHARACTER

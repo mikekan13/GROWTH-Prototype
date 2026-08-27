@@ -1,0 +1,37 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e9]: CANVAS://session.layer.0
+        - generic [ref=e10]: ⊘ ⊕
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - link "←" [ref=e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=e14]
+        - generic [ref=e17]:
+          - button "Canvas" [ref=e18]
+          - button "Forge" [ref=e19]
+          - button "Encounters" [ref=e20]
+          - button "Tapestry" [ref=e21]
+          - button "Character" [ref=e22]
+    - main [ref=e23]:
+      - generic [ref=e47]:
+        - img [ref=e48]:
+          - generic [ref=e51]
+          - generic [ref=e99]
+          - generic [ref=e160]
+          - generic [ref=e221]
+        - button "TOOLS" [ref=e280] [cursor=pointer]:
+          - img [ref=e281]
+          - text: TOOLS
+          - img [ref=e283]
+      - generic [ref=e286]:
+        - button "▼ TERMINAL" [active] [ref=e287]
+        - generic [ref=e291]:
+          - generic [ref=e292]
+          - generic [ref=e311]
+          - generic [ref=e748]
+  - button "Open Next.js Dev Tools" [ref=e43] [cursor=pointer]:
+    - img [ref=e44]
+  - alert [ref=e285]

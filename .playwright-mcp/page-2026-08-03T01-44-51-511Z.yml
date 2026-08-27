@@ -1,0 +1,26 @@
+- generic [active] [ref=f21e1]:
+  - generic [ref=f21e2]:
+    - banner [ref=f21e3]:
+      - generic [ref=f21e4]:
+        - generic [ref=f21e9]: CANVAS://session.layer.0
+        - generic [ref=f21e10]: ⊘ ⊕
+      - generic [ref=f21e11]:
+        - generic [ref=f21e12]:
+          - link "←" [ref=f21e13] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=f21e14]:
+            - heading "The Incubator" [level=1] [ref=f21e15]
+            - text: DAYA
+            - generic [ref=f21e16]: "Invite: 482ff8d4"
+        - generic [ref=f21e17]:
+          - button "Forge" [ref=f21e18]
+          - button "Canvas" [ref=f21e19]
+          - button "Tapestry" [ref=f21e20]
+        - link "Campaign Settings" [ref=f21e22] [cursor=pointer]:
+          - /url: /watcher/campaign/cms5z4j6z0000zg48z5vzl2jn/settings
+    - main [ref=f21e26]:
+      - button "▲ TERMINAL" [ref=f21e27]
+  - generic [ref=f21e36]:
+    - generic [ref=f21e37]: "[ Downloading dice engine... ]"
+    - generic [ref=f21e38]: THREE.js + CANNON-es
+  - button "Open Next.js Dev Tools" [ref=f21e46] [cursor=pointer]

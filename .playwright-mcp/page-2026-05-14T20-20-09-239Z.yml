@@ -1,0 +1,81 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e31]: TERMINAL://reality.layer.0
+        - generic [ref=e32]: ⊘ ⊕
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - link "GRO.WTH" [ref=e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=e36]:
+              - generic [ref=e40]: G
+              - generic [ref=e41]: R
+              - generic [ref=e42]: O
+              - generic [ref=e44]: <n>
+              - generic [ref=e45]: W
+              - generic [ref=e46]: T
+              - generic [ref=e47]: H
+          - generic [ref=e48]:
+            - generic [ref=e49]: Trailblazer Portal
+            - generic [ref=e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=e53]:
+              - generic [ref=e54]: E
+              - generic [ref=e55]: Ŷ
+              - generic [ref=e56]: ∃
+              - generic [ref=e57]: tehr
+              - generic [ref=e58]: "N"
+              - generic [ref=e59]: ET
+          - link "Portal" [ref=e60] [cursor=pointer]:
+            - /url: /trailblazer
+        - 'button "ClaudePlayer CONSCIOUSNESS: INTERFACED ▾" [ref=e62]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: ClaudePlayer
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=e65]: ▾
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]: The Prime Campaign
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: "Backstory: ClaudePlayer's Character"
+            - generic [ref=e73]: DRAFT
+          - paragraph [ref=e74]: Answer the prompts below to build your character's backstory. You don't need to answer every question — focus on what feels important. Your Watcher will use this to craft the mechanical character.
+          - generic [ref=e75]: 0 of 8 prompts answered
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e78]: Where did you grow up? Describe your childhood.
+              - textbox [ref=e79]
+            - generic [ref=e80]:
+              - generic [ref=e81]: Who raised you? What was your relationship with them?
+              - textbox [ref=e82]
+            - generic [ref=e83]:
+              - generic [ref=e84]: What cultural or social group do you belong to?
+              - textbox [ref=e85]
+            - generic [ref=e86]:
+              - generic [ref=e87]: Describe your physical appearance — what do people notice first?
+              - textbox [ref=e88]
+            - generic [ref=e89]:
+              - generic [ref=e90]: What formative event shaped who you are today?
+              - textbox [ref=e91]
+            - generic [ref=e92]:
+              - generic [ref=e93]: What drives you? What do you want more than anything?
+              - textbox [ref=e94]
+            - generic [ref=e95]:
+              - generic [ref=e96]: What are you afraid of? What do you avoid?
+              - textbox [ref=e97]
+            - generic [ref=e98]:
+              - generic [ref=e99]: Is there anything else your Watcher should know?
+              - textbox [ref=e100]
+          - generic [ref=e101]:
+            - button "Save Draft" [ref=e102]
+            - button "Submit for Review" [ref=e103]
+    - contentinfo [ref=e104]:
+      - generic [ref=e105]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=e106]: ====================
+      - generic [ref=e107]: "REALITY LEVEL: Primary Translation"
+  - button "Open Next.js Dev Tools" [ref=e113] [cursor=pointer]:
+    - img [ref=e114]

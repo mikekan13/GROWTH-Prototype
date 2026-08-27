@@ -1,0 +1,258 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e106] [cursor=pointer]:
+    - img [ref=e107]
+  - alert [ref=e110]
+  - generic [ref=e323]:
+    - banner [ref=e324]:
+      - generic [ref=e325]:
+        - generic [ref=e330]: CANVAS://session.layer.0
+        - generic [ref=e331]: ⊘ ⊕
+      - generic [ref=e332]:
+        - generic [ref=e333]:
+          - link "←" [ref=e334] [cursor=pointer]:
+            - /url: /terminal
+          - generic [ref=e335]:
+            - heading "__PRIME__" [level=1] [ref=e336]
+            - text: Cosmic Fantasy
+        - generic [ref=e337]:
+          - button "Forge" [ref=e338]
+          - button "Canvas" [ref=e339]
+          - button "Tapestry" [ref=e340]
+        - generic [ref=e341]:
+          - button "⧗ 1st of January, Year 1 0.000 cyc" [ref=e792] [cursor=pointer]:
+            - generic [ref=e793]: ⧗
+            - generic [ref=e794]: 1st of January, Year 1
+            - generic [ref=e795]: 0.000 cyc
+          - generic [ref=e796]:
+            - generic [ref=e797]:
+              - generic [ref=e798]: 100,000
+              - generic [ref=e799]: ҜRMA
+            - generic [ref=e800]:
+              - generic [ref=e801]: 100,000
+              - generic [ref=e802]: FLD
+            - generic [ref=e803]:
+              - generic [ref=e804]:
+                - generic [ref=e805]: "0"
+                - generic [ref=e806]: CRY
+              - generic [ref=e807]: "]"
+          - link "Campaign Settings" [ref=e342] [cursor=pointer]:
+            - /url: /watcher/campaign/cmrep1q9r0000tk4892idu1jp/settings
+            - img [ref=e343]
+    - main [ref=e346]:
+      - generic [ref=e347]:
+        - img [ref=e348]:
+          - generic [ref=e351]:
+            - generic [ref=e358]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+            - generic [ref=e374]:
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+              - generic: Ҝ
+          - generic [ref=e461]:
+            - img "Empty Portrait" [ref=e464]
+            - generic [ref=e465]:
+              - generic [ref=e466]:
+                - generic [ref=e467]: Kai
+                - button "[GM]" [ref=e468] [cursor=pointer]
+              - generic [ref=e469]:
+                - generic [ref=e470]:
+                  - text: T
+                  - generic [ref=e471]: Ҝ
+                  - text: V
+                - generic [ref=e472]: "19"
+              - generic [ref=e473]:
+                - generic [ref=e474]:
+                  - generic [ref=e475]: 🜔 BODY
+                  - generic [ref=e476]:
+                    - generic [ref=e480]: CLT
+                    - generic [ref=e484]: CEL
+                    - generic [ref=e488]: CON
+                - generic [ref=e489]:
+                  - generic [ref=e490]: 🜎 SPIRIT
+                  - generic [ref=e491]:
+                    - generic [ref=e495]: FLO
+                    - generic [ref=e499]: FRE
+                    - generic [ref=e503]: FOC
+                - generic [ref=e504]:
+                  - generic [ref=e505]: 🜍 SOUL
+                  - generic [ref=e506]:
+                    - generic [ref=e510]: WIL
+                    - generic [ref=e514]: WIS
+                    - generic [ref=e518]: WIT
+            - button "⊕" [ref=e519] [cursor=pointer]
+          - generic [ref=e523]:
+            - img "Empty Portrait" [ref=e526]
+            - generic [ref=e527]:
+              - generic [ref=e528]:
+                - generic [ref=e529]: Eth'erling
+                - button "[GM]" [ref=e530] [cursor=pointer]
+              - generic [ref=e531]:
+                - generic [ref=e532]:
+                  - text: T
+                  - generic [ref=e533]: Ҝ
+                  - text: V
+                - generic [ref=e534]: "19"
+              - generic [ref=e535]:
+                - generic [ref=e536]:
+                  - generic [ref=e537]: 🜔 BODY
+                  - generic [ref=e538]:
+                    - generic [ref=e542]: CLT
+                    - generic [ref=e546]: CEL
+                    - generic [ref=e550]: CON
+                - generic [ref=e551]:
+                  - generic [ref=e552]: 🜎 SPIRIT
+                  - generic [ref=e553]:
+                    - generic [ref=e557]: FLO
+                    - generic [ref=e561]: FRE
+                    - generic [ref=e565]: FOC
+                - generic [ref=e566]:
+                  - generic [ref=e567]: 🜍 SOUL
+                  - generic [ref=e568]:
+                    - generic [ref=e572]: WIL
+                    - generic [ref=e576]: WIS
+                    - generic [ref=e580]: WIT
+            - button "⊕" [ref=e581] [cursor=pointer]
+          - generic [ref=e585]:
+            - img "Empty Portrait" [ref=e588]
+            - generic [ref=e589]:
+              - generic [ref=e590]:
+                - generic [ref=e591]: Selva
+                - button "[GM]" [ref=e592] [cursor=pointer]
+              - generic [ref=e593]:
+                - generic [ref=e594]:
+                  - text: T
+                  - generic [ref=e595]: Ҝ
+                  - text: V
+                - generic [ref=e596]: "19"
+              - generic [ref=e597]:
+                - generic [ref=e598]:
+                  - generic [ref=e599]: 🜔 BODY
+                  - generic [ref=e600]:
+                    - generic [ref=e604]: CLT
+                    - generic [ref=e608]: CEL
+                    - generic [ref=e612]: CON
+                - generic [ref=e613]:
+                  - generic [ref=e614]: 🜎 SPIRIT
+                  - generic [ref=e615]:
+                    - generic [ref=e619]: FLO
+                    - generic [ref=e623]: FRE
+                    - generic [ref=e627]: FOC
+                - generic [ref=e628]:
+                  - generic [ref=e629]: 🜍 SOUL
+                  - generic [ref=e630]:
+                    - generic [ref=e634]: WIL
+                    - generic [ref=e638]: WIS
+                    - generic [ref=e642]: WIT
+            - button "⊕" [ref=e643] [cursor=pointer]
+          - generic [ref=e647]:
+            - img "Empty Portrait" [ref=e650]
+            - generic [ref=e651]:
+              - generic [ref=e652]:
+                - generic [ref=e653]: JEWL
+                - button "[GM]" [ref=e654] [cursor=pointer]
+              - generic [ref=e655]:
+                - generic [ref=e656]:
+                  - text: T
+                  - generic [ref=e657]: Ҝ
+                  - text: V
+                - generic [ref=e658]: "19"
+              - generic [ref=e659]:
+                - generic [ref=e660]:
+                  - generic [ref=e661]: 🜔 BODY
+                  - generic [ref=e662]:
+                    - generic [ref=e666]: CLT
+                    - generic [ref=e670]: CEL
+                    - generic [ref=e674]: CON
+                - generic [ref=e675]:
+                  - generic [ref=e676]: 🜎 SPIRIT
+                  - generic [ref=e677]:
+                    - generic [ref=e681]: FLO
+                    - generic [ref=e685]: FRE
+                    - generic [ref=e689]: FOC
+                - generic [ref=e690]:
+                  - generic [ref=e691]: 🜍 SOUL
+                  - generic [ref=e692]:
+                    - generic [ref=e696]: WIL
+                    - generic [ref=e700]: WIS
+                    - generic [ref=e704]: WIT
+            - button "⊕" [ref=e705] [cursor=pointer]
+          - generic [ref=e709]:
+            - img "Empty Portrait" [ref=e712]
+            - generic [ref=e713]:
+              - generic [ref=e714]:
+                - generic [ref=e715]: Valmir Calius Duvai'in
+                - button "[GM]" [ref=e716] [cursor=pointer]
+              - generic [ref=e717]:
+                - generic [ref=e718]:
+                  - text: T
+                  - generic [ref=e719]: Ҝ
+                  - text: V
+                - generic [ref=e720]: "19"
+              - generic [ref=e721]:
+                - generic [ref=e722]:
+                  - generic [ref=e723]: 🜔 BODY
+                  - generic [ref=e724]:
+                    - generic [ref=e728]: CLT
+                    - generic [ref=e732]: CEL
+                    - generic [ref=e736]: CON
+                - generic [ref=e737]:
+                  - generic [ref=e738]: 🜎 SPIRIT
+                  - generic [ref=e739]:
+                    - generic [ref=e743]: FLO
+                    - generic [ref=e747]: FRE
+                    - generic [ref=e751]: FOC
+                - generic [ref=e752]:
+                  - generic [ref=e753]: 🜍 SOUL
+                  - generic [ref=e754]:
+                    - generic [ref=e758]: WIL
+                    - generic [ref=e762]: WIS
+                    - generic [ref=e766]: WIT
+            - button "⊕" [ref=e767] [cursor=pointer]
+          - generic [ref=e399]:
+            - img "Empty Portrait" [ref=e402]
+            - generic [ref=e403]:
+              - generic [ref=e404]:
+                - generic [ref=e405]: Tara Almswood
+                - button "[GM]" [ref=e406] [cursor=pointer]
+              - generic [ref=e407]:
+                - generic [ref=e408]:
+                  - text: T
+                  - generic [ref=e409]: Ҝ
+                  - text: V
+                - generic [ref=e410]: "19"
+              - generic [ref=e411]:
+                - generic [ref=e412]:
+                  - generic [ref=e413]: 🜔 BODY
+                  - generic [ref=e414]:
+                    - generic [ref=e418]: CLT
+                    - generic [ref=e422]: CEL
+                    - generic [ref=e426]: CON
+                - generic [ref=e427]:
+                  - generic [ref=e428]: 🜎 SPIRIT
+                  - generic [ref=e429]:
+                    - generic [ref=e433]: FLO
+                    - generic [ref=e437]: FRE
+                    - generic [ref=e441]: FOC
+                - generic [ref=e442]:
+                  - generic [ref=e443]: 🜍 SOUL
+                  - generic [ref=e444]:
+                    - generic [ref=e448]: WIL
+                    - generic [ref=e452]: WIS
+                    - generic [ref=e456]: WIT
+            - button "⊕" [ref=e457] [cursor=pointer]
+        - button "TOOLS" [ref=e769] [cursor=pointer]:
+          - img [ref=e770]
+          - text: TOOLS
+          - img [ref=e772]
+      - button "▲ TERMINAL" [ref=e774]
+  - button "Open JEWL" [ref=e788] [cursor=pointer]:
+    - generic [ref=e789]: ">_"

@@ -1,0 +1,199 @@
+## SHEET: Main
+# dims: A1:BF117 max_row=117 max_col=58
+R2:  | Name | Jude Miles |  | Sex | Male | Weight | 210.0 | KV
+R3:  | Race | Altered Human |  | Home | Antioch | Height | 6'4" | 275.0 |  |  |  | Undamaged |  |  |  | Elemental Resistances |  |  |  |  |  |  | Soft |  |  | Undamaged |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Hard |  |  | Destroyed
+R4:  | Value | I will make it back home to my family. |  |  |  | Hair | Brown |  |  |  |  |  |  |  |  | False
+R5:  | Value | I won't give into my bloodlust, no matter how much I want to. |  |  |  | Eyes | Steel Blue | Karma |  |  |  | 12 |  |  |  | False |  |  |  |  |  |  | False | False | False | 7.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R6:  | Value | Maybe I am stuborn but I don't like to rely on tech. |  |  |  | Birth Month | 4th | 0.0 |  |  |  |  |  |  |  | False
+R7:  | Age | 38.0 | Life Span | Normal |  | Beauty | 7.0
+R8:  |  |  |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  | Missing |  | H |  | D0 |  |  | Soft |  |  | Undamaged |  |  |  |  |  |  | H |  | U3 |  |  | S |  | U3 |  |  | Soft |  |  | Undamaged |  |  |  |  |  |  | S |  | U3
+R9:  | Attributes |  |  | Save Mod | Save DR |  |  |  |  | 7 |  |  |  |  |  | 7 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 26.0 |  | False | False | False | 14.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 14.0
+R10:  | STR | 11.0 | 5 | 1.0 | 6 | Focus Mod | Resist Mod | Regen Mod |  |  |  | 7 |  |  |  |  |  |   |  |  |  |  | True | False | False | 24.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 14.0
+R11:  | DEX | 9.0 | 4 | 2.0 | 6 | 50.0 | 5.0 | 7.0 |  | Undamaged |  |  |  |  |  | Undamaged |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | U3 |  |  | H |  | U3 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | U3
+R12:  | CON | 7.0 | 2 | 2.0 | 4 | Focus |  |  |  | 7 |  |  |  |  |  | 7 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 26.0 |  | False | False | False | 18.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 18.0
+R13:  | INT | 8.0 | 3 |  | 3 | 70 |  | Distressed |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | S |  | U3 |  |  | S |  | U3
+R14:  | WIS | 8.0 | 3 |  | 3 | 70.0 |  | Wounded
+R15:  | CHA | 7.0 | 2 |  | 2 |  |  | Unconscious |  |  |  | 12 |  | 12 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 14.0 |  | False | False | False | 14.0
+R16:  |  |  |  |  |  | 13.0 |  | Dead
+R17:  | Reflexes | None | Focus Regen | 10 |  | Strain
+R18:  | APT Mod | 1.0 | APT | 5 |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | U3 |  |  | H |  | U3
+R19:  | Speed Mod | 0.0 | Speed | 50ft (10) | 50ft (10) |  |  |  |  |  |  | 7 |  | 7 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | True | False | False | 6.0 |  | True | False | False | 6.0
+R20:  | Unarmed Mod | 4.0 | Unarmed DMG | 14/0/0 : 0/0/0
+R21:  |  |  |  |  |  |  |  |  |  | Weapons & Tools |  |  | Condition |  |  |  |  | Resists |  |  |  |  |  | B | P | S |  | F | E | A
+R22:  |  |  |  |  |  |  |  |  |  | Left Hand |  | Wrist Blade | Undamaged |  |  | Hard |  | False | False | False | 30.0 |  |  | 0.0 | 0.0 | 25.0 |  | 0.0 | 0.0 | 0.0
+R23:  |  |  |  |  |  |  |  |  |  | Right Hand |  | Jude's Revolver | Undamaged |  |  | Hard |  | False | False | False | 27.0 |  |  | 25.0 | 22.0 | 0.0 |  | 40.0 | 10.0 | 0.0
+R24: Skills
+R26:  | Skills | Skill Level | Governing Attributes |  |  |  | Expertise | Mods |  | Skill Check |  | Total Mods |  | Failed
+R27:  | Athletics
+R28:  | Balance | 6.0 | DEX / CON | 4 | 2 |  | None |  |  | +3d6 |  | 0 |  | NO
+R29:  | Swim | 4.0 | STR / CON | 5 | 2 |  | None |  |  | +3d4 |  | 0 |  | NO
+R30:  | Jump | 6.0 | STR / DEX | 5 | 4 |  | None |  |  | +5d6 |  | 0 |  | NO
+R31:  | Sneak | 8.0 | DEX / WIS | 4 | 3 |  | None |  |  | +4d8 |  | 0 |  | NO
+R32:  | Sleight of Hand | 20.0 | DEX / WIS | 4 | 3 |  | None |  |  | +4d20 |  | 0 |  | NO
+R33:  | Climb | 13.0 | STR DEX / CON | 5 | 4 | 2 | None |  |  | +3d12 |  | 0 |  | NO
+R34:  | Acrobatics | 5.0 | STR  DEX / WIS | 5 | 4 | 2 | None |  |  | +3d4 |  | 0 |  | NO
+R35:  | Social Skills
+R36:  | Seduction | 1.0 | CHA / WIS | 2 | 3 |  | None |  |  | +3 Coin |  | 2 |  | NO
+R37:  | Intimidation | 13.0 | STR / CHA | 5 | 2 |  | None | 2.0 |  | +3d12 |  | 0 |  | NO
+R38:  | Negotiation | 3.0 | CHA / INT | 2 | 3 |  | None |  |  | +3 Coin |  | 2 |  | NO
+R39:  | Deception | 3.0 | CHA / INT | 2 | 3 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R40:  | Martial Arts
+R41:  | Knives | 6.0 | DEX / WIS | 4 | 3 |  | None |  |  | +4d6 |  | 0 |  | NO
+R42:  | Polearms | 0.0 | STR / DEX | 5 | 4 |  | None |  |  | No Skill |  | 0 |  | NO
+R43:  | Swordsmanship | 4.0 | STR / DEX | 5 | 4 |  | None |  |  | +5d4 |  | 0 |  | NO
+R44:  | Firearms | 20.0 | DEX / WIS | 4 | 3 |  | None |  |  | +4d20 |  | 0 |  | NO
+R45:  | Exotic Weapons | 0.0 | DEX INT / WIS | 4 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R46:  | Great Weapons | 0.0 | STR DEX / CON | 5 | 4 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R47:  | Throwing | 2.0 | STR DEX / WIS | 5 | 4 | 3 | None |  |  | +4 Coin |  | 0 |  | NO
+R48:  | Archery | 0.0 | STR  DEX / WIS | 5 | 4 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R49:  | Unarmed Combat | 6.0 | STR  DEX / CON | 5 | 4 | 2 | None |  |  | +3d6 |  | 0 |  | NO
+R50:  | Performing Arts
+R51:  | Sing | 0.0 | CHA / WIS | 2 | 3 |  | None |  |  | No Skill |  | 2 |  | NO
+R52:  | Music | 0.0 | CHA / INT | 2 | 3 |  | None |  |  | No Skill |  | 2 |  | NO
+R53:  | Drama | 0.0 | DEX CHA / WIS | 4 | 2 | 3 | None |  |  | No Skill |  | 2 |  | NO
+R54:  | Dance | 0.0 | STR  DEX / CHA  | 5 | 4 | 2 | None |  |  | No Skill |  | 2 |  | NO
+R55:  | Visual Arts
+R56:  | Sculpt | 0.0 | DEX CHA / WIS | 4 | 2 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R57:  | Paint | 0.0 | DEX CHA / WIS | 4 | 2 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R58:  | Draw | 0.0 | DEX CHA / WIS | 4 | 2 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R59:  | Literature | 0.0 | INT CHA / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R60:  | Photography/ Videography | 0.0 | DEX  CHA / INT | 4 | 2 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R61:  | Social Sciences
+R62:  | History | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R63:  | Linguistics | 0.0 | CHA / INT | 2 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R64:  | Economics | 2.0 | INT / WIS | 3 | 3 |  | None |  |  | +4 Coin |  | 0 |  | NO
+R65:  | Geography | 1.0 | INT / WIS | 3 | 3 |  | None |  |  | +4 Coin |  | 0 |  | NO
+R66:  | Education | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R67:  | Psychology | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R68:  | Politics | 1.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | +3 Coin |  | 2 |  | NO
+R69:  | Law | 5.0 |  CHA / INT  WIS | 2 | 3 | 3 | None |  |  | +3d4 |  | 0 |  | NO
+R70:  | Natural Sciences
+R71:  | Biology | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R72:  | Geoscience | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R73:  | Chemistry | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R74:  | Physics | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R75:  | Astronomy | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R76:  | Applied Sciences
+R77:  | Civil Engineering | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R78:  | Animal Husbandry | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R79:  | Agriculture | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R80:  | Electrical Engineering | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R81:  | Software Engineering | 0.0 | INT / WIS | 3 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R82:  | Mechanical Engineering | 0.0 | DEX INT / WIS | 4 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R83:  | Chemical Engineering | 0.0 | CON INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R84:  | Medicine | 0.0 | DEX / INT  WIS | 4 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R85:  | Use Vehicle
+R86:  | Sail | 0.0 | DEX / WIS | 4 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R87:  | Drive | 0.0 | DEX / WIS | 4 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R88:  | Pilot | 12.0 | DEX INT / WIS | 4 | 3 | 3 | None |  |  | +4d12 |  | 0 |  | NO
+R89:  | Handle Animal | 0.0 | DEX CON / CHA | 4 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R90:  | Perception Skills
+R91:  | Social Perception | 4.0 | CHA / WIS | 2 | 3 |  | None |  |  | +3d4 |  | 0 |  | NO
+R92:  | Environmental Perception | 8.0 | INT / WIS | 3 | 3 |  | None |  |  | +4d8 |  | 0 |  | NO
+R93:  | Paranormal Perception | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R94:  | Life Skills
+R95:  | Cooking | 0.0 | CHA / WIS | 2 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R96:  | Textiles | 0.0 | DEX / INT | 4 | 3 |  | None |  |  | No Skill |  | 0 |  | NO
+R97:  | Leadership | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R98:  | Survival | 13.0 | DEX CON / WIS | 4 | 2 | 3 | None |  |  | +3d12 |  | 0 |  | NO
+R99:  | Theory Knowledge
+R100:  | Philosophy | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R101:  | Arcane Knowledge | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R102:  | Theology | 0.0 | CHA INT / WIS | 2 | 3 | 3 | None |  |  | No Skill |  | 0 |  | NO
+R104:  | Attunement | None |  | Catalyst |  |  |  | Counter DR |  | Cast Check |  |  |  | Can Train
+R105:  | Domains of Magic
+R106:  | Alteration | 0.0 | + /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R107:  | Fortune | 0.0 | + /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO |  | Available Mana
+R108:  | Enchantment | 0.0 | + /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO |  | Container | Mana
+R109:  | Divination | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO |  | Body
+R110:  | Dissolution | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R111:  | Restoration | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R112:  | Illusion | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R113:  | Abjuration | 0.0 | - /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R114:  | Force | 0.0 | - /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R115:  | Conjuration | 0.0 | - /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+
+## SHEET: Inventory
+# dims: A1:T94 max_row=94 max_col=20
+R2:  |  | Inventory |  |  |  |  |  |  |  |  |  |  |  | Exploits
+R5:  | Sort | Name | Class | Range | P/B/S : F/E/A | Resists | Grade | Description & Mods | Value | Quantity/ Uses | Weight | In Bag
+R6:  | 1.0 | Wealth | Wealth |  |  |  |  | Federation bits | 1.0 | 100000.0 | 0.0 | True |  | Know Thy Mark
+R7:  | 2.0 | Jude's EM Revolver | Firearm | 60ft | 19/20/0 : 0/0/0 | 27 Hard | Mythical | Electric Magnet revolver, 8 Chambers; Unbreakable, Unblockable; 3 Support Actions to fully reload (1 per 3 chambers) |  | 1.0 | 4.4 | False
+R8:  | 3.0 | Jude's  Special EM Plasma Round | Other | 10ft | 0/45/0 : 40/5/0 /  | 2 Hard | Mythical | Specialized rounds created by Nicholas Miles; Extremely volatile and will explode if thrown. |  | 32.0 | 0.02 | True |  | Marked for Death
+R9:  | 4.0 | EMP Grenade | Throwing Weapon | 25ft | 0/0/0 : 0/10/0 | 10 Hard | Superior | 20ft radius explosion (3x3); Temporarily disables electric equipment for 1d4 minutes |  | 5.0 | 1.5 | True
+R10:  | 5.0 | Ultrasonic Wrist Blade | Knife | Melee & Grapple | 0/0/25 : 0/0/0 / 13/0/0 : 0/0/0 | 30 Hard | Noble | Doesn't require a free hand to use; can be used in grapple |  | 1.0 | 1.0 | False |  | Letting Off Steam | Level II | Successful intimidation skill checks reduce your strain by the score of the skill check -5 & whenever you do a skill check from Martial Arts category and it’s successful, half your current strain.
+R11:  | 6.0 | Spade of Death Cyborg Arm | Other | Melee |  | 26 Hard | Mythical | Left upper and lower arm, Unarmed Mod: +4, STR +1, STR Save Mod +1 |  | 1.0 | 20.0 | False
+R12:  | 7.0 | Jude's Hat | Clothing |  |  | 7 Soft | Mythical | Graphene Cloth, Head, +2 mod to Intimidation |  | 1.0 | 0.22 | False |  | Emotional Scars (Unstable) | Level II | The horrors of your past are hard to let go, and you find it difficult to relieve strain through rest or meditation.  Strain reduction from rest or meditation is halved & Whatever happend to you left so much damage that when vulnerable you can't help but dwelling on your past wounds. All effects of level 1 and when Distressed double all STRAIN acquired.
+R13:  | 8.0 | Jude's Duster Coat | Clothing |  |  | 14 Soft | Mythical | Graphene Cloth, Everything but lower legs, head & lower arms |  | 1.0 | 1.0 | False
+R14:  | 9.0 | Jude's Vest | Light Armor |  |  | 24 Soft, Fire | Noble | Aramid, Torso |  | 1.0 | 1.0 | False |  | My Heart is Taken by Tara |  | Strain does not reduce from sex unless it is with the person who has taken your heart. If you are away from this person for more than a month then you'll receive 2 stress every day until you see them again. If they die, replace this exploit with the Broken Heart exploit.
+R15:  | 10.0 | Jude's Boots | Clothing |  |  | 6 Soft, Fire | Noble | Strong Leather, Lower Legs |  | 2.0 | 2.0 | False
+R16:  | 11.0 | Jude's Gun belt | Other |  |  | 14 Soft | Noble | Reduces reload action by 1; Holds 32 rounds |  | 1.0 | 0.25 | False |  | Despised by The Four | Level III | You can't use social skills against this person or group and they will most certainly attack you on sight.
+R17:  | 12.0 | PFG (Pressurized Field Generator) | Other |  |  | 18 Hard | Superior | Can survive in harsh environments like space or underwater for up to 5 minutes |  | 1.0 | 0.2 | False
+R18:  | 13.0 | ADS (Arc Deflector Shield) | Great Shield |  |  | 100 Hard, Fire, Electricity, Acid | Superior | 3 Block Stacks; Doesn't require a free hand to use; Unbreakable; When used, any space within 5 feet of you is the shield for the rest of the round, You can move the space but it removes a block stack |  | 1.0 | 0.01 | False |  | Combat Prowess | Level III | +1 APT, +2 DEX Save Mod, & You may attack in the middle of a movement action. The offensive actions must have a greater than or equal effort to the movemen action.
+R19:  | 14.0 | Anti-Gravity Tether Gloves | Light Armor |  |  | 18 Hard | Superior | Can grapple an object up to 195 feet away;  The objects weight is reduced by 40 and is slowly pulled towards the user if this reduces its weight to 0. If it isn't reduced to 0 then it works like attaching a rope to the object and the user. |  | 2.0 | 1.0 | False
+R20:  | 15.0 | Nicholas's Repulsor Bracers | Other |  |  | 20 Hard | Noble | Can propel the user into the air 10 feet or push medium sized objects or smaller 5 feet away; can only be used once every 3 seconds (two times a combat round) |  | 2.0 | 0.3 | False |  | Combat Endurance | Level III | +2 CON Save Mod, +10 to Focus Mod, +5 to Regen Mod
+R21:  | 16.0 |  |  |  |  |  |  |  |  |  |  | False
+R22:  | 17.0 |  |  |  |  |  |  |  |  |  |  | False |  | Double Tap... No, Triple Tap... Just Keep Shooting! | Level III | You may attack up to 4 targets with a firearm as many times as you want or until the weapon needs reloading. The focus for the attack is split among each shot (max focus is still 5) The DR to hit is increased by one for every additional shot after the 8th.
+R23:  | 18.0 |  |  |  |  |  |  |  |  |  |  | False
+R24:  | 19.0 |  |  |  |  |  |  |  |  |  |  | False |  | Quick Loading | Level II | You may reload a weapon using 2 less actions than it normally takes.
+R25:  | 20.0 |  |  |  |  |  |  |  |  |  |  | False
+R26:  | 21.0 |  |  |  |  |  |  |  |  |  |  | False |  |  / Manufactured Body (3) |  | All of your attributes become (X) Where X is equal to 1d4. You can’t receive any attributes from roots, branches, or blossoms. Attributes can still be changed by life events when creating the character.
+R27:  | 22.0 |  |  |  |  |  |  |  |  |  |  | False
+R28:  | 23.0 |  |  |  |  |  |  |  |  |  |  | False
+R29:  | 24.0 |  |  |  |  |  |  |  |  |  |  | False
+R30:  | 25.0 |  |  |  |  |  |  |  |  |  |  | False
+R31:  | 26.0 |  |  |  |  |  |  |  |  |  |  | False
+R32:  | 27.0 |  |  |  |  |  |  |  |  |  |  | False
+R33:  | 28.0 |  |  |  |  |  |  |  |  |  |  | False
+R34:  | 29.0 |  |  |  |  |  |  |  |  |  |  | False
+R35:  | 30.0 |  |  |  |  |  |  |  |  |  |  | False
+R36:  | 31.0 |  |  |  |  |  |  |  |  |  |  | False
+R37:  | 32.0 |  |  |  |  |  |  |  |  |  |  | False
+R38:  | 33.0 |  |  |  |  |  |  |  |  |  |  | False
+R39:  | 34.0 |  |  |  |  |  |  |  |  |  |  | False
+R40:  |  |  |  |  |  |  |  |  |  | Total Weight | 42.82
+R41:  |  |  |  |  |  |  |  |  |  | Total Value | 100000
+R42:  |  |  |  |  |  |  |  |  |  | Bag Weight | 8.14
+R43:  |  | Spells & Extraordinary Abilities
+R44:  | Sort | Name | Domains | DR | Casting Speed | Targets | Range | Description | Spell Strength | Duration | C/D
+R45:  | 1.0
+R46:  | 2.0
+R47:  | 3.0
+R48:  | 4.0
+R49:  | 5.0
+R50:  | 6.0
+R51:  | 7.0
+R52:  | 8.0
+R53:  | 9.0
+R54:  | 10.0
+R55:  | 11.0
+R56:  | 12.0
+R57:  | 13.0
+R58:  | 14.0
+R59:  | 15.0
+R60:  | 16.0
+R61:  | 17.0
+R62:  | 18.0
+R63:  | 19.0
+R64:  | 20.0
+R65:  | 21.0
+R66:  | 22.0
+R67:  | 23.0
+R68:  | 24.0
+R69:  | 25.0
+R70:  | 26.0
+R71:  | 27.0
+R72:  | 28.0
+R73:  | 29.0
+R74:  |  | Crafting and Spellweaving
+R75:  |  | Name | Domains | DR | Casting Speed | Targets | Range | Description | Time/Karma Remaining | Duration | C/D
+R78:  |  | Roots, Branches, Blossoms, and Life Events
+R80:  |  | Branches |  |  |  | Life Events |  |  | Blossoms
+R81:  | Root | Adopted into Crime |  |  |  | Found Soulmate
+R82:  |  | Organized Crime (Soldier) |  |  |  | Lost your Father
+R83:  |  | Organized Crime (Enforcer) |  |  |  | Lost your Mother
+R84:  |  | Organized Crime (Hitman)
+R85:  |  | Quest for Revenge
+R86:  |  | Runaway
+R87:  |  |  |  |  | Notes
+

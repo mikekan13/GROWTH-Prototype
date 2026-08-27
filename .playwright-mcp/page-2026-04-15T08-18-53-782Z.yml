@@ -1,0 +1,302 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e51] [cursor=pointer]:
+    - img [ref=e52]
+  - alert [ref=e55]
+  - main [ref=e56]:
+    - link "← All characters" [ref=e58] [cursor=pointer]:
+      - /url: /
+    - generic [ref=e61]:
+      - textbox "Character Name" [ref=e63]: Tara
+      - generic [ref=e64]:
+        - generic [ref=e65]: Seed
+        - generic [ref=e66]:
+          - combobox [ref=e67]:
+            - option "— Select a Seed —"
+            - option "Altered Human — d6 · KV 350"
+            - option "Human — d6 · KV 225" [selected]
+          - generic [ref=e68]:
+            - generic [ref=e69]: Humans are diverse and adaptable, originating from countless worlds across fantasy and sci-fi civilizations. Highly versatile and resourceful.
+            - generic [ref=e70]:
+              - generic [ref=e71]: Resist 15
+              - generic [ref=e72]: Freq 40
+              - generic [ref=e73]: Fated Age 80
+              - generic [ref=e74]: "Nectars: Ambitious"
+              - generic [ref=e75]: "Thorns: Bounded Potential"
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]: Reference Photos
+            - generic [ref=e80]: Upload photos of your character inspiration. Used for face identity and auto-description.
+          - generic [ref=e82] [cursor=pointer]: + Upload
+        - generic [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]: +
+          - generic [ref=e86]: Add Photo
+      - generic [ref=e87]:
+        - generic [ref=e88]: Physical Identity
+        - generic [ref=e89]: Describe each part of your body. Equipment, wounds, and age are reflected dynamically.
+        - generic [ref=e91]: Overall
+        - generic [ref=e93]:
+          - generic [ref=e94]:
+            - generic [ref=e95]: Gender
+            - combobox [ref=e96]:
+              - option "—" [selected]
+              - option "Male"
+              - option "Female"
+              - option "Non-binary"
+              - option "Other"
+          - generic [ref=e97]:
+            - generic [ref=e98]: Age
+            - generic [ref=e99]:
+              - generic [ref=e100]: "25"
+              - slider [ref=e101]: "25"
+              - generic [ref=e102]:
+                - generic [ref=e103]: "10"
+                - generic [ref=e104]: "Fated: 80"
+          - generic [ref=e105]:
+            - generic [ref=e106]: Height
+            - generic [ref=e107]:
+              - generic [ref=e108]: —
+              - slider [ref=e109]: "69"
+              - generic [ref=e110]:
+                - generic [ref=e111]: 4'6"
+                - generic [ref=e112]: 7'0"
+          - generic [ref=e113]:
+            - generic [ref=e114]: Build
+            - combobox [ref=e115]:
+              - option "—" [selected]
+              - option "Slight"
+              - option "Slim"
+              - option "Lean"
+              - option "Average"
+              - option "Athletic"
+              - option "Stocky"
+              - option "Muscular"
+              - option "Heavy"
+              - option "Large"
+          - generic [ref=e116]:
+            - generic [ref=e117]: Skin Tone
+            - combobox [ref=e118]:
+              - option "—" [selected]
+              - option "Porcelain"
+              - option "Ivory"
+              - option "Fair"
+              - option "Light"
+              - option "Light-Medium"
+              - option "Medium"
+              - option "Olive"
+              - option "Tan"
+              - option "Caramel"
+              - option "Brown"
+              - option "Dark Brown"
+              - option "Deep Brown"
+              - option "Ebony"
+              - option "Ruddy"
+              - option "Golden"
+        - generic [ref=e119]:
+          - generic [ref=e120]:
+            - button "▾ Head ●" [ref=e121]:
+              - generic [ref=e122]:
+                - generic [ref=e123]: ▾
+                - generic [ref=e124]: Head ●
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: Face
+                - generic [ref=e129]:
+                  - generic [ref=e130]:
+                    - generic [ref=e131]: Shape
+                    - combobox [ref=e132]:
+                      - option "—" [selected]
+                      - option "Oval"
+                      - option "Round"
+                      - option "Square"
+                      - option "Heart"
+                      - option "Long"
+                      - option "Diamond"
+                      - option "Angular"
+                  - generic [ref=e133]:
+                    - generic [ref=e134]: Facial Hair
+                    - textbox "clean-shaven, full beard" [ref=e135]
+              - generic [ref=e136]:
+                - generic [ref=e137]: Eyes
+                - generic [ref=e138]:
+                  - generic [ref=e139]:
+                    - generic [ref=e140]: Shape
+                    - combobox [ref=e141]:
+                      - option "—" [selected]
+                      - option "Almond"
+                      - option "Round"
+                      - option "Hooded"
+                      - option "Downturned"
+                      - option "Upturned"
+                      - option "Wide-set"
+                      - option "Deep-set"
+                      - option "Narrow"
+                  - generic [ref=e142]:
+                    - generic [ref=e143]: Color
+                    - textbox "green, hazel, amber" [ref=e144]
+              - generic [ref=e145]:
+                - generic [ref=e146]: Hair
+                - generic [ref=e147]:
+                  - generic [ref=e148]:
+                    - generic [ref=e149]: Color
+                    - textbox "black, auburn, silver" [ref=e150]
+                  - generic [ref=e151]:
+                    - generic [ref=e152]: Length
+                    - combobox [ref=e153]:
+                      - option "—" [selected]
+                      - option "Bald"
+                      - option "Buzzed"
+                      - option "Short"
+                      - option "Ear-length"
+                      - option "Chin-length"
+                      - option "Shoulder-length"
+                      - option "Mid-back"
+                      - option "Waist-length"
+                      - option "Hip-length"
+                      - option "Knee-length"
+                      - option "Floor-length"
+                  - generic [ref=e154]:
+                    - generic [ref=e155]: Texture
+                    - combobox [ref=e156]:
+                      - option "—" [selected]
+                      - option "Straight"
+                      - option "Wavy"
+                      - option "Curly"
+                      - option "Coily"
+                      - option "Kinky"
+                      - option "Wiry"
+                      - option "Fine"
+                      - option "Thick"
+                  - generic [ref=e157]:
+                    - generic [ref=e158]: Style
+                    - textbox "braided, ponytail, loose, pinned up" [ref=e159]
+              - generic [ref=e160]:
+                - generic [ref=e161]: Grooming
+                - generic [ref=e162]:
+                  - generic [ref=e163]:
+                    - generic [ref=e164]: Cosmetics
+                    - textbox "kohl eyeliner, war paint, none" [ref=e165]
+                  - generic [ref=e166]:
+                    - generic [ref=e167]: Hygiene
+                    - combobox [ref=e168]:
+                      - option "—" [selected]
+                      - option "Pristine"
+                      - option "Well-kept"
+                      - option "Average"
+                      - option "Rugged"
+                      - option "Rough"
+                      - option "Unkempt"
+                      - option "Feral"
+              - generic [ref=e169]:
+                - generic [ref=e170]: Distinguishing Features
+                - textbox "Scars, pointed ears, piercings, birthmarks, glowing runes..." [ref=e171]
+          - button "▸ Torso ●" [ref=e173]:
+            - generic [ref=e174]:
+              - generic [ref=e175]: ▸
+              - generic [ref=e176]: Torso ●
+          - button "▸ Left Upper Arm" [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]: ▸
+              - generic [ref=e181]: Left Upper Arm
+          - button "▸ Left Lower Arm" [ref=e183]:
+            - generic [ref=e184]:
+              - generic [ref=e185]: ▸
+              - generic [ref=e186]: Left Lower Arm
+          - button "▸ Right Upper Arm" [ref=e188]:
+            - generic [ref=e189]:
+              - generic [ref=e190]: ▸
+              - generic [ref=e191]: Right Upper Arm
+          - button "▸ Right Lower Arm" [ref=e193]:
+            - generic [ref=e194]:
+              - generic [ref=e195]: ▸
+              - generic [ref=e196]: Right Lower Arm
+          - button "▸ Left Upper Leg" [ref=e198]:
+            - generic [ref=e199]:
+              - generic [ref=e200]: ▸
+              - generic [ref=e201]: Left Upper Leg
+          - button "▸ Left Lower Leg" [ref=e203]:
+            - generic [ref=e204]:
+              - generic [ref=e205]: ▸
+              - generic [ref=e206]: Left Lower Leg
+          - button "▸ Right Upper Leg" [ref=e208]:
+            - generic [ref=e209]:
+              - generic [ref=e210]: ▸
+              - generic [ref=e211]: Right Upper Leg
+          - button "▸ Right Lower Leg" [ref=e213]:
+            - generic [ref=e214]:
+              - generic [ref=e215]: ▸
+              - generic [ref=e216]: Right Lower Leg
+      - generic [ref=e217]:
+        - generic [ref=e218]: Style Preferences
+        - generic [ref=e219]: Your character's visual style. Colors and aesthetic shape how equipment and clothing appear.
+        - generic [ref=e220]:
+          - generic [ref=e221]:
+            - generic [ref=e222]: primary
+            - textbox [ref=e223] [cursor=pointer]: "#582a72"
+            - generic [ref=e224]: "#582a72"
+          - generic [ref=e225]:
+            - generic [ref=e226]: secondary
+            - textbox [ref=e227] [cursor=pointer]: "#d0a030"
+            - generic [ref=e228]: "#D0A030"
+          - generic [ref=e229]:
+            - generic [ref=e230]: tertiary
+            - textbox [ref=e231] [cursor=pointer]: "#22ab94"
+            - generic [ref=e232]: "#22ab94"
+        - generic [ref=e233]:
+          - generic [ref=e234]: Aesthetic (choose up to 2)
+          - generic [ref=e235]:
+            - button "Ornate" [ref=e236] [cursor=pointer]
+            - button "Practical" [ref=e237] [cursor=pointer]
+            - button "Rugged" [ref=e238] [cursor=pointer]
+            - button "Elegant" [ref=e239] [cursor=pointer]
+            - button "Minimal" [ref=e240] [cursor=pointer]
+            - button "Wild" [ref=e241] [cursor=pointer]
+            - button "Military" [ref=e242] [cursor=pointer]
+            - button "Scholarly" [ref=e243] [cursor=pointer]
+            - button "Noble" [ref=e244] [cursor=pointer]
+            - button "Street" [ref=e245] [cursor=pointer]
+            - button "Ceremonial" [ref=e246] [cursor=pointer]
+            - button "Artisan" [ref=e247] [cursor=pointer]
+            - button "Nomadic" [ref=e248] [cursor=pointer]
+            - button "Mystic" [ref=e249] [cursor=pointer]
+            - button "Mercenary" [ref=e250] [cursor=pointer]
+            - button "Courtly" [ref=e251] [cursor=pointer]
+            - button "Tribal" [ref=e252] [cursor=pointer]
+            - button "Anarchic" [ref=e253] [cursor=pointer]
+            - button "Maritime" [ref=e254] [cursor=pointer]
+            - button "Monastic" [ref=e255] [cursor=pointer]
+            - button "Gothic" [ref=e256] [cursor=pointer]
+            - button "Theatrical" [ref=e257] [cursor=pointer]
+            - button "Pastoral" [ref=e258] [cursor=pointer]
+            - button "Ascetic" [ref=e259] [cursor=pointer]
+            - button "Industrial" [ref=e260] [cursor=pointer]
+            - button "Diplomatic" [ref=e261] [cursor=pointer]
+            - button "Predatory" [ref=e262] [cursor=pointer]
+            - button "Festive" [ref=e263] [cursor=pointer]
+            - button "Ancient" [ref=e264] [cursor=pointer]
+            - button "Biomantic" [ref=e265] [cursor=pointer]
+      - generic [ref=e266]:
+        - generic [ref=e267]:
+          - generic [ref=e268]:
+            - generic [ref=e269]: Visual Identity
+            - generic [ref=e270]: Lock your character's appearance. This defines how they look across all portraits, tokens, and 3D renders.
+          - button "Lock Identity" [ref=e271] [cursor=pointer]
+        - generic [ref=e272]:
+          - generic [ref=e273]:
+            - generic [ref=e274]: Portrait
+            - img "Portrait — not yet generated" [ref=e276]
+          - generic [ref=e277]:
+            - generic [ref=e278]: Token
+            - img "Token — not yet generated" [ref=e280]
+          - generic [ref=e281]:
+            - generic [ref=e282]: 3D View
+            - generic [ref=e284]:
+              - generic [ref=e285]: ▱
+              - generic [ref=e286]: Coming Soon
+      - generic [ref=e287]:
+        - generic [ref=e288]: Backstory
+        - generic [ref=e289]: Trailblazer-submitted backstory. Use to inform seed, root, and branch creation.
+        - textbox "Write your character's story here..." [ref=e290]
+      - generic [ref=e291]:
+        - button "Saved" [disabled] [ref=e292]
+        - button "Submit to Watcher" [disabled] [ref=e293]

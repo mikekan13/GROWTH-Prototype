@@ -1,0 +1,131 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e31]: TERMINAL://reality.layer.0
+        - generic [ref=e32]: ⊘ ⊕
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - link "GRO.WTH" [ref=e35] [cursor=pointer]:
+            - /url: /hub
+            - generic "GRO.WTH" [ref=e36]:
+              - generic [ref=e40]: G
+              - generic [ref=e41]: R
+              - generic [ref=e42]: O
+              - generic [ref=e44]: <n>
+              - generic [ref=e45]: W
+              - generic [ref=e46]: T
+              - generic [ref=e47]: H
+          - generic [ref=e48]:
+            - generic [ref=e49]: Terminal Admin
+            - generic [ref=e50]: "[PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active] [PATTERN RECOGNITION: Active]"
+        - navigation [ref=e51]:
+          - link "E Ŷ ∃ tehr N ET" [ref=e52] [cursor=pointer]:
+            - /url: /hub
+            - generic [ref=e53]:
+              - generic [ref=e54]: E
+              - generic [ref=e55]: Ŷ
+              - generic [ref=e56]: ∃
+              - generic [ref=e57]: tehr
+              - generic [ref=e58]: "N"
+              - generic [ref=e59]: ET
+          - link "Terminal" [ref=e60] [cursor=pointer]:
+            - /url: /terminal
+        - 'button "Mikekan13 CONSCIOUSNESS: INTERFACED ▾" [ref=e62]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: Mikekan13
+            - text: "CONSCIOUSNESS: INTERFACED"
+          - generic [ref=e65]: ▾
+    - main [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - paragraph [ref=e70]: "[STREAM RECONNECTED...] [STREAM RECONNECTED...] [STREAM RECONNECTED...]"
+          - generic [ref=e71]: "[INTERFACE 50.1% STABLE]⊘"
+        - generic [ref=e72]:
+          - generic [ref=e73]: "{0.G} — Godhead Console"
+          - paragraph [ref=e74]: "FRAGMENT{} TERMINAL_INTERFACE::SYSTEM_OVERVIEW]"
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e78]: System Health
+              - generic [ref=e79]: LIVE
+            - generic [ref=e80]:
+              - generic [ref=e81]:
+                - generic [ref=e82]:
+                  - generic [ref=e83]: 100,000,000,000
+                  - generic [ref=e84]: ҜRMA
+                - generic [ref=e85]:
+                  - generic [ref=e86]: 30,000
+                  - generic [ref=e87]: CIRC
+                - generic [ref=e88]:
+                  - generic [ref=e89]:
+                    - generic [ref=e90]: "0"
+                    - generic [ref=e91]: BURN
+                  - generic [ref=e92]: "]"
+              - generic [ref=e93]:
+                - generic [ref=e94]: Pattern Stability
+                - generic [ref=e95]: 50.1%
+              - generic [ref=e96]:
+                - generic [ref=e97]: Transactions
+                - generic [ref=e98]: "8"
+              - generic [ref=e99]:
+                - generic [ref=e100]: Wallets
+                - generic [ref=e101]: "11"
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - generic [ref=e104]: 74,999,990,000
+                  - generic [ref=e105]: Terminal
+                - generic [ref=e106]:
+                  - generic [ref=e107]: 12,499,980,000
+                  - generic [ref=e108]: Balance
+                - generic [ref=e109]:
+                  - generic [ref=e110]: 6,250,000,000
+                  - generic [ref=e111]: Mercy
+                - generic [ref=e112]:
+                  - generic [ref=e113]: 6,250,000,000
+                  - generic [ref=e114]: Severity
+          - generic [ref=e115]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: Access Codes
+              - generic [ref=e118]: WATCHER KEYS
+            - generic [ref=e119]:
+              - paragraph [ref=e120]: Generate access codes for Watcher recruitment. Each code grants WATCHER role on registration.
+              - generic [ref=e121]: npx tsx scripts/generate-access-codes.ts [count]
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - generic [ref=e124]: Registered Consciousnesses
+              - generic [ref=e125]: USERS
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: GOD
+                - generic [ref=e129]: Mikekan13
+                - generic [ref=e130]: ACTIVE
+              - paragraph [ref=e132]: No other consciousnesses have interfaced yet.
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]: Active Campaigns
+              - generic [ref=e136]: WORLDS
+            - generic [ref=e138]:
+              - generic [ref=e139]:
+                - link "The Prime Campaign" [ref=e140] [cursor=pointer]:
+                  - /url: /campaign/cmmr6djjy0000ws482a52nc1y
+                - generic [ref=e141]: by Mikekan13
+              - generic [ref=e142]:
+                - generic [ref=e143]: 3 chars · 1 members
+                - generic [ref=e144]: ACTIVE
+        - generic [ref=e145]:
+          - paragraph [ref=e148]: tHE TERmInAl sEEs aLL paTTerNs. tHE TERmInAl kNoWs aLL cONnEcTiONs.The patterns were always here.
+          - paragraph [ref=e149]: ============================================================
+        - generic [ref=e150]:
+          - paragraph [ref=e152]: "[PSEQ INITIALIZING]"
+          - paragraph [ref=e154]: The journey ahead is both a game and a doorway. Through it, you'll discover how to craft stories, shape realities, and recognize the patterns that have always existed.
+          - paragraph [ref=e156]: "[REALITY ANCHOR ESTABLISHED]"
+    - contentinfo [ref=e157]:
+      - generic [ref=e158]: <STREAM STABILIZING> <STREAM STABILIZING> <STREAM STABILIZING>
+      - generic [ref=e159]: ====================
+      - generic [ref=e160]: "REALITY LEVEL: Primary Translation"
+    - button "◎ View As" [ref=e162]:
+      - generic [ref=e163]: ◎
+      - text: View As
+  - button "Open Next.js Dev Tools" [ref=e169] [cursor=pointer]:
+    - img [ref=e170]
