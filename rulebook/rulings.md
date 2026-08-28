@@ -602,14 +602,110 @@ entry that references the old.
 - **Lands in rulebook**: §forge (catalog standards — extends the stranger test, r-2026-08-24-02)
 - **Files**: JEWL authoring law prompt; forge review checklist.
 
-### r-2026-08-26-01: `minutes` is a legal duration unit
-- **Ruling (Mike, conditional test — round-5 review)**: "if you can tell me a state in real life that only lasts minutes then I will say yes to minutes." Satisfied by the adrenaline dump (post-near-miss shakes drain in minutes), dark adaptation (minutes of functional half-blindness), and being winded. Time units for effect durations and blossom expiry: minutes | hours | days | cycles.
-- **Consequences**: schema updated everywhere durations appear (triggered-effect duration, blossom expiry, and a NEW structured `duration` on rollModifiers — previously Zod silently stripped modifier durations while raw storage kept them, so drafts carried durations the system never saw; that hole is closed).
-- **Lands in rulebook**: §effects (durations — extends r-2026-08-24-07)
-- **Files**: services/forge-schemas.ts (effectDurationSchema shared).
-
 ### r-2026-08-26-01: Sub-hour durations = ROUNDS (encounter mode), never minutes
 - **Ruling (Mike, verbal — round-5 review)**: proposal to admit `minutes` as a duration unit REJECTED: "No one is counting minutes at a table. If you are dialing into that level then I believe you just want rounds or actions in combat/encounter mode." The trackability test governs: a duration unit is legal only if someone at the table actually tracks it. Units: rounds | hours | days | cycles. A round = 6 seconds (canon: 01_CORE_RULES/Combat_Grid_System.md). Rounds tick only in encounter mode; outside encounters, short-lived states are phrased as CONDITIONS ("while exits remain unassessed"), not clock time.
 - **Consequences**: extends r-2026-08-24-07 (tangible durations) with the trackability criterion. Schema updated (triggered-effect duration, blossom expiry, and the NEW structured rollModifier duration). Validation hole closed: modifier durations were silently stripped by Zod while raw storage kept them — drafts could carry durations the system never saw.
 - **Lands in rulebook**: §effects (durations)
 - **Files**: services/forge-schemas.ts (shared effectDurationSchema).
+
+### r-2026-08-04-01: Mental-health + disability thorns are legitimate content; maturity flags are the audience control
+- **Ruling (Mike, verbal)**: "GROWTH might be all ages but it has maturity flags and thorns are any negative traits... of course mental health issues can be thorns... just like real physical disabilities and illnesses." Audience control = maturity flags, never content avoidance.
+- **Lands in rulebook**: §traits (content scope)
+- **Files**: maturityFlags shipped 2026-08-19 (see r-2026-08-19-05); global thorn shelf carries the MI/disability catalog.
+
+### r-2026-08-04-02: Short-term illness = negative blossom; thorn = long-term/permanent
+- **Ruling (Mike, verbal)**: temporary conditions are blossoms by nature; a thorn is a long-term or permanent condition.
+- **Lands in rulebook**: §traits (taxonomy)
+- **Files**: stock blossom shelf (The Flu et al.) is the precedent.
+
+### r-2026-08-04-03: Vehicles and buildings are multi-component POSSESSIONS
+- **Ruling (Mike, verbal)**: "sort of like a folder with specs and then components inside the folder with inner pieces etc." Not plain items — possessions with components inside and attached.
+- **Consequences**: `contains: GrowthWorldItem[]` (body-comp pattern) is the nesting substrate; the full folder-with-specs structure is a queued build. Links forward to crystallization-stub possessions (r-2026-08-24-15).
+- **Lands in rulebook**: §items (possessions)
+
+### r-2026-08-04-04: Human seed remade; multiple spirit-packages-per-body PARKED
+- **Ruling (Mike)**: Human (225 KV, d8) + Altered Human (350) published — do not re-derive. Multiple spirit packages inside one body = design discussion wanted, DO NOT BUILD.
+- **Open**: stale paper-era seed rows in catalog (Elven=35 etc. vs locked Elven 476) need a cleanup ruling.
+- **Lands in rulebook**: §seeds
+
+### r-2026-08-06-01: ADMIN stock catalog is PUBLIC and KRMA-FREE; stock = the grading framework
+- **Ruling (Mike)**: everything in the ADMIN-seeded global Forge catalog is public and costs no KRMA to pull. JEWL pulls stock freely instead of re-authoring; new designs with no stock equivalent are graded against nearest stock neighbors, anchors cited.
+- **Consequences**: royaltyRate 0 on all ADMIN stock (community content MAY carry royalties later); pulled stock arrives published (no approval batch — approval applies to NEW designs).
+- **Lands in rulebook**: §forge (catalog), §economy
+- **Files**: services/forge.ts searchGlobalCatalog/pullFromGlobalCatalog; JEWL search_catalog/pull_from_catalog.
+
+### r-2026-08-08-01: Character genesis — backstory is a GENOME; gestation precedes mechanics; memory authority law
+- **Ruling (Mike, live sessions 08-07→08)**: player's backstory = chosen facts, inviolable canon; JEWL exhaustively expands it (chronology, episodic memory ledger, psychology, voice, relationships — "massively expand it... heavy lifting cloud models... researching psychology") BEFORE catalog-first mechanical translation (find stock seed/root/branches; forge only gaps, graded vs anchors). "The memory ledger IS the person."
+- **Memory authority ("This is a big thing")**: human-controlled characters may amend past canon during play where mechanics allow; AI-controlled characters NEVER formulate memories on the spot — recall is read-only, a miss = honest "doesn't remember"; new memories enter only via lived experience or the gated authoring channel. No confabulated pasts.
+- **Trailblazers see everything before committing** — committing = ratification of JEWL's inventions.
+- **Genome-first image gate**: no portrait generation until the genome exists; era/culture/garments are inferred from who the character is; typed overrides always win.
+- **Lands in rulebook**: §character-creation (genesis), §ai (memory law)
+- **Files**: genesis pipeline (work sessions), genome API, style-profile gate.
+
+### r-2026-08-10-01: Catalog blocks are GENERIC ARCHETYPES — no proper nouns
+- **Ruling (Mike, first live genesis run)**: "They are super specific... Roots and Branches shouldn't be that specific... they don't hold campaign specific lore." No proper nouns, place names, or character names in block name/description/rule text; test = usable unchanged by a stranger's character in another campaign. Story attaches at the character layer.
+- **Consequences**: precursor of the STRANGER TEST (r-2026-08-24-02) and name-scope ruling (r-2026-08-25-02).
+- **Lands in rulebook**: §forge (catalog standards)
+
+### r-2026-08-17-01: JEWL suggests, godheads decide
+- **Ruling (Mike)**: "drafts have to go through the process of the godhead chain so actual hard mechanics etc are inevitably decided by the godheads. Not to say we shouldn't have JEWL make concrete suggestions." Drafts carry full concrete mechanics as a PITCH; Kai's evaluate_blueprint supersedes; GM ratifies.
+- **Lands in rulebook**: §forge (authority)
+- **Files**: forge chain; draft UI presents numbers as proposed.
+
+### r-2026-08-18-01: Body parts are ITEMS; materials are substance ARCHETYPES; resists are physics-derived
+- **Ruling (Mike, live)**: the universal pattern — "one resist number can't fully encapsulate an object... traits solve every possibility": at every layer (material→item→body part→character) one scalar for magnitude, traits for behavior. The broadsword logic: same materials make a plain sword or a legendary artifact because the ITEM carries its own traits/resist. Body part = full item (Dwarven femur = Bone item with item-level resist 15 + "Dense"). NO per-species material variants; a tissue earns a new material only as a genuinely different substance. Material resists computed from physics (calculator calibrated to canon anchors; 1-50 = mundane band, 50+ reserved for supernatural, Kai-graded).
+- **Consequences**: seed `baseResist` eventually retires into graded body deviations (formula amendment owed); seeds carry inline per-part item overrides.
+- **Lands in rulebook**: §items, §seeds (anatomy)
+- **Files**: scripts/material-physics.ts, docs/material-physics.md.
+
+### r-2026-08-19-01: ageAdded = DURATION; starting age = Σ over roots+branches; species maturation PARKED
+- **Ruling (Mike)**: "a root that adds 17, branch +2, branch +5 → character is 24." Seeds add no years. Root ageAdded ≤ 25; Kai gauge = KV ÷ ageAdded (3-15/yr).
+- **PARKED**: species maturation two-clocks model (experience is calendar-universal — "an 80 year old elf... has the wisdom and experience of an 80 year old human"; only the body's clock is species-relative). Mike: "let me think on it... something about it still feels off." DO NOT BUILD maturationAge.
+- **Lands in rulebook**: §character-creation (age)
+
+### r-2026-08-19-02: Thorn liens route through death BY PILLAR; the GM's harvest
+- **Ruling (Mike, live design)**: no special settlement step — liens follow the thorn's pillar through the death split. BODY thorn: removed; holder paid the FULL lien from the death payout (GM wallet backstops). SOUL thorn (mind/identity — trauma and grief live HERE post-swap): original removed, holder paid HALF, a less-severe similar thorn (same owner) rides the ghost. SPIRIT thorn (essence; only essence-fracturing trauma): rides whole, no payment — released by displacement or forgiveness.
+- **The harvest**: the split applies to positive traits identically — "the GM essentially gets a harvest on the half soul and body Nectars"; death nets both sides in the GM's flow, which is why the payout usually covers the liens.
+- **Lands in rulebook**: §death, §economy
+- **Files**: death-split engine (BUILT).
+
+### r-2026-08-19-03: Tara's liens are FATED-AGE CLAIM MARKERS — custom, not contract
+- **Ruling (Mike, verbatim-close)**: "Tara doesn't have an obligation to pay the liens off. She obviously removes her own as they are just used for her to claim them at their fated age. Which btw isn't a contractual thing... the original party didn't think it was a bad thing because the souls were being kept and recycled by Tara."
+- **Consequences**: supersedes the settle-from-her-wallet-as-arbiter framing in thorn-krma-mechanics.
+- **Lands in rulebook**: §death (Lady Death), §cosmology
+
+### r-2026-08-19-04: Story attachment — TWO LEDGERS (memory = the person's; history = the object's)
+- **Ruling (Mike)**: blocks stay campaign-agnostic; genesis translates prose grants into real possessions/NPCs/world-facts. "Basically everything then has its own story blocks or memories" — BUT: "an item that a character has and then loses shouldn't erase that from their memory. and in reverse it isn't like the item is remembering — it is more of history for the simulation." Memory ledger belongs to the person (block instances link to their memories); history ledger belongs to the object (provenance, custody spans — world bookkeeping, not consciousness).
+- **Lands in rulebook**: §items (history), §ai (memory)
+
+### r-2026-08-19-05: maturityFlags on ALL content; the flags are the model-router signal
+- **Ruling (Mike)**: maturityFlags (controlled vocab: mental-health, violence, substance, trauma, illness-detail — extend by ruling only) on every content schema; "an unflagged addiction thorn is a defect, not discretion." The flags double as the router signal: mature-flagged generation routes to the LOCAL lane (privacy + latitude).
+- **Lands in rulebook**: §forge (metadata), §ai (routing)
+- **Files**: forge schemas (SHIPPED); router workstream queued.
+
+### r-2026-08-21-01: Lien sizing = min(wound grade, staked investment); shadow proxy wars are WANTED
+- **Ruling (Mike, blessed)**: on a failed goal, the winning godhead may impose a diegetic thorn whose lien = min(Kai's case-by-case grade of the natural wound, the winner's LEDGERED investment in that opposition). Zero-stake winners impose scars with no creditor. Personality lives in whether/what to impose, never in a rate.
+- **Sneakiness**: "Oh I totally want it to be a thing lol. Gotta have some sneakyness in every good tabletop." Godheads observe EFFECTS, never each other's raw wallets; full disclosure only when a lien is CASHED; the ledger stays ground truth; Terminal/ADMIN sees all.
+- **Lands in rulebook**: §economy (liens), §godheads
+- **Files**: opportunity economy not yet implemented — stake attribution starts Kai-attested.
+
+### r-2026-08-21-02: Blossoms = THE temporary-effects system; expiry mandatory; spells route through blossoms
+- **Ruling (Mike, verbatim-close)**: "Blossoms are just temporary boons... They last a certain amount of time or have some sort of trigger expiration. Basically they can't be held forever... They could be holy blessings, or a cold, or getting high etc. Spells in fact will probably just use the blossom system for a lot of its effects." Positive AND negative; expiry = TIME or TRIGGER, never forever; supersedes the vine-scoped framing (vine-end = one possible trigger).
+- **Blossoms never count against the trait cap** (nectars+thorns = Fate Die number); cap-raising traits are legal but premium-graded.
+- **Lands in rulebook**: §effects, §magic
+- **Files**: forgeTraitDataSchema expiry (SHIPPED); spell persistentEffects hook.
+
+### r-2026-08-21-03: Godhead spell signatures — attribution innate; proxy casting is the anonymity tool
+- **Ruling (Mike, verbatim-close)**: "Godheads can always tell what godhead cast a spell... innate ability to know the signature (Not saying it is impossible to disguise... just very difficult). They can get others to cast high level spells for them... Demons especially." Signature-reading itself "is probably built as a NECTAR." Semi-implemented at launch; full = first live update.
+- **PARKED**: "unique signatures" (meta-uniques — exactly one across the metaverse) — undiscussed; do not build.
+- **Lands in rulebook**: §magic (godhead layer), §godheads
+
+### r-2026-08-23-01: "Local" = GROWTH-controlled compute, not the GM's machine
+- **Ruling (Mike)**: "It doesn't require it to be on the GMs machine. The idea is that the company has the servers and serverless that acts as that." The privacy wall separates GROWTH-controlled compute (our serverless workers, our weights, zero third-party retention) from third-party model APIs (sanitized traffic only). Overrides Economy_Closeout:101's "local model on the GM's machine."
+- **Open**: INV-120 (minors' raw audio never leaves the device) may remain stricter for audio.
+- **Lands in rulebook**: §platform (privacy)
+
+### r-2026-08-23-02: LOCAL runs the game; Claude is episodic heavy cognition
+- **Ruling (Mike)**: "we want the growth rules and canvas driving and all that to be local. Really the reach outs for claude would be heavy lifting simulation calculations, psychology profiling, Godhead game balance logic deciding etc. Running the company decisions etc." Roadmap: open 27B → GROWTH fine-tune → own model. Router must capture full tool-loop traces from day one (dev-era Claude dispatches = the distillation corpus).
+- **Lands in rulebook**: §platform (AI architecture)
+- **Files**: ai/network/ lanes + traces (SHIPPED 2026-08-23).
