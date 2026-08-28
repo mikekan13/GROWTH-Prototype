@@ -269,6 +269,15 @@ export function priceBlueprintByType(type: string, data: Record<string, unknown>
     case 'thorn':
     case 'blossom': return priceTrait(type, data as TraitPriceShape);
     default: {
+      // Kit items price at their draw-down budget (r-2026-08-24-16) — the
+      // budget IS the value; contents resolve on observation.
+      const item = data as { itemType?: string; kvBudget?: number };
+      if (type === 'item' && item.itemType === 'kit' && typeof item.kvBudget === 'number') {
+        return {
+          kv: item.kvBudget,
+          breakdown: [`kit budget ${item.kvBudget} KV — draw-down pool, contents resolve on plausible demand (r-2026-08-24-16)`],
+        };
+      }
       // item/skill/spell: Kai/chain grades case-by-case.
       const declared = (data as { declaredKv?: number; declaredKvRationale?: string });
       if (typeof declared.declaredKv === 'number') {

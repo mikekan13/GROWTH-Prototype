@@ -21,6 +21,7 @@ import './focus-view';
 import './place-item';
 import './establish-world-facts';
 import './edit-character-sheet';
+import './draw-from-kit';
 import './forge-blueprint';
 import './forge-list-drafts';
 import './forge-withdraw';

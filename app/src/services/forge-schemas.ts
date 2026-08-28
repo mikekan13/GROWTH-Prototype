@@ -108,8 +108,15 @@ const forgeItemDataSchema = z.object({
   ]).optional(),
   value: z.number().min(0).optional(),
   notes: z.string().max(1000).optional(),
-  // Item sub-type (weapon, armor, etc.)
-  itemType: z.enum(['weapon', 'armor', 'accessory', 'consumable', 'tool', 'artifact', 'prima_materia', 'misc']).optional(),
+  // Item sub-type (weapon, armor, etc.). 'kit' = a possession with a KV
+  // budget drawn down on plausible demand (r-2026-08-24-16 — Mike marks it
+  // controversial but fun-chosen; plausibility gate + finite budget are the
+  // mitigations; ontology-consistent with crystallization).
+  itemType: z.enum(['weapon', 'armor', 'accessory', 'consumable', 'tool', 'artifact', 'prima_materia', 'kit', 'misc']).optional(),
+  /** REQUIRED when itemType='kit': the finite draw-down pool. Anything
+   *  plausibly in the kit and needed is pulled FROM this budget on demand —
+   *  never pre-itemized. */
+  kvBudget: z.number().int().min(1).max(500).optional(),
   // Canonical GrowthWorldItem fields (item-fields canon 2026-05-14)
   primaryMaterial: z.string().max(100).optional(),
   subordinateMaterials: z.array(z.string().max(100)).max(10).optional(),
@@ -476,7 +483,15 @@ export function validateForgeData(type: string, data: unknown) {
     case 'root': return forgeRootDataSchema.parse(data);
     case 'branch': return forgeBranchDataSchema.parse(data);
     case 'skill': return forgeSkillDataSchema.parse(data);
-    case 'item': return forgeItemDataSchema.parse(data);
+    case 'item': {
+      const parsed = forgeItemDataSchema.parse(data);
+      if (parsed.itemType === 'kit' && typeof parsed.kvBudget !== 'number') {
+        throw new ValidationError(
+          "Kits require a kvBudget (r-2026-08-24-16) — the finite pool draws are pulled from.",
+        );
+      }
+      return parsed;
+    }
     case 'nectar':
     case 'thorn': return forgeTraitDataSchema.parse(data);
     case 'blossom': {
