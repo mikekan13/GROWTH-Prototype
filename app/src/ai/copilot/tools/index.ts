@@ -24,6 +24,7 @@ import './edit-character-sheet';
 import './draw-from-kit';
 import './forge-blueprint';
 import './forge-list-drafts';
+import './forge-read';
 import './forge-withdraw';
 import './catalog';
 import './work-session';
