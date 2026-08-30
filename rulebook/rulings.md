@@ -709,3 +709,15 @@ entry that references the old.
 - **Ruling (Mike)**: "we want the growth rules and canvas driving and all that to be local. Really the reach outs for claude would be heavy lifting simulation calculations, psychology profiling, Godhead game balance logic deciding etc. Running the company decisions etc." Roadmap: open 27B → GROWTH fine-tune → own model. Router must capture full tool-loop traces from day one (dev-era Claude dispatches = the distillation corpus).
 - **Lands in rulebook**: §platform (AI architecture)
 - **Files**: ai/network/ lanes + traces (SHIPPED 2026-08-23).
+
+### r-2026-08-28-01: The AUTHOR TEST — allusive-specific descriptions fail both ways
+- **Ruling (Mike, verbal — reviewing "Weight Without Witness")**: "the first thing that stands out to me is still how Violet centric this is... this is still too far off for JEWL." And the diagnostic: "I wrote her bio awhile ago... I don't even remember what the event was. This doesn't refresh my memory but I also know it only fits her." A catalog description that alludes to specific events without naming them fails BOTH audiences: too specific to be an archetype (fits only one character), too oblique to be biography (even the author can't recover the events). Removing proper nouns is NOT genericizing — an event constellation — a specific sequence of unnamed life events — is still story. (Concrete example redacted: the GM plays this campaign blind; see the review corpus, post-campaign.)
+- **Consequences**: sharpens the stranger test (r-2026-08-24-02) and archetype law (r-2026-08-10-01). Catalog descriptions state the PATTERN and its developmental consequence, never enumerate events; events live on the block-instance and in memories. Meta standard: the godhead chain is the safety net, not the bar — JEWL's drafts must arrive near the ideal.
+- **Lands in rulebook**: §forge (catalog standards)
+- **Files**: JEWL authoring law prompt (add the author test); Violet branch revisions.
+
+### r-2026-08-29-01: Frequency debt — rare on roots, frequent on branches; the gatekeeping floor
+- **Ruling (Mike, verbal)**: "Frequency in a Root is rare but possible. In branches it is more frequent. It acts as a gatekeeping system in some ways. A character only has so much frequency and they need some to start. Like you have to have 1 to be alive."
+- **Consequences**: negative frequency is primarily a LIFE-EVENTS lever (branches — what happened to you), only rarely a temperament lever on roots; debts stack across blocks at 1:1 (r-2026-08-25-01); the assembled character's starting Frequency must clear the LIFE FLOOR of ≥1 after all block debts — assembly-time check.
+- **Lands in rulebook**: §character-creation (frequency), §seeds
+- **Files**: sheet assembly floor check (build item); JEWL authoring law.
