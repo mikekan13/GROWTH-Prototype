@@ -670,30 +670,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             aSK jEWL
           </button>
         )}
-        {isGM && !showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
-          /* Speak with a DAYA-wrapped character in-world — summons the
-             ConversePanel at the click point. What the GM types is delivered
-             verbatim as a stimulus into her being loop; if she isn't
-             wrapped/awake the panel says so gracefully. */
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              window.dispatchEvent(new CustomEvent('daya:converse', {
-                detail: {
-                  characterId: node.id,
-                  name: node.name,
-                  x: contextMenuPos.x,
-                  y: contextMenuPos.y,
-                },
-              }));
-              setShowContextMenu(false);
-            }}
-            className="w-full px-3 py-1.5 text-left text-sm text-[#22ab94] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2"
-          >
-            <span>{'❝'}</span>
-            sPEAK
-          </button>
-        )}
         {!showSkillCheckMenu && !showContestedMenu && !showDefenderMenu && !showDamageMenu && (
           /* Take out — moves the card one level up the location
              hierarchy (room → apartment → loose). The drag gesture
