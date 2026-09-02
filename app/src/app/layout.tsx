@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bebas_Neue, Comfortaa, Inknut_Antiqua } from "next/font/google";
 import { DiceOverlayLoader } from "@/components/dice/DiceOverlayLoader";
 import { JewlChip } from "@/components/copilot/JewlChip";
+import { DayaConversePanel } from "@/components/daya/ConversePanel";
 import "./globals.css";
 
 const bebasNeue = Bebas_Neue({
@@ -38,6 +39,7 @@ export default function RootLayout({
         {children}
         <DiceOverlayLoader />
         <JewlChip />
+        <DayaConversePanel />
       </body>
     </html>
   );

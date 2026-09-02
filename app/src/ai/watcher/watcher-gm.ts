@@ -1,6 +1,12 @@
 /**
  * The Watcher-seat AI GM — TEST INSTRUMENT for the Incubator campaign only.
  *
+ * ★ PARKED 2026-09-02 (Mike): he GMs the Incubator himself, roleplaying the
+ * NPC seat directly through the on-canvas ConversePanel — no GM persona
+ * between him and her loop. The API route and /play page were removed; this
+ * engine is kept for the lessons it encodes (diegetic gate, split-minds
+ * enforcement) and possible future test use. Nothing imports it.
+ *
  * Sanctioned by Mike 2026-08-29 (see memory: incubator-ai-gm-test-instrument):
  * GROWTH-the-product never gets AI GMs; this exists so Mike can sit in the
  * PLAYER seat and feel a DAYA being out through blind roleplay.
