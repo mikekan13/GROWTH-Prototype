@@ -128,10 +128,9 @@ differ from the guidance and rules.
 | **−100** | Following nothing — probably lots of creativity, but no consistency. Improbable extreme. |
 
 The system can **monitor, learn, and steer every GM toward 0**. It also
-distinguishes **content creators (+)** from **content consumers (−)**:
-taking AI suggestions pushes toward consumer; creating your own ideas or
-modifying JEWL's pushes toward creator. (Sign convention between the two
-descriptions above needs Mike's confirmation — see §8.) "The meta" =
+distinguishes **content consumers (+)** from **content creators (−)**:
+taking AI suggestions pushes toward + (consumer); creating your own ideas or
+modifying JEWL's pushes toward − (creator). One axis, confirmed 2026-09-02. "The meta" =
 this network-level statistic over all tables, not a component.
 
 ## 5. GM improvisation in play (NEW — never discussed or built before)
@@ -179,11 +178,9 @@ inference, timeskips, the outward wave) stretches outward from this.
 
 ## 8. Open questions (ask Mike; do not improvise)
 
-1. **Alignment-scale sign convention** — Mike gave +100 = "in sync with the
-   simulation, following everything, no input" AND creators = +, consumers
-   = − (AI suggestions push toward consumer). Those point opposite ways.
-   Which sign is creator? (Or are these two axes?) ("The meta" itself:
-   RESOLVED — JEWL + GM validate; the meta is the network statistic.)
+1. ~~Alignment-scale sign convention~~ RESOLVED: one axis, + = consumer
+   (follows the sim), − = creator (follows nothing). "The meta" RESOLVED —
+   JEWL + GM validate; the meta is the network statistic.
 2. **Improvisation limit** — KRMA from the GM wallet, a per-session ration,
    or something else?
 3. **State representation** — prose `WorldFact` rows maintained by the sim,
