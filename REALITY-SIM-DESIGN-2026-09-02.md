@@ -160,6 +160,96 @@ canon → every participant's ledger receives the round as lived memory.
 Six seconds, fully consistent, no gap-filling. Time fluidity (narration
 inference, timeskips, the outward wave) stretches outward from this.
 
+### 6.1 Combat round walkthrough (Mike, step by step, 2026-09-03 — IN PROGRESS)
+
+Mike is walking Claude through the round; Claude asks one question at a
+time. Claude's earlier Time Stack reading was WRONG per Mike — do not rely
+on the canon-keeper summary of ordering until Mike restates it here.
+
+- **All entities are in the dilation.** Campaign time flows via the GM's
+  narrative; when the table is at 6-second rounds, the whole campaign is.
+- **Entering:** encounters are often preplanned cards (combat, tension,
+  race-the-clock) but NOT always ("murder-hobo party members"). A mode is
+  switched on — GM hits a button OR JEWL understands it from the talk.
+- **Surface:** an encounter card on the canvas (think Roll20 — advanced card
+  features). Most encounters have a map (AI-generated maps: still to be
+  investigated). Some can be theater-of-mind; with the DAYA sim running,
+  theoretically ALL encounters could be, if the system answers players'
+  perception questions fast enough.
+- **★ PCs run DAYA too.** A player's character is a running DAYA branch; the
+  player's actions and speech overwrite the branch's own as canon. Therefore
+  the system can tell what EVERY character is seeing/perceiving (rolls etc.).
+- **Stage 1 — setup + intention:** GM narrates the setup; JEWL + DAYA fill
+  in any details players ask for their decision. Stage is set, everyone is
+  looking at the same reality, then all players choose their intentions for
+  the following 6 seconds. Intentions are managed by **Actions: Body, Spirit,
+  Soul actions** — players allocate actions explicitly per pillar (canon,
+  Turn_Structure_and_Action_Economy.md; secrecy if undetected; undefined
+  intentions = reserve, faster than changed intentions; free/joint/reactive
+  actions as written).
+- **REPOSITORY FIX NEEDED (Mike 09-03):** "Effort per action is limited in
+  combat" (Turn_Structure_and_Action_Economy.md) is NOT unpacked and is
+  misleading. Update the repository.
+- **Stage 2 — Resolution order is determined by THE SIMULATION we are
+  building**; GROWTH mechanics are inputs to it. Both existing Time Stack
+  write-ups (Combat_Grid_System.md stat-tiers vs Turn_Structure declared-
+  alignment) are superseded by this layered model:
+  - **Layer 1 — action count.** Total actions in the round. Character A with
+    1B/2S/1S = 4 actions; character B with 2B/2S/1S = 5 → B's FIRST action
+    sits higher on the stack than A's. **Interleave:** the higher-count
+    character's surplus actions go first, solo; then lockstep SIMULTANEOUS
+    slots: `B1 · (B2,A1) · (B3,A2) · (B4,A3) · (B5,A4)`.
+    **Layer 1 is SOLID/absolute (Mike 09-04):** a creature with 3 actions vs
+    one with 6 is just straight-up faster. **The entity with the most
+    actions sets the GRANULARITY within the 6 seconds** — the round is
+    sliced into max-action-count slots. This is how it scales from normal
+    human speed to godly battles (hundreds of punches in 6 s = hundreds of
+    slots). **Objects can have actions too** (vehicles); and things WITHOUT
+    actions but in motion (a fan propeller) exist in the sim as continuous
+    environment state tracked through the same slots.
+    **Uneven counts, CONFIRMED intended (Mike 09-04):** 3 vs 6 =
+    `B1 · B2 · B3 · (B4,A1) · (B5,A2) · (B6,A3)` — the faster entity's
+    surplus runs solo FIRST; the slower entity's actions pack toward the
+    END of the round.
+  - **STILL TO DISCUSS (Mike's list 09-04):** blocking and dodging,
+    grappling, "all the little nuances", and the simulation that handles
+    physical things — a trigger pull on a gun, falling, missile velocity,
+    etc.
+  - **Layer 2 — attribute MAX POOL values shift order within a slot.** This
+    is where the simulation and raw GROWTH mechanics start to mingle. The
+    "speed gauges" for an action, by the action's pillar: **Celerity (Body)
+    · Frequency (Spirit) · Wisdom (Soul).** (Frequency: excluded from action
+    COUNT, but IS the Spirit speed gauge.) Gauges are NOT compared raw
+    across pillars: **pillar speed order is Spirit > Soul > Body** (Spirit
+    fastest). This is **further compounded by skills and their actual
+    governors**. It does NOT mean a Body action is always last — **that is
+    where the simulation comes in** (contextual adjudication over the
+    mechanical prior). **Layer-2 clarification (Mike 09-04):** the pillar
+    order is a BIAS on the gauge VALUES, not a strict sort — a Body action
+    with Celerity 200 would "most likely" go BEFORE a Soul action with
+    Wisdom 20. Big gaps override pillar order; "most likely" = the
+    simulation weighs it, not a hard formula.
+    **Governor example (Mike 09-04):** Archery governed by Celerity, Focus,
+    Flow, Wisdom. It can be fired with a Soul action, but a Spirit action
+    pegs higher speed (Spirit > Soul base). And because it is ALSO governed
+    by Celerity and Wisdom, it is not as fast as a skill governed just by
+    Wisdom — the governor set BLENDS/drags the speed, it does not replace
+    the action pillar's base.
+  - **Layer 3 — skill-governor speed tiers (Mike 09-04, categorical, not
+    values).** "Everything is a layer; skill governors and their speed is a
+    layer." A skill can NOT be governed by Frequency, so the only speed
+    gauges that can appear as governors are Wisdom and Celerity. Tiers:
+    1. governed by **Wisdom only** → first-tier speed
+    2. **Wisdom + Celerity** only
+    3. **Celerity only**
+    4. any other mix — **more governors = slower**. (continues…)
+
+**Simultaneity consolidation (Mike 09-02):** the simulation must consolidate
+what happens at one time when actions from entities conflict. This is the
+Willpower reconcile step; combat rounds are its first real test. Combat/
+encounter time dilation and gameplay to be discussed with Mike before the
+loop is built unit by unit.
+
 ## 7. What it sits on (locked earlier, never built)
 
 - **Space** — one recursive tree of Locations; above the crystallization
