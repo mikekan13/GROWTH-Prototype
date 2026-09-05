@@ -14,6 +14,7 @@ import type { RollResult } from '@/types/dice';
 import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
+import EncounterPanel from './EncounterPanel';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export default function CampaignTerminal({
   connectedUsers,
   campaignCharacters,
 }: CampaignTerminalProps) {
-  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'table'>('terminal');
+  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'table' | 'encounter'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<TerminalFilter>('all');
@@ -104,7 +105,7 @@ export default function CampaignTerminal({
 
   // If the session ends (or role loads late) while sitting on TABLE, fall back.
   useEffect(() => {
-    if (terminalMode === 'table' && !tableAvailable) setTerminalMode('terminal');
+    if ((terminalMode === 'table' || terminalMode === 'encounter') && !tableAvailable) setTerminalMode('terminal');
   }, [terminalMode, tableAvailable]);
 
   // ── Fetch merged events ──────────────────────────────────────────────────
@@ -861,8 +862,24 @@ export default function CampaignTerminal({
                   Table
                 </button>
               )}
+              {/* ENCOUNTER — one round through the reality simulation; session-mode, GM only */}
+              {tableAvailable && (
+                <button
+                  onClick={() => setTerminalMode('encounter')}
+                  className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                    letterSpacing: '0.05em',
+                    color: terminalMode === 'encounter' ? '#0a0a1a' : '#f7525f',
+                    backgroundColor: terminalMode === 'encounter' ? '#f7525f' : 'transparent',
+                    borderLeft: '1px solid rgba(34,171,148,0.4)',
+                  }}
+                >
+                  Encounter
+                </button>
+              )}
             </div>
-            {terminalMode !== 'copilot' && (
+            {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (
               <button
                 onClick={() => { fetchEvents(); fetchSessions(); }}
                 className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
@@ -917,8 +934,13 @@ export default function CampaignTerminal({
         />
       )}
 
+      {/* Encounter — the round engine's GM surface */}
+      {terminalMode === 'encounter' && (
+        <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={fetchEvents} />
+      )}
+
       {/* Event Feed (terminal + table modes — the table shares the record) */}
-      {terminalMode !== 'copilot' && (<>
+      {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (<>
       {/* Event Feed */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
         {loading && events.length === 0 && (

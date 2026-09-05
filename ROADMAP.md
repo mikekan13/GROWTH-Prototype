@@ -650,3 +650,9 @@ Detail owed beyond Phase 1 seeded entities:
 - **KRMA Subscription tuning** — diminishing returns curve, GM lump sum + monthly drip, social/creative contributions as primary source over time. Draft targets only; not canon yet.
 - **Reversible book** — Flow front-to-back lore, Focus back-to-front mechanics, Balance synthesizes in middle. AI-assisted page creation eventually. App comes first.
 - **KRMA → ledger crypto** — long-term: built on a ledger-based cryptocurrency so KRMA maps to actual company shares; players become co-owners. Depends on legality + working product first.
+
+## 2026-09-05 — Reality Simulation Unit 1 (one round through the engine) — SHIPPED
+- Founded the simulation layer under DAYA (design: REALITY-SIM-DESIGN-2026-09-02.md; rulings 09-02→09-05).
+- Built: `src/sim/` round engine (action economy, slot granularity, layered ordering, per-slot resolution with negate/redirect/block), senses field v0, branch planner (local lane + heuristic), Encounter model + service + API, ENCOUNTER tab in the Campaign Terminal. 21 unit tests.
+- Also: Defect 1 (CharacterTab cross-character bleed) fixed 09-02; combat rules status sheet (rulebook/COMBAT-RULES-STATUS-2026-09-04.md).
+- NEXT (Unit 2 candidates, Mike picks): mid-round reactions (one free change, reserve priority loss), grapple hold/re-roll, weapons carry damage/reload, player-side declaration UI, canvas encounter card, Layer-5 contextual call on the local lane, repository rewrites queued in STATE-OF-PLAY-2026-09-05.

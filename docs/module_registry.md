@@ -424,3 +424,22 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/krma/wallets/character/[id]/transactions | GET | KRMA Wallet (character wallet transaction history) |
 | /api/hub | GET | HubService (list LISTED campaigns, public, filterable) |
 | /api/hub/[id] | GET | HubService (campaign listing detail, public) |
+
+## Reality Simulation — `app/src/sim/` (Unit 1, 2026-09-05)
+Design authority: `REALITY-SIM-DESIGN-2026-09-02.md`. The simulation layer under DAYA; every entity (PC/NPC/creature/object) runs the same loop, player/GM override the ACT step only.
+
+| Module | Purpose |
+|---|---|
+| `sim/round/types.ts` | Pillar, ActionPools, SpeedGauges, Participant, Intention (explicit per-pillar allocation), Slot/OrderedSlot, RoundLogEntry, RoundResult |
+| `sim/round/action-economy.ts` | Pure: per-pillar action pools (`max(1+ActionMod, ActionMod+floor(sum levels/25))`, Frequency excluded), speed gauges (Celerity/Frequency/Wisdom max pools), governor speed tiers, skill-from-pillar rule |
+| `sim/round/slots.ts` | Pure: Layer 1 — the fastest participant's action count sets slot granularity; surplus solo first, slower packs to the end |
+| `sim/round/ordering.ts` | Pure: Layers 2–4 within a slot (pillar-biased gauge values, governor tier, modifiers) + Layer-5 contextual-call hook |
+| `sim/round/resolve.ts` | Pure core, side-effects injected: per-slot resolution — negate (contested, matching governor), reflex redirect (free, needs an action in hand, speed-gated, defender-favored), deliberate block (total = extra resist), damage lands per slot, downed skip later slots |
+| `sim/senses/field.ts` | Senses contract v0: raw sensory field per entity (body-filtered), free involuntary salience |
+| `sim/planning/branch-plan.ts` | A branch plans its round like a player: local-lane (L1) JSON plan when the lane is ready, reflex heuristic otherwise (never throws) |
+| `sim/encounter/state.ts` | Encounter.state shape + participant snapshot from a character sheet |
+| `services/encounter.ts` | Lifecycle (create/activate/pause/resolve), declareIntentions (owner or GM), runRound (plan → slots → order → resolve with real dice + services/damage → record: game_event + SSE, clock +1 round, perception memory into every participant's DayaEntity ledger) |
+| `components/terminal/EncounterPanel.tsx` | ENCOUNTER tab (session-mode, GM): build encounter, declare for anyone, run round, read the record |
+| API | `GET/POST api/campaigns/[id]/encounters`, `GET/PATCH …/[encounterId]`, `POST …/[encounterId]/intentions`, `POST …/[encounterId]/round` |
+
+Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive changes (one free change / reserve-with-priority-loss), grapple hold, weapons/damage values, grid positions, player-side declaration UI, canvas encounter card.

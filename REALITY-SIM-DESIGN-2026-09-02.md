@@ -429,3 +429,28 @@ seam and no-confabulation discipline are all *consumers* or *components* of
 the sim described here. What changes: perception comes from the sim, not
 from the prompt; off-screen beings keep living; the world has state, time,
 and place; and JEWL advises from a forecast instead of improvising one.
+
+## 10. As built — Unit 1 (2026-09-05)
+
+`app/src/sim/` + `services/encounter.ts` + ENCOUNTER tab. One round through the
+engine, honoring every ruling in §6.1 that fits inside a single synchronous
+round. See docs/module_registry.md §Reality Simulation for the module map.
+
+Honored: slot granularity + end-packing; layered ordering (count → biased
+gauges → governor tiers → modifiers; Layer-5 hook present, unused); explicit
+per-pillar intentions; negate (contested, matching governor, ties to
+defender); reflex redirect (free, ≥1 action in hand, speed-gated ×1.25
+defender advantage, player-chosen interposition); deliberate block (skips
+gate, total = extra resist); consequences per slot; downed lose later
+slots; every entity's branch plans like a player (local lane, probe-gated;
+heuristic fallback); senses = raw field + free salience; the round is
+recorded as canon (game_event + SSE), the clock moves one round, and every
+participating DayaEntity receives the round as a perception memory.
+
+Deferred to Unit 2+: mid-round reactive changes (one free change / reserve
+priority loss — v0 defenses are readied at Intention), grapple hold +
+re-roll, weapons carrying damage/reload (v0: damage rides the intention),
+DR derived by the sim (v0: DR 10 reality default), grid/positions, the
+faculties as separate workers, the outward wave, player-side declaration
+UI, the canvas encounter card, Frequency overflow → downed (v0: vital
+part destroyed only).
