@@ -240,6 +240,62 @@ on the canon-keeper summary of ordering until Mike restates it here.
         reflex Redirect. No second free change — BUT traits from Blossoms,
         items, Nectars etc. will augment/extend all of these in different
         ways (base rule, not a ceiling).
+  - **GRAPPLE (Mike 09-05):** the grappler's initial roll total becomes the
+    **DR of the grapple**. The grappler must **HOLD that action** (it stays
+    committed, not re-rolled) to keep the grapple; releasing frees the
+    action. The grappled creature just needs to **break it** — a check vs
+    that DR. Supersedes the draft "opposed check every round"; compatible
+    with the validated Clout-contest note. **Across rounds:** the held
+    action occupies one of the grappler's slots every round (a 3-action
+    grappler effectively acts with 2 while holding). The grappler may
+    **re-roll the held action at will** — no extra action needed, it IS the
+    held action — but the new total **becomes the new DR, higher or lower**.
+  - **RANGED (Mike 09-05):** the range-increment DR doubling (+2/+4/+8…)
+    and Close/Short/Medium/Long bands were **paper-version rules**. With the
+    sim we do better: **range difficulty is DERIVED by the simulation** from
+    the physical situation — distance, target size, missile velocity,
+    cover, movement, etc. The paper increments are at most a fallback
+    default, not the mechanic. (Pattern: paper rules = the sim's floor when
+    it lacks data; sim supersedes when it has the situation.)
+  - **PHYSICAL GAPS (Mike 09-05):** falling damage, drowning, projectile
+    behavior — **no paper rule**; GROWTH stats + mechanics + the sim derive
+    them. **Reload costs are a property of the weapon/item** that requires
+    reloading (declared on the item, not a global rule).
+  - **IMPACT / CONSEQUENCE TIMING (Mike 09-05):** the canon "all damage
+    applies simultaneously at Impact" refers to **the damage of a hit
+    applying together when it hits a creature** (all components of that
+    hit land at once) — NOT deferral to end of round ("would make no sense
+    otherwise"). **Consequences apply as each slot resolves**: a creature
+    dropped in slot 2 does NOT act in slot 4. Repository fix:
+    Turn_Structure Phase 3 + Combat_Grid_System "Impact" wording.
+  - **WITHIN A SHARED SLOT (Mike 09-05):** both outcomes are possible,
+    **based on the simulation** — a true trade (both land) OR the faster
+    action (layer 2/3 speed) pre-empting the other. The sim decides from
+    the situation; no fixed rule.
+  - **MANA (Mike 09-05): still a SEPARATE resource from Frequency**, live
+    canon — Mana_System.md / Prima_Materia_System.md / Casting_Methods.md
+    stand ("should be well documented in the rules"). The 09-04 status
+    sheet's "likely stale" flag was WRONG. Fix: CANON_CORE §7 should name
+    Mana alongside Frequency so sweeps stop mis-flagging it.
+  - **COUP DE GRACE (Mike 09-05): paper-version rule, most likely CUT.** A
+    helpless target is just an uncontested attack; damage cascades and the
+    one-roll Facing Death stands as written. Repository: retire the
+    Special_Combat_Actions.md coup de grace entry.
+  - **OPPORTUNITY ATTACKS (Mike 09-05): NONE by default.** Leaving a
+    threatened square triggers nothing. "Sounds like a good Nectar" —
+    opportunity attacks become a Nectar (trait), not a base rule.
+    Repository: remove the OA trigger from Combat_Grid_System.md §Reach and
+    threatened squares + ActionMod_System.md reactive-check mention.
+  - **OBJECTS WITH ACTIONS (Mike 09-05):** vehicles are POSSESSIONS (items)
+    with their own traits, materials, etc. — so the item itself declares
+    its action count, speed, etc. (fields on the item, same as reload
+    cost). A **horse is a creature with a character sheet**, not a vehicle
+    — its actions come from its attributes like any being. (Consistent
+    with rulings-content-scope 2026-08-04: vehicles/buildings = POSSESSIONS.)
+  - **IN-COMBAT HEALING (Mike 09-05):** non-magical stabilize/first-aid =
+    a **skill check** (spends an action, like any skill check) against the
+    situation (body-part condition etc., sim-derived). Plus Nectars and
+    Blossoms that extend it. No special healing subsystem.
     - **Redirect** = does NOT spend an action, but **REQUIRES at least one
       action remaining** (Mike 09-05). **Speed comparison (RULED YES):** the
       sim compares the defender's reflex speed vs the incoming action's
@@ -288,7 +344,12 @@ on the canon-keeper summary of ordering until Mike restates it here.
     1. governed by **Wisdom only** → first-tier speed
     2. **Wisdom + Celerity** only
     3. **Celerity only**
-    4. any other mix — **more governors = slower**. (continues…)
+    4. any other mix — **more governors = slower**.
+  - **Layer 4 — modifiers (Mike 09-05 "yeah"):** items, ActionMod,
+    conditions, Blossoms, Nectars/Thorns shift speed.
+  - **Layer 5 — the simulation's contextual call** on top of all of it.
+  - **Multiple hits on one target:** the sim, under the body-part cascade
+    rules; no separate stacking rule.
 
 **Simultaneity consolidation (Mike 09-02):** the simulation must consolidate
 what happens at one time when actions from entities conflict. This is the

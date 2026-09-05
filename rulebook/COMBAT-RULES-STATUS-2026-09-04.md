@@ -22,7 +22,7 @@ Status legend: **V** = `#validated` · **NV** = `#needs-validation` (draft) ·
 |---|---|---|
 | Reactive actions inject into the stack only if the reactor's action is still undefined | Turn_Structure_and_Action_Economy.md | V |
 | Undefined intentions = reserve; resolve faster than *changed* intentions; changing an intention loses position priority | same | V |
-| Opportunity attack: leaving a threatened square "may trigger a reactive check"; ActionMod adds to the reactor's FD | Combat_Grid_System.md, ActionMod_System.md | V (trigger) / GAP (procedure) |
+| ~~Opportunity attack~~ **CUT 09-05 (Mike): no opportunity attacks by default — becomes a Nectar.** | Combat_Grid_System.md, ActionMod_System.md | retire |
 
 ## 3. Special actions
 | Rule | Source | Status |
@@ -63,7 +63,7 @@ Status legend: **V** = `#validated` · **NV** = `#needs-validation` (draft) ·
 | Multiple hits same target | — | GAP (only "each cascades independently at Impact") |
 | No inherent bleeding/DoT; persistent effects only via Nectars/Thorns/materials/spells/hazards | Damage_Type_Interactions.md | V |
 | Short Rest: −1 Frequency current → +1 to every other attribute. Long Rest: full Frequency + clear depletion conditions; advancement window | CANON_CORE §6, r-2026-07-15-01 | R |
-| In-combat healing action | — | GAP (Restoration magic only) |
+| In-combat healing action | Mike 09-05 | **RULED:** stabilize/first-aid = a skill check (action); Nectars/Blossoms extend. |
 
 ## 7. Effort in combat
 | Rule | Source | Status |
@@ -80,7 +80,7 @@ Status legend: **V** = `#validated` · **NV** = `#needs-validation` (draft) ·
 | Resistance = actual entities with GRO.vines + custodian Godhead, not text | memory resistance-is-entities | M |
 | DR-tiered creature table (Small Animal → Ein Sof, DR 2–200+, HP/Mana framing) | Creature_Classifications.md | NV / likely pre-KRMA stale |
 | Morale / NPC tactical behavior | — | **GAP** (this IS the DAYA loop in combat) |
-| Objects/vehicles with actions | — | **GAP** (Mike 09-04 confirmed they exist; only mount-fit written) |
+| Objects/vehicles with actions | Mike 09-05 | **RULED:** vehicles = possessions; the item declares its own actions/speed/etc. Mounts/animals = creatures with sheets. Write into Vehicle/item spec. |
 
 ## 9. Spirit actions / magic in combat
 | Rule | Source | Status |
@@ -98,9 +98,9 @@ Status PLANNED→ACTIVE→PAUSED→RESOLVED; only ACTIVE consumes actions. Map i
 2. Called shots: flat +2 vs hit-location table → table wins; retire the flat rule.
 3. Time Stack: BOTH repository versions vs Mike's layered model (09-03/04) → rewrite Combat_Grid_System + Turn_Structure to the layered model once complete.
 4. Creature_Classifications HP/Mana framing vs Frequency/KRMA economy → likely dead; confirm.
-5. **Mana / Prima Materia pool vs Frequency-only** → NEEDS MIKE: dead, folded, or separate?
+5. ~~Mana / Prima Materia pool vs Frequency-only~~ **RESOLVED 09-05 (Mike): Mana is a live, SEPARATE resource.** Magic files stand; add Mana to CANON_CORE §7.
 6. Grapple: Unarmed-skill version vs Clout-contest version → probably compatible; state it.
-7. **Coup de grace vs one-roll Facing Death** → NEEDS MIKE.
+7. ~~Coup de grace vs one-roll Facing Death~~ **RESOLVED 09-05 (Mike): coup de grace = paper-version rule, most likely CUT.** Retire it.
 
 ## Genuine gaps (Mike expects to fill some)
 Falling damage · drowning · reload cost · ammo × action economy · trip/shove ·
