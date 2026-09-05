@@ -211,10 +211,56 @@ on the canon-keeper summary of ordering until Mike restates it here.
     `B1 · B2 · B3 · (B4,A1) · (B5,A2) · (B6,A3)` — the faster entity's
     surplus runs solo FIRST; the slower entity's actions pack toward the
     END of the round.
-  - **STILL TO DISCUSS (Mike's list 09-04):** blocking and dodging,
-    grappling, "all the little nuances", and the simulation that handles
-    physical things — a trigger pull on a gun, falling, missile velocity,
-    etc.
+  - **STILL TO DISCUSS (Mike's list 09-04):** grappling, "all the little
+    nuances", and the simulation that handles physical things — a trigger
+    pull on a gun, falling, missile velocity, etc. The Effort "misleading"
+    issue is something OTHER than the cap rule — DEFERRED by Mike.
+  - **DEFENSE (Mike 09-05) — NOMENCLATURE CHANGE:** Dodge → **NEGATE**
+    (prevent the attack completely); Block → **REDIRECT** (defender picks
+    WHAT the attacker is damaging — which part/item/layer). A **Dodge
+    SKILL** will exist in the global repository (governed ~Clout, Celerity,
+    Constitution, Focus, Flow): physically moving out of the way of
+    anything physical.
+    - **A skill check ALWAYS uses an action.**
+    - **Negate** = a skill check with at least one governor matching a
+      governor of the skill being negated → spends an action (Mike thinks
+      it should). **Resolution: CONTESTED (Mike 09-05)** — the defender's
+      total is the DR the attacker's total must beat (canon tie rule:
+      ties go to the defender). **Timing (Mike 09-05, CORRECTED —
+      SUPERSEDES repository "undefined beats changed"):**
+      - A creature may **freely change ONE of its actions once per round**,
+        no penalty — e.g. into a Negate in response to being attacked.
+      - If it responds using an **UNASSIGNED (reserve) action** instead, it
+        **loses a bit of priority on all its actions after** that one.
+        (Amount of "a bit": tuning value, OPEN.)
+      - Repository fix: Turn_Structure_and_Action_Economy.md §Undefined
+        Intentions / §Intention Changes must be rewritten to this.
+      - **Second attack same round (Mike 09-05):** free change already
+        used → options are only an unassigned action (priority loss) or a
+        reflex Redirect. No second free change — BUT traits from Blossoms,
+        items, Nectars etc. will augment/extend all of these in different
+        ways (base rule, not a ceiling).
+    - **Redirect** = does NOT spend an action, but **REQUIRES at least one
+      action remaining** (Mike 09-05). **Speed comparison (RULED YES):** the
+      sim compares the defender's reflex speed vs the incoming action's
+      speed; the margin sets how much say the defender has over where the
+      hit lands (faster = free pick; even = constrained pick; slower =
+      attacker's target stands). **Defender gets an advantage** in the
+      comparison. Redirect = the involuntary/reflexive layer of the DAYA
+      loop; wears the interposed item's condition.
+    - **Deliberate block (nuance, Mike 09-05):** a player may SPEND an
+      action to attempt to block → this is a skill check → must carry "a
+      distinct advantage somehow" over the free reflexive redirect.
+      **RULED YES (Mike 09-05, "pretty nice"):** a deliberate block (1)
+      SKIPS the speed gate — full choice of what takes the hit regardless of
+      margin — and (2) its **skill-check total counts as EXTRA RESIST on the
+      interposed item** (shield resist 6 + block total 9 soaks 15; if not
+      exceeded, the item's condition doesn't tick). Ladder: reflex redirect
+      (free, needs an action in hand, speed-gated) → deliberate block
+      (spends an action, guaranteed choice, absorbs by skill) → negate
+      (spends an action, matching governor, nothing lands).
+    - Repository files to update: Attack_Resolution_Mechanics.md,
+      Damage_Calculation_System.md (block/dodge → redirect/negate).
   - **Layer 2 — attribute MAX POOL values shift order within a slot.** This
     is where the simulation and raw GROWTH mechanics start to mingle. The
     "speed gauges" for an action, by the action's pillar: **Celerity (Body)
