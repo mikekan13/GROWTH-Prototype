@@ -179,6 +179,40 @@ on the canon-keeper summary of ordering until Mike restates it here.
 - **★ PCs run DAYA too.** A player's character is a running DAYA branch; the
   player's actions and speech overwrite the branch's own as canon. Therefore
   the system can tell what EVERY character is seeing/perceiving (rolls etc.).
+  **Reaffirmed 09-05: it is not an "NPC side" — ALL entities go through the
+  same loop.** Every branch perceives from the sim, fires affect/recall, and
+  logs inputs as memory; when a player controls the entity, the player's
+  actions take over the ACT step. **Override boundary (Mike 09-05):** the
+  player decides intentions, deliberate blocks/negates, AND **where a reflex
+  Redirect sends the hit** (the choice of interposition is the player's).
+  The sim still computes WHETHER the reflex is fast enough (speed gate,
+  defender-favored) and the involuntary layer (affect, recall, memory).
+- **★ SENSES vs NOTICING (Mike 09-05) — the senses contract:**
+  - **Senses = raw input, determined by BODY PARTS.** The parts determine
+    the capabilities: eyesight range, low-light, hearing, taste, smell, and
+    senses outside the human set. Raw input is passive, continuous, and
+    full-field — "if I sit in my room and look at my desk, I see it all."
+  - **Noticing = conscious effort.** "If I try to find a penny, I am taking
+    a conscious effort in perceiving the penny" — a deliberate act, i.e. a
+    skill check → spends an action.
+  - Therefore the sim delivers each branch its full raw sensory field
+    (filtered ONLY by what its body can sense and the scene's fidelity),
+    and deliberate perception is an action the entity/player chooses.
+  - **Involuntary salience is FREE** (Mike 09-05): a bang, sudden movement,
+    a familiar face pops out of the raw field via the involuntary stage
+    (affect/salience). Determining WHERE it came from = deliberate check.
+  - Working rule from here (Mike): ordinary perception cases follow
+    reality/tabletop convention without asking; questions go to GROWTH-
+    specific forks.
+- **★ STRATEGY (Mike 09-05):** "Of course" a DAYA entity has strategy.
+  **Think about how a human plays GROWTH — an entity does the same thing,
+  it just doesn't see it as a game.** It plans its own round and acts
+  accordingly. The ONLY time it doesn't is when a GM overrides it with his
+  own choices, exactly as a player overrides their character's DAYA
+  decisions. Don't view the loop through a combat lens — combat is just a
+  round-granular instance of the same planning. (Existing design carries:
+  a non-omniscient entity plans from its BELIEVED sheet, introspection-
+  gated — DayaBelievedSheet; JEWL-tier sees True Sheets.)
 - **Stage 1 — setup + intention:** GM narrates the setup; JEWL + DAYA fill
   in any details players ask for their decision. Stage is set, everyone is
   looking at the same reality, then all players choose their intentions for
