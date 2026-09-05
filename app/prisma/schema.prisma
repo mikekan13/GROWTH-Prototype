@@ -115,6 +115,7 @@ model Campaign {
   copilotMessages     CopilotMessage[]
   changeLogs          ChangeLog[]
   sessions            GameSession[]
+  encounters          Encounter[]
   events              CampaignEvent[]
   forgeItems          ForgeItem[]
   playerRequests      PlayerRequest[]
@@ -365,6 +366,26 @@ model ChangeLog {
   @@index([campaignId, createdAt])
   @@index([characterId, createdAt])
   @@index([groupId])
+}
+
+// ── Reality simulation — Encounter (Unit 1, 2026-09-05) ────────────────────
+// One encounter card: a scene living in 6-second rounds. Participants,
+// declared intentions, and the per-round log live in `state` (JSON) for the
+// walking version; they become proper rows when the canvas card needs them.
+model Encounter {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  name       String
+  status     String   @default("PLANNED") // PLANNED | ACTIVE | PAUSED | RESOLVED
+  round      Int      @default(0)         // rounds completed
+  locationId String?
+  state      String                        // JSON<EncounterState> — see src/sim/encounter/state.ts
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([campaignId, status])
 }
 
 model GameSession {

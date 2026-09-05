@@ -184,12 +184,13 @@ export function priceRootBranch(type: 'root' | 'branch', data: RootBranchShape):
   return result;
 }
 
+interface PriceModShape { flat?: number; pillar?: string; allChecks?: boolean }
 interface TraitPriceShape {
-  rollModifiers?: Array<{ flat?: number }>;
+  rollModifiers?: PriceModShape[];
   effects?: Array<{
     kind?: string;
     name?: string;
-    modifiers?: Array<{ flat?: number }>;
+    modifiers?: PriceModShape[];
     spawnsBlossom?: string;
   }>;
   declaredKv?: number;
@@ -210,12 +211,17 @@ export function priceTrait(
 ): PricedBlueprint {
   const breakdown: string[] = [];
 
-  const legacyNet = (data.rollModifiers ?? []).reduce((a, m) => a + (m.flat ?? 0), 0);
+  // Breadth weight (compliance pass 2026-08-26): a point that lands on
+  // every roll is worth more than one on a single governor. Anchor
+  // weights — attribute/skill ×1, pillar ×2, all-checks ×3. Kai re-grades.
+  const weighted = (m: { flat?: number; pillar?: string; allChecks?: boolean }) =>
+    (m.flat ?? 0) * (m.allChecks ? 3 : m.pillar ? 2 : 1);
+  const legacyNet = (data.rollModifiers ?? []).reduce((a, m) => a + weighted(m), 0);
   let effectsNet = 0;
   let unpriceable = 0;
   for (const e of data.effects ?? []) {
     const mods = e.modifiers ?? [];
-    if (mods.length) effectsNet += mods.reduce((a, m) => a + (m.flat ?? 0), 0);
+    if (mods.length) effectsNet += mods.reduce((a, m) => a + weighted(m), 0);
     else unpriceable++;
     if (e.spawnsBlossom) {
       breakdown.push(`spawns blossom "${e.spawnsBlossom}" — its measured KV folds into THIS grade (internal pricing)`);
@@ -263,6 +269,15 @@ export function priceBlueprintByType(type: string, data: Record<string, unknown>
     case 'thorn':
     case 'blossom': return priceTrait(type, data as TraitPriceShape);
     default: {
+      // Kit items price at their draw-down budget (r-2026-08-24-16) — the
+      // budget IS the value; contents resolve on observation.
+      const item = data as { itemType?: string; kvBudget?: number };
+      if (type === 'item' && item.itemType === 'kit' && typeof item.kvBudget === 'number') {
+        return {
+          kv: item.kvBudget,
+          breakdown: [`kit budget ${item.kvBudget} KV — draw-down pool, contents resolve on plausible demand (r-2026-08-24-16)`],
+        };
+      }
       // item/skill/spell: Kai/chain grades case-by-case.
       const declared = (data as { declaredKv?: number; declaredKvRationale?: string });
       if (typeof declared.declaredKv === 'number') {

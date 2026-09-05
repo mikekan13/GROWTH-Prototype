@@ -1,0 +1,2307 @@
+### SHEET: Main
+B2	Name
+C2	Tara Almswood
+E2	Sex
+F2	Female
+G2	Weight
+H2	100.0
+I2	KV
+B3	Race
+C3	Altered Human
+E3	Home
+F3	Tiberoak
+G3	Height
+H3	5'1"
+I3	377.0
+M3	Undamaged
+Q3	Elemental Resistances
+X3	Hard
+AA3	Destroyed
+AR3	Hard
+AU3	Destroyed
+BL3	Hard
+BO3	Destroyed
+B4	Value
+G4	Hair
+H4	Black
+J4	=
+K4	Auto Count KV
+B5	Value
+G5	Eyes
+H5	Teal/Gold
+I5	Karma
+J5	=
+K5	True
+M5	9
+AA5	0.0
+AU5	0.0
+BO5	0.0
+B6	Value
+G6	Birth Month
+B7	Age
+C7	25.0
+D7	Life Span
+E7	Normal
+G7	Beauty
+H7	10.0
+K8	Undamaged
+M8	Undamaged
+Q8	Undamaged
+S8	H
+U8	D0
+X8	Hard
+AA8	Destroyed
+AH8	H
+AJ8	D0
+AM8	H
+AO8	D0
+AR8	Hard
+AU8	Destroyed
+BB8	H
+BD8	D0
+BG8	H
+BI8	D0
+BL8	Hard
+BO8	Destroyed
+BV8	H
+BX8	D0
+B9	Attributes
+E9	Save Mod
+F9	Save DR
+G9	Focus Mod
+H9	Resist Mod
+I9	Regen Mod
+K9	4
+Q9	4
+V9	0.0
+AK9	0.0
+AP9	0.0
+BE9	0.0
+BJ9	0.0
+BY9	0.0
+B10	STR
+C10	5.0
+D10	0
+F10	0
+G10	40.0
+H10	5.0
+I10	2.0
+M10	4
+AU10	0.0
+BO10	0.0
+B11	DEX
+C11	7.0
+D11	2
+E11	2.0
+F11	4
+G11	Focus
+K11	Undamaged
+Q11	Undamaged
+S11	H
+U11	D0
+AH11	H
+AJ11	D0
+AM11	H
+AO11	D0
+BB11	H
+BD11	D0
+BG11	H
+BI11	D0
+BV11	H
+BX11	D0
+B12	CON
+C12	4.0
+D12	-1
+F12	-1
+G12	60
+I12	Distressed
+K12	4
+Q12	4
+V12	0.0
+AK12	0.0
+AP12	0.0
+BE12	0.0
+BJ12	0.0
+BY12	0.0
+B13	INT
+C13	16.0
+D13	11
+E13	1.0
+F13	12
+G13	60.0
+I13	Wounded
+M13	Undamaged
+O13	Undamaged
+X13	H
+Z13	D0
+AC13	H
+AE13	D0
+AR13	H
+AT13	D0
+AW13	H
+AY13	D0
+BL13	H
+BN13	D0
+BQ13	H
+BS13	D0
+B14	WIS
+C14	14.0
+D14	9
+E14	1.0
+F14	10
+I14	Unconscious
+Q14	Wounds Treated
+B15	CHA
+C15	10.0
+D15	5
+E15	1.0
+F15	6
+G15	0.0
+I15	Dead
+M15	9
+O15	9
+AA15	0.0
+AF15	0.0
+AU15	0.0
+AZ15	0.0
+BO15	0.0
+BT15	0.0
+G16	Strain
+B17	Reflexes
+C17	Level 1
+D17	Focus Regen
+E17	6
+G17	Notes
+Q17	Block Stacks
+B18	APT Mod
+C18	1.0
+D18	APT
+E18	5
+G18	COMBAT
+M18	Undamaged
+O18	Undamaged
+Q18	0.0
+X18	H
+Z18	D0
+AC18	H
+AE18	D0
+AR18	H
+AT18	D0
+AW18	H
+AY18	D0
+BL18	H
+BN18	D0
+BQ18	H
+BS18	D0
+B19	Speed Mod
+C19	0.0
+D19	Speed
+E19	40ft (8)
+G19	MAGIC
+M19	4
+O19	4
+AA19	0.0
+AF19	0.0
+AU19	0.0
+AZ19	0.0
+BO19	0.0
+BT19	0.0
+B20	Unarmed Mod
+C20	0.0
+D20	Unarmed DMG
+E20	0/5/0 : 0/0/0
+G20	ITEMS
+G21	MISC
+K21	Weapons & Tools
+N21	Condition
+S21	Resists
+Y21	P
+Z21	B
+AA21	S
+AC21	F
+AD21	E
+AE21	A
+B22	Tech Level
+K22	Left Hand
+N22	Destroyed
+Q22	Hard
+B23	5 - Transcendent
+K23	Right Hand
+N23	Destroyed
+Q23	Hard
+A24	Skills
+B26	Skills
+C26	Skill Level
+D26	Governing Attributes
+H26	Expertise
+I26	Mods
+K26	Skill Check
+M26	Total Mods
+O26	Failed
+B27	Athletics
+B28	Balance
+C28	1.0
+D28	DEX
+CON
+E28	2
+F28	-1
+H28	None
+K28	-2 Coin
+M28	0
+O28	NO
+B29	Swim
+C29	1.0
+D29	STR
+CON
+E29	0
+F29	-1
+H29	None
+K29	-2 Coin
+M29	0
+O29	NO
+B30	Jump
+C30	1.0
+D30	STR
+DEX
+E30	0
+F30	2
+H30	None
+K30	+1 Coin
+M30	0
+O30	NO
+B31	Sneak
+C31	6.0
+D31	DEX
+WIS
+E31	2
+F31	9
+H31	None
+K31	+3d6
+M31	0
+O31	NO
+B32	Sleight of Hand
+C32	8.0
+D32	DEX
+WIS
+E32	2
+F32	9
+H32	None
+K32	+3d8
+M32	0
+O32	NO
+B33	Climb
+C33	2.0
+D33	STR DEX
+CON
+E33	0
+F33	2
+G33	-1
+H33	None
+K33	-2 Coin
+M33	0
+O33	NO
+B34	Acrobatics
+C34	0.0
+D34	STR  DEX
+WIS
+E34	0
+F34	2
+G34	-1
+H34	None
+K34	No Skill
+M34	0
+O34	NO
+B35	.
+B36	Seduction
+C36	13.0
+D36	CHA
+WIS
+E36	5
+F36	9
+H36	None
+K36	+6d12
+M36	3
+O36	NO
+B37	Intimidation
+C37	8.0
+D37	STR
+CHA
+E37	0
+F37	5
+H37	None
+K37	+1d8
+M37	-3
+O37	NO
+B38	Negotiation
+C38	12.0
+D38	CHA
+INT
+E38	5
+F38	11
+H38	None
+K38	+6d12
+M38	3
+O38	NO
+B39	Deception
+C39	8.0
+D39	CHA
+INT
+E39	5
+F39	11
+H39	None
+K39	+6d8
+M39	0
+O39	NO
+B40	Martial Arts
+B41	Knives
+C41	6.0
+D41	DEX
+WIS
+E41	2
+F41	9
+H41	None
+K41	+3d6
+M41	0
+O41	NO
+B42	Polearms
+C42	0.0
+D42	STR
+DEX
+E42	0
+F42	2
+H42	None
+K42	No Skill
+M42	0
+O42	NO
+B43	Swordsmanship
+C43	0.0
+D43	STR
+DEX
+E43	0
+F43	2
+H43	None
+K43	No Skill
+M43	0
+O43	NO
+B44	Firearms
+C44	1.0
+D44	DEX
+WIS
+E44	2
+F44	9
+H44	None
+K44	+3 Coin
+M44	0
+O44	NO
+B45	Exotic Weapons
+C45	0.0
+D45	DEX INT
+WIS
+E45	2
+F45	11
+G45	9
+H45	None
+K45	No Skill
+M45	0
+O45	NO
+B46	Great Weapons
+C46	0.0
+D46	STR DEX
+CON
+E46	0
+F46	2
+G46	-1
+H46	None
+K46	No Skill
+M46	0
+O46	NO
+B47	Throwing
+C47	1.0
+D47	STR DEX
+WIS
+E47	0
+F47	2
+G47	9
+H47	None
+K47	+1 Coin
+M47	0
+O47	NO
+B48	Archery
+C48	0.0
+D48	STR  DEX
+WIS
+E48	0
+F48	2
+G48	9
+H48	None
+K48	No Skill
+M48	0
+O48	NO
+B49	Unarmed
+C49	3.0
+D49	STR  DEX
+CON
+E49	0
+F49	2
+G49	-1
+H49	None
+K49	-2 Coin
+M49	0
+O49	NO
+B50	Performing Arts
+B51	Sing
+C51	6.0
+D51	CHA
+WIS
+E51	5
+F51	9
+H51	None
+K51	+6d6
+M51	3
+O51	NO
+B52	Music
+C52	0.0
+D52	CHA
+INT
+E52	5
+F52	11
+H52	None
+K52	No Skill
+M52	3
+O52	NO
+B53	Drama
+C53	0.0
+D53	DEX CHA
+WIS
+E53	2
+F53	5
+G53	9
+H53	None
+K53	No Skill
+M53	3
+O53	NO
+B54	Dance
+C54	0.0
+D54	STR  DEX
+CHA
+E54	0
+F54	2
+G54	5
+H54	None
+K54	No Skill
+M54	3
+O54	NO
+B55	Visual Arts
+B56	Sculpt
+C56	0.0
+D56	DEX CHA
+WIS
+E56	2
+F56	5
+G56	9
+H56	None
+K56	No Skill
+M56	0
+O56	NO
+B57	Paint
+C57	0.0
+D57	DEX CHA
+WIS
+E57	2
+F57	5
+G57	9
+H57	None
+K57	No Skill
+M57	0
+O57	NO
+B58	Draw
+C58	0.0
+D58	DEX CHA
+WIS
+E58	2
+F58	5
+G58	9
+H58	None
+K58	No Skill
+M58	0
+O58	NO
+B59	Literature
+C59	10.0
+D59	INT CHA
+WIS
+E59	5
+F59	11
+G59	9
+H59	None
+K59	+6d10
+M59	0
+O59	NO
+B60	Photography/ Videography
+C60	0.0
+D60	DEX  CHA
+INT
+E60	2
+F60	5
+G60	11
+H60	None
+K60	No Skill
+M60	0
+O60	NO
+B61	Social Sciences
+B62	History
+C62	20.0
+D62	INT
+WIS
+E62	11
+F62	9
+H62	Master
+K62	+12d20
+M62	1
+O62	NO
+B63	Linguistics
+C63	15.0
+D63	CHA
+INT
+E63	5
+F63	11
+H63	None
+K63	+6d12
+M63	0
+O63	NO
+B64	Economics
+C64	4.0
+D64	INT
+WIS
+E64	11
+F64	9
+H64	None
+K64	+10d4
+M64	0
+O64	NO
+B65	Geography
+C65	20.0
+D65	INT
+WIS
+E65	11
+F65	9
+H65	None
+K65	+10d20
+M65	0
+O65	NO
+B66	Education
+C66	10.0
+D66	CHA INT
+WIS
+E66	5
+F66	11
+G66	9
+H66	None
+K66	+6d10
+M66	0
+O66	NO
+B67	Psychology
+C67	12.0
+D67	CHA INT
+WIS
+E67	5
+F67	11
+G67	9
+H67	None
+K67	+6d12
+M67	0
+O67	NO
+B68	Politics
+C68	8.0
+D68	CHA INT
+WIS
+E68	5
+F68	11
+G68	9
+H68	None
+K68	+6d8
+M68	3
+O68	NO
+B69	Law
+C69	8.0
+D69	CHA
+INT  WIS
+E69	5
+F69	11
+G69	9
+H69	None
+K69	+6d8
+M69	0
+O69	NO
+B70	Natural Sciences
+B71	Biology
+C71	12.0
+D71	INT
+WIS
+E71	11
+F71	9
+H71	None
+K71	+10d12
+M71	0
+O71	NO
+B72	Geoscience
+C72	6.0
+D72	INT
+WIS
+E72	11
+F72	9
+H72	None
+K72	+10d6
+M72	0
+O72	NO
+B73	Chemistry
+C73	12.0
+D73	INT
+WIS
+E73	11
+F73	9
+H73	None
+K73	+10d12
+M73	0
+O73	NO
+B74	Physics
+C74	8.0
+D74	INT
+WIS
+E74	11
+F74	9
+H74	None
+K74	+10d8
+M74	0
+O74	NO
+B75	Astronomy
+C75	10.0
+D75	INT
+WIS
+E75	11
+F75	9
+H75	None
+K75	+10d10
+M75	0
+O75	NO
+B76	Applied Sciences
+B77	Civil Engineering
+C77	3.0
+D77	INT
+WIS
+E77	11
+F77	9
+H77	None
+K77	+10 Coin
+M77	0
+O77	NO
+B78	Animal Husbandry
+C78	3.0
+D78	INT
+WIS
+E78	11
+F78	9
+H78	None
+K78	+10 Coin
+M78	0
+O78	NO
+B79	Agriculture
+C79	3.0
+D79	INT
+WIS
+E79	11
+F79	9
+H79	None
+K79	+10 Coin
+M79	0
+O79	NO
+B80	Electrical Engineering
+C80	8.0
+D80	INT
+WIS
+E80	11
+F80	9
+H80	None
+K80	+10d8
+M80	0
+O80	NO
+B81	Software Engineering
+C81	3.0
+D81	INT
+WIS
+E81	11
+F81	9
+H81	None
+K81	+10 Coin
+M81	0
+O81	NO
+B82	Mechanical Engineering
+C82	6.0
+D82	DEX INT
+WIS
+E82	2
+F82	11
+G82	9
+H82	None
+K82	+3d6
+M82	0
+O82	NO
+B83	Chemical Engineering
+C83	10.0
+D83	CON INT
+WIS
+E83	-1
+F83	11
+G83	9
+H83	None
+K83	-2d10
+M83	0
+O83	NO
+B84	Medicine
+C84	12.0
+D84	DEX
+INT  WIS
+E84	2
+F84	11
+G84	9
+H84	None
+K84	+3d12
+M84	0
+O84	NO
+B85	Use Vehicle
+B86	Sail
+C86	0.0
+D86	DEX
+WIS
+E86	2
+F86	9
+H86	None
+K86	No Skill
+M86	0
+O86	NO
+B87	Drive
+C87	0.0
+D87	DEX
+WIS
+E87	2
+F87	9
+H87	None
+K87	No Skill
+M87	0
+O87	NO
+B88	Pilot
+C88	0.0
+D88	DEX INT
+WIS
+E88	2
+F88	11
+G88	9
+H88	None
+K88	No Skill
+M88	0
+O88	NO
+B89	Handle Animal
+C89	4.0
+D89	DEX CON
+CHA
+E89	2
+F89	-1
+G89	5
+H89	None
+K89	-2d4
+M89	0
+O89	NO
+B90	Perception Skills
+B91	Social Perception
+C91	6.0
+D91	CHA
+WIS
+E91	5
+F91	9
+H91	None
+K91	+6d6
+M91	0
+O91	NO
+B92	Environmental Perception
+C92	3.0
+D92	INT
+WIS
+E92	11
+F92	9
+H92	None
+K92	+10 Coin
+M92	0
+O92	NO
+B93	Paranormal Perception
+C93	15.0
+D93	CHA INT
+WIS
+E93	5
+F93	11
+G93	9
+H93	None
+K93	+6d12
+M93	0
+O93	NO
+B94	Life Skills
+B95	Cooking
+C95	10.0
+D95	CHA
+WIS
+E95	5
+F95	9
+H95	None
+K95	+6d10
+M95	0
+O95	NO
+B96	Textiles
+C96	3.0
+D96	DEX
+INT
+E96	2
+F96	11
+H96	None
+K96	+3 Coin
+M96	0
+O96	NO
+B97	Leadership
+C97	5.0
+D97	CHA INT
+WIS
+E97	5
+F97	11
+G97	9
+H97	None
+K97	+6d4
+M97	0
+O97	NO
+B98	Survival
+C98	3.0
+D98	DEX CON
+WIS
+E98	2
+F98	-1
+G98	9
+H98	None
+K98	-2 Coin
+M98	0
+O98	NO
+B99	Theory Knowledge
+B100	Philosophy
+C100	10.0
+D100	CHA INT
+WIS
+E100	5
+F100	11
+G100	9
+H100	None
+K100	+6d10
+M100	0
+O100	NO
+B101	Arcane Knowledge
+C101	17.0
+D101	CHA INT
+WIS
+E101	5
+F101	11
+G101	9
+H101	None
+K101	+6d12
+M101	0
+O101	NO
+B102	Theology
+C102	9.0
+D102	CHA INT
+WIS
+E102	5
+F102	11
+G102	9
+H102	None
+K102	+6d8
+M102	0
+O102	NO
+B104	Attunement
+C104	Negative
+E104	Catalyst
+I104	Counter DR
+K104	Cast Check
+O104	Can Train
+B105	Domains of Magic
+B106	Alteration
+C106	8.0
+D106	+
+E106	None
+F106	-1
+I106	+2d8
+K106	-2d8
+O106	NO
+B107	Fortune
+C107	4.0
+D107	+
+E107	None
+F107	-1
+I107	+2d4
+K107	-2d4
+O107	NO
+Q107	Available Mana
+B108	Enchantment
+C108	9.0
+D108	+
+E108	None
+F108	-1
+I108	+2d8
+K108	-2d8
+O108	NO
+Q108	Container
+R108	Mana
+B109	Divination
+C109	8.0
+D109	N
+E109	None
+F109	0
+I109	Can't Counter
+K109	+1d8
+O109	NO
+Q109	Body
+R109	15/15
+B110	Dissolution
+C110	16.0
+D110	N
+E110	None
+F110	0
+I110	Can't Counter
+K110	+1 d12
+O110	NO
+B111	Restoration
+C111	2.0
+D111	N
+E111	None
+F111	0
+I111	Can't Counter
+K111	+1 Coin
+O111	NO
+B112	Illusion
+C112	7.0
+D112	N
+E112	None
+F112	0
+I112	Can't Counter
+K112	+1d6
+O112	NO
+B113	Abjuration
+C113	4.0
+D113	-
+E113	None
+F113	1
+I113	Can't Counter
+K113	+2d4
+O113	NO
+B114	Force
+C114	7.0
+D114	-
+E114	None
+F114	1
+I114	Can't Counter
+K114	+2d6
+O114	NO
+B115	Conjuration
+C115	10.0
+D115	-
+E115	None
+F115	1
+I115	Can't Counter
+K115	+2d10
+O115	NO
+### SHEET: Inventory
+C3	Inventory
+O3	Exploits
+B5	Sort
+C5	Name
+D5	Grade
+E5	Range
+F5	P/B/S : F/E/A
+G5	Resists
+H5	Material
+I5	Description & Mods
+J5	Value
+K5	Quantity/ Uses
+L5	Weight
+M5	In Bag
+O5	Type
+P5	Name
+Q5	Level
+R5	Description
+S5	X
+B6	1.0
+O6	Supernatural
+P6	Eidetic Memory
+Q6	Level I
+B7	2.0
+B8	3.0
+O8	Supernatural
+P8	Machine Interfacing
+Q8	Level I
+B9	4.0
+B10	5.0
+O10	Supernatural
+P10	Precognition
+Q10	Level I
+B11	6.0
+B12	7.0
+O12	Combat
+P12	Combat Prowess
+Q12	Level II
+B13	8.0
+B14	9.0
+O14	Combat
+P14	Advanced Reflexes
+Q14	Level I
+B15	10.0
+B16	11.0
+O16	Learning
+P16	Gifted
+Q16	Level I
+B17	12.0
+B18	13.0
+O18	Learning
+P18	Hive Mind
+Q18	Level I
+B19	14.0
+B20	15.0
+O20	Learning
+P20	Expertise at (X)
+Q20	Level III
+S20	History
+B21	16.0
+B22	17.0
+O22	Negative
+P22	Heart is Taken by (X)
+Q22	Level I
+S22	Valmir Calius
+B23	18.0
+B24	19.0
+O24	Negative
+P24	Bane (X)
+Q24	Level I
+S24	JEWL
+B25	20.0
+B26	21.0
+O26	Magic
+P26	Esther Conduit
+Q26	Level III
+B27	22.0
+B28	23.0
+O28	Magic
+P28	Attunement (X)
+Q28	Level I
+S28	Negative
+B29	24.0
+B30	25.0
+O30	Magic
+P30	Battery Body
+Q30	Level III
+B31	26.0
+B32	27.0
+B33	28.0
+B34	29.0
+B35	30.0
+B36	31.0
+B37	32.0
+B38	33.0
+B39	34.0
+K40	Total Weight
+L40	0
+K41	Total Value
+L41	0
+K42	Bag Weight
+L42	0
+C43	Woven Spells
+B44	Sort
+C44	Name
+D44	Domains
+E44	DR
+F44	Casting Speed
+G44	Targets
+H44	Range
+I44	Description
+J44	Spell Strength
+K44	Duration
+L44	C/D
+B45	1.0
+B46	2.0
+B47	3.0
+B48	4.0
+B49	5.0
+B50	6.0
+B51	7.0
+B52	8.0
+B53	9.0
+B54	10.0
+B55	11.0
+B56	12.0
+B57	13.0
+B58	14.0
+B59	15.0
+B60	16.0
+B61	17.0
+B62	18.0
+B63	19.0
+B64	20.0
+B65	21.0
+B66	22.0
+B67	23.0
+B68	24.0
+B69	25.0
+B70	26.0
+B71	27.0
+B72	28.0
+B73	29.0
+C74	Passive Tasks
+C75	Type
+D75	Time
+E75	Notes
+C79	Root, Branches, Thorns & Blossoms
+C80	Branches
+E80	Thorns
+I80	Blossoms
+B81	Root
+### SHEET: EXPLOITDATA
+A1	Ancient Soul
+B1	Born Evolved
+C1	Death's Hand
+D1	Eidetic Memory
+E1	Enthralling Aura
+F1	Flight
+G1	Healing Factor
+H1	Magic Negator (X)
+I1	Precognition
+J1	Proof (X)
+K1	Shapeshifter
+L1	The Hunger
+M1	The Need for Speed
+N1	They're All Going to Laugh at You!
+O1	Undead
+P1	Unnatural Existence
+Q1	Voice of the Esther
+R1	Leyline of Ascalia
+S1	Iron Mind
+T1	Impossible Luck
+U1	Esther Locked
+A3	Ancient Soul
+B3	Born Evolved
+C3	Death's Hand
+D3	Eidetic Memory
+E3	Enthralling Aura
+F3	Flight
+G3	Healing Factor
+H3	Magic Negator (X)
+I3	Precognition
+J3	Proof (X)
+K3	Shapeshifter
+L3	The Hunger
+M3	The Need for Speed
+N3	They're All Going to Laugh at You!
+O3	Undead
+P3	Unnatural Existence
+Q3	Voice of the Esther
+R3	Leyline of Ascalia
+S3	Iron Mind
+T3	Impossible Luck
+U3	Esther Locked
+A5	Ancient Soul
+B5	Born Evolved
+C5	Death's Hand
+D5	Eidetic Memory
+E5	Enthralling Aura
+F5	Flight
+G5	Healing Factor
+H5	Magic Negator (X)
+I5	Precognition
+J5	Proof (X)
+K5	Shapeshifter
+L5	The Hunger
+M5	The Need for Speed
+N5	They're All Going to Laugh at You!
+O5	Undead
+P5	Unnatural Existence
+Q5	Voice of the Esther
+R5	Leyline of Ascalia
+S5	Iron Mind
+T5	Impossible Luck
+U5	Esther Locked
+A7	Combat Improvision
+B7	Way of the Fists
+C7	Battle Momentum
+D7	Battle Proficiency
+E7	Brawler
+F7	Combat Endurance
+G7	Combat Prowess
+H7	Combat Tactics
+I7	Counter Combatives
+J7	Destroy Guard
+K7	Die Hard
+L7	Dirty Fighter
+M7	Disarm
+N7	Double Tap... No, Triple Tap... Just Keep Shooting!
+O7	Dual Wield
+P7	Envigorating Rally
+Q7	Fighting Flow
+R7	I Am Your Shield!
+S7	I Only Make Headshots
+T7	Lay It All On The Line
+U7	Lend Me A Hand
+V7	Look, No Hands!
+W7	Master Grappler
+X7	Missile Command
+Y7	Move Like a Butterfly
+Z7	Murder-Stroke
+AA7	Parry
+AB7	Patience, Grasshopper!
+AC7	Put A Tourniquet On That!
+AD7	Quick Loading
+AE7	Rapid Fists
+AF7	Rhythmic Cadence
+AG7	Riposte
+AH7	Running Start
+AI7	Shank Blitz
+AJ7	Shield Bash
+AK7	Shield Proficiency
+AL7	Shield Up!
+AM7	Sniper
+AN7	Split the Arrow
+AO7	Sting Like a Bee
+AP7	Weaver's Bane
+AQ7	Taunt
+AR7	Tactical Footing
+A9	Combat Improvision
+B9	Way of the Fists
+C9	Battle Momentum
+D9	Battle Proficiency
+E9	Brawler
+F9	Combat Endurance
+G9	Combat Prowess
+H9	Combat Tactics
+I9	Counter Combatives
+J9	Destroy Guard
+K9	Die Hard
+L9	Dirty Fighter
+M9	Disarm
+N9	Double Tap... No, Triple Tap... Just Keep Shooting!
+O9	Dual Wield
+P9	Envigorating Rally
+Q9	Fighting Flow
+R9	I Am Your Shield!
+S9	I Only Make Headshots
+T9	Lay It All On The Line
+U9	Lend Me A Hand
+V9	Look, No Hands!
+W9	Master Grappler
+X9	Missile Command
+Y9	Move Like a Butterfly
+Z9	Murder-Stroke
+AA9	Parry
+AB9	Patience, Grasshopper!
+AC9	Put A Tourniquet On That!
+AD9	Quick Loading
+AE9	Rapid Fists
+AF9	Rhythmic Cadence
+AG9	Riposte
+AH9	Running Start
+AI9	Shank Blitz
+AJ9	Shield Bash
+AK9	Shield Proficiency
+AL9	Shield Up!
+AM9	Sniper
+AN9	Split the Arrow
+AO9	Sting Like a Bee
+AP9	Weaver's Bane
+AQ9	Taunt
+AR9	Tactical Footing
+A11	Fast Learner
+B11	Gifted
+C11	Hive Mind
+D11	Jack of All Trades
+E11	Knowledge is Power
+F11	Muscle Memory
+G11	Scatterbrained
+H11	Self Teacher
+A13	Fast Learner
+B13	Gifted
+C13	Hive Mind
+D13	Jack of All Trades
+E13	Knowledge is Power
+F13	Muscle Memory
+G13	Scatterbrained
+H13	Self Teacher
+A15	Fast Learner
+B15	Gifted
+C15	Hive Mind
+D15	Jack of All Trades
+E15	Knowledge is Power
+F15	Muscle Memory
+G15	Scatterbrained
+H15	Self Teacher
+A17	Allergic to (X)
+B17	Bad Blood with (X)
+C17	Bane (X)
+D17	Broken Heart
+E17	Emotional Baggage
+F17	Emotional Scars
+G17	Emotional Torment
+H17	Heart is Taken by (X)
+I17	I'm Awkward
+J17	Impaired Taste
+K17	Karma is a Bitch
+L17	Over-Thinker
+M17	Silver Spoon
+N17	Stagnant Vitality
+O17	Static
+P17	Strange Vibrations
+Q17	Strange Vibrations (Partial Supression)
+R17	Teetotaler
+S17	That's Mine!
+T17	Weak Weave Connection
+A19	Allergic to (X)
+B19	Bad Blood with (X)
+C19	Bane (X)
+D19	Broken Heart
+E19	Emotional Baggage
+F19	Emotional Scars
+G19	Emotional Torment
+H19	Heart is Taken by (X)
+I19	I'm Awkward
+J19	Impaired Taste
+K19	Karma is a Bitch
+L19	Over-Thinker
+M19	Silver Spoon
+N19	Stagnant Vitality
+O19	Static
+P19	Strange Vibrations
+Q19	Strange Vibrations (Partial Supression)
+R19	Teetotaler
+S19	That's Mine!
+T19	Weak Weave Connection
+A21	Chaotic Spark
+B21	Enchanted Performer
+C21	Ritualist
+D21	Altruistic Spark
+E21	Attunement (X)
+F21	Battery Body
+G21	Blessed Arcana
+H21	Demonic Arts
+I21	Esther Conduit
+J21	Feel the Esther
+K21	Parsley, Sage, Rosemary, and Thyme
+L21	Sacred Exchange
+M21	Selfish Spark
+N21	Karmic Power
+O21	Don't Break My Concentration
+P21	Attunement Unlocked
+A23	Chaotic Spark
+B23	Enchanted Performer
+C23	Ritualist
+D23	Altruistic Spark
+E23	Attunement (X)
+F23	Battery Body
+G23	Blessed Arcana
+H23	Demonic Arts
+I23	Esther Conduit
+J23	Feel the Esther
+K23	Parsley, Sage, Rosemary, and Thyme
+L23	Sacred Exchange
+M23	Selfish Spark
+N23	Karmic Power
+O23	Don't Break My Concentration
+P23	Attunement Unlocked
+A25	Chaotic Spark
+B25	Enchanted Performer
+C25	Ritualist
+D25	Altruistic Spark
+E25	Attunement (X)
+F25	Battery Body
+G25	Blessed Arcana
+H25	Demonic Arts
+I25	Esther Conduit
+J25	Feel the Esther
+K25	Parsley, Sage, Rosemary, and Thyme
+L25	Sacred Exchange
+M25	Selfish Spark
+N25	Karmic Power
+O25	Don't Break My Concentration
+P25	Attunement Unlocked
+A27	#REF!
+A29	#REF!
+A31	#REF!
+A33	#REF!
+A35	#REF!
+A37	#REF!
+A39	#REF!
+A41	#REF!
+A43	#REF!
+A45	#REF!
+A47	#REF!
+A49	#REF!
+A51	#REF!
+A53	#REF!
+A55	#REF!
+A57	#REF!
+A59	#REF!
+A61	#REF!
+A63	#REF!
+A65	#REF!
+A67	#REF!
+A69	#REF!
+A71	#REF!
+A73	#REF!
+A75	#REF!
+A77	#REF!
+A79	#REF!
+A81	#REF!
+A83	#REF!
+A85	#REF!
+A87	#REF!
+### SHEET: Combat
+A1	Combat Improvision
+B1	[Deception 5 ]
+Once per combat round, at any time, you may turn a Defense token into a Basic or Magic token.
+D1	[Deception 10]
+Once per combat round, at any time, you may turn a Defense token into a Basic or Magic token, or you may turn a Basic or Magic token into a Defense token.
+F1	[Deception 14]
+Once per combat round, at any time, you may change up to three Action tokens to whatever type you want.
+A2	Way of the Fists
+B2	[Unarmed 10]
+You may take an additional reaction action per combat round. The reaction action must be an unarmed attack.
+D2	[Unarmed 15]
+You may take up to two additional reaction actions per combat round. The reaction actions must be unarmed attacks.
+F2	[Unarmed 20]
+You may take up to two additional reaction actions per combat round. The reaction actions must be unarmed attacks. In addition, once per combat round you can make one of these reaction unarmed attacks automatically bypass one level of ar
+A3	Battle Momentum
+B3	[Any Melee Martial Arts Skill 6]
+Successful melee attacks give you a free spontaneous 5 foot step.
+D3	[Any Melee Martial Arts Skill 10]
+Successful melee attacks give you a free spontaneous 10 foot step in one direction.
+F3	[Any Melee Martial Arts Skill 14]
+Successful melee attacks give you a free spontaneous 10 foot step in one direction. You may take a Free Spontaneous Basic action whenever you kill a creature.
+A4	Battle Proficiency
+B4	[Any Martial Arts Skill 6]
++1 Mod to all Martial Arts Skills
+D4	[Any Martial Arts Skill 10 or STR 5]
++1 Mod to all Martial Arts Skills. Successful attacks will allow you to move the attacked creature 5 feet any any direction.
+F4	[Any Martial Arts Skill 17 or DEX 6]
++1 Mod to all Martial Arts Skills. Successful attacks will allow you to move the attacked creature 5 feet any any direction. You may take a free spontaneous 5 foot step in the direction of the attacked creature.
+A5	Brawler
+B5	[Unarmed 4]
+Unarmed Mod +2
+D5	[Unarmed 9]
+Unarmed Mod +4
+F5	[Unarmed 14]
+Unarmed Mod +4. You can add an additional +5 Bashing damage to your unarmed attacks for one round but you must remove an active defensive action. (You can only do this once per round.)
+A6	Combat Endurance
+B6	[Combined Athletics 10]
++2 to Virility Mod.
+D6	[CON 4]
++2 to Virility Mod; +5 to Base Endurance
+F6	[Survival 12]
++3 to Virility Mod; +5 to Base Endurance; +1 to Base Resist.
+A7	Combat Prowess
+B7	[Fought in a battle; Any Martial Arts Skill 4]
++1 APT
+D7	[Any Martial Arts Skill 8]
++1 APT; +2 to Nimbleness Mod.
+F7	[Any Martial Arts Skill 14]
++1 APT; +2 Nimbleness Mod. You may reroll attack rolls but you have to keep the second roll.
+A8	Combat Tactics
+B8	[Leadership 3; Any 3 Martial Arts Skills 4]
+At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT during the first round of combat.
+D8	[Leadership 10; WIS 3]
+At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT for the remainder of the batte; +1 APT Mod
+F8	[Leadership 15; Any 3 Martial Arts Skills 6]
+At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT for the remainder of the batte; +1 APT Mod. You ma
+A9	Counter Combatives
+B9	[Any Martial Arts Skill 6]
+Requires a defensive action:
+If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them).
+D9	[Unarmed 8 or STR 5]
+Requires a defensive action:
+If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them). With a successful counter-attack, you knock the target to the gro
+F9	[Unarmed Combat 12 or STR 7]
+Requires a defensive action:
+If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them). With a successful counter-attack, you knock the target to
+A10	Destroy Guard
+B10	[Unarmed 10]
+A successful unarmed attack removes a Defensive action from the creature attacked.
+D10	-[]
+F10	-[]
+A11	Die Hard
+B11	[Must have fallen unconcious during a battle; CON 4]
++2 Conviction Mod
+D11	[CHA 4]
++2 Conviction Mod; +2 Virility Mod.
+F11	[Defied Death]
++2 Conviction Mod; +2 Virility Mod.; +1 mod to fate roll for defying death.
+A12	Dirty Fighter
+B12	[Unarmed 5]
+During any attack you make that is blocked you may pay 5 Fortitude to trip the blocker and knock them prone.
+D12	[Nimbleness 8]
+During any attack you make that is blocked you may pay 5 Fortitude to trip the blocker and knock them prone. Or, During any attack you make that is blocked you may pay 8 Fortitude to kick dust into the blocker's eyes and blind them for
+F12	[Nimbleness 10, Unarmed 15]
+During any attack you make you may pay 5 Fortitude to trip the blocker and knock them prone. And/Or, During any attack you make you may pay 8 Fortitude to kick dust into the blocker's eyes and blind them for the remainder 
+A13	Disarm
+B13	[Manual Dexterity 3]
+You can make a creature drop an object when you hit the object or the lower arm carrying it.
+D13	[STR 3; Manual Dexterity 7]
+You can make a creature drop an object when you hit the object or the lower arm carrying it. If able, you may pick up that object with a successful Free No Effort Spontaneous Manual Dexterity Skill Check.
+F13	[DEX 5; Manual Dexterity 11]
+You can make a creature drop an object when you hit it or the lower arm carrying it. If able, you may grab the dropped object as a Free No Effort Spontaneous Manual Dexterity Skill Check; afterwards, you may take a Free S
+A14	Double Tap... No, Triple Tap... Just Keep Shooting!
+B14	[Firearms 5]
+Using only one basic action, you may attack a target with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every shot after the first.
+D14	[Firearms 11]
+Using only one basic action, you may attack up to 2 targets with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every two shots after the first.
+F14	[Firearms 16]
+Using only one basic action, you may attack up to 4 targets with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every three shots after the first.
+A15	Dual Wield
+B15	[None]
+You may dual wield one-handed weapons that are Trivial weight or less; You may use one Basic Action to attack with both weapons using one skill check. The DR for the target is increased by 3.
+D15	[STR 4]
+You may dual wield one-handed weapons that are Light weight or less; You may use one Basic Action to attack with both weapons using one skill check. You may attack a single target or two different targets. The DR for targets are increased by 
+F15	[STR 5; DEX 4]
+You may dual wield one-handed weapons that are Moderate weight or less; You may use one Basic Action to attack one target twice or two different targets using a different skill check for each weapon.
+A16	Envigorating Rally
+B16	[Virility 5]
+Once per day you may summon inner determination to keep going. During combat you may take a Basic Action to increase your Fortitude by your heal rate.
+D16	[Virility 9]
+Once per day you may summon inner determination to keep going. Take a Basic Action to increase your Fortitude by your heal rate.
+F16	[Virility 11; Conviction 5]
+Once per day you may summon inner determination to keep going. Take a Basic Action to increase your Fortitude by your heal rate. If you haven't taken this action during a battle and your Fortitude reaches 0 then you may us
+A17	Fighting Flow
+B17	[DEX 5]
+Once per day during combat you may increase your ATP by 2.
+D17	[Nimbleness 12]
+Once per day during combat you may increase your ATP by 3.
+F17	[Combined Athletics 50]
+Once per combat you may increase your ATP by 3.
+A18	I Am Your Shield!
+B18	[Combat Prowess Level 1]
+Requires a Defensive action:
+You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit. Remove one of your defensive actions after the attack.
+D18	[STR 5 CON 4]
+Requires a Defensive action:
+You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit.
+F18	[CON 5; DEX 5; Leadership 4]
+Requires a Defensive action:
+You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit. After you swap places they may take a Free Spontaneous 5 foot 
+A19	I Only Make Headshots
+B19	[Firearms or Archery 10; Manual Dexterity 8]
+Ranged attacks do not impose a +2 DR when calling a shot.
+D19	-[]
+F19	-[]
+A20	Lay It All On The Line
+B20	[CHA 4]
+Once, at the beginging of a combat round, you may pay 20 Fortitude for +1 APT that round.
+D20	[CHA 5]
+Once, at the beginging of a combat round, you may pay 15 Fortitude for +1 APT that round.
+F20	[CHA 6; DEX 5]
+As many times as you like, you may pay 15 Fortitude for +1 APT that round.
+A21	Lend Me A Hand
+B21	[Leadership 3]
+At the begining of a combat round, a willing creature within 5 feet may reduce their APT by 1 and you gain +1 APT this round.
+D21	[Leadership 6]
+Any time during combat, a willing creature within 20 feet may remove 1 action and you gain 1 free action.
+F21	[Leadership 12; Negotiation 7]
+Any time during or before combat, a willing creature within 20 feet may remove 1 action and you gain 2 free actions.
+A22	Look, No Hands!
+B22	[Unarmed 8]
+Defensive tokens still prevent death from critical attacks when you are grappling a creature.
+D22	[Unarmed 10; Environmental Perception 5; Combat Prowess Level 2]
+Defensive tokens still prevent death from critical attacks when you are grappling a creature. You may still block while grappling.
+F22	[Unarmed 13]
+Defensive tokens still prevent death from critical attacks when you are grappling a creature. You may still block while grappling. You may still evade while grappling.
+A23	Master Grappler
+B23	[Successfuly Grappled 5 Creatues]
+You can grapple creatures 2 sizes larger than you instead of 1.
+D23	[Unarmed 13]
+You can grapple creatures 2 sizes larger than you instead of 1. When grappled or grappling you may add +3 Bashing to your unarmed attacks.
+F23	[Unarmed 16]
+You can grapple creatures 2 sizes larger than you instead of 1. When grappled or grappling you may add +3 Bashing to your unarmed attacks. Grappled creatures may not reverse or break the grapple. Desperate escape can still be used.
+A24	Missile Command
+B24	[Manual Dexterity 8]
+Requires a defensive action:
+Instead of blocking or dodging a ranged attack you may instead make a free Manual Dexterity skill check against the attack roll. If successful you can grab the missile out of the air. If you fail then
+D24	[Manual Dexterity 13]
+Requires a defensive action:
+Instead of blocking or dodging a ranged attack you may instead make a free Manual Dexterity skill check against the attack roll. If successful you can grab the missile out of the air.
+F24	[Manual Dexterity 15]
+Requires a defensive action:
+You may deflect any ranged attack that passes within 5 feet of you with a free successful Manual Dexterity skill check against the attack roll. If the ranged attack will hit you then you may still bl
+A25	Move Like a Butterfly
+B25	[Acrobatics 6]
+Requires a Defensive action:
+As a reaction to a successful melee attack you may make a free acrobatics 0 effort skill check to directly contest the attack. If you are successful then the damage from the attack is negated. Remove one of
+D25	[Acrobatics 13]
+Requires a Defensive action:
+As a reaction to a successful melee attack you may make a free acrobatics skill check to directly contest the attack. If you are successful then the damage from the attack is negated and you may take a fre
+F25	[Acrobatics 15; Environmental Perception 10]
+Requires a Defensive action:
+Damage from a successful melee attack is negated and the attacker falls prone. You may take a 5 foot step. Remove one of your defensive actions.
+A26	Murder-Stroke
+B26	[Blades 3]
+Damage is equal to the weapon's slashing attack damage -12 but as bashing.
+D26	[Blades 6]
+Damage is equal to the weapon's slashing attack damage - 8 but as bashing.
+F26	[Blades 12]
+Damage is equal to the weapon's slashing attack damage -6 but as bashing. If you do damage to a creatures body with this attack and they are the same size or smaller than you, then they are knocked prone.
+A27	Parry
+B27	[None]
+When you block you may directly contest an incoming melee attack with a free 0 effort melee Martial Arts Action. Remove 1 defensive action if their attack is still succesful after the parry attempt.
+D27	-[]
+F27	-[]
+A28	Patience, Grasshopper!
+B28	[None]
+You may defer 1 action in combat to the next round; You will get the deferred action plus your normal APT. You must choose to defer before the round begins and actions are placed.
+D28	[Environmental Perception 10]
+You may defer up to 2 actions in combat to the next round; You will get the deferred actions plus your normal APT.
+F28	[DEX 6; Environmental Perception 14]
+You may defer up to 3 actions in combat to the next round; You will get the deferred actions plus your normal APT; +5 to fate rolls determining action priority.
+A29	Put A Tourniquet On That!
+B29	[Survival 6 or Medicine 2]
+A successful medicine or survival check in battle can heal a wounded body part of yours or another to undamaged. You must have something to act as a bandage and they must be within 5 feet.
+D29	[Survival 12 or Medicine 6; Combat Prowess level 1]
+A successful medicine or survival check in battle can heal all wounded body parts of yours or anothers to undamaged. You must have something to act as a bandage for each wounded area and they must b
+F29	[Survival 15 or Medicine 9]
+A successful medicine or survival check in battle can heal all wounded body parts of yours and anyone you want around you to undamaged. You must have something to act as a bandage for each wounded area and they must be wit
+A30	Quick Loading
+B30	[Manual Dexterity 7]
+You may reload a weapon using 1 less action than it normally takes.
+D30	[Manual Dexterity 14]
+You may reload a weapon using 2 less actions than it normally takes.
+F30	-[]
+A31	Rapid Fists
+B31	[Unarmed 6; Manual Dexterity 7]
+You may strike one target up to 5 times with a single Basic action using an unarmed attack.  You must declare how many strikes and pay 1 Fortitude for every strike after the first. If the attack is unsucessful you must
+D31	[Unarmed 8; Manual Dexterity 10]
+You may strike up to 2 targets up to 10 times with a single Basic action using an unarmed attack.  You must declare how many strikes and pay 1 Fortitude for every strike after the first. If the attack is unsucessful y
+F31	[Unarmed 15]
+You may strike up to 4 targets up to 15 times with a single Basic action using an unarmed attack.  You must pay 1 Fortitude for every strike after the first. If the attack is unsucessful you must still pay the Fortitude for each addition
+A32	Rhythmic Cadence
+B32	[Music 6]
+A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR) (May only be used once per combat)
+D32	[Music 8]
+A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR). If the free APT is used on a Defensive action then they regain 10 Fortitude. (May only be used once per day)
+F32	[Music 10; Social Perception 6]
+A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR). If the free APT is used on a Defensive action then they regain 20 Fortitude. (May only be used once per day)
+A33	Riposte
+B33	[Level 1 Parry]
+After a successful Parry you get a free Spontaneous Basic action.
+D33	-[]
+F33	-[]
+A34	Running Start
+B34	[Nothing]
+You can move 5 feet as a free joint spontanious action before an Basic action.
+D34	[DEX 5]
+You can move 10 feet as a free joint spontanious action before an Basic action.  Movement must be in one direction.
+F34	[Acrobatics 8 or DEX 6]
+You can move 10 feet as a free joint spontanious action before an Basic action.  Movement must be in one direction. You may make an additional 10 foot free joint spontanious action after the attack. All Movement must be in one
+A35	Shank Blitz
+B35	[Knives 7]
+Can't Dual Wield: 
+You can strike one target up to 3 times with a single Basic Action using a knife. If your attack is unsuccesful and you chose to strike multiple times: remove 1 defensive action and then the creature you attacked may cho
+D35	[Knives 12]
+Can't Dual Wield: 
+You can strike one target up to 4 times with a single Basic Action using a knife. If your attack is unsuccesful and you chose to strike multiple times: the creature you attacked may choose to automaticaly put you into a
+F35	[Knives 17]
+Can't Dual Wield: 
+You can strike one target up to 5 times with a single Basic Action using a knife.
+A36	Shield Bash
+B36	[STR 5]
+If you block against a melee attack with a shield then you may remove a defensive token from the attacker.
+D36	-[]
+F36	-[]
+A37	Shield Proficiency
+B37	[DEX 4]
+The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing.
+D37	[DEX 5; CON 4; Manual Dexterity 8]
+The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing. You may block unblockable Attacks targeting you.
+F37	[CON 5; Manual Dexterity 10]
+The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing. You may block unblockable Spells and Attacks targeting you.
+A38	Shield Up!
+B38	[Shield Proficiency Level 3]
+You may block attacks that pass or happen within 5 feet of you.
+D38	-[]
+F38	-[]
+A39	Sniper
+B39	[Manual Dexterity 15]
+Effective range for all ranged weapons is doubled.
+D39	-[]
+F39	-[]
+A40	Split the Arrow
+B40	[Archery 5]
+While you have a defensive action, you may contest an incoming thrown or archery attack directly with a free archery skill check of your own. If you win, the attack is considered a miss; if you lose, your defensive action is removed.
+D40	[Archery 10]
+While you have a defensive action, you may contest an incoming thrown or archery attack directly with a free archery skill check of your own. You may also contest these attacks not directed at you with a free 0 effort archery skill check
+F40	[Archery 18; Manual Dexterity 8; Environmental Perception 12]
+While you have a defensive action, you may contest an incoming physical projectile directly with a free archery skill check of your own. You may also contest these attacks not directed at 
+A41	Sting Like a Bee
+B41	[Brawler Level 1]
+You may apply your DEX to your unarmed mod.
+D41	-[]
+F41	-[]
+A42	Weaver's Bane
+B42	[Arcane Knowledge 8]
+Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you.
+D42	[Arcane Knowledge 13]
+Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you. You may apply your Conviction to the DR of any spell being cast within 5 feet of you.
+F42	[Arcane Knowledge 20]
+Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you. You may apply your Conviction to the DR of any spell being cast within 5 feet of you. Also, If you attack someone focusing on a spell you mak
+A43	Taunt
+B43	[None]
+When you attack a creature you may spend 5 Fortitude to taunt the creature. For the remainder of the combat round if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll.
+D43	[Intimidation 10]
+When you attack a creature you may spend 3 Fortitude to taunt the creature. For the remainder of the combat round if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll.
+F43	[Intimidation 20]
+When you attack a creature you may spend 3 Fortitude to taunt the creature. For the remainder of the battle if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll.
+A44	Tactical Footing
+B44	[Nimbleness 5]
+You may take a free 5 foot step before using a Basic Action.
+D44	[Ingenuity 7]
+You may take a free 5 foot step before using a Basic Action. At any time you may remove a Defensive token to take a free spontaneous 5 foot step.
+F44	[Nimbleness 10]
+You may take a free 5 foot step before and after using a Basic Action. At any time you may remove a Defensive token to take a free spontaneous 5 foot step.
+### SHEET: Utility
+A1	Field Repair
+B1	[Mechanical Engineering 8]
+You may use a basic action to increase the condition of a non-resource item by 1 tier. The object gains the brittle trait.
+D1	[Mechanical Engineering 12]
+You may use a basic action to increase the condition of a non-resource item by 1 tier. Make a 0 Effort Mechanical Engineering check DR 10. On a failure the item gains the brittle trait.
+F1	[Mechanical Engineering 15]
+You may use a basic action to increase the condition of a non-resource item by 2 tiers. Make a 0 Effort Mechanical Engineering check DR 10. On a failure the item gains the brittle trait.
+A2	*Hello Darkness, My Old Friend
+B2	-[Any Performing Arts Skill 4]
+D2	-[]
+F2	-[]
+A3	*Inspirational Performer
+B3	-[Any Performing Arts Skill 4]
+A successful Performing Arts skill check during combat will increase your allies’ (able to witness the performance) movement 5 feet for a round and you may take a 5 foot step during the performance.
+D3	-[Any Performing Arts Skill 8; CHA +2]
+Successful performing art skill checks with a level 8 or higher allow anyone witnessing to mark successful skill checks as trainable if the skill is less than level 8. (Their skill check must still have 5 Stamin
+F3	-[Any Performing Arts Skill 16]
+Successful performing art skill checks with a level 16 or higher give your allies (able to witness the performance) a +1 mod to all their skill checks.
+A4	*Marked for Death
+B4	-[Sneak 6]
+D4	-[Any Martial Arts Skill 8; Sneak 10]
+If you surprise attack a creature, and you succeed a Sneak check, gain a free round of combat on the target with a +1 mod to attacks against the target during that round. Marked for Death can't be used again duri
+F4	-[Any Martial Art 12; Sneak 17]
+The killing blow is so masterful that it takes a moment for those around the target to even realize you struck the blow. You gain a free round of combat if you successfuly kill the target.  Marked for Death can't be us
+A5	Death Becomes Me
+B5	[Defied Death twice]
+Whenever you Defy Death gain 7 Karma.
+D5	[Defied Death thrice]
+You are immune to Monkey Paws from Defying Death. Whenever you Defy Death gain 7 Karma.
+F5	[Rolled a 10 Defying Death]
+Choose one Supernatural Exploit. You are immune to Monkey Paws from Defying Death. Whenever you Defy Death gain 7 Karma.
+A6	Fleet Footed
+B6	[Combined Athletics 30; Dex 6]
+Speed Mod +2
+D6	-[]
+F6	-[]
+A7	Fortify Your Mind!
+B7	[WIS 3]
+You know when someone is reading your mind.
+D7	[INT 3; CHA 3]
+You know when someone is reading your mind. You can't be put to sleep magically. +1 to Wit, Ingenuity, and Conviction
+F7	[WIS 4; INT 4; CHA 4]
+Your mind can't be read and you can't be put to sleep magically. +2 to Wit, Ingenuity, and Conviction
+A8	Head on a Swivel
+B8	[Environmental Awareness 12]
+You are considered to have an active Defensive Action outside of combat.
+D8	-[]
+F8	-[]
+A9	Hey! Listen!
+B9	[Leadership 6]
+You can let another creature do skill checks using your skill level. They must have at least 1 in the skill to use it. If they fail they may not mark the skill trainable.
+D9	-[]
+F9	-[]
+A10	Know Thy Mark
+B10	[Any Perception Skill 3; WIS 2]
+You know just by looking at someone their Wealth Level. If they are trying to disguise themselves then this estimate could be wrong.
+D10	[Environmental Perception 6; Social Perception 10] 
+You know just by looking at someone their Wealth Level even if they are trying to hide it.
+F10	[Social Perception 14]
+You know just by looking at someone their Wealth Level and all the items they are carrying even if they are trying to hide it.
+A11	Pinnacle of Health
+B11	[CON 6; Life Span < Epic]
+Increase your lifespan one tier
+D11	-[]
+F11	-[]
+A12	Recon Expert
+B12	[Social Insight 8]
+if you spend at least 1 minute observing another creature outside combat, you can learn if any skill or attribute of your choice is equal, superior, or inferior to your own.
+D12	[Social Insight 13]
+if you spend at least 1 minute observing another creature outside combat, you can learn if two skills or attribute of your choice is equal, superior, or inferior to your own.
+F12	[Social Insight 17]
+if you spend at least 1 minute observing another creature outside combat, you can learn if two skills or attribute of your choice is equal, superior, or inferior to your own. You also learn of one random exploit they possess and t
+A13	Resolute
+B13	[None]
++1 Mod to all Saves.
+D13	-[]
+F13	-[]
+A14	Sharp Memory
+B14	[INT 5]
+You always know what direction you are traveling.
+D14	[INT 7]
+You always know what direction you are traveling. You can remember in great detail everything you have seen or heard within the past month.
+F14	[INT 9]
+You always know what direction you are traveling. You can remember in great detail everything you have seen or heard within the past month. You can memorize entire books and recite them word for word.
+A15	There's No Such Thing as Luck
+B15	[None]
+You may not spend Karma to change you or anyone else's luck. (can't bargain with GM)  Whenever you gain Karma for upholding your goals or values double the amount you recieve.
+D15	-[]
+F15	-[]
+A16	With Imagination, Anything is possible
+B16	[WIS 3]
+On completion of an invention you recieve a normal version of the item instead of a prototype.
+D16	[WIS 5]
+On completion of an invention you recieve a normal version of the item instead of a prototype. Invention minimum time is reduced from 1 month to 1 week.
+F16	[INT 5]
+On completion of an invention you recieve a normal version of the item instead of a prototype. Invention minimum time is reduced from 1 month to 1 week. +1 to Tech Level
+A17	Resolute Mind
+B17	[Environmental Awareness 10]
+Conviction +2
+D17	[WIS 5]
+Conviction +4
+F17	[One Magic Pillar 20]
+Conviction +4. Your Toughness is applied in addition to your Conviction when resisting a spell concentration break.
+A18	Master of Disguise
+B18	[Deception 12; Social Insight 12]
+Once per session, while not in combat, you may remove your chartacter from play. At anytime after this, you may return to play revealing yourself as a GM's NPC that was just in disguise.
+D18	-[]
+F18	-[]
+A19	Meditation
+B19	[]
+Double recovery for all short rest Frequency spent
+D19	-[]
+F19	-[]
+A20	Easy to Find Work
+B20	[]
+You have no issues integrating into the local populace and making connections via oddjobs.
+D20	-[]
+F20	-[]
+A21	Natural Sportsman
+B21	[]
+Any attribute points spent during the course of a sport is doubled.
+D21	-[]
+F21	-[]
+A22	University Contacts
+B22	[]
+As an alumni, you have have easy access to the University reasearch resources and have contacts within the establishment.
+D22	-[]
+F22	-[]
+### SHEET: Learning
+A1	Fast Learner
+B1	[None]
+When rolling to train a skill, a 5 and above is a success instead of 6 and above.
+D1	[INT 3; CHA 4]
+When rolling to train a skill, a 5 and above is a success instead of 6 and above. +1 to Learning Mod
+F1	[WIS 6]
+When rolling to train a skill, a 5 and above is a success instead of 6 and above. If you roll successfuly to train a skill, gain 2 levels in that skill instead of 1. +1 to Learning Mod
+A2	Gifted
+B2	[CHA 4]
+When a skill is increased from level 0 to 1, gain 2 extra levels.
+D2	-[]
+F2	-[]
+A3	Hive Mind
+B3	[Social Perception 6; CHA 4]
+Before after actions for a session you may pick one of your party members. Every time they gain a level in a skill you may make a fate roll. If the fate roll is a success you also gain a level in that skill.
+D3	[Social Perception 10; WIS 4]
+Before after actions for a session you may pick one of your party members. Every level they gain in skills you also gain.
+F3	[Social Perception 18; WIS 5; INT 5; CHA 5]
+
+Whenever a member of your party gains a level in a skill you also gain a level in that skill.
+A4	Jack of All Trades
+B4	[At least one trained skill in every skill category except magic]
+If you roll successfuly to train a basic skill, if that skill level is less than 6 then gain 2 extra levels in that skill.
+D4	-[]
+F4	-[]
+A5	Knowledge is Power
+B5	[INT 3]
+If you roll a 10 on a skill training check then you gain an extra level on that skill.
+D5	[INT 5]
+When rolling to train a skill, if you roll a 10, gain an extra level in that skill, and keep the skill marked as trainable for next session.
+F5	[INT 8]
+When rolling to train a skill, if you roll a 10, gain an extra level in that skill, keep the skill marked as trainable for next session, and gain 1 Karma.
+A6	Muscle Memory
+B6	[STR 4, DEX 5]
+Any Skills with STR or DEX governing them can be trained when they are trainable at the end of a session, regardless of your max skills trainable.
+D6	-[]
+F6	-[]
+A7	Scatterbrained
+B7	[INT 4]
+At the end of a session you may change one trainable skill to another of the same skill class.
+D7	-[]
+F7	-[]
+A8	Self Teacher
+B8	[WIS 5]
+Instead of training any skills at the end of a session you may instead gain a level in any non magic skill that is currently 0 with a successful fate roll.
+D8	-[]
+F8	-[]
+### SHEET: Social
+A1	Alluring Spark
+B1	[Seduction 6; Beauty 7]
+Anyone that finds you sexually attractive will do one minor favor without expecting compensation.
+D1	[Beauty 8]
+Anyone that finds you sexually attractive will do one minor favor without expecting compensation. Your Social Skill Checks aren't effected by Deficiency Status Effects.
+F1	[Beauty 10]
+Anyone that finds you sexually attractive will do one minor favor without expecting compensation. Your Social Skill Checks aren't effected by Deficiency Status Effects. Anyone that has had sex with you can't contest any of your Social Ski
+A2	Diplomatic Immunity in (X)
+B2	[Law 8]
+Government officials can’t persecute based on their laws if murder isn’t involved; the most they can do is detain and extradite you. (X is equal to a region the size of a large city.)
+D2	[Law 14]
+  Even if murder is involved the law can only detain and extradite you.
+F2	[Law 16]
+The law can't touch you.
+A3	Heavenly Beauty
+B3	[Beauty 10, All Social Skills 5]
+Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies.
+D3	[Seduction 13]
+Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies. Seduction checks can’t be denied because of a character’s sexual preference.
+F3	[All Social Skills 15]
+Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies. Seduction checks can’t be denied because of a character’s sexual preference. Some may assume you to be a
+A4	Letting Off Steam
+B4	[None]
+Successful intimidation skill checks reduce your strain by the score of the skill check -2.
+D4	[Survival 8, Fortitude 4]
+Successful intimidation skill checks reduce your strain by the score of the skill check -2 and you get +2 Strain reduction from alcohol.
+F4	[CHA 7]
+Successful intimidation skill checks reduce your strain by the score of the skill check -2 and you get +2 Strain reduction from alcohol. When your strain is 10 or higher, double your combat damage and reduce your strain by 4 when you make a s
+A5	You Have No Power Over Me!
+B5	[WIS 4]
+Others may not apply their beauty modifier to checks against you.
+D5	[WIS 5; INT 6]
+Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or seduced unless you allow it.
+F5	[WIS 6; INT 6; CHA 5]
+Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or seduced unless you allow it. Supernatural and magical effects used to control you have no effect.
+### SHEET: Magic
+A1	Chaotic Spark
+B1	[None]
+Add 3 levels to every school of magic. You can no longer spellweave and all woven spells you have are gone. When raw casting you can not choose what school to cast from, instead roll a 1d10 to determine what school of magic you will cast from.
+D1	-[]
+F1	-[]
+A2	Enchanted Performer
+B2	[None]
+You may use a performing arts skill to augment casting magic. Add half your skill level in the performing art rounded down to the magic skill check. The time required for casting is doubled.
+D2	-[]
+F2	-[]
+A3	Ritualist
+B3	[Supernatural Perception 10; Arcane Knowledge 10]
+You may destroy items in exchange for mana during spellcasting. This mana may not be stored. The mana recieved is detemined by the GM based on the items value grade and condition. The GM may also dete
+D3	-[]
+F3	-[]
+A4	Altruistic Spark
+B4	[Positive or Neutral Attunement]
+Monkey Paws from raw casting can only be directed at you.
+D4	-[]
+F4	-[]
+A5	Attunement (X)
+B5	[Replaces Feel the Esther Level 1; Must be gained through Root, Branch, Blossom, or GM awarded]
+You gain the ability to use magic and spellweave. Mercy, Severity or Balance attunement
+D5	-[]
+F5	-[]
+A6	Battery Body
+B6	[Any Domains of Magic Skill 4; Arcane Knowledge 5]
+You can store 5 mana within your body.
+D6	[Any Domains of Magic Skill 6; Arcane Knowledge 10]
+You can store 10 mana within your body.
+F6	[Any Domains of Magic Skill 8; Arcane Knowledge 15]
+You can store 15 mana within your body.
+A7	Blessed Arcana
+B7	[Must be gained through Root, Branch, Blossom, or GM awarded]
+You have a strong foundation in the arcane arts. You will take no negatives from the Understand the Esther blossom.
+D7	[Arcane Knowledge 6; Feel the Esther Level 1]
+You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Mercy Magic Skill
+F7	[Arcane Knowledge 10]
+You have a strong foundation in the holy arcane arts. You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Mercy Magic Skill. You will take no negatives from the Path to Attunement Blossom.  Additional
+A8	Demonic Arts
+B8	[Must be gained through Root, Branch, Blossom, or GM awarded]
+You can peform an ancient dark ritual to unlock a connection to the Esther. Remove 1 attribute point from a fellow party member as you perform the ritual to unlock the knowledge you seek. 
+D8	[Arcane Knowledge 6; Feel the Esther Level 1]
+You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Severity Magic Skill
+F8	[Arcane Knowledge 10]
+You have a strong foundation in the dark arts. You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Severity Magic Skill. With great sacrifice, you can gain your attunement through the suffering of tho
+A9	Esther Conduit
+B9	[Used 20 Mana]
+Whenever you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored and must be applied to the current casted spell or it burns up.
+D9	[Used 40 Mana]
+When you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. If someone else uses mana to cast a spell within 500 feet of you, you recieve half of the mana rounded up that they used which w
+E9	Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or seduced unless you allow it. Supernatural and magical effects used to control you have no effect.
+F9	[Used 60 Mana]
+When you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. If someone else uses mana to cast a spell within 500 feet of you,  you recieve half of the mana rounded up that they used which 
+A10	Feel the Esther
+B10	[Must be gained through Root, Branch, Blossom, or GM awarded]
+You can increase levels in the Domains of Magic Skills. (This doesn't give you the ability to cast or spellweave.)
+D10	-[]
+F10	-[]
+A11	Parsley, Sage, Rosemary, and Thyme
+B11	[Chemical Engineering 6; Arcane Knowledge 8]
+You may raw cast by sacrificing items. Using a magic action, you may destroy one undamaged item to cast from any school of magic. The value of the item is equal to the skill during casting. No mana from an
+D11	[Chemical Engineering 10; Arcane Knowledge 12]
+You may raw cast by sacrificing items. Using a magic action, you may destroy up to 2 undamaged item to cast from any school of magic. The combined value of the items is equal to the skill during casting.
+F11	[Chemical Engineering 12; Arcane Knowledge 16]
+You may raw cast by sacrificing items. Using a magic action, you may destroy up to 3 undamaged item to cast from any school of magic. The combined value of the items is equal to the skill during casting.
+A12	Sacred Exchange
+B12	[The Hunger or Arcane Knowledge 8]
+You may freely consume 1 available Mana to instantly regain 1 Fortitude.
+D12	-[]
+F12	-[]
+A13	Selfish Spark
+B13	[Negative or Neutral Attunement]
+Monkey Paws from raw casting can only be directed at others or the environment.
+D13	-[]
+F13	-[]
+A14	Karmic Power
+B14	[None]
+You may use Karma as if it was Mana stored in your body.
+D14	-[]
+F14	-[]
+A15	Don't Break My Concentration
+B15	[Arcane Knowledge 12]
+If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body.
+D15	[Supernatural Perception 12]
+If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body. Any mana you used for the spell is returned to you.
+F15	[Conviction 10]
+If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body. Any mana you used for the spell is returned to you. The spell is still dispel
+A16	Attunement Unlocked
+B16	[1 School of magic in your attunement pillar 20]
+You may roll an additional 1d10 when casting any spell in your pillar of attunement
+D16	[2 Schools of magic in your attunement pillar 20]
+You may roll an additional 1d12 when casting any spell in your pillar of attunement
+F16	[3 Schools of magic in your attunement pillar 20]
+You may roll an additional 1d20 when casting any spell in your pillar of attunement
+### SHEET: Supernatural
+A1	Ancient Soul
+B1	[None]
+This body may be new but your soul is very old. +1 Karma at the end of every session no matter what.
+D1	-[]
+F1	-[]
+A2	Born Evolved
+B2	[None]
+All attributes +1
+D2	-[]
+F2	-[]
+A3	Death's Hand
+B3	[Lifespan < 4 - Long]
+Increase Lifespan 2 ranks. If someone in your party must roll to defy death then you must also roll to defy death. You don't recieve a monkey paw but if you roll a 5 or lower then your character is doomed.
+D3	-[]
+F3	-[]
+A4	Eidetic Memory
+B4	[None]
+You remember everything you read, hear, or see in great detail with nearly perfect recollection. This should provide substantial bonuses in numerous occasions at GM's discretion. Also you no longer have to roll or spend karma to level up skill
+D4	-[]
+F4	-[]
+A5	Enthralling Aura
+B5	[None]
+Enthrall one being of DR of 11 or lower at a time. You have complete control over them. GM makes them a character sheet and plays them but you command them.
+D5	[Subsequent Earning]
+Enthrall one being of DR of 18 or lower at a time. You have complete control over them. GM makes them a character sheet and plays them but you command them.
+F5	[Subsequent Earning]
+Entrall any non player being. You have complete control over them. GM makes them a character sheet and plays them but you command them.
+A6	Flight
+B6	[None]
+You have the natural ability of flight. You can fly in any direction at your movement speed.
+D6	-[]
+F6	-[]
+A7	Healing Factor
+B7	[None]
+Worn body parts automaticaly heal in 6 seconds or one combat round.
+D7	[CON +4]
+Worn and broken body parts heal one condition in 6 seconds or one combat round.
+F7	[CON +6]
+Worn and broken body parts heal one condition in 6 seconds or one combat round. Destroyed body parts heal in 1 day.
+A8	Magic Negator (X)
+B8	[None]
+If (X) school of magic is used within 300 feet of you the spell is instantly countered and you have access to the mana used for that spell. You can store the mana in a catalyst or it must be used within 6 seconds or by the end of the next comb
+D8	-[]
+F8	-[]
+A9	Precognition
+B9	[None]
+You may at anytime ask the GM to have the last 10 minutes of game time be replayed. The events never happened; you just saw the future. You can't replay the same span of time twice.  (Can only be used once per session)
+D9	-[]
+F9	-[]
+A10	Proof (X)
+B10	[None]
+Your body is naturally immune to cold, fire, electricity, or acid
+D10	-[]
+F10	-[]
+A11	Shapeshifter
+B11	[None]
+You may change your apperance at will. You can't grow or shrink in size but everything else is free game. Changing is exhausting and every transformation reduces your Fortitude by 5. This can allow the user to change their Beauty stat.
+D11	-[]
+F11	-[]
+A12	The Hunger
+B12	Consume the Body: [None]
+Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude.
+D12	Drink the Spirit: [Subsequent Earning]
+Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude. Consuming a body gives you 
+F12	Savour the Soul: []
+Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude. When consuming a body you may choose to reciev
+A13	The Need for Speed
+B13	1.209 Gigawatts: [None]
++2 to APT; + 6 Speed Mod
+D13	Give Me Fuel, Give Me Fire: [Subsequent Earning]
++2 to APT; +6 Speed Mod; +8 Healing Mod;
+F13	Touch the Speed Force: [Subsequent Earning]
++2 to APT; +7 Speed Mod; +8 Healing Mod; Once a day you can move 99.99% the speed of light for a minute.
+A14	They're All Going to Laugh at You!
+B14	[None]
+You can create a medium size fire at will within 30 feet of you. In combat this can only be done once per round as an offesnive action. Damage from this fire is 15 Fire.
+D14	-[]
+F14	-[]
+A15	Undead
+B15	[None]
+CON levels are reduced to 0 and you can't gain CON. You can't die from having a 0 CON. Regen Mod is reduced to 0 and you can't raise it higher. +300 Stamina Mod.
+D15	-[]
+F15	-[]
+A16	Unnatural Existence
+B16	[None]
+You do not need to eat, drink, or sleep. You don't lose Fortitude from a lack of any of these things.
+D16	[CON +5]
+You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't lose Fortitude from a lack of any of these things.
+F16	[Immortal Life Span]
+You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't lose Fortitude from a lack of any of these things. The only way you can die is if your head is destroyed.
+A17	Voice of the Esther
+B17	[None]
+You are connected to everything around you, the elements speak to you, and let know you what is happening around you at all times.  You cannot be caught unaware.  Any trap/hidden object, creature, or person is known to you.
+D17	-[]
+F17	-[]
+A18	Leyline of Ascalia
+B18	[Special]
+There is a surplus of Mana to draw from this realm. Whenever anyone draws upon this leyline it gives 1d20 worth of mana to be used immedietly. The Mana given then goes down one tier of dice. It goes back up one tier everyday.
+D18	-[]
+F18	-[]
+A19	Iron Mind
+B19	[None]
+Your memory cannot be changed or altered by any outside force. You can vividly relive moments from your past and remember details you may not have conciously remembered.
+D19	-[]
+F19	-[]
+A20	Impossible Luck
+B20	[None]
++1 Mod to all Basic Skills
+D20	-[]
+F20	-[]
+A21	Esther Locked
+B21	[None]
+Magic that targets you automatically fails
+D21	-[]
+F21	-[]
+### SHEET: Negative
+A1	Allergic to (X)
+B1	[None]
+When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds).
+D1	[Subsequent Earning]
+When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds) and +2 DR to every roll.
+F1	[Subsequent Earning]
+When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds) and +2 DR to every roll. If X touches you it causes immediate Death.
+A2	Bad Blood with (X)
+B2	[None]
+The person or group doesn't trust you. +2 DR to all checks involved with influencing that person or group.
+D2	[Subsequent Earning]
+The person or group hates you. +4 DR to all checks involved with influencing that person or group, and they will be strongly urged to attack you and your party if they notice you.
+F2	[Subsequent Earning]
+You can't use social skills against this person or group and they will most certainly attack you on sight.
+A3	Bane (X)
+B3	[None]
+When you are within 100 feet of X all your skill rolls get a -5 mod and you lose 5 Fortitude every turn (6 Seconds).
+D3	-[]
+F3	-[]
+A4	Broken Heart
+B4	[Heart is Taken by (X) X Dies]
+Add +2 DR to all Skill Checks you perform. If the GM allows, you may replace this Exploit with a Level in Emotional Scars Exploit after some time has passed.
+D4	-[]
+F4	-[]
+A5	Emotional Baggage
+B5	[None]
+The horrors of your past are hard to let go. Strain reduction from sleep is halved rounded down.
+D5	-[]
+F5	-[]
+A6	Emotional Scars
+B6	[Replaces Emotional Baggage]
+Whatever happend to you left so much damage that when vulnerable you can't help but dwelling on your past wounds.  Strain reduction from sleep is halved rounded down and when Distressed double all Strain acquired.
+D6	-[]
+F6	-[]
+A7	Emotional Torment
+B7	[Replaces Emotional Scars]
+The pain is so bad that death is probably welcomed. Strain isn't reduced from sleep. When Distressed, double all Strain acquired.You may not attempt to defy death.
+D7	-[]
+F7	-[]
+A8	Heart is Taken by (X)
+B8	[None]
+Strain does not reduce from intimate enounters unless it is with the person who has taken your heart. If you are away from this person for more than a month then you'll receive 4 Strain at the end of every session until you see them again. If 
+D8	-[]
+F8	-[]
+A9	I'm Awkward
+B9	[None]
+Social ineptness is often a sign of a genius but it also means social situations are extremely taxing and hard to understand.
+Social Perception, and Social Skills cannot be purchased with karma; if you attempt to increase them with a training 
+D9	-[]
+F9	-[]
+A10	Impaired Taste
+B10	[None]
+Eating doesn't restore Fortitude
+D10	-[]
+F10	-[]
+A11	Karma is a Bitch
+B11	[None]
+Remove 1 Karma at the end of each session. This removal does not increase your KV. (This can take you into negative Karma)
+D11	-[]
+F11	-[]
+A12	Over-Thinker
+B12	[None]
+Exerting INT governed skill checks results in double the Strain.
+D12	-[]
+F12	-[]
+A13	Silver Spoon
+B13	[None]
+You are not used to getting your hands dirty or being uncomfortable. You lose double Fortitude whenever you Exert a Skill Check.
+D13	-[]
+F13	-[]
+A14	Stagnant Vitality
+B14	[None]
+Your Heal Rate is always effectively 0. You don't recover Fortitude from Sleeping.
+D14	-[]
+F14	-[]
+A15	Static
+B15	[None]
+All attributes are set to 2 and can't be changed by Roots, Branches, Blossoms, or Thorns
+D15	-[]
+F15	-[]
+A16	Strange Vibrations
+B16	[None]
+You can't use, resist, or gain any positive benefits from magic.
+D16	-[]
+F16	-[]
+A17	Strange Vibrations (Partial Supression)
+B17	[None]
+It is easier to cast negative spell targeting you and harder for possitive. -5 DR to negative spells targeting you. +5 DR to possitive spells targeting you.
+D17	-[]
+F17	-[]
+A18	Teetotaler
+B18	[None]
+You won't drink alcohol willingly. Drinking Alcohol doesn't restore Fortitude.
+D18	-[]
+F18	-[]
+A19	That's Mine!
+B19	[None]
+If you give something away you take strain equal to the value of the object/100.
+D19	-[]
+F19	-[]
+A20	Weak Weave Connection
+B20	[None]
+You may only Raw Cast Empowered Spells and lower (<30 DR). Woven Spells are unaffected.
+D20	-[]
+F20	-[]
+### SHEET: Racial
+A1	#REF!
+B1	#REF!
+C1	#REF!
+D1	#REF!
+E1	#REF!
+F1	#REF!
+G1	#REF!

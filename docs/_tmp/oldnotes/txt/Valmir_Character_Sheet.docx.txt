@@ -1,0 +1,83 @@
+CLASS & LEVEL PLAYER NAME 
+BACKGROUND 
+RACE 
+ALIGNMENT EXPERIENCE POINTS 
+CHARACTER NAME 
+STRENGTH 
+INSPIRATION 
+ARMOR CLASS 
+PROFICIENCY BONUS INITIATIVE SPEED 
+PERSONALITY TRAITS 
+DEXTERITY 
+CONSTITUTION INTELLIGENCE WISDOM 
+CHARISMA 
+Strength 
+Dexterity 
+Constitution 
+Intelligence 
+Wisdom 
+Charisma 
+SAVING THROWS 
+Acrobatics (Dex) 
+Animal Handling (Wis) 
+Arcana (Int) 
+Athletics (Str) 
+Deception (Cha) 
+History (Int) 
+Insight (Wis) 
+Intimidation (Cha) 
+Investigation (Int) 
+Medicine (Wis) 
+Nature (Int) 
+Perception (Wis) 
+Performance (Cha) 
+Persuasion (Cha) 
+Religion (Int) 
+Sleight of Hand (Dex) 
+Stealth (Dex) 
+Survival (Wis) 
+SKILLS
+PASSIVE WISDOM (PERCEPTION) 
+Hit Point Maximum 
+CURRENT HIT POINTS 
+TEMPORARY HIT POINTS 
+Total SUCCESSES FAILURES 
+HIT DICE DEATH SAVES 
+NAME ATK BONUS DAMAGE/TYPE 
+ATTACKS & SPELLCASTING 
+CP 
+SP 
+EP 
+GP 
+PP 
+IDEALS BONDS FLAWS 
+OTHER PROFICIENCIES & LANGUAGES EQUIPMENT 
+FEATURES & TRAITS 
+TM & © 2014 Wizards of the Coast LLC. Permission is granted to photocopy this document for personal use. 
+AGE HEIGHT WEIGHT 
+CHARACTER NAME EYES CHARACTER APPEARANCE 
+SKIN HAIR 
+NAME 
+SYMBOL 
+ALLIES & ORGANIZATIONS 
+ADDITIONAL FEATURES & TRAITS 
+CHARACTER BACKSTORY TREASURE TM & © 2014 Wizards of the Coast LLC. Permission is granted to photocopy this document for personal use.
+0 
+SPELL 
+SPELLCASTING 
+CLASS 
+CANTRIPS
+SPELLCASTING 
+ABILITYSPELL SAVE DC SPELL ATTACK BONUS 
+3 6 
+LEVEL SLOTS TOTAL SLOTS EXPENDED 
+1 
+7 
+PSPELL NAME REPARED 
+4 
+SPELLS KNOWN 
+8 
+2 
+5 
+9 
+TM & © 2014 Wizards of the Coast LLC. Permission is granted to photocopy this document for personal use. 
