@@ -88,7 +88,9 @@ export default function EncounterPanel({
     try {
       const j = await api('');
       setList(j.encounters ?? []);
-      const live = (j.encounters ?? []).find((e: { status: string }) => e.status === 'ACTIVE' || e.status === 'PAUSED') ?? (j.encounters ?? [])[0];
+      // Only a live (ACTIVE/PAUSED) encounter auto-opens; resolved ones stay
+      // in the list as buttons so "resolve" really returns to the create form.
+      const live = (j.encounters ?? []).find((e: { status: string }) => e.status === 'ACTIVE' || e.status === 'PAUSED');
       if (live) {
         const d = await api(`/${live.id}`);
         setEnc(d.encounter);
