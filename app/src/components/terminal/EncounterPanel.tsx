@@ -19,7 +19,9 @@ interface Participant {
   id: string; name: string; side: string; control: 'player' | 'gm' | 'branch';
   pools: Record<Pillar, number>; gauges: { celerity: number; frequency: number; wisdom: number };
   skills: Array<{ name: string; level: number; governors: string[] }>;
-  heldItemName: string | null; heldResist: number; downed: boolean;
+  attrs?: Record<string, { current: number; max: number }>;
+  fateDie?: string;
+  heldItemName: string | null; heldResist: number; heldCondition?: number; downed: boolean;
 }
 interface LogEntry { slot: number; kind: string; actorId: string | null; targetId: string | null; text: string }
 interface RoundResult { round: number; log: LogEntry[]; downed: string[] }
@@ -35,7 +37,7 @@ interface Encounter {
 }
 interface IntentionDraft {
   pillar: Pillar; kind: Kind; description: string; skillName?: string; targetId?: string;
-  damageType?: 'bashing' | 'slashing' | 'piercing'; baseDamage?: number; redirectTo?: string;
+  damageType?: 'bashing' | 'slashing' | 'piercing'; baseDamage?: number; redirectTo?: string; effort?: number;
 }
 
 const KINDS: Kind[] = ['attack', 'skill', 'move', 'negate', 'block', 'reserve', 'hold'];
@@ -187,8 +189,14 @@ export default function EncounterPanel({
             <span style={{ color: '#888' }}>{p.control}</span>
             <span>B{p.pools.body} S{p.pools.spirit} So{p.pools.soul}</span>
             <span style={{ color: '#888' }}>cel {p.gauges.celerity} · frq {p.gauges.frequency} · wis {p.gauges.wisdom}</span>
-            {p.heldItemName && <span style={{ color: '#888' }}>holds {p.heldItemName} (r{p.heldResist})</span>}
+            {p.attrs?.frequency && <span style={{ color: p.attrs.frequency.current <= 0 ? '#f7525f' : '#D0A030' }}>Frequency {p.attrs.frequency.current}/{p.attrs.frequency.max}</span>}
+            {p.heldItemName && <span style={{ color: '#888' }}>holds {p.heldItemName} (r{p.heldResist}{p.heldCondition !== undefined ? `, c${p.heldCondition}` : ''})</span>}
             {p.downed && <span style={{ color: '#f7525f' }}>DOWN</span>}
+            {enc.status === 'ACTIVE' && (
+              <button style={btn()} onClick={() => run('downed', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ participantId: p.id, downed: !p.downed }) })).encounter))}>
+                {p.downed ? 'stand up' : 'put down'}
+              </button>
+            )}
             {declaredFor(p.id) > 0 && <span style={{ color: '#D0A030' }}>declared {declaredFor(p.id)}</span>}
             {enc.state.lastPlan[p.id] && <span style={{ color: '#666' }}>last: {enc.state.lastPlan[p.id].source}{enc.state.lastPlan[p.id].note ? ` — ${enc.state.lastPlan[p.id].note}` : ''}</span>}
           </div>
@@ -222,8 +230,13 @@ export default function EncounterPanel({
                 <select style={field} value={d.damageType ?? 'bashing'} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, damageType: e.target.value as IntentionDraft['damageType'] } : x))}>
                   {['bashing', 'slashing', 'piercing'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <input style={{ ...field, width: 44 }} type="number" min={1} max={20} value={d.baseDamage ?? 2} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, baseDamage: Number(e.target.value) } : x))} />
+                <input style={{ ...field, width: 44 }} type="number" min={1} max={20} title="base damage" value={d.baseDamage ?? 2} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, baseDamage: Number(e.target.value) } : x))} />
               </>)}
+              {(d.kind === 'attack' || d.kind === 'skill' || d.kind === 'negate' || d.kind === 'block') && (
+                <label style={{ color: '#888', fontSize: 11 }}>
+                  effort <input style={{ ...field, width: 40 }} type="number" min={0} max={50} value={d.effort ?? 0} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, effort: Number(e.target.value) || 0 } : x))} />
+                </label>
+              )}
               <button style={btn()} onClick={() => setDrafts(ds => ds.filter((_, j) => j !== i))}>×</button>
             </div>
           ))}
@@ -231,7 +244,13 @@ export default function EncounterPanel({
             <button style={btn()} onClick={() => setDrafts(ds => [...ds, { pillar: 'body', kind: 'attack', description: '', damageType: 'bashing', baseDamage: 2, redirectTo: selected.heldResist > 0 ? 'held' : undefined }])}>+ action</button>
             <button
               style={btn(true)}
-              disabled={!!busy || drafts.length === 0 || drafts.some(d => !d.description)}
+              disabled={
+                !!busy || drafts.length === 0
+                || drafts.some(d => !d.description)
+                || drafts.some(d => (d.kind === 'attack' || d.kind === 'negate') && !d.targetId)
+                || drafts.some(d => d.kind === 'negate' && !d.skillName)
+                || PILLARS.some(pl => draftCounts[pl] > selected.pools[pl])
+              }
               onClick={() => run('declare', async () => {
                 const j = await api(`/${enc.id}/intentions`, { method: 'POST', body: JSON.stringify({ participantId: selected.id, intentions: drafts }) });
                 setEnc(j.encounter); setDrafts([]);

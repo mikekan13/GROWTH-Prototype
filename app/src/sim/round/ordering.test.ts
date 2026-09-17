@@ -2,11 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { orderSlots, speedScore } from './ordering';
 import type { Intention, Participant } from './types';
 
+const attrs = (): Participant['attrs'] => ({
+  clout: { current: 0, max: 0 }, celerity: { current: 0, max: 0 }, constitution: { current: 0, max: 0 },
+  flow: { current: 0, max: 0 }, frequency: { current: 0, max: 0 }, focus: { current: 0, max: 0 },
+  willpower: { current: 0, max: 0 }, wisdom: { current: 0, max: 0 }, wit: { current: 0, max: 0 },
+});
 function participant(id: string, gauges: Participant['gauges'], skills: Participant['skills'] = []): Participant {
   return {
     id, name: id, side: 'x', control: 'branch',
     pools: { body: 1, spirit: 1, soul: 1 }, actionMod: 0, gauges, skills,
-    fateDie: 'd8', heldResist: 0, heldItemName: null, downed: false,
+    fateDie: 'd8', attrs: attrs(), heldResist: 0, heldBaseResist: 0, heldCondition: 0, heldItemId: null, heldItemName: null, downed: false,
   };
 }
 function intention(id: string, participantId: string, pillar: Intention['pillar'], skillName?: string): Intention {
@@ -41,6 +46,15 @@ describe('layer 3 — governor tiers', () => {
     const wisOnly = speedScore({ participant: p, intention: intention('c', 'p', 'soul', 'Insight') }).score;
     expect(viaSpirit).toBeGreaterThan(viaSoul);
     expect(wisOnly).toBeGreaterThan(viaSoul);
+  });
+});
+
+describe('layer 3 — unskilled actions', () => {
+  it('an unskilled action sits in the slow tier — slower than a Celerity-only skill at equal gauges', () => {
+    const p = participant('p', { celerity: 20, frequency: 20, wisdom: 20 }, [{ name: 'Sprint', level: 3, governors: ['celerity'] }]);
+    const unskilled = speedScore({ participant: p, intention: intention('u', 'p', 'body') }).score;
+    const celOnly = speedScore({ participant: p, intention: intention('s', 'p', 'body', 'Sprint') }).score;
+    expect(celOnly).toBeGreaterThan(unskilled);
   });
 });
 

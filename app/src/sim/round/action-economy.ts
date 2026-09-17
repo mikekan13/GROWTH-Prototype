@@ -12,9 +12,52 @@
  *    3 = Celerity only; 4+ = any other mix, more governors = slower.
  */
 import type { GrowthAttribute, GrowthAttributes, GrowthCharacter, GrowthSkill } from '@/types/growth';
-import type { ActionPools, Governor, ParticipantSkill, Pillar, SpeedGauges } from './types';
+import type { ActionPools, AttrKey, FateDie, Governor, Participant, ParticipantSkill, Pillar, SpeedGauges } from './types';
+import { ATTR_KEYS } from './types';
 
 export const ACTION_DIVISOR = 25;
+
+export const FATE_DIE_MAX: Record<FateDie, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
+
+/**
+ * Canon (GROWTH-DESIGN-TRUTH §Resolution): max Effort on a roll = Fate Die
+ * max + Skill Level (skilled) / Fate Die max only (unskilled).
+ */
+export function effortCap(fateDie: FateDie, skillLevel: number | null): number {
+  return FATE_DIE_MAX[fateDie] + (skillLevel ?? 0);
+}
+
+/** Snapshot of every attribute pool (current / max) from a sheet. Frequency has no augments. */
+export function attributeSnapshot(sheet: Pick<GrowthCharacter, 'attributes'> | undefined): Participant['attrs'] {
+  const a = sheet?.attributes;
+  const out = {} as Participant['attrs'];
+  for (const key of ATTR_KEYS) {
+    if (key === 'frequency') {
+      out[key] = { current: a?.frequency?.current ?? 0, max: a?.frequency?.level ?? 0 };
+    } else {
+      const attr = a?.[key];
+      out[key] = { current: attr?.current ?? 0, max: poolMax(attr) };
+    }
+  }
+  return out;
+}
+
+/**
+ * Canon (Combat_Grid_System): Effort wagered on a roll must come from the
+ * SAME pillar's attribute pool as the action spent. Eligible governors = the
+ * skill's governors that belong to the action's pillar; unskilled = the
+ * pillar's own attributes (Frequency never — it is the life pool).
+ */
+export function eligibleEffortAttributes(pillar: Pillar, skill: ParticipantSkill | null): Governor[] {
+  const pillarAttrs = PILLAR_ATTRIBUTES[pillar].filter(k => k !== 'frequency') as Governor[];
+  if (!skill) return pillarAttrs;
+  const eligible = skill.governors.filter(g => pillarAttrs.includes(g));
+  return eligible.length ? eligible : pillarAttrs;
+}
+
+export function isAttrKey(s: string): s is AttrKey {
+  return (ATTR_KEYS as string[]).includes(s);
+}
 
 export const PILLAR_ATTRIBUTES: Record<Pillar, Array<keyof GrowthAttributes>> = {
   body: ['clout', 'celerity', 'constitution'],

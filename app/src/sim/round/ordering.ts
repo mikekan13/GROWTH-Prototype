@@ -43,13 +43,14 @@ export function speedScore(input: SpeedInput): { score: number; trace: string } 
   const bias = PILLAR_BIAS[intention.pillar];
   let score = gauge * bias;
   let trace = `L2 ${intention.pillar} gauge ${gauge} × bias ${bias}`;
-  if (intention.skillName) {
-    const skill = p.skills.find(s => s.name === intention.skillName);
-    const tier = governorTier(skill?.governors);
-    const mult = Math.max(0.2, 1 - (tier - 1) * GOVERNOR_TIER_STEP);
-    score *= mult;
-    trace += ` · L3 governor tier ${tier} ×${mult.toFixed(2)}`;
-  }
+  // Layer 3 applies to every action: an UNSKILLED action has no governors and
+  // sits in the slow "any other mix" tier — an untrained flail is not faster
+  // than a trained strike.
+  const skill = intention.skillName ? p.skills.find(s => s.name === intention.skillName) : undefined;
+  const tier = governorTier(skill?.governors);
+  const mult = Math.max(0.2, 1 - (tier - 1) * GOVERNOR_TIER_STEP);
+  score *= mult;
+  trace += ` · L3 ${skill ? `governor tier ${tier}` : 'unskilled (tier 4)'} ×${mult.toFixed(2)}`;
   if (mod) {
     score += mod;
     trace += ` · L4 +${mod}`;

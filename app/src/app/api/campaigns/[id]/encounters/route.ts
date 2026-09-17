@@ -5,12 +5,13 @@ import { createEncounter, createEncounterSchema, listEncounters } from '@/servic
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/campaigns/[id]/encounters — list this campaign's encounters.
+// GET /api/campaigns/[id]/encounters — list this campaign's encounters (GM or member).
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const { id: campaignId } = await params;
-    return NextResponse.json({ encounters: await listEncounters(campaignId) });
+    const encounters = await listEncounters(campaignId, { userId: session.user.id, username: session.user.username, role: session.user.role });
+    return NextResponse.json({ encounters });
   } catch (error) {
     return errorResponse(error);
   }

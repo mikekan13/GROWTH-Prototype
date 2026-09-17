@@ -30,6 +30,10 @@ export type Governor =
   | 'flow' | 'focus'
   | 'willpower' | 'wisdom' | 'wit';
 
+export type AttrKey = Governor | 'frequency';
+
+export const ATTR_KEYS: AttrKey[] = ['clout', 'celerity', 'constitution', 'flow', 'frequency', 'focus', 'willpower', 'wisdom', 'wit'];
+
 export interface ParticipantSkill {
   name: string;
   level: number;
@@ -38,10 +42,12 @@ export interface ParticipantSkill {
 
 export type Control = 'player' | 'gm' | 'branch';
 
+export type FateDie = 'd4' | 'd6' | 'd8' | 'd12' | 'd20';
+
 /**
  * Snapshot of one participant for the round engine. Built from the character
- * sheet at encounter creation and refreshed each round (pools are levels-
- * derived so they don't move; `downed` and `actionsRemaining` do).
+ * sheet at encounter creation and refreshed after every round (attribute
+ * currents move with Effort spend and attribute damage).
  */
 export interface Participant {
   id: string;            // characterId
@@ -52,9 +58,16 @@ export interface Participant {
   actionMod: number;     // items/Nectars/conditions — v0 always 0 (layer 4 hook)
   gauges: SpeedGauges;
   skills: ParticipantSkill[];
-  fateDie: 'd4' | 'd6' | 'd8' | 'd12' | 'd20';
-  /** Base resist of a held interposable item (shield etc.) — v0 reads the first held item with baseResist. */
+  fateDie: FateDie;
+  /** Attribute pools (current / max) — Effort is wagered from these; Frequency is the life pool. */
+  attrs: Record<AttrKey, { current: number; max: number }>;
+  /** EFFECTIVE resist of the held interposable item (base, halved when Broken, 0 when Destroyed). */
   heldResist: number;
+  /** The item's base resist (condition-independent). */
+  heldBaseResist: number;
+  /** Condition tier 0–4 (4 Indestructible, 3 Undamaged, 2 Worn, 1 Broken, 0 Destroyed). */
+  heldCondition: number;
+  heldItemId: string | null;
   heldItemName: string | null;
   downed: boolean;
 }
@@ -76,15 +89,17 @@ export interface Intention {
   pillar: Pillar;
   kind: IntentionKind;
   description: string;
-  /** Skill used, if any (must exist on the participant's sheet). */
+  /** Skill used, if any (must exist on the participant's sheet and be usable from `pillar`). */
   skillName?: string;
   /** Target participant for attack / negate / block-against. */
   targetId?: string;
   /** Attack fields (v0: the sim has no weapon model yet — declared on the intention). */
   damageType?: DamageType;
   baseDamage?: number;
-  /** Effort wagered from the governing attribute pool (v0: informational; persisted spend comes in Unit 2). */
+  /** Effort wagered (canon: ALWAYS spent, from a governor of the action's pillar; capped by FD max + skill level). */
   effort?: number;
+  /** Which attribute the Effort comes from — must belong to the action's pillar. Defaults at declare time. */
+  effortAttribute?: Governor;
   /** Piercing only: partName path below the root the attacker designates. */
   piercingTargetPath?: string[];
   /**
@@ -119,7 +134,7 @@ export interface OrderedSlot {
 }
 
 export type RoundLogKind =
-  | 'order' | 'action' | 'check' | 'negate' | 'redirect' | 'block'
+  | 'order' | 'action' | 'check' | 'effort' | 'negate' | 'redirect' | 'block'
   | 'damage' | 'downed' | 'skip' | 'note';
 
 export interface RoundLogEntry {
@@ -128,14 +143,16 @@ export interface RoundLogEntry {
   actorId: string | null;
   targetId: string | null;
   text: string;
-  /** Structured detail (rolls, totals, damage events) for replay and memory. */
+  /** Structured detail (rolls, totals, damage events) for replay. */
   detail?: Record<string, unknown>;
+  /** Diegetic line — what a witness perceives, no numbers. This is what enters memory ledgers. */
+  narration?: string;
 }
 
 export interface RoundResult {
   round: number;
   slots: OrderedSlot[];
   log: RoundLogEntry[];
-  /** Participants downed during this round (vital destroyed or Frequency ≤ 0). */
+  /** Participants downed during this round (vital destroyed or Frequency crossed to ≤ 0). */
   downed: string[];
 }
