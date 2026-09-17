@@ -53,15 +53,19 @@ export const withdrawDraftTool: JewlTool = {
       throw new Error('You can only withdraw drafts you authored.');
     }
 
+    // Free the name slot (@@unique includes name) so a future re-proposal
+    // never collides with this tombstone; original name kept in the tag.
     await prisma.forgeItem.update({
       where: { id: item.id },
       data: {
         status: 'superseded',
+        name: `${item.name} [w:${item.id.slice(-4)}]`,
         relationshipTags: JSON.stringify({
           withdrawn: {
             by: 'JEWL',
             reason: parsed.reason ?? null,
             at: new Date().toISOString(),
+            originalName: item.name,
           },
         }),
       },

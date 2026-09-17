@@ -25,7 +25,7 @@ import {
   type ClaudeToolSpec,
 } from '../providers/claude-tools';
 import { broadcastEvent } from '@/lib/campaign-stream';
-import { resolveLane, workCycleLane, recordAiCall, recordTrace } from '@/ai/network';
+import { resolveLane, workCycleLane, tableLane, recordAiCall, recordTrace } from '@/ai/network';
 
 // System prompt is versioned (T18): src/ai/copilot/prompts/system/
 // v2 encodes the 15 behavioral laws from JEWL_Golden_Voice_Dataset_Seed.md.
@@ -268,8 +268,11 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // Lane resolution (ai/network): work cycles route through workCycleLane()
   // — 'judgment' (Sonnet) by default, flippable to 'grunt' (Haiku) via
   // JEWL_WORK_CYCLE_LANE once the cheap lane is proven on cycle chores.
+  // Table-facing dispatches (GM_TEXT, voice, ambient — raw play content)
+  // route through tableLane(): 'judgment' by default, 'local' under the
+  // privacy-wall play configuration (JEWL_TABLE_LANE=local).
   const isWorkCycle = prompt.source === 'JEWL_WORK_CYCLE';
-  const lane = isWorkCycle ? workCycleLane() : ('judgment' as const);
+  const lane = isWorkCycle ? workCycleLane() : tableLane();
   const resolvedLane = resolveLane(lane);
 
   // 2. Conversation history — now timestamped. Each row carries createdAt
@@ -358,8 +361,23 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     } catch { /* best-effort */ }
   };
 
+  // Transport switch: openai-compat lanes (local — inside the privacy
+  // wall) run the same tool loop through callLocalWithTools; everything
+  // else stays on the Anthropic path.
+  const callModel = resolvedLane.provider === 'openai-compat'
+    ? async (o: Parameters<typeof callClaudeWithTools>[0]) => {
+        const { callLocalWithTools } = await import('../providers/local-tools');
+        return callLocalWithTools({
+          ...o,
+          model: resolvedLane.model,
+          baseUrl: resolvedLane.baseUrl!,
+          apiKey: resolvedLane.apiKey,
+        });
+      }
+    : callClaudeWithTools;
+
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
-    const result = await callClaudeWithTools({
+    const result = await callModel({
       systemPrompt: fullSystemPrompt,
       messages,
       tools,

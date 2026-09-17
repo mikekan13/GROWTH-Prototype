@@ -57,6 +57,15 @@ export function workCycleLane(): LaneName {
   return env('JEWL_WORK_CYCLE_LANE') === 'grunt' ? 'grunt' : 'judgment';
 }
 
+/** Which lane TABLE-FACING dispatches run on (GM_TEXT, voice, ambient —
+ *  everything that carries raw play content). Default 'judgment'; set
+ *  JEWL_TABLE_LANE=local for blind-play/privacy-wall operation (Mike
+ *  directive 2026-08-29: the local model fronts play upfront; Claude is
+ *  reachable only through the sanitize membrane). */
+export function tableLane(): LaneName {
+  return env('JEWL_TABLE_LANE') === 'local' ? 'local' : 'judgment';
+}
+
 export interface LocalLaneConfig {
   baseUrl: string;
   model: string;

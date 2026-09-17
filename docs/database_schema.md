@@ -502,3 +502,17 @@ Durable JEWL job worked across message boundaries; the work-loop fires cycles wh
 - `continueUnattended`: GM answered the spoken hand-off question yes → cycles run with no client connected
 - `cycleCount`/`lastCycleAt` (loop bookkeeping; round-robin ordering), `startedAt`/`endedAt`, `createdBy`, `blockedReason`
 - Indexes: `[status, lastCycleAt]`, `[campaignId, status]`. No Campaign relation field (scalar campaignId only).
+
+## Encounter (Unit 1, migration 20260905095440_encounter_unit1)
+| Field | Type | Notes |
+|---|---|---|
+| id | String | cuid |
+| campaignId | String | FK Campaign |
+| name | String | |
+| status | String | PLANNED / ACTIVE / PAUSED / RESOLVED |
+| round | Int | rounds completed |
+| locationId | String? | reserved (Location link; unused in v0) |
+| state | String | JSON<EncounterState> — participants[], intentions[] (next round), sceneNarration, rounds[] (RoundResult log), lastPlan{} |
+| createdBy | String | user id |
+
+`EncounterState` is defined in `src/sim/encounter/state.ts`; participants/intentions become rows when the canvas card needs them. Each run round also writes a `CampaignEvent` (type game_event, eventType encounter_round) and one `DayaMemoryEntry` (source perception) per participant that has a DayaEntity.
