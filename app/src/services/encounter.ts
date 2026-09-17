@@ -77,6 +77,8 @@ export const intentionInputSchema = z.object({
   targetId: z.string().optional(),
   damageType: z.enum(['piercing', 'slashing', 'bashing', 'heat', 'cold', 'decay', 'energy']).optional(),
   baseDamage: z.number().int().min(1).max(20).optional(),
+  /** Situational DR (GM's call in v0). */
+  dr: z.number().int().min(1).max(60).optional(),
   effort: z.number().int().min(0).max(50).optional(),
   effortAttribute: z.enum(governors).optional(),
   piercingTargetPath: z.array(z.string()).optional(),
@@ -277,13 +279,13 @@ export async function setEncounterStatus(encounterId: string, actor: EncounterAc
  */
 export async function declareIntentions(encounterId: string, actor: EncounterActor, input: z.infer<typeof declareIntentionsSchema>) {
   const enc = await loadEncounter(encounterId);
+  const { isGm } = await requireCampaignAccess(enc.campaignId, actor); // outsiders learn nothing, not even participant ids
   if (enc.status !== 'ACTIVE') throw new ValidationError('Encounter is not active');
   const state = parseState(enc.state);
   const participant = state.participants.find(p => p.id === input.participantId);
   if (!participant) throw new NotFoundError('Participant not in this encounter');
   if (participant.downed) throw new ValidationError(`${participant.name} is down`);
 
-  const isGm = canManageCampaign(actor.userId, actor.role, enc.campaign);
   const owned = await prisma.character.findFirst({ where: { id: participant.id, userId: actor.userId }, select: { id: true, data: true } });
   if (!isGm && !owned) throw new ForbiddenError('You can only declare for your own character');
 
@@ -345,6 +347,7 @@ export async function declareIntentions(encounterId: string, actor: EncounterAct
       targetId: i.targetId,
       damageType: i.damageType,
       baseDamage: i.baseDamage,
+      dr: isGm ? i.dr : undefined, // only the GM sets difficulty
       effort: effort || undefined,
       effortAttribute,
       piercingTargetPath: i.piercingTargetPath,
@@ -353,7 +356,8 @@ export async function declareIntentions(encounterId: string, actor: EncounterAct
   });
 
   state.intentions = state.intentions.filter(i => i.participantId !== participant.id).concat(out);
-  state.lastPlan[participant.id] = { source: owned ? 'player' : 'gm' };
+  // A declaration for a PC by its owner is the player's; anything else (GM for an NPC, GM overriding a PC) is the GM's override.
+  state.lastPlan[participant.id] = { source: participant.control === 'player' && owned && !isGm ? 'player' : isGm ? 'gm' : 'player' };
   await prisma.encounter.update({ where: { id: encounterId }, data: { state: serialize(state) } });
   return getEncounter(encounterId, actor);
 }
@@ -507,8 +511,9 @@ export async function runRound(encounterId: string, actor: EncounterActor) {
     const freqAfter = pool.characterData.attributes?.frequency?.current ?? 0;
     const freqBefore = state.participants.find(p => p.id === targetId)?.attrs.frequency.current ?? 0;
     const crossed = freqBefore > 0 && freqAfter <= 0;
-    const poolNote = pool.changes.length ? pool.changes.join('; ') : `${target} −${amount}`;
-    const sheetNote = freqBefore <= 0 && !crossed ? ' [no Frequency on this sheet — cannot fall further]' : '';
+    const noPools = pool.changes.some(ch => /^Unknown attribute/.test(ch));
+    const poolNote = noPools ? `${target} pool: none on this sheet` : pool.changes.length ? pool.changes.join('; ') : `${target} −${amount}`;
+    const sheetNote = !noPools && freqBefore <= 0 && !crossed ? ' [no Frequency on this sheet — cannot fall further]' : '';
     // Keep the in-memory snapshot honest for later hits this round.
     const p = state.participants.find(x => x.id === targetId);
     if (p) p.attrs = { ...p.attrs, [target]: { ...p.attrs[target], current: pool.characterData.attributes?.[target]?.current ?? 0 }, frequency: { ...p.attrs.frequency, current: freqAfter } };

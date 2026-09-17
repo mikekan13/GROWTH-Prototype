@@ -96,6 +96,8 @@ export interface Intention {
   /** Attack fields (v0: the sim has no weapon model yet — declared on the intention). */
   damageType?: DamageType;
   baseDamage?: number;
+  /** Situational DR for attack/skill checks — the GM's call in v0 (default DEFAULT_DR); the sim derives it later. */
+  dr?: number;
   /** Effort wagered (canon: ALWAYS spent, from a governor of the action's pillar; capped by FD max + skill level). */
   effort?: number;
   /** Which attribute the Effort comes from — must belong to the action's pillar. Defaults at declare time. */

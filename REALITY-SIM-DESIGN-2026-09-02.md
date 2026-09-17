@@ -447,10 +447,59 @@ heuristic fallback); senses = raw field + free salience; the round is
 recorded as canon (game_event + SSE), the clock moves one round, and every
 participating DayaEntity receives the round as a perception memory.
 
+### 10.1 Conformance pass (2026-09-17, self-verification before Mike's test)
+
+An independent rules audit + Claude's own re-read found and fixed:
+- **Effort** is now ALWAYS spent from a governor of the action's pillar
+  (canon §5), capped at FD max + skill level, refused while Muted (Focus at
+  0), validated against the live pool at declare time. Verified in-browser:
+  "Danny is Muted (Focus at 0) — no Effort can be added".
+- **Both canon damage paths run per hit**: the body cascade (parts, armor,
+  vital → Facing Death) AND the Affinity Cycle attribute pool (natural
+  target of the damage type; overflow → Frequency; Frequency CROSSING to
+  ≤ 0 = downed + Facing Death). **[QUESTION for Mike]** how the two couple:
+  v0 sends the amount that got past the declared defenses to both; if
+  body-part absorption should also shield the pool, that is one line in
+  `services/encounter.ts`.
+- **Interposed items wear** (canon tiers; a hit reaching the effective
+  resist drops one tier, 3× destroys; Broken = half resist) and persist.
+- **Redirect requires an UNSPENT action** — a reserve kept in hand counts
+  even after its slot passed; an action already used does not.
+- **Speed gate**: defender advantage ×1.5 (beats the largest pillar bias at
+  equal gauges); a near-miss (≥0.8) still allows a CONSTRAINED pick (held
+  item only). Tuning knobs, not canon.
+- A weak negate never lowers DR below the situational floor; a negate that
+  can't apply (no shared governor) stays in hand; a negate must be a skill.
+  **[QUESTION]** unskilled attacks: v0 lets a negate skill with a governor
+  in the attack's pillar apply (reality default) — is that the rule?
+- Unskilled actions sit in the slow governor tier (an untrained flail is not
+  faster than a trained strike).
+- Declare-time rules: cross-pillar (skill only from a pillar it has a
+  governor in), unskilled attacks are Body/Spirit, block needs a held item,
+  no self-target, redirect = held item only in v0.
+- **Situational DR is the GM's call in v0** (`dr` on an attack/skill
+  intention, default 10); the sim derives it in a later unit.
+- **Secrecy**: encounter reads need GM or campaign membership; members see
+  the shared record but only their own characters' intentions/plans.
+- **Memory is sense-limited and diegetic**: every consequential log entry
+  carries a numberless narration; a being's ledger gets the narration up to
+  the slot it went down, gated by working eye/ear parts; no round numbers,
+  rolls, or DRs ever enter a ledger.
+- Per-action error resilience: the record is always complete and persisted.
+- GM can stand a participant back up after Facing Death (PATCH downed).
+- DiceOverlayLoader 6 s safety net (a headless run showed the loading
+  screen could hold the page hostage when no canvas was mounted).
+
+Verified live 2026-09-17 in the Incubator (Danny vs Mr. Carrasco, thin
+sheets): 3 rounds, illegal declarations refused, forced hit ran both damage
+paths, memories diegetic, member view redacted, non-member 403, resolve
+final. Known data limit: the genesis NPCs have NO attributes/skills, so
+every gauge is 0 and an unaided d8 cannot reach DR 10 — use the DR field.
+
 Deferred to Unit 2+: mid-round reactive changes (one free change / reserve
 priority loss — v0 defenses are readied at Intention), grapple hold +
 re-roll, weapons carrying damage/reload (v0: damage rides the intention),
-DR derived by the sim (v0: DR 10 reality default), grid/positions, the
+DR derived by the sim, redirect onto a named body part (routing for
+non-piercing types), ActionMod from items/armor, grid/positions, the
 faculties as separate workers, the outward wave, player-side declaration
-UI, the canvas encounter card, Frequency overflow → downed (v0: vital
-part destroyed only).
+UI, the canvas encounter card.

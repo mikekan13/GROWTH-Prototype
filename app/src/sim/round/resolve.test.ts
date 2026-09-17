@@ -237,7 +237,14 @@ describe('resolveRound', () => {
     expect(r.log.filter(l => l.kind === 'order').length).toBe(4);
   });
 
-  it('default DR is the v0 reality fallback', () => {
+  it('default DR is the v0 reality fallback; the GM may set a situational DR on the intention', async () => {
     expect(DEFAULT_DR).toBe(10);
+    const sink = damageSink();
+    const r = await run([p('A', { gauges: { celerity: 60, frequency: 5, wisdom: 5 } }), p('B', { gauges: { celerity: 5, frequency: 5, wisdom: 5 } })], [atk('a1', 'A', 'B', { dr: 4 })], fixedCheck({ A: 6, B: 5 }), sink.fn);
+    expect(sink.calls[0]?.amount).toBe(4); // 2 base + margin 2 over DR 4
+    expect(r.log.find(l => l.kind === 'check')?.text).toMatch(/vs DR 4 → HIT/);
+    // narration never doubles the target name when the description already carries it
+    const r2 = await run([p('A', { gauges: { celerity: 60, frequency: 5, wisdom: 5 } }), p('B', { gauges: { celerity: 5, frequency: 5, wisdom: 5 } })], [atk('a1', 'A', 'B', { description: 'strikes at B' })], fixedCheck({ A: 6, B: 5 }), sink.fn);
+    expect(r2.log.find(l => l.kind === 'check')?.narration).toBe('A strikes at B — it misses');
   });
 });

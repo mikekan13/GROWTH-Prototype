@@ -7,11 +7,12 @@
  * NOTICING is conscious effort — a skill check, an action. Involuntary
  * salience (a bang, sudden movement) pops out for free.
  *
- * v0 filters by body only coarsely: an entity with no sighted head region is
+ * v0 filters by body only coarsely: an entity with no working eye/ear part is
  * told so. Everything else at the scene is in the field (theater-of-mind
- * encounter; no grid positions yet). The field is deliberately plain text —
- * it is what the branch's Spirit prompt reads and what gets ledgered as the
- * perception memory, so it must contain nothing the body could not sense.
+ * encounter; no grid positions yet). The field is deliberately plain,
+ * diegetic text — it is what the branch's planner reads and what gets
+ * ledgered as the perception memory, so it must contain nothing the body
+ * could not sense: no round numbers, no rolls, no DRs.
  */
 import type { Participant, RoundLogEntry } from '../round/types';
 
@@ -21,7 +22,7 @@ export interface SensoryField {
   text: string;
   /** Participants visible to this entity (v0: all not-downed others at the scene). */
   visible: Array<{ id: string; name: string; side: string; downed: boolean }>;
-  /** Free involuntary salience — what popped out last round (downs, hits on self, hits near self). */
+  /** Free involuntary salience — what popped out last round (downs, hits on self). */
   salient: string[];
 }
 
@@ -46,14 +47,13 @@ export function buildSensoryField(input: FieldInput): SensoryField {
 
   const salient: string[] = [];
   for (const l of lastRoundLog) {
-    if (l.kind === 'downed') salient.push(l.text);
-    else if (l.kind === 'damage' && l.targetId === self.id) salient.push(`You are hit: ${l.text}`);
-    else if (l.kind === 'negate' && l.actorId === self.id) salient.push(l.text);
+    if (!l.narration) continue;
+    if (l.kind === 'downed') salient.push(l.narration);
+    else if (l.kind === 'damage' && l.targetId === self.id) salient.push(`You are hit — ${l.narration}`);
   }
 
   const lines: string[] = [];
   if (input.sceneNarration) lines.push(input.sceneNarration.trim());
-  lines.push(`Round ${round}.`);
   if (!canSee && !canHear) {
     lines.push('You cannot see or hear. You feel the ground and the air.');
   } else {
@@ -68,13 +68,13 @@ export function buildSensoryField(input: FieldInput): SensoryField {
     } else {
       lines.push('You cannot see. You hear movement around you.');
     }
-    if (canHear && round > 1) {
-      const heard = lastRoundLog.filter(l => l.kind === 'check' || l.kind === 'damage' || l.kind === 'downed').slice(-6).map(l => l.text);
-      if (heard.length) lines.push('What just happened: ' + heard.join(' '));
+    if (round > 1) {
+      const recent = lastRoundLog.filter(l => l.narration).slice(-6).map(l => l.narration as string);
+      if (recent.length) lines.push('A moment ago: ' + recent.join('. ') + '.');
     }
   }
   if (self.downed) lines.push('You are down.');
-  if (salient.length) lines.push('What grabs you: ' + salient.join(' '));
+  if (salient.length) lines.push('What grabs you: ' + salient.join('. '));
 
   return { forParticipantId: self.id, text: lines.join('\n'), visible, salient };
 }

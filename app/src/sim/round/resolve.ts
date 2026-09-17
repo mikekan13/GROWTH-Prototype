@@ -198,7 +198,9 @@ async function resolveAttack(
   }
 
   // ── Negate (contested; a skill check, spends the readied action when it applies) ──
-  let dr = DEFAULT_DR;
+  // The situational DR is the GM's call (v0: declared on the intention; the sim will derive it later).
+  const situationalDr = attack.dr ?? DEFAULT_DR;
+  let dr = situationalDr;
   const negate = findReadiedDefense(state, target.id, attacker.id, 'negate');
   let negateTotal: number | null = null;
   if (negate) {
@@ -213,7 +215,7 @@ async function resolveAttack(
       const n = await deps.check({ participant: target, skillName: negate.skillName, effort: negate.effort ?? 0, effortAttribute: negate.effortAttribute, dr: DEFAULT_DR });
       negateTotal = n.total;
       // A weak negate never makes you EASIER to hit than standing still: the situational DR still floors it.
-      dr = Math.max(DEFAULT_DR, n.total);
+      dr = Math.max(situationalDr, n.total);
       push(state, slotIndex, 'negate', target.id, attacker.id,
         `${target.name} negates with ${negate.skillName} → ${n.total}${effortSuffix(n)}; DR ${dr} (ties to defender)`, { negate: n },
         `${target.name} moves to slip ${attacker.name}'s ${attack.description}`);
@@ -225,9 +227,10 @@ async function resolveAttack(
   const c = await deps.check({ participant: attacker, skillName: attack.skillName, effort: attack.effort ?? 0, effortAttribute: attack.effortAttribute, dr });
   // Contested: attacker must BEAT the negate total (ties → defender) and still meet the floor.
   const hit = c.total >= dr && (negateTotal === null || c.total > negateTotal);
+  const described = attack.description.includes(target.name) ? attack.description : `${attack.description} at ${target.name}`;
   push(state, slotIndex, 'check', attacker.id, target.id,
     `${attacker.name} ${attack.description} (${attack.skillName ?? 'unskilled'}): ${c.total}${effortSuffix(c)} vs DR ${dr} → ${hit ? 'HIT' : 'MISS'}`, { check: c },
-    `${attacker.name} ${attack.description} at ${target.name} — ${hit ? 'it connects' : 'it misses'}`);
+    `${attacker.name} ${described} — ${hit ? 'it connects' : 'it misses'}`);
   if (!hit) {
     if (negateTotal !== null) push(state, slotIndex, 'negate', target.id, attacker.id, `${target.name} negates ${attacker.name}'s ${attack.description} completely`, undefined, `${target.name} avoids it entirely`);
     return;
@@ -355,7 +358,7 @@ export async function resolveRound(
             break;
           case 'skill': {
             spend(state, actor.id);
-            const c = await deps.check({ participant: actor, skillName: intention.skillName, effort: intention.effort ?? 0, effortAttribute: intention.effortAttribute, dr: DEFAULT_DR });
+            const c = await deps.check({ participant: actor, skillName: intention.skillName, effort: intention.effort ?? 0, effortAttribute: intention.effortAttribute, dr: intention.dr ?? DEFAULT_DR });
             push(state, slot.index, 'check', actor.id, intention.targetId ?? null,
               `${actor.name} ${intention.description} (${intention.skillName ?? 'unskilled'}): ${c.total}${effortSuffix(c)} vs DR ${c.dr} → ${c.success ? 'success' : 'fail'}`, { check: c },
               `${actor.name} ${intention.description} — ${c.success ? 'and manages it' : 'and fails'}`);

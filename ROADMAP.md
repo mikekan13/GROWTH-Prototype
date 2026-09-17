@@ -656,3 +656,8 @@ Detail owed beyond Phase 1 seeded entities:
 - Built: `src/sim/` round engine (action economy, slot granularity, layered ordering, per-slot resolution with negate/redirect/block), senses field v0, branch planner (local lane + heuristic), Encounter model + service + API, ENCOUNTER tab in the Campaign Terminal. 21 unit tests.
 - Also: Defect 1 (CharacterTab cross-character bleed) fixed 09-02; combat rules status sheet (rulebook/COMBAT-RULES-STATUS-2026-09-04.md).
 - NEXT (Unit 2 candidates, Mike picks): mid-round reactions (one free change, reserve priority loss), grapple hold/re-roll, weapons carry damage/reload, player-side declaration UI, canvas encounter card, Layer-5 contextual call on the local lane, repository rewrites queued in STATE-OF-PLAY-2026-09-05.
+
+## 2026-09-17 — Unit 1 self-verification pass (before Mike's test)
+- Rules audit vs canon + repository; 18 findings fixed (Effort spend/cap/Muted, both damage paths, item wear, unspent-action redirect, DR floor on negate, unskilled tier, declare-time rules, secrecy redaction, diegetic sense-limited memory, error resilience, GM-set situational DR, stand-up after Facing Death, dice-overlay safety net). See REALITY-SIM-DESIGN §10.1.
+- Verified live in the Incubator via browser + API; 343+ tests green.
+- Open for Mike: damage-path coupling; unskilled-attack negate rule; tuning knobs.

@@ -37,7 +37,7 @@ interface Encounter {
 }
 interface IntentionDraft {
   pillar: Pillar; kind: Kind; description: string; skillName?: string; targetId?: string;
-  damageType?: 'bashing' | 'slashing' | 'piercing'; baseDamage?: number; redirectTo?: string; effort?: number;
+  damageType?: 'bashing' | 'slashing' | 'piercing'; baseDamage?: number; redirectTo?: string; effort?: number; dr?: number;
 }
 
 const KINDS: Kind[] = ['attack', 'skill', 'move', 'negate', 'block', 'reserve', 'hold'];
@@ -232,6 +232,11 @@ export default function EncounterPanel({
                 </select>
                 <input style={{ ...field, width: 44 }} type="number" min={1} max={20} title="base damage" value={d.baseDamage ?? 2} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, baseDamage: Number(e.target.value) } : x))} />
               </>)}
+              {(d.kind === 'attack' || d.kind === 'skill') && (
+                <label style={{ color: '#888', fontSize: 11 }} title="situational difficulty — the GM's call">
+                  DR <input style={{ ...field, width: 40 }} type="number" min={1} max={60} value={d.dr ?? 10} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, dr: Number(e.target.value) || 10 } : x))} />
+                </label>
+              )}
               {(d.kind === 'attack' || d.kind === 'skill' || d.kind === 'negate' || d.kind === 'block') && (
                 <label style={{ color: '#888', fontSize: 11 }}>
                   effort <input style={{ ...field, width: 40 }} type="number" min={0} max={50} value={d.effort ?? 0} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, effort: Number(e.target.value) || 0 } : x))} />
