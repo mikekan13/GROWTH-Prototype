@@ -47,7 +47,10 @@ import { effortCap, eligibleEffortAttributes, skillUsableFromPillar } from '@/si
 import type { Governor, Intention, IntentionKind, Participant, Pillar, RoundResult } from '@/sim/round/types';
 import { buildSensoryField } from '@/sim/senses/field';
 import { planRound } from '@/sim/planning/branch-plan';
-import { emptyState, parseState, participantFromCharacter, refreshParticipant, type EncounterState, type HeldItem } from '@/sim/encounter/state';
+import { effectiveHeldResist, emptyState, parseState, participantFromCharacter, refreshParticipant, type EncounterState, type HeldItem } from '@/sim/encounter/state';
+
+/** Rounds in flight, per encounter — two "Run round" clicks must not run twice (survives dev hot reload). */
+const inflightRounds: Set<string> = ((globalThis as unknown as { __encounterRoundsInflight?: Set<string> }).__encounterRoundsInflight ??= new Set<string>());
 
 export interface EncounterActor {
   userId: string;
@@ -130,8 +133,9 @@ async function heldInterposable(characterId: string): Promise<HeldItem | null> {
   });
   for (const it of items) {
     try {
-      const d = JSON.parse(it.data) as { baseResist?: number; isBodyPart?: boolean; condition?: number };
-      if (!d.isBodyPart && typeof d.baseResist === 'number' && d.baseResist > 0 && (d.condition ?? 3) > 0) {
+      const d = JSON.parse(it.data) as { baseResist?: number; isBodyPart?: boolean; condition?: number; equippedTo?: string | null };
+      // Worn (equipped) armor is already the outer damage layer — only a HELD item can be interposed.
+      if (!d.isBodyPart && !d.equippedTo && typeof d.baseResist === 'number' && d.baseResist > 0 && (d.condition ?? 3) > 0) {
         return { id: it.id, name: it.name, baseResist: d.baseResist, condition: d.condition ?? 3 };
       }
     } catch { /* skip */ }
@@ -158,8 +162,9 @@ function senseFlags(sheet: GrowthCharacter | null): { canSee: boolean; canHear: 
   const walk = (n: GrowthWorldItem) => {
     const name = (n.partName ?? '').toLowerCase();
     const ok = (n.condition ?? 3) > 0;
-    if (/eye/.test(name)) { found.anyEye = true; if (ok) found.eye = true; }
-    if (/ear/.test(name)) { found.anyEar = true; if (ok) found.ear = true; }
+    // Word-bounded: "Heart" must not read as an ear.
+    if (/\beyes?\b/.test(name)) { found.anyEye = true; if (ok) found.eye = true; }
+    if (/\bears?\b/.test(name)) { found.anyEar = true; if (ok) found.ear = true; }
     for (const c of n.contains ?? []) walk(c);
   };
   walk(root);
@@ -439,6 +444,16 @@ async function spendEffortNow(characterId: string, attribute: Governor, amount: 
  * clock +1 round, and a perception memory for every participant's DayaEntity.
  */
 export async function runRound(encounterId: string, actor: EncounterActor) {
+  if (inflightRounds.has(encounterId)) throw new ValidationError('A round is already running for this encounter');
+  inflightRounds.add(encounterId);
+  try {
+    return await runRoundInner(encounterId, actor);
+  } finally {
+    inflightRounds.delete(encounterId);
+  }
+}
+
+async function runRoundInner(encounterId: string, actor: EncounterActor) {
   const enc = await loadEncounter(encounterId);
   requireGm(actor, enc.campaign);
   if (enc.status !== 'ACTIVE') throw new ValidationError('Encounter is not active');
@@ -447,10 +462,20 @@ export async function runRound(encounterId: string, actor: EncounterActor) {
   const living = state.participants.filter(p => !p.downed);
   if (living.length === 0) throw new ValidationError('No living participants');
 
-  // Fresh attribute pools for everyone (Effort spend / damage moved them).
+  // Fresh attribute pools for everyone (Effort spend / damage moved them) and a
+  // fresh look at what each one is holding (items change hands, wear, break).
   for (let i = 0; i < state.participants.length; i++) {
     const row = await prisma.character.findUnique({ where: { id: state.participants[i].id }, select: { data: true } });
-    state.participants[i] = refreshParticipant(state.participants[i], row ? parseSheet(row.data) : null);
+    const refreshed = refreshParticipant(state.participants[i], row ? parseSheet(row.data) : null);
+    const held = await heldInterposable(refreshed.id);
+    state.participants[i] = {
+      ...refreshed,
+      heldResist: held ? effectiveHeldResist(held.baseResist, held.condition) : 0,
+      heldBaseResist: held?.baseResist ?? 0,
+      heldCondition: held?.condition ?? 0,
+      heldItemId: held?.id ?? null,
+      heldItemName: held?.name ?? null,
+    };
   }
 
   // ── Stage 1: senses + intention. Each branch plans unless overridden. ──
@@ -507,7 +532,10 @@ export async function runRound(encounterId: string, actor: EncounterActor) {
     // Path 2 — Affinity Cycle attribute pool (natural target; overflow → Frequency).
     // v0 ASSUMPTION: the same amount hits the pool (see file header).
     const target = NATURAL_TARGET[damageType];
-    const pool = await applyAttributeDamage(actor.userId, actor.role, { characterId: targetId, amount, targetAttribute: target, damageType, note });
+    const hasPools = !!sheets.get(targetId)?.attributes;
+    const pool = hasPools
+      ? await applyAttributeDamage(actor.userId, actor.role, { characterId: targetId, amount, targetAttribute: target, damageType, note })
+      : { characterData: sheets.get(targetId) ?? ({} as GrowthCharacter), changes: [`Unknown attribute: ${target}`], frequencyDepleted: false };
     const freqAfter = pool.characterData.attributes?.frequency?.current ?? 0;
     const freqBefore = state.participants.find(p => p.id === targetId)?.attrs.frequency.current ?? 0;
     const crossed = freqBefore > 0 && freqAfter <= 0;
@@ -546,7 +574,11 @@ export async function runRound(encounterId: string, actor: EncounterActor) {
   await prisma.encounter.update({ where: { id: encounterId }, data: { round, state: serialize(state) } });
 
   const summary = summarizeRound(result, state.participants);
-  await postGameEvent(enc.campaignId, actor, 'encounter_round', `${enc.name} — ${summary}`);
+  // The round is committed above; everything after is best-effort record-keeping
+  // that must never turn a resolved round into a 500.
+  try {
+    await postGameEvent(enc.campaignId, actor, 'encounter_round', `${enc.name} — ${summary}`);
+  } catch (err) { console.warn('[encounter] round event failed', err); }
   try {
     await advanceClock(enc.campaignId, actor.userId, actor.role, { amount: 1, unit: 'round', note: `${enc.name} round ${round}` });
   } catch { /* clock advance is best-effort in v0 */ }
@@ -572,7 +604,7 @@ export async function runRound(encounterId: string, actor: EncounterActor) {
       .join('. ');
     const hitMe = result.log.some(l => l.kind === 'damage' && l.targetId === p.id);
     const wentDown = result.downed.includes(p.id);
-    await writeMemoryEntry({
+    try { await writeMemoryEntry({
       entityId: entity.id,
       narrativeCycle: cycle,
       source: 'perception',
@@ -582,7 +614,7 @@ export async function runRound(encounterId: string, actor: EncounterActor) {
       salience: wentDown ? 0.95 : hitMe ? 0.8 : 0.5,
       entityRefs: state.participants.filter(x => x.id !== p.id).map(x => x.id),
       classification: { encounterId, round, kind: 'encounter_round' },
-    });
+    }); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
 
   return getEncounter(encounterId, actor);

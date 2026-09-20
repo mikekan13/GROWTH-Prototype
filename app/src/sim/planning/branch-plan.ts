@@ -148,7 +148,8 @@ export async function planRound(input: PlanInput): Promise<PlanResult> {
   // A cold serverless lane must never stall the table: probe (5 s, and the
   // probe itself spins the worker up); plan on the model only when it is
   // ready, otherwise the reflex heuristic acts and the GM sees why.
-  const lane = await l1Status();
+  let lane: Awaited<ReturnType<typeof l1Status>> = 'offline';
+  try { lane = await l1Status(); } catch { /* probe failure = lane not usable */ }
   if (lane !== 'ready') return { ...heuristicPlan(input), note: `local lane ${lane} — heuristic used` };
   try {
     const { system, user } = planPrompt(input);
