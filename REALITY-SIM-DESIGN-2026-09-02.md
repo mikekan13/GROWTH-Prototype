@@ -519,3 +519,34 @@ DR derived by the sim, redirect onto a named body part (routing for
 non-piercing types), ActionMod from items/armor, grid/positions, the
 faculties as separate workers, the outward wave, player-side declaration
 UI, the canvas encounter card.
+
+## 11. Research briefings (2026-09-18) — assessment and queue
+
+Sources: `docs/research/growth-agent-research-briefing-2026-09-18.md` and
+`docs/research/growth-provenance-ledger-briefing-2026-09-18.md`.
+
+**Already aligned with this document:** engine-authored observations (Unit 1
+writes every perception memory from the sim); reflections marked as
+inferences with evidence pointers (dreams: source + parentMemoryId +
+clusterId); secondhand belief ("Danny said X"); rehearsal recency, salience
+at write, affect-shaped recall; and the GM alignment scale (§4) as the
+"world grades it" filter that makes any later consolidation safe from model
+collapse.
+
+**Changes adopted (queued in ROADMAP 2026-09-20):** consent bit on the
+trace corpus; provenance manifest at write-time; per-entity probe
+baselines (IDENTITY_HASH); salience-threshold dream trigger; per-entity
+believed world (Attend must not read the global WorldFact list — an
+omniscience leak against ruling 2 of §6.1's senses contract); embedding
+relevance in recall.
+
+**Bridge (from the ledger briefing §2.3):** an entity's creative act that
+becomes a platform asset carries `memoryRefs` into its ledger, so "why did
+she say that?" and "who contributed to this?" are one query. This is the
+same ledger at two grains and follows from ruling 7 (the sim's product for an
+entity IS its memory ledger).
+
+**Not adopted:** AI-GM framings; file-per-entity layout (tables already
+exist). Build order unchanged: reality first, personalities after —
+except the two cheap, order-independent items (provenance rules, probe
+baselines), which the briefings correctly say cannot be retrofitted.

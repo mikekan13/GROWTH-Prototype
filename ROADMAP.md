@@ -661,3 +661,32 @@ Detail owed beyond Phase 1 seeded entities:
 - Rules audit vs canon + repository; 18 findings fixed (Effort spend/cap/Muted, both damage paths, item wear, unspent-action redirect, DR floor on negate, unskilled tier, declare-time rules, secrecy redaction, diegetic sense-limited memory, error resilience, GM-set situational DR, stand-up after Facing Death, dice-overlay safety net). See REALITY-SIM-DESIGN §10.1.
 - Verified live in the Incubator via browser + API; 343+ tests green.
 - Open for Mike: damage-path coupling; unskilled-attack negate rule; tuning knobs.
+
+## 2026-09-20 — Research briefings assessed → QUEUED (Mike: "Do it")
+Two briefings (docs/research/*-2026-09-18.md: agent individuation; provenance
+ledger) assessed against the reality-sim rulings. Founding structure
+unchanged. Queued, in order:
+1. **Consent bit on the trace corpus** — the JEWL tool-loop traces
+   (ai/network/traces.ts) are the planned fine-tune corpus and contain
+   player-authored content with no AI-training consent recorded. Add the
+   flag (campaign + member level), gate the trace writer on it, BEFORE any
+   adapter is trained.
+2. **Provenance manifest at write-time** for new creative acts (Forge items,
+   generated text, portraits): creator, creatorKind (human|ai|composite),
+   model/entity/adapter, ingredients[], memoryRefs[], rights bits (remix /
+   external AI training / commercial). Schema first — cannot be retrofitted.
+   Ownership stays outside the manifest (KRMA/possessions).
+3. **Probe baselines** for Violet + the 3 NPCs: canonical identity-question
+   set, embedded responses stored as IDENTITY_HASH; monthly re-probe measures
+   drift-from-self (bounded) and divergence-between-entities (growing).
+4. **Dream trigger → accumulated salience threshold** (event-driven, Smallville
+   150-importance pattern) replacing the 6 h interval; manual sweep stays as
+   fallback. Fits Mike's rejection of ticks/clocks.
+5. **Per-entity believed world** in the next sim unit with positions: Attend
+   must read the entity's own perception ledger (Smallville stale subgraph),
+   not the global WorldFact list (current omniscience leak, ensemble.ts).
+6. **Embedding relevance in recall** (local lane) alongside keyword Jaccard —
+   retrieval misses are the documented #1 failure mode.
+Not adopted: AI-GM framings (parked 09-02); soul.py file layout as files —
+it maps onto existing tables (SALIENCE=DayaAffect, RELATIONS=DayaRelationship,
+PROCEDURES=JEWL rulings library); only IDENTITY_HASH is new (item 3).
