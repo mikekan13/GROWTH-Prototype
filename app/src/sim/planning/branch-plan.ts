@@ -18,7 +18,7 @@ import 'server-only';
 import type { Intention, IntentionKind, Participant, Pillar } from '../round/types';
 import type { SensoryField } from '../senses/field';
 import { PILLARS } from '../round/types';
-import { skillUsableFromPillar } from '../round/action-economy';
+import { eligibleEffortAttributes, skillUsableFromPillar } from '../round/action-economy';
 import { chat, DayaTierUnavailableError, DayaWarmingTimeoutError } from '@/daya/model-client';
 import { isDayaEnabled } from '@/daya/events';
 import { l1Status } from '@/daya/l1-warm';
@@ -65,7 +65,7 @@ export function heuristicPlan(input: PlanInput): PlanResult {
         out.push({
           id: makeId(self.id, n++), participantId: self.id, pillar, kind: 'attack',
           description: skill ? `attacks ${target.name} with ${skill.name}` : `strikes at ${target.name}`,
-          skillName: skill?.name, targetId: target.id, damageType: 'bashing', baseDamage: 2,
+          skillName: skill?.name, attribute: skill ? undefined : 'clout', targetId: target.id, damageType: 'bashing', baseDamage: 2,
           redirectTo: self.heldResist > 0 ? 'held' : undefined,
         });
       } else if (target && !negateReadied && skill) {
@@ -124,10 +124,12 @@ function validateModelPlan(raw: string, input: PlanInput): Intention[] | null {
     if ((kind === 'attack' || kind === 'negate') && !targetId) return null;
     if (kind === 'negate' && !skillName) return null;
     const dt = item.damageType;
+    // Unskilled checks use the pillar's first attribute (Mike 09-20) — the model doesn't choose it in v0.
+    const attribute = !skillName && (kind === 'attack' || kind === 'skill') ? eligibleEffortAttributes(pillar, null)[0] : undefined;
     out.push({
       id: makeId(self.id, n++), participantId: self.id, pillar, kind,
       description: typeof item.description === 'string' ? item.description.slice(0, 200) : kind,
-      skillName, targetId,
+      skillName, attribute, targetId,
       damageType: kind === 'attack' ? (dt === 'slashing' || dt === 'piercing' || dt === 'bashing' ? dt : 'bashing') : undefined,
       baseDamage: kind === 'attack' ? Math.min(4, Math.max(1, Number(item.baseDamage) || 2)) : undefined,
       redirectTo,

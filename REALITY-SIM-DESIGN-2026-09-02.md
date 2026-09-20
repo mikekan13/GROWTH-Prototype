@@ -447,6 +447,22 @@ heuristic fallback); senses = raw field + free salience; the round is
 recorded as canon (game_event + SSE), the clock moves one round, and every
 participating DayaEntity receives the round as a perception memory.
 
+### 10.2 Rulings on the §10.1 questions (Mike, 2026-09-20) — BUILT
+1. **Damage-path coupling:** a body part designates whether damage on it
+   procs attribute depletion — a horn or shell doesn't. Built as
+   `depletesAttributes` on the body-part item (default true = living
+   tissue; Seeds/creatures mark false on horn/shell/carapace). The pool
+   receives only what wasn't absorbed by non-depleting parts (v0 uses the
+   part's resist as its absorbed share, since the cascade reports excess).
+2. **Unskilled attacks vs negate:** an unskilled attack still uses an
+   attribute, and that attribute is the governor the defender's negate
+   skill must carry. Built: `attribute` on unskilled intentions (defaults to
+   the pillar's first attribute; declare-time validated to the pillar).
+3. **Tuning knobs:** placeholders, Mike will feel them in play; no decision
+   needed. Where they live: `sim/round/ordering.ts` (PILLAR_BIAS,
+   GOVERNOR_TIER_STEP), `sim/round/resolve.ts` (REDIRECT_DEFENDER_ADVANTAGE,
+   REDIRECT_CONSTRAINED_BAND, DEFAULT_DR).
+
 ### 10.1 Conformance pass (2026-09-17, self-verification before Mike's test)
 
 An independent rules audit + Claude's own re-read found and fixed:

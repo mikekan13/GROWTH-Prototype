@@ -91,6 +91,9 @@ export interface Intention {
   description: string;
   /** Skill used, if any (must exist on the participant's sheet and be usable from `pillar`). */
   skillName?: string;
+  /** UNSKILLED checks still use an attribute (Mike 09-20): the governing attribute of the raw
+   *  check, from the action's pillar. A negate against an unskilled attack must have it as a governor. */
+  attribute?: Governor;
   /** Target participant for attack / negate / block-against. */
   targetId?: string;
   /** Attack fields (v0: the sim has no weapon model yet — declared on the intention). */

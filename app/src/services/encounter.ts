@@ -77,6 +77,8 @@ export const intentionInputSchema = z.object({
   kind: z.enum(kinds),
   description: z.string().min(1).max(200),
   skillName: z.string().max(80).optional(),
+  /** Governing attribute for an UNSKILLED check (must belong to the action's pillar). */
+  attribute: z.enum(governors).optional(),
   targetId: z.string().optional(),
   damageType: z.enum(['piercing', 'slashing', 'bashing', 'heat', 'cold', 'decay', 'energy']).optional(),
   baseDamage: z.number().int().min(1).max(20).optional(),
@@ -316,6 +318,13 @@ export async function declareIntentions(encounterId: string, actor: EncounterAct
       throw new ValidationError('An unskilled attack is a Body or Spirit action');
     }
     if (i.kind === 'negate' && !skill) throw new ValidationError('A negate is a skill check — pick a skill');
+    // Unskilled checks still use an attribute (Mike 09-20) — it must belong to the action's pillar.
+    let attribute: Governor | undefined;
+    if (!skill && (i.kind === 'attack' || i.kind === 'skill' || i.kind === 'block')) {
+      const pillarAttrs = eligibleEffortAttributes(i.pillar, null);
+      attribute = i.attribute ?? pillarAttrs[0];
+      if (!pillarAttrs.includes(attribute)) throw new ValidationError(`An unskilled ${i.pillar} check uses ${pillarAttrs.join('/')}, not ${attribute}`);
+    }
     if (i.targetId && !ids.has(i.targetId)) throw new ValidationError('Target is not in this encounter');
     if (i.targetId === participant.id) throw new ValidationError('Cannot target yourself');
     if ((i.kind === 'attack' || i.kind === 'negate') && !i.targetId) throw new ValidationError(`${i.kind} needs a target`);
@@ -330,7 +339,7 @@ export async function declareIntentions(encounterId: string, actor: EncounterAct
     if (effort > 0) {
       if (muted) throw new ValidationError(`${participant.name} is Muted (Focus at 0) — no Effort can be added`);
       const eligible = eligibleEffortAttributes(i.pillar, skill ?? null);
-      effortAttribute = i.effortAttribute ?? eligible[0];
+      effortAttribute = i.effortAttribute ?? attribute ?? eligible[0];
       if (!eligible.includes(effortAttribute)) {
         throw new ValidationError(`Effort for a ${i.pillar} action must come from ${eligible.join('/')}, not ${effortAttribute}`);
       }
@@ -349,6 +358,7 @@ export async function declareIntentions(encounterId: string, actor: EncounterAct
       kind: i.kind,
       description: i.description,
       skillName: i.skillName,
+      attribute,
       targetId: i.targetId,
       damageType: i.damageType,
       baseDamage: i.baseDamage,
@@ -405,17 +415,18 @@ async function postGameEvent(campaignId: string, actor: EncounterActor, eventTyp
   broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
 }
 
+function findPart(root: GrowthWorldItem, path: string[]): GrowthWorldItem | null {
+  let node: GrowthWorldItem | undefined = root;
+  if (!node.partName || node.partName !== path[0]) return null;
+  for (const seg of path.slice(1)) {
+    node = (node.contains ?? []).find(c => c.partName === seg);
+    if (!node) return null;
+  }
+  return node ?? null;
+}
+
 function isVitalDestroyed(anatomy: GrowthWorldItem, events: Array<{ partPath: string[]; conditionBefore: number; conditionAfter: number }>): boolean {
-  const find = (root: GrowthWorldItem, path: string[]): GrowthWorldItem | null => {
-    let node: GrowthWorldItem | undefined = root;
-    if (!node.partName || node.partName !== path[0]) return null;
-    for (const seg of path.slice(1)) {
-      node = (node.contains ?? []).find(c => c.partName === seg);
-      if (!node) return null;
-    }
-    return node ?? null;
-  };
-  return events.some(ev => ev.conditionAfter === 0 && ev.conditionBefore !== 0 && find(anatomy, ev.partPath)?.isVital === true);
+  return events.some(ev => ev.conditionAfter === 0 && ev.conditionBefore !== 0 && findPart(anatomy, ev.partPath)?.isVital === true);
 }
 
 /**
@@ -530,17 +541,29 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     const parts = body.events.map(e => `${e.partPath.at(-1)} ${e.conditionBefore}→${e.conditionAfter}`).join(', ');
     const worn = body.wornDamage.length ? ` (armor: ${body.wornDamage.map(w => w.name).join(', ')})` : '';
     // Path 2 — Affinity Cycle attribute pool (natural target; overflow → Frequency).
-    // v0 ASSUMPTION: the same amount hits the pool (see file header).
+    // Mike 09-20: a body part declares whether damage on it depletes attributes
+    // (`depletesAttributes`; living tissue = true, horn/shell = false). What a
+    // non-depleting part ABSORBS never reaches the pool. v0 approximation: the
+    // absorbed share of a non-depleting part = its resist (capped by what was
+    // left), since the cascade only reports the excess it passed on.
     const target = NATURAL_TARGET[damageType];
+    let poolAmount = amount;
+    for (const ev of body.events) {
+      const part = findPart(body.bodyAnatomy, ev.partPath);
+      if (part?.depletesAttributes === false) poolAmount = Math.max(0, poolAmount - Math.min(ev.resist, poolAmount));
+    }
+    const shielded = amount - poolAmount;
     const hasPools = !!sheets.get(targetId)?.attributes;
-    const pool = hasPools
-      ? await applyAttributeDamage(actor.userId, actor.role, { characterId: targetId, amount, targetAttribute: target, damageType, note })
-      : { characterData: sheets.get(targetId) ?? ({} as GrowthCharacter), changes: [`Unknown attribute: ${target}`], frequencyDepleted: false };
+    const pool = hasPools && poolAmount > 0
+      ? await applyAttributeDamage(actor.userId, actor.role, { characterId: targetId, amount: poolAmount, targetAttribute: target, damageType, note })
+      : { characterData: sheets.get(targetId) ?? ({} as GrowthCharacter), changes: hasPools ? [] : [`Unknown attribute: ${target}`], frequencyDepleted: false };
     const freqAfter = pool.characterData.attributes?.frequency?.current ?? 0;
     const freqBefore = state.participants.find(p => p.id === targetId)?.attrs.frequency.current ?? 0;
     const crossed = freqBefore > 0 && freqAfter <= 0;
     const noPools = pool.changes.some(ch => /^Unknown attribute/.test(ch));
-    const poolNote = noPools ? `${target} pool: none on this sheet` : pool.changes.length ? pool.changes.join('; ') : `${target} −${amount}`;
+    const poolNote = noPools ? `${target} pool: none on this sheet`
+      : poolAmount <= 0 ? `${target} pool untouched — ${shielded} absorbed by non-depleting parts`
+      : `${pool.changes.length ? pool.changes.join('; ') : `${target} −${poolAmount}`}${shielded > 0 ? ` (${shielded} absorbed by non-depleting parts)` : ''}`;
     const sheetNote = !noPools && freqBefore <= 0 && !crossed ? ' [no Frequency on this sheet — cannot fall further]' : '';
     // Keep the in-memory snapshot honest for later hits this round.
     const p = state.participants.find(x => x.id === targetId);

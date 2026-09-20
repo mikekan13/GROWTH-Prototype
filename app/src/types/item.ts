@@ -103,6 +103,10 @@ export interface GrowthWorldItem {
    *  (r-2026-06-11-05). Seeds mark their own vitals; Human baseline marks
    *  Brain and Heart. */
   isVital?: boolean;
+  /** Mike 2026-09-20: whether damage landing on this part depletes the
+   *  bearer's attribute pool (Affinity Cycle path). Living tissue = true
+   *  (default when absent); a horn, shell, carapace, hoof = false. */
+  depletesAttributes?: boolean;
 }
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';

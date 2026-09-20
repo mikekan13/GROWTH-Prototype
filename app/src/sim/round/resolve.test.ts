@@ -113,6 +113,20 @@ describe('resolveRound', () => {
     expect(r2.log.some(l => /has no skill/.test(l.text))).toBe(true);
   });
 
+  it("Mike 09-20: an unskilled attack's attribute is the governor a negate must carry", async () => {
+    const swing = atk('a1', 'A', 'B', { skillName: undefined, attribute: 'clout' });
+    // Sword (clout/celerity) carries clout → applies and negates (B 20 > A 12)
+    const sink = damageSink();
+    const r1 = await run([p('A'), p('B')], [swing, { id: 'b1', participantId: 'B', pillar: 'body', kind: 'negate', description: 'parries', skillName: 'Sword', targetId: 'A' }], fixedCheck({ A: 12, B: 20 }), sink.fn);
+    expect(sink.calls.length).toBe(0);
+    expect(r1.log.some(l => /negates .* completely/.test(l.text))).toBe(true);
+    // Dodge (celerity/flow) lacks clout → does not apply
+    const sink2 = damageSink();
+    const r2 = await run([p('A'), p('B')], [swing, { id: 'b1', participantId: 'B', pillar: 'body', kind: 'negate', description: 'dodges', skillName: 'Dodge', targetId: 'A' }], fixedCheck({ A: 12, B: 20 }), sink2.fn);
+    expect(sink2.calls.length).toBe(1);
+    expect(r2.log.some(l => /shares no governor/.test(l.text))).toBe(true);
+  });
+
   it('a readied negate is consumed once — a second attacker in the same round is not negated', async () => {
     const a = p('A', { gauges: { celerity: 30, frequency: 5, wisdom: 5 } });
     const c = p('C', { gauges: { celerity: 25, frequency: 5, wisdom: 5 } });

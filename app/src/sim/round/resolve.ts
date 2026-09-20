@@ -132,15 +132,18 @@ function findReadiedDefense(state: ResolveState, defenderId: string, attackerId:
 
 /**
  * Negate rule (Mike 09-05): the negating SKILL must share ≥1 governor with the
- * attacking skill. Against an UNSKILLED attack (no governors) v0 applies the
- * reality default — the negate skill must have a governor in the attack's
- * pillar. [QUESTION for Mike: is that the GROWTH rule for unskilled attacks?]
+ * attacking skill. An UNSKILLED attack still uses an attribute (Mike 09-20),
+ * and that attribute is the governor the negate skill must carry. If an
+ * unskilled attack somehow carries no attribute, fall back to the pillar.
  */
 function negateGovernorMatches(defender: Participant, negate: Intention, attacker: Participant, attack: Intention): boolean {
   const negSkill = defender.skills.find(s => s.name === negate.skillName);
   if (!negSkill) return false;
   const attackSkill = attack.skillName ? attacker.skills.find(k => k.name === attack.skillName) : undefined;
-  if (!attackSkill) return negSkill.governors.some(g => pillarOfGovernor(g) === attack.pillar);
+  if (!attackSkill) {
+    if (attack.attribute) return negSkill.governors.includes(attack.attribute);
+    return negSkill.governors.some(g => pillarOfGovernor(g) === attack.pillar);
+  }
   const attackGov = new Set(attackSkill.governors);
   return negSkill.governors.some(g => attackGov.has(g));
 }

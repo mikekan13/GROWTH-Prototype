@@ -109,3 +109,7 @@ combat healing action · Terminal color DR thresholds · opportunity-attack
 procedure · Mana status · **defense vs the slot model** (open question in the
 walkthrough: does a block/dodge spend one of the defender's actions, pulling
 it forward out of its later slots?).
+
+## Rulings 2026-09-20 (Mike)
+- **Body parts declare attribute depletion**: a part flags whether damage on it depletes the bearer's attribute pool (horn/shell = no; living tissue = yes). Item field `depletesAttributes`.
+- **Unskilled attacks still use an attribute**, and that attribute is the governor a defender's negate skill must carry.
