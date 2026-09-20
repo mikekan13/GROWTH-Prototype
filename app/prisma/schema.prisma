@@ -25,7 +25,36 @@ model User {
   emailVerifications EmailVerificationToken[]
   passwordResets     PasswordResetToken[]
   subscription       Subscription?
+  // Provenance ledger (2026-09-20): may this user's authored content enter
+  // the fine-tune corpus / entity memory consolidation? Recorded at write-time
+  // on every trace and provenance manifest; default NO.
+  aiTrainingConsent   Boolean   @default(false)
+  aiTrainingConsentAt DateTime?
   createdAt          DateTime   @default(now())
+}
+
+// ── Provenance ledger (2026-09-20, docs/research/growth-provenance-ledger-briefing) ──
+// One manifest per creative act. Creation facts are immutable; ownership lives
+// elsewhere (possessions/KRMA). Ingredients form the creation DAG; memoryRefs
+// bridge an AI being's act to its memory ledger.
+model Provenance {
+  id              String   @id @default(cuid())
+  assetType       String   // forge_item | campaign_item | character | portrait | encounter_round | text
+  assetId         String
+  campaignId      String?
+  creatorUserId   String?  // human principal (owner of the act)
+  creatorEntityId String?  // DayaEntity id when an AI being authored/co-authored it
+  creatorKind     String   // human | ai | composite  (IPTC digital-source-type vocabulary)
+  tool            String?  // generator: model / lane / adapter version
+  ingredients     String   // JSON string[] of "assetType:assetId" consumed or conditioned on
+  memoryRefs      String   // JSON string[] DayaMemoryEntry ids retrieved/written during the act
+  rights          String   // JSON { aiTraining: boolean, remix: boolean|null, commercial: boolean|null }
+  contentHash     String?  // sha256 of the asset content at creation (ISCC-style key later)
+  createdAt       DateTime @default(now())
+
+  @@index([assetType, assetId])
+  @@index([campaignId, createdAt])
+  @@index([creatorEntityId])
 }
 
 // ── Auth: short-lived single-use tokens for email verification & password reset ──

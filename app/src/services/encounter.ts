@@ -37,6 +37,7 @@ import { applyDamageToCharacter } from '@/services/damage';
 import { applyAttributeDamage } from '@/services/character-attribute';
 import { advanceClock, getClock } from '@/services/time';
 import { writeMemoryEntry } from '@/daya/memory';
+import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
 import type { TerminalEvent, TerminalPayload } from '@/types/terminal';
@@ -613,6 +614,7 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   // No confabulation: this is the sim's product for the entity.
   let cycle = 0;
   try { cycle = (await getClock(enc.campaignId)).currentCycle; } catch { /* default 0 */ }
+  const memoryIds: string[] = [];
   for (const p of state.participants) {
     const field = fields.get(p.id);
     if (!field) continue; // was down before the round began
@@ -627,7 +629,7 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
       .join('. ');
     const hitMe = result.log.some(l => l.kind === 'damage' && l.targetId === p.id);
     const wentDown = result.downed.includes(p.id);
-    try { await writeMemoryEntry({
+    try { const written = await writeMemoryEntry({
       entityId: entity.id,
       narrativeCycle: cycle,
       source: 'perception',
@@ -637,8 +639,24 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
       salience: wentDown ? 0.95 : hitMe ? 0.8 : 0.5,
       entityRefs: state.participants.filter(x => x.id !== p.id).map(x => x.id),
       classification: { encounterId, round, kind: 'encounter_round' },
-    }); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
+    }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
+
+  // Provenance manifest for the round (2026-09-20): a COMPOSITE act — the
+  // GM's declarations + every branch's plan + the sim's resolution. The
+  // memoryRefs are the ledger bridge: "who contributed to this round?" and
+  // "why does Danny remember it?" become one query.
+  recordProvenanceSafe({
+    assetType: 'encounter_round',
+    assetId: `${encounterId}:${round}`,
+    campaignId: enc.campaignId,
+    creatorUserId: actor.userId,
+    creatorKind: 'composite',
+    tool: `sim.round:v1;plan=${[...new Set(Object.values(state.lastPlan).map(l => l.source))].sort().join('+')}`,
+    ingredients: state.participants.map(p => ingredientRef('character', p.id)),
+    memoryRefs: memoryIds,
+    content: result.log.map(l => l.text),
+  });
 
   return getEncounter(encounterId, actor);
 }

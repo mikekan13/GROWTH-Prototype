@@ -516,3 +516,21 @@ Durable JEWL job worked across message boundaries; the work-loop fires cycles wh
 | createdBy | String | user id |
 
 `EncounterState` is defined in `src/sim/encounter/state.ts`; participants/intentions become rows when the canvas card needs them. Each run round also writes a `CampaignEvent` (type game_event, eventType encounter_round) and one `DayaMemoryEntry` (source perception) per participant that has a DayaEntity.
+
+## Provenance (2026-09-20, migration 20260920224102_provenance_consent)
+One manifest per creative act (docs/research/growth-provenance-ledger-briefing-2026-09-18.md).
+| Field | Type | Notes |
+|---|---|---|
+| assetType | String | forge_item / campaign_item / character / portrait / encounter_round / text |
+| assetId | String | e.g. `<encounterId>:<round>` for rounds |
+| campaignId | String? | |
+| creatorUserId | String? | human principal |
+| creatorEntityId | String? | DayaEntity id when an AI being authored/co-authored |
+| creatorKind | String | human / ai / composite |
+| tool | String? | model / lane / adapter |
+| ingredients | String | JSON string[] "assetType:assetId" — the creation DAG |
+| memoryRefs | String | JSON string[] DayaMemoryEntry ids — the ledger bridge |
+| rights | String | JSON { aiTraining (from consent), remix: null, commercial: null } |
+| contentHash | String? | sha256 at creation |
+
+**User** gained `aiTrainingConsent` (Boolean, default false) + `aiTrainingConsentAt`. Set via PUT /api/profile { aiTrainingConsent }.

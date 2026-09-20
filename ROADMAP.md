@@ -666,12 +666,12 @@ Detail owed beyond Phase 1 seeded entities:
 Two briefings (docs/research/*-2026-09-18.md: agent individuation; provenance
 ledger) assessed against the reality-sim rulings. Founding structure
 unchanged. Queued, in order:
-1. **Consent bit on the trace corpus** — the JEWL tool-loop traces
+1. ✅ BUILT 09-20 — **Consent bit on the trace corpus** — the JEWL tool-loop traces
    (ai/network/traces.ts) are the planned fine-tune corpus and contain
    player-authored content with no AI-training consent recorded. Add the
    flag (campaign + member level), gate the trace writer on it, BEFORE any
    adapter is trained.
-2. **Provenance manifest at write-time** for new creative acts (Forge items,
+2. ✅ BUILT 09-20 (schema + service + 4 write sites) — **Provenance manifest at write-time** for new creative acts (Forge items,
    generated text, portraits): creator, creatorKind (human|ai|composite),
    model/entity/adapter, ingredients[], memoryRefs[], rights bits (remix /
    external AI training / commercial). Schema first — cannot be retrofitted.

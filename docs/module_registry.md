@@ -443,3 +443,12 @@ Design authority: `REALITY-SIM-DESIGN-2026-09-02.md`. The simulation layer under
 | API | `GET/POST api/campaigns/[id]/encounters`, `GET/PATCH …/[encounterId]`, `POST …/[encounterId]/intentions`, `POST …/[encounterId]/round` |
 
 Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive changes (one free change / reserve-with-priority-loss), grapple hold, weapons/damage values, grid positions, player-side declaration UI, canvas encounter card.
+
+## Provenance + consent (2026-09-20)
+| Module | Purpose |
+|---|---|
+| `services/consent.ts` | resolveTrainingConsent(campaignId): GM AND every ACTIVE member consented; setAiTrainingConsent(userId, bool) |
+| `services/provenance.ts` | recordProvenance / recordProvenanceSafe (fire-and-forget), deriveRights (pure), listProvenance; hooks in forge.createForgeItem, campaign-item.createCampaignItem, portraits/portrait-service (composite), encounter.runRound (composite, memoryRefs = the round's ledger writes) |
+| `ai/network/traces.ts` | now resolves consent at write-time; unconsented traces go to `traces/quarantine/` and carry `consent.training=false` — the corpus is only `traces/*.jsonl` |
+| `api/provenance` (GET) | manifests for one asset |
+| `api/profile` (PUT) | accepts `aiTrainingConsent` |
