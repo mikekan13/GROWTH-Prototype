@@ -541,3 +541,6 @@ One manifest per creative act (docs/research/growth-provenance-ledger-briefing-2
 One row per (entity, sweep, question): entityId, runId, probeVersion, questionKey, question, response, model. First run per entity = its IDENTITY_HASH baseline. Metrics (drift-from-self, divergence-between-entities) are computed, not stored. **Responses may carry a protagonist's story — the API never returns them, only metrics.**
 
 **DayaEntity** gained `dreamPressure` (Float, default 0): every ledger write adds salience×10; at 150 (env DAYA_DREAM_PRESSURE_THRESHOLD) the entity dreams and the counter resets.
+
+## CanonEvent (Mike 2026-09-20 — the infallible base reality; migration canon_ledger_truthref)
+Append-only, never edited (no write route). One row per resolved act: campaignId, cycle, seq, kind (encounter_round | check | negate | block | redirect | damage | downed | move | hold | dialogue | declaration…), locationId?, actorId?, targetId?, narration (diegetic, numberless), detail (JSON: the sim's numbers), consequences (JSON: pool/part/item deltas), sourceType/sourceId, parentId (round → its acts), provenanceId. **DayaMemoryEntry** gained `truthRef` (the CanonEvent a lived memory perceived); the round memory's classification also lists `truthRefs[]` for the acts the being could witness. The Watcher reads all of it; players have no route.

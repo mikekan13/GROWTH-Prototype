@@ -152,6 +152,8 @@ export interface WriteMemoryParams {
   parentMemoryId?: string | null;
   /** Bookkeeping rows (tick markers, tests) that must not raise dream pressure. */
   skipDreamPressure?: boolean;
+  /** The CanonEvent this lived memory perceived (Mike 09-20: fallible memory over infallible truth). */
+  truthRef?: string | null;
 }
 
 /**
@@ -173,6 +175,7 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
       classification: JSON.stringify(params.classification ?? {}),
       clusterId: params.clusterId ?? null,
       parentMemoryId: params.parentMemoryId ?? null,
+      truthRef: params.truthRef ?? null,
     },
   });
   // Event-driven dream trigger (2026-09-20): lived experience raises dream

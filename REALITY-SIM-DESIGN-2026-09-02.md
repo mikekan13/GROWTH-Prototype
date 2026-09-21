@@ -561,3 +561,16 @@ at every META entry point (create, invite join, express interest, hub
 apply), and the trace corpus keyed off the mode (DISCONNECTED → quarantine).
 OPEN: switching a live campaign DISCONNECTED → META (needs every member's
 consent at switch time).
+
+### 11.2 Ruling (Mike 2026-09-20): fallible memory, infallible truth
+
+Character memory is FALLIBLE by design (DayaMemoryEntry: affect-tagged,
+Wisdom/Wit-gated, Thorn-distortable, dream-drifted — correct as is). Beneath
+it there must be a **base reality that is recorded and infallible**. As built
+there is none: WorldFact, HistoryEntry, CampaignEvent, encounter round logs
+and Provenance are five partial records, none authoritative, none linked to
+the memories derived from them. Proposed (awaiting Mike): an append-only
+CANON EVENT ledger as the Willpower step's output (cycle §3) — when/where/
+who/what (structured + narration)/consequences/provenance — with every
+lived memory carrying a `truthRef`, so fallibility becomes measurable and
+the GM cannot edit ledgered canon (ruling 9). **Readers (Mike 09-20): "The GM can see whatever he needs to see. He is called the Watcher for a reason."** The Watcher reads all of it; players only through fallible memory.

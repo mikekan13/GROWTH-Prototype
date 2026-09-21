@@ -33,6 +33,35 @@ model User {
   createdAt          DateTime   @default(now())
 }
 
+// ── Canon ledger (Mike 2026-09-20): the infallible base reality ──────────────
+// Append-only, immutable. One row per resolved act — the output of the
+// Willpower step ("set as CANON via the recording on the canvas"). The GM
+// cannot edit ledgered canon (design doc ruling 9). The Watcher reads all of
+// it; players reach it only through their character's fallible memory.
+model CanonEvent {
+  id           String   @id @default(cuid())
+  campaignId   String
+  cycle        Float    // campaign clock (meta cycles) when it happened
+  seq          Int      // ordering within the same cycle (slot / step)
+  kind         String   // encounter_round | check | negate | block | redirect | damage | downed | move | hold | dialogue | declaration | …
+  locationId   String?
+  actorId      String?  // characterId
+  targetId     String?  // characterId
+  narration    String   // diegetic, numberless — what a witness would perceive
+  detail       String   // JSON: the sim's structured record (rolls, DRs, deltas)
+  consequences String   // JSON: pool/part/item deltas actually applied
+  sourceType   String?  // encounter | table | gm | sim
+  sourceId     String?  // e.g. encounterId
+  parentId     String?  // grouping event (the round for its slot actions)
+  provenanceId String?
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, cycle, seq])
+  @@index([campaignId, actorId])
+  @@index([campaignId, targetId])
+  @@index([parentId])
+}
+
 // ── Identity probes (2026-09-20, docs/research/growth-agent-research-briefing §3.3/§6) ──
 // A canonical question set re-asked per entity; responses are stored so
 // drift-from-self (bounded) and divergence-between-entities (growing) can be
@@ -1082,6 +1111,10 @@ model DayaMemoryEntry {
   classification String     @default("{}") // JSON: content category, sensitivity, IC/OOC
   clusterId      String?    // dream-tick hierarchy grouping
   parentMemoryId String?    // memories-of-memories (dream consolidation)
+  // Mike 2026-09-20: memory is FALLIBLE; beneath it sits the infallible canon
+  // ledger. A lived memory points at the CanonEvent it perceived, so drift
+  // between what a being remembers and what happened is measurable.
+  truthRef       String?
 
   @@index([entityId, narrativeCycle])
   @@index([entityId, salience])

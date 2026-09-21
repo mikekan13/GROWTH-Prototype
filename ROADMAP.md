@@ -690,3 +690,6 @@ unchanged. Queued, in order:
 Not adopted: AI-GM framings (parked 09-02); soul.py file layout as files —
 it maps onto existing tables (SALIENCE=DayaAffect, RELATIONS=DayaRelationship,
 PROCEDURES=JEWL rulings library); only IDENTITY_HASH is new (item 3).
+
+## 2026-09-20 — CANON LEDGER (the infallible base reality) — SHIPPED (walking version)
+Mike: character memory is fallible by design; a recorded, infallible truth must sit beneath it; the Watcher reads all of it. Built: CanonEvent (append-only, GM-read-only), written by the sim per round act; DayaMemoryEntry.truthRef; memory-vs-truth view. NEXT: table-speak dialogue and GM declarations/improvisations as canon events; location on events once positions land; canvas recording surface.

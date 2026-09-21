@@ -38,6 +38,7 @@ import { applyAttributeDamage } from '@/services/character-attribute';
 import { advanceClock, getClock } from '@/services/time';
 import { writeMemoryEntry } from '@/daya/memory';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
+import { recordRoundCanon } from '@/services/canon';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
 import type { TerminalEvent, TerminalPayload } from '@/types/terminal';
@@ -614,6 +615,15 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   // No confabulation: this is the sim's product for the entity.
   let cycle = 0;
   try { cycle = (await getClock(enc.campaignId)).currentCycle; } catch { /* default 0 */ }
+
+  // ── CANON first (Mike 09-20): the infallible record of what happened. ──
+  // One parent event for the round, one child per consequential act. Written
+  // before any memory so every memory can point at the truth it perceived.
+  let canon: Awaited<ReturnType<typeof recordRoundCanon>> | null = null;
+  try {
+    canon = await recordRoundCanon({ campaignId: enc.campaignId, cycle, encounterId, encounterName: enc.name, round, log: result.log });
+  } catch (err) { console.warn('[encounter] canon write failed', err); }
+
   const memoryIds: string[] = [];
   for (const p of state.participants) {
     const field = fields.get(p.id);
@@ -622,11 +632,16 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     if (!entity) continue;
     const downSlot = result.log.find(l => l.kind === 'downed' && l.targetId === p.id)?.slot;
     const flags = senseFlags(sheets.get(p.id) ?? null);
+    const perceivable = (slot: number) => (flags.canSee || flags.canHear) && (downSlot === undefined || slot <= downSlot);
     const witnessed = result.log
-      .filter(l => l.narration && (downSlot === undefined || l.slot <= downSlot))
-      .filter(() => flags.canSee || flags.canHear)
+      .filter(l => l.narration && perceivable(l.slot))
       .map(l => l.narration as string)
       .join('. ');
+    // The canon events this being actually witnessed — the fallible memory's
+    // pointers into the infallible record, up to the slot it went down in.
+    const truthRefs = canon
+      ? [...canon.childBySlotIndex.entries()].filter(([slot]) => perceivable(slot)).flatMap(([, ids]) => ids)
+      : [];
     const hitMe = result.log.some(l => l.kind === 'damage' && l.targetId === p.id);
     const wentDown = result.downed.includes(p.id);
     try { const written = await writeMemoryEntry({
@@ -638,7 +653,8 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
       arousal: wentDown ? 0.95 : hitMe ? 0.8 : 0.6,
       salience: wentDown ? 0.95 : hitMe ? 0.8 : 0.5,
       entityRefs: state.participants.filter(x => x.id !== p.id).map(x => x.id),
-      classification: { encounterId, round, kind: 'encounter_round' },
+      classification: { encounterId, round, kind: 'encounter_round', truthRefs },
+      truthRef: canon?.roundId ?? null,
     }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
 

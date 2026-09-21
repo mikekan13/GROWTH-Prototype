@@ -459,3 +459,10 @@ Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive ch
 | `daya/probes.ts` | PROBE_SET_V1 (10 questions, Smallville's 5 categories); vectorize/cosine/distance (v0 TF cosine, swap for embeddings later); computeProbeMetrics (pure: baseline = first run; drift-from-self; pairwise divergence on the latest shared run); runProbeSweep (local lane, persona + 8 most salient memories, writes NO memories; 503 until the lane is ready) |
 | `api/daya/probes` | GET metrics per campaign (ADMIN; responses never returned) · POST run a sweep |
 | `daya/dream-pressure.ts` | accumulateDreamPressure: salience×10 per ledger write; at threshold → reset + wake(dream_tick). Hooked in memory.writeMemoryEntry (dream rows and skipDreamPressure rows excluded). Interval sweep remains a fallback. |
+
+## Canon ledger (2026-09-20)
+| Module | Purpose |
+|---|---|
+| `services/canon.ts` | recordCanonEvent, roundLogToCanon (pure: narrated consequential log entries → events, numbers in detail), recordRoundCanon (parent round + children, returns ids by slot), listCanon (GM/ADMIN), memoryVersusTruth (a being's memories beside the canon they point at) |
+| `api/campaigns/[id]/canon` (GET only) | the Watcher's ledger view; `?versusCharacterId=` = memory-vs-truth |
+| `services/encounter.runRound` | writes canon BEFORE memories; each perception memory gets truthRef (round) + truthRefs[] (witnessed acts up to its down slot) |
