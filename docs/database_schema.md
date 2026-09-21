@@ -534,3 +534,5 @@ One manifest per creative act (docs/research/growth-provenance-ledger-briefing-2
 | contentHash | String? | sha256 at creation |
 
 **User** gained `aiTrainingConsent` (Boolean, default false) + `aiTrainingConsentAt`. Set via PUT /api/profile { aiTrainingConsent }.
+
+**Campaign** gained `networkMode` (String, default META): META = consent required to enter, play trains GROWTH; DISCONNECTED = features only, never trains (migration 20260920_campaign_network_mode).

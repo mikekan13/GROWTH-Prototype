@@ -550,3 +550,14 @@ entity IS its memory ledger).
 exist). Build order unchanged: reality first, personalities after —
 except the two cheap, order-independent items (provenance rules, probe
 baselines), which the briefings correctly say cannot be retrofitted.
+
+### 11.1 Ruling (Mike 2026-09-20): consent is the price of the META
+
+**Consent to AI training is required to play in the META** (the connected
+network, whose play is what trains GROWTH). A **DISCONNECTED** campaign keeps
+every feature and never uses that table's data to train. Built:
+`Campaign.networkMode` (META | DISCONNECTED, set at creation), a consent gate
+at every META entry point (create, invite join, express interest, hub
+apply), and the trace corpus keyed off the mode (DISCONNECTED → quarantine).
+OPEN: switching a live campaign DISCONNECTED → META (needs every member's
+consent at switch time).

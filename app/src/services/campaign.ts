@@ -5,6 +5,7 @@ import { ForbiddenError, NotFoundError, ConflictError, ValidationError } from '@
 import { isWatcherOrAbove, isAdminRole, canManageCampaign } from '@/lib/permissions';
 import { createCampaignWallet } from '@/services/krma/wallet';
 import { createDraftCharacterForMember } from '@/services/character';
+import { assertMetaConsent } from '@/services/consent';
 
 // --- Schemas ---
 
@@ -14,6 +15,8 @@ export const createCampaignSchema = z.object({
   description: z.string().max(2000).optional(),
   worldContext: z.string().max(5000).optional(),
   customPrompts: z.array(z.string().max(500)).max(20).optional(),
+  /** META (connected; consent required; play trains GROWTH) or DISCONNECTED (features only, never trains). Default META. */
+  networkMode: z.enum(['META', 'DISCONNECTED']).optional(),
 });
 
 export const joinCampaignSchema = z.object({
@@ -54,6 +57,9 @@ export async function createCampaign(userId: string, userRole: string, input: z.
     throw new ForbiddenError('Only Watchers can create campaigns');
   }
 
+  const networkMode = input.networkMode ?? 'META';
+  await assertMetaConsent(userId, { networkMode }, 'create');
+
   const inviteCode = crypto.randomBytes(4).toString('hex');
   const campaign = await prisma.campaign.create({
     data: {
@@ -64,6 +70,7 @@ export async function createCampaign(userId: string, userRole: string, input: z.
       customPrompts: input.customPrompts ? JSON.stringify(input.customPrompts) : null,
       gmUserId: userId,
       inviteCode,
+      networkMode,
     },
   });
 
@@ -113,6 +120,7 @@ export async function joinCampaign(userId: string, inviteCode: string) {
   if (campaign.status !== 'ACTIVE') throw new ValidationError('Campaign is not active');
   if (campaign._count.members >= campaign.maxTrailblazers) throw new ValidationError('Campaign is full');
   if (campaign.gmUserId === userId) throw new ValidationError('You are the GM of this campaign');
+  await assertMetaConsent(userId, campaign, 'join');
 
   const existing = await prisma.campaignMember.findUnique({
     where: { campaignId_userId: { campaignId: campaign.id, userId } },
@@ -138,6 +146,8 @@ export async function expressInterest(userId: string, campaignId: string) {
   if (campaign.gmUserId === userId) {
     throw new ConflictError("You are this campaign's GM and cannot apply to it.");
   }
+
+  await assertMetaConsent(userId, campaign, 'express interest in');
 
   const existing = await prisma.campaignMember.findUnique({
     where: { campaignId_userId: { campaignId, userId } },

@@ -666,7 +666,7 @@ Detail owed beyond Phase 1 seeded entities:
 Two briefings (docs/research/*-2026-09-18.md: agent individuation; provenance
 ledger) assessed against the reality-sim rulings. Founding structure
 unchanged. Queued, in order:
-1. ✅ BUILT 09-20 — **Consent bit on the trace corpus** — the JEWL tool-loop traces
+1. ✅ BUILT 09-20 — **Consent bit on the trace corpus** + Mike's ruling: consent REQUIRED for META; DISCONNECTED mode = features without training (Campaign.networkMode, gates at every entry). OPEN: DISCONNECTED→META switch UX. — the JEWL tool-loop traces
    (ai/network/traces.ts) are the planned fine-tune corpus and contain
    player-authored content with no AI-training consent recorded. Add the
    flag (campaign + member level), gate the trace writer on it, BEFORE any

@@ -137,6 +137,10 @@ model Campaign {
   gmUserId            String
   inviteCode          String?              @unique
   status              String               @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  // Mike 2026-09-20: consent is required to play in the META (the connected
+  // network, whose play trains GROWTH). DISCONNECTED keeps the features but
+  // never uses the table's data to train. Set at creation.
+  networkMode         String               @default("META") // META | DISCONNECTED
   maxTrailblazers     Int                  @default(5)
   characters          Character[]
   members             CampaignMember[]

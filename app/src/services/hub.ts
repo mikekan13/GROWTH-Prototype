@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
+import { assertMetaConsent } from '@/services/consent';
 
 // --- Schemas ---
 
@@ -243,6 +244,7 @@ export async function applyToCampaign(
   if (campaign.status !== 'ACTIVE') throw new ValidationError('Campaign is not active');
   if (campaign._count.members >= campaign.maxTrailblazers) throw new ValidationError('Campaign is full');
   if (campaign.gmUserId === userId) throw new ValidationError('You cannot apply to your own campaign');
+  await assertMetaConsent(userId, campaign, 'apply to');
 
   // Check not already a member
   const existing = await prisma.campaignMember.findUnique({
