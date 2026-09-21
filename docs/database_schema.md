@@ -536,3 +536,8 @@ One manifest per creative act (docs/research/growth-provenance-ledger-briefing-2
 **User** gained `aiTrainingConsent` (Boolean, default false) + `aiTrainingConsentAt`. Set via PUT /api/profile { aiTrainingConsent }.
 
 **Campaign** gained `networkMode` (String, default META): META = consent required to enter, play trains GROWTH; DISCONNECTED = features only, never trains (migration 20260920_campaign_network_mode).
+
+## DayaIdentityProbe (2026-09-20, migration 20260921025242)
+One row per (entity, sweep, question): entityId, runId, probeVersion, questionKey, question, response, model. First run per entity = its IDENTITY_HASH baseline. Metrics (drift-from-self, divergence-between-entities) are computed, not stored. **Responses may carry a protagonist's story — the API never returns them, only metrics.**
+
+**DayaEntity** gained `dreamPressure` (Float, default 0): every ledger write adds salience×10; at 150 (env DAYA_DREAM_PRESSURE_THRESHOLD) the entity dreams and the counter resets.

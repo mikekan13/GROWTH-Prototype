@@ -452,3 +452,10 @@ Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive ch
 | `ai/network/traces.ts` | now resolves consent at write-time; unconsented traces go to `traces/quarantine/` and carry `consent.training=false` — the corpus is only `traces/*.jsonl` |
 | `api/provenance` (GET) | manifests for one asset |
 | `api/profile` (PUT) | accepts `aiTrainingConsent` |
+
+## Identity probes + dream pressure (2026-09-20)
+| Module | Purpose |
+|---|---|
+| `daya/probes.ts` | PROBE_SET_V1 (10 questions, Smallville's 5 categories); vectorize/cosine/distance (v0 TF cosine, swap for embeddings later); computeProbeMetrics (pure: baseline = first run; drift-from-self; pairwise divergence on the latest shared run); runProbeSweep (local lane, persona + 8 most salient memories, writes NO memories; 503 until the lane is ready) |
+| `api/daya/probes` | GET metrics per campaign (ADMIN; responses never returned) · POST run a sweep |
+| `daya/dream-pressure.ts` | accumulateDreamPressure: salience×10 per ledger write; at threshold → reset + wake(dream_tick). Hooked in memory.writeMemoryEntry (dream rows and skipDreamPressure rows excluded). Interval sweep remains a fallback. |

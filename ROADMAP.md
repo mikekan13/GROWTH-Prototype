@@ -676,10 +676,10 @@ unchanged. Queued, in order:
    model/entity/adapter, ingredients[], memoryRefs[], rights bits (remix /
    external AI training / commercial). Schema first — cannot be retrofitted.
    Ownership stays outside the manifest (KRMA/possessions).
-3. **Probe baselines** for Violet + the 3 NPCs: canonical identity-question
+3. ✅ BUILT 09-20 — **Probe baselines** for Violet + the 3 NPCs: canonical identity-question
    set, embedded responses stored as IDENTITY_HASH; monthly re-probe measures
    drift-from-self (bounded) and divergence-between-entities (growing).
-4. **Dream trigger → accumulated salience threshold** (event-driven, Smallville
+4. ✅ BUILT 09-20 — **Dream trigger → accumulated salience threshold** (event-driven, Smallville
    150-importance pattern) replacing the 6 h interval; manual sweep stays as
    fallback. Fits Mike's rejection of ticks/clocks.
 5. **Per-entity believed world** in the next sim unit with positions: Attend

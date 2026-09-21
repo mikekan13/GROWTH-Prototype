@@ -150,6 +150,8 @@ export interface WriteMemoryParams {
   classification?: TaggerClassification | Record<string, unknown>;
   clusterId?: string | null;
   parentMemoryId?: string | null;
+  /** Bookkeeping rows (tick markers, tests) that must not raise dream pressure. */
+  skipDreamPressure?: boolean;
 }
 
 /**
@@ -173,6 +175,11 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
       parentMemoryId: params.parentMemoryId ?? null,
     },
   });
+  // Event-driven dream trigger (2026-09-20): lived experience raises dream
+  // pressure; dream-authored rows don't (no self-triggering). Fire-and-forget.
+  if (params.source !== 'dream' && !params.skipDreamPressure) {
+    void import('./dream-pressure').then(m => m.accumulateDreamPressure(params.entityId, params.salience ?? 0)).catch(() => {});
+  }
   return { id: row.id };
 }
 

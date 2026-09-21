@@ -33,6 +33,25 @@ model User {
   createdAt          DateTime   @default(now())
 }
 
+// ── Identity probes (2026-09-20, docs/research/growth-agent-research-briefing §3.3/§6) ──
+// A canonical question set re-asked per entity; responses are stored so
+// drift-from-self (bounded) and divergence-between-entities (growing) can be
+// measured over months. The first run per entity is its IDENTITY_HASH baseline.
+model DayaIdentityProbe {
+  id           String   @id @default(cuid())
+  entityId     String   // DayaEntity id
+  runId        String   // groups one sweep across entities
+  probeVersion String   // e.g. "v1"
+  questionKey  String
+  question     String
+  response     String
+  model        String?
+  createdAt    DateTime @default(now())
+
+  @@index([entityId, runId])
+  @@index([runId])
+}
+
 // ── Provenance ledger (2026-09-20, docs/research/growth-provenance-ledger-briefing) ──
 // One manifest per creative act. Creation facts are immutable; ownership lives
 // elsewhere (possessions/KRMA). Ingredients form the creation DAG; memoryRefs
@@ -1018,6 +1037,10 @@ model DayaEntity {
   introspection  Float     @default(0.5) // 0..1 self-insight capacity — shapes true-vs-believed divergence
   personaProfile String    @default("{}") // JSON: bias/voice params
   status         String    @default("DORMANT") // DORMANT | ACTIVE | ARCHIVED
+  // Event-driven dream trigger (2026-09-20, Smallville importance counter):
+  // every ledger write adds salience×10; at DREAM_PRESSURE_THRESHOLD the
+  // entity dreams and the counter resets. No clock.
+  dreamPressure  Float     @default(0)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
