@@ -16,18 +16,23 @@ across all layers. Companion to `REALITY-SIM-DESIGN-2026-09-02.md` (§11–12).
 And: use and adapt anything already being done well in AI memory toward it.
 
 Two consequences shape everything below:
-1. **The Terminal layer is a record, not a model.** Perfect recollection is
-   achieved by never letting a fact exist only in a model's head: every act is
-   ledgered once, immutably, with its chain; answers are lookups and
-   traversals over that record, and a model only phrases them.
-2. **Fallibility lives above the record, by design.** Characters misremember;
+1. **The Terminal is a BEING (Mike 09-23), and the canon ledger is its
+   memory.** Fidelity is a function of attributes at every layer — one
+   mechanism, three scales. A character with Wisdom 20 misremembers; a
+   Godhead with a godlike sheet can only be fooled on purpose; the Terminal
+   has perfect attributes, so its recollection is perfect. Perfect
+   recollection is therefore achieved the same way everything else is: the
+   ledger holds every act once with its chain, and the Terminal's recall over
+   it has a threshold of zero and a budget of everything. A model only
+   phrases what the record returns.
+2. **Fallibility is attribute-priced, by design.** Characters misremember;
    Godheads almost never do; the Terminal never does.
 
 ## 1. The layers (one machine at three scales)
 
 | Layer | Record | Reader | Fidelity | Scope |
 |---|---|---|---|---|
-| **Terminal** | Canon ledger: every event once, append-only, with its chain | The Watcher via JEWL; Godheads; the sim | Infallible | ADMIN/Prime: everything. A **Watcher sees everything within their campaign and nothing beyond** (09-23). |
+| **Terminal** (a being — The Godhead) | Canon ledger = its memory: every event once, append-only, with its chain | Itself; the Watcher via JEWL; Godheads; the sim | Perfect attributes → perfect recollection | ADMIN/Prime: everything. A **Watcher sees everything within their campaign and nothing beyond** (09-23). |
 | **Godheads** | The **vines** they custody (a vine is the custodian's memory of a goal) | Themselves; JEWL on request | Godlike sheets → faithful unless deliberately fooled; coloring = interpretation, not error | Within the asking campaign |
 | **JEWL** | Reads canon + the campaign's vines; front man for the audience with the gods | The Watcher | Faithful within scope | Within the campaign |
 | **Character** | Fallible memory ledger, each entry pointing at the canon it perceived (`truthRef`) | The being itself; the player through it | Fallible by design (Wisdom/Wit gates, Thorns, dreams) | What its body could sense and it can learn in-fiction |
