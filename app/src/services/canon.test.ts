@@ -22,6 +22,24 @@ describe('roundLogToCanon', () => {
     expect(events[0].narration).not.toMatch(/\d/); // canon narration is diegetic
     expect((events[0].detail as { text: string }).text).toMatch(/14 vs DR 10/); // the numbers live in detail
   });
+  it('fills the truth-side chain: held items on hits, goals touched, domains (Mike 09-23)', () => {
+    const events = roundLogToCanon({
+      campaignId: 'c', cycle: 1, encounterId: 'e', round: 1, log, parentId: 'p',
+      context: {
+        locationId: 'loc1',
+        heldItemByParticipant: { A: 'sword1', B: 'shield1' },
+        goalsByParticipant: { A: [{ id: 'gA', description: 'Drive B out of the stairwell for good' }], B: [{ id: 'gB', description: 'Keep the door and the landing locked and safe' }] },
+      },
+    });
+    const dmg = events.find(e => e.kind === 'damage')!;
+    expect(dmg.itemIds).toEqual(['sword1', 'shield1']);
+    expect(dmg.locationId).toBe('loc1');
+    expect(dmg.domains).toContain('restoration'); // "hurt"
+    const move = events.find(e => e.kind === 'move')!; // "B moves: back toward the door" touches B's door/landing goal? needs 2 overlaps → door only → no
+    expect(move.itemIds).toEqual([]);
+    expect(events.find(e => e.kind === 'check')!.domains).toContain('force');
+  });
+
   it('order lines and unnarrated bookkeeping are not events', () => {
     const events = roundLogToCanon({ campaignId: 'c', cycle: 0, encounterId: 'e', round: 1, log: log.filter(l => l.kind === 'order' || (l.kind === 'action' && !l.narration)), parentId: 'p' });
     expect(events).toHaveLength(0);

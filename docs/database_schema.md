@@ -544,3 +544,7 @@ One row per (entity, sweep, question): entityId, runId, probeVersion, questionKe
 
 ## CanonEvent (Mike 2026-09-20 — the infallible base reality; migration canon_ledger_truthref)
 Append-only, never edited (no write route). One row per resolved act: campaignId, cycle, seq, kind (encounter_round | check | negate | block | redirect | damage | downed | move | hold | dialogue | declaration…), locationId?, actorId?, targetId?, narration (diegetic, numberless), detail (JSON: the sim's numbers), consequences (JSON: pool/part/item deltas), sourceType/sourceId, parentId (round → its acts), provenanceId. **DayaMemoryEntry** gained `truthRef` (the CanonEvent a lived memory perceived); the round memory's classification also lists `truthRefs[]` for the acts the being could witness. The Watcher reads all of it; players have no route.
+
+## Memory chain + domains (Mike 2026-09-23; migration memory_chain_domains)
+**DayaMemoryEntry** gained `pillar` (MERCY|BALANCE|SEVERITY, null until the seat is ruled), `domain` (primary key from src/daya/domains.ts), `domains` (JSON string[], overlap is the rule), `chain` (JSON<MemoryChain>: truthRefs, entities, items, locationId, goalIds, antecedentId). Classified at write-time by the keyword classifier unless the caller passes an explicit classification.
+**CanonEvent** gained `itemIds`, `goalIds`, `domains` (JSON string[]) — the truth-side chain.

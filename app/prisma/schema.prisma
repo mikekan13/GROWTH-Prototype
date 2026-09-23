@@ -54,6 +54,10 @@ model CanonEvent {
   sourceId     String?  // e.g. encounterId
   parentId     String?  // grouping event (the round for its slot actions)
   provenanceId String?
+  // The chain on the truth side (Mike 09-23): what was involved.
+  itemIds      String   @default("[]") // JSON string[] CampaignItem ids
+  goalIds      String   @default("[]") // JSON string[] Goal ids this act touched
+  domains      String   @default("[]") // JSON string[] domain keys (same registry as memories)
   createdAt    DateTime @default(now())
 
   @@index([campaignId, cycle, seq])
@@ -1115,6 +1119,14 @@ model DayaMemoryEntry {
   // ledger. A lived memory points at the CanonEvent it perceived, so drift
   // between what a being remembers and what happened is measurable.
   truthRef       String?
+  // Mike 2026-09-23 (MEMORY-DESIGN §3): every memory is classified into the
+  // same ten domains the Godheads sit at (pillar Mercy/Balance/Severity +
+  // domain), and carries the CHAIN that backs it — entities, items, place,
+  // goals touched, antecedent — each tracking from its own perspective.
+  pillar         String?    // MERCY | BALANCE | SEVERITY (from the domain registry; null until the seat is ruled)
+  domain         String?    // primary domain key (src/daya/domains.ts)
+  domains        String     @default("[]") // JSON string[] — all matched domains (overlap is the rule)
+  chain          String     @default("{}") // JSON<MemoryChain> — see src/daya/chain.ts
 
   @@index([entityId, narrativeCycle])
   @@index([entityId, salience])

@@ -16,6 +16,8 @@ import { prisma } from '@/lib/db';
 import { chat, type DayaChatMessage, type DayaClientOverrides, type DayaTier } from './model-client';
 import { buildTaggerPrompt, type TaggerRosterEntry } from './prompts/roles/tagger';
 import { RECALL_TUNING } from './recall-tuning';
+import { classifyDomains, pillarOfDomain } from './domains';
+import { makeChain, type MemoryChain } from './chain';
 
 export type { TaggerRosterEntry };
 
@@ -154,6 +156,12 @@ export interface WriteMemoryParams {
   skipDreamPressure?: boolean;
   /** The CanonEvent this lived memory perceived (Mike 09-20: fallible memory over infallible truth). */
   truthRef?: string | null;
+  /** Domain classification (Mike 09-23). Omit to classify from content at write-time. */
+  domain?: string | null;
+  domains?: string[];
+  pillar?: string | null;
+  /** The chain that backs the memory (Mike 09-23). Omit for an empty chain. */
+  chain?: Partial<MemoryChain>;
 }
 
 /**
@@ -162,8 +170,24 @@ export interface WriteMemoryParams {
  * experience (Ruling 5: the attempt itself is a memory).
  */
 export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id: string }> {
+  // Classification at write-time (Mike 09-23): every memory is tagged into the
+  // ten domains; callers may pass an explicit classification, otherwise the
+  // keyword classifier runs on the content. Overlap is the rule.
+  const cls = params.domain !== undefined || params.domains ? null : classifyDomains(params.content);
+  const domains = params.domains ?? cls?.all ?? [];
+  const domain = params.domain !== undefined ? params.domain : cls?.primary ?? null;
+  const pillar = params.pillar !== undefined ? params.pillar : pillarOfDomain(domain);
+  const chain = makeChain({
+    ...(params.chain ?? {}),
+    truthRefs: [...(params.chain?.truthRefs ?? []), ...(params.truthRef ? [params.truthRef] : [])],
+    entities: params.chain?.entities ?? params.entityRefs ?? [],
+  });
   const row = await prisma.dayaMemoryEntry.create({
     data: {
+      pillar,
+      domain,
+      domains: JSON.stringify(domains),
+      chain: JSON.stringify(chain),
       entityId: params.entityId,
       narrativeCycle: params.narrativeCycle,
       source: params.source,
@@ -223,6 +247,13 @@ export async function ingestStimulus(
 
   const salienceStored = clamp(tags.salience * (1 + RECALL_TUNING.encodeArousalSalienceMul * tags.arousal), 0, 1);
 
+  // Chain (Mike 09-23): the being's previous memory is the antecedent.
+  const previous = await prisma.dayaMemoryEntry.findFirst({
+    where: { entityId: params.entityId, NOT: { source: 'dream' } },
+    orderBy: { realTime: 'desc' },
+    select: { id: true },
+  });
+
   const row = await writeMemoryEntry({
     entityId: params.entityId,
     narrativeCycle: params.cycle,
@@ -234,6 +265,7 @@ export async function ingestStimulus(
     entityRefs: tags.entityRefs,
     classification: tags.classification,
     parentMemoryId: params.parentMemoryId ?? null,
+    chain: { entities: tags.entityRefs, antecedentId: previous?.id ?? null },
   });
 
   return { persisted: true, memoryEntryId: row.id, tags };

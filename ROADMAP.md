@@ -696,3 +696,6 @@ Mike: character memory is fallible by design; a recorded, infallible truth must 
 
 ## 2026-09-23 — MEMORY DESIGN founded (MEMORY-DESIGN-2026-09-23.md)
 North star: PERFECT RECOLLECTION at the Terminal. Rulings from the 09-20→23 walkthrough recorded; 7-step build order proposed (schema-first: memory chain + domain tags, then ladder recall, canon writers, vines as custodian memory, Godheads as beings, Terminal recall, recollection harness). Awaiting Mike's pick of the first unit.
+
+## 2026-09-23 — MEMORY step 1 SHIPPED: chain + domain tags at write-time
+Every memory now carries pillar/domain/domains + chain (truthRefs, entities, items, place, goals, antecedent); canon events carry items/goals/domains/location. Ten-domain registry is DATA awaiting Mike's seating/names/keywords. Retrieval unchanged (step 2 = ladder recall).

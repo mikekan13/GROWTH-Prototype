@@ -130,7 +130,7 @@ Do not adopt: per-entity file layouts (tables exist), AI-GM framings, any
 
 ## 7. Build order (PROPOSAL — schema-first, since it cannot be retrofitted)
 
-1. **Memory chain + domain tags at write-time** — `DayaMemoryEntry` gains
+1. ✅ BUILT 09-23 — **Memory chain + domain tags at write-time** — `DayaMemoryEntry` gains
    `pillar`, `domain`, `chain` (JSON: entities, items, locationId, goalIds,
    antecedentId); the sim and the tagger fill them; canon events gain
    `locationId` + `itemIds` + `goalIds`. Nothing retrieved yet; nothing lost.

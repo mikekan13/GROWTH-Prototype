@@ -466,3 +466,12 @@ Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive ch
 | `services/canon.ts` | recordCanonEvent, roundLogToCanon (pure: narrated consequential log entries → events, numbers in detail), recordRoundCanon (parent round + children, returns ids by slot), listCanon (GM/ADMIN), memoryVersusTruth (a being's memories beside the canon they point at) |
 | `api/campaigns/[id]/canon` (GET only) | the Watcher's ledger view; `?versusCharacterId=` = memory-vs-truth |
 | `services/encounter.runRound` | writes canon BEFORE memories; each perception memory gets truthRef (round) + truthRefs[] (witnessed acts up to its down slot) |
+
+## Memory chain + the ten domains (2026-09-23)
+| Module | Purpose |
+|---|---|
+| `daya/domains.ts` | The ten-domain registry (school-parallel keys; labels/pillar seating/keywords are [NEEDS MIKE] data); classifyDomains(text) = multi-tag keyword classifier ("keywords to an extent") |
+| `daya/chain.ts` | MemoryChain type, makeChain/parseChain, goalsTouched (keyword overlap with a goal description) |
+| `daya/memory.writeMemoryEntry` | classifies + builds the chain on every write (explicit values win); ingestStimulus adds entities + antecedent |
+| `services/canon.roundLogToCanon` | fills itemIds (held items of the parties on hits), goalIds (touched goals of actor/target), domains, locationId from a RoundChainContext |
+| `services/encounter.runRound` | builds the chain context (location, held items, every participant's ACTIVE goals); each perception memory gets items seen, place, own goals touched, antecedent |

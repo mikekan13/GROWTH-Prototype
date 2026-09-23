@@ -39,6 +39,7 @@ import { advanceClock, getClock } from '@/services/time';
 import { writeMemoryEntry } from '@/daya/memory';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { recordRoundCanon } from '@/services/canon';
+import { goalsTouched } from '@/daya/chain';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
 import type { TerminalEvent, TerminalPayload } from '@/types/terminal';
@@ -619,9 +620,19 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   // ── CANON first (Mike 09-20): the infallible record of what happened. ──
   // One parent event for the round, one child per consequential act. Written
   // before any memory so every memory can point at the truth it perceived.
+  // The chain context (Mike 09-23): where, what was held, which goals were in play.
+  const goalsByParticipant: Record<string, Array<{ id: string; description: string }>> = {};
+  for (const p of state.participants) {
+    goalsByParticipant[p.id] = await prisma.goal.findMany({ where: { characterId: p.id, status: 'ACTIVE' }, select: { id: true, description: true } });
+  }
+  const chainContext = {
+    locationId: enc.locationId ?? null,
+    heldItemByParticipant: Object.fromEntries(state.participants.map(p => [p.id, p.heldItemId])),
+    goalsByParticipant,
+  };
   let canon: Awaited<ReturnType<typeof recordRoundCanon>> | null = null;
   try {
-    canon = await recordRoundCanon({ campaignId: enc.campaignId, cycle, encounterId, encounterName: enc.name, round, log: result.log });
+    canon = await recordRoundCanon({ campaignId: enc.campaignId, cycle, encounterId, encounterName: enc.name, round, log: result.log, context: chainContext });
   } catch (err) { console.warn('[encounter] canon write failed', err); }
 
   const memoryIds: string[] = [];
@@ -642,6 +653,11 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     const truthRefs = canon
       ? [...canon.childBySlotIndex.entries()].filter(([slot]) => perceivable(slot)).flatMap(([, ids]) => ids)
       : [];
+    // The being's chain (Mike 09-23): items it saw in play, the place, its own
+    // goals the round touched, and its previous perception as antecedent.
+    const itemsSeen = canon ? [...canon.itemsBySlotIndex.entries()].filter(([slot]) => perceivable(slot)).flatMap(([, ids]) => ids) : [];
+    const goalIds = canon?.goalsByParticipant.get(p.id) ?? goalsTouched(witnessed, goalsByParticipant[p.id] ?? []);
+    const previous = await prisma.dayaMemoryEntry.findFirst({ where: { entityId: entity.id, source: 'perception' }, orderBy: { realTime: 'desc' }, select: { id: true } });
     const hitMe = result.log.some(l => l.kind === 'damage' && l.targetId === p.id);
     const wentDown = result.downed.includes(p.id);
     try { const written = await writeMemoryEntry({
@@ -655,6 +671,14 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
       entityRefs: state.participants.filter(x => x.id !== p.id).map(x => x.id),
       classification: { encounterId, round, kind: 'encounter_round', truthRefs },
       truthRef: canon?.roundId ?? null,
+      chain: {
+        truthRefs,
+        entities: state.participants.filter(x => x.id !== p.id).map(x => x.id),
+        items: itemsSeen,
+        locationId: enc.locationId ?? null,
+        goalIds,
+        antecedentId: previous?.id ?? null,
+      },
     }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
 

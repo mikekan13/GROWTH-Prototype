@@ -17,6 +17,8 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import type { RoundLogEntry } from '@/sim/round/types';
+import { classifyDomains } from '@/daya/domains';
+import { goalsTouched } from '@/daya/chain';
 
 export interface CanonEventInput {
   campaignId: string;
@@ -33,11 +35,27 @@ export interface CanonEventInput {
   sourceId?: string | null;
   parentId?: string | null;
   provenanceId?: string | null;
+  /** The chain on the truth side (Mike 09-23). */
+  itemIds?: string[];
+  goalIds?: string[];
+  domains?: string[];
+}
+
+/** What the sim knows about the scene when it records a round — feeds the truth-side chain. */
+export interface RoundChainContext {
+  locationId?: string | null;
+  /** participantId → held item id (the interposable one) */
+  heldItemByParticipant?: Record<string, string | null>;
+  /** participantId → that being's ACTIVE goals */
+  goalsByParticipant?: Record<string, Array<{ id: string; description: string }>>;
 }
 
 export async function recordCanonEvent(input: CanonEventInput) {
   return prisma.canonEvent.create({
     data: {
+      itemIds: JSON.stringify(input.itemIds ?? []),
+      goalIds: JSON.stringify(input.goalIds ?? []),
+      domains: JSON.stringify(input.domains ?? []),
       campaignId: input.campaignId,
       cycle: input.cycle,
       seq: input.seq,
@@ -71,16 +89,27 @@ export function roundLogToCanon(args: {
   round: number;
   log: RoundLogEntry[];
   parentId: string;
+  context?: RoundChainContext;
 }): CanonEventInput[] {
   const out: CanonEventInput[] = [];
+  const ctx = args.context ?? {};
   let seq = 0;
   for (const l of args.log) {
     if (!CANON_KINDS.has(l.kind) || !l.narration) continue;
+    // Truth-side chain: items interposed/held by the parties to this act, the
+    // goals of actor and target the act touched, the domains it falls under.
+    const parties = [l.actorId, l.targetId].filter((x): x is string => !!x);
+    const itemIds = (l.kind === 'block' || l.kind === 'redirect' || l.kind === 'damage' || l.kind === 'note')
+      ? parties.map(p => ctx.heldItemByParticipant?.[p] ?? null).filter((x): x is string => !!x)
+      : [];
+    const goalIds = parties.flatMap(p => goalsTouched(`${l.narration} ${l.text}`, ctx.goalsByParticipant?.[p] ?? []));
+    const domains = classifyDomains(`${l.narration} ${l.text}`).all;
     out.push({
       campaignId: args.campaignId,
       cycle: args.cycle,
       seq: seq++,
       kind: l.kind === 'action' ? (l.text.includes(' moves') ? 'move' : l.text.includes(' holds') ? 'hold' : 'action') : l.kind,
+      locationId: ctx.locationId ?? null,
       actorId: l.actorId,
       targetId: l.targetId,
       narration: l.narration,
@@ -89,6 +118,9 @@ export function roundLogToCanon(args: {
       sourceType: 'encounter',
       sourceId: args.encounterId,
       parentId: args.parentId,
+      itemIds: [...new Set(itemIds)],
+      goalIds: [...new Set(goalIds)],
+      domains,
     });
   }
   return out;
@@ -103,28 +135,39 @@ export async function recordRoundCanon(args: {
   round: number;
   log: RoundLogEntry[];
   provenanceId?: string | null;
-}): Promise<{ roundId: string; childIds: string[]; childBySlotIndex: Map<number, string[]> }> {
+  context?: RoundChainContext;
+}): Promise<{ roundId: string; childIds: string[]; childBySlotIndex: Map<number, string[]>; itemsBySlotIndex: Map<number, string[]>; goalsByParticipant: Map<string, string[]> }> {
   const parent = await recordCanonEvent({
     campaignId: args.campaignId,
     cycle: args.cycle,
     seq: 0,
     kind: 'encounter_round',
+    locationId: args.context?.locationId ?? null,
     narration: `${args.encounterName}: six seconds pass.`,
     detail: { round: args.round, entries: args.log.filter(l => l.kind !== 'order').length },
     sourceType: 'encounter',
     sourceId: args.encounterId,
     provenanceId: args.provenanceId ?? null,
   });
-  const inputs = roundLogToCanon({ campaignId: args.campaignId, cycle: args.cycle, encounterId: args.encounterId, round: args.round, log: args.log, parentId: parent.id });
+  const inputs = roundLogToCanon({ campaignId: args.campaignId, cycle: args.cycle, encounterId: args.encounterId, round: args.round, log: args.log, parentId: parent.id, context: args.context });
   const childIds: string[] = [];
   const childBySlotIndex = new Map<number, string[]>();
+  const itemsBySlotIndex = new Map<number, string[]>();
+  const goalsByParticipant = new Map<string, string[]>();
   for (const input of inputs) {
     const row = await recordCanonEvent(input);
     childIds.push(row.id);
     const slot = Number((input.detail as { slot: number }).slot) - 1;
     childBySlotIndex.set(slot, [...(childBySlotIndex.get(slot) ?? []), row.id]);
+    itemsBySlotIndex.set(slot, [...new Set([...(itemsBySlotIndex.get(slot) ?? []), ...(input.itemIds ?? [])])]);
+    for (const p of [input.actorId, input.targetId]) {
+      if (!p) continue;
+      const own = (args.context?.goalsByParticipant?.[p] ?? []).map(g => g.id);
+      const touched = (input.goalIds ?? []).filter(g => own.includes(g));
+      if (touched.length) goalsByParticipant.set(p, [...new Set([...(goalsByParticipant.get(p) ?? []), ...touched])]);
+    }
   }
-  return { roundId: parent.id, childIds, childBySlotIndex };
+  return { roundId: parent.id, childIds, childBySlotIndex, itemsBySlotIndex, goalsByParticipant };
 }
 
 // ── Reading — the Watcher's view ────────────────────────────────────────────
