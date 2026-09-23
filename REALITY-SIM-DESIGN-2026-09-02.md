@@ -574,3 +574,50 @@ CANON EVENT ledger as the Willpower step's output (cycle §3) — when/where/
 who/what (structured + narration)/consequences/provenance — with every
 lived memory carrying a `truthRef`, so fallibility becomes measurable and
 the GM cannot edit ledgered canon (ruling 9). **Readers (Mike 09-20): "The GM can see whatever he needs to see. He is called the Watcher for a reason."** The Watcher reads all of it; players only through fallible memory.
+
+## 12. Memory at the meta (walkthrough, 2026-09-22 — IN PROGRESS)
+
+**Ruling (Mike):** the meta memory belongs to **the Terminal, not JEWL**. Memory
+is structured correctly; **the Godheads are essentially memory managers** (on
+top of their other roles). They sit at the **10 sephiroth / 10 domains**,
+paralleling the 10 magic schools (not their real names), grouped by the three
+pillars **Mercy / Balance / Severity** exactly as a character has three
+pillars. Everything is classified by domain ("keywords to an extent"); the
+domain's Godhead is its source of truth — **Death → Tara**. Not documented
+anywhere before this session. Refined: Tara is a MAIN Godhead with Godheads
+under her (custodian TREE); events are OVERLAPPED by many — every witness
+logs it, their gods may take interest — so the meta memory is an INDEX over
+the one infallible record, not a partition. **Attention routes through GOALS** (each goal has a
+custodian Godhead — start there; domain classification second). **The VINE is
+the custodian's memory of the goal**; several recorders per goal (custodian,
+the resistance's opposing Godhead on its own vine, the witnesses) — one
+truth, many angles = "the God perspective upon that world." **Fidelity:** a Godhead's
+godlike attributes make it faithful by default; it can be fooled only on
+purpose (a contest). Coloring = interpretation, not error. So a Godhead is
+the same DAYA mechanism with a godlike sheet — no separate memory system. OPEN: seating; whether a Godhead's domain memory is fallible or a
+curated index; who authors the classifier.
+**Recall at the meta (Mike 09-22):** an audience with the gods, with JEWL as
+the front man — he answers most of it himself from canon and the campaign's
+vines; the Godheads sit behind him. Scope: a player reaches only what their
+character remembers; the Watcher, through JEWL, everything within the
+campaign; anything outside the campaign only by in-game means (powerful
+spells — the Divination parallel). **The wall holds for the Watcher too**
+(09-23): a Watcher sees everything within their campaign and nothing beyond;
+Godheads answer a campaign only from that campaign's vines.
+**Below (Mike 09-23):** a being's memory is a priority ladder — **survival, then
+goals, then everything else** — weighting both what is stored and what is
+reachable. Goals give a being its own "vines"; survival sits beneath them and is
+DERIVED from the sheet + the current situation (the sheet drives survival,
+body state, emotions), never authored.
+**Third tier (Mike 09-23):** the same 10-domain classification runs below —
+every memory is tagged pillar + domain at write-time and carries the CHAIN
+that backs it (entities involved, the canon event, goals touched, place,
+antecedent). Recall = classify the cue → survival → goals → domain → chain →
+words last. A being's memory is the Terminal's in miniature.
+**The chain (Mike 09-23):** items, locations, other entities — each tracking
+from its own perspective, all linked to the one canon event.
+
+**★ NORTH STAR (Mike 09-23):** PERFECT RECOLLECTION at the Terminal layer —
+the Terminal answers any question about anything anywhere in GROWTH with
+perfect detail and no hallucination. Use and adapt whatever AI memory already
+does well toward it.

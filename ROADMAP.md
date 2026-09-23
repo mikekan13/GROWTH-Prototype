@@ -693,3 +693,6 @@ PROCEDURES=JEWL rulings library); only IDENTITY_HASH is new (item 3).
 
 ## 2026-09-20 — CANON LEDGER (the infallible base reality) — SHIPPED (walking version)
 Mike: character memory is fallible by design; a recorded, infallible truth must sit beneath it; the Watcher reads all of it. Built: CanonEvent (append-only, GM-read-only), written by the sim per round act; DayaMemoryEntry.truthRef; memory-vs-truth view. NEXT: table-speak dialogue and GM declarations/improvisations as canon events; location on events once positions land; canvas recording surface.
+
+## 2026-09-23 — MEMORY DESIGN founded (MEMORY-DESIGN-2026-09-23.md)
+North star: PERFECT RECOLLECTION at the Terminal. Rulings from the 09-20→23 walkthrough recorded; 7-step build order proposed (schema-first: memory chain + domain tags, then ladder recall, canon writers, vines as custodian memory, Godheads as beings, Terminal recall, recollection harness). Awaiting Mike's pick of the first unit.
