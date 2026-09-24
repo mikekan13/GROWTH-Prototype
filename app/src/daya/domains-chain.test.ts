@@ -3,10 +3,10 @@ import { classifyDomains, DOMAINS, pillarOfDomain } from './domains';
 import { makeChain, parseChain, goalsTouched, EMPTY_CHAIN } from './chain';
 
 describe('domain registry', () => {
-  it('has exactly ten domains with unique keys; Death is the worked example', () => {
+  it('has exactly ten domains with unique keys; labels and seats blank until ruled', () => {
     expect(DOMAINS).toHaveLength(10);
     expect(new Set(DOMAINS.map(d => d.key)).size).toBe(10);
-    expect(DOMAINS.find(d => d.label === 'Death')?.key).toBe('dissolution');
+    expect(DOMAINS.every(d => d.label === null && d.pillar === null)).toBe(true); // blank until Mike names/seats them
   });
   it('classifies death text to Death, overlap allowed, ties by registry order', () => {
     const c = classifyDomains('Danny drives a fist into his gut — it connects. Mr. Carrasco goes down; he is dying.');

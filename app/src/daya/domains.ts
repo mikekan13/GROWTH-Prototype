@@ -18,13 +18,15 @@ export type Pillar3 = 'MERCY' | 'BALANCE' | 'SEVERITY';
 export interface DomainDef {
   key: string;            // stable id (school-parallel)
   parallel: string;       // the magic school it parallels (explanation only)
-  label: string | null;   // the domain's real name — [NEEDS MIKE]
+  label: string | null;   // the domain's real name / seated Godhead — BLANK until Mike names them (09-23)
   pillar: Pillar3 | null; // seat — [NEEDS MIKE]
   keywords: string[];     // "keywords to an extent" — starter set, [NEEDS MIKE]
 }
 
+// Mike 2026-09-23: no names yet for all the Godheads — labels stay blank.
+// The worked example is Death → Tara, which parallels Dissolution here.
 export const DOMAINS: DomainDef[] = [
-  { key: 'dissolution', parallel: 'Dissolution', label: 'Death', pillar: null, keywords: ['death', 'die', 'died', 'dies', 'dying', 'dead', 'kill', 'killed', 'corpse', 'grave', 'decay', 'rot', 'reap', 'mortal', 'funeral', 'down', 'facing death'] },
+  { key: 'dissolution', parallel: 'Dissolution', label: null, pillar: null, keywords: ['death', 'die', 'died', 'dies', 'dying', 'dead', 'kill', 'killed', 'corpse', 'grave', 'decay', 'rot', 'reap', 'mortal', 'funeral', 'down', 'facing death'] },
   { key: 'restoration', parallel: 'Restoration', label: null, pillar: null, keywords: ['heal', 'healed', 'healing', 'mend', 'recover', 'rest', 'stabilize', 'bandage', 'cure', 'restore', 'wound', 'hurt', 'injur'] },
   { key: 'force', parallel: 'Force', label: null, pillar: null, keywords: ['attack', 'strike', 'struck', 'hit', 'swing', 'punch', 'fist', 'blow', 'fight', 'fought', 'violence', 'shove', 'blade', 'weapon', 'connects', 'misses'] },
   { key: 'abjuration', parallel: 'Abjuration', label: null, pillar: null, keywords: ['block', 'guard', 'shield', 'protect', 'ward', 'defend', 'negate', 'avoid', 'dodge', 'lock', 'locked', 'safe', 'safety', 'door'] },
