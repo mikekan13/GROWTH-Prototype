@@ -150,6 +150,15 @@ export async function startSession(campaignId: string, name?: string): Promise<G
     },
   });
 
+  // Pre-warm the local lane (2026-09-26): the beings at the table run on the
+  // serverless core, which cold-starts in minutes. Kick it awake the moment a
+  // session opens so the first narration doesn't land on a sleeping worker.
+  // Fire-and-forget — never blocks or fails the session start.
+  void import('@/daya/l1-warm')
+    .then((m) => m.warmL1())
+    .then((status) => console.log(`[campaign-event] L1 pre-warm for session ${session.number}: ${status}`))
+    .catch((err) => console.warn('[campaign-event] L1 pre-warm failed', err));
+
   return {
     id: session.id,
     number: session.number,

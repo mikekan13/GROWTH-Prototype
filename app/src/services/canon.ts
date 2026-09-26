@@ -18,7 +18,7 @@ import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import type { RoundLogEntry } from '@/sim/round/types';
 import { classifyDomains } from '@/daya/domains';
-import { goalsTouched } from '@/daya/chain';
+import { goalsTouched, makeChain, parseChain } from '@/daya/chain';
 import { recordVineEntriesSafe } from '@/services/vine-memory';
 import { writeMemoryEntry } from '@/daya/memory';
 import { createCampaignEvent } from '@/services/campaign-event';
@@ -274,9 +274,14 @@ export async function declareCanon(
   try { await postCanonGameEvent(campaignId, actor, 'declaration', input.narration); } catch (err) { console.warn('[canon] declaration event failed', err); }
 
   // Everyone present perceives it — engine-authored, no confabulation.
-  const witnesses = input.witnessIds?.length
-    ? await prisma.dayaEntity.findMany({ where: { characterId: { in: input.witnessIds } }, select: { id: true, characterId: true } })
-    : await prisma.dayaEntity.findMany({ where: { status: 'ACTIVE', character: { campaignId } }, select: { id: true, characterId: true } });
+  // witnessIds undefined = every ACTIVE being in the campaign; an explicit
+  // empty array = nobody here (the caller delivers the perception itself,
+  // e.g. the Narrate channel runs it through each being's full loop).
+  const witnesses = input.witnessIds === undefined
+    ? await prisma.dayaEntity.findMany({ where: { status: 'ACTIVE', character: { campaignId } }, select: { id: true, characterId: true } })
+    : input.witnessIds.length
+      ? await prisma.dayaEntity.findMany({ where: { characterId: { in: input.witnessIds } }, select: { id: true, characterId: true } })
+      : [];
   const memoryIds: string[] = [];
   for (const w of witnesses) {
     try {
@@ -310,15 +315,33 @@ export async function recordDialogueCanon(campaignId: string, speakerId: string,
   return event;
 }
 
-/** Point a being's memories written since `since` at the canon event they perceived (for writers that go through the stimulus pipeline). */
+/** Point ONE memory (the stimulus row the being loop returned) at the canon event it perceived. Precise form — preferred over the time-window sweep. */
+export async function attachTruthToMemory(memoryId: string, canonEventId: string): Promise<boolean> {
+  const row = await prisma.dayaMemoryEntry.findUnique({ where: { id: memoryId }, select: { id: true, chain: true, truthRef: true } });
+  if (!row) return false;
+  const prior = parseChain(row.chain);
+  const chain = makeChain({ ...prior, truthRefs: [...prior.truthRefs, canonEventId] });
+  await prisma.dayaMemoryEntry.update({ where: { id: row.id }, data: { truthRef: row.truthRef ?? canonEventId, chain: JSON.stringify(chain) } });
+  return true;
+}
+
+/** Point a being's memories written since `since` at the canon event they perceived — the sweep form, for writers that don't hand back the stimulus row's id.
+ *  Note: the being loop also writes inner rows (failed-recall attempts, held states, the rest outcome) as 'perception'; a sweep tags those too, so prefer attachTruthToMemory when the id is known. */
 export async function attachTruthToRecentMemories(characterId: string, canonEventId: string, since: Date): Promise<number> {
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true } });
   if (!entity) return 0;
-  const res = await prisma.dayaMemoryEntry.updateMany({
+  // Per-row so the chain's truthRefs carry the link too (the chain rung reads
+  // the chain, not the truthRef column).
+  const rows = await prisma.dayaMemoryEntry.findMany({
     where: { entityId: entity.id, realTime: { gte: since }, truthRef: null, source: { in: ['dialogue', 'perception'] } },
-    data: { truthRef: canonEventId },
+    select: { id: true, chain: true },
   });
-  return res.count;
+  for (const row of rows) {
+    const prior = parseChain(row.chain);
+    const chain = makeChain({ ...prior, truthRefs: [...prior.truthRefs, canonEventId] });
+    await prisma.dayaMemoryEntry.update({ where: { id: row.id }, data: { truthRef: canonEventId, chain: JSON.stringify(chain) } });
+  }
+  return rows.length;
 }
 
 /** The vine, read from the custodian's side (Watcher). */

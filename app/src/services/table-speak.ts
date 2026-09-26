@@ -23,7 +23,15 @@ import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, type ConverseStatus } from '@/daya/conversation';
 import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
-import { attachTruthToRecentMemories, recordDialogueCanon } from '@/services/canon';
+import { attachTruthToMemory, attachTruthToRecentMemories, declareCanon, recordDialogueCanon } from '@/services/canon';
+
+/** The being loop hands back the id of the memory row that IS the perception; point that one at the truth. Sweep only when it didn't. */
+async function attachTruth(listenerId: string, memoryEntryId: string | undefined, canonEventId: string, since: Date) {
+  try {
+    if (memoryEntryId && (await attachTruthToMemory(memoryEntryId, canonEventId))) return;
+    await attachTruthToRecentMemories(listenerId, canonEventId, since);
+  } catch { /* record-keeping only */ }
+}
 
 export interface TableActor {
   userId: string;
@@ -155,7 +163,7 @@ export async function speakThroughNpc(
       detail: result.detail,
     };
     responses.push(response);
-    if (dialogueCanonId) { try { await attachTruthToRecentMemories(listener.id, dialogueCanonId, since); } catch { /* record-keeping only */ } }
+    if (dialogueCanonId) await attachTruth(listener.id, result.memoryEntryId, dialogueCanonId, since);
 
     if (result.status === 'ok' && result.action) {
       const line = actionToTableLine(listener.name, result.action);
@@ -166,6 +174,73 @@ export async function speakThroughNpc(
   }
 
   return { npcName: npc.name, responses };
+}
+
+export interface TableNarrateResult {
+  canonEventId: string;
+  responses: ListenerResponse[];
+}
+
+/**
+ * The GM narrates the world at the table (readiness for the live campaign,
+ * 2026-09-26). Narration is a Watcher DECLARATION: it becomes canon first
+ * (`declareCanon`, which also posts it to the table record as a game event),
+ * then every ACTIVE DAYA being present perceives it through its full being
+ * loop — a 'perception' memory pointing at the canon event — and anything it
+ * does in response posts back as chat, exactly like table-speak.
+ *
+ * Nothing is said "through" anyone here: the actor is the world itself.
+ */
+export async function narrateAtTable(
+  campaignId: string,
+  actor: TableActor,
+  input: { message: string; actorId?: string | null; targetId?: string | null; locationId?: string | null },
+): Promise<TableNarrateResult> {
+  if (!isWatcherOrAbove(actor.role)) {
+    throw new ForbiddenError('GM/ADMIN only — narrating is a Watcher-seat action');
+  }
+  // 1. Truth first. witnessIds: [] — we deliver the perception ourselves below
+  //    so each being lives it (emotion, attention, action), not just files it.
+  const since = new Date();
+  const declared = await declareCanon(campaignId, actor, {
+    narration: input.message,
+    kind: 'narration',
+    actorId: input.actorId ?? null,
+    targetId: input.targetId ?? null,
+    locationId: input.locationId ?? null,
+    witnessIds: [],
+  });
+
+  // 2. Every awake being present perceives the world change.
+  const characters = await prisma.character.findMany({ where: { campaignId }, select: { id: true, name: true } });
+  const activeEntities = await prisma.dayaEntity.findMany({
+    where: { characterId: { in: characters.map((c) => c.id) }, status: 'ACTIVE' },
+    select: { characterId: true },
+  });
+  const activeIds = new Set(activeEntities.map((e) => e.characterId));
+  const listeners = characters.filter((c) => activeIds.has(c.id));
+
+  const responses: ListenerResponse[] = [];
+  for (const listener of listeners) {
+    const result = await converseWithEntity(listener.id, actor.role, input.message, {}, 'perception');
+    responses.push({
+      characterId: listener.id,
+      characterName: listener.name,
+      status: result.status,
+      actionKind: result.action?.kind,
+      detail: result.detail,
+    });
+    await attachTruth(listener.id, result.memoryEntryId, declared.event.id, since);
+
+    if (result.status === 'ok' && result.action) {
+      const line = actionToTableLine(listener.name, result.action);
+      if (line) {
+        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
+      }
+    }
+  }
+
+  return { canonEventId: declared.event.id, responses };
 }
 
 /**

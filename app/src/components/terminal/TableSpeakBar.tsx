@@ -18,8 +18,12 @@ interface RosterCharacter {
   name: string;
 }
 
+/** Picker value for "the GM narrates the world" — canon + perception, no NPC voice. */
+const NARRATE = '__narrate__';
+
 interface SpeakResponse {
-  npcName: string;
+  npcName?: string;
+  canonEventId?: string;
   responses: Array<{
     characterId: string;
     characterName: string;
@@ -40,7 +44,8 @@ export default function TableSpeakBar({
 }) {
   const [npcs, setNpcs] = useState<RosterCharacter[]>([]);
   const [dayaActive, setDayaActive] = useState<RosterCharacter[]>([]);
-  const [speakerId, setSpeakerId] = useState('');
+  // Default = Narrate: a live session opens with the GM setting the scene.
+  const [speakerId, setSpeakerId] = useState(NARRATE);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [coreStatus, setCoreStatus] = useState<CoreStatus>('unknown');
@@ -58,7 +63,7 @@ export default function TableSpeakBar({
         if (cancelled) return;
         setNpcs(data.npcs);
         setDayaActive(data.dayaActive);
-        setSpeakerId((prev) => prev || data.npcs[0]?.id || '');
+        setSpeakerId((prev) => prev || NARRATE);
       } catch { /* silent */ }
     })();
     return () => { cancelled = true; };
@@ -101,7 +106,9 @@ export default function TableSpeakBar({
       const res = await fetch(`/api/campaigns/${campaignId}/table`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ npcCharacterId: speakerId, message: trimmed }),
+        body: JSON.stringify(
+          speakerId === NARRATE ? { narrate: true, message: trimmed } : { npcCharacterId: speakerId, message: trimmed },
+        ),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -135,7 +142,8 @@ export default function TableSpeakBar({
     }
   }
 
-  const speakerName = npcs.find((n) => n.id === speakerId)?.name ?? '—';
+  const narrating = speakerId === NARRATE;
+  const speakerName = narrating ? 'The world' : (npcs.find((n) => n.id === speakerId)?.name ?? '—');
 
   return (
     <div className="border-t" style={{ borderColor: 'rgba(34, 171, 148, 0.3)', backgroundColor: '#0d0d1a' }}>
@@ -143,7 +151,7 @@ export default function TableSpeakBar({
       {(note || coreStatus === 'warming' || sending) && (
         <div className="px-3 pt-1.5 text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255, 204, 120, 0.75)' }}>
           {sending
-            ? `${speakerName} speaks — the table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
+            ? `${narrating ? 'The world moves' : `${speakerName} speaks`} — the table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
             : note ?? 'The core is warming up from a cold start…'}
         </div>
       )}
@@ -161,7 +169,7 @@ export default function TableSpeakBar({
             maxWidth: '180px',
           }}
         >
-          {npcs.length === 0 && <option value="">no NPCs yet</option>}
+          <option value={NARRATE}>Narrate</option>
           {npcs.map((n) => (
             <option key={n.id} value={n.id}>
               {n.name}
@@ -178,7 +186,7 @@ export default function TableSpeakBar({
               void handleSubmit();
             }
           }}
-          placeholder={speakerId ? `Speak as ${speakerName}… (*asterisks* for actions)` : 'Build an NPC first — the table needs a voice'}
+          placeholder={narrating ? 'Narrate the scene… (becomes canon; everyone present perceives it)' : `Speak as ${speakerName}… (*asterisks* for actions)`}
           disabled={sending || !speakerId}
           className="flex-1 px-2 py-1 text-[13px] outline-none"
           style={{
@@ -201,7 +209,7 @@ export default function TableSpeakBar({
             borderRadius: '2px',
           }}
         >
-          {sending ? '…' : 'Speak'}
+          {sending ? '…' : narrating ? 'Narrate' : 'Speak'}
         </button>
       </div>
     </div>

@@ -47,6 +47,9 @@ export async function converseWithEntity(
   actorRole: string,
   message: string,
   overrides: DayaClientOverrides = {},
+  /** Memory source the being files this under: 'dialogue' (someone spoke) or
+   * 'perception' (the GM narrated the world). Same loop either way. */
+  source: 'dialogue' | 'perception' = 'dialogue',
 ): Promise<ConverseResult> {
   if (!isWatcherOrAbove(actorRole)) {
     throw new ForbiddenError('GM/ADMIN only — the persona-harness conversation surface is Watcher-console-and-above');
@@ -65,7 +68,7 @@ export async function converseWithEntity(
   }
 
   try {
-    const result = await deliverStimulus(characterId, 'dialogue', message, overrides);
+    const result = await deliverStimulus(characterId, source, message, overrides);
     return { status: 'ok', action: result.action, memoryEntryId: result.memoryEntryId };
   } catch (err) {
     // Order matters: DayaWarmingTimeoutError extends AppError, not
