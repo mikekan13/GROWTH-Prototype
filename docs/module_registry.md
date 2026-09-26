@@ -475,3 +475,14 @@ Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive ch
 | `daya/memory.writeMemoryEntry` | classifies + builds the chain on every write (explicit values win); ingestStimulus adds entities + antecedent |
 | `services/canon.roundLogToCanon` | fills itemIds (held items of the parties on hits), goalIds (touched goals of actor/target), domains, locationId from a RoundChainContext |
 | `services/encounter.runRound` | builds the chain context (location, held items, every participant's ACTIVE goals); each perception memory gets items seen, place, own goals touched, antecedent |
+
+## Memory steps 2–7 (2026-09-25/26)
+| Module | Purpose |
+|---|---|
+| `daya/ladder.ts` | Ladder recall: rung per memory (survival → goals → domain → chain → words), ordering rung/strength/score; `recall.ts` climbs every candidate, goals-rung+ passes at half threshold; `soulState.godlike` = threshold 0, budget all, Wit always passes |
+| `daya/ensemble.renderAttention` | a being attends to its OWN perceptions (per-entity believed world); only omniscient entities read the global fact list |
+| `services/canon` (+) | declareCanon (Watcher declaration → canon + witness memories + vines), recordDialogueCanon (table lines are truth), attachTruthToRecentMemories, readVineForWatcher; POST …/canon/declare; GET …/canon?goalId= |
+| `services/vine-memory.ts` | recordVineEntries: custodian side on touched goals + resistance side on resisting entities' goals; readVine / readCustodianLedger |
+| `services/godhead-beings.ts` | ensureGodheadEntities (godlike DayaEntity per Godhead), seatGodhead (parentId/domainKey), godheadTree; GET/POST/PATCH /api/daya/godheads (ADMIN) |
+| `services/terminal-recall.ts` | askTerminal: classify → scope to campaign → score canon events (parties/goals/domains/words) + custodians' vine readings → phrase with a model, then enforceCitations drops any sentence without a resolving [c:ID]; recollectionCheck = the perfect-recollection harness (recall@k over sampled canon); POST /api/campaigns/[id]/terminal |
+| `ai/copilot/tools/ask-terminal.ts` | JEWL tool `ask_terminal` — JEWL as front man for the audience with the gods |

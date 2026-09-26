@@ -699,3 +699,6 @@ North star: PERFECT RECOLLECTION at the Terminal. Rulings from the 09-20→23 wa
 
 ## 2026-09-23 — MEMORY step 1 SHIPPED: chain + domain tags at write-time
 Every memory now carries pillar/domain/domains + chain (truthRefs, entities, items, place, goals, antecedent); canon events carry items/goals/domains/location. Ten-domain registry is DATA awaiting Mike's seating/names/keywords. Retrieval unchanged (step 2 = ladder recall).
+
+## 2026-09-26 — MEMORY steps 2–7 SHIPPED (walking versions)
+Ladder recall (survival > goals > domain > chain > words) + per-entity believed world in Attend; canon writers (table dialogue, Watcher declarations); vines as custodian memory (custodian + resistance sides); Godheads as beings (godlike recall; custodian tree; seating = Mike); Terminal recall (askTerminal + JEWL tool ask_terminal; every sentence cited or "the record holds nothing"); recollection harness (recall@k over sampled canon). NEXT: embeddings for the words step; domain seating/names/keywords from Mike; location on canon once positions land; canvas recording surface; canon-checking of declarations against prior ledger.

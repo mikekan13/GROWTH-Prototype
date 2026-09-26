@@ -548,3 +548,7 @@ Append-only, never edited (no write route). One row per resolved act: campaignId
 ## Memory chain + domains (Mike 2026-09-23; migration memory_chain_domains)
 **DayaMemoryEntry** gained `pillar` (MERCY|BALANCE|SEVERITY, null until the seat is ruled), `domain` (primary key from src/daya/domains.ts), `domains` (JSON string[], overlap is the rule), `chain` (JSON<MemoryChain>: truthRefs, entities, items, locationId, goalIds, antecedentId). Classified at write-time by the keyword classifier unless the caller passes an explicit classification.
 **CanonEvent** gained `itemIds`, `goalIds`, `domains` (JSON string[]) — the truth-side chain.
+
+## VineEntry (Mike 2026-09-22; migration vines_godhead_tree)
+The vine is the custodian's memory of a goal: goalId, campaignId, custodianId? (GodHead), custodianPillar? (the coloring), side (custodian | resistance), canonEventId, cycle, reading. Written when canon touches a goal; the resistance's opposing custodians record the same event on the resisting entity's own vines.
+**GodHead** gained `parentId` (custodian tree; null = main seat) and `domainKey` (one of the ten domains; blank until Mike seats them).

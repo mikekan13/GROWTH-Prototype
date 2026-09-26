@@ -134,20 +134,20 @@ Do not adopt: per-entity file layouts (tables exist), AI-GM framings, any
    `pillar`, `domain`, `chain` (JSON: entities, items, locationId, goalIds,
    antecedentId); the sim and the tagger fill them; canon events gain
    `locationId` + `itemIds` + `goalIds`. Nothing retrieved yet; nothing lost.
-2. **Ladder recall** — restructure `recall.ts` scoring into survival → goals
+2. ✅ BUILT 09-25 — **Ladder recall** (words step = TF-cosine; embeddings still to come) — restructure `recall.ts` scoring into survival → goals
    → domain → chain → words; add embeddings for words (local lane).
-3. **Canon writers** — table-speak dialogue and GM declarations become canon
+3. ✅ BUILT 09-26 — **Canon writers** (dialogue + declarations; location once positions land) — table-speak dialogue and GM declarations become canon
    events; the sim stamps location once positions land.
-4. **Vines as custodian memory** — on canon write, match touched goals
+4. ✅ BUILT 09-26 — **Vines as custodian memory** — on canon write, match touched goals
    (existing vine-progress matcher) and write a custodian entry on each vine,
    from that Godhead's side; resistance vines get the opposing entry.
-5. **Godheads as beings** — a DayaEntity per seated Godhead with a godlike
+5. ✅ BUILT 09-26 (seating still Mike's) — **Godheads as beings** — a DayaEntity per seated Godhead with a godlike
    sheet; the custodian tree (`parentId` on GodHead); seating [NEEDS MIKE].
-6. **Terminal recall** — JEWL's "ask the Terminal": classify → scope to the
+6. ✅ BUILT 09-26 — **Terminal recall** — JEWL's "ask the Terminal": classify → scope to the
    campaign → traverse canon + vines → cite → phrase. Hallucination check:
    every claim in the answer resolves to a canon id or is marked as a
    Godhead's interpretation.
-7. **Perfect-recollection harness** — a probe set of factual questions with
+7. ✅ BUILT 09-26 — **Perfect-recollection harness** — a probe set of factual questions with
    known canon answers, run per campaign; the score is the north star.
 
 ## 8. Open [NEEDS MIKE]
