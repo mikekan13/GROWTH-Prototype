@@ -18,6 +18,7 @@
  */
 import 'server-only';
 import { randomUUID } from 'crypto';
+import { vectorize, cosine } from './probes-vec';
 import { prisma } from '@/lib/db';
 import { chat, DayaTierUnavailableError, DayaWarmingTimeoutError } from '@/daya/model-client';
 import { l1Status } from '@/daya/l1-warm';
@@ -39,25 +40,7 @@ export const PROBE_SET_V1: Array<{ key: string; category: string; question: stri
 
 // ── Pure: vectors + distances ────────────────────────────────────────────────
 
-const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'is', 'am', 'are', 'was', 'i', 'my', 'me', 'it', 'that', 'this', 'for', 'with', 'be', 'as', 'you', 'your', 'not', 'but', 'so', 'do', 'if', 'would', 'what', 'who', 'they', 'them', 'their', 'have', 'has', 'had']);
-
-export function vectorize(text: string): Map<string, number> {
-  const v = new Map<string, number>();
-  for (const raw of text.toLowerCase().split(/[^a-z']+/)) {
-    const t = raw.replace(/'s$/, '');
-    if (t.length < 3 || STOP.has(t)) continue;
-    v.set(t, (v.get(t) ?? 0) + 1);
-  }
-  return v;
-}
-
-export function cosine(a: Map<string, number>, b: Map<string, number>): number {
-  let dot = 0, na = 0, nb = 0;
-  for (const [k, x] of a) { na += x * x; const y = b.get(k); if (y) dot += x * y; }
-  for (const [, y] of b) nb += y * y;
-  if (!na || !nb) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
-}
+export { vectorize, cosine };
 
 /** 0 = identical, 1 = nothing in common. */
 export function distance(aText: string, bText: string): number {

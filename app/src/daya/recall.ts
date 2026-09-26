@@ -20,6 +20,9 @@ import { prisma } from '@/lib/db';
 import { chat, type DayaClientOverrides } from './model-client';
 import { writeMemoryEntry } from './memory';
 import { RECALL_TUNING } from './recall-tuning';
+import { climb, ladderCompare, RUNG_RANK, type Rung } from './ladder';
+import { parseChain, type MemoryChain } from './chain';
+import { classifyDomains } from './domains';
 
 export { RECALL_TUNING };
 
@@ -50,11 +53,16 @@ export interface RecallRequest {
    * src/daya/mechanics/thorns.ts's isRuminationLockActive(); defaults false
    * so every pre-WP8 caller/test keeps its existing behavior unchanged. */
   ruminationLockActive?: boolean;
+  /** Ladder recall (Mike 09-23): the being's ACTIVE goals and its derived survival situation. */
+  goals?: Array<{ id: string; description: string }>;
+  situation?: { threatened: boolean; frequencyLow: boolean };
 }
 
 export interface SurfacedMemory {
   memoryId: string;
   score: number;
+  /** Which rung of the ladder surfaced it: survival > goals > domain > chain > words. */
+  rung?: Rung;
 }
 
 export interface RecallResult {
@@ -270,6 +278,9 @@ export interface ParsedMemory {
   salience: number;
   entityRefs: string[];
   narrativeCycle: number;
+  domain?: string | null;
+  domains?: string[];
+  chain?: MemoryChain;
 }
 
 export interface ScoredCandidate {
@@ -410,6 +421,9 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
     salience: r.salience,
     entityRefs: parseEntityRefs(r.entityRefs),
     narrativeCycle: r.narrativeCycle,
+    domain: r.domain ?? null,
+    domains: parseEntityRefs(r.domains ?? '[]'),
+    chain: parseChain(r.chain),
   }));
 
   const scored = parsed.map((m) => scoreCandidate(m, req.cue, cueRefs, req.mood, req.nowCycle, req.thornBlocks, req.ruminationLockActive ?? false));
@@ -417,9 +431,23 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
   const theta = wisdomThreshold(req.soulState.wisdomMax);
   const budget = req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur);
 
+  // Ladder (Mike 09-23): classify the cue, then survival → goals → domain → chain → words.
+  // A memory standing on the goals rung or higher is reachable at half the
+  // words-threshold — what a being cares about stays reachable even when the
+  // words don't match; the flat pile still needs the full threshold.
+  const cueDomains = classifyDomains(req.cue).all;
+  const ladderCtx = { cue: req.cue, cueRefs, goals: req.goals ?? [], situation: req.situation ?? { threatened: false, frequencyLow: false }, cueDomains };
+  const rungOf = new Map<string, ReturnType<typeof climb>>();
+  for (const c of scored) {
+    rungOf.set(c.memory.id, climb({ id: c.memory.id, content: c.memory.content, valence: c.memory.valence, arousal: c.memory.arousal, domain: c.memory.domain ?? null, domains: c.memory.domains ?? [], chain: c.memory.chain ?? parseChain(null) }, ladderCtx));
+  }
   let passing = scored
-    .filter((c) => Number.isFinite(c.score) && c.score >= theta)
-    .sort((a, b) => b.score - a.score);
+    .filter((c) => {
+      if (!Number.isFinite(c.score)) return false;
+      const r = rungOf.get(c.memory.id)!;
+      return c.score >= theta || (RUNG_RANK[r.rung] >= RUNG_RANK.goals && c.score >= theta * 0.5);
+    })
+    .sort((a, b) => ladderCompare({ ...rungOf.get(a.memory.id)!, score: a.score }, { ...rungOf.get(b.memory.id)!, score: b.score }));
 
   passing = await maybeRerank(passing, req.cue, overrides);
 
@@ -489,7 +517,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
 
   return {
     prose,
-    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score })),
+    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung })),
     failedFeel,
     deferred,
   };

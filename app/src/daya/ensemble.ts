@@ -264,24 +264,34 @@ async function runBodyInward(
 // ── Attention rendering (Attend: -> renderer, depth-capped recursion) ────
 
 async function renderAttention(ctx: EntityContext, attendContent: string, overrides: DayaClientOverrides): Promise<string> {
-  if (!ctx.campaignId) return 'Nothing more comes into focus.';
-  const facts = await currentFacts(ctx.campaignId);
-  if (facts.length === 0) return 'Nothing more comes into focus.';
-
-  let best = facts[0];
-  let bestScore = -1;
-  for (const f of facts) {
-    const score = stemmedJaccard(attendContent, `${f.subjectKey} ${f.fact}`);
-    if (score > bestScore) {
-      bestScore = score;
-      best = f;
+  // Per-entity believed world (Mike 09-05 senses contract; MEMORY-DESIGN §5):
+  // a being attends to what IT has perceived — its own perception/dialogue/
+  // seed memories — never the campaign's global fact list. Only an omniscient
+  // (JEWL-tier) entity reads the Terminal's truth directly.
+  let best: { subjectKey: string; fact: string } | null = null;
+  if (ctx.persona.omniscient) {
+    if (!ctx.campaignId) return 'Nothing more comes into focus.';
+    const facts = await currentFacts(ctx.campaignId);
+    let bestScore = -1;
+    for (const f of facts) {
+      const score = stemmedJaccard(attendContent, `${f.subjectKey} ${f.fact}`);
+      if (score > bestScore) { bestScore = score; best = { subjectKey: f.subjectKey, fact: f.fact }; }
+    }
+  } else {
+    const own = await prisma.dayaMemoryEntry.findMany({
+      where: { entityId: ctx.entityDaId, source: { in: ['perception', 'dialogue', 'seed'] } },
+      select: { id: true, content: true },
+      orderBy: { realTime: 'desc' },
+      take: 400,
+    });
+    let bestScore = -1;
+    for (const m of own) {
+      const score = stemmedJaccard(attendContent, m.content);
+      if (score > bestScore) { bestScore = score; best = { subjectKey: `memory:${m.id}`, fact: m.content }; }
     }
   }
+  if (!best) return 'Nothing more comes into focus.';
 
-  // Omniscient perception (WP13 spec §2-2): a JEWL-tier entity's ensemble
-  // uses the renderer's Terminal-truth bypass for ALL perception — he sees
-  // True Sheets, never a Believed/rendered view. Every other entity keeps
-  // its own attunement/bias/mood lens, unchanged.
   const observer: Observer = ctx.persona.omniscient
     ? { entityId: null, attunement: 1, biasProfile: {}, mood: ctx.mood, voice: ctx.persona.voice ?? {} }
     : {
