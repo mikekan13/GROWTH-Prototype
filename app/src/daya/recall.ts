@@ -41,7 +41,7 @@ export interface RecallRequest {
   cue: string;
   cueRefs?: string[];
   mood: { morale: number; stress: number; grief: number };
-  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number };
+  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number; /** Mike 09-23: godlike attributes → perfect recall unless deliberately fooled */ godlike?: boolean };
   thornBlocks: ThornBlock[];
   nowCycle: number;
   budget?: number;
@@ -428,8 +428,9 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
 
   const scored = parsed.map((m) => scoreCandidate(m, req.cue, cueRefs, req.mood, req.nowCycle, req.thornBlocks, req.ruminationLockActive ?? false));
 
-  const theta = wisdomThreshold(req.soulState.wisdomMax);
-  const budget = req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur);
+  const godlike = req.soulState.godlike === true;
+  const theta = godlike ? 0 : wisdomThreshold(req.soulState.wisdomMax);
+  const budget = godlike ? Number.MAX_SAFE_INTEGER : (req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur));
 
   // Ladder (Mike 09-23): classify the cue, then survival → goals → domain → chain → words.
   // A memory standing on the goals rung or higher is reachable at half the
@@ -456,7 +457,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
   const surfacedList: ScoredCandidate[] = [];
   const deferred: string[] = [];
   for (const c of withinBudget) {
-    if (witPasses(req.entityId, c.memory.id, req.nowCycle, req.soulState.witMax)) {
+    if (godlike || witPasses(req.entityId, c.memory.id, req.nowCycle, req.soulState.witMax)) {
       surfacedList.push(c);
     } else {
       deferred.push(c.memory.id);

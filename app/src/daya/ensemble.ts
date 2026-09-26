@@ -62,6 +62,8 @@ interface PersonaProfileData {
    * step through the unrestricted copilot tool dispatch, instead of the
    * default self-only path every other entity uses. */
   omniscient?: boolean;
+  /** Mike 09-23: a Godhead is the same mechanism with a godlike sheet — recall threshold zero, budget everything, unfoolable except on purpose. */
+  godlike?: boolean;
 }
 
 function parsePersonaProfile(raw: string): PersonaProfileData {
@@ -91,7 +93,7 @@ interface EntityContext {
   sheet: Partial<GrowthCharacter> | null;
   persona: PersonaProfileData;
   mood: AffectVector;
-  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number };
+  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number; godlike?: boolean };
 }
 
 async function loadEntityContext(characterId: string): Promise<EntityContext> {
@@ -118,6 +120,7 @@ async function loadEntityContext(characterId: string): Promise<EntityContext> {
     wisdomCur: wisdom ? wisdom.current : 10,
     witMax: wit ? wit.level + wit.augmentPositive - wit.augmentNegative : 10,
     witCur: wit ? wit.current : 10,
+    godlike: persona.godlike === true || persona.omniscient === true,
   };
 
   return { characterId, entityDaId, campaignId, cycle, name: character.name, sheet, persona, mood, soulState };
@@ -348,7 +351,14 @@ async function runStimulusPipeline(
     isRuminationLockActive(ctx.entityDaId),
   ]);
 
-  // 2. Recall (stat-gated). Crosses into the phenomenal zone -> sealed.
+  // 2. Recall (stat-gated, ladder-ordered — Mike 09-23: survival → goals → domain → chain → words).
+  // Survival is DERIVED here from the sheet + this moment, never authored.
+  const activeGoals = await prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } });
+  const freq = ctx.sheet?.attributes?.frequency;
+  const situation = {
+    threatened: ingest.tags.arousal >= 0.7 && ingest.tags.valence < 0,
+    frequencyLow: !!freq && freq.level > 0 && freq.current <= freq.level * 0.25,
+  };
   const recallResult = await recall(
     {
       entityId: ctx.entityDaId,
@@ -358,6 +368,8 @@ async function runStimulusPipeline(
       thornBlocks: activeThornBlocks,
       nowCycle: ctx.cycle,
       ruminationLockActive,
+      goals: activeGoals,
+      situation,
     },
     overrides,
   );

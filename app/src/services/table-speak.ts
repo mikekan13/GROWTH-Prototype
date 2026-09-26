@@ -23,6 +23,7 @@ import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, type ConverseStatus } from '@/daya/conversation';
 import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
+import { attachTruthToRecentMemories, recordDialogueCanon } from '@/services/canon';
 
 export interface TableActor {
   userId: string;
@@ -125,6 +126,10 @@ export async function speakThroughNpc(
 
   // 1. The NPC's line hits the table record first, like normal tabletop.
   await postChat(campaignId, 'gm', actor.userId, actor.username, npc.id, npc.name, input.message);
+  // Truth first (Mike 09-20/23): what was said is canon; listeners' memories will point at it.
+  const since = new Date();
+  let dialogueCanonId: string | null = null;
+  try { dialogueCanonId = (await recordDialogueCanon(campaignId, npc.id, npc.name, input.message)).id; } catch (err) { console.warn('[table-speak] dialogue canon failed', err); }
 
   // 2. Every awake DAYA being in the campaign perceives it. No filter,
   //    no selection — stimulus always goes through.
@@ -150,6 +155,7 @@ export async function speakThroughNpc(
       detail: result.detail,
     };
     responses.push(response);
+    if (dialogueCanonId) { try { await attachTruthToRecentMemories(listener.id, dialogueCanonId, since); } catch { /* record-keeping only */ } }
 
     if (result.status === 'ok' && result.action) {
       const line = actionToTableLine(listener.name, result.action);
