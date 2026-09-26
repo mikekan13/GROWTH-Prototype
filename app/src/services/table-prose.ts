@@ -114,7 +114,12 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
       const afterTag = afterAll.split(/(?<=[.!?])\s|\n/)[0] ?? '';
       const beforeWindow = (stripped.length > 0 ? stripped : line.slice(0, start)).slice(-240);
       const contextSentence = lastSentence(beforeWindow);
-      const npc = findRosterName(beforeWindow.slice(-160), roster) ?? firstRosterName(afterTag.slice(0, 120), roster);
+      // A speech tag AFTER the quote only counts when the quote runs into it
+      // (`"…," Ruth says` / `"…" she says`); a quote closed with . ! ? followed
+      // by a capitalized new sentence ("Ruth sighs.") is a new beat, not a tag.
+      const quoteText = m[1].trim();
+      const runsOn = /,$/.test(quoteText) || !/[.!?…]$/.test(quoteText) || /^\s*[,a-z]/.test(afterAll);
+      const npc = findRosterName(beforeWindow.slice(-160), roster) ?? (runsOn ? firstRosterName(afterTag.slice(0, 120), roster) : null);
       const subject = npc ? null : introducedSubject(contextSentence);
       quotes.push({
         text: m[1].trim(),

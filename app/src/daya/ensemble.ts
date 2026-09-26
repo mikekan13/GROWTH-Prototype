@@ -345,7 +345,7 @@ async function runStimulusPipeline(
     try {
       const p = await perceive(characterId, ctx.campaignId, truthContent, source, overrides);
       content = p.prose;
-      mirrorAudit = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, truthChars: truthContent.length } };
+      mirrorAudit = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, truthChars: truthContent.length, observer: p.observer } };
     } catch (err) {
       console.error('[daya/ensemble] perception composer failed; stimulus ingested raw (non-fatal):', err);
     }
@@ -356,6 +356,7 @@ async function runStimulusPipeline(
   // lived experience.
   const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content, extraClassification: mirrorAudit }, overrides);
   if (!ingest.persisted) {
+    console.log(`[daya/ensemble] ${source} for ${ctx.name} classified ${ingest.tags.classification.icOoc} (${ingest.tags.classification.rationaleTag ?? 'no rationale'}) — not persisted, loop ends`);
     return {};
   }
 
@@ -469,12 +470,12 @@ async function runStimulusPipeline(
         salience: 0.2,
         classification: { contentCategory: 'dialogue', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'own words spoken' },
       });
-      return { memoryEntryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
+      return { memoryEntryId: ingest.memoryEntryId, spokenMemoryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
     }
 
     case 'act': {
       if (!ctx.campaignId) {
-        return { action: { kind: 'act', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
       // Unrestricted action (WP13 spec §2-3): a JEWL-tier entity's 'Do:'
@@ -499,7 +500,7 @@ async function runStimulusPipeline(
           salience: 0.3,
           classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'unrestricted action dispatch' },
         });
-        return { action: { kind: 'act', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
       const facts = await currentFacts(ctx.campaignId);
@@ -533,12 +534,12 @@ async function runStimulusPipeline(
         { kind: 'adjudication_result', entityId: characterId, payload: adjudication as unknown as Record<string, unknown> },
         overrides,
       );
-      return { action: { kind: 'act', content: action.content } };
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
     }
 
     case 'attend': {
       if (depth >= ATTEND_DEPTH_CAP) {
-        return { action: { kind: 'attend', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'attend', content: action.content } };
       }
       const rendered = await renderAttention(ctx, action.content, overrides);
       return runStimulusPipeline(characterId, 'perception', rendered, depth + 1, overrides);
@@ -564,7 +565,7 @@ async function runStimulusPipeline(
         salience: 0.05,
         classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'rest, no action' },
       });
-      return { action: { kind: 'rest' } };
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'rest' } };
     }
   }
 }

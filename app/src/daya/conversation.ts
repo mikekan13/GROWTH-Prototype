@@ -27,6 +27,7 @@ export interface ConverseResult {
   status: ConverseStatus;
   action?: WakeResult['action'];
   memoryEntryId?: string;
+  spokenMemoryId?: string;
   /** Human-readable detail for the 'core_offline'/'warming' states — never
    * surfaced as a raw error, just a plain note about what's going on. */
   detail?: string;
@@ -69,7 +70,7 @@ export async function converseWithEntity(
 
   try {
     const result = await deliverStimulus(characterId, source, message, overrides);
-    return { status: 'ok', action: result.action, memoryEntryId: result.memoryEntryId };
+    return { status: 'ok', action: result.action, memoryEntryId: result.memoryEntryId, spokenMemoryId: result.spokenMemoryId };
   } catch (err) {
     // Order matters: DayaWarmingTimeoutError extends AppError, not
     // DayaTierUnavailableError, so this must be checked first — a cold

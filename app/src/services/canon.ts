@@ -294,7 +294,7 @@ export async function declareCanon(
       try {
         const p = await perceive(w.characterId, campaignId, input.narration, 'perception');
         content = p.prose;
-        mirror = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines } };
+        mirror = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, observer: p.observer } };
       } catch (err) { console.warn('[canon] witness mirror failed; raw narration used', err); }
       const m = await writeMemoryEntry({
         entityId: w.id, narrativeCycle: cycle, source: 'perception', content,

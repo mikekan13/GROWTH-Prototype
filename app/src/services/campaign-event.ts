@@ -186,6 +186,12 @@ export async function endSession(campaignId: string): Promise<GameSessionInfo | 
 
   // Session over — release the lane (the loop would notice on its own next tick; this is immediate).
   void import('@/daya/l1-keepalive').then((m) => m.stopKeepalive(campaignId)).catch(() => {});
+  // Session end is a hard cement (Mike 09-26): every confirmed improvisation settles same-or-under.
+  try {
+    const gm = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
+    const { settleAllForCampaign } = await import('@/services/reconciliation');
+    await settleAllForCampaign(campaignId, gm?.gmUserId ?? 'system');
+  } catch (err) { console.warn('[campaign-event] improvisation settlement at session end failed', err); }
 
   return {
     id: updated.id,

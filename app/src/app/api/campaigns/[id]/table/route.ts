@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
 const proseBodySchema = z.object({
   message: z.string().min(1).max(6000),
   locationId: z.string().min(1).nullable().optional(),
+  /** The Watcher answered JEWL's popup with "continue": the ticket is CONFIRMED and the world was spun up. */
+  confirmTicketId: z.string().min(1).nullable().optional(),
 });
 
 // Pre-09-26 shapes, still honored for scripts/tests.
@@ -44,7 +46,8 @@ export async function GET(
 }
 
 // POST /api/campaigns/[id]/table
-//   { message }                  — prose: narration + quoted speech, picked up as written.
+//   { message, confirmTicketId? } — prose: narration + quoted speech, picked up as written.
+//     May return { held: ticket } when JEWL stops the table (see /reconcile).
 //   { npcCharacterId, message }  — speak one utterance through an NPC (legacy shape).
 //   { narrate: true, message }   — narrate only (legacy shape; prose covers it).
 // Every ACTIVE DAYA character at the table lives it through the mirror; their

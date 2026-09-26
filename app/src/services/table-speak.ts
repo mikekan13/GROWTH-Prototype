@@ -42,6 +42,7 @@ import {
 } from '@/services/canon';
 import { parseTableProse, type ProseQuote } from '@/services/table-prose';
 import { ensureKeepalive } from '@/daya/l1-keepalive';
+import { readNarration, takeConfirmed, attachCanonToTicket, cementCheck, type ReconTicket } from '@/services/reconciliation';
 
 export interface TableActor {
   userId: string;
@@ -63,6 +64,8 @@ export interface TableSpeakResult {
 }
 
 export interface TableProseResult {
+  /** JEWL stopped the table: the narration differs enough from the sim. Nothing was written. Answer via /reconcile, then resend with confirmTicketId. */
+  held?: ReconTicket;
   /** The narration canon event (null when the message was speech alone). */
   canonEventId: string | null;
   /** One per quoted line, with who the record says spoke it. */
@@ -194,7 +197,7 @@ async function deliverToTable(
 export async function speakProse(
   campaignId: string,
   actor: TableActor,
-  input: { message: string; locationId?: string | null },
+  input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
 ): Promise<TableProseResult> {
   if (!isWatcherOrAbove(actor.role)) {
     throw new ForbiddenError('GM/ADMIN only — the table is a Watcher-seat surface');
@@ -207,6 +210,20 @@ export async function speakProse(
     select: { id: true, name: true },
   });
   const parsed = parseTableProse(message, roster);
+
+  // 0. JEWL reads it against the sim BEFORE it becomes canon (Mike 09-26,
+  //    fluid-canon ruling). A confirmed ticket means the Watcher already
+  //    answered "we're going somewhere new" and the world was spun up.
+  const listeners = await activeListeners(campaignId);
+  let ticketId: string | null = null;
+  if (input.confirmTicketId) {
+    ticketId = (await takeConfirmed(campaignId, input.confirmTicketId, message)).id;
+    const rosterNow = await prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } });
+    Object.assign(parsed, parseTableProse(message, rosterNow));
+  } else {
+    const held = await readNarration(campaignId, actor, message, parsed, listeners);
+    if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
+  }
 
   // 1. TRUTH — narration as a declaration (also lands in the feed as a game
   //    event), each quote as dialogue. witnessIds: [] because the beings
@@ -245,6 +262,10 @@ export async function speakProse(
     { primary: canonEventId, extra: dialogue.map((d) => d.canonEventId) },
     soloAttributed ? parsed.quotes[0].speakerId! : undefined,
   );
+
+  if (ticketId) await attachCanonToTicket(ticketId, canonEventId ?? dialogue[0]?.canonEventId ?? null);
+  // Canon is fluid till it isn't: settle any improvisation the table has now built on.
+  try { await cementCheck(campaignId, actor.userId); } catch (err) { console.warn('[table-speak] cement check failed', err); }
 
   return { canonEventId, dialogue, narration: parsed.narration, responses };
 }

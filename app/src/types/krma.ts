@@ -7,7 +7,7 @@
 
 // ── Wallet Types ──
 
-export type WalletType = 'USER' | 'RESERVE' | 'CAMPAIGN' | 'CHARACTER' | 'BURN' | 'LADY_DEATH' | 'GODHEAD';
+export type WalletType = 'USER' | 'RESERVE' | 'CAMPAIGN' | 'CHARACTER' | 'BURN' | 'LADY_DEATH' | 'GODHEAD' | 'HOLD';
 
 // ── Transaction Enums ──
 
@@ -27,6 +27,10 @@ export type TransactionReason =
   // Character Creation
   | 'CHARACTER_INVEST'
   | 'CHARACTER_ADJUST'
+  // Improvisation (Mike 09-26): JEWL holds an over-estimate while the scene runs on the sketch, settles same-or-under at cementing
+  | 'IMPROV_HOLD'
+  | 'IMPROV_SETTLE'
+  | 'IMPROV_RELEASE'
   // Forge / Blueprint Authoring
   | 'BLUEPRINT_AUTHOR'        // GM funds the Creator god-head for the chain (entry payment)
   | 'BLUEPRINT_CHAIN_HANDOFF' // Inter-godhead payment between chain stages (Creator→Kai→Et'herling)

@@ -38,6 +38,54 @@ model User {
 // Willpower step ("set as CANON via the recording on the canvas"). The GM
 // cannot edit ledgered canon (design doc ruling 9). The Watcher reads all of
 // it; players reach it only through their character's fallible memory.
+// JEWL's catch between the Watcher's words and the simulated reality (Mike
+// 2026-09-26, tavern ruling): raised BEFORE canon/perception when the
+// narration differs enough from the sim; the GM dismisses (mistake) or
+// confirms (improvising). On confirm JEWL plans what the world needs (search
+// planned elements, else stub), over-estimates the price and HOLDS it against
+// the campaign wallet (DoorDash-style); the scene runs on the sketch; the hold
+// SETTLES same-or-under once the canon is cemented (the GM built on it, or
+// the session ended).
+model Reconciliation {
+  id           String    @id @default(cuid())
+  campaignId   String
+  status       String    @default("PENDING") // PENDING | CONFIRMED | DISMISSED | REFUSED | SETTLED
+  message      String    // the GM prose that raised it
+  kinds        String    @default("[]") // JSON string[]: relocation | new_presence | contradicted_fact | contradiction | continuity
+  summary      String    // what differs — JEWL's read
+  question     String    // JEWL's popup, in his voice
+  plan         String    @default("[]") // JSON PlanItem[] — what the world needs: matched or stubbed
+  estimateKrma Int       @default(0)    // the over-estimate held
+  holdWalletId String?
+  holdTxId     String?
+  settledKrma  Int?
+  canonEventId String?   // the narration event, once confirmed and written
+  createdBy    String    // userId (the Watcher)
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+  settledAt    DateTime?
+
+  @@index([campaignId, status])
+}
+
+// A correction to a canon event after it was written (Mike 09-26: canon is
+// fluid till it isn't; corrections retroactively re-render every involved
+// memory). Keeps the previous version and the REACH of the rewrite so Mike can
+// find the limits of canon changing in play.
+model CanonRevision {
+  id           String   @id @default(cuid())
+  campaignId   String
+  canonEventId String
+  previous     String   // JSON { narration, detail }
+  narration    String   // the corrected narration
+  reason       String   @default("")
+  reach        String   @default("{}") // JSON { memories, rerendered, vines, laterEvents, entities }
+  authoredBy   String   // userId
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, canonEventId])
+}
+
 model CanonEvent {
   id           String   @id @default(cuid())
   campaignId   String

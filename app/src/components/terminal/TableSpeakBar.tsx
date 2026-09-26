@@ -19,7 +19,21 @@ interface RosterCharacter {
   name: string;
 }
 
+interface ReconTicket {
+  id: string;
+  status: string;
+  kinds: string[];
+  summary: string;
+  question: string;
+  plan: Array<{ kind: string; name: string; matchId: string | null; matchName: string | null; baseKrma: number }>;
+  estimateKrma: number;
+  fluidKrma: number;
+  message: string;
+}
+
 interface ProseResponse {
+  /** JEWL stopped the table — answer him (continue = improvising; take it back = mistake). */
+  held?: ReconTicket;
   canonEventId: string | null;
   dialogue: Array<{ canonEventId: string; speakerId: string | null; speakerLabel: string; text: string }>;
   narration: string | null;
@@ -46,6 +60,8 @@ export default function TableSpeakBar({
   const [sending, setSending] = useState(false);
   const [coreStatus, setCoreStatus] = useState<CoreStatus>('unknown');
   const [note, setNote] = useState<string | null>(null);
+  const [held, setHeld] = useState<ReconTicket | null>(null);
+  const [answering, setAnswering] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Roster on mount — only to know whom to warm and who is awake.
@@ -92,22 +108,32 @@ export default function TableSpeakBar({
 
   async function handleSubmit() {
     const trimmed = value.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || sending || held) return;
     setValue('');
+    await send(trimmed, null);
+  }
+
+  async function send(message: string, confirmTicketId: string | null) {
     setNote(null);
     setSending(true);
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/table`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify(confirmTicketId ? { message, confirmTicketId } : { message }),
       });
       const json = await res.json();
       if (!res.ok) {
         setNote(json.error ?? 'Failed to send');
+        setValue(message);
         return;
       }
       const result = json as ProseResponse;
+      if (result.held) {
+        // JEWL caught it: nothing was written. The words wait in the box until the Watcher answers.
+        setHeld(result.held);
+        return;
+      }
       setCoreStatus((prev) => (result.responses.some((r) => r.status === 'ok') ? 'ready' : prev));
       const notes: string[] = [];
       const unattributed = result.dialogue.filter((d) => !d.speakerId);
@@ -136,10 +162,59 @@ export default function TableSpeakBar({
     }
   }
 
+  // The Watcher answers JEWL's popup.
+  async function answerJewl(action: 'confirm' | 'dismiss') {
+    if (!held || answering) return;
+    setAnswering(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/reconcile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ticketId: held.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setNote(json.error ?? 'JEWL did not get that'); return; }
+      const ticket = json.ticket as ReconTicket & { created?: Array<{ kind: string; name: string }>; moved?: string[]; refusedReason?: string };
+      const message = held.message;
+      setHeld(null);
+      if (action === 'dismiss') { setValue(message); inputRef.current?.focus(); return; }
+      if (ticket.status === 'REFUSED') { setNote(ticket.refusedReason ?? 'The world cannot afford this.'); setValue(message); return; }
+      const spun = (ticket.created ?? []).map((c) => c.name).join(', ');
+      const moved = (ticket.moved ?? []).join(', ');
+      if (spun || moved) setNote(`JEWL spun up ${spun || 'nothing new'}${moved ? `; ${moved} now there` : ''} — holding ${ticket.estimateKrma} KRMA until it sticks`);
+      await send(message, ticket.id);
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAnswering(false);
+    }
+  }
+
   const awake = dayaActive.map((d) => d.name).join(', ');
 
   return (
     <div className="border-t" style={{ borderColor: 'rgba(34, 171, 148, 0.3)', backgroundColor: '#0d0d1a' }}>
+      {/* JEWL's catch — the table holds until the Watcher answers (Mike 09-26) */}
+      {held && (
+        <div className="mx-3 mt-2 px-3 py-2" style={{ border: '1px solid rgba(255, 204, 120, 0.55)', borderRadius: '2px', backgroundColor: 'rgba(255, 204, 120, 0.06)' }}>
+          <div className="text-[11px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#ffcc78' }}>JEWL</div>
+          <div className="text-[13px] mt-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#CBD9E8' }}>{held.question}</div>
+          {held.plan.length > 0 && (
+            <div className="text-[12px] mt-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(203, 217, 232, 0.7)' }}>
+              {held.plan.map((p) => (p.matchId ? `${p.name} → ${p.matchName} (already here)` : `${p.name} → new ${p.kind}`)).join(' · ')}
+              {held.estimateKrma > 0 && ` · hold ${held.estimateKrma} of ${held.fluidKrma} fluid KRMA`}
+            </div>
+          )}
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => void answerJewl('confirm')} disabled={answering} className="px-3 py-1 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#0a0a1a', backgroundColor: '#ffcc78', border: '1px solid rgba(255, 204, 120, 0.6)', borderRadius: '2px' }}>
+              {answering ? '…' : "We're going somewhere new"}
+            </button>
+            <button onClick={() => void answerJewl('dismiss')} disabled={answering} className="px-3 py-1 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#CBD9E8', backgroundColor: 'transparent', border: '1px solid rgba(203, 217, 232, 0.35)', borderRadius: '2px' }}>
+              My mistake — take it back
+            </button>
+          </div>
+        </div>
+      )}
       {/* GM-only status strip — infra truth, never part of the table record */}
       {(note || coreStatus === 'warming' || sending) && (
         <div className="px-3 pt-1.5 text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255, 204, 120, 0.75)' }}>
@@ -161,7 +236,7 @@ export default function TableSpeakBar({
             }
           }}
           placeholder={awake ? `Narrate. Put speech in quotes, or Name: line. ${awake} will live it. (Shift+Enter for a new line)` : 'Narrate. Put speech in quotes, or Name: line. No one is awake at the table yet.'}
-          disabled={sending}
+          disabled={sending || !!held}
           className="flex-1 px-2 py-1 text-[13px] outline-none resize-none"
           style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -173,7 +248,7 @@ export default function TableSpeakBar({
         />
         <button
           onClick={() => void handleSubmit()}
-          disabled={sending || !value.trim()}
+          disabled={sending || !!held || !value.trim()}
           className="px-3 py-1 text-[12px] uppercase tracking-wider"
           style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',

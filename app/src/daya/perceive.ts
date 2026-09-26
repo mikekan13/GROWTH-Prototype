@@ -39,6 +39,13 @@ export interface PerceiveResult {
   truthLines: number;
   /** false = godlike bypass or no campaign: prose is the raw truth. */
   mirrored: boolean;
+  /** The lens this was rendered with — snapshotted on the memory so a later re-render (canon correction) uses the mood of the moment. */
+  observer: { mood: { morale: number; stress: number; grief: number }; attunement: number };
+}
+
+export interface PerceiveOptions {
+  /** Re-render with the lens of another moment (canon corrections). */
+  observer?: Partial<PerceiveResult['observer']>;
 }
 
 /** Perceptual attunement to one's own surroundings. Flat for now — [QUESTION for Mike]: which attribute governs it (Focus? Wisdom?). */
@@ -147,7 +154,13 @@ export async function composeSceneTruth(
         const chars = await prisma.character.findMany({ where: { id: { in: ids }, campaignId }, select: { id: true, name: true, data: true } });
         present = chars.map((c) => {
           let description: string | null = null;
-          try { description = (JSON.parse(c.data) as { identity?: { physicalDescription?: string } }).identity?.physicalDescription?.slice(0, 200) ?? null; } catch { /* no description */ }
+          // What can be seen of them: a free-text description if the sheet carries one (improvised stubs, NPC blocks); the structured physicalDescription otherwise.
+          try {
+            const d = JSON.parse(c.data) as { identity?: { physicalDescription?: unknown }; _improv?: { description?: string }; _npc?: { description?: string; appearance?: string } };
+            const pd = d.identity?.physicalDescription;
+            const structured = pd && typeof pd === 'object' ? Object.entries(pd as Record<string, unknown>).filter(([k, v]) => typeof v === 'string' && v && !['underclothing', 'measurements'].includes(k)).map(([, v]) => v as string).join(', ') : typeof pd === 'string' ? pd : '';
+            description = (d._improv?.description ?? d._npc?.appearance ?? d._npc?.description ?? structured ?? '').slice(0, 200) || null;
+          } catch { /* no description */ }
           return { name: c.name, description };
         });
       }
@@ -198,16 +211,19 @@ export async function perceive(
   stimulus: string,
   source: 'perception' | 'dialogue',
   overrides: DayaClientOverrides = {},
+  opts: PerceiveOptions = {},
 ): Promise<PerceiveResult> {
   const { truth, locationId } = await composeSceneTruth(characterId, campaignId, stimulus, source);
-  const { observer, godlike } = await observerFor(characterId);
+  const { observer: current, godlike } = await observerFor(characterId);
+  const observer: Observer = { ...current, ...(opts.observer?.mood ? { mood: opts.observer.mood } : {}), ...(opts.observer?.attunement != null ? { attunement: opts.observer.attunement } : {}) };
+  const snapshot = { mood: observer.mood, attunement: observer.attunement };
   if (godlike) {
-    return { prose: sceneTruthText(truth), fidelityLevel: 5, distortions: ['godlike:unmirrored'], locationId, truthLines: truth.lines.length, mirrored: false };
+    return { prose: sceneTruthText(truth), fidelityLevel: 5, distortions: ['godlike:unmirrored'], locationId, truthLines: truth.lines.length, mirrored: false, observer: snapshot };
   }
   const view = await render(
     { subject: 'scene', subjectKey: `scene:${locationId ?? 'nowhere'}`, trueData: truth, context: source === 'dialogue' ? 'Someone just spoke to you, here, now.' : 'This is happening around you, here, now.' },
     observer,
     overrides,
   );
-  return { prose: view.prose, fidelityLevel: view.fidelityLevel, distortions: view.distortions, locationId, truthLines: truth.lines.length, mirrored: true };
+  return { prose: view.prose, fidelityLevel: view.fidelityLevel, distortions: view.distortions, locationId, truthLines: truth.lines.length, mirrored: true, observer: snapshot };
 }
