@@ -101,7 +101,9 @@ describe('l1Status / warmL1 (WP14)', () => {
     expect(seenHeaders?.Authorization).toBe('Bearer tok');
   });
 
-  it('warmL1 sends no Authorization header when DAYA_L1_API_KEY is unset', async () => {
+  it('warmL1 sends no Authorization header when no lane key is set at all', async () => {
+    delete process.env.AI_LOCAL_API_KEY;
+    delete process.env.RUNPOD_API_KEY;
     let seenHeaders: Record<string, string> | undefined;
     const fetchImpl: DayaFetch = async (_url, init) => {
       seenHeaders = init.headers;
@@ -109,5 +111,18 @@ describe('l1Status / warmL1 (WP14)', () => {
     };
     await warmL1({ fetchImpl });
     expect(seenHeaders?.Authorization).toBeUndefined();
+  });
+
+  it('warmL1 falls back to AI_LOCAL_API_KEY / RUNPOD_API_KEY like model-client (09-20: a 401 read as "warming" forever)', async () => {
+    delete process.env.DAYA_L1_API_KEY;
+    process.env.AI_LOCAL_API_KEY = 'shared';
+    let seenHeaders: Record<string, string> | undefined;
+    const fetchImpl: DayaFetch = async (_url, init) => {
+      seenHeaders = init.headers;
+      return okResponse();
+    };
+    await warmL1({ fetchImpl });
+    expect(seenHeaders?.Authorization).toBe('Bearer shared');
+    delete process.env.AI_LOCAL_API_KEY;
   });
 });

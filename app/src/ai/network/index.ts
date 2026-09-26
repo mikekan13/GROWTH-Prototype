@@ -14,6 +14,7 @@ export {
   gruntModel,
   godheadModel,
   workCycleLane,
+  tableLane,
 } from './config';
 export { route, enforceWall, WallViolationError } from './route';
 export { anthropicChatText, getAnthropicClient } from './transports/anthropic';

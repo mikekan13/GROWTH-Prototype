@@ -44,7 +44,10 @@ export function isDayaEnabled(): boolean {
 // ── Handler registry ─────────────────────────────────────────────────────
 
 export interface HandlerResult {
+  /** The memory row that IS the perception of the stimulus (the ingest row) — what truthRef should point at. */
   memoryEntryId?: string;
+  /** The row of the entity's own spoken words, when it spoke (2026-09-26 fix: this used to be returned AS memoryEntryId, so canon got attached to the wrong row). */
+  spokenMemoryId?: string;
   /** What the entity actually did, when a handler resolved one (WP9
    * ensemble) — optional so WP1-WP7 handlers that never set it stay valid.
    * `content` carries plain-language detail specific to `kind` (spoken
@@ -175,6 +178,7 @@ export interface WakeResult {
   ran: boolean; // true if a handler actually executed (vs. audit-only)
   auditId?: string; // set when DAYA is disabled — see writePendingAudit
   memoryEntryId?: string; // id of the DayaMemoryEntry written, if any
+  spokenMemoryId?: string;
   action?: HandlerResult['action']; // what the entity did, when the handler resolved one
 }
 
@@ -201,7 +205,7 @@ export async function wake(trigger: DayaTrigger, overrides?: DayaClientOverrides
   }
 
   const result = await handler(trigger, overrides);
-  return { trigger: trigger.kind, ran: true, memoryEntryId: result?.memoryEntryId, action: result?.action };
+  return { trigger: trigger.kind, ran: true, memoryEntryId: result?.memoryEntryId, spokenMemoryId: result?.spokenMemoryId, action: result?.action };
 }
 
 /**

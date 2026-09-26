@@ -1,0 +1,64 @@
+
+Dominion - Dominion is a god's level of power. This level can be increased and decreased by various means
+Dominion level ranges from 1-10
+1 = Godling
+-God Wish
+-Can use God Relics
+-Dominion Leyline
+-Primary God Powers
+2 
+3 = Demi-God
+-Esther Roots
+-Greater God Wish
+4
+5 = Lesser God
+-Planar Control
+-Godly Emblem
+-Secondary God Powers
+6
+ 
+7-Divine Will
+-Contract Stasis
+8
+9 = Supreme God
+-Supreme God Powers
+-Pantheon Control
+-Supreme Denial
+10 = Aeon 
+-No longer bound by God contracts
+-An Aeon is bound to its own mind (reality). If an Aeon exists within another Aeons mind then it causes destabilization and can result in Aeons combining or the complete destruction of both Aeons
+-Having a chaperone automatically gives a God +1 to their Dominion Level max of Dominion 9
+-Every 100K followers gives you +1 to your Dominion Level up to a max of +5 
+God Contracts
+Gods are the pinnacle of power but they must still abide by rules set in place by the Aeons. Contracts are written based on the Gods domain and are different for each god. Contracts must be honored within 24 hrs or they are considered delinquent. When a contract becomes delinquent the god automatically loses one level of Dominion until the contract is fulfilled or ignored.
+Delinquent Contracts
+Any contract that hasn’t been fulfilled within 24hrs is considered delinquent and gives a -1 to the Gods Dominion and they may not use their Dominion Leyline until the contract is completed or ignored.
+Ignored Contracts
+A god may choose to ignore a contract. If they do this then they will take a -1 permanently to their Dominion level and -25 Karma. A god can not have their total Dominion lowered to 0 through ignored contracts. However, if a god ever has -100 Karma and any of their contracts are delinquent, then the god is erased from reality. A god may also not ignore any further contracts if their Karma is &lt;= -100
+Completed Contracts
+A god may burn a completed contract for an instant 100 Mana
+Natural God Abilities
+God Wish (Spell) (7 day cooldown, 500 DR)
+After 6 hours of concentrating on the fabric of reality you whisper a sentence that becomes true. This can only be changed or nullified by another God Wish.
+Dominon Leyline
+A god may draw mana from their essence of influence. Once per day the God may draw mana from their followers and cosmic influence. This mana is equal to their dominion level X 100. This mana may not be stored.
+Esther Roots
+The God is completely connected to the weave and thus is able to store pockets of mana that they may tap into at will. Storage is equal to 1000 mana multiplied by their current Dominion
+Divine Will
+The god isn’t limited by focus with spells cast from schools of their Attunement.
+Greater God Wish (Spell) (1000 DR)
+The same effects as a God Wish but has no cooldown or time requirement
+Planar Control
+The God has control over its own plane. The plane comes with Planar actions available to the god
+Emblem 
+A Godly Emblem is essentially a God Wish that is always enabled and in effect for all of the God’s followers, including its chaperone. This God Wish requires nothing to cast and can only be nullified temporarily by a god wish. If an emblem contradicts another God’s emblem then the God who has more power will override the other’s emblem. The effects of an emblem may not affect the God themself. The effects of the emblem may only be changed with the use of a Greater God Wish.
+Contract Stasis
+You may keep 1 God Contract in stasis. This contract doesn’t affect you.
+Pantheon Control
+This God may draw upon any of its subordinate Leylines. All of its subordinate’s Emblems apply to every follower within the Pantheon. You may create a God Contract for a subordinate God once a year per subordinate. 
+Primary, Secondary, and Supreme God Powers
+These are powers unique to each god that are unlocked as the god progresses.
+4 primary, 2 secondary, 2 Supreme
+Supreme Denial
+You may counter any God Wish or Greater God Wish cast from your pantheon as a free spontaneous action.
+

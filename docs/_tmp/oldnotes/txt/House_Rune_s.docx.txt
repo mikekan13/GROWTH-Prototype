@@ -1,0 +1,80 @@
+House Rune’s
+Life Assurance Initiative
+
+
+Explaining Tax Rates
+
+First: Increase Taxes to 4GP per person a year
+
+This should be sustainable as even a poor person is considered to spend 72GP per year. We could use a little bit of trickle-down welfare or basically handwave the squalid and below. Remember our people are all getting an education if they want it. So, their earning potential should be slightly higher than a normal nation’s. I would argue the majority of our nation’s people are at modest level lifestyles which spends 360GP a year. The average of these two lower-tier lifestyles is 216GP a year.
+
+That is 4 GP per person per year at a tax rate of 1.85%. This is more than a reasonable percentage to be a part of obviously the greatest house ever. (I mean shit U.S. has way higher tax rate)
+
+Population: 140,850 X 4GP =
+563,400 GP a year
+
+Removing Death from "Death and Taxes"
+
+Resources for Raise the Dead = 500gp
+
+In a typical population, we can assume a death rate of about 10/1000 meaning every year a population of 1000 will have 10 deaths. The average death rate for the earth is around 8/1000 and the US is a little lower at about 7 and some change. 
+
+Now, if everyone had access to free MAGICAL healthcare that almost instantly removes non-magical diseases, sickness, and wounds then I believe that number would be much smaller. But for the sake of concrete math lets go with the death rate of Earth’s U.S. 
+
+Our current population of house rune would then expect to have 985.95 deaths per year. Let’s go ahead and be pessimistic and round that number up to a clean 1000 deaths a year for our population.
+
+1000 Deaths X 500GP (Cost of resources for Raise Dead) =
+500,000GP per year in death prevention costs
+
+Taxes: 563,400GP - 500,000 =
+63,400 GP leftover after resurrecting the dead
+
+
+
+Paying the Clerics
+Taking the largest suggested number of family health practitioners (found in the real world sources section below.) we get roughly 30 doctors for every 100,000 people. Which translates to about 1 doctor for 3,333.33 people.
+
+42.25 Clerics are needed for House Rune. Five of these clerics would need to have Raise Undead (9 Level Cleric) These special clerics will be referred to as Life Agents or LAs from now on
+
+At a rate of about 360 GP a year for our Healthcare Clerics (Modest Life Style)
+And 720 GP a year for out LA Clerics (Comfortable Life Style)
+
+LAs(720 X 5) + Normal Clerics(38 X 360) =  13,680 + 3,600
+17,280 to pay our heatlh care professionals
+
+This leaves us with 46,120 GP a year in taxes
+
+46,120/7 = 6,588.57 gold a year per party member and party bank
+
+Our side profits from the school and other endeavors = 4,320GP a year
+If we divide that 7 ways then we all get an additional 617.14 GP a year
+
+Perhaps the party overall will want more gold, but COME ON. 7,205 Gold a year? That is off the charts! With the previous plan, our numbers for taxing and economy were both unrealistic and we as players made more gold a year with the previous plan: 12,684 each. Just too much gold to not start breaking D&D.
+
+With this new plan, it gives free healthcare to all our citizens, Resurrects them no matter their social standing, is more realistic with the numbers, and still fills player and government coffers with a much more modest 7,205GP each a year.
+
+THAT IS STILL 600GP a month per player!
+An aristocrat, which is the highest tier lifestyle starts at 10GP a month……
+
+
+
+
+
+
+
+Additional rules for the LAI
+-To qualify for LAI a citizen must be seen by a cleric health professional twice a year. This is to ensure preventive healthcare and reduce the number of deaths per year. It is also a great quality of life increase for our cherished people.
+
+-A citizen can choose to not be resurrected. If so, a stipend will instead be given to his or her family = to 500GP. This basically gives a huge chunk of money to their family. (Redistributes wealth to our citizens) Realistically, it would cost the government the same amount to resurrect the person and in the long run, would save money as that person would be removed completely from the system and would no longer cost additional funds to resurrect. The one additional caveat to this lump sum payment is that the person would also be required to donate their body to House Rune for scientific and national defense purposes. :)
+
+-During times of war or national emergencies, House Rune reserves the right to suspend LAI rights.
+
+
+Real World Sources
+Medical Providers to Population: https://www.merritthawkins.com/news-and-insights/blog/healthcare-news-trends/ideal-physician-to-population-ratio/
+
+Real World Death Rates: https://en.wikipedia.org/wiki/Mortality_rate
+
+D&D Lifestyle Expenses: https://roll20.net/compendium/dnd5e/Expenses#content
+
+Tax Percentage: https://www.fidelity.com/tax-information/tax-brackets

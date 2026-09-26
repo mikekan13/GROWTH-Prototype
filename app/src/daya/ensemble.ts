@@ -26,6 +26,7 @@ import { ingestStimulus, writeMemoryEntry } from './memory';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
+import { perceive } from './perceive';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
 import { runJewlToolAction } from './jewl-action';
@@ -62,6 +63,8 @@ interface PersonaProfileData {
    * step through the unrestricted copilot tool dispatch, instead of the
    * default self-only path every other entity uses. */
   omniscient?: boolean;
+  /** Mike 09-23: a Godhead is the same mechanism with a godlike sheet — recall threshold zero, budget everything, unfoolable except on purpose. */
+  godlike?: boolean;
 }
 
 function parsePersonaProfile(raw: string): PersonaProfileData {
@@ -91,7 +94,7 @@ interface EntityContext {
   sheet: Partial<GrowthCharacter> | null;
   persona: PersonaProfileData;
   mood: AffectVector;
-  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number };
+  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number; godlike?: boolean };
 }
 
 async function loadEntityContext(characterId: string): Promise<EntityContext> {
@@ -118,6 +121,7 @@ async function loadEntityContext(characterId: string): Promise<EntityContext> {
     wisdomCur: wisdom ? wisdom.current : 10,
     witMax: wit ? wit.level + wit.augmentPositive - wit.augmentNegative : 10,
     witCur: wit ? wit.current : 10,
+    godlike: persona.godlike === true || persona.omniscient === true,
   };
 
   return { characterId, entityDaId, campaignId, cycle, name: character.name, sheet, persona, mood, soulState };
@@ -264,24 +268,34 @@ async function runBodyInward(
 // ── Attention rendering (Attend: -> renderer, depth-capped recursion) ────
 
 async function renderAttention(ctx: EntityContext, attendContent: string, overrides: DayaClientOverrides): Promise<string> {
-  if (!ctx.campaignId) return 'Nothing more comes into focus.';
-  const facts = await currentFacts(ctx.campaignId);
-  if (facts.length === 0) return 'Nothing more comes into focus.';
-
-  let best = facts[0];
-  let bestScore = -1;
-  for (const f of facts) {
-    const score = stemmedJaccard(attendContent, `${f.subjectKey} ${f.fact}`);
-    if (score > bestScore) {
-      bestScore = score;
-      best = f;
+  // Per-entity believed world (Mike 09-05 senses contract; MEMORY-DESIGN §5):
+  // a being attends to what IT has perceived — its own perception/dialogue/
+  // seed memories — never the campaign's global fact list. Only an omniscient
+  // (JEWL-tier) entity reads the Terminal's truth directly.
+  let best: { subjectKey: string; fact: string } | null = null;
+  if (ctx.persona.omniscient) {
+    if (!ctx.campaignId) return 'Nothing more comes into focus.';
+    const facts = await currentFacts(ctx.campaignId);
+    let bestScore = -1;
+    for (const f of facts) {
+      const score = stemmedJaccard(attendContent, `${f.subjectKey} ${f.fact}`);
+      if (score > bestScore) { bestScore = score; best = { subjectKey: f.subjectKey, fact: f.fact }; }
+    }
+  } else {
+    const own = await prisma.dayaMemoryEntry.findMany({
+      where: { entityId: ctx.entityDaId, source: { in: ['perception', 'dialogue', 'seed'] } },
+      select: { id: true, content: true },
+      orderBy: { realTime: 'desc' },
+      take: 400,
+    });
+    let bestScore = -1;
+    for (const m of own) {
+      const score = stemmedJaccard(attendContent, m.content);
+      if (score > bestScore) { bestScore = score; best = { subjectKey: `memory:${m.id}`, fact: m.content }; }
     }
   }
+  if (!best) return 'Nothing more comes into focus.';
 
-  // Omniscient perception (WP13 spec §2-2): a JEWL-tier entity's ensemble
-  // uses the renderer's Terminal-truth bypass for ALL perception — he sees
-  // True Sheets, never a Believed/rendered view. Every other entity keeps
-  // its own attunement/bias/mood lens, unchanged.
   const observer: Observer = ctx.persona.omniscient
     ? { entityId: null, attunement: 1, biasProfile: {}, mood: ctx.mood, voice: ctx.persona.voice ?? {} }
     : {
@@ -309,7 +323,7 @@ const ATTEND_DEPTH_CAP = 1;
 async function runStimulusPipeline(
   characterId: string,
   source: string,
-  content: string,
+  truthContent: string,
   depth: number,
   overrides: DayaClientOverrides,
 ): Promise<HandlerResult> {
@@ -319,11 +333,30 @@ async function runStimulusPipeline(
   // pre-WP13 behavior.
   const omniscient = ctx.persona.omniscient === true;
 
+  // 0. The murky mirror (Mike 09-26): the world never reaches a being raw.
+  // Perception and dialogue are composed with the place the being stands in
+  // (who is present, what is there, the standing facts), filtered by its
+  // senses and rendered through its own observer. Everything downstream —
+  // thorns, recall, soul, spirit — reacts to what was PERCEIVED. Godlike
+  // beings and depth>0 attention re-entries skip it.
+  let content = truthContent;
+  let mirrorAudit: Record<string, unknown> | undefined;
+  if ((source === 'perception' || source === 'dialogue') && depth === 0 && !omniscient && !ctx.soulState.godlike && ctx.campaignId) {
+    try {
+      const p = await perceive(characterId, ctx.campaignId, truthContent, source, overrides);
+      content = p.prose;
+      mirrorAudit = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, truthChars: truthContent.length, observer: p.observer } };
+    } catch (err) {
+      console.error('[daya/ensemble] perception composer failed; stimulus ingested raw (non-fatal):', err);
+    }
+  }
+
   // 1. Tagger: ingest + classify. OOC content is processed but never
   // persisted (WP6 residency law) — and never wakes Spirit, since it isn't
   // lived experience.
-  const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content }, overrides);
+  const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content, extraClassification: mirrorAudit }, overrides);
   if (!ingest.persisted) {
+    console.log(`[daya/ensemble] ${source} for ${ctx.name} classified ${ingest.tags.classification.icOoc} (${ingest.tags.classification.rationaleTag ?? 'no rationale'}) — not persisted, loop ends`);
     return {};
   }
 
@@ -338,7 +371,14 @@ async function runStimulusPipeline(
     isRuminationLockActive(ctx.entityDaId),
   ]);
 
-  // 2. Recall (stat-gated). Crosses into the phenomenal zone -> sealed.
+  // 2. Recall (stat-gated, ladder-ordered — Mike 09-23: survival → goals → domain → chain → words).
+  // Survival is DERIVED here from the sheet + this moment, never authored.
+  const activeGoals = await prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } });
+  const freq = ctx.sheet?.attributes?.frequency;
+  const situation = {
+    threatened: ingest.tags.arousal >= 0.7 && ingest.tags.valence < 0,
+    frequencyLow: !!freq && freq.level > 0 && freq.current <= freq.level * 0.25,
+  };
   const recallResult = await recall(
     {
       entityId: ctx.entityDaId,
@@ -348,6 +388,8 @@ async function runStimulusPipeline(
       thornBlocks: activeThornBlocks,
       nowCycle: ctx.cycle,
       ruminationLockActive,
+      goals: activeGoals,
+      situation,
     },
     overrides,
   );
@@ -428,12 +470,12 @@ async function runStimulusPipeline(
         salience: 0.2,
         classification: { contentCategory: 'dialogue', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'own words spoken' },
       });
-      return { memoryEntryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
+      return { memoryEntryId: ingest.memoryEntryId, spokenMemoryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
     }
 
     case 'act': {
       if (!ctx.campaignId) {
-        return { action: { kind: 'act', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
       // Unrestricted action (WP13 spec §2-3): a JEWL-tier entity's 'Do:'
@@ -458,7 +500,7 @@ async function runStimulusPipeline(
           salience: 0.3,
           classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'unrestricted action dispatch' },
         });
-        return { action: { kind: 'act', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
       const facts = await currentFacts(ctx.campaignId);
@@ -492,12 +534,12 @@ async function runStimulusPipeline(
         { kind: 'adjudication_result', entityId: characterId, payload: adjudication as unknown as Record<string, unknown> },
         overrides,
       );
-      return { action: { kind: 'act', content: action.content } };
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
     }
 
     case 'attend': {
       if (depth >= ATTEND_DEPTH_CAP) {
-        return { action: { kind: 'attend', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'attend', content: action.content } };
       }
       const rendered = await renderAttention(ctx, action.content, overrides);
       return runStimulusPipeline(characterId, 'perception', rendered, depth + 1, overrides);
@@ -523,7 +565,7 @@ async function runStimulusPipeline(
         salience: 0.05,
         classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'rest, no action' },
       });
-      return { action: { kind: 'rest' } };
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'rest' } };
     }
   }
 }

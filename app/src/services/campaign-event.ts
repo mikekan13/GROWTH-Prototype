@@ -150,6 +150,15 @@ export async function startSession(campaignId: string, name?: string): Promise<G
     },
   });
 
+  // Keep the local lane warm while the session is hot (Mike 2026-09-26): the
+  // beings at the table run on the serverless core, which cold-starts in
+  // minutes and scales to zero after ~2 min idle. The keep-warm loop probes
+  // it every minute until the session ends. Fire-and-forget — never blocks
+  // or fails the session start.
+  void import('@/daya/l1-keepalive')
+    .then((m) => m.startKeepalive(campaignId))
+    .catch((err) => console.warn('[campaign-event] L1 keep-warm failed to start', err));
+
   return {
     id: session.id,
     number: session.number,
@@ -174,6 +183,15 @@ export async function endSession(campaignId: string): Promise<GameSessionInfo | 
     where: { id: active.id },
     data: { endedAt: new Date() },
   });
+
+  // Session over — release the lane (the loop would notice on its own next tick; this is immediate).
+  void import('@/daya/l1-keepalive').then((m) => m.stopKeepalive(campaignId)).catch(() => {});
+  // Session end is a hard cement (Mike 09-26): every confirmed improvisation settles same-or-under.
+  try {
+    const gm = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
+    const { settleAllForCampaign } = await import('@/services/reconciliation');
+    await settleAllForCampaign(campaignId, gm?.gmUserId ?? 'system');
+  } catch (err) { console.warn('[campaign-event] improvisation settlement at session end failed', err); }
 
   return {
     id: updated.id,

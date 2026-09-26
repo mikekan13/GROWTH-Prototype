@@ -27,6 +27,7 @@ export interface ConverseResult {
   status: ConverseStatus;
   action?: WakeResult['action'];
   memoryEntryId?: string;
+  spokenMemoryId?: string;
   /** Human-readable detail for the 'core_offline'/'warming' states — never
    * surfaced as a raw error, just a plain note about what's going on. */
   detail?: string;
@@ -47,6 +48,9 @@ export async function converseWithEntity(
   actorRole: string,
   message: string,
   overrides: DayaClientOverrides = {},
+  /** Memory source the being files this under: 'dialogue' (someone spoke) or
+   * 'perception' (the GM narrated the world). Same loop either way. */
+  source: 'dialogue' | 'perception' = 'dialogue',
 ): Promise<ConverseResult> {
   if (!isWatcherOrAbove(actorRole)) {
     throw new ForbiddenError('GM/ADMIN only — the persona-harness conversation surface is Watcher-console-and-above');
@@ -65,8 +69,8 @@ export async function converseWithEntity(
   }
 
   try {
-    const result = await deliverStimulus(characterId, 'dialogue', message, overrides);
-    return { status: 'ok', action: result.action, memoryEntryId: result.memoryEntryId };
+    const result = await deliverStimulus(characterId, source, message, overrides);
+    return { status: 'ok', action: result.action, memoryEntryId: result.memoryEntryId, spokenMemoryId: result.spokenMemoryId };
   } catch (err) {
     // Order matters: DayaWarmingTimeoutError extends AppError, not
     // DayaTierUnavailableError, so this must be checked first — a cold

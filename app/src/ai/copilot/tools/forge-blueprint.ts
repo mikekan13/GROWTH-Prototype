@@ -86,7 +86,15 @@ export const proposeForgeBlueprintTool: JewlTool = {
       validateForgeData(parsed.type, body);
     } catch (e) {
       const issues = e instanceof z.ZodError
-        ? e.issues.map(i => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')
+        ? e.issues.map(i => {
+            const path = i.path.join('.') || '(root)';
+            // Zod blames the discriminator for ANY failure inside a union
+            // variant (cost a full work cycle 2026-08-27) — decode it.
+            const hint = /discriminator|union/i.test(i.code) || /discriminator|union/i.test(i.message)
+              ? " (NOTE: effects[] discriminator is kind:'persistent'|'triggered'; this error usually means a field INSIDE the entry is wrong — persistent requires modifiers[≥1]; triggered takes no modifiers; duration units are rounds|hours|days|cycles)"
+              : '';
+            return `${path}: ${i.message}${hint}`;
+          }).join('; ')
         : e instanceof Error ? e.message : String(e);
       throw new Error(
         `Blueprint body does not match the canonical ${parsed.type} schema — ${issues}. ` +
@@ -107,15 +115,24 @@ export const proposeForgeBlueprintTool: JewlTool = {
     const campaignId = ctx.campaignId;
 
     // Uniqueness guard — ForgeItem has @@unique([campaignId, name, type]).
+    // Superseded tombstones don't get to hold name slots (round-5 review,
+    // 2026-08-25): rename the tombstone out of the way and proceed.
     const existing = await prisma.forgeItem.findFirst({
       where: { campaignId, name: parsed.name, type: parsed.type },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (existing) {
-      throw new Error(
-        `Blueprint already exists for (campaign=${campaignId}, ` +
-          `type=${parsed.type}, name=${parsed.name}): ${existing.id}`,
-      );
+      if (existing.status === 'superseded') {
+        await prisma.forgeItem.update({
+          where: { id: existing.id },
+          data: { name: `${parsed.name} [w:${existing.id.slice(-4)}]` },
+        });
+      } else {
+        throw new Error(
+          `Blueprint already exists for (campaign=${campaignId}, ` +
+            `type=${parsed.type}, name=${parsed.name}): ${existing.id}`,
+        );
+      }
     }
 
     // Pre-price with the locked formulas (audit X2) so the draft reaches

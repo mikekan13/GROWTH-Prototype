@@ -207,9 +207,22 @@ export async function callOpenAiCompatible(
   const { url, model: tierModel } = resolveOpenAiTierConfig(tier);
   const model = params.model || tierModel;
 
+  // vLLM/Qwen chat templates cannot render a conversation with no
+  // user/assistant turn — a system-only message list 500s opaquely through
+  // the RunPod proxy (found 2026-08-30, A/B verified). The harness composes
+  // single system-blob prompts; normalize by demoting to a user turn
+  // (single) or folding the tail into one (multiple). No text is added —
+  // instruction-following is equivalent from the user role here.
+  let messages = params.messages;
+  if (!messages.some(m => m.role !== 'system')) {
+    messages = messages.length === 1
+      ? [{ ...messages[0], role: 'user' as const }]
+      : [messages[0], { role: 'user' as const, content: messages.slice(1).map(m => m.content).join('\n\n') }];
+  }
+
   const requestBody: Record<string, unknown> = {
     model,
-    messages: params.messages,
+    messages,
     max_tokens: params.maxTokens ?? 1024,
     temperature: params.temperature ?? 0.7,
   };
@@ -228,7 +241,12 @@ export async function callOpenAiCompatible(
   // OpenAI-compatible endpoint behind a bearer token; the current
   // always-on pod has none configured, so absent = unchanged (no header).
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const apiKey = process.env[`DAYA_${tier}_API_KEY`];
+  // Fallback chain matches ai/network/config localLane(): tier-specific
+  // key first, then the shared local-lane / RunPod keys (2026-08-29 — the
+  // serverless endpoint 401'd because only DAYA_L1_API_KEY was consulted).
+  const apiKey = process.env[`DAYA_${tier}_API_KEY`]
+    ?? process.env.AI_LOCAL_API_KEY
+    ?? process.env.RUNPOD_API_KEY;
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   // WP14 — generous, env-configurable timeout so a cold start (worker
@@ -259,6 +277,14 @@ export async function callOpenAiCompatible(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
+    // Diagnostic breadcrumb (2026-08-30): the RunPod proxy masks vLLM
+    // errors as opaque 500s — log what we actually sent so shape bugs
+    // (overlong prompts, bad model names, odd roles) are visible.
+    const chars = JSON.stringify(requestBody).length;
+    // eslint-disable-next-line no-console
+    console.error(
+      `[daya/model-client] ${tier} ${res.status} — model=${model} messages=${params.messages.length} bodyChars=${chars} maxTokens=${requestBody.max_tokens} roles=${params.messages.map(m => m.role).join(',').slice(0, 120)}`,
+    );
     throw new AppError(`DAYA ${tier} endpoint returned ${res.status}: ${detail}`, 502);
   }
 

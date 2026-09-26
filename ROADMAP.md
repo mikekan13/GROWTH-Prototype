@@ -1,6 +1,12 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-07-10
+Last updated: 2026-08-26
+
+> 2026-08-26: stock-catalog structure+balance compliance pass (487 items: structured
+> effects[]/expiry across all traits, scene/minutes purged per r-2026-08-26-01,
+> campaign-trait KV placeholders repriced, 2 legacy betaDraft roots flagged);
+> forge authoring law folded into 00_CANON_CORE.md; round-5 Violet review in
+> progress (rulings r-2026-08-24-01..19 + 08-25/08-26 landed in rulebook/rulings.md).
 
 ## Status (2026-07-10) — BUILD PHASE (GROWTH_BUILD_PLAN.md is the active task list)
 
@@ -644,3 +650,73 @@ Detail owed beyond Phase 1 seeded entities:
 - **KRMA Subscription tuning** — diminishing returns curve, GM lump sum + monthly drip, social/creative contributions as primary source over time. Draft targets only; not canon yet.
 - **Reversible book** — Flow front-to-back lore, Focus back-to-front mechanics, Balance synthesizes in middle. AI-assisted page creation eventually. App comes first.
 - **KRMA → ledger crypto** — long-term: built on a ledger-based cryptocurrency so KRMA maps to actual company shares; players become co-owners. Depends on legality + working product first.
+
+## 2026-09-05 — Reality Simulation Unit 1 (one round through the engine) — SHIPPED
+- Founded the simulation layer under DAYA (design: REALITY-SIM-DESIGN-2026-09-02.md; rulings 09-02→09-05).
+- Built: `src/sim/` round engine (action economy, slot granularity, layered ordering, per-slot resolution with negate/redirect/block), senses field v0, branch planner (local lane + heuristic), Encounter model + service + API, ENCOUNTER tab in the Campaign Terminal. 21 unit tests.
+- Also: Defect 1 (CharacterTab cross-character bleed) fixed 09-02; combat rules status sheet (rulebook/COMBAT-RULES-STATUS-2026-09-04.md).
+- NEXT (Unit 2 candidates, Mike picks): mid-round reactions (one free change, reserve priority loss), grapple hold/re-roll, weapons carry damage/reload, player-side declaration UI, canvas encounter card, Layer-5 contextual call on the local lane, repository rewrites queued in STATE-OF-PLAY-2026-09-05.
+
+## 2026-09-17 — Unit 1 self-verification pass (before Mike's test)
+- Rules audit vs canon + repository; 18 findings fixed (Effort spend/cap/Muted, both damage paths, item wear, unspent-action redirect, DR floor on negate, unskilled tier, declare-time rules, secrecy redaction, diegetic sense-limited memory, error resilience, GM-set situational DR, stand-up after Facing Death, dice-overlay safety net). See REALITY-SIM-DESIGN §10.1.
+- Verified live in the Incubator via browser + API; 343+ tests green.
+- Open for Mike: damage-path coupling; unskilled-attack negate rule; tuning knobs.
+
+## 2026-09-20 — Research briefings assessed → QUEUED (Mike: "Do it")
+Two briefings (docs/research/*-2026-09-18.md: agent individuation; provenance
+ledger) assessed against the reality-sim rulings. Founding structure
+unchanged. Queued, in order:
+1. ✅ BUILT 09-20 — **Consent bit on the trace corpus** + Mike's ruling: consent REQUIRED for META; DISCONNECTED mode = features without training (Campaign.networkMode, gates at every entry). OPEN: DISCONNECTED→META switch UX. — the JEWL tool-loop traces
+   (ai/network/traces.ts) are the planned fine-tune corpus and contain
+   player-authored content with no AI-training consent recorded. Add the
+   flag (campaign + member level), gate the trace writer on it, BEFORE any
+   adapter is trained.
+2. ✅ BUILT 09-20 (schema + service + 4 write sites) — **Provenance manifest at write-time** for new creative acts (Forge items,
+   generated text, portraits): creator, creatorKind (human|ai|composite),
+   model/entity/adapter, ingredients[], memoryRefs[], rights bits (remix /
+   external AI training / commercial). Schema first — cannot be retrofitted.
+   Ownership stays outside the manifest (KRMA/possessions).
+3. ✅ BUILT 09-20 — **Probe baselines** for Violet + the 3 NPCs: canonical identity-question
+   set, embedded responses stored as IDENTITY_HASH; monthly re-probe measures
+   drift-from-self (bounded) and divergence-between-entities (growing).
+4. ✅ BUILT 09-20 — **Dream trigger → accumulated salience threshold** (event-driven, Smallville
+   150-importance pattern) replacing the 6 h interval; manual sweep stays as
+   fallback. Fits Mike's rejection of ticks/clocks.
+5. **Per-entity believed world** in the next sim unit with positions: Attend
+   must read the entity's own perception ledger (Smallville stale subgraph),
+   not the global WorldFact list (current omniscience leak, ensemble.ts).
+6. **Embedding relevance in recall** (local lane) alongside keyword Jaccard —
+   retrieval misses are the documented #1 failure mode.
+Not adopted: AI-GM framings (parked 09-02); soul.py file layout as files —
+it maps onto existing tables (SALIENCE=DayaAffect, RELATIONS=DayaRelationship,
+PROCEDURES=JEWL rulings library); only IDENTITY_HASH is new (item 3).
+
+## 2026-09-20 — CANON LEDGER (the infallible base reality) — SHIPPED (walking version)
+Mike: character memory is fallible by design; a recorded, infallible truth must sit beneath it; the Watcher reads all of it. Built: CanonEvent (append-only, GM-read-only), written by the sim per round act; DayaMemoryEntry.truthRef; memory-vs-truth view. NEXT: table-speak dialogue and GM declarations/improvisations as canon events; location on events once positions land; canvas recording surface.
+
+## 2026-09-23 — MEMORY DESIGN founded (MEMORY-DESIGN-2026-09-23.md)
+North star: PERFECT RECOLLECTION at the Terminal. Rulings from the 09-20→23 walkthrough recorded; 7-step build order proposed (schema-first: memory chain + domain tags, then ladder recall, canon writers, vines as custodian memory, Godheads as beings, Terminal recall, recollection harness). Awaiting Mike's pick of the first unit.
+
+## 2026-09-23 — MEMORY step 1 SHIPPED: chain + domain tags at write-time
+Every memory now carries pillar/domain/domains + chain (truthRefs, entities, items, place, goals, antecedent); canon events carry items/goals/domains/location. Ten-domain registry is DATA awaiting Mike's seating/names/keywords. Retrieval unchanged (step 2 = ladder recall).
+
+## 2026-09-26 — MEMORY steps 2–7 SHIPPED (walking versions)
+Ladder recall (survival > goals > domain > chain > words) + per-entity believed world in Attend; canon writers (table dialogue, Watcher declarations); vines as custodian memory (custodian + resistance sides); Godheads as beings (godlike recall; custodian tree; seating = Mike); Terminal recall (askTerminal + JEWL tool ask_terminal; every sentence cited or "the record holds nothing"); recollection harness (recall@k over sampled canon). NEXT: embeddings for the words step; domain seating/names/keywords from Mike; location on canon once positions land; canvas recording surface; canon-checking of declarations against prior ledger.
+
+## 2026-09-26 — CAMPAIGN READINESS (Mike GMs, Violet played by the AI)
+Assessed NOT ready (no way for narration to reach Violet; seed memories untagged; nobody had goals; NPCs had no sheets; lane cold at session start). Built: **Narrate channel** (TABLE tab picker default = Narrate; `POST /table {narrate:true,message}` → canon declaration → 'perception' through every ACTIVE being → precise truthRef on the stimulus row); **memory tag backfill** (+ `--rechain-goals`); **goals** proposed by the C tier for Violet (4) and the three NPCs (3 each; contents never printed — spoiler firewall); **NPC sheets** via the Human seed through `assignMechanics`; **L1 pre-warm** fired from `startSession`. Live 09-26: narrate 200 → canon row + Violet perceived (rest) + Terminal cited it; session start 201 with pre-warm fired. NEXT: Mike runs a real session (start session → Narrate → speak as NPCs → ask the Terminal); Effort/Mute check on NPCs in a round; seat the domains; the two "failed recall" rows per stimulus are noisy (Ruling 5) — tune or dedupe.
+
+## 2026-09-26 (later) — PROSE TABLE + THE MURKY MIRROR ON THE WORLD
+Mike: "fix the failed recall rows" → one Ruling-5 self-ingest per reached-for memory per 6 h (parentMemoryId = the memory that wouldn't come; `RECALL_TUNING.failedRecallDedupeMs`). Mike: "shouldn't need a tab switcher… pick up from normal prose" → picker gone; `services/table-prose.ts` parses narration + quoted speech with attribution from the prose (NPC name / introducing noun phrase / "someone present"); narration → declaration canon, quotes → dialogue canon (unattributed kept with label + context). Mike: "the GM narrative is additive… everything goes through the murky Mirror… the entire point of the perception engine" → `daya/perceive.ts`: the stimulus is composed with the being's canvas Location, the entities present, items and place-scoped WorldFacts, sense-filtered, rendered through `render()` subject 'scene' (new envelope: headline always, salience floors per fidelity, seeded murk, mood/bias tilt) — hooked at step 0 of the being loop for every perception/dialogue stimulus; declareCanon witnesses too. Live with Mike's inn example: canon + attribution correct, Violet acted, Terminal cited both events, memory row = perceived scene with mirror audit. OPEN: which attribute governs scene attunement (flat 0.8 now); the lane is cold on every idle gap (~5 min first response) — consider keeping a worker warm during a session.
+
+## 2026-09-26 (night) — KEEP-WARM + FLUID CANON: JEWL reconciles narration with the sim
+Mike: keep the lane live while a session is hot → `daya/l1-keepalive` (60 s probes from startSession to endSession; TABLE roster re-arms). RULING walked through the tavern case (memory: ruling-fluid-canon-jewl-reconciliation-2026-09-26): JEWL catches narration first → "mistake or somewhere new?" → improvising → search planned, else spin up via the meta (stubs below the line) → DoorDash hold (over-estimate, settle same-or-under at cementing) → beings perceive the sketch at once → canon fluid till the GM builds on it; self-contradiction flags; corrections re-render involved memories; canon-rewrite LIMITS undecided (Mike finds them in play; floor: never erase a character). BUILT: `services/reconciliation*.ts`, `Reconciliation`/`CanonRevision` models, `/reconcile` + `/canon/correct` routes, JEWL card in the table bar, HOLD wallet + IMPROV_* reasons, cement/settle on load or session end, correction re-render with observer snapshots. Also fixed: the being loop returned the spoken-words row as the perception row (canon attached to the wrong memory). Live-verified end to end. OPEN: IMPROV_TUNING placeholders (stub prices, ×1.5, cementLoad 3); OOC table talk → corrections/time advance (ruled, not built); voice input.
+
+## 2026-09-26 (later) — BRIDGE: a confirmed continuity jump renders its interval
+Mike: "if a continuity jump is established the simulation must render everything that would lead up to it" / "the NPCs would all simulate so the simulation writes it." Built `services/bridge.ts`: on confirm (with a real move), the sim forecasts the interval (≤6 steps, bounded), writes a `continuity` parent + `bridge` children as sim-authored canon across the interval, advances the clock by the elapsed time, and each traveller remembers the trip through its mirror. Summary fidelity (render distance); deterministic fallback when the model is down. Live: 18 min / 6 steps / 16 s. NEXT: full-fidelity expansion of a bridged stretch when the Watcher narrates into it; OOC table talk → corrections/time; BRIDGE_TUNING placeholders.
+
+## 2026-09-26 (pre-session) — JEWL places what he spins up on the canvas
+Mike: no OOC command (the filter will handle it once built); "JEWL to position objects on the canvas so a human can see and interpret details correctly." Built `services/canvas-placement.ts`: non-overlapping placement beside the scene for stub locations, inside-the-folder for stub NPCs and moved beings; narrated moves snap the card (`snapCanvas`). Left the inn run on the Incubator canvas for Mike to inspect. READY FOR THE FIRST CAMPAIGN TEST (cautions: 30–40 s per response with a warm lane; everything typed is in character until the OOC filter exists; corrections are API-only; combat via the ENCOUNTER tab).
+
+## 2026-09-26 — Incubator canvas organized by JEWL
+Inn example cleared. `scripts/jewl-arrange-canvas.ts`: JEWL laid out the Incubator (block as the frame; Carrasco Arms, shelter, Napoli Slice, library inside it; the apartment inside Carrasco Arms; Main Room, kitchen, bathroom as sibling rooms; people in Main Room). He flagged for Mike: the duplicate apartment Location row (orphan set aside, not deleted) and all four characters located in Main Room.

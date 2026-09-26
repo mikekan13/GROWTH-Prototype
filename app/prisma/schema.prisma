@@ -25,7 +25,157 @@ model User {
   emailVerifications EmailVerificationToken[]
   passwordResets     PasswordResetToken[]
   subscription       Subscription?
+  // Provenance ledger (2026-09-20): may this user's authored content enter
+  // the fine-tune corpus / entity memory consolidation? Recorded at write-time
+  // on every trace and provenance manifest; default NO.
+  aiTrainingConsent   Boolean   @default(false)
+  aiTrainingConsentAt DateTime?
   createdAt          DateTime   @default(now())
+}
+
+// ── Canon ledger (Mike 2026-09-20): the infallible base reality ──────────────
+// Append-only, immutable. One row per resolved act — the output of the
+// Willpower step ("set as CANON via the recording on the canvas"). The GM
+// cannot edit ledgered canon (design doc ruling 9). The Watcher reads all of
+// it; players reach it only through their character's fallible memory.
+// JEWL's catch between the Watcher's words and the simulated reality (Mike
+// 2026-09-26, tavern ruling): raised BEFORE canon/perception when the
+// narration differs enough from the sim; the GM dismisses (mistake) or
+// confirms (improvising). On confirm JEWL plans what the world needs (search
+// planned elements, else stub), over-estimates the price and HOLDS it against
+// the campaign wallet (DoorDash-style); the scene runs on the sketch; the hold
+// SETTLES same-or-under once the canon is cemented (the GM built on it, or
+// the session ended).
+model Reconciliation {
+  id           String    @id @default(cuid())
+  campaignId   String
+  status       String    @default("PENDING") // PENDING | CONFIRMED | DISMISSED | REFUSED | SETTLED
+  message      String    // the GM prose that raised it
+  kinds        String    @default("[]") // JSON string[]: relocation | new_presence | contradicted_fact | contradiction | continuity
+  summary      String    // what differs — JEWL's read
+  question     String    // JEWL's popup, in his voice
+  plan         String    @default("[]") // JSON PlanItem[] — what the world needs: matched or stubbed
+  estimateKrma Int       @default(0)    // the over-estimate held
+  holdWalletId String?
+  holdTxId     String?
+  settledKrma  Int?
+  canonEventId String?   // the narration event, once confirmed and written
+  createdBy    String    // userId (the Watcher)
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+  settledAt    DateTime?
+
+  @@index([campaignId, status])
+}
+
+// A correction to a canon event after it was written (Mike 09-26: canon is
+// fluid till it isn't; corrections retroactively re-render every involved
+// memory). Keeps the previous version and the REACH of the rewrite so Mike can
+// find the limits of canon changing in play.
+model CanonRevision {
+  id           String   @id @default(cuid())
+  campaignId   String
+  canonEventId String
+  previous     String   // JSON { narration, detail }
+  narration    String   // the corrected narration
+  reason       String   @default("")
+  reach        String   @default("{}") // JSON { memories, rerendered, vines, laterEvents, entities }
+  authoredBy   String   // userId
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, canonEventId])
+}
+
+model CanonEvent {
+  id           String   @id @default(cuid())
+  campaignId   String
+  cycle        Float    // campaign clock (meta cycles) when it happened
+  seq          Int      // ordering within the same cycle (slot / step)
+  kind         String   // encounter_round | check | negate | block | redirect | damage | downed | move | hold | dialogue | declaration | …
+  locationId   String?
+  actorId      String?  // characterId
+  targetId     String?  // characterId
+  narration    String   // diegetic, numberless — what a witness would perceive
+  detail       String   // JSON: the sim's structured record (rolls, DRs, deltas)
+  consequences String   // JSON: pool/part/item deltas actually applied
+  sourceType   String?  // encounter | table | gm | sim
+  sourceId     String?  // e.g. encounterId
+  parentId     String?  // grouping event (the round for its slot actions)
+  provenanceId String?
+  // The chain on the truth side (Mike 09-23): what was involved.
+  itemIds      String   @default("[]") // JSON string[] CampaignItem ids
+  goalIds      String   @default("[]") // JSON string[] Goal ids this act touched
+  domains      String   @default("[]") // JSON string[] domain keys (same registry as memories)
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, cycle, seq])
+  @@index([campaignId, actorId])
+  @@index([campaignId, targetId])
+  @@index([parentId])
+}
+
+// ── Vine entries (Mike 2026-09-22): the vine is the custodian's memory of a goal ──
+// When canon touches a goal, its custodian Godhead records it on the vine from
+// its side; the resistance's opposing custodian records the same event on the
+// resisting entity's own vine. Several recorders per goal; one truth.
+model VineEntry {
+  id           String   @id @default(cuid())
+  goalId       String
+  campaignId   String
+  custodianId  String?  // GodHead.id writing this entry (null = uncustodied goal; the Terminal holds it)
+  custodianPillar String? // MERCY | BALANCE | SEVERITY — the coloring (interpretation, not error)
+  side         String   // custodian | resistance
+  canonEventId String
+  cycle        Float
+  reading      String   // the custodian's reading of the event as it bears on this goal
+  createdAt    DateTime @default(now())
+
+  @@index([goalId, cycle])
+  @@index([custodianId, cycle])
+  @@index([canonEventId])
+}
+
+// ── Identity probes (2026-09-20, docs/research/growth-agent-research-briefing §3.3/§6) ──
+// A canonical question set re-asked per entity; responses are stored so
+// drift-from-self (bounded) and divergence-between-entities (growing) can be
+// measured over months. The first run per entity is its IDENTITY_HASH baseline.
+model DayaIdentityProbe {
+  id           String   @id @default(cuid())
+  entityId     String   // DayaEntity id
+  runId        String   // groups one sweep across entities
+  probeVersion String   // e.g. "v1"
+  questionKey  String
+  question     String
+  response     String
+  model        String?
+  createdAt    DateTime @default(now())
+
+  @@index([entityId, runId])
+  @@index([runId])
+}
+
+// ── Provenance ledger (2026-09-20, docs/research/growth-provenance-ledger-briefing) ──
+// One manifest per creative act. Creation facts are immutable; ownership lives
+// elsewhere (possessions/KRMA). Ingredients form the creation DAG; memoryRefs
+// bridge an AI being's act to its memory ledger.
+model Provenance {
+  id              String   @id @default(cuid())
+  assetType       String   // forge_item | campaign_item | character | portrait | encounter_round | text
+  assetId         String
+  campaignId      String?
+  creatorUserId   String?  // human principal (owner of the act)
+  creatorEntityId String?  // DayaEntity id when an AI being authored/co-authored it
+  creatorKind     String   // human | ai | composite  (IPTC digital-source-type vocabulary)
+  tool            String?  // generator: model / lane / adapter version
+  ingredients     String   // JSON string[] of "assetType:assetId" consumed or conditioned on
+  memoryRefs      String   // JSON string[] DayaMemoryEntry ids retrieved/written during the act
+  rights          String   // JSON { aiTraining: boolean, remix: boolean|null, commercial: boolean|null }
+  contentHash     String?  // sha256 of the asset content at creation (ISCC-style key later)
+  createdAt       DateTime @default(now())
+
+  @@index([assetType, assetId])
+  @@index([campaignId, createdAt])
+  @@index([creatorEntityId])
 }
 
 // ── Auth: short-lived single-use tokens for email verification & password reset ──
@@ -108,6 +258,10 @@ model Campaign {
   gmUserId            String
   inviteCode          String?              @unique
   status              String               @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  // Mike 2026-09-20: consent is required to play in the META (the connected
+  // network, whose play trains GROWTH). DISCONNECTED keeps the features but
+  // never uses the table's data to train. Set at creation.
+  networkMode         String               @default("META") // META | DISCONNECTED
   maxTrailblazers     Int                  @default(5)
   characters          Character[]
   members             CampaignMember[]
@@ -115,6 +269,7 @@ model Campaign {
   copilotMessages     CopilotMessage[]
   changeLogs          ChangeLog[]
   sessions            GameSession[]
+  encounters          Encounter[]
   events              CampaignEvent[]
   forgeItems          ForgeItem[]
   playerRequests      PlayerRequest[]
@@ -365,6 +520,26 @@ model ChangeLog {
   @@index([campaignId, createdAt])
   @@index([characterId, createdAt])
   @@index([groupId])
+}
+
+// ── Reality simulation — Encounter (Unit 1, 2026-09-05) ────────────────────
+// One encounter card: a scene living in 6-second rounds. Participants,
+// declared intentions, and the per-round log live in `state` (JSON) for the
+// walking version; they become proper rows when the canvas card needs them.
+model Encounter {
+  id         String   @id @default(cuid())
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  name       String
+  status     String   @default("PLANNED") // PLANNED | ACTIVE | PAUSED | RESOLVED
+  round      Int      @default(0)         // rounds completed
+  locationId String?
+  state      String                        // JSON<EncounterState> — see src/sim/encounter/state.ts
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([campaignId, status])
 }
 
 model GameSession {
@@ -670,6 +845,11 @@ model GodHead {
   pillar        String    // MERCY, BALANCE, SEVERITY
   character     Character @relation(fields: [characterId], references: [id])
   characterId   String    @unique // Links to Character record (universal sheet)
+  // Mike 2026-09-22: main Godheads sit at the ten domains with Godheads under
+  // them taking narrower requests — a custodian TREE. null = a main seat.
+  parentId      String?
+  // Which of the ten domains this seat holds (src/daya/domains.ts key). Blank until Mike seats them.
+  domainKey     String?
 
   // AI behavior. aiActionMode = false means the GodHead row exists (persona +
   // memory + identity) but a human (GM or player) is picking the character's
@@ -964,6 +1144,10 @@ model DayaEntity {
   introspection  Float     @default(0.5) // 0..1 self-insight capacity — shapes true-vs-believed divergence
   personaProfile String    @default("{}") // JSON: bias/voice params
   status         String    @default("DORMANT") // DORMANT | ACTIVE | ARCHIVED
+  // Event-driven dream trigger (2026-09-20, Smallville importance counter):
+  // every ledger write adds salience×10; at DREAM_PRESSURE_THRESHOLD the
+  // entity dreams and the counter resets. No clock.
+  dreamPressure  Float     @default(0)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -1005,6 +1189,18 @@ model DayaMemoryEntry {
   classification String     @default("{}") // JSON: content category, sensitivity, IC/OOC
   clusterId      String?    // dream-tick hierarchy grouping
   parentMemoryId String?    // memories-of-memories (dream consolidation)
+  // Mike 2026-09-20: memory is FALLIBLE; beneath it sits the infallible canon
+  // ledger. A lived memory points at the CanonEvent it perceived, so drift
+  // between what a being remembers and what happened is measurable.
+  truthRef       String?
+  // Mike 2026-09-23 (MEMORY-DESIGN §3): every memory is classified into the
+  // same ten domains the Godheads sit at (pillar Mercy/Balance/Severity +
+  // domain), and carries the CHAIN that backs it — entities, items, place,
+  // goals touched, antecedent — each tracking from its own perspective.
+  pillar         String?    // MERCY | BALANCE | SEVERITY (from the domain registry; null until the seat is ruled)
+  domain         String?    // primary domain key (src/daya/domains.ts)
+  domains        String     @default("[]") // JSON string[] — all matched domains (overlap is the rule)
+  chain          String     @default("{}") // JSON<MemoryChain> — see src/daya/chain.ts
 
   @@index([entityId, narrativeCycle])
   @@index([entityId, salience])

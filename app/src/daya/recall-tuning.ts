@@ -11,6 +11,9 @@ export const RECALL_TUNING = {
   // Candidate gate — Wisdom breadth (§4)
   thetaBase: 0.45,
   thetaReach: 0.35,
+  // Ruling 5 self-ingest: one "failed recall" row per reached-for memory per
+  // this much real time (Mike 09-26: every stimulus was leaving two).
+  failedRecallDedupeMs: 6 * 60 * 60 * 1000,
   wisdomBreadthFactor: 0.35, // theta = thetaBase * (1 - 0.35 * wisdomNorm)
   wisdomBudgetGain: 3, // budget n = 1 + round(3 * wisdomNorm)
   wisdomNormDivisor: 40, // Ruling 23 calibration: 30-40 human
