@@ -26,6 +26,7 @@ import { ingestStimulus, writeMemoryEntry } from './memory';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
+import { perceive } from './perceive';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
 import { runJewlToolAction } from './jewl-action';
@@ -322,7 +323,7 @@ const ATTEND_DEPTH_CAP = 1;
 async function runStimulusPipeline(
   characterId: string,
   source: string,
-  content: string,
+  truthContent: string,
   depth: number,
   overrides: DayaClientOverrides,
 ): Promise<HandlerResult> {
@@ -332,10 +333,28 @@ async function runStimulusPipeline(
   // pre-WP13 behavior.
   const omniscient = ctx.persona.omniscient === true;
 
+  // 0. The murky mirror (Mike 09-26): the world never reaches a being raw.
+  // Perception and dialogue are composed with the place the being stands in
+  // (who is present, what is there, the standing facts), filtered by its
+  // senses and rendered through its own observer. Everything downstream —
+  // thorns, recall, soul, spirit — reacts to what was PERCEIVED. Godlike
+  // beings and depth>0 attention re-entries skip it.
+  let content = truthContent;
+  let mirrorAudit: Record<string, unknown> | undefined;
+  if ((source === 'perception' || source === 'dialogue') && depth === 0 && !omniscient && !ctx.soulState.godlike && ctx.campaignId) {
+    try {
+      const p = await perceive(characterId, ctx.campaignId, truthContent, source, overrides);
+      content = p.prose;
+      mirrorAudit = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, truthChars: truthContent.length } };
+    } catch (err) {
+      console.error('[daya/ensemble] perception composer failed; stimulus ingested raw (non-fatal):', err);
+    }
+  }
+
   // 1. Tagger: ingest + classify. OOC content is processed but never
   // persisted (WP6 residency law) — and never wakes Spirit, since it isn't
   // lived experience.
-  const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content }, overrides);
+  const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content, extraClassification: mirrorAudit }, overrides);
   if (!ingest.persisted) {
     return {};
   }

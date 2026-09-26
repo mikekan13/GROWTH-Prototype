@@ -48,7 +48,7 @@ import { orderSlots } from '@/sim/round/ordering';
 import { resolveRound, type CheckFn, type DamageFn } from '@/sim/round/resolve';
 import { effortCap, eligibleEffortAttributes, skillUsableFromPillar } from '@/sim/round/action-economy';
 import type { Governor, Intention, IntentionKind, Participant, Pillar, RoundResult } from '@/sim/round/types';
-import { buildSensoryField } from '@/sim/senses/field';
+import { buildSensoryField, senseFlagsFromSheet } from '@/sim/senses/field';
 import { planRound } from '@/sim/planning/branch-plan';
 import { effectiveHeldResist, emptyState, parseState, participantFromCharacter, refreshParticipant, type EncounterState, type HeldItem } from '@/sim/encounter/state';
 
@@ -159,22 +159,8 @@ async function persistItemWear(itemId: string | null, condition: number, destroy
   await prisma.campaignItem.update({ where: { id: itemId }, data: { data: JSON.stringify(d), ...(destroyed ? { status: 'DESTROYED' } : {}) } });
 }
 
-/** v0 sense flags from anatomy: an eye/ear part with condition > 0 means the sense works; no anatomy = human default. */
-function senseFlags(sheet: GrowthCharacter | null): { canSee: boolean; canHear: boolean } {
-  const root = sheet?.bodyAnatomy as GrowthWorldItem | undefined;
-  if (!root) return { canSee: true, canHear: true };
-  const found = { eye: false, ear: false, anyEye: false, anyEar: false };
-  const walk = (n: GrowthWorldItem) => {
-    const name = (n.partName ?? '').toLowerCase();
-    const ok = (n.condition ?? 3) > 0;
-    // Word-bounded: "Heart" must not read as an ear.
-    if (/\beyes?\b/.test(name)) { found.anyEye = true; if (ok) found.eye = true; }
-    if (/\bears?\b/.test(name)) { found.anyEar = true; if (ok) found.ear = true; }
-    for (const c of n.contains ?? []) walk(c);
-  };
-  walk(root);
-  return { canSee: found.anyEye ? found.eye : true, canHear: found.anyEar ? found.ear : true };
-}
+/** Sense flags now live with the senses (sim/senses/field.ts) so the perception composer shares them. */
+const senseFlags = (sheet: GrowthCharacter | null) => senseFlagsFromSheet(sheet);
 
 function serialize(state: EncounterState): string {
   return JSON.stringify(state);

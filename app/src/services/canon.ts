@@ -21,6 +21,7 @@ import { classifyDomains } from '@/daya/domains';
 import { goalsTouched, makeChain, parseChain } from '@/daya/chain';
 import { recordVineEntriesSafe } from '@/services/vine-memory';
 import { writeMemoryEntry } from '@/daya/memory';
+import { perceive } from '@/daya/perceive';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { TerminalEvent, TerminalPayload } from '@/types/terminal';
@@ -286,11 +287,20 @@ export async function declareCanon(
   for (const w of witnesses) {
     try {
       const own = await prisma.goal.findMany({ where: { characterId: w.characterId, status: 'ACTIVE' }, select: { id: true, description: true } });
+      // The murky mirror (Mike 09-26): a witness lives the declaration as its
+      // own perception of the scene, never the Watcher's words raw.
+      let content = input.narration;
+      let mirror: Record<string, unknown> = {};
+      try {
+        const p = await perceive(w.characterId, campaignId, input.narration, 'perception');
+        content = p.prose;
+        mirror = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines } };
+      } catch (err) { console.warn('[canon] witness mirror failed; raw narration used', err); }
       const m = await writeMemoryEntry({
-        entityId: w.id, narrativeCycle: cycle, source: 'perception', content: input.narration,
+        entityId: w.id, narrativeCycle: cycle, source: 'perception', content,
         valence: 0, arousal: 0.4, salience: 0.5,
         entityRefs: parties.filter(p => p !== w.characterId),
-        classification: { kind: 'declaration', canonEventId: event.id },
+        classification: { kind: 'declaration', canonEventId: event.id, ...mirror },
         truthRef: event.id,
         chain: { truthRefs: [event.id], entities: parties.filter(p => p !== w.characterId), locationId: input.locationId ?? null, goalIds: goalsTouched(input.narration, own) },
       });
@@ -315,12 +325,23 @@ export async function recordDialogueCanon(campaignId: string, speakerId: string,
   return event;
 }
 
+/** Speech the GM wrote into prose with no campaign NPC to pin it on ("a bright eyed lass behind the bar"): truth too, actor unknown, label + introducing sentence kept. */
+export async function recordUnattributedDialogueCanon(campaignId: string, speakerLabel: string, message: string, context: string | null) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } });
+  const cycle = campaign?.currentCycle ?? 0;
+  return recordCanonEvent({
+    campaignId, cycle, seq: 0, kind: 'dialogue', actorId: null,
+    narration: `${speakerLabel} says: "${message}"`, detail: { message, speakerLabel, context }, consequences: {},
+    sourceType: 'table', goalIds: [], domains: classifyDomains(message).all,
+  });
+}
+
 /** Point ONE memory (the stimulus row the being loop returned) at the canon event it perceived. Precise form — preferred over the time-window sweep. */
-export async function attachTruthToMemory(memoryId: string, canonEventId: string): Promise<boolean> {
+export async function attachTruthToMemory(memoryId: string, canonEventId: string, extraRefs: string[] = []): Promise<boolean> {
   const row = await prisma.dayaMemoryEntry.findUnique({ where: { id: memoryId }, select: { id: true, chain: true, truthRef: true } });
   if (!row) return false;
   const prior = parseChain(row.chain);
-  const chain = makeChain({ ...prior, truthRefs: [...prior.truthRefs, canonEventId] });
+  const chain = makeChain({ ...prior, truthRefs: [...prior.truthRefs, canonEventId, ...extraRefs] });
   await prisma.dayaMemoryEntry.update({ where: { id: row.id }, data: { truthRef: row.truthRef ?? canonEventId, chain: JSON.stringify(chain) } });
   return true;
 }

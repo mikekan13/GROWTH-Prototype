@@ -1,16 +1,26 @@
 /**
- * Table speak — the GM speaking through an NPC at the table (Mike 2026-09-02:
- * "As a GM you should be able to select any npc and speak through them. It
- * works like normal tabletop.").
+ * Table speak — the GM types normal tabletop prose at the table.
  *
- * One utterance does two things, in table order:
- *   1. Lands in the shared campaign event stream as `chat` attributed to the
- *      NPC (same shape npc_speak established) — everyone at the table sees it.
- *   2. Is delivered VERBATIM (prefixed with the speaker's name) as a
- *      'dialogue' stimulus to every ACTIVE DAYA-wrapped character in the
- *      campaign — stimulus always goes through, it is part of the loop the
- *      same way thinking is. Their responses land back in the event stream
- *      as chat from them, like any player speaking.
+ * Mike 2026-09-02: "As a GM you should be able to select any npc and speak
+ * through them. It works like normal tabletop."
+ * Mike 2026-09-26: "The system shouldn't need a tab switcher. It should pick
+ * up from normal prose." — and: "The GM narrative during play is usually
+ * additive. Everything should essentially go through the murky Mirror
+ * before being presented to the AI."
+ *
+ * One message does three things, in table order:
+ *   1. TRUTH. The prose is parsed (services/table-prose.ts): narration
+ *      becomes a Watcher declaration (`declareCanon`, kind `narration`) and
+ *      each quoted line a `dialogue` canon event — attributed to a campaign
+ *      NPC when the prose names one, otherwise to the noun phrase that
+ *      introduced it. The table record (event feed) gets the line.
+ *   2. PERCEPTION. Every ACTIVE DAYA being at the table receives the prose
+ *      as one stimulus — and the being loop runs it through the murky
+ *      mirror (daya/perceive.ts): composed with the place it stands in, who
+ *      is present, what is there; filtered by its senses; rendered through
+ *      its own observer. What it perceived is what it remembers, pointing
+ *      at the canon events (truthRef + chain).
+ *   3. RESPONSE. Whatever the being does posts back into the feed as chat.
  *
  * Infra states (core warming / offline) are RETURNED to the caller for the
  * GM's eyes only — they are never posted into the table record.
@@ -23,15 +33,14 @@ import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, type ConverseStatus } from '@/daya/conversation';
 import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
-import { attachTruthToMemory, attachTruthToRecentMemories, declareCanon, recordDialogueCanon } from '@/services/canon';
-
-/** The being loop hands back the id of the memory row that IS the perception; point that one at the truth. Sweep only when it didn't. */
-async function attachTruth(listenerId: string, memoryEntryId: string | undefined, canonEventId: string, since: Date) {
-  try {
-    if (memoryEntryId && (await attachTruthToMemory(memoryEntryId, canonEventId))) return;
-    await attachTruthToRecentMemories(listenerId, canonEventId, since);
-  } catch { /* record-keeping only */ }
-}
+import {
+  attachTruthToMemory,
+  attachTruthToRecentMemories,
+  declareCanon,
+  recordDialogueCanon,
+  recordUnattributedDialogueCanon,
+} from '@/services/canon';
+import { parseTableProse, type ProseQuote } from '@/services/table-prose';
 
 export interface TableActor {
   userId: string;
@@ -51,6 +60,18 @@ export interface TableSpeakResult {
   npcName: string;
   responses: ListenerResponse[];
 }
+
+export interface TableProseResult {
+  /** The narration canon event (null when the message was speech alone). */
+  canonEventId: string | null;
+  /** One per quoted line, with who the record says spoke it. */
+  dialogue: Array<{ canonEventId: string; speakerId: string | null; speakerLabel: string; text: string }>;
+  narration: string | null;
+  responses: ListenerResponse[];
+}
+
+/** Kept for the pre-09-26 narrate-only callers; prose handles it now. */
+export type TableNarrateResult = TableProseResult;
 
 async function postChat(
   campaignId: string,
@@ -105,11 +126,147 @@ function actionToTableLine(name: string, action: { kind: string; content?: strin
   }
 }
 
+/** The being loop hands back the id of the memory row that IS the perception; point that one at the truth. Sweep only when it didn't. */
+async function attachTruth(listenerId: string, memoryEntryId: string | undefined, canonEventId: string, extraRefs: string[], since: Date) {
+  try {
+    if (memoryEntryId && (await attachTruthToMemory(memoryEntryId, canonEventId, extraRefs))) return;
+    await attachTruthToRecentMemories(listenerId, canonEventId, since);
+  } catch { /* record-keeping only */ }
+}
+
+async function activeListeners(campaignId: string, excludeId?: string) {
+  const characters = await prisma.character.findMany({
+    where: { campaignId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true, name: true },
+  });
+  const activeEntities = await prisma.dayaEntity.findMany({
+    where: { characterId: { in: characters.map((c) => c.id) }, status: 'ACTIVE' },
+    select: { characterId: true },
+  });
+  const activeIds = new Set(activeEntities.map((e) => e.characterId));
+  return characters.filter((c) => activeIds.has(c.id));
+}
+
 /**
- * The GM speaks one utterance through an NPC. Watcher-and-above only.
+ * Deliver one stimulus to every awake being at the table (no filter, no
+ * selection — stimulus always goes through; the mirror inside the loop
+ * decides what each one perceives), point the perception at the truth, and
+ * post what each does back into the feed.
+ */
+async function deliverToTable(
+  campaignId: string,
+  actor: TableActor,
+  stimulus: string,
+  source: 'perception' | 'dialogue',
+  truth: { primary: string | null; extra: string[] },
+  excludeId?: string,
+): Promise<ListenerResponse[]> {
+  const since = new Date();
+  const listeners = await activeListeners(campaignId, excludeId);
+  const responses: ListenerResponse[] = [];
+  for (const listener of listeners) {
+    const result = await converseWithEntity(listener.id, actor.role, stimulus, {}, source);
+    responses.push({
+      characterId: listener.id,
+      characterName: listener.name,
+      status: result.status,
+      actionKind: result.action?.kind,
+      detail: result.detail,
+    });
+    const primary = truth.primary ?? truth.extra[0];
+    if (primary) await attachTruth(listener.id, result.memoryEntryId, primary, truth.extra.filter((id) => id !== primary), since);
+
+    if (result.status === 'ok' && result.action) {
+      const line = actionToTableLine(listener.name, result.action);
+      if (line) {
+        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
+      }
+    }
+  }
+  return responses;
+}
+
+/**
+ * The GM types prose. Narration and quoted speech are picked up from it;
+ * nothing to select. Watcher-and-above only.
+ */
+export async function speakProse(
+  campaignId: string,
+  actor: TableActor,
+  input: { message: string; locationId?: string | null },
+): Promise<TableProseResult> {
+  if (!isWatcherOrAbove(actor.role)) {
+    throw new ForbiddenError('GM/ADMIN only — the table is a Watcher-seat surface');
+  }
+  const message = input.message.trim();
+  if (!message) throw new ValidationError('Nothing to say');
+
+  const roster = await prisma.character.findMany({
+    where: { campaignId, entityType: 'NPC' },
+    select: { id: true, name: true },
+  });
+  const parsed = parseTableProse(message, roster);
+
+  // 1. TRUTH — narration as a declaration (also lands in the feed as a game
+  //    event), each quote as dialogue. witnessIds: [] because the beings
+  //    live it through the mirror below, not as a raw witness row.
+  let canonEventId: string | null = null;
+  const dialogue: TableProseResult['dialogue'] = [];
+  const soloAttributed = parsed.narration === null && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
+  if (parsed.narration !== null || parsed.quotes.length !== 1) {
+    const declared = await declareCanon(campaignId, actor, {
+      narration: parsed.full,
+      kind: 'narration',
+      locationId: input.locationId ?? null,
+      witnessIds: [],
+    });
+    canonEventId = declared.event.id;
+  }
+  for (const q of parsed.quotes) {
+    try {
+      const ev = await recordQuote(campaignId, q);
+      dialogue.push({ canonEventId: ev.id, speakerId: q.speakerId, speakerLabel: q.speakerLabel, text: q.text });
+    } catch (err) { console.warn('[table-speak] dialogue canon failed', err); }
+  }
+  // A lone attributed line ("Ruth: Sit down.") reads at the table as that NPC speaking.
+  if (soloAttributed) {
+    const q = parsed.quotes[0];
+    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text);
+  }
+
+  // 2 + 3. PERCEPTION through the mirror, then responses.
+  const source: 'perception' | 'dialogue' = parsed.narration !== null ? 'perception' : 'dialogue';
+  const stimulus = source === 'perception'
+    ? parsed.full
+    : parsed.quotes.map((q) => `${q.speakerLabel}: ${q.text}`).join('\n');
+  const responses = await deliverToTable(
+    campaignId, actor, stimulus, source,
+    { primary: canonEventId, extra: dialogue.map((d) => d.canonEventId) },
+    soloAttributed ? parsed.quotes[0].speakerId! : undefined,
+  );
+
+  return { canonEventId, dialogue, narration: parsed.narration, responses };
+}
+
+async function recordQuote(campaignId: string, q: ProseQuote) {
+  if (q.speakerId) return recordDialogueCanon(campaignId, q.speakerId, q.speakerLabel, q.text);
+  return recordUnattributedDialogueCanon(campaignId, q.speakerLabel, q.text, q.context);
+}
+
+/** Narrate-only entry (pre-09-26 API shape) — prose covers it. */
+export async function narrateAtTable(
+  campaignId: string,
+  actor: TableActor,
+  input: { message: string; actorId?: string | null; targetId?: string | null; locationId?: string | null },
+): Promise<TableNarrateResult> {
+  return speakProse(campaignId, actor, { message: input.message, locationId: input.locationId ?? null });
+}
+
+/**
+ * The GM speaks one utterance through a chosen NPC (pre-09-26 API shape;
+ * the picker is gone from the table but scripts and tests still use it).
  * Every ACTIVE DAYA entity in the campaign (other than the speaker) hears
- * it and responds through its full being loop; responses post back into
- * the event stream attributed to those characters.
+ * it through the mirror and responds through its full being loop.
  */
 export async function speakThroughNpc(
   campaignId: string,
@@ -135,112 +292,12 @@ export async function speakThroughNpc(
   // 1. The NPC's line hits the table record first, like normal tabletop.
   await postChat(campaignId, 'gm', actor.userId, actor.username, npc.id, npc.name, input.message);
   // Truth first (Mike 09-20/23): what was said is canon; listeners' memories will point at it.
-  const since = new Date();
   let dialogueCanonId: string | null = null;
   try { dialogueCanonId = (await recordDialogueCanon(campaignId, npc.id, npc.name, input.message)).id; } catch (err) { console.warn('[table-speak] dialogue canon failed', err); }
 
-  // 2. Every awake DAYA being in the campaign perceives it. No filter,
-  //    no selection — stimulus always goes through.
-  const characters = await prisma.character.findMany({
-    where: { campaignId, id: { not: npc.id } },
-    select: { id: true, name: true },
-  });
-  const activeEntities = await prisma.dayaEntity.findMany({
-    where: { characterId: { in: characters.map((c) => c.id) }, status: 'ACTIVE' },
-    select: { characterId: true },
-  });
-  const activeIds = new Set(activeEntities.map((e) => e.characterId));
-  const listeners = characters.filter((c) => activeIds.has(c.id));
-
-  const responses: ListenerResponse[] = [];
-  for (const listener of listeners) {
-    const result = await converseWithEntity(listener.id, actor.role, `${npc.name}: ${input.message}`);
-    const response: ListenerResponse = {
-      characterId: listener.id,
-      characterName: listener.name,
-      status: result.status,
-      actionKind: result.action?.kind,
-      detail: result.detail,
-    };
-    responses.push(response);
-    if (dialogueCanonId) await attachTruth(listener.id, result.memoryEntryId, dialogueCanonId, since);
-
-    if (result.status === 'ok' && result.action) {
-      const line = actionToTableLine(listener.name, result.action);
-      if (line) {
-        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
-      }
-    }
-  }
-
+  // 2. Every awake DAYA being in the campaign perceives it (through the mirror).
+  const responses = await deliverToTable(campaignId, actor, `${npc.name}: ${input.message}`, 'dialogue', { primary: dialogueCanonId, extra: [] }, npc.id);
   return { npcName: npc.name, responses };
-}
-
-export interface TableNarrateResult {
-  canonEventId: string;
-  responses: ListenerResponse[];
-}
-
-/**
- * The GM narrates the world at the table (readiness for the live campaign,
- * 2026-09-26). Narration is a Watcher DECLARATION: it becomes canon first
- * (`declareCanon`, which also posts it to the table record as a game event),
- * then every ACTIVE DAYA being present perceives it through its full being
- * loop — a 'perception' memory pointing at the canon event — and anything it
- * does in response posts back as chat, exactly like table-speak.
- *
- * Nothing is said "through" anyone here: the actor is the world itself.
- */
-export async function narrateAtTable(
-  campaignId: string,
-  actor: TableActor,
-  input: { message: string; actorId?: string | null; targetId?: string | null; locationId?: string | null },
-): Promise<TableNarrateResult> {
-  if (!isWatcherOrAbove(actor.role)) {
-    throw new ForbiddenError('GM/ADMIN only — narrating is a Watcher-seat action');
-  }
-  // 1. Truth first. witnessIds: [] — we deliver the perception ourselves below
-  //    so each being lives it (emotion, attention, action), not just files it.
-  const since = new Date();
-  const declared = await declareCanon(campaignId, actor, {
-    narration: input.message,
-    kind: 'narration',
-    actorId: input.actorId ?? null,
-    targetId: input.targetId ?? null,
-    locationId: input.locationId ?? null,
-    witnessIds: [],
-  });
-
-  // 2. Every awake being present perceives the world change.
-  const characters = await prisma.character.findMany({ where: { campaignId }, select: { id: true, name: true } });
-  const activeEntities = await prisma.dayaEntity.findMany({
-    where: { characterId: { in: characters.map((c) => c.id) }, status: 'ACTIVE' },
-    select: { characterId: true },
-  });
-  const activeIds = new Set(activeEntities.map((e) => e.characterId));
-  const listeners = characters.filter((c) => activeIds.has(c.id));
-
-  const responses: ListenerResponse[] = [];
-  for (const listener of listeners) {
-    const result = await converseWithEntity(listener.id, actor.role, input.message, {}, 'perception');
-    responses.push({
-      characterId: listener.id,
-      characterName: listener.name,
-      status: result.status,
-      actionKind: result.action?.kind,
-      detail: result.detail,
-    });
-    await attachTruth(listener.id, result.memoryEntryId, declared.event.id, since);
-
-    if (result.status === 'ok' && result.action) {
-      const line = actionToTableLine(listener.name, result.action);
-      if (line) {
-        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
-      }
-    }
-  }
-
-  return { canonEventId: declared.event.id, responses };
 }
 
 /**

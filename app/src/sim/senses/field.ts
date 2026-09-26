@@ -38,6 +38,25 @@ export interface FieldInput {
   body?: { canSee: boolean; canHear: boolean };
 }
 
+/** v0 sense flags from anatomy: an eye/ear part with condition > 0 means the sense works; no anatomy = human default.
+ *  Shared by the round engine and the perception composer (daya/perceive.ts). */
+export function senseFlagsFromSheet(sheet: { bodyAnatomy?: unknown } | null | undefined): { canSee: boolean; canHear: boolean } {
+  type Part = { partName?: string; condition?: number; contains?: Part[] };
+  const root = sheet?.bodyAnatomy as Part | undefined;
+  if (!root) return { canSee: true, canHear: true };
+  const found = { eye: false, ear: false, anyEye: false, anyEar: false };
+  const walk = (n: Part) => {
+    const name = (n.partName ?? '').toLowerCase();
+    const ok = (n.condition ?? 3) > 0;
+    // Word-bounded: "Heart" must not read as an ear.
+    if (/\beyes?\b/.test(name)) { found.anyEye = true; if (ok) found.eye = true; }
+    if (/\bears?\b/.test(name)) { found.anyEar = true; if (ok) found.ear = true; }
+    for (const c of n.contains ?? []) walk(c);
+  };
+  walk(root);
+  return { canSee: found.anyEye ? found.eye : true, canHear: found.anyEar ? found.ear : true };
+}
+
 export function buildSensoryField(input: FieldInput): SensoryField {
   const { self, participants, round, lastRoundLog } = input;
   const canSee = input.body?.canSee ?? true;

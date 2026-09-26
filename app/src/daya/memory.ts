@@ -219,6 +219,8 @@ export interface IngestParams {
   content: string;
   roster?: TaggerRosterEntry[];
   parentMemoryId?: string | null;
+  /** Audit fields merged into the row's classification (e.g. the mirror's fidelity/distortions) — JEWL-visible, never prompt content. */
+  extraClassification?: Record<string, unknown>;
 }
 
 export interface IngestResult {
@@ -263,7 +265,7 @@ export async function ingestStimulus(
     arousal: tags.arousal,
     salience: salienceStored,
     entityRefs: tags.entityRefs,
-    classification: tags.classification,
+    classification: params.extraClassification ? { ...tags.classification, ...params.extraClassification } : tags.classification,
     parentMemoryId: params.parentMemoryId ?? null,
     chain: { entities: tags.entityRefs, antecedentId: previous?.id ?? null },
   });

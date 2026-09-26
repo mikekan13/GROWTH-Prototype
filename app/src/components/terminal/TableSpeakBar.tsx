@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * TableSpeakBar — the TABLE tab's input row (Mike 2026-09-02: "As a GM you
- * should be able to select any npc and speak through them. It works like
- * normal tabletop.").
+ * TableSpeakBar — the TABLE tab's input row.
  *
- * Replaces CommandInput when the terminal is in TABLE mode (session active,
- * GM only). Pick an NPC, type their line; it posts to the shared event
- * stream attributed to the NPC and is heard by every ACTIVE DAYA character
- * at the table — responses arrive back in the same feed. Infra states
- * (core warming/offline) show here for the GM only, never in the record.
+ * Mike 2026-09-26: "The system shouldn't need a tab switcher. It should
+ * pick up from normal prose." One box. The GM types tabletop prose —
+ * narration, and speech in quotes (or `Ruth: …`) — and the server picks up
+ * what's what: narration becomes canon, each quoted line becomes dialogue
+ * attributed from the prose, and every awake DAYA character at the table
+ * lives it through the murky mirror. Their responses arrive back in the
+ * same feed. Infra states (core warming/offline) show here for the GM
+ * only, never in the record.
  */
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -18,12 +19,10 @@ interface RosterCharacter {
   name: string;
 }
 
-/** Picker value for "the GM narrates the world" — canon + perception, no NPC voice. */
-const NARRATE = '__narrate__';
-
-interface SpeakResponse {
-  npcName?: string;
-  canonEventId?: string;
+interface ProseResponse {
+  canonEventId: string | null;
+  dialogue: Array<{ canonEventId: string; speakerId: string | null; speakerLabel: string; text: string }>;
+  narration: string | null;
   responses: Array<{
     characterId: string;
     characterName: string;
@@ -42,17 +41,14 @@ export default function TableSpeakBar({
   campaignId: string;
   onEvent?: () => void;
 }) {
-  const [npcs, setNpcs] = useState<RosterCharacter[]>([]);
   const [dayaActive, setDayaActive] = useState<RosterCharacter[]>([]);
-  // Default = Narrate: a live session opens with the GM setting the scene.
-  const [speakerId, setSpeakerId] = useState(NARRATE);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [coreStatus, setCoreStatus] = useState<CoreStatus>('unknown');
   const [note, setNote] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Roster on mount
+  // Roster on mount — only to know whom to warm and who is awake.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -61,9 +57,7 @@ export default function TableSpeakBar({
         if (!res.ok) return;
         const data = (await res.json()) as { npcs: RosterCharacter[]; dayaActive: RosterCharacter[] };
         if (cancelled) return;
-        setNpcs(data.npcs);
         setDayaActive(data.dayaActive);
-        setSpeakerId((prev) => prev || NARRATE);
       } catch { /* silent */ }
     })();
     return () => { cancelled = true; };
@@ -98,7 +92,7 @@ export default function TableSpeakBar({
 
   async function handleSubmit() {
     const trimmed = value.trim();
-    if (!trimmed || !speakerId || sending) return;
+    if (!trimmed || sending) return;
     setValue('');
     setNote(null);
     setSending(true);
@@ -106,33 +100,33 @@ export default function TableSpeakBar({
       const res = await fetch(`/api/campaigns/${campaignId}/table`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          speakerId === NARRATE ? { narrate: true, message: trimmed } : { npcCharacterId: speakerId, message: trimmed },
-        ),
+        body: JSON.stringify({ message: trimmed }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setNote(json.error ?? 'Failed to speak');
+        setNote(json.error ?? 'Failed to send');
         return;
       }
-      const result = json as SpeakResponse;
+      const result = json as ProseResponse;
       setCoreStatus((prev) => (result.responses.some((r) => r.status === 'ok') ? 'ready' : prev));
-      const infra = result.responses.filter((r) => r.status !== 'ok');
-      if (infra.length > 0) {
-        setNote(
-          infra
-            .map((r) =>
-              r.status === 'warming'
-                ? `${r.characterName} is still coming awake — say it again in a moment`
-                : r.status === 'core_offline'
-                  ? `${r.characterName}'s core is unreachable (${r.detail ?? 'L1 offline'})`
-                  : r.status === 'dormant'
-                    ? `${r.characterName} is dormant`
-                    : `DAYA disabled`,
-            )
-            .join(' · '),
+      const notes: string[] = [];
+      const unattributed = result.dialogue.filter((d) => !d.speakerId);
+      if (unattributed.length > 0) {
+        notes.push(`recorded as spoken by ${unattributed.map((d) => d.speakerLabel).join(', ')}`);
+      }
+      for (const r of result.responses) {
+        if (r.status === 'ok') continue;
+        notes.push(
+          r.status === 'warming'
+            ? `${r.characterName} is still coming awake — say it again in a moment`
+            : r.status === 'core_offline'
+              ? `${r.characterName}'s core is unreachable (${r.detail ?? 'L1 offline'})`
+              : r.status === 'dormant'
+                ? `${r.characterName} is dormant`
+                : `DAYA disabled`,
         );
       }
+      if (notes.length > 0) setNote(notes.join(' · '));
       onEvent?.();
     } catch (err) {
       setNote(err instanceof Error ? err.message : String(err));
@@ -142,8 +136,7 @@ export default function TableSpeakBar({
     }
   }
 
-  const narrating = speakerId === NARRATE;
-  const speakerName = narrating ? 'The world' : (npcs.find((n) => n.id === speakerId)?.name ?? '—');
+  const awake = dayaActive.map((d) => d.name).join(', ');
 
   return (
     <div className="border-t" style={{ borderColor: 'rgba(34, 171, 148, 0.3)', backgroundColor: '#0d0d1a' }}>
@@ -151,44 +144,25 @@ export default function TableSpeakBar({
       {(note || coreStatus === 'warming' || sending) && (
         <div className="px-3 pt-1.5 text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255, 204, 120, 0.75)' }}>
           {sending
-            ? `${narrating ? 'The world moves' : `${speakerName} speaks`} — the table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
+            ? `The table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
             : note ?? 'The core is warming up from a cold start…'}
         </div>
       )}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <select
-          value={speakerId}
-          onChange={(e) => setSpeakerId(e.target.value)}
-          className="px-2 py-1 text-[13px]"
-          style={{
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
-            backgroundColor: '#0a0a1a',
-            color: 'var(--terminal-prime)',
-            border: '1px solid rgba(34, 171, 148, 0.4)',
-            borderRadius: '2px',
-            maxWidth: '180px',
-          }}
-        >
-          <option value={NARRATE}>Narrate</option>
-          {npcs.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.name}
-            </option>
-          ))}
-        </select>
-        <input
+      <div className="flex items-end gap-2 px-3 py-2">
+        <textarea
           ref={inputRef}
           value={value}
+          rows={2}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               void handleSubmit();
             }
           }}
-          placeholder={narrating ? 'Narrate the scene… (becomes canon; everyone present perceives it)' : `Speak as ${speakerName}… (*asterisks* for actions)`}
-          disabled={sending || !speakerId}
-          className="flex-1 px-2 py-1 text-[13px] outline-none"
+          placeholder={awake ? `Narrate. Put speech in quotes, or Name: line. ${awake} will live it. (Shift+Enter for a new line)` : 'Narrate. Put speech in quotes, or Name: line. No one is awake at the table yet.'}
+          disabled={sending}
+          className="flex-1 px-2 py-1 text-[13px] outline-none resize-none"
           style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
             backgroundColor: '#0a0a1a',
@@ -199,7 +173,7 @@ export default function TableSpeakBar({
         />
         <button
           onClick={() => void handleSubmit()}
-          disabled={sending || !value.trim() || !speakerId}
+          disabled={sending || !value.trim()}
           className="px-3 py-1 text-[12px] uppercase tracking-wider"
           style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
@@ -209,7 +183,7 @@ export default function TableSpeakBar({
             borderRadius: '2px',
           }}
         >
-          {sending ? '…' : narrating ? 'Narrate' : 'Speak'}
+          {sending ? '…' : 'Send'}
         </button>
       </div>
     </div>

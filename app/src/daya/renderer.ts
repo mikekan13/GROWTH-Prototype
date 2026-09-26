@@ -29,7 +29,9 @@ import {
   computeDescriptiveContent,
   computeFidelityLevel,
   computeNumericContent,
+  computeSceneContent,
   isNumericStat,
+  isSceneTruth,
   rngFor,
   sealLint,
   type AffectVector,
@@ -140,14 +142,18 @@ function buildVoicingSystemPrompt(voice: VoiceParams, level: number, subject: Re
     'You are given an honest CONTENT ENVELOPE: the exact facts and degree of uncertainty this character is allowed to perceive right now. Voice ONLY what is in the envelope, in this character\'s own words — never invent facts outside it, never add numbers or specifics the envelope does not contain.',
     `Perceived subject type: ${subject}. Fidelity: level ${level} out of 5 (0 = no reliable signal, 5 = exact).`,
     register, rhythm, images,
-    'Write at most 3 sentences. First-person or close-second only. Never use game-mechanical vocabulary: no "roll", "DR", "pool", "KRMA", "modifier", "tier", die-type names (d4/d6/d8/d10/d12/d20), or a signed number attached to an attribute name (e.g. "+3 Willpower"). This is lived experience, not a rules readout.',
+    subject === 'scene'
+      ? 'The envelope is the scene around this character right now: what was just narrated, then the place, who is present, what is there. Voice it as one continuous moment of noticing — what draws the eye first, then the rest — in at most 6 sentences. Keep every name and every spoken line exactly as the envelope gives them; drop nothing the envelope marks as said.'
+      : '',
+    `Write at most ${subject === 'scene' ? 6 : 3} sentences. First-person or close-second only. Never use game-mechanical vocabulary: no "roll", "DR", "pool", "KRMA", "modifier", "tier", die-type names (d4/d6/d8/d10/d12/d20), or a signed number attached to an attribute name (e.g. "+3 Willpower"). This is lived experience, not a rules readout.`,
   ].filter(Boolean).join('\n');
 }
 
 /** Rough envelope-diff: for F0-F2 the content carries no magnitude at all,
  * so any digit in the voiced text is an invented specific. For F3+ the
  * envelope already states the felt numeric content, so digits are allowed. */
-function violatesEnvelope(text: string, level: number): boolean {
+function violatesEnvelope(text: string, level: number, subject?: RenderSubject): boolean {
+  if (subject === 'scene') return false; // the scene envelope carries its own specifics; digits in it are legitimate
   if (level <= 2 && /\d/.test(text)) return true;
   return false;
 }
@@ -177,7 +183,7 @@ async function voiceRendering(params: VoicingParams): Promise<{ prose: string; u
         subsystem: 'renderer',
         entityId: entityDaId,
         messages: finalMessages,
-        maxTokens: 200,
+        maxTokens: req.subject === 'scene' ? 450 : 200,
         sanitized: true,
       },
       overrides,
@@ -187,7 +193,7 @@ async function voiceRendering(params: VoicingParams): Promise<{ prose: string; u
   try {
     const first = await attempt();
     const lint = sealLint(first.text);
-    if (lint.ok && !violatesEnvelope(first.text, level) && first.text.trim().length > 0) {
+    if (lint.ok && !violatesEnvelope(first.text, level, req.subject) && first.text.trim().length > 0) {
       return { prose: first.text.trim(), usedFallback: false };
     }
 
@@ -196,7 +202,7 @@ async function voiceRendering(params: VoicingParams): Promise<{ prose: string; u
       'Your previous answer used mechanical vocabulary or stated specifics outside the content envelope. Try again, strictly within the envelope, with no mechanical vocabulary.',
     );
     const lint2 = sealLint(second.text);
-    if (lint2.ok && !violatesEnvelope(second.text, level) && second.text.trim().length > 0) {
+    if (lint2.ok && !violatesEnvelope(second.text, level, req.subject) && second.text.trim().length > 0) {
       return { prose: second.text.trim(), usedFallback: false };
     }
 
@@ -223,6 +229,12 @@ function computeContent(
   level: number,
   rng: () => number,
 ): ComputedContent {
+  if (req.subject === 'scene' && isSceneTruth(req.trueData)) {
+    return computeSceneContent(
+      { subject: req.subject, subjectKey: req.subjectKey, trueData: req.trueData, context: req.context },
+      bias, mood, level, rng,
+    );
+  }
   if (isNumericStat(req.trueData)) {
     return computeNumericContent(
       { subject: req.subject, subjectKey: req.subjectKey, trueData: req.trueData, context: req.context },

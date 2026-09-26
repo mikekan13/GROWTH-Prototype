@@ -499,17 +499,30 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
       // Self-ingest the failed attempt itself (source perception, low salience).
       // Awaited so the write is durable before recall() returns (never throws
       // outward — a self-ingest failure is logged, not propagated).
+      // Mike 09-26 ("fix the failed recall rows"): ONE row per reached-for
+      // memory per stretch of real time — the being loop recalls several
+      // times per wake and every stimulus was leaving two identical rows.
+      // parentMemoryId names the memory that wouldn't come.
       try {
-        await writeMemoryEntry({
-          entityId: req.entityId,
-          narrativeCycle: req.nowCycle,
-          source: 'perception',
-          content: failedFeel,
-          valence: 0,
-          arousal: 0.1,
-          salience: 0.1,
-          classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'failed recall attempt' },
+        const since = new Date(Date.now() - RECALL_TUNING.failedRecallDedupeMs);
+        const already = await prisma.dayaMemoryEntry.findFirst({
+          where: { entityId: req.entityId, parentMemoryId: best.memory.id, realTime: { gte: since }, classification: { contains: 'failed recall attempt' } },
+          select: { id: true },
         });
+        if (!already) {
+          await writeMemoryEntry({
+            entityId: req.entityId,
+            narrativeCycle: req.nowCycle,
+            source: 'perception',
+            content: failedFeel,
+            valence: 0,
+            arousal: 0.1,
+            salience: 0.1,
+            parentMemoryId: best.memory.id,
+            skipDreamPressure: true,
+            classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'failed recall attempt' },
+          });
+        }
       } catch (err) {
         console.error('[daya/recall] failed-recall self-ingest failed (non-fatal):', err);
       }
