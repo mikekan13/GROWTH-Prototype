@@ -40,6 +40,7 @@ import { moveCharacterToLocation } from '@/services/character-location';
 import { executeTransaction } from '@/services/krma/ledger';
 import { getCampaignEconomy } from '@/services/krma/wallet';
 import { bridgeContinuity, type BridgeResult } from '@/services/bridge';
+import { placeNewLocation, snapCharacterToLocation } from '@/services/canvas-placement';
 import type { ParsedProse } from '@/services/table-prose';
 import {
   IMPROV_TUNING,
@@ -245,6 +246,9 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
   const plan = (JSON.parse(row.plan) as Array<PlanItem & { relocate?: boolean }>);
   const created: Array<{ kind: string; id: string; name: string }> = [];
   let sceneLocationId: string | null = null;
+  // Where the scene was, for canvas placement: the first awake being's location (or its card).
+  const firstAwake = await prisma.dayaEntity.findFirst({ where: { status: 'ACTIVE', character: { campaignId } }, select: { characterId: true } });
+  const wasAt = firstAwake ? await prisma.entityRelationship.findFirst({ where: { sourceId: firstAwake.characterId, relationshipType: 'located_at' }, select: { targetId: true } }) : null;
   for (const p of plan) {
     if (p.kind !== 'location') continue;
     if (p.matchId) { sceneLocationId = p.matchId; continue; }
@@ -252,6 +256,8 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
     created.push({ kind: 'location', id: loc.id, name: loc.name });
     sceneLocationId = loc.id;
     await prisma.location.update({ where: { id: loc.id }, data: { data: JSON.stringify({ ...(JSON.parse(loc.data) as Record<string, unknown>), improvised: { reconciliationId: row.id, holdKrma: row.estimateKrma } }) } });
+    // On the canvas, beside where the scene was — so the Watcher can see it (Mike 09-26).
+    try { await placeNewLocation(campaignId, loc.id, { locationId: wasAt?.targetId ?? null, characterId: firstAwake?.characterId ?? null }); } catch (err) { console.warn('[reconciliation] location placement failed', err); }
   }
   for (const p of plan) {
     if (p.kind !== 'npc' || p.matchId) continue;
@@ -260,7 +266,8 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
     data._improv = { reconciliationId: row.id, description: p.description };
     const npc = await prisma.character.create({ data: { name: p.name, entityType: 'NPC', status: 'DRAFT', userId: actor.userId, campaignId, data: JSON.stringify(data) }, select: { id: true, name: true } });
     created.push({ kind: 'npc', id: npc.id, name: npc.name });
-    if (sceneLocationId) await moveCharacterToLocation(actor.userId, actor.role, { characterId: npc.id, locationId: sceneLocationId, note: 'improvised here' });
+    if (sceneLocationId) await moveCharacterToLocation(actor.userId, actor.role, { characterId: npc.id, locationId: sceneLocationId, note: 'improvised here', snapCanvas: true });
+    else { try { await snapCharacterToLocation(campaignId, npc.id, wasAt?.targetId ?? ''); } catch { /* no place to snap to */ } }
   }
   // Relocate the awake beings when the narration moved them — remembering
   // where they were, because a jump owes the record the interval.
@@ -271,7 +278,7 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
     for (const a of awake) {
       const was = await prisma.entityRelationship.findFirst({ where: { sourceId: a.characterId, relationshipType: 'located_at' }, select: { targetId: true } });
       if (was?.targetId === sceneLocationId) continue; // already there — no jump for this one
-      await moveCharacterToLocation(actor.userId, actor.role, { characterId: a.characterId, locationId: sceneLocationId, note: 'the Watcher narrated them here' });
+      await moveCharacterToLocation(actor.userId, actor.role, { characterId: a.characterId, locationId: sceneLocationId, note: 'the Watcher narrated them here', snapCanvas: true });
       moved.push(a.character.name);
       travellers.push({ id: a.characterId, name: a.character.name, fromLocationId: was?.targetId ?? null });
     }
