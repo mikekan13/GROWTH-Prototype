@@ -41,6 +41,7 @@ import {
   recordUnattributedDialogueCanon,
 } from '@/services/canon';
 import { parseTableProse, type ProseQuote } from '@/services/table-prose';
+import { ensureKeepalive } from '@/daya/l1-keepalive';
 
 export interface TableActor {
   userId: string;
@@ -308,6 +309,9 @@ export async function getTableRoster(campaignId: string, actorRole: string) {
   if (!isWatcherOrAbove(actorRole)) {
     throw new ForbiddenError('GM/ADMIN only');
   }
+  // The TABLE tab opening is the moment to make sure the lane is being kept
+  // warm for the open session (re-arms after a dev-server restart).
+  void ensureKeepalive(campaignId).catch(() => {});
   const characters = await prisma.character.findMany({
     where: { campaignId },
     select: { id: true, name: true, entityType: true, status: true, data: true },

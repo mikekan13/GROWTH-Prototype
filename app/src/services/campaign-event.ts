@@ -150,14 +150,14 @@ export async function startSession(campaignId: string, name?: string): Promise<G
     },
   });
 
-  // Pre-warm the local lane (2026-09-26): the beings at the table run on the
-  // serverless core, which cold-starts in minutes. Kick it awake the moment a
-  // session opens so the first narration doesn't land on a sleeping worker.
-  // Fire-and-forget — never blocks or fails the session start.
-  void import('@/daya/l1-warm')
-    .then((m) => m.warmL1())
-    .then((status) => console.log(`[campaign-event] L1 pre-warm for session ${session.number}: ${status}`))
-    .catch((err) => console.warn('[campaign-event] L1 pre-warm failed', err));
+  // Keep the local lane warm while the session is hot (Mike 2026-09-26): the
+  // beings at the table run on the serverless core, which cold-starts in
+  // minutes and scales to zero after ~2 min idle. The keep-warm loop probes
+  // it every minute until the session ends. Fire-and-forget — never blocks
+  // or fails the session start.
+  void import('@/daya/l1-keepalive')
+    .then((m) => m.startKeepalive(campaignId))
+    .catch((err) => console.warn('[campaign-event] L1 keep-warm failed to start', err));
 
   return {
     id: session.id,
@@ -183,6 +183,9 @@ export async function endSession(campaignId: string): Promise<GameSessionInfo | 
     where: { id: active.id },
     data: { endedAt: new Date() },
   });
+
+  // Session over — release the lane (the loop would notice on its own next tick; this is immediate).
+  void import('@/daya/l1-keepalive').then((m) => m.stopKeepalive(campaignId)).catch(() => {});
 
   return {
     id: updated.id,
