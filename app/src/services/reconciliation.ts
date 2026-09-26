@@ -39,6 +39,7 @@ import { createLocation } from '@/services/location';
 import { moveCharacterToLocation } from '@/services/character-location';
 import { executeTransaction } from '@/services/krma/ledger';
 import { getCampaignEconomy } from '@/services/krma/wallet';
+import { bridgeContinuity, type BridgeResult } from '@/services/bridge';
 import type { ParsedProse } from '@/services/table-prose';
 import {
   IMPROV_TUNING,
@@ -210,7 +211,7 @@ async function holdWallet(campaignId: string) {
  * narration relocated them. Returns the ticket, now CONFIRMED (or REFUSED if
  * the estimate does not fit the campaign's fluid KRMA).
  */
-export async function confirmReconciliation(campaignId: string, actor: TableActorLike, ticketId: string): Promise<ReconTicket & { created: Array<{ kind: string; id: string; name: string }>; moved: string[]; refusedReason?: string }> {
+export async function confirmReconciliation(campaignId: string, actor: TableActorLike, ticketId: string): Promise<ReconTicket & { created: Array<{ kind: string; id: string; name: string }>; moved: string[]; bridge?: BridgeResult | null; refusedReason?: string }> {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
   if (!campaign) throw new NotFoundError('Campaign not found');
   if (!canManageCampaign(actor.userId, actor.role, campaign)) throw new ForbiddenError('Only the Watcher answers JEWL');
@@ -261,18 +262,34 @@ export async function confirmReconciliation(campaignId: string, actor: TableActo
     created.push({ kind: 'npc', id: npc.id, name: npc.name });
     if (sceneLocationId) await moveCharacterToLocation(actor.userId, actor.role, { characterId: npc.id, locationId: sceneLocationId, note: 'improvised here' });
   }
-  // Relocate the awake beings when the narration moved them.
+  // Relocate the awake beings when the narration moved them — remembering
+  // where they were, because a jump owes the record the interval.
   const moved: string[] = [];
+  const travellers: Array<{ id: string; name: string; fromLocationId: string | null }> = [];
   if (sceneLocationId && plan.some((p) => p.relocate)) {
     const awake = await prisma.dayaEntity.findMany({ where: { status: 'ACTIVE', character: { campaignId } }, select: { characterId: true, character: { select: { name: true } } } });
     for (const a of awake) {
+      const was = await prisma.entityRelationship.findFirst({ where: { sourceId: a.characterId, relationshipType: 'located_at' }, select: { targetId: true } });
+      if (was?.targetId === sceneLocationId) continue; // already there — no jump for this one
       await moveCharacterToLocation(actor.userId, actor.role, { characterId: a.characterId, locationId: sceneLocationId, note: 'the Watcher narrated them here' });
       moved.push(a.character.name);
+      travellers.push({ id: a.characterId, name: a.character.name, fromLocationId: was?.targetId ?? null });
     }
   }
+  // A continuity jump is established: the simulation renders everything that
+  // would lead up to it (Mike 09-26, ruling point 13). Summary fidelity;
+  // sim-authored canon below the Watcher's declaration; the clock advances;
+  // the travellers remember the trip through their own mirrors.
+  let bridge: BridgeResult | null = null;
+  const kinds = (() => { try { return JSON.parse(row.kinds) as string[]; } catch { return []; } })();
+  if (travellers.length > 0 && (kinds.includes('continuity') || kinds.includes('relocation'))) {
+    try {
+      bridge = await bridgeContinuity({ campaignId, actor, reconciliationId: row.id, travellers, toLocationId: sceneLocationId, destinationNarration: row.message });
+    } catch (err) { console.warn('[reconciliation] bridge failed; the jump stands unbridged', err); }
+  }
 
-  const updated = await prisma.reconciliation.update({ where: { id: row.id }, data: { status: 'CONFIRMED', holdTxId, holdWalletId, resolvedAt: new Date(), plan: JSON.stringify(plan.map((p) => ({ ...p, createdId: created.find((c) => c.kind === p.kind && c.name === p.name)?.id ?? null }))) } });
-  return { ...parseRow(updated, fluid - row.estimateKrma), created, moved };
+  const updated = await prisma.reconciliation.update({ where: { id: row.id }, data: { status: 'CONFIRMED', holdTxId, holdWalletId, resolvedAt: new Date(), plan: JSON.stringify(plan.map((p) => ({ ...p, createdId: created.find((c) => c.kind === p.kind && c.name === p.name)?.id ?? null, ...(bridge ? { bridge: { parentEventId: bridge.parentEventId, elapsedMinutes: bridge.elapsedMinutes, steps: bridge.stepEventIds.length } } : {}) }))) } });
+  return { ...parseRow(updated, fluid - row.estimateKrma), created, moved, bridge };
 }
 
 /** The Watcher takes it back: a mistake. Nothing was written. */

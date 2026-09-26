@@ -174,14 +174,15 @@ export default function TableSpeakBar({
       });
       const json = await res.json();
       if (!res.ok) { setNote(json.error ?? 'JEWL did not get that'); return; }
-      const ticket = json.ticket as ReconTicket & { created?: Array<{ kind: string; name: string }>; moved?: string[]; refusedReason?: string };
+      const ticket = json.ticket as ReconTicket & { created?: Array<{ kind: string; name: string }>; moved?: string[]; bridge?: { elapsedMinutes: number; stepEventIds: string[] } | null; refusedReason?: string };
       const message = held.message;
       setHeld(null);
       if (action === 'dismiss') { setValue(message); inputRef.current?.focus(); return; }
       if (ticket.status === 'REFUSED') { setNote(ticket.refusedReason ?? 'The world cannot afford this.'); setValue(message); return; }
       const spun = (ticket.created ?? []).map((c) => c.name).join(', ');
       const moved = (ticket.moved ?? []).join(', ');
-      if (spun || moved) setNote(`JEWL spun up ${spun || 'nothing new'}${moved ? `; ${moved} now there` : ''} — holding ${ticket.estimateKrma} KRMA until it sticks`);
+      const bridged = ticket.bridge ? `; the sim bridged the jump (${ticket.bridge.elapsedMinutes} min, ${ticket.bridge.stepEventIds.length} steps)` : '';
+      if (spun || moved) setNote(`JEWL spun up ${spun || 'nothing new'}${moved ? `; ${moved} now there` : ''}${bridged} — holding ${ticket.estimateKrma} KRMA until it sticks`);
       await send(message, ticket.id);
     } catch (err) {
       setNote(err instanceof Error ? err.message : String(err));
