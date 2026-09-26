@@ -717,3 +717,6 @@ Mike: "if a continuity jump is established the simulation must render everything
 
 ## 2026-09-26 (pre-session) — JEWL places what he spins up on the canvas
 Mike: no OOC command (the filter will handle it once built); "JEWL to position objects on the canvas so a human can see and interpret details correctly." Built `services/canvas-placement.ts`: non-overlapping placement beside the scene for stub locations, inside-the-folder for stub NPCs and moved beings; narrated moves snap the card (`snapCanvas`). Left the inn run on the Incubator canvas for Mike to inspect. READY FOR THE FIRST CAMPAIGN TEST (cautions: 30–40 s per response with a warm lane; everything typed is in character until the OOC filter exists; corrections are API-only; combat via the ENCOUNTER tab).
+
+## 2026-09-26 — Incubator canvas organized by JEWL
+Inn example cleared. `scripts/jewl-arrange-canvas.ts`: JEWL laid out the Incubator (block as the frame; Carrasco Arms, shelter, Napoli Slice, library inside it; the apartment inside Carrasco Arms; Main Room, kitchen, bathroom as sibling rooms; people in Main Room). He flagged for Mike: the duplicate apartment Location row (orphan set aside, not deleted) and all four characters located in Main Room.
