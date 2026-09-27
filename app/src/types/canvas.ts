@@ -14,6 +14,10 @@ export interface CanvasFolder {
   /** Folder position (used as fallback when folder has no nodes) */
   posX?: number;
   posY?: number;
+  /** Server: when a placement (JEWL / the sim) last wrote this location's anchor (ms). A placement newer than the GM's last drag wins over the browser-stored position (2026-09-26). */
+  placedAt?: number;
+  /** Client: when the GM last dragged/resized this folder (ms). Stored in localStorage with the folder. */
+  movedAt?: number;
   /** When true, folder collapses to just the header bar */
   collapsed?: boolean;
   /** When true, the location details panel shows in full (description/

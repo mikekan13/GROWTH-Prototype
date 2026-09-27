@@ -461,8 +461,19 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   });
 
   const handleFoldersChange = useCallback((newFolders: CanvasFolder[]) => {
-    setFolders(newFolders);
-    try { localStorage.setItem(folderStorageKey, JSON.stringify(newFolders)); } catch { /* ignore */ }
+    // Stamp movedAt on folders whose position/size changed, so a later
+    // server placement (JEWL) can be compared against the GM's last drag.
+    setFolders((prev) => {
+      const prevById = new Map(prev.map((f) => [f.id, f]));
+      const now = Date.now();
+      const stamped = newFolders.map((f) => {
+        const p = prevById.get(f.id);
+        const moved = !p || p.posX !== f.posX || p.posY !== f.posY || p.userWidth !== f.userWidth || p.userHeight !== f.userHeight;
+        return moved ? { ...f, movedAt: now } : f;
+      });
+      try { localStorage.setItem(folderStorageKey, JSON.stringify(stamped)); } catch { /* ignore */ }
+      return stamped;
+    });
   }, [folderStorageKey]);
 
   // Keep folder nodeIds in sync — remove deleted nodes
@@ -491,12 +502,17 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     const merged = folders.filter(f => !autoIds.has(f.id));
     for (const af of autoFolders ?? []) {
       const stored = storedById.get(af.id);
+      // Position: the GM's stored drag wins UNLESS the server placed this
+      // location more recently (JEWL organizing the canvas, the sim moving
+      // things) — Mike 2026-09-26: "I do not see a change on the canvas".
+      const serverStamp = af.placedAt ?? 0;
+      const localStamp = stored?.movedAt ?? 0;
+      const localPosWins = stored?.posX != null && stored?.posY != null && localStamp >= serverStamp;
       merged.push({
         // Server-fresh: nodeIds, locationInfo, name, type.
         ...af,
         // GM-authored overrides that should persist:
-        ...(stored?.posX != null ? { posX: stored.posX } : {}),
-        ...(stored?.posY != null ? { posY: stored.posY } : {}),
+        ...(localPosWins ? { posX: stored!.posX, posY: stored!.posY } : {}),
         ...(stored?.userWidth != null ? { userWidth: stored.userWidth } : {}),
         ...(stored?.userHeight != null ? { userHeight: stored.userHeight } : {}),
         // Every Location renders as a container per the world-recursive

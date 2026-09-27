@@ -57,6 +57,8 @@ export const arrangeCanvasTool: JewlTool = {
         try { data = JSON.parse(row.data) as Record<string, unknown>; } catch { /* fresh */ }
         data.canvasX = p.x;
         data.canvasY = p.y;
+        // A JEWL placement newer than the GM's last drag wins over the browser-stored folder position (2026-09-26).
+        data.canvasPlacedAt = Date.now();
         await updateLocation(loc.id, ctx.campaignId, ctx.actorId, ctx.actorRole, { data });
         placed.push({ target: p.target, kind: 'location', id: loc.id });
         continue;

@@ -283,6 +283,9 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     // folders land where the GM clicked instead of at the origin).
     const locX = typeof loc?.data?.canvasX === 'number' ? loc.data.canvasX as number : undefined;
     const locY = typeof loc?.data?.canvasY === 'number' ? loc.data.canvasY as number : undefined;
+    // When a placement (JEWL / the sim) last wrote this anchor — the client
+    // lets it beat a browser-stored drag that is older (2026-09-26).
+    const placedAt = typeof loc?.data?.canvasPlacedAt === 'number' ? loc.data.canvasPlacedAt as number : undefined;
     return {
       id: `auto-${parentId}`,
       name: nodeNameById.get(parentId) ?? loc?.name ?? 'Container',
@@ -290,6 +293,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       nodeIds: nodeIdsForParent,
       posX: locX,
       posY: locY,
+      ...(placedAt != null ? { placedAt } : {}),
       locationInfo: loc
         ? {
             locationId: parentId,

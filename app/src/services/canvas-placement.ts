@@ -93,7 +93,8 @@ export async function stampLocationCanvas(locationId: string, p: Pt): Promise<vo
   if (!loc) return;
   let d: Record<string, unknown> = {};
   try { d = JSON.parse(loc.data) as Record<string, unknown>; } catch { d = {}; }
-  await prisma.location.update({ where: { id: locationId }, data: { data: JSON.stringify({ ...d, canvasX: p.x, canvasY: p.y }) } });
+  // canvasPlacedAt: a placement newer than the GM's last drag wins over the browser-stored folder position.
+  await prisma.location.update({ where: { id: locationId }, data: { data: JSON.stringify({ ...d, canvasX: p.x, canvasY: p.y, canvasPlacedAt: Date.now() }) } });
 }
 
 /** Stamp a character card's canvas position (the same fields the drag writes). */
