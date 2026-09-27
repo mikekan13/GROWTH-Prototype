@@ -720,3 +720,6 @@ Mike: no OOC command (the filter will handle it once built); "JEWL to position o
 
 ## 2026-09-26 — Incubator canvas organized by JEWL
 Inn example cleared. `scripts/jewl-arrange-canvas.ts`: JEWL laid out the Incubator (block as the frame; Carrasco Arms, shelter, Napoli Slice, library inside it; the apartment inside Carrasco Arms; Main Room, kitchen, bathroom as sibling rooms; people in Main Room). He flagged for Mike: the duplicate apartment Location row (orphan set aside, not deleted) and all four characters located in Main Room.
+
+## 2026-09-26 — Why JEWL's layout was invisible, and the fix
+Three canvas laws found by looking headless (raw CDP against the installed Chromium): drafting locations are clamped below the line; a populated folder's rect comes from its members, not its anchor; localStorage positions/folders always won over the server. Built `services/canvas-layout.ts` (deterministic geometry from JEWL's tree + order, below the line, items gridded, characters inside rooms) and placement stamps (`canvasPlacedAt`/`placedAt` → `placedAt` on nodes/folders; client `movedAt` on drags; server wins when newer). Verified with deliberately stale storage. Mike reloads to see it.

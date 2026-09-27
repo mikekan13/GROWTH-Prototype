@@ -40,6 +40,8 @@ interface CanvasNode {
   name: string;
   x: number;
   y: number;
+  /** Server: when a placement (JEWL / the sim) last wrote this position (ms). Newer than the GM's last drag → the server position wins over the browser-stored one (2026-09-26). */
+  placedAt?: number;
   status?: string;
   color?: string;
   portrait?: string | null;
@@ -297,8 +299,9 @@ export default function RelationsCanvas({
   } | null>(null);
 
   // â”€â”€ Node position & layering state â”€â”€
-  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => {
-    const stored = loadJSON<[string, { x: number; y: number }][]>('positions', []);
+  // Stored positions carry movedAt (the GM's last drag) so a server placement newer than it can win.
+  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number; movedAt?: number }>>(() => {
+    const stored = loadJSON<[string, { x: number; y: number; movedAt?: number }][]>('positions', []);
     return new Map(stored);
   });
   const [dragOffsets, setDragOffsets] = useState<Map<string, { x: number; y: number }>>(new Map());
@@ -1324,8 +1327,9 @@ export default function RelationsCanvas({
     }
     setNodePositions((prev) => {
       const next = new Map(prev);
+      const movedAt = Date.now();
       for (const m of finals) {
-        next.set(m.id, { x: m.fx, y: m.fy });
+        next.set(m.id, { x: m.fx, y: m.fy, movedAt });
         onNodePositionChange?.(m.id, m.fx, m.fy);
       }
       return next;
@@ -1375,7 +1379,12 @@ export default function RelationsCanvas({
     setNodePositions((prev) => {
       const next = new Map(prev);
       nodes.forEach((node) => {
-        if (!next.has(node.id)) {
+        const stored = next.get(node.id);
+        // Server wins when it placed this node more recently than the GM last
+        // dragged it (JEWL organizing the canvas, the sim moving a being) —
+        // Mike 2026-09-26: "I do not see a change on the canvas".
+        const serverNewer = typeof node.placedAt === 'number' && node.placedAt > (stored?.movedAt ?? 0);
+        if (!stored || serverNewer) {
           next.set(node.id, { x: node.x, y: node.y });
         }
       });
@@ -2914,7 +2923,7 @@ export default function RelationsCanvas({
               }
               setNodePositions((prev) => {
                 const next = new Map(prev);
-                next.set(nodeId, { x, y: clampedY });
+                next.set(nodeId, { x, y: clampedY, movedAt: Date.now() });
                 return next;
               });
               onNodePositionChange?.(nodeId, x, clampedY);

@@ -35,6 +35,7 @@ interface CanvasNode {
   name: string;
   x: number;
   y: number;
+  placedAt?: number;
   status?: string;
   color?: string;
   portrait?: string | null;

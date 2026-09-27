@@ -103,7 +103,7 @@ export async function stampCharacterCanvas(characterId: string, p: Pt): Promise<
   if (!c) return;
   let d: Record<string, unknown> = {};
   try { d = JSON.parse(c.data) as Record<string, unknown>; } catch { d = {}; }
-  await prisma.character.update({ where: { id: characterId }, data: { data: JSON.stringify({ ...d, canvasX: p.x, canvasY: p.y }) } });
+  await prisma.character.update({ where: { id: characterId }, data: { data: JSON.stringify({ ...d, canvasX: p.x, canvasY: p.y, canvasPlacedAt: Date.now() }) } });
 }
 
 /**
@@ -127,7 +127,12 @@ export async function snapCharacterToLocation(campaignId: string, characterId: s
 export async function placeNewLocation(campaignId: string, locationId: string, near: { locationId?: string | null; characterId?: string | null }): Promise<Pt> {
   const anchor = (await locationCanvasPos(near.locationId ?? null)) ?? (near.characterId ? await characterCanvasPos(near.characterId) : null) ?? { x: 0, y: 0 };
   const occupied = await occupiedRects(campaignId);
-  const p = placeNear({ x: anchor.x + CARD.location.w + GAP * 2, y: anchor.y }, CARD.location, occupied);
+  // The crystallization line: a drafting (non-ACTIVE) location lives BELOW it (y > 0) — the canvas
+  // clamps its folder there anyway (FolderGroup.clampDraftingRect). A stub is always drafting.
+  const loc = await prisma.location.findUnique({ where: { id: locationId }, select: { status: true } });
+  const drafting = loc?.status !== 'ACTIVE';
+  const wantY = drafting ? Math.max(anchor.y, CARD.location.h / 2 + GAP) : anchor.y;
+  const p = placeNear({ x: anchor.x + CARD.location.w + GAP * 2, y: wantY }, CARD.location, occupied);
   await stampLocationCanvas(locationId, p);
   return p;
 }
