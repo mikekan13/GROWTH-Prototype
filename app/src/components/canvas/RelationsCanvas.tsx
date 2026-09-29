@@ -30,6 +30,7 @@ import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
+import { lodForZoom, folderLabelSize } from "./canvas-lod";
 import FolderGroup from "./FolderGroup";
 
 // â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -258,6 +259,8 @@ export default function RelationsCanvas({
     const stored = loadJSON('zoom', 1);
     return clampZoom(stored);
   });
+  // Semantic zoom (Mike 2026-09-28): what a card renders as depends on how far out the Watcher is.
+  const lod = lodForZoom(zoom);
   const [camera, setCamera] = useState(() => {
     // Migrate from old viewBox storage or load camera position
     const oldVB = loadJSON<{ x: number; y: number; width?: number; height?: number } | null>('viewBox', null);
@@ -402,7 +405,7 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
-        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects);
+        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects, folderLabelSize(zoom) + 16);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
           rect = {
@@ -419,7 +422,7 @@ export default function RelationsCanvas({
       }
     }
     return rects;
-  }, [folders, nodes, nodePositions, dragOffsets, expandedNodes]);
+  }, [folders, nodes, nodePositions, dragOffsets, expandedNodes, zoom]);
 
   // Committed-geometry variant (no live drag offsets) — the live physics
   // (reflow/bumping) MUST measure against committed state or the
@@ -432,7 +435,7 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
-        const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects);
+        const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects, folderLabelSize(zoom) + 16);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
           rect = {
@@ -449,7 +452,7 @@ export default function RelationsCanvas({
       }
     }
     return rects;
-  }, [folders, nodes, nodePositions, expandedNodes]);
+  }, [folders, nodes, nodePositions, expandedNodes, zoom]);
 
   // â”€â”€ Inventory sub-panel state â”€â”€
   // Highlights the drop-target character when an inventory ROW is being dragged
@@ -2828,6 +2831,22 @@ export default function RelationsCanvas({
     const showGlow = hasCrossed || isShimmering;
     const glowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
+    // Zoomed out: a person is a portrait chip with a name — legible at any distance.
+    if (lod !== 'near') {
+      const r = lod === 'far' ? 110 : 90;
+      const fs = lod === 'far' ? 44 : 30;
+      return (
+        <g key={`card-group-${node.id}`} style={{ pointerEvents: 'none' }}>
+          <circle cx={visualX} cy={visualY} r={r} fill="#0d0d1a" stroke="var(--krma-gold)" strokeWidth={6} />
+          {node.portrait ? (
+            <image href={node.portrait} x={visualX - r + 6} y={visualY - r + 6} width={2 * r - 12} height={2 * r - 12} preserveAspectRatio="xMidYMid slice" style={{ clipPath: `circle(${r - 6}px at 50% 50%)` }} />
+          ) : (
+            <text x={visualX} y={visualY + r * 0.38} textAnchor="middle" fontSize={r * 1.05} fontWeight={700} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif">{node.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</text>
+          )}
+          <text x={visualX} y={visualY + r + fs} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace" letterSpacing="0.08em">{node.name.toUpperCase()}</text>
+        </g>
+      );
+    }
     return (
       <g key={`card-group-${node.id}`}>
         {/* Soft pulsing backlight glow when card has crossed the KRMA line */}
@@ -3724,6 +3743,7 @@ export default function RelationsCanvas({
               characters={folderChars}
               svgRef={svgRef}
               viewBox={viewBox}
+              zoom={zoom}
               showActionsMenu={false}
               onDrillIn={onDrillIn}
               onFolderResize={(folderId, width, height, posX, posY) => {
@@ -4014,6 +4034,19 @@ export default function RelationsCanvas({
             const itemShowGlow = itemHasCrossed || isShimmering;
             const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
+            // Zoomed out: an item is a gold dot (far) or a name chip (mid) — the room keeps its texture without the noise.
+            if (lod === 'far') {
+              return <circle key={`item-dot-${node.id}`} cx={visualX} cy={visualY} r={14} fill="var(--krma-gold)" opacity={0.55} style={{ pointerEvents: 'none' }} />;
+            }
+            if (lod === 'mid') {
+              const label = node.name.length > 14 ? node.name.slice(0, 13) + '…' : node.name;
+              return (
+                <g key={`item-chip-${node.id}`} style={{ pointerEvents: 'none' }}>
+                  <rect x={visualX - 110} y={visualY - 26} width={220} height={52} rx={10} fill="#0d0d1a" stroke="rgba(255,204,120,0.55)" strokeWidth={3} />
+                  <text x={visualX} y={visualY + 9} textAnchor="middle" fontSize={26} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace">{label}</text>
+                </g>
+              );
+            }
             return (
               <g key={`item-group-${node.id}`}>
               {itemShowGlow && (

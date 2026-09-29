@@ -726,3 +726,6 @@ Three canvas laws found by looking headless (raw CDP against the installed Chrom
 
 ## 2026-09-28 — Canvas layout epoch: a server re-lay resets every browser's remembered canvas
 Mike's browser still showed its own layout (collapse states / focus / camera survive the placement precedence). `Campaign.canvasLayoutEpoch` (migration) bumped by `jewl-arrange-canvas`; `applyLayoutEpochGate` in CampaignCanvas clears all `canvas-<cid>-*` storage and reloads once when the server epoch is newer. Incubator epoch set to 1 — Mike's next load resets.
+
+## 2026-09-28 — Semantic zoom + depth encoding on the canvas
+Mike: "still hard for a human to interpret… Semantic zoom and encode depth lets see it." Built `canvas-lod.ts`: near/mid/far from zoom (full cards → chips → dots), folder labels scale with zoom and cap to width, chrome hides when far; nesting depth from located_at drives header/body tint + ▸ prefixes; parents reserve label headroom above child folders. Verified headless at all three levels (block → building → apartment → rooms readable at a glance). NEXT (from the design list): items as a shelf with pinning; people chips in the room header; scene-focus as the default view; empty places as name tiles; thresholds/palette are placeholders for Mike's eye.

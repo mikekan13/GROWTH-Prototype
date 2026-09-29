@@ -31,6 +31,8 @@ export interface CanvasFolder {
    */
   locationInfo?: {
     locationId: string;
+    /** Nesting depth from the root place (0 = a root). Drives the depth palette (canvas-lod). */
+    depth?: number;
     locationType?: string;
     krmaReserve?: number;
     description?: string;

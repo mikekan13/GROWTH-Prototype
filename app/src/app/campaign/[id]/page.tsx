@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
+import { locationDepths } from '@/components/canvas/canvas-lod';
 import { recomputeAugments } from '@/lib/character-actions';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
@@ -268,6 +269,10 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   // Build one folder per Location — even those with no children. Empty
   // folders still render with their header (name, KRMA, portrait, child
   // counts at 0). New Locations land as empty folders, not as cards.
+  // Depth of every place from the root (canvas-lod: header/body palette + ▸ prefix).
+  const parentOfEntity = new Map<string, string>();
+  for (const [parent, kids] of childrenByParent) for (const k of kids) parentOfEntity.set(k, parent);
+  const locDepths = locationDepths(parentOfEntity);
   const autoFolders = campaign.locations.map(l => {
     const parentId = l.id;
     const nodeIdsForParent = childrenByParent.get(parentId) ?? [];
@@ -300,6 +305,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       locationInfo: loc
         ? {
             locationId: parentId,
+            depth: locDepths.get(parentId) ?? 0,
             locationType: loc.type,
             krmaReserve: typeof loc.data.krmaReserve === 'number' ? loc.data.krmaReserve : undefined,
             description: typeof loc.data.description === 'string' ? loc.data.description : undefined,

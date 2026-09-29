@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import RestPanel from './RestPanel';
 import type { CanvasFolder } from '@/types/canvas';
+import { lodForZoom, folderLabelSize, depthHeaderFill, depthBodyFill, depthPrefix } from './canvas-lod';
 import type { GrowthCharacter } from '@/types/growth';
 
 interface NodePosition {
@@ -122,6 +123,8 @@ export function calcContentBounds(
    *  folder rect is its footprint, so the parent's area encompasses the
    *  sub-folder. World-recursive design: folders nest. */
   childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>,
+  /** Headroom reserved ABOVE each child folder for its label (drawn above its box) — without it a child's name lands in its parent's header (2026-09-28). */
+  childLabelAllowance = 0,
 ): ContentBounds | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let hasNodes = false;
@@ -131,7 +134,7 @@ export function calcContentBounds(
     if (childRect) {
       hasNodes = true;
       minX = Math.min(minX, childRect.x);
-      minY = Math.min(minY, childRect.y);
+      minY = Math.min(minY, childRect.y - childLabelAllowance);
       maxX = Math.max(maxX, childRect.x + childRect.width);
       maxY = Math.max(maxY, childRect.y + childRect.height);
       continue;
@@ -217,6 +220,7 @@ export function FolderGroupRect({
   viewBox,
   isDropTarget = false,
   onDrillIn,
+  zoom = 1,
 }: {
   folder: CanvasFolder;
   nodePositions: Map<string, NodePosition>;
@@ -241,6 +245,8 @@ export function FolderGroupRect({
   viewBox?: { x: number; y: number; width: number; height: number };
   isDropTarget?: boolean;
   onDrillIn?: (entityId: string | null) => void;
+  /** Canvas zoom (1 = in, 6 = out) — semantic zoom + label scaling (canvas-lod). */
+  zoom?: number;
 }) {
   const [resizing, setResizing] = useState<{
     edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner';
@@ -253,8 +259,8 @@ export function FolderGroupRect({
   } | null>(null);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects),
-    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, folderLabelSize(zoom) + 16),
+    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, zoom]
   );
 
   // Collapse chip — small (Mike 2026-08-03: much smaller), just enough
@@ -428,8 +434,17 @@ export function FolderGroupRect({
 
   const color = folder.type === 'party' ? SOUL_BLUE : (folder.color || SOUL_BLUE);
   const collapsed = !!folder.collapsed;
-  const labelFontSize = 36;
-  const countFontSize = 32;
+  // Semantic zoom + depth encoding (Mike 2026-09-28): a place's palette steps
+  // by how deep it sits; labels grow as the Watcher zooms out.
+  const depth = folder.locationInfo?.depth;
+  const lod = lodForZoom(zoom);
+  const headerFill = folder.locationInfo ? depthHeaderFill(depth) : color;
+  const bodyFill = folder.locationInfo ? depthBodyFill(depth) : '#19191930';
+  const labelFill = folder.locationInfo ? '#CBD9E8' : color;
+  // Cap the label to the folder's width so zoomed-out names never run into a sibling's.
+  const labelChars = folder.name.length + (depth ?? 0) + 6;
+  const labelFontSize = Math.max(28, Math.min(folderLabelSize(zoom), Math.floor(bounds.width / (labelChars * 0.62))));
+  const countFontSize = Math.round(labelFontSize * 0.85);
   const btnW = 160;
   const btnH = 42;
   const btnFontSize = 20;
@@ -467,7 +482,7 @@ export function FolderGroupRect({
           height={displayHeight}
           rx={8}
           ry={8}
-          fill={isDropTarget ? '#22ab9440' : '#19191930'}
+          fill={isDropTarget ? '#22ab9440' : bodyFill}
           stroke={isDropTarget ? '#22ab94cc' : '#22ab9444'}
           strokeWidth={isDropTarget ? 4 : 2}
           style={{ pointerEvents: 'none', ...(isDropTarget ? { filter: 'drop-shadow(0 0 16px rgba(34,171,148,0.6))' } : undefined) }}
@@ -484,7 +499,7 @@ export function FolderGroupRect({
         height={collapsed ? HEADER_HEIGHT : locationHeaderHeight(folder)}
         rx={8}
         ry={8}
-        fill={isDropTarget ? 'var(--terminal-prime)' : color}
+        fill={isDropTarget ? 'var(--terminal-prime)' : headerFill}
         fillOpacity={1}
         stroke={isDropTarget ? 'var(--terminal-prime)' : 'none'}
         strokeWidth={isDropTarget ? 3 : 0}
@@ -535,14 +550,14 @@ export function FolderGroupRect({
       <text
         x={bounds.x + 8}
         y={bounds.y - 6}
-        fill={folder.type === 'party' ? 'var(--terminal-prime)' : color}
+        fill={folder.type === 'party' ? 'var(--terminal-prime)' : labelFill}
         fontSize={labelFontSize}
         fontWeight={700}
         fontFamily="var(--font-terminal), Consolas, monospace"
         letterSpacing="0.12em"
         style={{ pointerEvents: 'none' }}
       >
-        {folder.type === 'party' ? <><tspan letterSpacing="-0.53em">{'\u265F'}<tspan fontSize="1.15em">{'\u265F'}</tspan>{'\u265F'}</tspan>{' '}</> : '\u25A1 '}{folder.name.toUpperCase()}
+        {folder.type === 'party' ? <><tspan letterSpacing="-0.53em">{'\u265F'}<tspan fontSize="1.15em">{'\u265F'}</tspan>{'\u265F'}</tspan>{' '}</> : '\u25A1 '}<tspan fill={headerFill}>{depthPrefix(depth)}</tspan>{folder.name.toUpperCase()}
         <tspan fill={`${folder.type === 'party' ? '#22ab94' : color}99`} fontSize={countFontSize} dx={6}>
           ({folder.nodeIds.length})
         </tspan>
@@ -586,7 +601,7 @@ export function FolderGroupRect({
           counts. Renders only for Location auto-folders (those with
           locationInfo). Sits inside the 80 px header rectangle to the left
           of the KRMA reserve. */}
-      {folder.locationInfo && (
+      {folder.locationInfo && lod !== 'far' && (
         <>
           {/* Portrait box */}
           <foreignObject
@@ -1260,8 +1275,8 @@ export default function FolderGroup({
   }, [folder.id]);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects),
-    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, folderLabelSize(zoom) + 16),
+    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, zoom]
   );
 
   const bounds = useMemo(() => {
