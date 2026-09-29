@@ -41,7 +41,8 @@ export interface LayoutResult {
 export const LAYOUT = {
   itemCols: 3, itemDX: 260, itemDY: 150, itemGridTop: 160, itemGridLeft: -250, itemW: 300,
   charW: 520, charH: 240, charGap: 40,
-  emptyW: 720, emptyH: 200,
+  /** an EMPTY place renders as a name tile (FolderGroup TILE_W/H) */
+  emptyW: 560, emptyH: 150,
   /** header chrome (142) + a zoomed-out label above it (up to ~108) — a child's label must not run into its parent's bar */
   pad: 30, header: 260,
   siblingGap: 150, buildingGap: 300,

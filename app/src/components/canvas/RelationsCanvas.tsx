@@ -411,8 +411,8 @@ export default function RelationsCanvas({
           rect = {
             x: f.posX ?? -360,
             y: f.posY ?? 100,
-            width: Math.max(720, f.userWidth || 0),
-            height: Math.max(200, f.userHeight || 0),
+            width: Math.max(560, f.userWidth || 0),
+            height: Math.max(150, f.userHeight || 0),
           };
         } else {
           const display = getDisplayBounds(content, f);
@@ -441,8 +441,8 @@ export default function RelationsCanvas({
           rect = {
             x: f.posX ?? -360,
             y: f.posY ?? 100,
-            width: Math.max(280, f.userWidth || 0),
-            height: Math.max(120, f.userHeight || 0),
+            width: Math.max(560, f.userWidth || 0),
+            height: Math.max(150, f.userHeight || 0),
           };
         } else {
           const display = getDisplayBounds(content, f);
@@ -3730,6 +3730,7 @@ export default function RelationsCanvas({
               id: n.id,
               name: n.name,
               data: n.characterData as unknown as GrowthCharacter,
+              portrait: n.portrait ?? null,
             }));
           return (
             <FolderGroupRect

@@ -39,6 +39,8 @@ interface CharacterInfo {
   id: string;
   name: string;
   data: GrowthCharacter;
+  /** Portrait URL when one exists — header "who is here" chips use it, else initials. */
+  portrait?: string | null;
 }
 
 interface FolderGroupProps {
@@ -87,6 +89,9 @@ function locationDetailsPanelHeight(li: NonNullable<CanvasFolder['locationInfo']
   return descH + gridH + tagsH + notesH + gaps + PANEL_PADDING;
 }
 const SOUL_BLUE = '#002f6c';
+/** Name-tile size for an EMPTY location (canvas-layout.LAYOUT.emptyW/H mirror it). */
+const TILE_W = 560;
+const TILE_H = 150;
 const HANDLE_SIZE = 36;
 
 /** Compact details strip: one-line essence + the expand affordance. */
@@ -269,8 +274,12 @@ export function FolderGroupRect({
 
   // Much smaller floors (Mike 2026-08-03) — a room folder can be a tight
   // little box; the header still fits at 280 wide.
-  const MIN_FOLDER_W = 280;
-  const MIN_FOLDER_H = 120;
+  // An EMPTY location renders as a name TILE (2026-09-28): a compact card with
+  // an icon slot (the image pipeline fills it later), the name inside, and the
+  // depth tint — not a 720-wide empty box with a tiny name above it.
+  const isTile = !content && !!folder.locationInfo && !folder.collapsed;
+  const MIN_FOLDER_W = isTile ? TILE_W : 280;
+  const MIN_FOLDER_H = isTile ? TILE_H : 120;
 
   const bounds = useMemo(() => {
     if (!content) {
@@ -470,6 +479,43 @@ export function FolderGroupRect({
     const svgY = viewBox.y + ((e.clientY - rect.top) / rect.height) * viewBox.height;
     onFolderDragStart(folder.id, { x: svgX, y: svgY });
   };
+
+  if (isTile) {
+    const li = folder.locationInfo!;
+    // Name ABOVE the tile like every other place (zoom-scaled); the tile itself is icon + status.
+    const tileLabel = Math.max(28, Math.min(folderLabelSize(zoom), Math.floor((bounds.width + 160) / (labelChars * 0.62))));
+    // No status tag on the tile: the crystallization line IS the status (Mike 2026-09-28).
+    return (
+      <g>
+        <rect
+          x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} rx={14} ry={14}
+          fill={headerFill} stroke={isDropTarget ? 'var(--terminal-prime)' : 'rgba(203,217,232,0.35)'}
+          strokeWidth={isDropTarget ? 4 : 3}
+          data-folder-location-id={li.locationId}
+          style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
+          onMouseDown={handleHeaderDrag}
+        />
+        {/* Icon slot — a generated location icon lands here (imageUrl); a glyph until then. */}
+        <rect x={bounds.x + 16} y={bounds.y + 16} width={bounds.height - 32} height={bounds.height - 32} rx={10} fill="#0d0d1a" stroke="rgba(255,204,120,0.5)" strokeWidth={2} style={{ pointerEvents: 'none' }} />
+        {li.imageUrl ? (
+          <image href={li.imageUrl} x={bounds.x + 20} y={bounds.y + 20} width={bounds.height - 40} height={bounds.height - 40} preserveAspectRatio="xMidYMid slice" style={{ pointerEvents: 'none' }} />
+        ) : (
+          <text x={bounds.x + 16 + (bounds.height - 32) / 2} y={bounds.y + bounds.height / 2 + (bounds.height - 32) * 0.22} textAnchor="middle" fontSize={(bounds.height - 32) * 0.6} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif" style={{ pointerEvents: 'none' }}>{'□'}</text>
+        )}
+        <text x={bounds.x + 8} y={bounds.y - 6} fontSize={tileLabel} fontWeight={700} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace" letterSpacing="0.12em" style={{ pointerEvents: 'none' }}>
+          {'\u25A1 '}<tspan fill={headerFill}>{depthPrefix(depth)}</tspan>{folder.name.toUpperCase()}
+        </text>
+        {li.description && (
+          <foreignObject x={bounds.x + bounds.height} y={bounds.y + 14} width={bounds.width - bounds.height - 16} height={bounds.height - 28} style={{ pointerEvents: 'none' }}>
+            <div style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 18, lineHeight: 1.35, color: 'rgba(203,217,232,0.8)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' as const }}>{li.description}</div>
+          </foreignObject>
+        )}
+        {onDrillIn && (
+          <text x={bounds.x + bounds.width - 16} y={bounds.y + bounds.height - 16} textAnchor="end" fontSize={22} fill="rgba(203,217,232,0.7)" fontFamily="var(--font-terminal), Consolas, monospace" style={{ cursor: 'pointer', pointerEvents: 'auto' }} onClick={(e) => { e.stopPropagation(); onDrillIn(li.locationId); }}>{'▸ enter'}</text>
+        )}
+      </g>
+    );
+  }
 
   return (
     <g>
@@ -1109,6 +1155,37 @@ export function FolderGroupRect({
           {collapsed ? '\u2295' : '\u2297'}
         </button>
       </foreignObject>
+
+      {/* "Who is here" chips (2026-09-28): every character in this place, as a
+          portrait/initials chip in the header bar — the room's headline is its people. */}
+      {!collapsed && folder.locationInfo && folderChars.length > 0 && (() => {
+        const CHIP = 26, STEP = 60, MAX = 6;
+        const shown = folderChars.slice(0, MAX);
+        const extra = folderChars.length - shown.length;
+        const rightEdge = bounds.x + bounds.width - toggleSize - 28;
+        const cy = bounds.y + 40;
+        return (
+          <g style={{ pointerEvents: 'none' }}>
+            {shown.map((c, i) => {
+              const cx = rightEdge - (shown.length - i) * STEP + (extra > 0 ? -STEP : 0);
+              const initials = c.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <g key={c.id}>
+                  <circle cx={cx} cy={cy} r={CHIP} fill="#0d0d1a" stroke="var(--krma-gold)" strokeWidth={3} />
+                  {c.portrait ? (
+                    <image href={c.portrait} x={cx - CHIP + 3} y={cy - CHIP + 3} width={2 * CHIP - 6} height={2 * CHIP - 6} preserveAspectRatio="xMidYMid slice" style={{ clipPath: `circle(${CHIP - 3}px at 50% 50%)` }} />
+                  ) : (
+                    <text x={cx} y={cy + CHIP * 0.38} textAnchor="middle" fontSize={CHIP * 1.05} fontWeight={700} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif">{initials}</text>
+                  )}
+                </g>
+              );
+            })}
+            {extra > 0 && (
+              <text x={rightEdge - CHIP} y={cy + 8} textAnchor="middle" fontSize={22} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace">+{extra}</text>
+            )}
+          </g>
+        );
+      })()}
 
       {/* Resize handles — only when expanded */}
       {!collapsed && (
