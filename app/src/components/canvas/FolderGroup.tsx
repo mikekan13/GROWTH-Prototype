@@ -274,9 +274,8 @@ export function FolderGroupRect({
 
   // Much smaller floors (Mike 2026-08-03) — a room folder can be a tight
   // little box; the header still fits at 280 wide.
-  // An EMPTY location renders as a name TILE (2026-09-28): a compact card with
-  // an icon slot (the image pipeline fills it later), the name inside, and the
-  // depth tint — not a 720-wide empty box with a tiny name above it.
+  // An EMPTY location is a compact folder — same header and chips as every other place, just small
+  // (Mike 2026-09-28: places must all display the same way; the header portrait box is the icon slot).
   const isTile = !content && !!folder.locationInfo && !folder.collapsed;
   const MIN_FOLDER_W = isTile ? TILE_W : 280;
   const MIN_FOLDER_H = isTile ? TILE_H : 120;
@@ -452,7 +451,7 @@ export function FolderGroupRect({
   const labelFill = folder.locationInfo ? '#CBD9E8' : color;
   // Cap the label to the folder's width so zoomed-out names never run into a sibling's.
   const labelChars = folder.name.length + (depth ?? 0) + 6;
-  const labelFontSize = Math.max(28, Math.min(folderLabelSize(zoom), Math.floor(bounds.width / (labelChars * 0.62))));
+  const labelFontSize = Math.max(28, Math.min(folderLabelSize(zoom), Math.floor((bounds.width + 140) / (labelChars * 0.62))));
   const countFontSize = Math.round(labelFontSize * 0.85);
   const btnW = 160;
   const btnH = 42;
@@ -479,43 +478,6 @@ export function FolderGroupRect({
     const svgY = viewBox.y + ((e.clientY - rect.top) / rect.height) * viewBox.height;
     onFolderDragStart(folder.id, { x: svgX, y: svgY });
   };
-
-  if (isTile) {
-    const li = folder.locationInfo!;
-    // Name ABOVE the tile like every other place (zoom-scaled); the tile itself is icon + status.
-    const tileLabel = Math.max(28, Math.min(folderLabelSize(zoom), Math.floor((bounds.width + 160) / (labelChars * 0.62))));
-    // No status tag on the tile: the crystallization line IS the status (Mike 2026-09-28).
-    return (
-      <g>
-        <rect
-          x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} rx={14} ry={14}
-          fill={headerFill} stroke={isDropTarget ? 'var(--terminal-prime)' : 'rgba(203,217,232,0.35)'}
-          strokeWidth={isDropTarget ? 4 : 3}
-          data-folder-location-id={li.locationId}
-          style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
-          onMouseDown={handleHeaderDrag}
-        />
-        {/* Icon slot — a generated location icon lands here (imageUrl); a glyph until then. */}
-        <rect x={bounds.x + 16} y={bounds.y + 16} width={bounds.height - 32} height={bounds.height - 32} rx={10} fill="#0d0d1a" stroke="rgba(255,204,120,0.5)" strokeWidth={2} style={{ pointerEvents: 'none' }} />
-        {li.imageUrl ? (
-          <image href={li.imageUrl} x={bounds.x + 20} y={bounds.y + 20} width={bounds.height - 40} height={bounds.height - 40} preserveAspectRatio="xMidYMid slice" style={{ pointerEvents: 'none' }} />
-        ) : (
-          <text x={bounds.x + 16 + (bounds.height - 32) / 2} y={bounds.y + bounds.height / 2 + (bounds.height - 32) * 0.22} textAnchor="middle" fontSize={(bounds.height - 32) * 0.6} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif" style={{ pointerEvents: 'none' }}>{'□'}</text>
-        )}
-        <text x={bounds.x + 8} y={bounds.y - 6} fontSize={tileLabel} fontWeight={700} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace" letterSpacing="0.12em" style={{ pointerEvents: 'none' }}>
-          {'\u25A1 '}<tspan fill={headerFill}>{depthPrefix(depth)}</tspan>{folder.name.toUpperCase()}
-        </text>
-        {li.description && (
-          <foreignObject x={bounds.x + bounds.height} y={bounds.y + 14} width={bounds.width - bounds.height - 16} height={bounds.height - 28} style={{ pointerEvents: 'none' }}>
-            <div style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 18, lineHeight: 1.35, color: 'rgba(203,217,232,0.8)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' as const }}>{li.description}</div>
-          </foreignObject>
-        )}
-        {onDrillIn && (
-          <text x={bounds.x + bounds.width - 16} y={bounds.y + bounds.height - 16} textAnchor="end" fontSize={22} fill="rgba(203,217,232,0.7)" fontFamily="var(--font-terminal), Consolas, monospace" style={{ cursor: 'pointer', pointerEvents: 'auto' }} onClick={(e) => { e.stopPropagation(); onDrillIn(li.locationId); }}>{'▸ enter'}</text>
-        )}
-      </g>
-    );
-  }
 
   return (
     <g>
