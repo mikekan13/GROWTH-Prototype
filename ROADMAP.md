@@ -723,3 +723,6 @@ Inn example cleared. `scripts/jewl-arrange-canvas.ts`: JEWL laid out the Incubat
 
 ## 2026-09-26 — Why JEWL's layout was invisible, and the fix
 Three canvas laws found by looking headless (raw CDP against the installed Chromium): drafting locations are clamped below the line; a populated folder's rect comes from its members, not its anchor; localStorage positions/folders always won over the server. Built `services/canvas-layout.ts` (deterministic geometry from JEWL's tree + order, below the line, items gridded, characters inside rooms) and placement stamps (`canvasPlacedAt`/`placedAt` → `placedAt` on nodes/folders; client `movedAt` on drags; server wins when newer). Verified with deliberately stale storage. Mike reloads to see it.
+
+## 2026-09-28 — Canvas layout epoch: a server re-lay resets every browser's remembered canvas
+Mike's browser still showed its own layout (collapse states / focus / camera survive the placement precedence). `Campaign.canvasLayoutEpoch` (migration) bumped by `jewl-arrange-canvas`; `applyLayoutEpochGate` in CampaignCanvas clears all `canvas-<cid>-*` storage and reloads once when the server epoch is newer. Incubator epoch set to 1 — Mike's next load resets.

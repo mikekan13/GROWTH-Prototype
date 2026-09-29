@@ -277,6 +277,9 @@ model Campaign {
   campaignItems       CampaignItem[]
   goals               Goal[]
   aiSettings          String?              // JSON<CampaignAISettings> — provider preferences per feature
+  // Bumped when the server re-lays the whole canvas (JEWL organizing it). A browser holding an
+  // older epoch clears its remembered canvas layout for this campaign on load (2026-09-28).
+  canvasLayoutEpoch   Int                  @default(0)
   relationships       EntityRelationship[]
   godHeadMessages     GodHeadMessage[]
   jewlMistakes        JewlMistake[]

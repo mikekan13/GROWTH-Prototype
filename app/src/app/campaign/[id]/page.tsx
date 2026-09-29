@@ -328,6 +328,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     name: campaign.name,
     inviteCode: campaign.inviteCode,
     genre: campaign.genre,
+    canvasLayoutEpoch: campaign.canvasLayoutEpoch,
   };
 
   // Find the current user's character for terminal auto-detection

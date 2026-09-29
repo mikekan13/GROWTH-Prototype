@@ -74,6 +74,8 @@ interface CampaignCanvasProps {
     name: string;
     inviteCode: string | null;
     genre: string | null;
+    /** Server-side whole-canvas re-lay counter (JEWL organizing the canvas). */
+    canvasLayoutEpoch?: number;
   };
   nodes: CanvasNode[];
   connections: Connection[];
@@ -108,7 +110,32 @@ interface CampaignEconomyData {
   total: string;
 }
 
+/**
+ * Layout epoch gate (2026-09-28, Mike: "please reset it for me"): when the
+ * server has re-laid the whole canvas since this browser last looked, drop
+ * everything this browser remembers about the campaign's canvas (positions,
+ * folders, collapse states, drill-in focus, camera, zoom) and reload once, so
+ * the server layout is what renders. Runs before any canvas state initializer
+ * reads storage. Never loops: the new epoch is stored before the reload.
+ */
+function applyLayoutEpochGate(campaignId: string, serverEpoch: number | undefined): boolean {
+  if (typeof window === 'undefined' || typeof serverEpoch !== 'number') return false;
+  const key = `canvas-${campaignId}-layoutEpoch`;
+  let seen = 0;
+  try { seen = Number(localStorage.getItem(key) ?? '0') || 0; } catch { return false; }
+  if (serverEpoch <= seen) return false;
+  try {
+    const prefix = `canvas-${campaignId}-`;
+    for (const k of Object.keys(localStorage)) if (k.startsWith(prefix) && k !== key) localStorage.removeItem(k);
+    localStorage.setItem(key, String(serverEpoch));
+  } catch { return false; }
+  window.location.reload();
+  return true;
+}
+
 export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers, autoFolders, locatedAtEdges = [], entityNames = {} }: CampaignCanvasProps) {
+  const [epochReloading] = useState(() => applyLayoutEpochGate(campaign.id, campaign.canvasLayoutEpoch));
+  void epochReloading;
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
   // In-canvas character selection: when set, the Character tab loads THIS character
   // instead of the user's own PC. Cleared when navigating to a non-character tab so

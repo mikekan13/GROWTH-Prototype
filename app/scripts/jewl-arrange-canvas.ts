@@ -137,7 +137,9 @@ interface Plan {
     placed += o.placed.length;
     for (const sk of o.skipped) console.warn('  skipped', sk.target, sk.reason);
   }
-  console.log(`\napplied: ${plan.parents.length} containment changes, ${placed} placements`);
+  // A whole-canvas re-lay: every browser drops its remembered layout for this campaign on next load.
+  const bumped = await prisma.campaign.update({ where: { id: campaignId }, data: { canvasLayoutEpoch: { increment: 1 } }, select: { canvasLayoutEpoch: true } });
+  console.log(`\napplied: ${plan.parents.length} containment changes, ${placed} placements; canvas layout epoch → ${bumped.canvasLayoutEpoch}`);
   await prisma.$disconnect();
   process.exit(0);
 })().catch((err) => { console.error(err); process.exit(1); });
