@@ -2232,7 +2232,13 @@ export default function RelationsCanvas({
           const dragDist = Math.hypot(lastNodeOffset?.x ?? 0, lastNodeOffset?.y ?? 0);
           const startParentId = findContainingLocationFolder(baseX + 200, baseY + 40, folder.id);
           const newParentIdRaw = findContainingLocationFolder(checkX, checkY, folder.id);
-          const newParentId = dragDist >= 8 && newParentIdRaw !== startParentId ? newParentIdRaw : null;
+          // 2026-10-01 (Mike: "the canvas is a mess… sub folders overlapping
+          // parent folders"): dragging a ROOM never re-files it. Nested boxes
+          // overlap by design, so geometry cannot express intent here —
+          // re-parenting a location is an explicit act (JEWL / the location
+          // editor), never a drag side-effect. The gesture still MOVES it.
+          const FOLDER_DRAG_REPARENT = false;
+          const newParentId = FOLDER_DRAG_REPARENT && dragDist >= 8 && newParentIdRaw !== startParentId ? newParentIdRaw : null;
           if (process.env.NODE_ENV !== 'production' && newParentIdRaw !== startParentId) {
             console.log(`[reparent] ${myLocId.slice(-6)} drag=${Math.round(dragDist)} from=${startParentId ? startParentId.slice(-6) : 'root'} to=${newParentIdRaw ? newParentIdRaw.slice(-6) : 'root'} → ${newParentId ? 'APPLY' : 'skip'}`);
           }
