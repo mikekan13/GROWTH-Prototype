@@ -15,6 +15,7 @@ import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import EncounterPanel from './EncounterPanel';
+import SessionWarmupOverlay from './SessionWarmupOverlay';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,10 @@ export default function CampaignTerminal({
   const [sessions, setSessions] = useState<GameSessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<GameSessionInfo | null>(null);
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
+  // Session-start loading screen (Mike 2026-10-01): shown once per active
+  // session, for the GM, while the self-hosted core cold-starts.
+  const [warmup, setWarmup] = useState<{ startedAt: string; number: number } | null>(null);
+  const warmupSeenRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<CommandInputHandle>(null);
 
@@ -107,6 +112,28 @@ export default function CampaignTerminal({
   useEffect(() => {
     if ((terminalMode === 'table' || terminalMode === 'encounter') && !tableAvailable) setTerminalMode('terminal');
   }, [terminalMode, tableAvailable]);
+
+  // A session just became active (started here, or already live on a reload):
+  // one lane check; if the core is not answering yet, raise the loading screen.
+  useEffect(() => {
+    if (!activeSession || !isGM) return;
+    if (warmupSeenRef.current === activeSession.id) return;
+    warmupSeenRef.current = activeSession.id;
+    const { id, startedAt, number } = activeSession;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/lane`);
+        if (!res.ok || cancelled) return;
+        const lane = (await res.json()) as { phase: string };
+        if (cancelled || warmupSeenRef.current !== id) return;
+        if (lane.phase !== 'ready' && lane.phase !== 'disabled') setWarmup({ startedAt, number });
+      } catch { /* the speak bar's status strip still covers it */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSession, isGM, campaignId]);
+  useEffect(() => { if (!activeSession) setWarmup(null); }, [activeSession]);
+  const closeWarmup = useCallback(() => setWarmup(null), []);
 
   // ── Fetch merged events ──────────────────────────────────────────────────
 
@@ -786,6 +813,15 @@ export default function CampaignTerminal({
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#0a0a1a' }}>
+      {warmup && isGM && (
+        <SessionWarmupOverlay
+          campaignId={campaignId}
+          startedAt={warmup.startedAt}
+          sessionNumber={warmup.number}
+          onReady={closeWarmup}
+          onDismiss={closeWarmup}
+        />
+      )}
       {/* Header */}
       <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
         <div className="flex items-center justify-between mb-2">
