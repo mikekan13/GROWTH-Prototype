@@ -168,8 +168,11 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       const base = locPosById.get(item.locationId)!;
       const idx = perRoomItemIndex.get(item.locationId) ?? 0;
       perRoomItemIndex.set(item.locationId, idx + 1);
-      fallbackItemX = base.x - 250 + (idx % 3) * 260;
-      fallbackItemY = base.y + 160 + Math.floor(idx / 3) * 150;
+      // Item cards are 300×160 (FolderGroup CARD_SIZES) — the grid must be
+      // wider than the card or every card is clipped by its neighbour
+      // (measured 2026-10-01 at 260×150).
+      fallbackItemX = base.x - 250 + (idx % 3) * 320;
+      fallbackItemY = base.y + 160 + Math.floor(idx / 3) * 180;
     }
 
     return {

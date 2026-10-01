@@ -30,6 +30,7 @@ import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
+import { settle, packFolder, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import { lodForZoom, folderLabelSize } from "./canvas-lod";
 import FolderGroup from "./FolderGroup";
 
@@ -844,7 +845,10 @@ export default function RelationsCanvas({
   // triggers compaction — contents reflow into the new bounds, cascading
   // down the tree), and sibling location folders never overlap (the
   // moved/resized one yields, nudged to the nearest free spot).
-  const [pendingLayoutPass, setPendingLayoutPass] = useState<{ locId: string; compact: boolean } | null>(null);
+  // Settle-once (Mike 2026-10-01): queued on release, runs one render later
+  // against fresh committed geometry. `repack` = the location whose contents
+  // must first be shelf-packed into its new user width (resize end).
+  const [pendingLayoutPass, setPendingLayoutPass] = useState<{ priority: SettlePriority; repack?: string } | null>(null);
 
   /** All descendant node ids (cards) under a location, walking nested
    *  location folders. */
@@ -897,16 +901,11 @@ export default function RelationsCanvas({
     });
   }, [walkDescendantNodeIds, onNodePositionChange, committedFolderRectById]);
 
-  /** Shelf-pack a location folder's direct members (cards + child
-   *  folders) into its user-set width — the cascade-shrink reflow. */
-  // ── LIVE physics (Mike 2026-08-03: "Think of all these things having
-  // physicality... They bump into and resize each other dynamically
-  // based on the hierarchy in real time.") Everything below emits
-  // TRANSIENT drag offsets — the render layer already applies offsets
-  // per frame — and commitPhysicsOffsets() lands the final state once
-  // on release. All measurement runs against COMMITTED geometry
-  // (committedFolderRectById), never offset-following rects, or the
-  // per-frame math compounds into runaway motion.
+  // ── Gesture offsets + glide (what remains of the 08-03 live physics) ──
+  // The held thing tracks the cursor through gesture offsets; after a
+  // settle, moved things glide from their old place to rest through the
+  // same rAF loop. Nothing is computed per frame any more (Mike
+  // 2026-10-01: measured oscillation + whole-tree relocation).
 
   /** Accumulate an offset onto a whole folder subtree (descendant cards
    *  + descendant folder pseudo-keys). */
@@ -927,141 +926,142 @@ export default function RelationsCanvas({
     }
   }, [walkDescendantNodeIds]);
 
-  /** Live reflow: shelf-pack a folder's members against a target width,
-   *  emitted as offsets from committed positions. Runs every resize
-   *  frame — contents move organically WITH the handle. */
-  /** Resize-gesture baseline: geometry frozen at gesture start so
-   *  per-frame math is stable (idempotent deltas, no compounding) and
-   *  shrunk children RECOVER when the handle moves back out. `dirty`
-   *  latches once a reflow has run so recovery keeps recomputing. */
-  const resizeBaselineRef = useRef<{
-    parentW: number;
-    rects: Map<string, { x: number; y: number; width: number; height: number }>;
-    dirty: boolean;
-  } | null>(null);
+  const ensurePhysicsLoopRef = useRef<(() => void) | null>(null);
+  const pickAutoDropTargetRef = useRef<((px: number, py: number) => string | null) | null>(null);
+  // ── Settle-once (Mike 2026-10-01, replaces the per-frame reflow/push) ──
+  // The pure engine lives in canvas-settle.ts. Here: build its model from
+  // COMMITTED state (refs are synced every render), apply its moves in one
+  // batch, and let the moved things glide from where they were.
 
-  const computeReflowOffsetsInto = useCallback((
-    next: Map<string, { x: number; y: number }>,
-    locId: string,
-    targetW: number,
-    targetH?: number,
-    folderSizes?: Map<string, { w: number; h: number }>,
-    depth: number = 0,
-  ): { width: number; height: number } | null => {
-    if (depth > 3) return null;
+  /** Committed geometry → settle model. Only location (auto-) folders and
+   *  the cards inside them / loose on the canvas take part; party and
+   *  manual-group folders keep their own rules. */
+  const buildSettleModel = useCallback((): { sNodes: SettleNode[]; sFolders: SettleFolder[] } => {
     const foldersList = foldersRef.current;
-    const folder = foldersList.find(f => f.id === `auto-${locId}`);
-    if (!folder || folder.collapsed || folder.nodeIds.length === 0) return null;
-    const baseline = resizeBaselineRef.current;
-    const baseRect = (id: string) => baseline?.rects.get(id) ?? committedFolderRectById.get(id);
-    const selfRect = baseRect(locId);
-    const anchorX = folder.posX ?? selfRect?.x ?? 0;
-    const anchorY = folder.posY ?? selfRect?.y ?? 0;
-    // Cascade-shrink ratio (Mike 2026-08-03: "when I resize a parent it
-    // should also resize children as it shrinks"): children scale with
-    // the parent, floored at the minimum folder size, capped at their
-    // gesture-start size (growing past baseline never inflates them).
-    const wRatio = targetW / Math.max(1, selfRect?.width ?? targetW);
-    const hRatio = targetH != null ? targetH / Math.max(1, selfRect?.height ?? targetH) : 1;
-    const ratio = Math.max(0.35, Math.min(1, Math.min(wRatio, hRatio)));
-
-    type Member = { id: string; w: number; h: number; kind: 'node' | 'folder'; oldX: number; oldY: number; topH: number };
-    const members: Member[] = [];
-    for (const id of folder.nodeIds) {
-      if (foldersList.some(ff => ff.id === `auto-${id}`)) {
-        const r = baseRect(id);
-        if (!r) continue;
-        const childF = foldersList.find(ff => ff.id === `auto-${id}`);
-        if (childF?.collapsed) {
-          members.push({ id, w: r.width, h: r.height, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
-          continue;
-        }
-        const childTargetW = Math.max(280, Math.min(r.width, Math.round(r.width * ratio)));
-        const packed = computeReflowOffsetsInto(next, id, childTargetW, undefined, folderSizes, depth + 1);
-        const childW = childTargetW;
-        const childH = packed?.height ?? r.height;
-        folderSizes?.set(id, { w: childW, h: childH });
-        members.push({ id, w: childW, h: childH, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
-        continue;
+    const positions = nodePositionsRef.current;
+    const expanded = expandedNodesRef.current;
+    const autoFolders = foldersList.filter(f => f.id.startsWith('auto-'));
+    const locIds = new Set(autoFolders.map(f => f.id.slice('auto-'.length)));
+    const parentOf = new Map<string, string>();
+    const folderOfNode = new Map<string, string>();
+    for (const f of autoFolders) {
+      const locId = f.id.slice('auto-'.length);
+      for (const nid of f.nodeIds) {
+        if (locIds.has(nid)) parentOf.set(nid, locId);
+        else folderOfNode.set(nid, locId);
       }
-      const pos = nodePositionsRef.current.get(id);
-      if (!pos) continue;
-      const n = nodes.find(nn => nn.id === id);
-      const dims = getNodeDimensions(n?.type || 'character', expandedNodesRef.current.has(id));
-      members.push({
-        id, kind: 'node', w: dims.width, h: dims.topH + dims.bottomH,
-        oldX: pos.x - dims.width / 2, oldY: pos.y - dims.topH, topH: dims.topH,
+    }
+    const inManualFolder = new Set<string>();
+    for (const f of foldersList) if (!f.id.startsWith('auto-')) for (const nid of f.nodeIds) inManualFolder.add(nid);
+    const sNodes: SettleNode[] = [];
+    for (const n of nodes) {
+      if (n.type === 'location' || inManualFolder.has(n.id)) continue;
+      const pos = positions.get(n.id) ?? { x: n.x, y: n.y };
+      const dims = getNodeDimensions(n.type, expanded.has(n.id));
+      sNodes.push({ id: n.id, x: pos.x, y: pos.y, w: dims.width, topH: dims.topH, bottomH: dims.bottomH, folderId: folderOfNode.get(n.id) ?? null });
+    }
+    const sFolders: SettleFolder[] = autoFolders.map(f => {
+      const locId = f.id.slice('auto-'.length);
+      return {
+        id: locId,
+        parentId: parentOf.get(locId) ?? null,
+        userWidth: f.userWidth,
+        userHeight: f.userHeight,
+        posX: f.posX,
+        posY: f.posY,
+        collapsed: f.collapsed,
+        drafting: !!f.locationInfo && f.locationInfo.status !== 'ACTIVE',
+        headerH: locationHeaderHeight(f),
+      };
+    });
+    return { sNodes, sFolders };
+  }, [nodes]);
+
+  /** Run one settle pass (optionally repacking a resized folder first) and
+   *  land the result: positions + folder anchors committed in one batch,
+   *  moved things glide in from where they were. */
+  const applySettle = useCallback((priority: SettlePriority, repackLocId?: string) => {
+    const { sNodes, sFolders } = buildSettleModel();
+    const labelAllowance = folderLabelSize(zoom) + 16;
+    // A dropped card joins the smallest room under it (the same rule the
+    // server applies via onDropIntoLocation, whose refresh lands later) —
+    // settle against the membership it is ABOUT to have, not the stale one.
+    if (priority?.kind === 'node') {
+      const n = sNodes.find(sn => sn.id === priority.id);
+      const hit = n ? pickAutoDropTargetRef.current?.(n.x, n.y) ?? null : null;
+      if (n && hit && hit !== n.folderId && sFolders.some(sf => sf.id === hit)) n.folderId = hit;
+    }
+    const moves = new Map<string, { x: number; y: number }>();
+    const shifts = new Map<string, { dx: number; dy: number }>();
+    let workingNodes = sNodes;
+    let workingFolders = sFolders;
+    if (repackLocId) {
+      const f = foldersRef.current.find(ff => ff.id === `auto-${repackLocId}`);
+      if (f?.userWidth) {
+        const packed = packFolder(repackLocId, f.userWidth, sNodes, sFolders, { labelAllowance });
+        if (packed) {
+          for (const [id, m] of packed.nodeMoves) moves.set(id, m);
+          for (const [id, sh] of packed.folderShifts) shifts.set(id, sh);
+          workingNodes = sNodes.map(n => { const m = packed.nodeMoves.get(n.id); return m ? { ...n, x: m.x, y: m.y } : n; });
+          workingFolders = sFolders.map(sf => {
+            const sh = packed.folderShifts.get(sf.id);
+            if (!sh) return sf;
+            return { ...sf, posX: sf.posX != null ? sf.posX + sh.dx : sf.posX, posY: sf.posY != null ? sf.posY + sh.dy : sf.posY };
+          });
+        }
+      }
+    }
+    const result = settle(workingNodes, workingFolders, priority, { labelAllowance });
+    for (const [id, m] of result.nodeMoves) moves.set(id, m);
+    for (const [id, sh] of result.folderShifts) {
+      const prev = shifts.get(id) ?? { dx: 0, dy: 0 };
+      shifts.set(id, { dx: prev.dx + sh.dx, dy: prev.dy + sh.dy });
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      const tree = workingFolders.map(f => `${f.id.slice(-6)}<${f.parentId ? f.parentId.slice(-6) : 'root'}`).join(' ');
+      const prioNode = priority?.kind === 'node' ? workingNodes.find(n => n.id === priority.id) : undefined;
+      const prioInfo = prioNode ? ` prioFolder=${prioNode.folderId ? prioNode.folderId.slice(-6) : 'loose'} stillOver=${workingNodes.filter(n => n.id !== prioNode.id && (() => { const a = moves.get(n.id) ?? { x: n.x, y: n.y }; const b = moves.get(prioNode.id) ?? { x: prioNode.x, y: prioNode.y }; return Math.abs(a.x - b.x) < (n.w + prioNode.w) / 2 && Math.abs((a.y - n.topH + (n.topH + n.bottomH) / 2) - (b.y - prioNode.topH + (prioNode.topH + prioNode.bottomH) / 2)) < (n.topH + n.bottomH + prioNode.topH + prioNode.bottomH) / 2; })()).map(n => `${n.id.slice(-6)}@${n.folderId ? n.folderId.slice(-6) : 'loose'}`).join(',') || '-'}` : '';
+      console.log(`[settle] ${priority ? `${priority.kind}:${priority.id.slice(-6)}` : 'none'}${prioInfo}${repackLocId ? ` repack:${repackLocId.slice(-6)}` : ''} nodes=${workingNodes.length} folders=${workingFolders.length} rounds=${result.rounds} moves=${moves.size} shifts=${[...shifts].map(([id, sh]) => `${id.slice(-6)}(${Math.round(sh.dx)},${Math.round(sh.dy)})`).join(',') || '-'} tree=${tree}`);
+    }
+    if (moves.size === 0 && shifts.size === 0) return;
+    // Glide: every moved thing starts at its OLD place and eases to rest.
+    const currents = new Map<string, { x: number; y: number }>();
+    for (const [id, m] of moves) {
+      const base = nodePositionsRef.current.get(id);
+      if (base) currents.set(id, { x: base.x - m.x, y: base.y - m.y });
+    }
+    for (const [id, sh] of shifts) currents.set(`__folder__auto-${id}`, { x: -sh.dx, y: -sh.dy });
+    gestureOffsetsRef.current = new Map();
+    reactionTargetsRef.current = new Map();
+    reactionCurrentsRef.current = currents;
+    ensurePhysicsLoopRef.current?.();
+    // Commit.
+    const movedAt = Date.now();
+    if (moves.size) {
+      setNodePositions(prev => {
+        const next = new Map(prev);
+        for (const [id, m] of moves) {
+          next.set(id, { x: m.x, y: m.y, movedAt });
+          onNodePositionChange?.(id, m.x, m.y);
+        }
+        return next;
       });
     }
-    if (!members.length) return null;
-    // Reflow only when contents overflow the live width (starburst
-    // guard) — but once a reflow has run this gesture, keep recomputing
-    // so growing back RECOVERS the layout toward baseline.
-    const hh = locationHeaderHeight(folder);
-    if (!(baseline?.dirty)) {
-      const fitLeft = anchorX + 4;
-      const fitRight = anchorX + targetW - 24;
-      const fitTop = anchorY + hh - 8;
-      const fitBottom = targetH != null ? anchorY + targetH - 8 : Infinity;
-      const overflows = members.some(m =>
-        m.oldX < fitLeft || m.oldX + m.w > fitRight ||
-        m.oldY < fitTop || m.oldY + m.h > fitBottom);
-      if (!overflows) return null;
-      if (baseline) baseline.dirty = true;
+    if (shifts.size) {
+      const updated = foldersRef.current.map(f => {
+        const locId = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
+        const sh = locId ? shifts.get(locId) : undefined;
+        if (!sh) return f;
+        return {
+          ...f,
+          ...(f.posX != null ? { posX: f.posX + sh.dx } : {}),
+          ...(f.posY != null ? { posY: f.posY + sh.dy } : {}),
+          movedAt,
+        };
+      });
+      onFoldersChange?.(updated);
     }
-    members.sort((a, b) => (a.oldY - b.oldY) || (a.oldX - b.oldX));
-    const PAD = FOLDER_PADDING, GAP = 20;
-    let cx = anchorX + PAD, cy = anchorY + hh + PAD, rowH = 0;
-    for (const m of members) {
-      if (cx + m.w > anchorX + targetW - PAD && cx > anchorX + PAD) {
-        cx = anchorX + PAD; cy += rowH + GAP; rowH = 0;
-      }
-      const dx = cx - m.oldX;
-      const dy = cy - m.oldY;
-      if (dx !== 0 || dy !== 0) {
-        if (m.kind === 'node') next.set(m.id, { x: dx, y: dy });
-        else addSubtreeOffsetInto(next, m.id, dx, dy);
-      }
-      cx += m.w + GAP; rowH = Math.max(rowH, m.h);
-    }
-    return { width: targetW, height: (cy + rowH + PAD) - anchorY };
-  }, [nodes, committedFolderRectById, addSubtreeOffsetInto]);
-
-  /** Live bumping: the actor's live rect pushes overlapping sibling
-   *  folders (and their subtrees) away along the minimal axis. */
-  const computeSiblingPushesInto = useCallback((next: Map<string, { x: number; y: number }>, locId: string, liveRect: { x: number; y: number; width: number; height: number }) => {
-    const foldersList = foldersRef.current;
-    const parentOf = (id: string): string | null =>
-      foldersList.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(id))?.id.slice('auto-'.length) ?? null;
-    const myParent = parentOf(locId);
-    const GAP = 24;
-    for (const f of foldersList) {
-      if (!f.id.startsWith('auto-') || f.id === `auto-${locId}`) continue;
-      const sib = f.id.slice('auto-'.length);
-      if (parentOf(sib) !== myParent) continue;
-      const rs0 = committedFolderRectById.get(sib);
-      if (!rs0) continue;
-      const cur = next.get(`__folder__auto-${sib}`) ?? { x: 0, y: 0 };
-      const rs = { x: rs0.x + cur.x, y: rs0.y + cur.y, width: rs0.width, height: rs0.height };
-      const overlapX = Math.min(liveRect.x + liveRect.width, rs.x + rs.width) - Math.max(liveRect.x, rs.x);
-      const overlapY = Math.min(liveRect.y + liveRect.height, rs.y + rs.height) - Math.max(liveRect.y, rs.y);
-      if (overlapX <= 0 || overlapY <= 0) continue;
-      let dx = 0, dy = 0;
-      if (overlapX < overlapY) dx = rs.x + rs.width / 2 < liveRect.x + liveRect.width / 2 ? -(overlapX + GAP) : overlapX + GAP;
-      else dy = rs.y + rs.height / 2 < liveRect.y + liveRect.height / 2 ? -(overlapY + GAP) : overlapY + GAP;
-      // A physics push must NEVER shove a drafting folder across the
-      // crystallization line — crossing is the OWNER's gesture (with its
-      // KRMA consequence), not collateral of someone else's drag (bug
-      // 2026-08-03: pushed items stranded above the line after a
-      // declined crystallize prompt). Deflect horizontally instead.
-      const sibDrafting = f.locationInfo && f.locationInfo.status !== 'ACTIVE';
-      if (sibDrafting && dy < 0 && rs.y + dy < 0) {
-        dy = 0;
-        dx = rs.x + rs.width / 2 < liveRect.x + liveRect.width / 2 ? -(overlapX + GAP) : overlapX + GAP;
-      }
-      addSubtreeOffsetInto(next, sib, dx, dy);
-    }
-  }, [committedFolderRectById, addSubtreeOffsetInto]);
+  }, [buildSettleModel, zoom, onNodePositionChange, onFoldersChange]);
 
   // ── Fluid reaction layer (Mike 2026-08-03: "still too snappy, more
   // fluid") ── The DRAGGED thing tracks the cursor 1:1 (gesture
@@ -1111,6 +1111,7 @@ export default function RelationsCanvas({
       physicsRafRef.current = requestAnimationFrame(physicsTick);
     }
   }, [physicsTick]);
+  ensurePhysicsLoopRef.current = ensurePhysicsLoop;
 
   /** Land every transient physics offset as committed state, batched.
    *  Commits the TARGETS (final resting places), not the mid-animation
@@ -1165,45 +1166,6 @@ export default function RelationsCanvas({
     }
     setDragOffsets(new Map());
   }, [committedFolderRectById, onNodePositionChange, onFoldersChange]);
-
-  /** Nudge a moved/resized location folder out of its siblings — the
-   *  disturbed folder yields. */
-  const resolveSiblingOverlaps = useCallback((locId: string) => {
-    const foldersList = foldersRef.current;
-    const parentOf = (id: string): string | null =>
-      foldersList.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(id))?.id.slice('auto-'.length) ?? null;
-    const myParent = parentOf(locId);
-    const siblings = foldersList
-      .filter(f => f.id.startsWith('auto-') && f.id !== `auto-${locId}`)
-      .map(f => f.id.slice('auto-'.length))
-      .filter(id => parentOf(id) === myParent);
-    let rect = committedFolderRectById.get(locId);
-    if (!rect) return;
-    let totalDx = 0, totalDy = 0;
-    for (let iter = 0; iter < 8; iter++) {
-      let pushed = false;
-      for (const sib of siblings) {
-        const rs = committedFolderRectById.get(sib);
-        if (!rs) continue;
-        const cur = { x: rect.x + totalDx, y: rect.y + totalDy, width: rect.width, height: rect.height };
-        const overlapX = Math.min(cur.x + cur.width, rs.x + rs.width) - Math.max(cur.x, rs.x);
-        const overlapY = Math.min(cur.y + cur.height, rs.y + rs.height) - Math.max(cur.y, rs.y);
-        if (overlapX <= 0 || overlapY <= 0) continue;
-        const GAP = 24;
-        if (overlapX < overlapY) {
-          totalDx += (cur.x + cur.width / 2 < rs.x + rs.width / 2 ? -(overlapX + GAP) : overlapX + GAP);
-        } else {
-          totalDy += (cur.y + cur.height / 2 < rs.y + rs.height / 2 ? -(overlapY + GAP) : overlapY + GAP);
-        }
-        pushed = true;
-      }
-      if (!pushed) break;
-    }
-    if (totalDx !== 0 || totalDy !== 0) {
-      const updated = shiftFolderTree(locId, totalDx, totalDy, foldersList);
-      onFoldersChange?.(updated);
-    }
-  }, [committedFolderRectById, shiftFolderTree, onFoldersChange]);
 
   // ── JEWL stage direction (C2/C3): camera focus + transient highlights ──
   const [jewlHighlights, setJewlHighlights] = useState<Map<string, number>>(new Map());
@@ -1282,6 +1244,7 @@ export default function RelationsCanvas({
     }
     return best?.locId ?? null;
   }, [folderRectById]);
+  pickAutoDropTargetRef.current = pickAutoDropTarget;
 
   /** The location the node currently lives in (its auto-folder parent). */
   const currentAutoParentOf = useCallback((nodeId: string): string | null => {
@@ -1351,13 +1314,13 @@ export default function RelationsCanvas({
   }, [nodes, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, onNodePositionChange]);
 
 
-  // Layout pass runs one render AFTER a commit so folderRectById is fresh.
+  // Settle runs one render AFTER a commit so the refs hold fresh geometry.
   useEffect(() => {
     if (!pendingLayoutPass) return;
-    const { locId } = pendingLayoutPass;
+    const { priority, repack } = pendingLayoutPass;
     setPendingLayoutPass(null);
-    resolveSiblingOverlaps(locId);
-  }, [pendingLayoutPass, resolveSiblingOverlaps]);
+    applySettle(priority, repack);
+  }, [pendingLayoutPass, applySettle]);
 
 
   // Refs for RAF throttling
@@ -2024,17 +1987,9 @@ export default function RelationsCanvas({
             }
             gesture.set(`__folder__${folder.id}`, { x: dx, y: dy });
             gestureOffsetsRef.current = gesture;
-            // REACTIONS ease: bumped siblings glide out of the way.
-            const reactions = new Map<string, { x: number; y: number }>();
-            if (dragLocId) {
-              const rect = committedFolderRectById.get(dragLocId);
-              if (rect) {
-                computeSiblingPushesInto(reactions, dragLocId, {
-                  x: rect.x + dx, y: rect.y + dy, width: rect.width, height: rect.height,
-                });
-              }
-            }
-            reactionTargetsRef.current = reactions;
+            // Settle-once (2026-10-01): nothing reacts while the folder is in
+            // hand — siblings are pushed clear ONCE on release.
+            reactionTargetsRef.current = new Map();
             mergePhysicsFrame();
             ensurePhysicsLoop();
           }
@@ -2137,7 +2092,7 @@ export default function RelationsCanvas({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
-    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee, addSubtreeOffsetInto, computeSiblingPushesInto, committedFolderRectById, mergePhysicsFrame, ensurePhysicsLoop]
+    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee, addSubtreeOffsetInto, committedFolderRectById, mergePhysicsFrame, ensurePhysicsLoop]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -2323,7 +2278,7 @@ export default function RelationsCanvas({
       {
         const movedFolder = foldersRef.current.find(f => f.id === dragFolderId);
         const movedLocId = movedFolder?.locationInfo?.locationId;
-        if (movedLocId) setPendingLayoutPass({ locId: movedLocId, compact: false });
+        if (movedLocId) setPendingLayoutPass({ priority: { kind: 'folder', id: movedLocId } });
       }
       setDragFolderId(null);
       setFolderDragStartSvg(null);
@@ -2364,6 +2319,11 @@ export default function RelationsCanvas({
         onFoldersChange?.(updated);
         setDropTargetFolderId(null);
         dropTargetRef.current = null;
+      }
+      // Settle-once (2026-10-01): the dropped card never yields; whatever it
+      // landed on is pushed clear one render later, against committed state.
+      if (offset && (offset.x !== 0 || offset.y !== 0)) {
+        setPendingLayoutPass({ priority: { kind: 'node', id: dragNodeId } });
       }
       setDragOffsets((prev) => {
         const next = new Map(prev);
@@ -2946,6 +2906,7 @@ export default function RelationsCanvas({
                 return next;
               });
               onNodePositionChange?.(nodeId, x, clampedY);
+              setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
               bringNodeToFront(nodeId);
 
               // NOTE: Do NOT update folder posX/posY here. posX/posY are only set by
@@ -3748,57 +3709,23 @@ export default function RelationsCanvas({
               showActionsMenu={false}
               onDrillIn={onDrillIn}
               onFolderResize={(folderId, width, height, posX, posY) => {
-                // LIVE physics: every resize frame, contents reflow into
-                // the live width, children scale down with the parent,
-                // and overlapped siblings get bumped — all organically
-                // WITH the handle, not on release.
-                if (!resizeActiveRef.current) {
-                  // Freeze gesture-start geometry: stable per-frame math
-                  // + shrunk children recover when the handle backs out.
-                  const locId0 = folderId.startsWith('auto-') ? folderId.slice('auto-'.length) : null;
-                  resizeBaselineRef.current = {
-                    parentW: (locId0 ? committedFolderRectById.get(locId0)?.width : undefined) ?? width,
-                    rects: new Map(committedFolderRectById),
-                    dirty: false,
-                  };
-                }
+                // Settle-once (2026-10-01): while the handle is held only THIS
+                // folder's rect changes. Contents repack and siblings move
+                // once, on release.
                 resizeActiveRef.current = true;
                 stampGesture();
-                const childSizes = new Map<string, { w: number; h: number }>();
-                if (folderId.startsWith('auto-')) {
-                  const locId = folderId.slice('auto-'.length);
-                  const rect = resizeBaselineRef.current?.rects.get(locId) ?? committedFolderRectById.get(locId);
-                  const next = new Map<string, { x: number; y: number }>();
-                  computeReflowOffsetsInto(next, locId, width, height, childSizes);
-                  computeSiblingPushesInto(next, locId, {
-                    x: posX ?? rect?.x ?? 0,
-                    y: posY ?? rect?.y ?? 0,
-                    width,
-                    height,
-                  });
-                  // Fluid: reactions ease toward their slots instead of
-                  // teleporting.
-                  reactionTargetsRef.current = next;
-                  ensurePhysicsLoop();
-                }
-                const updated = foldersRef.current.map(f => {
-                  if (f.id === folderId) {
-                    return { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}), ...(posY != null ? { posY } : {}) };
-                  }
-                  const l = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
-                  const s = l ? childSizes.get(l) : undefined;
-                  return s ? { ...f, userWidth: s.w, userHeight: s.h } : f;
-                });
+                const updated = foldersRef.current.map(f =>
+                  f.id === folderId
+                    ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}), ...(posY != null ? { posY } : {}) }
+                    : f,
+                );
                 onFoldersChange?.(updated);
               }}
               onFolderResizeEnd={(folderId) => {
-                // Land the live-physics offsets; a safety overlap pass
-                // runs one render later against fresh geometry.
-                commitPhysicsOffsets();
                 resizeActiveRef.current = false;
-                resizeBaselineRef.current = null;
                 if (folderId.startsWith('auto-')) {
-                  setPendingLayoutPass({ locId: folderId.slice('auto-'.length), compact: false });
+                  const locId = folderId.slice('auto-'.length);
+                  setPendingLayoutPass({ priority: { kind: 'folder', id: locId }, repack: locId });
                 }
               }}
               onToggleDetails={(folderId) => {
@@ -3986,6 +3913,7 @@ export default function RelationsCanvas({
                         return next;
                       });
                       onNodePositionChange?.(nodeId, x, y);
+                      setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
                       bringNodeToFront(nodeId);
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
@@ -4130,6 +4058,7 @@ export default function RelationsCanvas({
                           return next;
                         });
                         onNodePositionChange?.(nodeId, x, y);
+                        setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
                         bringNodeToFront(nodeId);
                         // Drop-into-room for items (server-side: locationId +
                         // located_at edge stay in sync via the service).
