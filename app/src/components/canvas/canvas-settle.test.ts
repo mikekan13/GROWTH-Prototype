@@ -133,3 +133,25 @@ describe('settle — cross-level', () => {
     expect(b.x <= a.x && b.x + b.width >= a.x + a.width).toBe(true);
   });
 });
+
+describe('packFolder — a sub-folder is never larger than its parent', () => {
+  it('shrinking a parent caps a wider child to the interior and repacks the child into rows', () => {
+    // Child room holds three 520-wide cards in a row (≈1640 wide); parent packed to 1000.
+    const nodes = [card('a', 0, 0, 'room'), card('b', 560, 0, 'room'), card('c', 1120, 0, 'room')];
+    const folders = [folder('apt'), folder('room', 'apt')];
+    const res = packFolder('apt', 1000, nodes, folders);
+    expect(res).not.toBeNull();
+    const cap = res!.folderSizes.get('room');
+    expect(cap).toBeDefined();
+    expect(cap!.width).toBeLessThanOrEqual(1000 - 60);
+    // The child's cards no longer sit on one row.
+    const ys = new Set(nodes.map((n) => res!.nodeMoves.get(n.id)?.y ?? n.y));
+    expect(ys.size).toBeGreaterThan(1);
+  });
+
+  it('leaves a child that already fits alone', () => {
+    const nodes = [card('a', 0, 0, 'room')];
+    const folders = [folder('apt'), folder('room', 'apt')];
+    expect(packFolder('apt', 2000, nodes, folders)).toBeNull();
+  });
+});

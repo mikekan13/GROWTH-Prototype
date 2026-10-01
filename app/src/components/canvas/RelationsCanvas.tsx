@@ -993,6 +993,7 @@ export default function RelationsCanvas({
     }
     const moves = new Map<string, { x: number; y: number }>();
     const shifts = new Map<string, { dx: number; dy: number }>();
+    const sizes = new Map<string, { width: number; height: number }>();
     let workingNodes = sNodes;
     let workingFolders = sFolders;
     if (repackLocId) {
@@ -1002,11 +1003,18 @@ export default function RelationsCanvas({
         if (packed) {
           for (const [id, m] of packed.nodeMoves) moves.set(id, m);
           for (const [id, sh] of packed.folderShifts) shifts.set(id, sh);
+          for (const [id, sz] of packed.folderSizes) sizes.set(id, sz);
           workingNodes = sNodes.map(n => { const m = packed.nodeMoves.get(n.id); return m ? { ...n, x: m.x, y: m.y } : n; });
           workingFolders = sFolders.map(sf => {
             const sh = packed.folderShifts.get(sf.id);
-            if (!sh) return sf;
-            return { ...sf, posX: sf.posX != null ? sf.posX + sh.dx : sf.posX, posY: sf.posY != null ? sf.posY + sh.dy : sf.posY };
+            const sz = packed.folderSizes.get(sf.id);
+            if (!sh && !sz) return sf;
+            return {
+              ...sf,
+              posX: sh && sf.posX != null ? sf.posX + sh.dx : sf.posX,
+              posY: sh && sf.posY != null ? sf.posY + sh.dy : sf.posY,
+              ...(sz ? { userWidth: sz.width, userHeight: sz.height } : {}),
+            };
           });
         }
       }
@@ -1023,7 +1031,7 @@ export default function RelationsCanvas({
       const prioInfo = prioNode ? ` prioFolder=${prioNode.folderId ? prioNode.folderId.slice(-6) : 'loose'} stillOver=${workingNodes.filter(n => n.id !== prioNode.id && (() => { const a = moves.get(n.id) ?? { x: n.x, y: n.y }; const b = moves.get(prioNode.id) ?? { x: prioNode.x, y: prioNode.y }; return Math.abs(a.x - b.x) < (n.w + prioNode.w) / 2 && Math.abs((a.y - n.topH + (n.topH + n.bottomH) / 2) - (b.y - prioNode.topH + (prioNode.topH + prioNode.bottomH) / 2)) < (n.topH + n.bottomH + prioNode.topH + prioNode.bottomH) / 2; })()).map(n => `${n.id.slice(-6)}@${n.folderId ? n.folderId.slice(-6) : 'loose'}`).join(',') || '-'}` : '';
       console.log(`[settle] ${priority ? `${priority.kind}:${priority.id.slice(-6)}` : 'none'}${prioInfo}${repackLocId ? ` repack:${repackLocId.slice(-6)}` : ''} nodes=${workingNodes.length} folders=${workingFolders.length} rounds=${result.rounds} moves=${moves.size} shifts=${[...shifts].map(([id, sh]) => `${id.slice(-6)}(${Math.round(sh.dx)},${Math.round(sh.dy)})`).join(',') || '-'} tree=${tree}`);
     }
-    if (moves.size === 0 && shifts.size === 0) return;
+    if (moves.size === 0 && shifts.size === 0 && sizes.size === 0) return;
     // Glide: every moved thing starts at its OLD place and eases to rest.
     const currents = new Map<string, { x: number; y: number }>();
     for (const [id, m] of moves) {
@@ -1047,15 +1055,17 @@ export default function RelationsCanvas({
         return next;
       });
     }
-    if (shifts.size) {
+    if (shifts.size || sizes.size) {
       const updated = foldersRef.current.map(f => {
         const locId = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
         const sh = locId ? shifts.get(locId) : undefined;
-        if (!sh) return f;
+        const sz = locId ? sizes.get(locId) : undefined;
+        if (!sh && !sz) return f;
         return {
           ...f,
-          ...(f.posX != null ? { posX: f.posX + sh.dx } : {}),
-          ...(f.posY != null ? { posY: f.posY + sh.dy } : {}),
+          ...(sh && f.posX != null ? { posX: f.posX + sh.dx } : {}),
+          ...(sh && f.posY != null ? { posY: f.posY + sh.dy } : {}),
+          ...(sz ? { userWidth: sz.width, userHeight: sz.height } : {}),
           movedAt,
         };
       });
@@ -2214,7 +2224,18 @@ export default function RelationsCanvas({
           const baseY = folder.posY ?? 0;
           const checkX = baseX + (lastNodeOffset?.x ?? 0) + 200; // ~middle of a typical header
           const checkY = baseY + (lastNodeOffset?.y ?? 0) + 40;  // ~middle of the chrome strip
-          const newParentId = findContainingLocationFolder(checkX, checkY, folder.id);
+          // Re-parent only when THIS drag changed containment (2026-10-01):
+          // nested boxes stacked at one corner already "contain" each
+          // other's header point, so a click or a sub-threshold drag used
+          // to file rooms into their siblings. The point must have moved,
+          // and must land somewhere it was not before.
+          const dragDist = Math.hypot(lastNodeOffset?.x ?? 0, lastNodeOffset?.y ?? 0);
+          const startParentId = findContainingLocationFolder(baseX + 200, baseY + 40, folder.id);
+          const newParentIdRaw = findContainingLocationFolder(checkX, checkY, folder.id);
+          const newParentId = dragDist >= 8 && newParentIdRaw !== startParentId ? newParentIdRaw : null;
+          if (process.env.NODE_ENV !== 'production' && newParentIdRaw !== startParentId) {
+            console.log(`[reparent] ${myLocId.slice(-6)} drag=${Math.round(dragDist)} from=${startParentId ? startParentId.slice(-6) : 'root'} to=${newParentIdRaw ? newParentIdRaw.slice(-6) : 'root'} → ${newParentId ? 'APPLY' : 'skip'}`);
+          }
           // With real nesting, overlap is NORMAL: children sit inside
           // their parent, and a dragged parent often covers its own
           // children. Only re-parent on a REAL change, and never into a
@@ -3714,6 +3735,21 @@ export default function RelationsCanvas({
                 // once, on release.
                 resizeActiveRef.current = true;
                 stampGesture();
+                // A sub-folder is never larger than its parent (Mike 2026-10-01):
+                // clamp the handle to the parent's interior.
+                if (folderId.startsWith('auto-')) {
+                  const locId = folderId.slice('auto-'.length);
+                  const parentEntry = foldersRef.current.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(locId));
+                  const parentRect = parentEntry ? committedFolderRectById.get(parentEntry.id.slice('auto-'.length)) : undefined;
+                  if (parentEntry && parentRect) {
+                    const innerW = parentRect.width - FOLDER_PADDING * 2;
+                    const innerH = parentRect.height - locationHeaderHeight(parentEntry) - FOLDER_PADDING;
+                    width = Math.min(width, innerW);
+                    height = Math.min(height, innerH);
+                    if (posX != null) posX = Math.max(parentRect.x + FOLDER_PADDING, Math.min(posX, parentRect.x + parentRect.width - FOLDER_PADDING - width));
+                    if (posY != null) posY = Math.max(parentRect.y + locationHeaderHeight(parentEntry), Math.min(posY, parentRect.y + parentRect.height - FOLDER_PADDING - height));
+                  }
+                }
                 const updated = foldersRef.current.map(f =>
                   f.id === folderId
                     ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}), ...(posY != null ? { posY } : {}) }
@@ -3721,6 +3757,7 @@ export default function RelationsCanvas({
                 );
                 onFoldersChange?.(updated);
               }}
+              onFolderResizeStart={() => { resizeActiveRef.current = true; }}
               onFolderResizeEnd={(folderId) => {
                 resizeActiveRef.current = false;
                 if (folderId.startsWith('auto-')) {
@@ -4449,6 +4486,7 @@ export default function RelationsCanvas({
             zoom={zoom}
             onDrillIn={onDrillIn}
             onFolderDragStart={(folderId, startSvg) => {
+              if (resizeActiveRef.current) return; // resize is resize, never a drag
               setDragFolderId(folderId);
               setFolderDragStartSvg(startSvg);
             }}

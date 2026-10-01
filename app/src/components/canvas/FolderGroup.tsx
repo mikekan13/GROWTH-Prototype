@@ -216,6 +216,7 @@ export function FolderGroupRect({
   characters,
   onFolderResize,
   onFolderResizeEnd,
+  onFolderResizeStart,
   onToggleDetails,
   onFolderDragStart,
   onActionsToggle,
@@ -237,6 +238,8 @@ export function FolderGroupRect({
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number, posY?: number) => void;
   /** Fired once when a resize gesture ENDS — compaction/overlap pass. */
   onFolderResizeEnd?: (folderId: string) => void;
+  /** Fired on the handle's mousedown — the canvas must know a resize has begun BEFORE any drag could start on the same gesture (2026-10-01: a resize that also became a folder drag re-parented rooms into each other). */
+  onFolderResizeStart?: (folderId: string) => void;
   /** Toggle the location details panel (compact strip ↔ full panel). */
   onToggleDetails?: (folderId: string) => void;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
@@ -330,6 +333,7 @@ export function FolderGroupRect({
     e.stopPropagation();
     e.preventDefault();
     if (!bounds) return;
+    onFolderResizeStart?.(folder.id);
     // Capture the folder's TRUE origin and user-padded size — not the
     // content-clamped display values. The resize math writes posX/userWidth
     // directly, so the start values must match what we're modifying;
@@ -345,7 +349,7 @@ export function FolderGroupRect({
       startPosX: folder.posX ?? bounds.x,
       startPosY: folder.posY ?? bounds.y,
     });
-  }, [bounds, folder.posX, folder.posY, folder.userWidth, folder.userHeight]);
+  }, [bounds, folder.id, folder.posX, folder.posY, folder.userWidth, folder.userHeight, onFolderResizeStart]);
 
   useEffect(() => {
     if (!resizing) return;

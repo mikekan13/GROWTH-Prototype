@@ -288,56 +288,99 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
   return { nodeMoves, folderShifts, folderRects: rects, rounds: rounds + 1 };
 }
 
+export interface PackResult {
+  nodeMoves: Map<string, { x: number; y: number }>;
+  folderShifts: Map<string, { dx: number; dy: number }>;
+  /** Child folders capped to fit (Mike 2026-10-01: a sub-folder is never
+   *  larger than its parent) — the caller writes these as user sizes. */
+  folderSizes: Map<string, { width: number; height: number }>;
+  height: number;
+}
+
 /** One-shot shelf-pack of a folder's DIRECT members into a target width,
  *  used after a resize when the contents overflow the new size (Mike
  *  08-03: shrinking a parent repacks its children — now once, on release,
- *  not per frame). Child folders pack as blocks. Returns the moves. */
+ *  not per frame). Child folders pack as blocks; a child wider than the
+ *  parent's interior is first capped to it and packed itself (cascade,
+ *  depth ≤ 4). Returns null when nothing had to change. */
 export function packFolder(
   folderId: string,
   targetWidth: number,
-  nodes: SettleNode[],
-  folders: SettleFolder[],
+  nodesIn: SettleNode[],
+  foldersIn: SettleFolder[],
   options: SettleOptions = {},
-): { nodeMoves: Map<string, { x: number; y: number }>; folderShifts: Map<string, { dx: number; dy: number }>; height: number } | null {
+  _depth = 0,
+): PackResult | null {
   const opts: Required<SettleOptions> = { ...DEFAULTS, ...options, emptyFolderSize: options.emptyFolderSize ?? DEFAULTS.emptyFolderSize };
+  const nodes = nodesIn.map((n) => ({ ...n }));
+  const folders = foldersIn.map((f) => ({ ...f }));
   const f = folders.find((x) => x.id === folderId);
   if (!f || f.collapsed) return null;
-  const rects = deriveFolderRects(nodes, folders, opts);
+  const nodeMoves = new Map<string, { x: number; y: number }>();
+  const folderShifts = new Map<string, { dx: number; dy: number }>();
+  const folderSizes = new Map<string, { width: number; height: number }>();
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const applyShift = (id: string, dx: number, dy: number) => {
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      const sh = folderShifts.get(cur) ?? { dx: 0, dy: 0 };
+      folderShifts.set(cur, { dx: sh.dx + dx, dy: sh.dy + dy });
+      const cf = folders.find((x) => x.id === cur);
+      if (cf) { if (cf.posX != null) cf.posX += dx; if (cf.posY != null) cf.posY += dy; }
+      for (const n of nodes) if (n.folderId === cur) { n.x += dx; n.y += dy; nodeMoves.set(n.id, { x: n.x, y: n.y }); }
+      for (const c of folders) if (c.parentId === cur) stack.push(c.id);
+    }
+  };
+
+  // Cascade: children wider than the interior shrink to it first.
+  const inner = targetWidth - opts.padding * 2;
+  let rects = deriveFolderRects(nodes, folders, opts);
+  if (_depth < 4) {
+    for (const c of folders) {
+      if (c.parentId !== folderId) continue;
+      const r = rects.get(c.id);
+      if (!r || r.width <= inner) continue;
+      c.userWidth = Math.min(c.userWidth ?? inner, inner);
+      const sub = packFolder(c.id, inner, nodes, folders, opts, _depth + 1);
+      if (sub) {
+        for (const [id, m] of sub.nodeMoves) { const n = nodeById.get(id); if (n) { n.x = m.x; n.y = m.y; } nodeMoves.set(id, m); }
+        for (const [id, sh] of sub.folderShifts) {
+          const cf = folders.find((x) => x.id === id);
+          if (cf) { if (cf.posX != null) cf.posX += sh.dx; if (cf.posY != null) cf.posY += sh.dy; }
+          const prev = folderShifts.get(id) ?? { dx: 0, dy: 0 };
+          folderShifts.set(id, { dx: prev.dx + sh.dx, dy: prev.dy + sh.dy });
+        }
+        for (const [id, sz] of sub.folderSizes) folderSizes.set(id, sz);
+      }
+      rects = deriveFolderRects(nodes, folders, opts);
+      folderSizes.set(c.id, { width: Math.min(inner, rects.get(c.id)?.width ?? inner), height: rects.get(c.id)?.height ?? r.height });
+    }
+  }
+
   const self = rects.get(folderId);
   if (!self) return null;
   type Member = { id: string; kind: 'node' | 'folder'; x: number; y: number; w: number; h: number };
   const members: Member[] = [];
   for (const n of nodes) if (n.folderId === folderId) { const r = nodeRect(n); members.push({ id: n.id, kind: 'node', x: r.x, y: r.y, w: r.width, h: r.height }); }
   for (const c of folders) if (c.parentId === folderId) { const r = rects.get(c.id); if (r) members.push({ id: c.id, kind: 'folder', x: r.x, y: r.y - opts.labelAllowance, w: r.width, h: r.height + opts.labelAllowance }); }
-  if (!members.length) return null;
+  const changed = folderSizes.size > 0 || nodeMoves.size > 0;
+  if (!members.length) return changed ? { nodeMoves, folderShifts, folderSizes, height: self.height } : null;
   const anchorX = self.x, anchorY = self.y;
   const fitRight = anchorX + targetWidth - opts.padding;
   const overflows = members.some((m) => m.x + m.w > fitRight || m.x < anchorX + opts.padding);
-  if (!overflows) return null;
+  if (!overflows) return changed ? { nodeMoves, folderShifts, folderSizes, height: self.height } : null;
   members.sort((a, b) => (a.y - b.y) || (a.x - b.x));
   const GAP = 20;
   let cx = anchorX + opts.padding, cy = anchorY + f.headerH + opts.padding, rowH = 0;
-  const nodeMoves = new Map<string, { x: number; y: number }>();
-  const folderShifts = new Map<string, { dx: number; dy: number }>();
-  const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  const shiftSubtree = (id: string, dx: number, dy: number) => {
-    const stack = [id];
-    while (stack.length) {
-      const cur = stack.pop()!;
-      const s = folderShifts.get(cur) ?? { dx: 0, dy: 0 };
-      folderShifts.set(cur, { dx: s.dx + dx, dy: s.dy + dy });
-      for (const n of nodes) if (n.folderId === cur) nodeMoves.set(n.id, { x: (nodeMoves.get(n.id)?.x ?? n.x) + dx, y: (nodeMoves.get(n.id)?.y ?? n.y) + dy });
-      for (const c of folders) if (c.parentId === cur) stack.push(c.id);
-    }
-  };
   for (const m of members) {
     if (cx + m.w > anchorX + targetWidth - opts.padding && cx > anchorX + opts.padding) { cx = anchorX + opts.padding; cy += rowH + GAP; rowH = 0; }
     const dx = cx - m.x, dy = cy - m.y;
     if (dx !== 0 || dy !== 0) {
-      if (m.kind === 'node') { const n = nodeById.get(m.id)!; nodeMoves.set(m.id, { x: n.x + dx, y: n.y + dy }); }
-      else shiftSubtree(m.id, dx, dy);
+      if (m.kind === 'node') { const n = nodeById.get(m.id)!; n.x += dx; n.y += dy; nodeMoves.set(m.id, { x: n.x, y: n.y }); }
+      else applyShift(m.id, dx, dy);
     }
     cx += m.w + GAP; rowH = Math.max(rowH, m.h);
   }
-  return { nodeMoves, folderShifts, height: (cy + rowH + opts.padding) - anchorY };
+  return { nodeMoves, folderShifts, folderSizes, height: (cy + rowH + opts.padding) - anchorY };
 }
