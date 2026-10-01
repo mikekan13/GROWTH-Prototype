@@ -111,7 +111,12 @@ audit (locationId, entities, truthLines), never a separate truth to maintain.
 
 ## 8. Build order (small, testable units)
 
-- U1 Plumbing: eager off + 32k on the endpoint; measure tok/s warm. (Costs one worker spin-up — ask first.)
+- U1 Plumbing: eager off + 32k on the endpoint; measure tok/s warm. **DONE 2026-10-01.** Template
+  jh3qgfbp9o: ENFORCE_EAGER=false, MAX_MODEL_LEN=32768, GPU_MEMORY_UTILIZATION=0.85. Measured warm on
+  H100 SXM (`scripts/bench-l1-lane.mjs`, streamed): spirit-sized 1k-in/450-out 6.2 s total at 75 tok/s
+  decode (was ~18); short spoken line 1k-in/22-out 1.1 s total; TTFT 0.4–1.0 s. Cold start unchanged
+  at ~340 s = weights streaming off the network volume; baking weights into the image is the fix
+  (separate change, not done).
 - U2 Loop restructure: chunk-driven listening, concurrency, ask detector, short streamed answer. Measure
   first-words latency at the ask.
 - U3 Ownership rule + liveness + planning board (chips, edit, commit-on-next-move). NPC beings wake up.
