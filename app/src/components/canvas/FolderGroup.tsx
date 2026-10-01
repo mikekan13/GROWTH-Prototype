@@ -307,13 +307,15 @@ export function FolderGroupRect({
     const anchorY = (folder.posY != null ? Math.min(folder.posY + folderOffset.y, content.y) : content.y);
     const contentRight = content.x + content.minWidth;
     const contentBottom = content.y + content.minHeight;
-    // Right edge: max of (user-padded right, content right, absolute minimum).
-    const basePosX = folder.posX != null ? folder.posX + folderOffset.x : content.x;
-    const rightEdge = Math.max(basePosX + MIN_FOLDER_W, basePosX + (folder.userWidth || 0), contentRight);
+    // Right/bottom edges measure the user size from the SAME anchor the box
+    // is drawn from (2026-10-01: measuring it from posX/posY while drawing
+    // from min(pos, content) made a right-edge drag jump the HEIGHT by the
+    // anchor gap on its first frame — "instantly expanded past its sub
+    // folder"). This matches getDisplayBounds / folderRectById / the settle
+    // engine, so every consumer agrees on one rect.
+    const rightEdge = Math.max(anchorX + MIN_FOLDER_W, anchorX + (folder.userWidth || 0), contentRight);
     const width = rightEdge - anchorX;
-    // Bottom edge: same shape as right.
-    const basePosY = folder.posY != null ? folder.posY + folderOffset.y : content.y;
-    const bottomEdge = Math.max(basePosY + MIN_FOLDER_H, basePosY + (folder.userHeight || 0), contentBottom);
+    const bottomEdge = Math.max(anchorY + MIN_FOLDER_H, anchorY + (folder.userHeight || 0), contentBottom);
     let height = bottomEdge - anchorY;
     // Party folders: clamp bottom edge above KRMA line (y=0)
     if (folder.type === 'party') {
@@ -344,10 +346,13 @@ export function FolderGroupRect({
       edge,
       startX: e.clientX,
       startY: e.clientY,
-      startW: folder.userWidth ?? bounds.width,
-      startH: folder.userHeight ?? bounds.height,
-      startPosX: folder.posX ?? bounds.x,
-      startPosY: folder.posY ?? bounds.y,
+      // The drawn rect IS the gesture's baseline — user sizes are measured
+      // from the drawn anchor, so starting anywhere else makes the first
+      // frame jump (2026-10-01).
+      startW: bounds.width,
+      startH: bounds.height,
+      startPosX: bounds.x,
+      startPosY: bounds.y,
     });
   }, [bounds, folder.id, folder.posX, folder.posY, folder.userWidth, folder.userHeight, onFolderResizeStart]);
 

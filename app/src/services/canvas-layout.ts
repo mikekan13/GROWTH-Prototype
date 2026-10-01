@@ -6,7 +6,7 @@
  *   - a populated folder's rectangle is derived from its MEMBERS; only an
  *     empty folder sits at its own anchor (min 720 × 200);
  *   - items with no stored position are gridded near their room's anchor:
- *     3 columns 260 apart, rows 150 apart, from (anchor.x − 250, anchor.y + 160)
+ *     3 columns 320 apart, rows 180 apart, from (anchor.x − 250, anchor.y + 160)
  *     (app/campaign/[id]/page.tsx);
  *   - a character card is 520 × 240, centred; a location folder adds
  *     FOLDER_PADDING 30 around its content and a header of ~140.
@@ -39,7 +39,8 @@ export interface LayoutResult {
 }
 
 export const LAYOUT = {
-  itemCols: 3, itemDX: 260, itemDY: 150, itemGridTop: 160, itemGridLeft: -250, itemW: 300,
+  // Pitch must exceed the card (300×160, FolderGroup CARD_SIZES) or every card is clipped by its neighbour (2026-10-01; was 260×150).
+  itemCols: 3, itemDX: 320, itemDY: 180, itemGridTop: 160, itemGridLeft: -250, itemW: 300,
   charW: 520, charH: 240, charGap: 40,
   /** an EMPTY place renders as a name tile (FolderGroup TILE_W/H) */
   emptyW: 560, emptyH: 150,

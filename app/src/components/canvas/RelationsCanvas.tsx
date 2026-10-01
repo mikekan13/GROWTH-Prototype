@@ -1029,7 +1029,7 @@ export default function RelationsCanvas({
       const tree = workingFolders.map(f => `${f.id.slice(-6)}<${f.parentId ? f.parentId.slice(-6) : 'root'}`).join(' ');
       const prioNode = priority?.kind === 'node' ? workingNodes.find(n => n.id === priority.id) : undefined;
       const prioInfo = prioNode ? ` prioFolder=${prioNode.folderId ? prioNode.folderId.slice(-6) : 'loose'} stillOver=${workingNodes.filter(n => n.id !== prioNode.id && (() => { const a = moves.get(n.id) ?? { x: n.x, y: n.y }; const b = moves.get(prioNode.id) ?? { x: prioNode.x, y: prioNode.y }; return Math.abs(a.x - b.x) < (n.w + prioNode.w) / 2 && Math.abs((a.y - n.topH + (n.topH + n.bottomH) / 2) - (b.y - prioNode.topH + (prioNode.topH + prioNode.bottomH) / 2)) < (n.topH + n.bottomH + prioNode.topH + prioNode.bottomH) / 2; })()).map(n => `${n.id.slice(-6)}@${n.folderId ? n.folderId.slice(-6) : 'loose'}`).join(',') || '-'}` : '';
-      console.log(`[settle] ${priority ? `${priority.kind}:${priority.id.slice(-6)}` : 'none'}${prioInfo}${repackLocId ? ` repack:${repackLocId.slice(-6)}` : ''} nodes=${workingNodes.length} folders=${workingFolders.length} rounds=${result.rounds} moves=${moves.size} shifts=${[...shifts].map(([id, sh]) => `${id.slice(-6)}(${Math.round(sh.dx)},${Math.round(sh.dy)})`).join(',') || '-'} tree=${tree}`);
+      console.log(`[settle] ${priority ? `${priority.kind}:${priority.id.slice(-6)}` : 'none'}${prioInfo}${repackLocId ? ` repack:${repackLocId.slice(-6)}` : ''} nodes=${workingNodes.length} folders=${workingFolders.length} rounds=${result.rounds} perRound=${result.roundMoves.join('/')} moves=${moves.size} shifts=${[...shifts].map(([id, sh]) => `${id.slice(-6)}(${Math.round(sh.dx)},${Math.round(sh.dy)})`).join(',') || '-'} tree=${tree}`);
     }
     if (moves.size === 0 && shifts.size === 0 && sizes.size === 0) return;
     // Glide: every moved thing starts at its OLD place and eases to rest.
@@ -2046,12 +2046,11 @@ export default function RelationsCanvas({
               // Match the visual bounds computation from FolderGroupRect
               const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
               const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
-              const basePosX = f.posX ?? content.x;
-              const basePosY = f.posY ?? content.y;
               const contentRight = content.x + content.minWidth;
               const contentBottom = content.y + content.minHeight;
-              const rightEdge = Math.max(basePosX + MIN_FOLDER_W, basePosX + (f.userWidth || 0), contentRight);
-              const bottomEdge = Math.max(basePosY + MIN_FOLDER_H, basePosY + (f.userHeight || 0), contentBottom);
+              // Same anchor-based rect as FolderGroupRect (2026-10-01).
+              const rightEdge = Math.max(anchorX + MIN_FOLDER_W, anchorX + (f.userWidth || 0), contentRight);
+              const bottomEdge = Math.max(anchorY + MIN_FOLDER_H, anchorY + (f.userHeight || 0), contentBottom);
               let w = rightEdge - anchorX;
               let h = bottomEdge - anchorY;
               if (f.type === 'party') {

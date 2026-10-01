@@ -15,7 +15,7 @@ describe('settle — cards', () => {
     const d = r.nodeMoves.get('danny')!;
     expect(d).toBeDefined();
     // Pushed along the shortest axis (y: overlap 220 vs x: overlap 460) → down.
-    expect(d.y).toBeGreaterThanOrEqual(2360 + 240 + 24);
+    expect(d.y).toBeGreaterThanOrEqual(2360 + 240 + 16);
     expect(d.x).toBe(60);
   });
 

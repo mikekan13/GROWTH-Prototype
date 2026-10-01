@@ -76,9 +76,13 @@ export interface SettleResult {
   /** Final rects, for callers that want to animate or assert. */
   folderRects: Map<string, Rect>;
   rounds: number;
+  /** Pushes applied per round — a diagnostic; a non-decreasing tail means oscillation. */
+  roundMoves: number[];
 }
 
-const DEFAULTS = { gap: 24, padding: 30, labelAllowance: 0, maxRounds: 10, emptyFolderSize: { width: 560, height: 150 } };
+// gap must sit BELOW the grid gaps the page/JEWL lay things out with (20) or
+// every settle nudges every grid and the pass never converges (10-01).
+const DEFAULTS = { gap: 16, padding: 30, labelAllowance: 0, maxRounds: 10, emptyFolderSize: { width: 560, height: 150 } };
 
 function nodeRect(n: SettleNode): Rect {
   return { x: n.x - n.w / 2, y: n.y - n.topH, width: n.w, height: n.topH + n.bottomH };
@@ -149,8 +153,12 @@ function pushVector(a: Rect, b: Rect, gap: number): { dx: number; dy: number } {
   return { dx: 0, dy: bBelow ? overlapY + gap : -(overlapY + gap) };
 }
 
-/** Resolve overlaps inside one group of rects. `fixed` never moves; among
- *  two movable rects the later one in `order` yields (deterministic). */
+/** Resolve overlaps inside one group of rects. `fixed` never moves. Pushes
+ *  propagate OUTWARD from the fixed rects: a rect pushed by a fixed (or
+ *  already-pinned) rect becomes pinned for the rest of the call, so a rect
+ *  squeezed between the moved thing and a neighbour is never ping-ponged
+ *  (measured 10-01: 32 pushes per round, forever). Between two unpinned
+ *  rects the later one in `ids` yields (deterministic). */
 function resolveGroup(
   ids: string[],
   rectOf: (id: string) => Rect,
@@ -160,20 +168,22 @@ function resolveGroup(
   constrain?: (id: string, r: Rect, dx: number, dy: number) => { dx: number; dy: number },
 ): boolean {
   let movedAny = false;
+  const pinned = new Set(fixed);
   for (let iter = 0; iter < 16; iter++) {
     let moved = false;
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const A = ids[i], B = ids[j];
-        // Decide who yields: the non-fixed one; both movable → later yields.
+        const aPinned = pinned.has(A), bPinned = pinned.has(B);
+        if (aPinned && bPinned) continue; // over-constrained: both already settled this pass
         let anchor = A, mover = B;
-        if (fixed.has(B) && !fixed.has(A)) { anchor = B; mover = A; }
-        else if (fixed.has(A) && fixed.has(B)) continue;
+        if (bPinned && !aPinned) { anchor = B; mover = A; }
         const v = pushVector(rectOf(anchor), rectOf(mover), gap);
         if (v.dx === 0 && v.dy === 0) continue;
         const c = constrain ? constrain(mover, rectOf(mover), v.dx, v.dy) : v;
         if (c.dx === 0 && c.dy === 0) continue;
         apply(mover, c.dx, c.dy);
+        if (aPinned || bPinned) pinned.add(mover); // pushed by something settled → settled
         moved = true; movedAny = true;
       }
     }
@@ -225,6 +235,8 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
 
   let rects = deriveFolderRects(nodes, folders, opts);
   let rounds = 0;
+  const roundMoves: number[] = [];
+  let pushes = 0;
   // Group key: a folder id, or '__root__' for loose cards + root folders.
   // Each group = the parent's DIRECT member cards + its DIRECT child folders
   // (as blocks). Resolving them together is what keeps a card from ending on
@@ -256,6 +268,7 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
         fixed,
         opts.gap,
         (id, dx, dy) => {
+          pushes++;
           if (isFolder(id)) { shiftSubtree(id, dx, dy); rects = deriveFolderRects(nodes, folders, opts); }
           else { const n = nodeById.get(id)!; n.x += dx; n.y += dy; }
         },
@@ -276,6 +289,7 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
       // Member moves change this parent's rect for the next (shallower) group.
       rects = deriveFolderRects(nodes, folders, opts);
     }
+    roundMoves.push(pushes); pushes = 0;
     if (!moved) break;
   }
 
@@ -285,7 +299,7 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
     if (n.x !== o.x || n.y !== o.y) nodeMoves.set(n.id, { x: n.x, y: n.y });
   }
   for (const [id, s] of [...folderShifts]) if (s.dx === 0 && s.dy === 0) folderShifts.delete(id);
-  return { nodeMoves, folderShifts, folderRects: rects, rounds: rounds + 1 };
+  return { nodeMoves, folderShifts, folderRects: rects, rounds: rounds + 1, roundMoves };
 }
 
 export interface PackResult {
