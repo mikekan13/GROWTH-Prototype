@@ -1,6 +1,12 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-07-10
+Last updated: 2026-08-26
+
+> 2026-08-26: stock-catalog structure+balance compliance pass (487 items: structured
+> effects[]/expiry across all traits, scene/minutes purged per r-2026-08-26-01,
+> campaign-trait KV placeholders repriced, 2 legacy betaDraft roots flagged);
+> forge authoring law folded into 00_CANON_CORE.md; round-5 Violet review in
+> progress (rulings r-2026-08-24-01..19 + 08-25/08-26 landed in rulebook/rulings.md).
 
 ## Status (2026-07-10) — BUILD PHASE (GROWTH_BUILD_PLAN.md is the active task list)
 
@@ -644,3 +650,104 @@ Detail owed beyond Phase 1 seeded entities:
 - **KRMA Subscription tuning** — diminishing returns curve, GM lump sum + monthly drip, social/creative contributions as primary source over time. Draft targets only; not canon yet.
 - **Reversible book** — Flow front-to-back lore, Focus back-to-front mechanics, Balance synthesizes in middle. AI-assisted page creation eventually. App comes first.
 - **KRMA → ledger crypto** — long-term: built on a ledger-based cryptocurrency so KRMA maps to actual company shares; players become co-owners. Depends on legality + working product first.
+
+## 2026-09-05 — Reality Simulation Unit 1 (one round through the engine) — SHIPPED
+- Founded the simulation layer under DAYA (design: REALITY-SIM-DESIGN-2026-09-02.md; rulings 09-02→09-05).
+- Built: `src/sim/` round engine (action economy, slot granularity, layered ordering, per-slot resolution with negate/redirect/block), senses field v0, branch planner (local lane + heuristic), Encounter model + service + API, ENCOUNTER tab in the Campaign Terminal. 21 unit tests.
+- Also: Defect 1 (CharacterTab cross-character bleed) fixed 09-02; combat rules status sheet (rulebook/COMBAT-RULES-STATUS-2026-09-04.md).
+- NEXT (Unit 2 candidates, Mike picks): mid-round reactions (one free change, reserve priority loss), grapple hold/re-roll, weapons carry damage/reload, player-side declaration UI, canvas encounter card, Layer-5 contextual call on the local lane, repository rewrites queued in STATE-OF-PLAY-2026-09-05.
+
+## 2026-09-17 — Unit 1 self-verification pass (before Mike's test)
+- Rules audit vs canon + repository; 18 findings fixed (Effort spend/cap/Muted, both damage paths, item wear, unspent-action redirect, DR floor on negate, unskilled tier, declare-time rules, secrecy redaction, diegetic sense-limited memory, error resilience, GM-set situational DR, stand-up after Facing Death, dice-overlay safety net). See REALITY-SIM-DESIGN §10.1.
+- Verified live in the Incubator via browser + API; 343+ tests green.
+- Open for Mike: damage-path coupling; unskilled-attack negate rule; tuning knobs.
+
+## 2026-09-20 — Research briefings assessed → QUEUED (Mike: "Do it")
+Two briefings (docs/research/*-2026-09-18.md: agent individuation; provenance
+ledger) assessed against the reality-sim rulings. Founding structure
+unchanged. Queued, in order:
+1. ✅ BUILT 09-20 — **Consent bit on the trace corpus** + Mike's ruling: consent REQUIRED for META; DISCONNECTED mode = features without training (Campaign.networkMode, gates at every entry). OPEN: DISCONNECTED→META switch UX. — the JEWL tool-loop traces
+   (ai/network/traces.ts) are the planned fine-tune corpus and contain
+   player-authored content with no AI-training consent recorded. Add the
+   flag (campaign + member level), gate the trace writer on it, BEFORE any
+   adapter is trained.
+2. ✅ BUILT 09-20 (schema + service + 4 write sites) — **Provenance manifest at write-time** for new creative acts (Forge items,
+   generated text, portraits): creator, creatorKind (human|ai|composite),
+   model/entity/adapter, ingredients[], memoryRefs[], rights bits (remix /
+   external AI training / commercial). Schema first — cannot be retrofitted.
+   Ownership stays outside the manifest (KRMA/possessions).
+3. ✅ BUILT 09-20 — **Probe baselines** for Violet + the 3 NPCs: canonical identity-question
+   set, embedded responses stored as IDENTITY_HASH; monthly re-probe measures
+   drift-from-self (bounded) and divergence-between-entities (growing).
+4. ✅ BUILT 09-20 — **Dream trigger → accumulated salience threshold** (event-driven, Smallville
+   150-importance pattern) replacing the 6 h interval; manual sweep stays as
+   fallback. Fits Mike's rejection of ticks/clocks.
+5. **Per-entity believed world** in the next sim unit with positions: Attend
+   must read the entity's own perception ledger (Smallville stale subgraph),
+   not the global WorldFact list (current omniscience leak, ensemble.ts).
+6. **Embedding relevance in recall** (local lane) alongside keyword Jaccard —
+   retrieval misses are the documented #1 failure mode.
+Not adopted: AI-GM framings (parked 09-02); soul.py file layout as files —
+it maps onto existing tables (SALIENCE=DayaAffect, RELATIONS=DayaRelationship,
+PROCEDURES=JEWL rulings library); only IDENTITY_HASH is new (item 3).
+
+## 2026-09-20 — CANON LEDGER (the infallible base reality) — SHIPPED (walking version)
+Mike: character memory is fallible by design; a recorded, infallible truth must sit beneath it; the Watcher reads all of it. Built: CanonEvent (append-only, GM-read-only), written by the sim per round act; DayaMemoryEntry.truthRef; memory-vs-truth view. NEXT: table-speak dialogue and GM declarations/improvisations as canon events; location on events once positions land; canvas recording surface.
+
+## 2026-09-23 — MEMORY DESIGN founded (MEMORY-DESIGN-2026-09-23.md)
+North star: PERFECT RECOLLECTION at the Terminal. Rulings from the 09-20→23 walkthrough recorded; 7-step build order proposed (schema-first: memory chain + domain tags, then ladder recall, canon writers, vines as custodian memory, Godheads as beings, Terminal recall, recollection harness). Awaiting Mike's pick of the first unit.
+
+## 2026-09-23 — MEMORY step 1 SHIPPED: chain + domain tags at write-time
+Every memory now carries pillar/domain/domains + chain (truthRefs, entities, items, place, goals, antecedent); canon events carry items/goals/domains/location. Ten-domain registry is DATA awaiting Mike's seating/names/keywords. Retrieval unchanged (step 2 = ladder recall).
+
+## 2026-09-26 — MEMORY steps 2–7 SHIPPED (walking versions)
+Ladder recall (survival > goals > domain > chain > words) + per-entity believed world in Attend; canon writers (table dialogue, Watcher declarations); vines as custodian memory (custodian + resistance sides); Godheads as beings (godlike recall; custodian tree; seating = Mike); Terminal recall (askTerminal + JEWL tool ask_terminal; every sentence cited or "the record holds nothing"); recollection harness (recall@k over sampled canon). NEXT: embeddings for the words step; domain seating/names/keywords from Mike; location on canon once positions land; canvas recording surface; canon-checking of declarations against prior ledger.
+
+## 2026-09-26 — CAMPAIGN READINESS (Mike GMs, Violet played by the AI)
+Assessed NOT ready (no way for narration to reach Violet; seed memories untagged; nobody had goals; NPCs had no sheets; lane cold at session start). Built: **Narrate channel** (TABLE tab picker default = Narrate; `POST /table {narrate:true,message}` → canon declaration → 'perception' through every ACTIVE being → precise truthRef on the stimulus row); **memory tag backfill** (+ `--rechain-goals`); **goals** proposed by the C tier for Violet (4) and the three NPCs (3 each; contents never printed — spoiler firewall); **NPC sheets** via the Human seed through `assignMechanics`; **L1 pre-warm** fired from `startSession`. Live 09-26: narrate 200 → canon row + Violet perceived (rest) + Terminal cited it; session start 201 with pre-warm fired. NEXT: Mike runs a real session (start session → Narrate → speak as NPCs → ask the Terminal); Effort/Mute check on NPCs in a round; seat the domains; the two "failed recall" rows per stimulus are noisy (Ruling 5) — tune or dedupe.
+
+## 2026-09-26 (later) — PROSE TABLE + THE MURKY MIRROR ON THE WORLD
+Mike: "fix the failed recall rows" → one Ruling-5 self-ingest per reached-for memory per 6 h (parentMemoryId = the memory that wouldn't come; `RECALL_TUNING.failedRecallDedupeMs`). Mike: "shouldn't need a tab switcher… pick up from normal prose" → picker gone; `services/table-prose.ts` parses narration + quoted speech with attribution from the prose (NPC name / introducing noun phrase / "someone present"); narration → declaration canon, quotes → dialogue canon (unattributed kept with label + context). Mike: "the GM narrative is additive… everything goes through the murky Mirror… the entire point of the perception engine" → `daya/perceive.ts`: the stimulus is composed with the being's canvas Location, the entities present, items and place-scoped WorldFacts, sense-filtered, rendered through `render()` subject 'scene' (new envelope: headline always, salience floors per fidelity, seeded murk, mood/bias tilt) — hooked at step 0 of the being loop for every perception/dialogue stimulus; declareCanon witnesses too. Live with Mike's inn example: canon + attribution correct, Violet acted, Terminal cited both events, memory row = perceived scene with mirror audit. OPEN: which attribute governs scene attunement (flat 0.8 now); the lane is cold on every idle gap (~5 min first response) — consider keeping a worker warm during a session.
+
+## 2026-09-26 (night) — KEEP-WARM + FLUID CANON: JEWL reconciles narration with the sim
+Mike: keep the lane live while a session is hot → `daya/l1-keepalive` (60 s probes from startSession to endSession; TABLE roster re-arms). RULING walked through the tavern case (memory: ruling-fluid-canon-jewl-reconciliation-2026-09-26): JEWL catches narration first → "mistake or somewhere new?" → improvising → search planned, else spin up via the meta (stubs below the line) → DoorDash hold (over-estimate, settle same-or-under at cementing) → beings perceive the sketch at once → canon fluid till the GM builds on it; self-contradiction flags; corrections re-render involved memories; canon-rewrite LIMITS undecided (Mike finds them in play; floor: never erase a character). BUILT: `services/reconciliation*.ts`, `Reconciliation`/`CanonRevision` models, `/reconcile` + `/canon/correct` routes, JEWL card in the table bar, HOLD wallet + IMPROV_* reasons, cement/settle on load or session end, correction re-render with observer snapshots. Also fixed: the being loop returned the spoken-words row as the perception row (canon attached to the wrong memory). Live-verified end to end. OPEN: IMPROV_TUNING placeholders (stub prices, ×1.5, cementLoad 3); OOC table talk → corrections/time advance (ruled, not built); voice input.
+
+## 2026-09-26 (later) — BRIDGE: a confirmed continuity jump renders its interval
+Mike: "if a continuity jump is established the simulation must render everything that would lead up to it" / "the NPCs would all simulate so the simulation writes it." Built `services/bridge.ts`: on confirm (with a real move), the sim forecasts the interval (≤6 steps, bounded), writes a `continuity` parent + `bridge` children as sim-authored canon across the interval, advances the clock by the elapsed time, and each traveller remembers the trip through its mirror. Summary fidelity (render distance); deterministic fallback when the model is down. Live: 18 min / 6 steps / 16 s. NEXT: full-fidelity expansion of a bridged stretch when the Watcher narrates into it; OOC table talk → corrections/time; BRIDGE_TUNING placeholders.
+
+## 2026-09-26 (pre-session) — JEWL places what he spins up on the canvas
+Mike: no OOC command (the filter will handle it once built); "JEWL to position objects on the canvas so a human can see and interpret details correctly." Built `services/canvas-placement.ts`: non-overlapping placement beside the scene for stub locations, inside-the-folder for stub NPCs and moved beings; narrated moves snap the card (`snapCanvas`). Left the inn run on the Incubator canvas for Mike to inspect. READY FOR THE FIRST CAMPAIGN TEST (cautions: 30–40 s per response with a warm lane; everything typed is in character until the OOC filter exists; corrections are API-only; combat via the ENCOUNTER tab).
+
+## 2026-09-26 — Incubator canvas organized by JEWL
+Inn example cleared. `scripts/jewl-arrange-canvas.ts`: JEWL laid out the Incubator (block as the frame; Carrasco Arms, shelter, Napoli Slice, library inside it; the apartment inside Carrasco Arms; Main Room, kitchen, bathroom as sibling rooms; people in Main Room). He flagged for Mike: the duplicate apartment Location row (orphan set aside, not deleted) and all four characters located in Main Room.
+
+## 2026-09-26 — Why JEWL's layout was invisible, and the fix
+Three canvas laws found by looking headless (raw CDP against the installed Chromium): drafting locations are clamped below the line; a populated folder's rect comes from its members, not its anchor; localStorage positions/folders always won over the server. Built `services/canvas-layout.ts` (deterministic geometry from JEWL's tree + order, below the line, items gridded, characters inside rooms) and placement stamps (`canvasPlacedAt`/`placedAt` → `placedAt` on nodes/folders; client `movedAt` on drags; server wins when newer). Verified with deliberately stale storage. Mike reloads to see it.
+
+## 2026-09-28 — Canvas layout epoch: a server re-lay resets every browser's remembered canvas
+Mike's browser still showed its own layout (collapse states / focus / camera survive the placement precedence). `Campaign.canvasLayoutEpoch` (migration) bumped by `jewl-arrange-canvas`; `applyLayoutEpochGate` in CampaignCanvas clears all `canvas-<cid>-*` storage and reloads once when the server epoch is newer. Incubator epoch set to 1 — Mike's next load resets.
+
+## 2026-09-28 — Semantic zoom + depth encoding on the canvas
+Mike: "still hard for a human to interpret… Semantic zoom and encode depth lets see it." Built `canvas-lod.ts`: near/mid/far from zoom (full cards → chips → dots), folder labels scale with zoom and cap to width, chrome hides when far; nesting depth from located_at drives header/body tint + ▸ prefixes; parents reserve label headroom above child folders. Verified headless at all three levels (block → building → apartment → rooms readable at a glance). NEXT (from the design list): items as a shelf with pinning; people chips in the room header; scene-focus as the default view; empty places as name tiles; thresholds/palette are placeholders for Mike's eye.
+
+## 2026-09-28 — Name tiles + who-is-here chips (canvas legibility, cont.)
+Mike: "Continue with your suggestions… this may set us up for the image generation pipeline so we can get icons." Empty places render as compact folders, same header as every place (Mike: no different look for empties); the header portrait box (`locationInfo.imageUrl`) is the icon-pipeline hook; every location header carries chips for the people in it. Mike: PLANNING tags below the line are redundant → removed; the line is the status. Verified headless. NEXT: items as a shelf with pinning (near zoom); scene-focus default view; item icon slot once items carry an image field; generated icons for places/items via the image pipeline.
+
+## 2026-10-01 — TABLE RHYTHM rulings + U1: the lane runs with CUDA graphs
+Mike: "it has to be faster than people at playing or none of this works." Diagnosed the 09-26 turn from the metering table: ~50 s, ~42 s of it the self-hosted lane at ~18 tok/s (eager mode, 128k ctx). Design session → `TABLE-RHYTHM-DESIGN-2026-10-01.md` (rulings): the table's four beats are the loop's clock (listen/reflect during narration, one short streamed answer at the ask); EVERY entity runs the loop and ownership = editor seat only (GM can see in; `PLAYER_CHARACTER`-as-control and ACTIVE/DORMANT-as-control are gone, status = liveness by scene); planning board of intent chips commits on the GM's next move; the mirror is a canvas overlay; the player's canvas is the character's memory drawn spatially and FOG FOLLOWS MEMORY. **U1 DONE:** template `jh3qgfbp9o` → ENFORCE_EAGER=false, MAX_MODEL_LEN=32768, GPU_MEM_UTIL=0.85; `scripts/bench-l1-lane.mjs` measured warm on H100 SXM: 450-token monologue 6.2 s (75 tok/s), 22-token spoken line 1.1 s, TTFT 0.4–1.0 s. Cold start unchanged ~340 s (weights off the network volume; bake into the image later). NEXT: U2 chunk-driven listening + ask detector + streamed answer → U3 ownership/liveness/board → U4 mirror + fog + see-in.
+
+## 2026-10-01 — Session-start loading screen (covers the cold start)
+Mike: "Getting the cold start time down is great but we should also just have a loading screen for when a GM starts a session that can run during the cold start." Built: `SessionWarmupOverlay` in the Campaign Terminal (raised once per active session for the GM when the core is not answering; closes on ready or `Prepare meanwhile`), `GET /api/campaigns/[id]/lane` → `daya/l1-endpoint.ts` `laneReadiness()` (chat probe rate-limited + RunPod health/worker GPU/uptime) with phases host → weights → awake and a progress bar against the observed ~340 s cold start. Terminal voice (black, amber Bebas + glitch, Consolas gold). Verified headless in two live smoke sessions with the endpoint pinned to zero workers (no spend); smoke sessions removed. NEXT: bake the weights into the worker image so the screen is a minute, not five; then U2.
+
+## 2026-10-01 — Canvas: FREE PLACEMENT + SETTLE-ONCE (the physics rewrite) + nesting data repaired
+Mike: "UI is a mess… try to move or resize something… behavior is erratic… we need ways to prevent overlapping." Drove the canvas headless over raw CDP and MEASURED: a corner resize drifted a folder 8415→7918 across ten frames and relocated every ancestor on release; no card-vs-card collision at all; item grid 260×150 vs 300×160 cards (every card clipped). Mike ruled **free placement** ("that is the point of the canvas") → `canvas-settle.ts`: while held only the held thing moves; on release settle ONCE from committed geometry (cards + child-folder blocks per parent push apart, folders grow to contain, drafting never crosses the line); resize = own rect live, one repack + settle on release. Per-frame reflow/push/cascade REMOVED. Also found + fixed DATA corruption: located_at edges had Main Room under the Kitchen, Bathroom under Main Room, Napoli Slice under the Bathroom (a six-deep chain → 8000-unit folders), and Violet filed under the building — restored (rooms as siblings under the apartment, Napoli under the block, Violet in the Main Room). Verified headless: drop pushes clear, persists; resize no oscillation, no ancestor relocation. ENTER on locations: Mike — repurpose as the encounter/combat map (direction, not built). NOT done: folder chrome limited to the focal scene (proposed); drag-to-reparent on drop is still a hazard when boxes nest.
+
+## 2026-10-01 (cont.) — Sub-folders never larger than parents + the re-parent bug that corrupted the nesting
+Mike: "Sub folders shouldn't be able to be larger than their parent folders." Built: child resize clamped to the parent's interior; `packFolder` cascades (a child wider than the parent's interior is capped and repacked, depth ≤ 4), caps written as user sizes. While verifying, the dev-server log showed `POST …/locations/[id]/parent` firing at the end of my own headless resize gestures — the ONLY client writer of a location's parent is the folder-drop re-parent, which decided containment from the header point, and nested boxes stacked at one corner already contain each other's header point. So a click or a resize that ended as a drop filed rooms into their siblings: Main Room → Kitchen, Bathroom → Main Room (confirmed twice today, timestamps match). Fixed: re-parent only when the drag moved ≥ 8 units AND changed containment; `onFolderResizeStart` marks the gesture before any drag can begin; both drag-start sites guarded. Nesting restored again (rooms under the apartment, Violet in the Main Room). Drive after the fix: zero parent writes, drop pushes clear, resize repacks in place. 13 settle tests, 416 total.
+
+## 2026-10-01 (cont.) — Room drag never re-files; canvas re-laid (epoch 5)
+Mike (looking at his browser): "the canvas is a mess… sub folders overlapping parent folders. Characters not staying in the folders they are supposed to." His tab was still on the pre-fix bundle and re-filed Kitchen → building and Main Room → Kitchen again at 21:06–21:08, plus Violet → building. Decision: dragging a ROOM never re-parents it (`FOLDER_DRAG_REPARENT = false`); re-parenting a location is explicit (JEWL arrange / location editor). Tree restored a third time; `scripts/jewl-arrange-canvas.ts` applied (0 containment changes, 48 placements, canvas layout epoch → 5) so every browser drops its remembered positions/sizes once on next load. His locally remembered folder userWidth/userHeight from the chain era were the "sub folders larger than parents".
+
+## 2026-10-01 (cont.) — Right-edge resize jumped the height: one anchor for every folder rect
+Mike (after reload): "tried to resize Carrasco Arms using the right grabber. The folder height instantly expanded past its sub folder." Cause: `FolderGroupRect` drew the box from `min(posX/posY, content)` but measured userWidth/userHeight from posX/posY, while `getDisplayBounds`/`folderRectById`/the settle engine measure from the drawn anchor — with JEWL's anchor below the content, the first resize frame stored a userHeight = box height + anchor gap. Fixed: FolderGroupRect (and the drop hit-test copy) measure user sizes from the drawn anchor; a resize starts from the drawn rect. Settle gap 24 → 16 (below the 20-unit layout grid gap, which had kept every settle nudging every grid and hitting the round cap). Verified headless: pure horizontal drag, every height constant per frame, only the dragged width changes; release pushes the sibling and grows the parents. Epoch → 6 so browsers drop the inflated stored heights.
+Follow-up (same evening): the settle was hitting its round cap (perRound 79/32/32/32…) — a card squeezed between the moved thing and a neighbour ping-ponged. `resolveGroup` now pins whatever a fixed/pinned rect pushes, so pushes propagate outward and terminate (perRound 1/0 after). JEWL's `canvas-layout.ts` item grid was 260×150 for 300×160 cards (same overlap-by-construction as page.tsx) → 320×180; re-laid, epoch → 7. Verified: horizontal resize keeps every height constant per frame; release pushes the kitchen 276 right and grows the apartment/building; 2 rounds, 8 moves.

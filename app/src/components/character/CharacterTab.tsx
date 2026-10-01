@@ -263,7 +263,26 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     if (hydratedIdRef.current === charId) return; // already hydrated for this character
     hydratedIdRef.current = charId;
 
-    setBodyAnatomy(null); // reset — repopulated below when this character has a spawned body
+    // Full reset BEFORE applying the new character's data. The setters below are
+    // conditional (`if (parsed.X) setX(...)`), so any field the new character
+    // lacks would otherwise keep the PREVIOUS character's value on screen — and
+    // a save while bled would write that copy into the open character for real.
+    setPhysicalDescription({});
+    setBodyAnatomy(null);
+    setReferencePhotos([]);
+    setGeneratedBust(null);
+    setGeneratedFullBody(null);
+    setStyleColors({ primary: '#582a72', secondary: '#D0A030', tertiary: '#22ab94' });
+    setStyleAesthetics([]);
+    setBackstoryText('');
+    setSelectedSeedName('');
+    setCharacterName('');
+    setDesiredAge(25);
+    setBackstorySubmitted(false);
+    setDirty(false);
+    setLastSaved(null);
+    setGenesisMsg('');
+    setDescribeError(null);
 
     if (effectiveCharacter?.data) {
       try {

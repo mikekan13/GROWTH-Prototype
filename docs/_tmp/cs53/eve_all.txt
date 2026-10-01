@@ -1,0 +1,1100 @@
+### SHEET: Main
+B2	Name
+C2	Eve Calius
+E2	Sex
+F2	Female
+G2	Weight
+H2	120.0
+I2	KV
+B3	Race
+C3	Neo-Human
+E3	Home
+F3	Kether
+G3	Height
+H3	5'3"
+M3	Undamaged
+Q3	Elemental Resistances
+X3	Hard
+AA3	Destroyed
+AR3	Hard
+AU3	Destroyed
+BL3	Hard
+BO3	Destroyed
+B4	Value
+G4	Hair
+H4	Black
+B5	Value
+G5	Eyes
+H5	Lilac/Teal
+I5	Karma
+M5	14
+AA5	0.0
+AU5	0.0
+BO5	0.0
+B6	Value
+G6	Birth Month
+H6	9th
+I6	10.0
+B7	Age
+C7	18.0
+D7	Life Span
+E7	Immortal
+G7	Beauty
+H7	10.0
+K8	Undamaged
+M8	Undamaged
+Q8	Undamaged
+S8	H
+U8	D0
+X8	Hard
+AA8	Destroyed
+AH8	H
+AJ8	D0
+AM8	H
+AO8	D0
+AR8	Hard
+AU8	Destroyed
+BB8	H
+BD8	D0
+BG8	H
+BI8	D0
+BL8	Hard
+BO8	Destroyed
+BV8	H
+BX8	D0
+B9	Attributes
+E9	Save Mod
+F9	Save DR
+G9	Focus Mod
+H9	Resist Mod
+I9	Regen Mod
+K9	8
+Q9	8
+V9	0.0
+AK9	0.0
+AP9	0.0
+BE9	0.0
+BJ9	0.0
+BY9	0.0
+B10	STR
+C10	7.0
+D10	2
+F10	2
+G10	40.0
+H10	6.0
+I10	7.0
+M10	8
+AA10	0.0
+AU10	0.0
+BO10	0.0
+B11	DEX
+C11	7.0
+D11	2
+F11	2
+G11	Focus
+K11	Undamaged
+Q11	Undamaged
+S11	H
+U11	D0
+AH11	H
+AJ11	D0
+AM11	H
+AO11	D0
+BB11	H
+BD11	D0
+BG11	H
+BI11	D0
+BV11	H
+BX11	D0
+B12	CON
+C12	7.0
+D12	2
+F12	2
+G12	60
+I12	Distressed
+K12	8
+Q12	8
+V12	0.0
+AK12	0.0
+AP12	0.0
+BE12	0.0
+BJ12	0.0
+BY12	0.0
+B13	INT
+C13	7.0
+D13	2
+F13	2
+G13	60.0
+I13	Wounded
+M13	Undamaged
+O13	Undamaged
+X13	H
+Z13	D0
+AC13	H
+AE13	D0
+AR13	H
+AT13	D0
+AW13	H
+AY13	D0
+BL13	H
+BN13	D0
+BQ13	H
+BS13	D0
+B14	WIS
+C14	7.0
+D14	2
+F14	2
+I14	Unconscious
+B15	CHA
+C15	7.0
+D15	2
+F15	2
+G15	0.0
+I15	Dead
+M15	14
+O15	14
+AA15	0.0
+AF15	0.0
+AU15	0.0
+AZ15	0.0
+BO15	0.0
+BT15	0.0
+G16	Strain
+B17	Reflexes
+C17	None
+D17	Focus Regen
+E17	10
+F17	Combat Notes
+B18	APT Mod
+C18	1.0
+D18	APT
+E18	4
+M18	Undamaged
+O18	Undamaged
+X18	H
+Z18	D0
+AC18	H
+AE18	D0
+AR18	H
+AT18	D0
+AW18	H
+AY18	D0
+BL18	H
+BN18	D0
+BQ18	H
+BS18	D0
+B19	Speed Mod
+C19	0.0
+D19	Speed
+E19	40ft (8)
+M19	8
+O19	8
+AA19	0.0
+AF19	0.0
+AU19	0.0
+AZ19	0.0
+BO19	0.0
+BT19	0.0
+B20	Unarmed Mod
+C20	0.0
+D20	Unarmed DMG
+E20	7/0/0 : 0/0/0
+K21	Weapons & Tools
+N21	Condition
+S21	Resists
+Y21	B
+Z21	P
+AA21	S
+AC21	F
+AD21	E
+AE21	A
+B22	Tech Level
+K22	Left Hand
+N22	Undamaged
+Q22	Hard
+V22	0.0
+B23	5 - Transcendent
+K23	Right Hand
+N23	Undamaged
+Q23	Hard
+V23	0.0
+A24	Skills
+B26	Skills
+C26	Skill Level
+D26	Governing Attributes
+H26	Expertise
+I26	Mods
+K26	Skill Check
+M26	Total Mods
+O26	Failed
+B27	Athletics
+B28	Balance
+C28	2.0
+D28	DEX
+CON
+E28	2
+F28	2
+H28	None
+K28	+3 Coin
+M28	0
+O28	NO
+B29	Swim
+C29	2.0
+D29	STR
+CON
+E29	2
+F29	2
+H29	None
+K29	+3 Coin
+M29	0
+O29	NO
+B30	Jump
+C30	2.0
+D30	STR
+DEX
+E30	2
+F30	2
+H30	None
+K30	+3 Coin
+M30	0
+O30	NO
+B31	Sneak
+C31	0.0
+D31	DEX
+WIS
+E31	2
+F31	2
+H31	None
+K31	No Skill
+M31	0
+O31	NO
+B32	Sleight of Hand
+C32	3.0
+D32	DEX
+WIS
+E32	2
+F32	2
+H32	None
+K32	+3 Coin
+M32	0
+O32	NO
+B33	Climb
+C33	2.0
+D33	STR DEX
+CON
+E33	2
+F33	2
+G33	2
+H33	None
+K33	+3 Coin
+M33	0
+O33	NO
+B34	Acrobatics
+C34	0.0
+D34	STR  DEX
+WIS
+E34	2
+F34	2
+G34	2
+H34	None
+K34	No Skill
+M34	0
+O34	NO
+B35	Social Skills
+B36	Seduction
+C36	1.0
+D36	CHA
+WIS
+E36	2
+F36	2
+H36	None
+K36	+3 Coin
+M36	3
+O36	NO
+B37	Intimidation
+C37	2.0
+D37	STR
+CHA
+E37	2
+F37	2
+H37	None
+K37	+3 Coin
+M37	-3
+O37	NO
+B38	Negotiation
+C38	1.0
+D38	CHA
+INT
+E38	2
+F38	2
+H38	None
+K38	+3 Coin
+M38	3
+O38	NO
+B39	Deception
+C39	1.0
+D39	CHA
+INT
+E39	2
+F39	2
+H39	None
+K39	+3 Coin
+M39	0
+O39	NO
+B40	Martial Arts
+B41	Knives
+C41	0.0
+D41	DEX
+WIS
+E41	2
+F41	2
+H41	None
+K41	No Skill
+M41	0
+O41	NO
+B42	Polearms
+C42	0.0
+D42	STR
+DEX
+E42	2
+F42	2
+H42	None
+K42	No Skill
+M42	0
+O42	NO
+B43	Swordsmanship
+C43	0.0
+D43	STR
+DEX
+E43	2
+F43	2
+H43	None
+K43	No Skill
+M43	0
+O43	NO
+B44	Firearms
+C44	5.0
+D44	DEX
+WIS
+E44	2
+F44	2
+H44	None
+K44	+3d4
+M44	0
+O44	NO
+B45	Exotic Weapons
+C45	0.0
+D45	DEX INT
+WIS
+E45	2
+F45	2
+G45	2
+H45	None
+K45	No Skill
+M45	0
+O45	NO
+B46	Great Weapons
+C46	0.0
+D46	STR DEX
+CON
+E46	2
+F46	2
+G46	2
+H46	None
+K46	No Skill
+M46	0
+O46	NO
+B47	Throwing
+C47	0.0
+D47	STR DEX
+WIS
+E47	2
+F47	2
+G47	2
+H47	None
+K47	No Skill
+M47	0
+O47	NO
+B48	Archery
+C48	0.0
+D48	STR  DEX
+WIS
+E48	2
+F48	2
+G48	2
+H48	None
+K48	No Skill
+M48	0
+O48	NO
+B49	Unarmed Combat
+C49	0.0
+D49	STR  DEX
+CON
+E49	2
+F49	2
+G49	2
+H49	None
+K49	No Skill
+M49	0
+O49	NO
+B50	Performing Arts
+B51	Sing
+C51	0.0
+D51	CHA
+WIS
+E51	2
+F51	2
+H51	None
+K51	No Skill
+M51	3
+O51	NO
+B52	Music
+C52	0.0
+D52	CHA
+INT
+E52	2
+F52	2
+H52	None
+K52	No Skill
+M52	3
+O52	NO
+B53	Drama
+C53	0.0
+D53	DEX CHA
+WIS
+E53	2
+F53	2
+G53	2
+H53	None
+K53	No Skill
+M53	3
+O53	NO
+B54	Dance
+C54	0.0
+D54	STR  DEX
+CHA
+E54	2
+F54	2
+G54	2
+H54	None
+K54	No Skill
+M54	3
+O54	NO
+B55	Visual Arts
+B56	Sculpt
+C56	0.0
+D56	DEX CHA
+WIS
+E56	2
+F56	2
+G56	2
+H56	None
+K56	No Skill
+M56	0
+O56	NO
+B57	Paint
+C57	0.0
+D57	DEX CHA
+WIS
+E57	2
+F57	2
+G57	2
+H57	None
+K57	No Skill
+M57	0
+O57	NO
+B58	Draw
+C58	0.0
+D58	DEX CHA
+WIS
+E58	2
+F58	2
+G58	2
+H58	None
+K58	No Skill
+M58	0
+O58	NO
+B59	Literature
+C59	0.0
+D59	INT CHA
+WIS
+E59	2
+F59	2
+G59	2
+H59	None
+K59	No Skill
+M59	0
+O59	NO
+B60	Photography/ Videography
+C60	0.0
+D60	DEX  CHA
+INT
+E60	2
+F60	2
+G60	2
+H60	None
+K60	No Skill
+M60	0
+O60	NO
+B61	Social Sciences
+B62	History
+C62	0.0
+D62	INT
+WIS
+E62	2
+F62	2
+H62	None
+K62	No Skill
+M62	0
+O62	NO
+B63	Linguistics
+C63	0.0
+D63	CHA
+INT
+E63	2
+F63	2
+H63	None
+K63	No Skill
+M63	0
+O63	NO
+B64	Economics
+C64	0.0
+D64	INT
+WIS
+E64	2
+F64	2
+H64	None
+K64	No Skill
+M64	0
+O64	NO
+B65	Geography
+C65	0.0
+D65	INT
+WIS
+E65	2
+F65	2
+H65	None
+K65	No Skill
+M65	0
+O65	NO
+B66	Education
+C66	0.0
+D66	CHA INT
+WIS
+E66	2
+F66	2
+G66	2
+H66	None
+K66	No Skill
+M66	0
+O66	NO
+B67	Psychology
+C67	0.0
+D67	CHA INT
+WIS
+E67	2
+F67	2
+G67	2
+H67	None
+K67	No Skill
+M67	0
+O67	NO
+B68	Politics
+C68	2.0
+D68	CHA INT
+WIS
+E68	2
+F68	2
+G68	2
+H68	None
+K68	+3 Coin
+M68	3
+O68	NO
+B69	Law
+C69	1.0
+D69	CHA
+INT  WIS
+E69	2
+F69	2
+G69	2
+H69	None
+K69	+3 Coin
+M69	0
+O69	NO
+B70	Natural Sciences
+B71	Biology
+C71	0.0
+D71	INT
+WIS
+E71	2
+F71	2
+H71	None
+K71	No Skill
+M71	0
+O71	NO
+B72	Geoscience
+C72	0.0
+D72	INT
+WIS
+E72	2
+F72	2
+H72	None
+K72	No Skill
+M72	0
+O72	NO
+B73	Chemistry
+C73	0.0
+D73	INT
+WIS
+E73	2
+F73	2
+H73	None
+K73	No Skill
+M73	0
+O73	NO
+B74	Physics
+C74	0.0
+D74	INT
+WIS
+E74	2
+F74	2
+H74	None
+K74	No Skill
+M74	0
+O74	NO
+B75	Astronomy
+C75	0.0
+D75	INT
+WIS
+E75	2
+F75	2
+H75	None
+K75	No Skill
+M75	0
+O75	NO
+B76	Applied Sciences
+B77	Civil Engineering
+C77	0.0
+D77	INT
+WIS
+E77	2
+F77	2
+H77	None
+K77	No Skill
+M77	0
+O77	NO
+B78	Animal Husbandry
+C78	0.0
+D78	INT
+WIS
+E78	2
+F78	2
+H78	None
+K78	No Skill
+M78	0
+O78	NO
+B79	Agriculture
+C79	0.0
+D79	INT
+WIS
+E79	2
+F79	2
+H79	None
+K79	No Skill
+M79	0
+O79	NO
+B80	Electrical Engineering
+C80	0.0
+D80	INT
+WIS
+E80	2
+F80	2
+H80	None
+K80	No Skill
+M80	0
+O80	NO
+B81	Software Engineering
+C81	0.0
+D81	INT
+WIS
+E81	2
+F81	2
+H81	None
+K81	No Skill
+M81	0
+O81	NO
+B82	Mechanical Engineering
+C82	0.0
+D82	DEX INT
+WIS
+E82	2
+F82	2
+G82	2
+H82	None
+K82	No Skill
+M82	0
+O82	NO
+B83	Chemical Engineering
+C83	0.0
+D83	CON INT
+WIS
+E83	2
+F83	2
+G83	2
+H83	None
+K83	No Skill
+M83	0
+O83	NO
+B84	Medicine
+C84	0.0
+D84	DEX
+INT  WIS
+E84	2
+F84	2
+G84	2
+H84	None
+K84	No Skill
+M84	0
+O84	NO
+B85	Use Vehicle
+B86	Sail
+C86	0.0
+D86	DEX
+WIS
+E86	2
+F86	2
+H86	None
+K86	No Skill
+M86	0
+O86	NO
+B87	Drive
+C87	0.0
+D87	DEX
+WIS
+E87	2
+F87	2
+H87	None
+K87	No Skill
+M87	0
+O87	NO
+B88	Pilot
+C88	2.0
+D88	DEX INT
+WIS
+E88	2
+F88	2
+G88	2
+H88	None
+K88	+3 Coin
+M88	0
+O88	NO
+B89	Handle Animal
+C89	0.0
+D89	DEX CON
+CHA
+E89	2
+F89	2
+G89	2
+H89	None
+K89	No Skill
+M89	0
+O89	NO
+B90	Perception Skills
+B91	Social Perception
+C91	1.0
+D91	CHA
+WIS
+E91	2
+F91	2
+H91	None
+K91	+3 Coin
+M91	0
+O91	NO
+B92	Environmental Perception
+C92	2.0
+D92	INT
+WIS
+E92	2
+F92	2
+H92	None
+K92	+3 Coin
+M92	0
+O92	NO
+B93	Paranormal Perception
+C93	0.0
+D93	CHA INT
+WIS
+E93	2
+F93	2
+G93	2
+H93	None
+K93	No Skill
+M93	0
+O93	NO
+B94	Life Skills
+B95	Cooking
+C95	1.0
+D95	CHA
+WIS
+E95	2
+F95	2
+H95	None
+K95	+3 Coin
+M95	0
+O95	NO
+B96	Textiles
+C96	0.0
+D96	DEX
+INT
+E96	2
+F96	2
+H96	None
+K96	No Skill
+M96	0
+O96	NO
+B97	Leadership
+C97	2.0
+D97	CHA INT
+WIS
+E97	2
+F97	2
+G97	2
+H97	None
+K97	+3 Coin
+M97	0
+O97	NO
+B98	Survival
+C98	3.0
+D98	DEX CON
+WIS
+E98	2
+F98	2
+G98	2
+H98	None
+K98	+3 Coin
+M98	0
+O98	NO
+B99	Theory Knowledge
+B100	Philosophy
+C100	0.0
+D100	CHA INT
+WIS
+E100	2
+F100	2
+G100	2
+H100	None
+K100	No Skill
+M100	0
+O100	NO
+B101	Arcane Knowledge
+C101	0.0
+D101	CHA INT
+WIS
+E101	2
+F101	2
+G101	2
+H101	None
+K101	No Skill
+M101	0
+O101	NO
+B102	Theology
+C102	0.0
+D102	CHA INT
+WIS
+E102	2
+F102	2
+G102	2
+H102	None
+K102	No Skill
+M102	0
+O102	NO
+B104	Attunement
+C104	None
+E104	Catalyst
+I104	Counter DR
+K104	Cast Check
+O104	Can Train
+B105	Domains of Magic
+B106	Alteration
+C106	0.0
+D106	+
+E106	None
+I106	No Skill
+K106	No Skill
+O106	NO
+B107	Fortune
+C107	0.0
+D107	+
+E107	None
+I107	No Skill
+K107	No Skill
+O107	NO
+Q107	Available Mana
+B108	Enchantment
+C108	0.0
+D108	+
+E108	None
+I108	No Skill
+K108	No Skill
+O108	NO
+Q108	Container
+R108	Mana
+B109	Divination
+C109	0.0
+D109	N
+E109	None
+I109	No Skill
+K109	No Skill
+O109	NO
+Q109	Body
+B110	Dissolution
+C110	0.0
+D110	N
+E110	None
+I110	No Skill
+K110	No Skill
+O110	NO
+B111	Restoration
+C111	0.0
+D111	N
+E111	None
+I111	No Skill
+K111	No Skill
+O111	NO
+B112	Illusion
+C112	0.0
+D112	N
+E112	None
+I112	No Skill
+K112	No Skill
+O112	NO
+B113	Abjuration
+C113	0.0
+D113	-
+E113	None
+I113	No Skill
+K113	No Skill
+O113	NO
+B114	Force
+C114	0.0
+D114	-
+E114	None
+I114	No Skill
+K114	No Skill
+O114	NO
+B115	Conjuration
+C115	0.0
+D115	-
+E115	None
+I115	No Skill
+K115	No Skill
+O115	NO
+### SHEET: Inventory
+C2	Inventory
+O2	Exploits
+B5	Sort
+C5	Name
+D5	Class
+E5	Range
+F5	B/P/S : F/E/A
+G5	Resists
+H5	Grade
+I5	Description & Mods
+J5	Value
+K5	Quantity/ Uses
+L5	Weight
+M5	In Bag
+B6	1.0
+C6	Wealth
+J6	1.0
+K6	25000.0
+B7	2.0
+B8	3.0
+B9	4.0
+B10	5.0
+B11	6.0
+B12	7.0
+B13	8.0
+B14	9.0
+B15	10.0
+B16	11.0
+B17	12.0
+B18	13.0
+B19	14.0
+B20	15.0
+B21	16.0
+B22	17.0
+B23	18.0
+B24	19.0
+B25	20.0
+B26	21.0
+B27	22.0
+B28	23.0
+B29	24.0
+B30	25.0
+B31	26.0
+B32	27.0
+B33	28.0
+B34	29.0
+B35	30.0
+B36	31.0
+B37	32.0
+B38	33.0
+B39	34.0
+K40	Total Weight
+L40	0
+K41	Total Value
+L41	25000
+K42	Bag Weight
+L42	0
+C43	Woven Spells
+B44	Sort
+C44	Name
+D44	Domains
+E44	DR
+F44	Casting Speed
+G44	Targets
+H44	Range
+I44	Description
+J44	Spell Strength
+K44	Duration
+L44	C/D
+B45	1.0
+B46	2.0
+B47	3.0
+B48	4.0
+B49	5.0
+B50	6.0
+B51	7.0
+B52	8.0
+B53	9.0
+B54	10.0
+B55	11.0
+B56	12.0
+B57	13.0
+B58	14.0
+B59	15.0
+B60	16.0
+B61	17.0
+B62	18.0
+B63	19.0
+B64	20.0
+B65	21.0
+B66	22.0
+B67	23.0
+B68	24.0
+B69	25.0
+B70	26.0
+B71	27.0
+B72	28.0
+B73	29.0
+C74	Passive Tasks
+C75	Type
+D75	Time
+E75	Notes
+C79	Roots, Branches, Blossoms, and Life Events
+C80	Branches
+G80	Life Events
+J80	Blossoms
+B81	Root
+F87	Notes

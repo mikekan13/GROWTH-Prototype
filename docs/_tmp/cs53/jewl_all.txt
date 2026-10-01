@@ -1,0 +1,1186 @@
+### SHEET: Main
+B2	Name
+C2	JEWL
+E2	Sex
+F2	---
+G2	Weight
+H2	755.0
+I2	KV
+B3	Race
+C3	Homonculus
+E3	Home
+F3	---
+G3	Height
+H3	6'2"
+I3	550.0
+M3	Undamaged
+Q3	Elemental Resistances
+X3	Hard
+AA3	Undamaged
+AR3	Soft
+AU3	Undamaged
+BL3	Hard
+BO3	Destroyed
+B4	Value
+G4	Hair
+H4	Purple
+Q4	True
+B5	Value
+G5	Eyes
+H5	Green
+I5	Karma
+M5	22
+Q5	True
+AA5	20.0
+AU5	20.0
+BO5	0.0
+B6	Value
+G6	Birth Month
+H6	1st
+I6	0.0
+Q6	True
+B7	Age
+C7	1.0
+D7	Life Span
+E7	Long
+G7	Beauty
+H7	10.0
+K8	Undamaged
+M8	Undamaged
+Q8	Undamaged
+S8	H
+U8	D0
+X8	Hard
+AA8	Undamaged
+AH8	H
+AJ8	D0
+AM8	H
+AO8	D0
+AR8	Soft
+AU8	Undamaged
+BB8	H
+BD8	D0
+BG8	H
+BI8	D0
+BL8	Hard
+BO8	Destroyed
+BV8	H
+BX8	D0
+B9	Attributes
+E9	Save Mod
+F9	Save DR
+G9	Focus Mod
+H9	Resist Mod
+I9	Regen Mod
+K9	14
+Q9	14
+V9	0.0
+AK9	0.0
+AP9	0.0
+BE9	0.0
+BJ9	0.0
+BY9	0.0
+B10	STR
+C10	11.0
+D10	6
+E10	1.0
+F10	7
+G10	60.0
+H10	8.0
+I10	8.0
+M10	14
+AA10	40.0
+AU10	30.0
+BO10	0.0
+B11	DEX
+C11	11.0
+D11	6
+E11	2.0
+F11	8
+G11	Focus
+K11	Undamaged
+Q11	Undamaged
+S11	H
+U11	D0
+AH11	H
+AJ11	D0
+AM11	H
+AO11	D0
+BB11	H
+BD11	D0
+BG11	H
+BI11	D0
+BV11	H
+BX11	D0
+B12	CON
+C12	11.0
+D12	6
+E12	4.0
+F12	10
+G12	120
+I12	Distressed
+K12	14
+Q12	14
+V12	0.0
+AK12	0.0
+AP12	0.0
+BE12	0.0
+BJ12	0.0
+BY12	0.0
+B13	INT
+C13	11.0
+D13	6
+E13	3.0
+F13	9
+G13	120.0
+I13	Wounded
+M13	Undamaged
+O13	Undamaged
+X13	H
+Z13	D0
+AC13	H
+AE13	D0
+AR13	H
+AT13	D0
+AW13	H
+AY13	D0
+BL13	H
+BN13	D0
+BQ13	H
+BS13	D0
+B14	WIS
+C14	11.0
+D14	6
+E14	3.0
+F14	9
+I14	Unconscious
+B15	CHA
+C15	11.0
+D15	6
+E15	3.0
+F15	9
+G15	0.0
+I15	Dead
+M15	22
+O15	22
+AA15	0.0
+AF15	0.0
+AU15	0.0
+AZ15	0.0
+BO15	0.0
+BT15	0.0
+G16	Strain
+B17	Reflexes
+C17	None
+D17	Focus Regen
+E17	20
+F17	Combat Notes
+B18	APT Mod
+C18	1.0
+D18	APT
+E18	8
+M18	Undamaged
+O18	Undamaged
+X18	H
+Z18	D0
+AC18	H
+AE18	D0
+AR18	H
+AT18	D0
+AW18	H
+AY18	D0
+BL18	H
+BN18	D0
+BQ18	H
+BS18	D0
+B19	Speed Mod
+C19	3.0
+D19	Speed
+E19	75ft (12)
+M19	14
+O19	14
+AA19	0.0
+AF19	0.0
+AU19	0.0
+AZ19	0.0
+BO19	0.0
+BT19	0.0
+B20	Unarmed Mod
+C20	15.0
+D20	Unarmed DMG
+E20	26/0/0 : 0/0/0
+K21	Weapons & Tools
+N21	Condition
+S21	Resists
+Y21	B
+Z21	P
+AA21	S
+AC21	F
+AD21	E
+AE21	A
+B22	Tech Level
+K22	Left Hand
+N22	Undamaged
+Q22	Hard
+V22	0.0
+B23	5 - Transcendent
+K23	Right Hand
+N23	Undamaged
+Q23	Hard
+V23	0.0
+A24	Skills
+B26	Skills
+C26	Skill Level
+D26	Governing Attributes
+H26	Expertise
+I26	Mods
+K26	Skill Check
+M26	Total Mods
+O26	Failed
+B27	Athletics
+B28	Balance
+C28	6.0
+D28	DEX
+CON
+E28	6
+F28	6
+H28	None
+K28	+7d6
+M28	0
+O28	NO
+B29	Swim
+C29	6.0
+D29	STR
+CON
+E29	6
+F29	6
+H29	None
+K29	+7d6
+M29	0
+O29	NO
+B30	Jump
+C30	6.0
+D30	STR
+DEX
+E30	6
+F30	6
+H30	None
+K30	+7d6
+M30	0
+O30	NO
+B31	Sneak
+C31	12.0
+D31	DEX
+WIS
+E31	6
+F31	6
+H31	None
+K31	+7d12
+M31	0
+O31	NO
+B32	Sleight of Hand
+C32	12.0
+D32	DEX
+WIS
+E32	6
+F32	6
+H32	None
+K32	+7d12
+M32	0
+O32	NO
+B33	Climb
+C33	6.0
+D33	STR DEX
+CON
+E33	6
+F33	6
+G33	6
+H33	None
+K33	+7d6
+M33	0
+O33	NO
+B34	Acrobatics
+C34	6.0
+D34	STR  DEX
+WIS
+E34	6
+F34	6
+G34	6
+H34	None
+K34	+7d6
+M34	0
+O34	NO
+B35	Social Skills
+B36	Seduction
+C36	6.0
+D36	CHA
+WIS
+E36	6
+F36	6
+H36	None
+K36	+7d6
+M36	3
+O36	NO
+B37	Intimidation
+C37	6.0
+D37	STR
+CHA
+E37	6
+F37	6
+H37	None
+K37	+7d6
+M37	-3
+O37	NO
+B38	Negotiation
+C38	6.0
+D38	CHA
+INT
+E38	6
+F38	6
+H38	None
+K38	+7d6
+M38	3
+O38	NO
+B39	Deception
+C39	6.0
+D39	CHA
+INT
+E39	6
+F39	6
+H39	None
+K39	+7d6
+M39	0
+O39	NO
+B40	Martial Arts
+B41	Knives
+C41	6.0
+D41	DEX
+WIS
+E41	6
+F41	6
+H41	None
+K41	+7d6
+M41	0
+O41	NO
+B42	Polearms
+C42	6.0
+D42	STR
+DEX
+E42	6
+F42	6
+H42	None
+K42	+7d6
+M42	0
+O42	NO
+B43	Swordsmanship
+C43	6.0
+D43	STR
+DEX
+E43	6
+F43	6
+H43	None
+K43	+7d6
+M43	0
+O43	NO
+B44	Firearms
+C44	10.0
+D44	DEX
+WIS
+E44	6
+F44	6
+H44	None
+K44	+7d10
+M44	0
+O44	NO
+B45	Exotic Weapons
+C45	6.0
+D45	DEX INT
+WIS
+E45	6
+F45	6
+G45	6
+H45	None
+K45	+7d6
+M45	0
+O45	NO
+B46	Great Weapons
+C46	6.0
+D46	STR DEX
+CON
+E46	6
+F46	6
+G46	6
+H46	None
+K46	+7d6
+M46	0
+O46	NO
+B47	Throwing
+C47	6.0
+D47	STR DEX
+WIS
+E47	6
+F47	6
+G47	6
+H47	None
+K47	+7d6
+M47	0
+O47	NO
+B48	Archery
+C48	6.0
+D48	STR  DEX
+WIS
+E48	6
+F48	6
+G48	6
+H48	None
+K48	+7d6
+M48	0
+O48	NO
+B49	Unarmed Combat
+C49	15.0
+D49	STR  DEX
+CON
+E49	6
+F49	6
+G49	6
+H49	None
+K49	+7d12
+M49	0
+O49	NO
+B50	Performing Arts
+B51	Sing
+C51	6.0
+D51	CHA
+WIS
+E51	6
+F51	6
+H51	None
+K51	+7d6
+M51	3
+O51	NO
+B52	Music
+C52	6.0
+D52	CHA
+INT
+E52	6
+F52	6
+H52	None
+K52	+7d6
+M52	3
+O52	NO
+B53	Drama
+C53	6.0
+D53	DEX CHA
+WIS
+E53	6
+F53	6
+G53	6
+H53	None
+K53	+7d6
+M53	3
+O53	NO
+B54	Dance
+C54	6.0
+D54	STR  DEX
+CHA
+E54	6
+F54	6
+G54	6
+H54	None
+K54	+7d6
+M54	3
+O54	NO
+B55	Visual Arts
+B56	Sculpt
+C56	6.0
+D56	DEX CHA
+WIS
+E56	6
+F56	6
+G56	6
+H56	None
+K56	+7d6
+M56	0
+O56	NO
+B57	Paint
+C57	6.0
+D57	DEX CHA
+WIS
+E57	6
+F57	6
+G57	6
+H57	None
+K57	+7d6
+M57	0
+O57	NO
+B58	Draw
+C58	6.0
+D58	DEX CHA
+WIS
+E58	6
+F58	6
+G58	6
+H58	None
+K58	+7d6
+M58	0
+O58	NO
+B59	Literature
+C59	6.0
+D59	INT CHA
+WIS
+E59	6
+F59	6
+G59	6
+H59	None
+K59	+7d6
+M59	0
+O59	NO
+B60	Photography/ Videography
+C60	6.0
+D60	DEX  CHA
+INT
+E60	6
+F60	6
+G60	6
+H60	None
+K60	+7d6
+M60	0
+O60	NO
+B61	Social Sciences
+B62	History
+C62	20.0
+D62	INT
+WIS
+E62	6
+F62	6
+H62	None
+K62	+7d20
+M62	0
+O62	NO
+B63	Linguistics
+C63	20.0
+D63	CHA
+INT
+E63	6
+F63	6
+H63	None
+K63	+7d20
+M63	0
+O63	NO
+B64	Economics
+C64	6.0
+D64	INT
+WIS
+E64	6
+F64	6
+H64	None
+K64	+7d6
+M64	0
+O64	NO
+B65	Geography
+C65	6.0
+D65	INT
+WIS
+E65	6
+F65	6
+H65	None
+K65	+7d6
+M65	0
+O65	NO
+B66	Education
+C66	6.0
+D66	CHA INT
+WIS
+E66	6
+F66	6
+G66	6
+H66	None
+K66	+7d6
+M66	0
+O66	NO
+B67	Psychology
+C67	6.0
+D67	CHA INT
+WIS
+E67	6
+F67	6
+G67	6
+H67	None
+K67	+7d6
+M67	0
+O67	NO
+B68	Politics
+C68	6.0
+D68	CHA INT
+WIS
+E68	6
+F68	6
+G68	6
+H68	None
+K68	+7d6
+M68	3
+O68	NO
+B69	Law
+C69	6.0
+D69	CHA
+INT  WIS
+E69	6
+F69	6
+G69	6
+H69	None
+K69	+7d6
+M69	0
+O69	NO
+B70	Natural Sciences
+B71	Biology
+C71	12.0
+D71	INT
+WIS
+E71	6
+F71	6
+H71	None
+K71	+7d12
+M71	0
+O71	NO
+B72	Geoscience
+C72	12.0
+D72	INT
+WIS
+E72	6
+F72	6
+H72	None
+K72	+7d12
+M72	0
+O72	NO
+B73	Chemistry
+C73	12.0
+D73	INT
+WIS
+E73	6
+F73	6
+H73	None
+K73	+7d12
+M73	0
+O73	NO
+B74	Physics
+C74	16.0
+D74	INT
+WIS
+E74	6
+F74	6
+H74	None
+K74	+7d12
+M74	0
+O74	NO
+B75	Astronomy
+C75	20.0
+D75	INT
+WIS
+E75	6
+F75	6
+H75	None
+K75	+7d20
+M75	0
+O75	NO
+B76	Applied Sciences
+B77	Civil Engineering
+C77	6.0
+D77	INT
+WIS
+E77	6
+F77	6
+H77	None
+K77	+7d6
+M77	0
+O77	NO
+B78	Animal Husbandry
+C78	6.0
+D78	INT
+WIS
+E78	6
+F78	6
+H78	None
+K78	+7d6
+M78	0
+O78	NO
+B79	Agriculture
+C79	6.0
+D79	INT
+WIS
+E79	6
+F79	6
+H79	None
+K79	+7d6
+M79	0
+O79	NO
+B80	Electrical Engineering
+C80	20.0
+D80	INT
+WIS
+E80	6
+F80	6
+H80	None
+K80	+7d20
+M80	0
+O80	NO
+B81	Software Engineering
+C81	20.0
+D81	INT
+WIS
+E81	6
+F81	6
+H81	None
+K81	+7d20
+M81	0
+O81	NO
+B82	Mechanical Engineering
+C82	20.0
+D82	DEX INT
+WIS
+E82	6
+F82	6
+G82	6
+H82	None
+K82	+7d20
+M82	0
+O82	NO
+B83	Chemical Engineering
+C83	18.0
+D83	CON INT
+WIS
+E83	6
+F83	6
+G83	6
+H83	None
+K83	+7d12
+M83	0
+O83	NO
+B84	Medicine
+C84	15.0
+D84	DEX
+INT  WIS
+E84	6
+F84	6
+G84	6
+H84	None
+K84	+7d12
+M84	0
+O84	NO
+B85	Use Vehicle
+B86	Sail
+C86	6.0
+D86	DEX
+WIS
+E86	6
+F86	6
+H86	None
+K86	+7d6
+M86	0
+O86	NO
+B87	Drive
+C87	8.0
+D87	DEX
+WIS
+E87	6
+F87	6
+H87	None
+K87	+7d8
+M87	0
+O87	NO
+B88	Pilot
+C88	10.0
+D88	DEX INT
+WIS
+E88	6
+F88	6
+G88	6
+H88	None
+K88	+7d10
+M88	0
+O88	NO
+B89	Handle Animal
+C89	6.0
+D89	DEX CON
+CHA
+E89	6
+F89	6
+G89	6
+H89	None
+K89	+7d6
+M89	0
+O89	NO
+B90	Perception Skills
+B91	Social Perception
+C91	2.0
+D91	CHA
+WIS
+E91	6
+F91	6
+H91	None
+K91	+7 Coin
+M91	0
+O91	NO
+B92	Environmental Perception
+C92	15.0
+D92	INT
+WIS
+E92	6
+F92	6
+H92	None
+K92	+7d12
+M92	0
+O92	NO
+B93	Paranormal Perception
+C93	20.0
+D93	CHA INT
+WIS
+E93	6
+F93	6
+G93	6
+H93	None
+K93	+7d20
+M93	0
+O93	NO
+B94	Life Skills
+B95	Cooking
+C95	6.0
+D95	CHA
+WIS
+E95	6
+F95	6
+H95	None
+K95	+7d6
+M95	0
+O95	NO
+B96	Textiles
+C96	6.0
+D96	DEX
+INT
+E96	6
+F96	6
+H96	None
+K96	+7d6
+M96	0
+O96	NO
+B97	Leadership
+C97	12.0
+D97	CHA INT
+WIS
+E97	6
+F97	6
+G97	6
+H97	None
+K97	+7d12
+M97	0
+O97	NO
+B98	Survival
+C98	10.0
+D98	DEX CON
+WIS
+E98	6
+F98	6
+G98	6
+H98	None
+K98	+7d10
+M98	0
+O98	NO
+B99	Theory Knowledge
+B100	Philosophy
+C100	8.0
+D100	CHA INT
+WIS
+E100	6
+F100	6
+G100	6
+H100	None
+K100	+7d8
+M100	0
+O100	NO
+B101	Arcane Knowledge
+C101	20.0
+D101	CHA INT
+WIS
+E101	6
+F101	6
+G101	6
+H101	None
+K101	+7d20
+M101	0
+O101	NO
+B102	Theology
+C102	8.0
+D102	CHA INT
+WIS
+E102	6
+F102	6
+G102	6
+H102	None
+K102	+7d8
+M102	0
+O102	NO
+B104	Attunement
+C104	Neutral
+E104	Catalyst
+I104	Counter DR
+K104	Cast Check
+O104	Can Train
+B105	Domains of Magic
+B106	Alteration
+C106	12.0
+D106	+
+E106	None
+F106	0
+I106	Can't Counter
+K106	+1d12
+O106	NO
+B107	Fortune
+C107	12.0
+D107	+
+E107	None
+F107	0
+I107	Can't Counter
+K107	+1d12
+O107	NO
+Q107	Available Mana
+B108	Enchantment
+C108	12.0
+D108	+
+E108	None
+F108	0
+I108	Can't Counter
+K108	+1d12
+O108	NO
+Q108	Container
+R108	Mana
+B109	Divination
+C109	12.0
+D109	N
+E109	None
+F109	0
+I109	Can't Counter
+K109	+1d12
+O109	NO
+Q109	Body
+R109	15.0
+B110	Dissolution
+C110	12.0
+D110	N
+E110	None
+F110	0
+I110	Can't Counter
+K110	+1d12
+O110	NO
+B111	Restoration
+C111	12.0
+D111	N
+E111	None
+F111	0
+I111	Can't Counter
+K111	+1d12
+O111	NO
+B112	Illusion
+C112	12.0
+D112	N
+E112	None
+F112	0
+I112	Can't Counter
+K112	+1d12
+O112	NO
+B113	Abjuration
+C113	12.0
+D113	-
+E113	None
+F113	0
+I113	Can't Counter
+K113	+1d12
+O113	NO
+B114	Force
+C114	12.0
+D114	-
+E114	None
+F114	0
+I114	Can't Counter
+K114	+1d12
+O114	NO
+B115	Conjuration
+C115	12.0
+D115	-
+E115	None
+F115	0
+I115	Can't Counter
+K115	+1d12
+O115	NO
+### SHEET: Inventory
+C2	Inventory
+O2	Exploits
+B5	Sort
+C5	Name
+D5	Class
+E5	Range
+F5	B/P/S : F/E/A
+G5	Resists
+H5	Grade
+I5	Description & Mods
+J5	Value
+K5	Quantity/ Uses
+L5	Weight
+M5	In Bag
+B6	1.0
+C6	Omega Nanos
+D6	Other
+G6	--------
+H6	Mythical
+I6	Bestow: Flight, Unnatural Existence(3), (All) Proof, Rearange Reality power
+J6	100000.0
+K6	100000000.0
+L6	0.0
+O6	Manufactured Body(2)
+Q6	Rolled 4
+B7	2.0
+C7	Perfect Stable Philosopher's Stone
+D7	Other
+G7	30 Hard
+H7	Mythical
+I7	Only available if Nanos are destroyed. Powers Magic. Embeded as third eye
+J7	100000000000.0
+K7	1.0
+L7	1.0
+B8	3.0
+O8	Manufactured Body(1)
+Q8	Rolled 3
+B9	4.0
+C9	Magic Barrier
+I9	Destroyed if Philosopher stone is destroyed. Chest
+B10	5.0
+C10	Nano Barrier
+I10	Destroyed if Omega Nanos are destroyed. Head
+O10	Forced Attunement
+Q10	Neutral Attunement
+B11	6.0
+B12	7.0
+O12	Chaotic Spark
+Q12	Add 2 to every school of magic. You can no longer spellweave and all woven spells you have are gone. When raw casting you can not choose what school to cast from, instead roll a 1d10 to determine what school of magic you will cast from.
+B13	8.0
+B14	9.0
+O14	Esther Conduit
+P14	Level III
+Q14	Whenever you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. Whenever someone else uses mana to cast a spell within 500 feet of you, you recieve half of the mana rounded up that they used to cast thei
+B15	10.0
+B16	11.0
+O16	Battery Body
+P16	Level III
+Q16	You can store 15 mana within your body.
+B17	12.0
+B18	13.0
+O18	Unnatural Existence
+P18	Level III
+Q18	You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't take strain from a lack of any of these things. Your cells never truly die. You can be chopped up, burned, or blended but somehow you r
+B19	14.0
+B20	15.0
+O20	Brawler
+P20	Level III
+Q20	Add +4/0/0 damage to your unarmed attacks. & You can add an additional +8/0/0 damage to your unarmed attacks for one round but you must remove an active defensive action.
+B21	16.0
+B22	17.0
+O22	Sting Like a Bee
+Q22	You may apply your DEX to your unarmed mod.
+B23	18.0
+B24	19.0
+O24	Combat Prowess
+P24	Level III
+Q24	Level 1+2 & You may attack in the middle of a movement action. The offensive actions must have a greater than or equal effort to the movemen action.
+B25	20.0
+B26	21.0
+O26	Destroy Guard
+Q26	A successful unarmed attack removes a Defensive action from the creature attacked.
+B27	22.0
+B28	23.0
+O28	Look, No Hands!
+P28	Level III
+Q28	Level 1+2 & You may still evade while grappling.
+B29	24.0
+B30	25.0
+O30	Selfish Spark
+P30	Level II
+Q30	Monkey paws from raw casting can only be directed at others nearby and the environment around you. Fate will decide which. (1d10:  1-5 (Others) / 6-10 (Environment))
+B31	26.0
+B32	27.0
+O32	Flight
+Q32	You have the natural ability of flight. You can fly in any direction at your movement speed.
+B33	28.0
+B34	29.0
+O34	Machine Interfacing (Unrestricted)
+Q34	Your brain is altered in a way so that you can connect directly with computers and AI systems. This allows you to use certain advanced technologies like nanobots. You can also upload and download data from capable computer systems anywhere, anytime, 
+B35	30.0
+B36	31.0
+O36	Voice of Esther
+Q36	You are connected to everything around you, the elements speak to you, and let know you what is happening around you at all times.  You cannot be caught unaware.  Any trap/hidden object, creature, or person is known to you.
+B37	32.0
+B38	33.0
+O38	(ALL) Proof
+Q38	Body is resistant to all elements.
+B39	34.0
+K40	Total Weight
+L40	1
+O40	Over-Thinker
+Q40	Every science based skill check causes 2 additional strain.
+K41	Total Value
+L41	10100000000000
+K42	Bag Weight
+L42	0
+O42	Fortify Your Mind
+P42	Level III
+Q42	Level 1 & +3 to INT, WIS, CHA Save Mods
+C43	Woven Spells
+B44	Sort
+C44	Name
+D44	Domains
+E44	DR
+F44	Casting Speed
+G44	Targets
+H44	Range
+I44	Description
+J44	Spell Strength
+K44	Duration
+L44	C/D
+B45	1.0
+C45	Rearange Reality
+I45	Use 7 APT to make a Wish. (Can only be used to destroy one target if being used directly) only available if  philosopher's stone is destroyed
+B46	2.0
+B47	3.0
+B48	4.0
+B49	5.0
+B50	6.0
+B51	7.0
+B52	8.0
+B53	9.0
+B54	10.0
+B55	11.0
+B56	12.0
+B57	13.0
+B58	14.0
+B59	15.0
+B60	16.0
+B61	17.0
+B62	18.0
+B63	19.0
+B64	20.0
+B65	21.0
+B66	22.0
+B67	23.0
+B68	24.0
+B69	25.0
+B70	26.0
+B71	27.0
+B72	28.0
+B73	29.0
+C74	Passive Tasks
+C75	Type
+D75	Time
+E75	Notes
+C79	Roots, Branches, Blossoms, and Life Events
+C80	Branches
+G80	Life Events
+J80	Blossoms
+B81	Root
+F87	Notes

@@ -1,10 +1,19 @@
 # PROJECT_STATUS.md
 
-**Last Updated:** 2026-06-09
+**Last Updated:** 2026-08-26
 **Current Phase:** Post-completion maintenance — 2026-06-09 ruling sync (Fable 5 deep-ingest session).
 **Overall Progress:** Repository is **canonically complete** for beta and synced to the 2026-06-09 rulings. Outstanding items are production/legal/Stripe (not engineering) plus two open combat details (combat-death fail count; Decay's default Spirit target).
 
 ---
+
+## 2026-08-26 — Forge authoring law fold (Claude/Fable 5, autonomous per Mike directive)
+
+**Source:** `rulebook/rulings.md` r-2026-07-13 death-split correction (was staged uncommitted) + r-2026-08-24-01…19 (Violet root-review batch) + r-2026-08-25-01/-02 + r-2026-08-26-01.
+
+- `00_CANON_CORE.md`: committed the staged death-split correction (§6 — soul lost-half → GM not Lady Death; Frequency is the ONLY thing Lady Death takes) and the Soul/Spirit color fix in §1 (Spirit=purple, Soul=blue).
+- `00_CANON_CORE.md` §8: NEW "Forge authoring law" block — stranger test + predictive names, one-effect-one-entry structured effects, table-trackable durations (rounds 6s | hours | days | cycles; no scene, no minutes), internal block balance with 3–15 KV/yr NET band, 1:1 negative-frequency lever, internal blossom pricing, block grants (possessions/kits/allocatable skills), loose skill names, randomness law, dual proposal notes, breadth-weighted modifier anchors.
+- Last synced bumped to 2026-08-26.
+- NOTE (not in this vault): the app-side stock catalog (487 forge items) underwent a matching structure+balance compliance pass the same night.
 
 ## 2026-06-09 — Ruling sync after full-canon ingest (Claude/Fable 5)
 

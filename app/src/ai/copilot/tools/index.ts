@@ -21,7 +21,10 @@ import './focus-view';
 import './place-item';
 import './establish-world-facts';
 import './edit-character-sheet';
+import './draw-from-kit';
 import './forge-blueprint';
+import './forge-list-drafts';
+import './forge-read';
 import './forge-withdraw';
 import './catalog';
 import './work-session';
@@ -43,6 +46,7 @@ import './daya-pov-view';
 import './daya-recall-probe';
 import './daya-author-entity';
 import './daya-seed-memory';
+import './ask-terminal';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';

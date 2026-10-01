@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
+import { locationDepths } from '@/components/canvas/canvas-lod';
 import { recomputeAugments } from '@/lib/character-actions';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
@@ -105,6 +106,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       name: char.name,
       x: storedX ?? (200 + index * 300),
       y: storedY ?? (-200 - index * 80),
+      ...(typeof charData?.canvasPlacedAt === 'number' ? { placedAt: charData.canvasPlacedAt as number } : {}),
       status: char.status,
       portrait: char.portrait,
       characterData: charData,
@@ -138,6 +140,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       name: loc.name,
       x: storedX ?? fallbackX,
       y: storedY ?? fallbackY,
+      ...(typeof (locData as { canvasPlacedAt?: unknown } | null)?.canvasPlacedAt === 'number' ? { placedAt: (locData as { canvasPlacedAt: number }).canvasPlacedAt } : {}),
       status: loc.status,
       locationType: loc.type,
       locationData: locData,
@@ -165,8 +168,11 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       const base = locPosById.get(item.locationId)!;
       const idx = perRoomItemIndex.get(item.locationId) ?? 0;
       perRoomItemIndex.set(item.locationId, idx + 1);
-      fallbackItemX = base.x - 250 + (idx % 3) * 260;
-      fallbackItemY = base.y + 160 + Math.floor(idx / 3) * 150;
+      // Item cards are 300×160 (FolderGroup CARD_SIZES) — the grid must be
+      // wider than the card or every card is clipped by its neighbour
+      // (measured 2026-10-01 at 260×150).
+      fallbackItemX = base.x - 250 + (idx % 3) * 320;
+      fallbackItemY = base.y + 160 + Math.floor(idx / 3) * 180;
     }
 
     return {
@@ -175,6 +181,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       name: item.name,
       x: storedX ?? fallbackItemX,
       y: storedY ?? fallbackItemY,
+      ...(typeof itemData?.placedAt === 'number' ? { placedAt: itemData.placedAt as number } : {}),
       status: item.status,
       itemType: item.type,
       itemData: itemData,
@@ -265,6 +272,10 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   // Build one folder per Location — even those with no children. Empty
   // folders still render with their header (name, KRMA, portrait, child
   // counts at 0). New Locations land as empty folders, not as cards.
+  // Depth of every place from the root (canvas-lod: header/body palette + ▸ prefix).
+  const parentOfEntity = new Map<string, string>();
+  for (const [parent, kids] of childrenByParent) for (const k of kids) parentOfEntity.set(k, parent);
+  const locDepths = locationDepths(parentOfEntity);
   const autoFolders = campaign.locations.map(l => {
     const parentId = l.id;
     const nodeIdsForParent = childrenByParent.get(parentId) ?? [];
@@ -283,6 +294,9 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     // folders land where the GM clicked instead of at the origin).
     const locX = typeof loc?.data?.canvasX === 'number' ? loc.data.canvasX as number : undefined;
     const locY = typeof loc?.data?.canvasY === 'number' ? loc.data.canvasY as number : undefined;
+    // When a placement (JEWL / the sim) last wrote this anchor — the client
+    // lets it beat a browser-stored drag that is older (2026-09-26).
+    const placedAt = typeof loc?.data?.canvasPlacedAt === 'number' ? loc.data.canvasPlacedAt as number : undefined;
     return {
       id: `auto-${parentId}`,
       name: nodeNameById.get(parentId) ?? loc?.name ?? 'Container',
@@ -290,9 +304,11 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       nodeIds: nodeIdsForParent,
       posX: locX,
       posY: locY,
+      ...(placedAt != null ? { placedAt } : {}),
       locationInfo: loc
         ? {
             locationId: parentId,
+            depth: locDepths.get(parentId) ?? 0,
             locationType: loc.type,
             krmaReserve: typeof loc.data.krmaReserve === 'number' ? loc.data.krmaReserve : undefined,
             description: typeof loc.data.description === 'string' ? loc.data.description : undefined,
@@ -321,6 +337,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     name: campaign.name,
     inviteCode: campaign.inviteCode,
     genre: campaign.genre,
+    canvasLayoutEpoch: campaign.canvasLayoutEpoch,
   };
 
   // Find the current user's character for terminal auto-detection

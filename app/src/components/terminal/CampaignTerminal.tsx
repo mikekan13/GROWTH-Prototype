@@ -13,6 +13,9 @@ import { diceEvents } from '@/lib/dice-events';
 import type { RollResult } from '@/types/dice';
 import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
+import TableSpeakBar from './TableSpeakBar';
+import EncounterPanel from './EncounterPanel';
+import SessionWarmupOverlay from './SessionWarmupOverlay';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +87,7 @@ export default function CampaignTerminal({
   connectedUsers,
   campaignCharacters,
 }: CampaignTerminalProps) {
-  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot'>('terminal');
+  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'table' | 'encounter'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<TerminalFilter>('all');
@@ -92,8 +95,45 @@ export default function CampaignTerminal({
   const [sessions, setSessions] = useState<GameSessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<GameSessionInfo | null>(null);
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
+  // Session-start loading screen (Mike 2026-10-01): shown once per active
+  // session, for the GM, while the self-hosted core cold-starts.
+  const [warmup, setWarmup] = useState<{ startedAt: string; number: number } | null>(null);
+  const warmupSeenRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<CommandInputHandle>(null);
+
+  // TABLE mode = GM roleplay through NPCs; only exists while a session is
+  // live (Mike 2026-09-02: "another tab there that is only available when
+  // the canvas is in session mode").
+  const isGM = _userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN';
+  const tableAvailable = isGM && !!activeSession;
+
+  // If the session ends (or role loads late) while sitting on TABLE, fall back.
+  useEffect(() => {
+    if ((terminalMode === 'table' || terminalMode === 'encounter') && !tableAvailable) setTerminalMode('terminal');
+  }, [terminalMode, tableAvailable]);
+
+  // A session just became active (started here, or already live on a reload):
+  // one lane check; if the core is not answering yet, raise the loading screen.
+  useEffect(() => {
+    if (!activeSession || !isGM) return;
+    if (warmupSeenRef.current === activeSession.id) return;
+    warmupSeenRef.current = activeSession.id;
+    const { id, startedAt, number } = activeSession;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/lane`);
+        if (!res.ok || cancelled) return;
+        const lane = (await res.json()) as { phase: string };
+        if (cancelled || warmupSeenRef.current !== id) return;
+        if (lane.phase !== 'ready' && lane.phase !== 'disabled') setWarmup({ startedAt, number });
+      } catch { /* the speak bar's status strip still covers it */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSession, isGM, campaignId]);
+  useEffect(() => { if (!activeSession) setWarmup(null); }, [activeSession]);
+  const closeWarmup = useCallback(() => setWarmup(null), []);
 
   // ── Fetch merged events ──────────────────────────────────────────────────
 
@@ -773,6 +813,15 @@ export default function CampaignTerminal({
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: '#0a0a1a' }}>
+      {warmup && isGM && (
+        <SessionWarmupOverlay
+          campaignId={campaignId}
+          startedAt={warmup.startedAt}
+          sessionNumber={warmup.number}
+          onReady={closeWarmup}
+          onDismiss={closeWarmup}
+        />
+      )}
       {/* Header */}
       <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
         <div className="flex items-center justify-between mb-2">
@@ -833,8 +882,40 @@ export default function CampaignTerminal({
               >
                 JEWL
               </button>
+              {/* TABLE — GM speaks through NPCs; session-mode only */}
+              {tableAvailable && (
+                <button
+                  onClick={() => setTerminalMode('table')}
+                  className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                    letterSpacing: '0.05em',
+                    color: terminalMode === 'table' ? '#0a0a1a' : '#CBD9E8',
+                    backgroundColor: terminalMode === 'table' ? '#CBD9E8' : 'transparent',
+                    borderLeft: '1px solid rgba(34,171,148,0.4)',
+                  }}
+                >
+                  Table
+                </button>
+              )}
+              {/* ENCOUNTER — one round through the reality simulation; session-mode, GM only */}
+              {tableAvailable && (
+                <button
+                  onClick={() => setTerminalMode('encounter')}
+                  className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+                    letterSpacing: '0.05em',
+                    color: terminalMode === 'encounter' ? '#0a0a1a' : '#f7525f',
+                    backgroundColor: terminalMode === 'encounter' ? '#f7525f' : 'transparent',
+                    borderLeft: '1px solid rgba(34,171,148,0.4)',
+                  }}
+                >
+                  Encounter
+                </button>
+              )}
             </div>
-            {terminalMode === 'terminal' && (
+            {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (
               <button
                 onClick={() => { fetchEvents(); fetchSessions(); }}
                 className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
@@ -889,8 +970,13 @@ export default function CampaignTerminal({
         />
       )}
 
-      {/* Event Feed (terminal mode only) */}
-      {terminalMode === 'terminal' && (<>
+      {/* Encounter — the round engine's GM surface */}
+      {terminalMode === 'encounter' && (
+        <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={fetchEvents} />
+      )}
+
+      {/* Event Feed (terminal + table modes — the table shares the record) */}
+      {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (<>
       {/* Event Feed */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
         {loading && events.length === 0 && (
@@ -974,12 +1060,16 @@ export default function CampaignTerminal({
         })}
       </div>
 
-      {/* Command Input */}
-      <CommandInput
-        ref={commandInputRef}
-        onSubmit={handleCommandSubmit}
-        placeholder={character ? `Type a message or /command as ${character.name}...` : 'Type a message or /command...'}
-      />
+      {/* Input: command line in terminal mode, speak-through-NPC bar at the table */}
+      {terminalMode === 'table' ? (
+        <TableSpeakBar campaignId={campaignId} onEvent={fetchEvents} />
+      ) : (
+        <CommandInput
+          ref={commandInputRef}
+          onSubmit={handleCommandSubmit}
+          placeholder={character ? `Type a message or /command as ${character.name}...` : 'Type a message or /command...'}
+        />
+      )}
       </>)}
     </div>
   );

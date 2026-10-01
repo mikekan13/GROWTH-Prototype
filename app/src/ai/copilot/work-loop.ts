@@ -20,6 +20,7 @@
  * acyclic at init.
  */
 import 'server-only';
+import { getCampaignEconomy } from '@/services/krma/wallet';
 import { getConnectionCount } from '@/lib/campaign-stream';
 import {
   getActiveWorkSessions,
@@ -102,11 +103,21 @@ async function runCycle(session: {
   const jewl = await getJewlGodHead();
   await touchCycle(session.id);
 
+  // Treasury awareness (Mike, 2026-08-25): JEWL should know the campaign's
+  // KRMA pool — it tells him what he's working with. Context only: the
+  // density band and internal block balance stay the sizing law.
+  let treasuryLine = '';
+  try {
+    const eco = await getCampaignEconomy(session.campaignId);
+    treasuryLine = `CAMPAIGN TREASURY: ${eco.fluid} fluid / ${eco.crystallized} crystallized / ${eco.total} total KRMA. Context, not spendable headroom — the density band remains your sizing law.`;
+  } catch { /* treasury is context, never a blocker */ }
+
   const recentNotes = parseProgress(session.progress).slice(-5);
   const text = [
     `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}.`,
     `GOAL: ${session.goal}`,
     session.plan ? `YOUR PLAN: ${session.plan}` : 'YOUR PLAN: (none recorded — set one via update_work_session if useful)',
+    ...(treasuryLine ? [treasuryLine] : []),
     recentNotes.length
       ? `YOUR RECENT PROGRESS NOTES:\n${recentNotes.map(n => `- ${n}`).join('\n')}`
       : 'No progress notes yet — this is the first working cycle.',

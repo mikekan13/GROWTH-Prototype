@@ -1,0 +1,194 @@
+## SHEET: Main
+# dims: A1:BZ117 max_row=117 max_col=78
+R2:  | Name | Eve Calius |  | Sex | Female | Weight | 120.0 | KV
+R3:  | Race | Neo-Human |  | Home | Kether | Height | 5'3" |  |  |  |  | Undamaged |  |  |  | Elemental Resistances |  |  |  |  |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Hard |  |  | Destroyed
+R4:  | Value |  |  |  |  | Hair | Black |  |  |  |  |  |  |  |  | False
+R5:  | Value |  |  |  |  | Eyes | Lilac/Teal | Karma |  |  |  | 14 |  |  |  | False |  |  |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R6:  | Value |  |  |  |  | Birth Month | 9th | 10.0 |  |  |  |  |  |  |  | False
+R7:  | Age | 18.0 | Life Span | Immortal |  | Beauty | 10.0
+R8:  |  |  |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  | Undamaged |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0
+R9:  | Attributes |  |  | Save Mod | Save DR | Focus Mod | Resist Mod | Regen Mod |  | 8 |  |  |  |  |  | 8 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R10:  | STR | 7.0 | 2 |  | 2 | 40.0 | 6.0 | 7.0 |  |  |  | 8 |  |  |  |  |  |   |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R11:  | DEX | 7.0 | 2 |  | 2 | Focus |  |  |  | Undamaged |  |  |  |  |  | Undamaged |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0
+R12:  | CON | 7.0 | 2 |  | 2 | 60 |  | Distressed |  | 8 |  |  |  |  |  | 8 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R13:  | INT | 7.0 | 2 |  | 2 | 60.0 |  | Wounded |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0
+R14:  | WIS | 7.0 | 2 |  | 2 |  |  | Unconscious
+R15:  | CHA | 7.0 | 2 |  | 2 | 0.0 |  | Dead |  |  |  | 14 |  | 14 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0
+R16:  |  |  |  |  |  | Strain
+R17:  | Reflexes | None | Focus Regen | 10 | Combat Notes
+R18:  | APT Mod | 1.0 | APT | 4 |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0
+R19:  | Speed Mod | 0.0 | Speed | 40ft (8) |  |  |  |  |  |  |  | 8 |  | 8 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0
+R20:  | Unarmed Mod | 0.0 | Unarmed DMG | 7/0/0 : 0/0/0
+R21:  |  |  |  |  |  |  |  |  |  | Weapons & Tools |  |  | Condition |  |  |  |  | Resists |  |  |  |  |  | B | P | S |  | F | E | A
+R22:  | Tech Level |  |  |  |  |  |  |  |  | Left Hand |  |  | Undamaged |  |  | Hard |  | False | False | False | 0.0
+R23:  | 5 - Transcendent |  |  |  |  |  |  |  |  | Right Hand |  |  | Undamaged |  |  | Hard |  | False | False | False | 0.0
+R24: Skills
+R26:  | Skills | Skill Level | Governing Attributes |  |  |  | Expertise | Mods |  | Skill Check |  | Total Mods |  | Failed
+R27:  | Athletics
+R28:  | Balance | 2.0 | DEX / CON | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R29:  | Swim | 2.0 | STR / CON | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R30:  | Jump | 2.0 | STR / DEX | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R31:  | Sneak | 0.0 | DEX / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R32:  | Sleight of Hand | 3.0 | DEX / WIS | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R33:  | Climb | 2.0 | STR DEX / CON | 2 | 2 | 2 | None |  |  | +3 Coin |  | 0 |  | NO
+R34:  | Acrobatics | 0.0 | STR  DEX / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R35:  | Social Skills
+R36:  | Seduction | 1.0 | CHA / WIS | 2 | 2 |  | None |  |  | +3 Coin |  | 3 |  | NO
+R37:  | Intimidation | 2.0 | STR / CHA | 2 | 2 |  | None |  |  | +3 Coin |  | -3 |  | NO
+R38:  | Negotiation | 1.0 | CHA / INT | 2 | 2 |  | None |  |  | +3 Coin |  | 3 |  | NO
+R39:  | Deception | 1.0 | CHA / INT | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R40:  | Martial Arts
+R41:  | Knives | 0.0 | DEX / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R42:  | Polearms | 0.0 | STR / DEX | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R43:  | Swordsmanship | 0.0 | STR / DEX | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R44:  | Firearms | 5.0 | DEX / WIS | 2 | 2 |  | None |  |  | +3d4 |  | 0 |  | NO
+R45:  | Exotic Weapons | 0.0 | DEX INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R46:  | Great Weapons | 0.0 | STR DEX / CON | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R47:  | Throwing | 0.0 | STR DEX / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R48:  | Archery | 0.0 | STR  DEX / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R49:  | Unarmed Combat | 0.0 | STR  DEX / CON | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R50:  | Performing Arts
+R51:  | Sing | 0.0 | CHA / WIS | 2 | 2 |  | None |  |  | No Skill |  | 3 |  | NO
+R52:  | Music | 0.0 | CHA / INT | 2 | 2 |  | None |  |  | No Skill |  | 3 |  | NO
+R53:  | Drama | 0.0 | DEX CHA / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 3 |  | NO
+R54:  | Dance | 0.0 | STR  DEX / CHA  | 2 | 2 | 2 | None |  |  | No Skill |  | 3 |  | NO
+R55:  | Visual Arts
+R56:  | Sculpt | 0.0 | DEX CHA / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R57:  | Paint | 0.0 | DEX CHA / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R58:  | Draw | 0.0 | DEX CHA / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R59:  | Literature | 0.0 | INT CHA / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R60:  | Photography/ Videography | 0.0 | DEX  CHA / INT | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R61:  | Social Sciences
+R62:  | History | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R63:  | Linguistics | 0.0 | CHA / INT | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R64:  | Economics | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R65:  | Geography | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R66:  | Education | 0.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R67:  | Psychology | 0.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R68:  | Politics | 2.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | +3 Coin |  | 3 |  | NO
+R69:  | Law | 1.0 |  CHA / INT  WIS | 2 | 2 | 2 | None |  |  | +3 Coin |  | 0 |  | NO
+R70:  | Natural Sciences
+R71:  | Biology | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R72:  | Geoscience | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R73:  | Chemistry | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R74:  | Physics | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R75:  | Astronomy | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R76:  | Applied Sciences
+R77:  | Civil Engineering | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R78:  | Animal Husbandry | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R79:  | Agriculture | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R80:  | Electrical Engineering | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R81:  | Software Engineering | 0.0 | INT / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R82:  | Mechanical Engineering | 0.0 | DEX INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R83:  | Chemical Engineering | 0.0 | CON INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R84:  | Medicine | 0.0 | DEX / INT  WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R85:  | Use Vehicle
+R86:  | Sail | 0.0 | DEX / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R87:  | Drive | 0.0 | DEX / WIS | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R88:  | Pilot | 2.0 | DEX INT / WIS | 2 | 2 | 2 | None |  |  | +3 Coin |  | 0 |  | NO
+R89:  | Handle Animal | 0.0 | DEX CON / CHA | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R90:  | Perception Skills
+R91:  | Social Perception | 1.0 | CHA / WIS | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R92:  | Environmental Perception | 2.0 | INT / WIS | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R93:  | Paranormal Perception | 0.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R94:  | Life Skills
+R95:  | Cooking | 1.0 | CHA / WIS | 2 | 2 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R96:  | Textiles | 0.0 | DEX / INT | 2 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R97:  | Leadership | 2.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | +3 Coin |  | 0 |  | NO
+R98:  | Survival | 3.0 | DEX CON / WIS | 2 | 2 | 2 | None |  |  | +3 Coin |  | 0 |  | NO
+R99:  | Theory Knowledge
+R100:  | Philosophy | 0.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R101:  | Arcane Knowledge | 0.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R102:  | Theology | 0.0 | CHA INT / WIS | 2 | 2 | 2 | None |  |  | No Skill |  | 0 |  | NO
+R104:  | Attunement | None |  | Catalyst |  |  |  | Counter DR |  | Cast Check |  |  |  | Can Train
+R105:  | Domains of Magic
+R106:  | Alteration | 0.0 | + /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R107:  | Fortune | 0.0 | + /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO |  | Available Mana
+R108:  | Enchantment | 0.0 | + /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO |  | Container | Mana
+R109:  | Divination | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO |  | Body
+R110:  | Dissolution | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R111:  | Restoration | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R112:  | Illusion | 0.0 | N /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R113:  | Abjuration | 0.0 | - /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R114:  | Force | 0.0 | - /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+R115:  | Conjuration | 0.0 | - /  | None |  |  |  | No Skill |  | No Skill |  |  |  | NO
+
+## SHEET: Inventory
+# dims: A1:T94 max_row=94 max_col=20
+R2:  |  | Inventory |  |  |  |  |  |  |  |  |  |  |  | Exploits
+R5:  | Sort | Name | Class | Range | B/P/S : F/E/A | Resists | Grade | Description & Mods | Value | Quantity/ Uses | Weight | In Bag
+R6:  | 1.0 | Wealth |  |  |  |  |  |  | 1.0 | 25000.0 |  | False
+R7:  | 2.0 |  |  |  |  |  |  |  |  |  |  | False
+R8:  | 3.0 |  |  |  |  |  |  |  |  |  |  | False
+R9:  | 4.0 |  |  |  |  |  |  |  |  |  |  | False
+R10:  | 5.0 |  |  |  |  |  |  |  |  |  |  | False
+R11:  | 6.0 |  |  |  |  |  |  |  |  |  |  | False
+R12:  | 7.0 |  |  |  |  |  |  |  |  |  |  | False
+R13:  | 8.0 |  |  |  |  |  |  |  |  |  |  | False
+R14:  | 9.0 |  |  |  |  |  |  |  |  |  |  | False
+R15:  | 10.0 |  |  |  |  |  |  |  |  |  |  | False
+R16:  | 11.0 |  |  |  |  |  |  |  |  |  |  | False
+R17:  | 12.0 |  |  |  |  |  |  |  |  |  |  | False
+R18:  | 13.0 |  |  |  |  |  |  |  |  |  |  | False
+R19:  | 14.0 |  |  |  |  |  |  |  |  |  |  | False
+R20:  | 15.0 |  |  |  |  |  |  |  |  |  |  | False
+R21:  | 16.0 |  |  |  |  |  |  |  |  |  |  | False
+R22:  | 17.0 |  |  |  |  |  |  |  |  |  |  | False
+R23:  | 18.0 |  |  |  |  |  |  |  |  |  |  | False
+R24:  | 19.0 |  |  |  |  |  |  |  |  |  |  | False
+R25:  | 20.0 |  |  |  |  |  |  |  |  |  |  | False
+R26:  | 21.0 |  |  |  |  |  |  |  |  |  |  | False
+R27:  | 22.0 |  |  |  |  |  |  |  |  |  |  | False
+R28:  | 23.0 |  |  |  |  |  |  |  |  |  |  | False
+R29:  | 24.0 |  |  |  |  |  |  |  |  |  |  | False
+R30:  | 25.0 |  |  |  |  |  |  |  |  |  |  | False
+R31:  | 26.0 |  |  |  |  |  |  |  |  |  |  | False
+R32:  | 27.0 |  |  |  |  |  |  |  |  |  |  | False
+R33:  | 28.0 |  |  |  |  |  |  |  |  |  |  | False
+R34:  | 29.0 |  |  |  |  |  |  |  |  |  |  | False
+R35:  | 30.0 |  |  |  |  |  |  |  |  |  |  | False
+R36:  | 31.0 |  |  |  |  |  |  |  |  |  |  | False
+R37:  | 32.0 |  |  |  |  |  |  |  |  |  |  | False
+R38:  | 33.0 |  |  |  |  |  |  |  |  |  |  | False
+R39:  | 34.0 |  |  |  |  |  |  |  |  |  |  | False
+R40:  |  |  |  |  |  |  |  |  |  | Total Weight | 0
+R41:  |  |  |  |  |  |  |  |  |  | Total Value | 25000
+R42:  |  |  |  |  |  |  |  |  |  | Bag Weight | 0
+R43:  |  | Woven Spells
+R44:  | Sort | Name | Domains | DR | Casting Speed | Targets | Range | Description | Spell Strength | Duration | C/D
+R45:  | 1.0
+R46:  | 2.0
+R47:  | 3.0
+R48:  | 4.0
+R49:  | 5.0
+R50:  | 6.0
+R51:  | 7.0
+R52:  | 8.0
+R53:  | 9.0
+R54:  | 10.0
+R55:  | 11.0
+R56:  | 12.0
+R57:  | 13.0
+R58:  | 14.0
+R59:  | 15.0
+R60:  | 16.0
+R61:  | 17.0
+R62:  | 18.0
+R63:  | 19.0
+R64:  | 20.0
+R65:  | 21.0
+R66:  | 22.0
+R67:  | 23.0
+R68:  | 24.0
+R69:  | 25.0
+R70:  | 26.0
+R71:  | 27.0
+R72:  | 28.0
+R73:  | 29.0
+R74:  |  | Passive Tasks
+R75:  |  | Type | Time | Notes
+R79:  |  | Roots, Branches, Blossoms, and Life Events
+R80:  |  | Branches |  |  |  | Life Events |  |  | Blossoms
+R81:  | Root
+R87:  |  |  |  |  | Notes
+

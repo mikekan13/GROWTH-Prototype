@@ -15,7 +15,30 @@
 
 // ── Shared types ────────────────────────────────────────────────────────
 
-export type RenderSubject = 'self-stat' | 'possession' | 'environment' | 'other-entity' | 'relationship';
+export type RenderSubject = 'self-stat' | 'possession' | 'environment' | 'other-entity' | 'relationship' | 'scene';
+
+/**
+ * A scene as truth (Mike 2026-09-26: "Everything should essentially go
+ * through the murky Mirror before being presented to the AI"): the GM's
+ * additive narration is the headline; the rest is what the engine knows
+ * about where the being stands — the place, who is present, what is there,
+ * the standing facts — each line weighted by how much it would draw notice.
+ * The mirror keeps the headline and drops low-salience lines as fidelity
+ * falls; it never invents.
+ */
+export interface SceneLine {
+  text: string;
+  /** 0..1 — how much this would draw notice; low lines are the first to blur. */
+  salience: number;
+  kind: 'place' | 'present' | 'item' | 'fact' | 'speech' | 'sense';
+}
+export interface SceneTruth {
+  headline: string | null;
+  lines: SceneLine[];
+}
+export function isSceneTruth(data: unknown): data is SceneTruth {
+  return typeof data === 'object' && data !== null && Array.isArray((data as SceneTruth).lines);
+}
 
 /** Distortion operators, each a signed strength -1..1, default 0. */
 export interface BiasProfile {
@@ -57,7 +80,59 @@ export const SUBJECT_ATTUNEMENT_CAPS: Record<RenderSubject, number> = {
   'environment': 0.8,
   'other-entity': 0.6,
   'relationship': 0.5,
+  // A being standing in a place perceives it with its senses; the murk comes
+  // from salience, mood and bias, not from a ceiling on the place itself.
+  'scene': 1,
 };
+
+/** Minimum salience a scene line needs to survive at each fidelity level. */
+export const SCENE_SALIENCE_FLOOR: Record<number, number> = { 0: 2, 1: 0.85, 2: 0.6, 3: 0.4, 4: 0.2, 5: 0 };
+
+/**
+ * Scene envelope: the headline (what the GM just narrated) always survives
+ * above F0; each other line survives if its salience clears the level's
+ * floor and a seeded "murk" roll (10% per level below F5). Mood and bias
+ * color the tilt tag the voicer receives; they never add content.
+ */
+export function computeSceneContent(
+  req: { subject: RenderSubject; subjectKey: string; trueData: SceneTruth; context?: string },
+  bias: BiasProfile,
+  mood: AffectVector,
+  level: number,
+  rng: () => number,
+): ContentResult & { kept: number; total: number } {
+  const distortions: string[] = [];
+  const pessimistic = moodTiltsPessimistic(mood, RENDERER_TUNING.moodTiltGain);
+  const optimistic = moodTiltsOptimistic(mood, RENDERER_TUNING.moodTiltGain);
+  if (pessimistic) distortions.push('moodTilt:pessimistic');
+  else if (optimistic) distortions.push('moodTilt:optimistic');
+  const colorBias = (bias.optimism ?? 0) - (bias.catastrophize ?? 0) * 0.5 + (bias.denial ?? 0) * 0.3;
+  if (bias.denial) distortions.push(`denial:${signStr(bias.denial)}→dampened`);
+  if (bias.catastrophize) distortions.push(`catastrophize:${signStr(bias.catastrophize)}→amplified`);
+  const grim = colorBias < -0.1 || pessimistic;
+  const rosy = colorBias > 0.1 || optimistic;
+
+  const total = req.trueData.lines.length + (req.trueData.headline ? 1 : 0);
+  if (level <= 0) {
+    distortions.push(`scene:kept=0/${total}`);
+    return { fraction: 0, numericEstimate: 0, prose: rng() < 0.5 ? "You can't quite tell where you are or what is happening." : 'Something is happening around you, but you cannot place what.', distortions, kept: 0, total };
+  }
+  const floor = SCENE_SALIENCE_FLOOR[Math.min(5, level)] ?? 0;
+  const murk = Math.max(0, 5 - level) * 0.1;
+  const kept: string[] = [];
+  if (req.trueData.headline) kept.push(req.trueData.headline.trim());
+  let dropped = 0;
+  for (const line of req.trueData.lines) {
+    const survives = line.salience >= floor && (line.salience >= 0.9 || rng() >= murk);
+    if (survives) kept.push(line.text.trim());
+    else dropped++;
+  }
+  if (dropped > 0) distortions.push(`scene:dropped=${dropped}`);
+  distortions.push(`scene:kept=${kept.length}/${total}`);
+  const tilt = grim ? 'Your mood tilts this grim.' : rosy ? 'Your mood tilts this warm.' : '';
+  const prose = [...kept, tilt].filter(Boolean).join('\n');
+  return { fraction: level >= 5 ? 1 : 0.5, numericEstimate: 0, prose, distortions, kept: kept.length, total };
+}
 
 // ── Seeded PRNG (mulberry32 fed by an FNV-1a hash) ──────────────────────
 

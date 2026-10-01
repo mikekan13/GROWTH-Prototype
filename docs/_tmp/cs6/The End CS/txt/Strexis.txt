@@ -1,0 +1,1006 @@
+===SHEET: Main===
+|Strexis|459||1 - Primitive||1 - Destitute|||True|True|True|||
+|#REF!|KARMIC LEVEL||TECH LEVEL||WEALTH LEVEL||||||||
+||STRENGTH||7.0|7|2.0|9|TOUGHNESS||10.0|2.0|||
+||DEXTERITY||11.0|11|1.0|12|NIMBLENESS||BASE RESIST|BASE HEALING|||
+||CONSTITUTION||13.0|13|2.0|15|VIRILITY||4.0|0.0|||
+||INTELLIGENCE||19.0|19|10.0|20|WIT||BASE APT|SPEED MOD|||
+||WISDOM||12.0|12|2.0|14|INGENUITY||30.0|0.0|||
+||CHARISMA||13.0|13|1.0|14|CONVICTION||BASE ENDURANCE|UNARMED MOD|||
+|||ATTRIBUTES|LEVEL|SCORE|RESIT MODS|RESISTANCES|||MODS||||
+|||Altered Human|||||||||||
+|||SEED|SEX|BEAUTY|HOME|||HEIGHT|WEIGHT|HAIR & EYES|||
+|||LIFE SPAN|AGE|BIRTH MONTH|BIRTH DAY|MONKEY PAW|||||||
+|||||||||APPEARANCE|||||
+|||GOALS & VALUES||||||KARMA|||||
+===SHEET: SEEDDATA===
+Human|30
+Altered Human|63
+Neo-Human|145
+Elven|78
+Dwarven|78
+Halfling|48
+*Draconic|130
+Tulpa|63
+Homunculus|92
+Cambion|70
+Moroi|96
+Nephilim|73
+*Cyborg|132
+*Android|
+*Tin Man|
+*Beta
+(The Forgotten Ones)|
+*Turbaraptus
+(The Wretched)|
+===SHEET: Skills===
+||Basic Skills||||||||||||||Magic Skills||||||||
+||SKILLS|LEVEL|GOVERNING ATTRIBUTES||||MODS|SKILL CHECK|EPA|MAX SKILL|FAILED||||SKILLS|LEVEL|FOCUS|MODS|SKILL CHECK|FPA|MAX SKILL|FAILED|
+||ATHLETICS||||||||||||||PILLAR OF MERCY||||||||
+||Swim||STR CON|7|13|||No Skill|7|0|NO||||Alteration||||No Skill|5|0|NO|
+||Sneak||DEX WIS|11|12|||No Skill|11|0|NO||||Restoration||||No Skill|5|0|NO|
+||Manual Dexterity||STR DEX|7|11|||No Skill|7|0|NO||||Enchantment||||No Skill|5|0|NO|
+||Climb||STR DEX CON|7|11|13||No Skill|7|0|NO||||PILLAR OF BALANCE||||||||
+||Acrobatics||STR DEX CHA|7|11|13||No Skill|7|0|NO||||Divination||||No Skill|5|0|NO|
+||SOCIAL SKILLS||||||||||||||Dissolution||||No Skill|5|0|NO|
+||Seduction||WIS CHA|12|13|||No Skill+FALSE|12|0|NO||||Abjuration||||No Skill|5|0|NO|
+||Intimidation||STR CHA|7|13|||No Skill-FALSE|7|0|NO||||Illusion||||No Skill|5|0|NO|
+||Negotiation||INT CHA|19|13|||No Skill+FALSE|13|0|NO||||PILLAR OF SEVERITY||||||||
+||Deception||INT WIS|19|12|||No Skill|12|0|NO||||Fortune||||No Skill|5|0|NO|
+||Leadership||INT WIS CHA|19|12|13||No Skill|12|0|NO||||Force||||No Skill|5|0|NO|
+||MARTIAL ARTS||||||||||||||Conjuration||||No Skill|5|0|NO|
+||Blades||STR DEX|7|11|||No Skill|7|0|NO||||ATTUNEMENT|None||RESOURCES|BODY MANA||||
+||Polearms||STR DEX|7|11|||No Skill|7|0|NO||||0.0|19|||CATALYST MANA||||
+||Hammers & Axes||STR CON|7|13|||No Skill|7|0|NO||||||||||||
+||Firearms||DEX CHA|11|13|||No Skill|11|0|NO||||LEARNING MOD|LEARNING|||||||
+||Exotic Weapons||STR DEX WIS|7|11|12||No Skill|7|0|NO||||SKILLS TOTAL KV|0|||||||
+||Archery||DEX CON WIS|11|13|12||No Skill|11|0|NO||||||||||||
+||Unarmed||STR DEX CON|7|11|13||No Skill|7|0|NO||||PASSIVE TASKS||||||||
+||PERFORMING ARTS|||||||||||||||TYPE||TIME|NOTES||||
+||Music||INT WIS|19|12|||No Skill+FALSE|12|0|NO||||||||||||
+||Drama||DEX WIS CHA|11|12|13||No Skill+FALSE|11|0|NO||||||||||||
+||Dance||STR DEX CHA |7|11|13||No Skill+FALSE|7|0|NO||||||||||||
+||VISUAL ARTS||||||||||||||STATUS EFFECTS||||||||
+||Sculpt||DEX WIS CHA|11|12|13||No Skill|11|0|NO||||||||||||
+||Paint & Draw||DEX WIS CHA|11|12|13||No Skill|11|0|NO||||||||||||
+||Literature||INT WIS CHA|19|12|13||No Skill|12|0|NO||||||||||||
+||SOCIAL SCIENCES||||||||||||||||||||||
+||History||INT CHA|19|13|||No Skill|13|0|NO||||||||||||
+||Economics||WIS CHA|12|13|||No Skill|12|0|NO||||||||||||
+||Geography||INT CHA|19|13|||No Skill|13|0|NO||||||||||||
+||Law||INT WIS CHA|19|12|13||No Skill|12|0|NO||||||||||||
+||NATURAL SCIENCES||||||||||||||||||||||
+||Biology||INT WIS|19|12|||No Skill|12|0|NO||||||||||||
+||Geoscience||INT WIS|19|12|||No Skill|12|0|NO||||||||||||
+||Chemistry||INT WIS|19|12|||No Skill|12|0|NO||||||||||||
+||Physics||INT WIS|19|12|||No Skill|12|0|NO||||||||||||
+||Astronomy||INT WIS|19|12|||No Skill|12|0|NO||||||||||||
+||APPLIED SCIENCES||||||||||||||||||||||
+||Civil Engineering||INT WIS CHA|19|12|13||No Skill|12|0|NO||||||||||||
+||Agriculture||STR INT WIS|7|19|12||No Skill|7|0|NO||||||||||||
+||Mechanical Engineering||DEX INT WIS|11|19|12||No Skill|11|0|NO||||||||||||
+||Chemical Engineering||CON INT WIS|13|19|12||No Skill|12|0|NO||||||||||||
+||Medicine||DEX INT CHA|11|19|13||No Skill|11|0|NO||||||||||||
+||VEHICLE HANDLING||||||||||||||||||||||
+||Sail||STR DEX INT|7|11|19||No Skill|7|0|NO||||||||||||
+||Drive||DEX WIS CHA|11|12|13||No Skill|11|0|NO||||||||||||
+||Pilot||DEX CON INT|11|13|19||No Skill|11|0|NO||||||||||||
+||Handle Animal||STR DEX CHA|7|11|13||No Skill|7|0|NO||||||||||||
+||PERCEPTION SKILLS||||||||||||||||||||||
+||Social Insight||WIS CHA|12|13|||No Skill|12|0|NO||||||||||||
+||Environmental Awareness||INT WIS|19|12|||No Skill|12|0|NO||||||||||||
+||Supernatural Perception||INT WIS CHA|19|12|13||No Skill|12|0|NO||||||||||||
+||LIFE SKILLS||||||||||||||||||||||
+||Cooking||DEX WIS CHA|11|12|13||No Skill|11|0|NO||||||||||||
+||Textiles||DEX INT WIS|11|19|12||No Skill|11|0|NO||||||||||||
+||Survival||CON WIS CHA|11|13|13||No Skill|11|0|NO||||||||||||
+||GREATER KNOWLEDGE||||||||||||||||||||||
+||Philosophy||INT WIS CHA|19|12|13||No Skill|12|0|NO||||||||||||
+||Arcane Knowledge||INT WIS CHA|19|12|13||No Skill|12|0|NO||||||||||||
+||Theology||INT WIS CHA|19|12|13||No Skill|12|0|NO|||||||||||False|
+===SHEET: Vitals===
+Vitals|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||Undamaged|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||14|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||Undamaged||Undamaged||||Undamaged|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||14||||||14|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||19||||||| |||||||||||||||||||| |||||||||||||||||||| ||||||||||||||||||||
+||Undamaged||||||Undamaged|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||14||||||14|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||Undamaged||Undamaged|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||19||19|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||Undamaged||Undamaged|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||14||14|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||BODY|||||||||||CLOTHING||||||||||||||||||||LIGHT ARMOR||||||||||||||||||||HEAVY ARMOR|||||||||||||||||
+||MAX|118|||DEAD||Wounds Treated|||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||CURRENT|118.0|||WOUNDED|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||||||UNCONCIOUS||False|||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+|||FORTITUDE||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||HEAL RATE||||16|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||APT||||11|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||SPEED||||35ft (7)|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||JUMP||||4.75ft Vertical
+21.75ft Long|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+||UNARMED DMG||||0/14/0 : 0/0/0|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged|||||||||0|
+||SPELL CONTROL||||14|||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||||||||||||Undamaged||||||||||
+===SHEET: Inventory===
+|Inventory||||||||||||||||||||||||||||||||||
+|SORT|NAME|GRADE|CLASS|MATERIAL|DAMAGE||||||||RANGE|RESISTS||||||DESCRIPTION & MODS|||||||||||VALUE|CONDITION|WEIGHT|
+||||||PIERCING|BASHING|SLASHING||FIRE|COLD|ELECTRIC|ACID||RATING|TYPE|FIRE|COLD|ELECTRIC|ACID||HEAD|CHEST|ULARM|URARM|LLARM|LRARM|ULLEG|URLEG|LLLEG|LRLEG||||
+|1.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|2.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|3.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|4.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|5.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|6.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|7.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|8.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|9.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|10.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|11.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|12.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|13.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|14.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|15.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|16.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|17.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|18.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|19.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|20.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|21.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|22.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|23.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|24.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|25.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|26.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|27.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|28.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|29.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|30.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|31.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|32.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|33.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|34.0||||||||:|||||||||||||False|False|False|False|False|False|False|False|False|False||||
+|||||||||||||||||||||||||||||||||WEIGHT STATUS|Fine|
+|||||||||||||||||||||||||||||||||CARRY LEVEL|3|
+===SHEET: Munition Items===
+#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A|#N/A
+Thick Heavy Gambeson|5 - Munitions|Heavy Armor|Wool|-|-|-|:|-|-|-|-|-|7|Soft|R|R|||Flexible|False|True|True|True|True|True|True|True|False|False|2|3 - Undamaged|4 - Moderate
+Wooden Scutum|5 - Munitions|Heavy Armor|Wood|-|-|-|:|-|-|-|-|-|32|Hard|||||Brittle, Unrepairable, Burnable, +1 Block Mod|False|False|False|False|False|False|False|False|False|False|3|3 - Undamaged|5 - Heavy
+Curiass|5 - Munitions|Light Armor|Steel|-|-|-|:|-|-|-|-|-|36|Hard||||||False|True|False|False|False|False|False|False|False|False|6|3 - Undamaged|5 - Heavy
+Heavy Curiass|5 - Munitions|Heavy Armor|Steel|-|-|-|:|-|-|-|-|-|48|Hard||||||False|True|False|False|False|False|False|False|False|False|6|3 - Undamaged|6 - Hefty
+Heavy Brigandine|5 - Munitions|Heavy Armor|Leather|-|-|-|:|-|-|-|-|-|18|Soft|R||||Hard to Repair|False|True|False|False|False|False|False|False|False|False|5|3 - Undamaged|3 - Light
+Heavy Boiled Brigandine|5 - Munitions|Heavy Armor|Rawhide|-|-|-|:|-|-|-|-|-|20|Hard|R||||Unrepairable|False|True|False|False|False|False|False|False|False|False|5|3 - Undamaged|3 - Light
+Brigandine|5 - Munitions|Light Armor|Leather|-|-|-|:|-|-|-|-|-|14|Soft|R||||Hard to Repair|False|True|False|False|False|False|False|False|False|False|5|3 - Undamaged|2 - Trivial
+Boiled Brigandine|5 - Munitions|Light Armor|Rawhide|-|-|-|:|-|-|-|-|-|15|Hard|R||||Unrepairable|False|True|False|False|False|False|False|False|False|False|5|3 - Undamaged|2 - Trivial
+Tortoise Curiass|5 - Munitions|Heavy Armor|Bone|-|-|-|:|-|-|-|-|-|34|Hard|||||Unrepairable|False|True|False|False|False|False|False|False|False|False|5|3 - Undamaged|4 - Moderate
+ Full Chain Mail Shirt|5 - Munitions|Light Armor|Steel|-|-|-|:|-|-|-|-|-|34|Hard||||||False|True|True|True|True|True|True|True|False|False|6|3 - Undamaged|6 - Hefty
+Heavy Silk Gambeson|5 - Munitions|Heavy Armor|Silk|-|-|-|:|-|-|-|-|-|22|Soft|||||Flexible, Protective|False|True|True|True|True|True|True|True|False|False|5|3 - Undamaged|4 - Moderate
+Armored Leather Skirt|5 - Munitions|Light Armor|Leather|-|-|-|:|-|-|-|-|-|12|Soft|R||||Hard to Repair|False|False|False|False|False|False|True|True|False|False|3|3 - Undamaged|1 - Featherlight
+ Cloak|5 - Munitions|Clothing|Wool|-|-|-|:|-|-|-|-|-|1|Soft|R|R|||Flexible|False|True|True|True|False|False|True|True|True|True|3|3 - Undamaged|2 - Trivial
+ Gauntlet|5 - Munitions|Light Armor|Steel|-|-|-|:|-|-|-|-|-|34|Hard||||||False|False|False|False|True|True|False|False|False|False|6|3 - Undamaged|4 - Moderate
+Armored Leather Long Boot|5 - Munitions|Light Armor|Leather|-|-|-|:|-|-|-|-|-|12|Soft|R||||Hard to Repair|False|False|False|False|False|False|True|True|True|True|5|3 - Undamaged|2 - Trivial
+Fishnet Leggings|5 - Munitions|Clothing|Cotton|-|-|-|:|-|-|-|-|-|2|Soft|||||Flexible, Thin, Seductive|False|False|False|False|False|False|True|True|True|True|3|3 - Undamaged|1 - Featherlight
+Leather Boot|5 - Munitions|Clothing|Leather|-|-|-|:|-|-|-|-|-|8|Soft|R||||Hard to Repair|False|False|False|False|False|False|False|False|True|True|4|3 - Undamaged|1 - Featherlight
+Baseball Bat|5 - Munitions|Two-Handed Weapon|Wood|-|25|-|:|-|-|-|-|-|25|Hard|||||Add Clout to damage|False|False|False|False|False|False|False|False|False|False|5|3 - Undamaged|1 - Featherlight
+Baseball Uniform|5 - Munitions|Clothing|Cotton|-|-|-|:|-|-|-|-|-|2|Soft||R||||False|True|True|True|True|True|True|True|False|False|2|3 - Undamaged|1 - Featherlight
+Baseball Cap|5 - Munitions|Light Armor|Leather|-|-|-|:|-|-|-|-|-|8|Soft|R||||Hard to repair|True|False|False|False|False|False|False|False|False|False|3|3 - Undamaged|1 - Featherlight
+Coveralls|5 - Munitions|Clothing|Cotton|-|-|-|:|-|-|-|-|-|2|Soft||R||||False|True|False|False|False|False|True|True|True|True|3|3 - Undamaged|1 - Featherlight
+T-shirt|5 - Munitions|Clothing|Cotton|-|-|-|:|-|-|-|-|-|2|Soft||R||||False|True|True|True|False|False|False|False|False|False|3|3 - Undamaged|1 - Featherlight
+Work Boots|5 - Munitions|Light Armor|Leather|-|-|-|:|-|-|-|-|-|9|Soft|R||||Hard to repair|False|False|False|False|False|False|False|False|True|True|4|3 - Undamaged|2 - Trivial
+Work Gloves|5 - Munitions|Light Armor|Leather|-|-|-|:|-|-|-|-|-|9|Soft|R||||Hard to repair|False|False|False|False|True|True|False|False|False|False|4|3 - Undamaged|2 - Trivial
+Tailored suit coat|5 - Munitions|Clothing|Wool||||:||||||1|Soft|R|R||||False|True|True|True|True|True|False|False|False|False|4|3 - Undamaged|2 - Trivial
+Suit Vest|5 - Munitions|Clothing|Silk||||:||||||10|Soft|||||Protective|False|True|False|False|False|False|False|False|False|False|5|3 - Undamaged|1 - Featherlight
+Dress shirt|5 - Munitions|Clothing|Cotton||||:||||||2|Soft||R||||False|True|True|True|True|True|False|False|False|False|2|3 - Undamaged|1 - Featherlight
+Fedora|5 - Munitions|Clothing|Wool||||:||||||1|Soft|R|R||||True|False|False|False|False|False|False|False|False|False|2|4- Indestructible|1 - Featherlight
+===SHEET: EQUIPPED===
+===SHEET: Woven Spells===
+|Woven Spells|||||||||||||||||||||||||||||
+||KARMA SPENT SPELLWEAVING|MONTHS SPENT SPELLWEAVING|||||||||||||||||||||||||||
+|SORT|NAME|DOMAINS||||||||||DR||||CASTING SPEED|REQS||||DURATION||TARGETS|RANGE|DESCRIPTION||CAST DR|STRENGTH|
+|||ALTERATION|RESTORATION|ENCHANTMENT|DIVINATION|DISSOLUTION|ABJURATION|ILLUSION|FORTUNE|FORCE|CONJURATION|RAW|REDUCTION||RESIST||VERBAL|SOMATIC|C/D||VALUE|TYPE|||||||
+|1.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|2.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|3.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|4.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|5.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|6.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|7.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|8.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|9.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|10.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|11.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|12.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|13.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|14.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|15.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|16.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|17.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|18.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|19.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|20.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|21.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|22.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|23.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|24.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|25.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|26.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|27.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|28.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+|29.0||False|False|False|False|False|False|False|False|False|False|||+|||False|False|||||||||||
+===SHEET: Exploits===
+|Exploits||||||
+|TYPE|NAME|LEVEL|DESCRIPTION|X|KV|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+||||False||False|
+===SHEET: Notes===
+|Notes|||||||||||
+|ROOT|||||||||||
+|BRANCHES|||||||||||
+|THORNS|||||||||||
+|BLOSSOMS|||||||||||
+===SHEET: Sheet Settings===
+|Portrait picture URL:
+(8x10) Ratio||https://docs.google.com/uc?export=view&id=1QhP4TqwU_VUD0HXZxcP6oQ1kF3xh3dMf|
+|Unlock 4th Goal&Value:||False|
+|Unlock 5th Goal&Value:||False|
+|KV Mod:|||
+===SHEET: EXPLOITDATA===
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner|Fast Learner
+===SHEET: Combat===
+Combat Improvision|[Deception 5 ]
+Once per combat round, at any time, you may turn a Defense token into a Basic or Magic token.|[Deception 10]
+Once per combat round, at any time, you may turn a Defense token into a Basic or Magic token, or you may turn a Basic or Magic token into a Defense token.|[Deception 14]
+Once per combat round, at any time, you may change up to three Action tokens to whatever type you want.|12|||||||||||||||||
+Way of the Fists|[Unarmed 10]
+You may take an additional reaction action per combat round. The reaction action must be an unarmed attack.|[Unarmed 15]
+You may take up to two additional reaction actions per combat round. The reaction actions must be unarmed attacks. |[Unarmed 20]
+You may take up to two additional reaction actions per combat round. The reaction actions must be unarmed attacks. In addition, once per combat round you can make one of these reaction unarmed attacks automatically bypass one level of armor.|15|||||||||||||||||
+Battle Momentum|[Any Melee Martial Arts Skill 6]
+Successful melee attacks give you a free spontaneous 5 foot step.
+|[Any Melee Martial Arts Skill 10]
+Successful melee attacks give you a free spontaneous 10 foot step in one direction.
+|[Any Melee Martial Arts Skill 14]
+Successful melee attacks give you a free spontaneous 10 foot step in one direction. You may take a Free Spontaneous Basic action whenever you kill a creature.
+|13|||||||||||||||||
+Battle Proficiency|[Any Martial Arts Skill 6]
++1 Mod to all Martial Arts Skills|[Any Martial Arts Skill 10 or STR 5]
++1 Mod to all Martial Arts Skills. Successful attacks will allow you to move the attacked creature 5 feet any any direction.|[Any Martial Arts Skill 17 or DEX 6]
++1 Mod to all Martial Arts Skills. Successful attacks will allow you to move the attacked creature 5 feet any any direction. You may take a free spontaneous 5 foot step in the direction of the attacked creature.|8|||||||||||||||||
+Brawler|[Unarmed 4]
+Unarmed Mod +2
+|[Unarmed 9]
+Unarmed Mod +4
+|[Unarmed 14]
+Unarmed Mod +4. You can add an additional +5 Bashing damage to your unarmed attacks for one round but you must remove an active defensive action. (You can only do this once per round.)
+|10|||||||||||||||||
+Combat Endurance|[Combined Athletics 10]
++2 to Virility Mod.
+|[CON 4]
++2 to Virility Mod; +5 to Base Endurance
+|[Survival 12]
++3 to Virility Mod; +5 to Base Endurance; +1 to Base Resist.|11|||||||||||||||||
+Combat Prowess|[Fought in a battle; Any Martial Arts Skill 4]
++1 APT
+|[Any Martial Arts Skill 8]
++1 APT; +2 to Nimbleness Mod.
+|[Any Martial Arts Skill 14]
++1 APT; +2 Nimbleness Mod. You may reroll attack rolls but you have to keep the second roll.|9|||||||||||||||||
+Combat Tactics|[Leadership 3; Any 3 Martial Arts Skills 4]
+At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT during the first round of combat. 
+|[Leadership 10; WIS 3]
+At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT for the remainder of the batte; +1 APT Mod
+|[Leadership 15; Any 3 Martial Arts Skills 6]
+At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT for the remainder of the batte; +1 APT Mod. You may give up to 4 free actions divided how you choose to anyone who can understand you but not yourself.
+|11|||||||||||||||||
+Counter Combatives|[Any Martial Arts Skill 6]
+Requires a defensive action:
+If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them).
+|[Unarmed 8 or STR 5]
+Requires a defensive action:
+If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them). With a successful counter-attack, you knock the target to the ground.
+|[Unarmed Combat 12 or STR 7]
+Requires a defensive action:
+If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them). With a successful counter-attack, you knock the target to the ground. You may also choose to automatically grapple them without an Unarmed Skill Check
+|13|||||||||||||||||
+Destroy Guard|[Unarmed 10]
+A successful unarmed attack removes a Defensive action from the creature attacked.
+|-[]|-[]|20|||||||||||||||||
+Die Hard|[Must have fallen unconcious during a battle; CON 4]
++2 Conviction Mod|[CHA 4]
++2 Conviction Mod; +2 Virility Mod. |[Defied Death]
++2 Conviction Mod; +2 Virility Mod.; +1 mod to fate roll for defying death.|9|||||||||||||||||
+Dirty Fighter|[Unarmed 5]
+During any attack you make that is blocked you may pay 5 Fortitude to trip the blocker and knock them prone.|[Nimbleness 8]
+During any attack you make that is blocked you may pay 5 Fortitude to trip the blocker and knock them prone. Or, During any attack you make that is blocked you may pay 8 Fortitude to kick dust into the blocker's eyes and blind them for the remainder of the combat round.|[Nimbleness 10, Unarmed 15]
+During any attack you make you may pay 5 Fortitude to trip the blocker and knock them prone. And/Or, During any attack you make you may pay 8 Fortitude to kick dust into the blocker's eyes and blind them for the remainder of the combat round.|13|||||||||||||||||
+Disarm|[Manual Dexterity 3]
+You can make a creature drop an object when you hit the object or the lower arm carrying it.
+|[STR 3; Manual Dexterity 7]
+You can make a creature drop an object when you hit the object or the lower arm carrying it. If able, you may pick up that object with a successful Free No Effort Spontaneous Manual Dexterity Skill Check.
+|[DEX 5; Manual Dexterity 11]
+You can make a creature drop an object when you hit it or the lower arm carrying it. If able, you may grab the dropped object as a Free No Effort Spontaneous Manual Dexterity Skill Check; afterwards, you may take a Free Spontaneous Basic Action using the object you just grabbed against the creature you disarmed.
+|9|||||||||||||||||
+Double Tap... No, Triple Tap... Just Keep Shooting!|[Firearms 5]
+Using only one basic action, you may attack a target with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every shot after the first.
+|[Firearms 11]
+Using only one basic action, you may attack up to 2 targets with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every two shots after the first.|[Firearms 16]
+Using only one basic action, you may attack up to 4 targets with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every three shots after the first.
+|10|||||||||||||||||
+Dual Wield|[None]
+You may dual wield one-handed weapons that are Trivial weight or less; You may use one Basic Action to attack with both weapons using one skill check. The DR for the target is increased by 3.
+|[STR 4]
+You may dual wield one-handed weapons that are Light weight or less; You may use one Basic Action to attack with both weapons using one skill check. You may attack a single target or two different targets. The DR for targets are increased by 2. (Both attacks use the same skill check total)
+|[STR 5; DEX 4]
+You may dual wield one-handed weapons that are Moderate weight or less; You may use one Basic Action to attack one target twice or two different targets using a different skill check for each weapon.
+|9|||||||||||||||||
+Envigorating Rally|[Virility 5]
+Once per day you may summon inner determination to keep going. During combat you may take a Basic Action to increase your Fortitude by your heal rate. |[Virility 9]
+Once per day you may summon inner determination to keep going. Take a Basic Action to increase your Fortitude by your heal rate.|[Virility 11; Conviction 5]
+Once per day you may summon inner determination to keep going. Take a Basic Action to increase your Fortitude by your heal rate. If you haven't taken this action during a battle and your Fortitude reaches 0 then you may use Envigorating Rally as a Free Spontaneous Action.|8|||||||||||||||||
+Fighting Flow|[DEX 5]
+Once per day during combat you may increase your ATP by 2.|[Nimbleness 12]
+Once per day during combat you may increase your ATP by 3.|[Combined Athletics 50]
+Once per combat you may increase your ATP by 3.|15|||||||||||||||||
+I Am Your Shield!|[Combat Prowess Level 1]
+Requires a Defensive action:
+You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit. Remove one of your defensive actions after the attack.
+|[STR 5 CON 4]
+Requires a Defensive action:
+You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit.
+|[CON 5; DEX 5; Leadership 4]
+Requires a Defensive action:
+You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit. After you swap places they may take a Free Spontaneous 5 foot step.|9|||||||||||||||||
+I Only Make Headshots|[Firearms or Archery 10; Manual Dexterity 8]
+Ranged attacks do not impose a +2 DR when calling a shot.|-[]|-[]
+|15|||||||||||||||||
+Lay It All On The Line|[CHA 4]
+Once, at the beginging of a combat round, you may pay 20 Fortitude for +1 APT that round.|[CHA 5]
+Once, at the beginging of a combat round, you may pay 15 Fortitude for +1 APT that round.|[CHA 6; DEX 5]
+As many times as you like, you may pay 15 Fortitude for +1 APT that round.|10|||||||||||||||||
+Lend Me A Hand|[Leadership 3]
+At the begining of a combat round, a willing creature within 5 feet may reduce their APT by 1 and you gain +1 APT this round.
+|[Leadership 6]
+Any time during combat, a willing creature within 20 feet may remove 1 action and you gain 1 free action.
+|[Leadership 12; Negotiation 7]
+Any time during or before combat, a willing creature within 20 feet may remove 1 action and you gain 2 free actions.
+|11|||||||||||||||||
+Look, No Hands!|[Unarmed 8]
+Defensive tokens still prevent death from critical attacks when you are grappling a creature.|[Unarmed 10; Environmental Perception 5; Combat Prowess Level 2]
+Defensive tokens still prevent death from critical attacks when you are grappling a creature. You may still block while grappling.|[Unarmed 13]
+Defensive tokens still prevent death from critical attacks when you are grappling a creature. You may still block while grappling. You may still evade while grappling.|8|||||||||||||||||
+Master Grappler|[Successfuly Grappled 5 Creatues]
+You can grapple creatures 2 sizes larger than you instead of 1.
+|[Unarmed 13]
+You can grapple creatures 2 sizes larger than you instead of 1. When grappled or grappling you may add +3 Bashing to your unarmed attacks.
+|[Unarmed 16]
+You can grapple creatures 2 sizes larger than you instead of 1. When grappled or grappling you may add +3 Bashing to your unarmed attacks. Grappled creatures may not reverse or break the grapple. Desperate escape can still be used.
+|10|||||||||||||||||
+Missile Command|[Manual Dexterity 8]
+Requires a defensive action:
+Instead of blocking or dodging a ranged attack you may instead make a free Manual Dexterity skill check against the attack roll. If successful you can grab the missile out of the air. If you fail then remove a defensive token.|[Manual Dexterity 13]
+Requires a defensive action:
+Instead of blocking or dodging a ranged attack you may instead make a free Manual Dexterity skill check against the attack roll. If successful you can grab the missile out of the air.|[Manual Dexterity 15]
+Requires a defensive action:
+You may deflect any ranged attack that passes within 5 feet of you with a free successful Manual Dexterity skill check against the attack roll. If the ranged attack will hit you then you may still block or dodge if you failed this check. If the check is successful then you may redirect the attack in any direction. Others would still be allowed to respond to the deflected attack.|11|||||||||||||||||
+Move Like a Butterfly|[Acrobatics 6]
+Requires a Defensive action:
+As a reaction to a successful melee attack you may make a free acrobatics 0 effort skill check to directly contest the attack. If you are successful then the damage from the attack is negated. Remove one of your defensive actions.|[Acrobatics 13]
+Requires a Defensive action:
+As a reaction to a successful melee attack you may make a free acrobatics skill check to directly contest the attack. If you are successful then the damage from the attack is negated and you may take a free 5 foot step. Remove one of your defensive actions.|[Acrobatics 15; Environmental Perception 10]
+Requires a Defensive action:
+Damage from a successful melee attack is negated and the attacker falls prone. You may take a 5 foot step. Remove one of your defensive actions.|7|||||||||||||||||
+Murder-Stroke|[Blades 3]
+Damage is equal to the weapon's slashing attack damage -12 but as bashing.
+|[Blades 6]
+Damage is equal to the weapon's slashing attack damage - 8 but as bashing.
+|[Blades 12]
+Damage is equal to the weapon's slashing attack damage -6 but as bashing. If you do damage to a creatures body with this attack and they are the same size or smaller than you, then they are knocked prone.
+|5|||||||||||||||||
+Parry|[None]
+When you block you may directly contest an incoming melee attack with a free 0 effort melee Martial Arts Action. Remove 1 defensive action if their attack is still succesful after the parry attempt. |-[]|-[]|5|||||||||||||||||
+Patience, Grasshopper!|[None]
+You may defer 1 action in combat to the next round; You will get the deferred action plus your normal APT. You must choose to defer before the round begins and actions are placed.
+|[Environmental Perception 10]
+You may defer up to 2 actions in combat to the next round; You will get the deferred actions plus your normal APT.
+|[DEX 6; Environmental Perception 14]
+You may defer up to 3 actions in combat to the next round; You will get the deferred actions plus your normal APT; +5 to fate rolls determining action priority.
+|10|||||||||||||||||
+Put A Tourniquet On That!|[Survival 6 or Medicine 2]
+A successful medicine or survival check in battle can heal a wounded body part of yours or another to undamaged. You must have something to act as a bandage and they must be within 5 feet.
+|[Survival 12 or Medicine 6; Combat Prowess level 1]
+A successful medicine or survival check in battle can heal all wounded body parts of yours or anothers to undamaged. You must have something to act as a bandage for each wounded area and they must be within 5 feet.
+|[Survival 15 or Medicine 9]
+A successful medicine or survival check in battle can heal all wounded body parts of yours and anyone you want around you to undamaged. You must have something to act as a bandage for each wounded area and they must be within 5 feet.
+|6|||||||||||||||||
+Quick Loading|[Manual Dexterity 7]
+You may reload a weapon using 1 less action than it normally takes.|[Manual Dexterity 14]
+You may reload a weapon using 2 less actions than it normally takes.|-[]|6|||||||||||||||||
+Rapid Fists|[Unarmed 6; Manual Dexterity 7]
+You may strike one target up to 5 times with a single Basic action using an unarmed attack.  You must declare how many strikes and pay 1 Fortitude for every strike after the first. If the attack is unsucessful you must still pay the Fortitude for each additional strike.
+|[Unarmed 8; Manual Dexterity 10]
+You may strike up to 2 targets up to 10 times with a single Basic action using an unarmed attack.  You must declare how many strikes and pay 1 Fortitude for every strike after the first. If the attack is unsucessful you must still pay the Fortitude for each additional strike.
+|[Unarmed 15]
+You may strike up to 4 targets up to 15 times with a single Basic action using an unarmed attack.  You must pay 1 Fortitude for every strike after the first. If the attack is unsucessful you must still pay the Fortitude for each additional strike.
+|13|||||||||||||||||
+Rhythmic Cadence|[Music 6]
+A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR) (May only be used once per combat)|[Music 8]
+A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR). If the free APT is used on a Defensive action then they regain 10 Fortitude. (May only be used once per day)|[Music 10; Social Perception 6]
+A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR). If the free APT is used on a Defensive action then they regain 20 Fortitude. (May only be used once per day)|19|||||||||||||||||
+Riposte|[Level 1 Parry]
+After a successful Parry you get a free Spontaneous Basic action.|-[]|-[]|5|||||||||||||||||
+Running Start|[Nothing]
+You can move 5 feet as a free joint spontanious action before an Basic action. 
+|[DEX 5]
+You can move 10 feet as a free joint spontanious action before an Basic action.  Movement must be in one direction.
+|[Acrobatics 8 or DEX 6]
+You can move 10 feet as a free joint spontanious action before an Basic action.  Movement must be in one direction. You may make an additional 10 foot free joint spontanious action after the attack. All Movement must be in one direction. You may pass through the attacked creature's square. Add +5 damage to slashing or piercing attacks if you move the entire 20 feet. 
+(You may not end in the same square as another creature.)|9|||||||||||||||||
+Shank Blitz|[Knives 7]
+Can't Dual Wield: 
+You can strike one target up to 3 times with a single Basic Action using a knife. If your attack is unsuccesful and you chose to strike multiple times: remove 1 defensive action and then the creature you attacked may choose to automaticaly put you into an uncontested grapple.|[Knives 12]
+Can't Dual Wield: 
+You can strike one target up to 4 times with a single Basic Action using a knife. If your attack is unsuccesful and you chose to strike multiple times: the creature you attacked may choose to automaticaly put you into an uncontested grapple.|[Knives 17]
+Can't Dual Wield: 
+You can strike one target up to 5 times with a single Basic Action using a knife. 
+|14|||||||||||||||||
+Shield Bash|[STR 5]
+If you block against a melee attack with a shield then you may remove a defensive token from the attacker.
+|-[]|-[]|20|||||||||||||||||
+Shield Proficiency|[DEX 4]
+The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing.|[DEX 5; CON 4; Manual Dexterity 8]
+The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing. You may block unblockable Attacks targeting you.|[CON 5; Manual Dexterity 10]
+The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing. You may block unblockable Spells and Attacks targeting you.|15|||||||||||||||||
+Shield Up!|[Shield Proficiency Level 3]
+You may block attacks that pass or happen within 5 feet of you.
+|-[]|-[]|12|||||||||||||||||
+Sniper|[Manual Dexterity 15]
+Effective range for all ranged weapons is doubled.|-[]|-[]
+|10|||||||||||||||||
+Split the Arrow|[Archery 5]
+While you have a defensive action, you may contest an incoming thrown or archery attack directly with a free archery skill check of your own. If you win, the attack is considered a miss; if you lose, your defensive action is removed.
+|[Archery 10]
+While you have a defensive action, you may contest an incoming thrown or archery attack directly with a free archery skill check of your own. You may also contest these attacks not directed at you with a free 0 effort archery skill check. If you win, the attack is considered a miss; if you lose, your defensive action is removed.
+|[Archery 18; Manual Dexterity 8; Environmental Perception 12]
+While you have a defensive action, you may contest an incoming physical projectile directly with a free archery skill check of your own. You may also contest these attacks not directed at you with a free 0 effort archery skill check. If you win, the attack is considered a miss.
+|7|||||||||||||||||
+Sting Like a Bee|[Brawler Level 1]
+You may apply your DEX to your unarmed mod.
+|-[]|-[]|7|||||||||||||||||
+Weaver's Bane|[Arcane Knowledge 8]
+Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you.|[Arcane Knowledge 13]
+Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you. You may apply your Conviction to the DR of any spell being cast within 5 feet of you.|[Arcane Knowledge 20]
+Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you. You may apply your Conviction to the DR of any spell being cast within 5 feet of you. Also, If you attack someone focusing on a spell you make them automatically fail their focus and interupt the spell if you hit.|15|||||||||||||||||
+Taunt|[None]
+When you attack a creature you may spend 5 Fortitude to taunt the creature. For the remainder of the combat round if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll.|[Intimidation 10]
+When you attack a creature you may spend 3 Fortitude to taunt the creature. For the remainder of the combat round if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll.|[Intimidation 20]
+When you attack a creature you may spend 3 Fortitude to taunt the creature. For the remainder of the battle if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll.|8|||||||||||||||||
+Tactical Footing|[Nimbleness 5]
+You may take a free 5 foot step before using a Basic Action.|[Ingenuity 7]
+You may take a free 5 foot step before using a Basic Action. At any time you may remove a Defensive token to take a free spontaneous 5 foot step.|[Nimbleness 10]
+You may take a free 5 foot step before and after using a Basic Action. At any time you may remove a Defensive token to take a free spontaneous 5 foot step.|10|||||||||||||||||
+===SHEET: Utility===
+Field Repair|[Mechanical Engineering 8]
+You may use a basic action to increase the condition of a non-resource item by 1 tier. The object gains the brittle trait.|[Mechanical Engineering 12]
+You may use a basic action to increase the condition of a non-resource item by 1 tier. Make a 0 Effort Mechanical Engineering check DR 10. On a failure the item gains the brittle trait.|[Mechanical Engineering 15]
+You may use a basic action to increase the condition of a non-resource item by 2 tiers. Make a 0 Effort Mechanical Engineering check DR 10. On a failure the item gains the brittle trait.|8|||||||||||||||||
+*Hello Darkness, My Old Friend|-[Any Performing Arts Skill 4]|-[]|-[]|13|||||||||||||||||
+*Inspirational Performer|-[Any Performing Arts Skill 4]
+A successful Performing Arts skill check during combat will increase your allies’ (able to witness the performance) movement 5 feet for a round and you may take a 5 foot step during the performance.|-[Any Performing Arts Skill 8; CHA +2]
+Successful performing art skill checks with a level 8 or higher allow anyone witnessing to mark successful skill checks as trainable if the skill is less than level 8. (Their skill check must still have 5 Stamina)|-[Any Performing Arts Skill 16]
+Successful performing art skill checks with a level 16 or higher give your allies (able to witness the performance) a +1 mod to all their skill checks.|9|||||||||||||||||
+*Marked for Death|-[Sneak 6]
+|-[Any Martial Arts Skill 8; Sneak 10]
+If you surprise attack a creature, and you succeed a Sneak check, gain a free round of combat on the target with a +1 mod to attacks against the target during that round. Marked for Death can't be used again during the free round.|-[Any Martial Art 12; Sneak 17]
+The killing blow is so masterful that it takes a moment for those around the target to even realize you struck the blow. You gain a free round of combat if you successfuly kill the target.  Marked for Death can't be used again during the free round.|13|||||||||||||||||
+Death Becomes Me|[Defied Death twice]
+Whenever you Defy Death gain 7 Karma.|[Defied Death thrice]
+You are immune to Monkey Paws from Defying Death. Whenever you Defy Death gain 7 Karma.|[Rolled a 10 Defying Death]
+Choose one Supernatural Exploit. You are immune to Monkey Paws from Defying Death. Whenever you Defy Death gain 7 Karma.|13|||||||||||||||||
+Fleet Footed|[Combined Athletics 30; Dex 6]
+Speed Mod +2|-[]|-[]
+|20|||||||||||||||||
+Fortify Your Mind!|[WIS 3]
+You know when someone is reading your mind.|[INT 3; CHA 3]
+You know when someone is reading your mind. You can't be put to sleep magically. +1 to Wit, Ingenuity, and Conviction|[WIS 4; INT 4; CHA 4]
+Your mind can't be read and you can't be put to sleep magically. +2 to Wit, Ingenuity, and Conviction|15|||||||||||||||||
+Head on a Swivel|[Environmental Awareness 12]
+You are considered to have an active Defensive Action outside of combat.|-[]|-[]
+|10|||||||||||||||||
+Hey! Listen!|[Leadership 6]
+You can let another creature do skill checks using your skill level. They must have at least 1 in the skill to use it. If they fail they may not mark the skill trainable.|-[]|-[]|7|||||||||||||||||
+Know Thy Mark|[Any Perception Skill 3; WIS 2]
+You know just by looking at someone their Wealth Level. If they are trying to disguise themselves then this estimate could be wrong. |[Environmental Perception 6; Social Perception 10] 
+You know just by looking at someone their Wealth Level even if they are trying to hide it.
+|[Social Perception 14]
+You know just by looking at someone their Wealth Level and all the items they are carrying even if they are trying to hide it.|4|||||||||||||||||
+Pinnacle of Health|[CON 6; Life Span < Epic]
+Increase your lifespan one tier|-[]|-[]|14|||||||||||||||||
+Recon Expert|[Social Insight 8]
+if you spend at least 1 minute observing another creature outside combat, you can learn if any skill or attribute of your choice is equal, superior, or inferior to your own.|[Social Insight 13]
+if you spend at least 1 minute observing another creature outside combat, you can learn if two skills or attribute of your choice is equal, superior, or inferior to your own.|[Social Insight 17]
+if you spend at least 1 minute observing another creature outside combat, you can learn if two skills or attribute of your choice is equal, superior, or inferior to your own. You also learn of one random exploit they possess and their current Fortitude.|7|||||||||||||||||
+Resolute|[None]
++1 Mod to all Saves.|-[]|-[]
+|15|||||||||||||||||
+Sharp Memory|[INT 5]
+You always know what direction you are traveling.|[INT 7]
+You always know what direction you are traveling. You can remember in great detail everything you have seen or heard within the past month.|[INT 9]
+You always know what direction you are traveling. You can remember in great detail everything you have seen or heard within the past month. You can memorize entire books and recite them word for word.|10|||||||||||||||||
+There's No Such Thing as Luck|[None]
+You may not spend Karma to change you or anyone else's luck. (can't bargain with GM)  Whenever you gain Karma for upholding your goals or values double the amount you recieve.|-[]|-[]|20|||||||||||||||||
+With Imagination, Anything is possible|[WIS 3]
+On completion of an invention you recieve a normal version of the item instead of a prototype.|[WIS 5]
+On completion of an invention you recieve a normal version of the item instead of a prototype. Invention minimum time is reduced from 1 month to 1 week.|[INT 5]
+On completion of an invention you recieve a normal version of the item instead of a prototype. Invention minimum time is reduced from 1 month to 1 week. +1 to Tech Level|12|||||||||||||||||
+Resolute Mind|[Environmental Awareness 10]
+Conviction +2 |[WIS 5]
+Conviction +4|[One Magic Pillar 20]
+Conviction +4. Your Toughness is applied in addition to your Conviction when resisting a spell concentration break.|18|||||||||||||||||
+Master of Disguise|[Deception 12; Social Insight 12]
+Once per session, while not in combat, you may remove your chartacter from play. At anytime after this, you may return to play revealing yourself as a GM's NPC that was just in disguise.
+|-[]
+|-[]
+|15|||||||||||||||||
+Meditation|[]
+Double recovery for all short rest Frequency spent|-[]
+|-[]
+|5|||||||||||||||||
+Easy to Find Work|[]
+You have no issues integrating into the local populace and making connections via oddjobs.|-[]
+|-[]
+|5|||||||||||||||||
+Natural Sportsman|[]
+Any attribute points spent during the course of a sport is doubled.|-[]
+|-[]
+|5|||||||||||||||||
+University Contacts|[]
+As an alumni, you have have easy access to the University reasearch resources and have contacts within the establishment.|-[]
+|-[]
+|5|||||||||||||||||
+===SHEET: Learning===
+Fast Learner|[None]
+When rolling to train a skill, a 5 and above is a success instead of 6 and above.|[INT 3; CHA 4]
+When rolling to train a skill, a 5 and above is a success instead of 6 and above. +1 to Learning Mod|[WIS 6]
+When rolling to train a skill, a 5 and above is a success instead of 6 and above. If you roll successfuly to train a skill, gain 2 levels in that skill instead of 1. +1 to Learning Mod|9|||||||||||||||||
+Gifted|[CHA 4]
+When a skill is increased from level 0 to 1, gain 2 extra levels.|-[]|-[]|10|||||||||||||||||
+Hive Mind|[Social Perception 6; CHA 4]
+Before after actions for a session you may pick one of your party members. Every time they gain a level in a skill you may make a fate roll. If the fate roll is a success you also gain a level in that skill.|[Social Perception 10; WIS 4]
+Before after actions for a session you may pick one of your party members. Every level they gain in skills you also gain.|[Social Perception 18; WIS 5; INT 5; CHA 5]
+
+Whenever a member of your party gains a level in a skill you also gain a level in that skill.|15|||||||||||||||||
+Jack of All Trades|[At least one trained skill in every skill category except magic]
+If you roll successfuly to train a basic skill, if that skill level is less than 6 then gain 2 extra levels in that skill.|-[]|-[]|6|||||||||||||||||
+Knowledge is Power|[INT 3]
+If you roll a 10 on a skill training check then you gain an extra level on that skill.|[INT 5]
+When rolling to train a skill, if you roll a 10, gain an extra level in that skill, and keep the skill marked as trainable for next session.|[INT 8]
+When rolling to train a skill, if you roll a 10, gain an extra level in that skill, keep the skill marked as trainable for next session, and gain 1 Karma.|7|||||||||||||||||
+Muscle Memory|[STR 4, DEX 5]
+Any Skills with STR or DEX governing them can be trained when they are trainable at the end of a session, regardless of your max skills trainable.|-[]|-[]|17|||||||||||||||||
+Scatterbrained|[INT 4]
+At the end of a session you may change one trainable skill to another of the same skill class.|-[]|-[]|7|||||||||||||||||
+Self Teacher|[WIS 5]
+Instead of training any skills at the end of a session you may instead gain a level in any non magic skill that is currently 0 with a successful fate roll.|-[]|-[]|5|||||||||||||||||
+===SHEET: Social===
+Alluring Spark|[Seduction 6; Beauty 7]
+Anyone that finds you sexually attractive will do one minor favor without expecting compensation.
+|[Beauty 8]
+Anyone that finds you sexually attractive will do one minor favor without expecting compensation. Your Social Skill Checks aren't effected by Deficiency Status Effects. |[Beauty 10]
+Anyone that finds you sexually attractive will do one minor favor without expecting compensation. Your Social Skill Checks aren't effected by Deficiency Status Effects. Anyone that has had sex with you can't contest any of your Social Skill checks for 5 days and will do one medium favor without expecting compensation.|7|||||||||||||||||
+Diplomatic Immunity in (X)|[Law 8]
+Government officials can’t persecute based on their laws if murder isn’t involved; the most they can do is detain and extradite you. (X is equal to a region the size of a large city.)|[Law 14]
+  Even if murder is involved the law can only detain and extradite you.|[Law 16]
+The law can't touch you.|15|||||||||||||||||
+Heavenly Beauty|[Beauty 10, All Social Skills 5]
+Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies.|[Seduction 13]
+Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies. Seduction checks can’t be denied because of a character’s sexual preference.|[All Social Skills 15]
+Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies. Seduction checks can’t be denied because of a character’s sexual preference. Some may assume you to be a deity just by looking at you and they may try to bestow gifts to you.|20|||||||||||||||||
+Letting Off Steam|[None]
+Successful intimidation skill checks reduce your strain by the score of the skill check -2.|[Survival 8, Fortitude 4]
+Successful intimidation skill checks reduce your strain by the score of the skill check -2 and you get +2 Strain reduction from alcohol.|[CHA 7]
+Successful intimidation skill checks reduce your strain by the score of the skill check -2 and you get +2 Strain reduction from alcohol. When your strain is 10 or higher, double your combat damage and reduce your strain by 4 when you make a successful combat roll.|10|||||||||||||||||
+You Have No Power Over Me!|[WIS 4]
+Others may not apply their beauty modifier to checks against you.|[WIS 5; INT 6]
+Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or seduced unless you allow it.|[WIS 6; INT 6; CHA 5]
+Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or seduced unless you allow it. Supernatural and magical effects used to control you have no effect.|15|||||||||||||||||
+===SHEET: Magic===
+Chaotic Spark|[None]
+Add 3 levels to every school of magic. You can no longer spellweave and all woven spells you have are gone. When raw casting you can not choose what school to cast from, instead roll a 1d10 to determine what school of magic you will cast from.|-[]|-[]|13|||||||||||||||||
+Enchanted Performer|[None]
+You may use a performing arts skill to augment casting magic. Add half your skill level in the performing art rounded down to the magic skill check. The time required for casting is doubled.|-[]|-[]|15|||||||||||||||||
+Ritualist|[Supernatural Perception 10; Arcane Knowledge 10]
+You may destroy items in exchange for mana during spellcasting. This mana may not be stored. The mana recieved is detemined by the GM based on the items value grade and condition. The GM may also determine an item isn't worth any mana. |-[]|-[]|10|||||||||||||||||
+Altruistic Spark|[Positive or Neutral Attunement]
+Monkey Paws from raw casting can only be directed at you. |-[]|-[]|8|||||||||||||||||
+Attunement (X)|[Replaces Feel the Esther Level 1; Must be gained through Root, Branch, Blossom, or GM awarded]
+You gain the ability to use magic and spellweave. Mercy, Severity or Balance attunement|-[]|-[]|15|||||||||||||||||
+Battery Body|[Any Domains of Magic Skill 4; Arcane Knowledge 5]
+You can store 5 mana within your body.|[Any Domains of Magic Skill 6; Arcane Knowledge 10]
+You can store 10 mana within your body.|[Any Domains of Magic Skill 8; Arcane Knowledge 15]
+You can store 15 mana within your body.|14|||||||||||||||||
+Blessed Arcana|[Must be gained through Root, Branch, Blossom, or GM awarded]
+You have a strong foundation in the arcane arts. You will take no negatives from the Understand the Esther blossom.|[Arcane Knowledge 6; Feel the Esther Level 1]
+You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Mercy Magic Skill|[Arcane Knowledge 10]
+You have a strong foundation in the holy arcane arts. You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Mercy Magic Skill. You will take no negatives from the Path to Attunement Blossom.  Additionally, gain a +2 mod to your roll when trying to gain Attunement. You will be Possitively Attuned.|7|||||||||||||||||
+Demonic Arts|[Must be gained through Root, Branch, Blossom, or GM awarded]
+You can peform an ancient dark ritual to unlock a connection to the Esther. Remove 1 attribute point from a fellow party member as you perform the ritual to unlock the knowledge you seek. Instantly gain the Feel the Esther Exploit.|[Arcane Knowledge 6; Feel the Esther Level 1]
+You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Severity Magic Skill|[Arcane Knowledge 10]
+You have a strong foundation in the dark arts. You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Severity Magic Skill. With great sacrifice, you can gain your attunement through the suffering of those around you. Have one of your party members make a Fate Roll. on a 1-5 they instantly die. On 6-10 they suffer a Major Monkey Paw. Either way, you gain Negative Attunement.|7|||||||||||||||||
+Esther Conduit|[Used 20 Mana]
+Whenever you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored and must be applied to the current casted spell or it burns up.|[Used 40 Mana]
+When you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. If someone else uses mana to cast a spell within 500 feet of you, you recieve half of the mana rounded up that they used which was stored in their body. You may store this mana.|[Used 60 Mana]
+When you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. If someone else uses mana to cast a spell within 500 feet of you,  you recieve half of the mana rounded up that they used which was stored in their body. When you succesfully raw cast using mana, you may roll a die equal to the mana used rounded down to closest die. Gain back the amount of mana rolled on the die.|10|||||||||||||||||
+Feel the Esther|[Must be gained through Root, Branch, Blossom, or GM awarded]
+You can increase levels in the Domains of Magic Skills. (This doesn't give you the ability to cast or spellweave.)|-[]|-[]|5|||||||||||||||||
+Parsley, Sage, Rosemary, and Thyme|[Chemical Engineering 6; Arcane Knowledge 8]
+You may raw cast by sacrificing items. Using a magic action, you may destroy one undamaged item to cast from any school of magic. The value of the item is equal to the skill during casting. No mana from any source may be added to this raw cast.|[Chemical Engineering 10; Arcane Knowledge 12]
+You may raw cast by sacrificing items. Using a magic action, you may destroy up to 2 undamaged item to cast from any school of magic. The combined value of the items is equal to the skill during casting. No mana from any source may be added to this raw cast.|[Chemical Engineering 12; Arcane Knowledge 16]
+You may raw cast by sacrificing items. Using a magic action, you may destroy up to 3 undamaged item to cast from any school of magic. The combined value of the items is equal to the skill during casting. Remaining values above 20 are considered mana added to the spell. No other mana from any source may be added to this raw cast.|12|||||||||||||||||
+Sacred Exchange|[The Hunger or Arcane Knowledge 8]
+You may freely consume 1 available Mana to instantly regain 1 Fortitude.|-[]|-[]|5|||||||||||||||||
+Selfish Spark|[Negative or Neutral Attunement]
+Monkey Paws from raw casting can only be directed at others or the environment.|-[]|-[]|10|||||||||||||||||
+Karmic Power|[None]
+You may use Karma as if it was Mana stored in your body.|-[]|-[]|20|||||||||||||||||
+Don't Break My Concentration|[Arcane Knowledge 12]
+If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body.|[Supernatural Perception 12]
+If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body. Any mana you used for the spell is returned to you.|[Conviction 10]
+If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body. Any mana you used for the spell is returned to you. The spell is still dispelled but isn't considered failed. (You may not mark it as trainable but no monkey paws are triggered)|20|||||||||||||||||
+Attunement Unlocked|[1 School of magic in your attunement pillar 20]
+You may roll an additional 1d10 when casting any spell in your pillar of attunement|[2 Schools of magic in your attunement pillar 20]
+You may roll an additional 1d12 when casting any spell in your pillar of attunement|[3 Schools of magic in your attunement pillar 20]
+You may roll an additional 1d20 when casting any spell in your pillar of attunement|25|||||||||||||||||
+===SHEET: Supernatural===
+Ancient Soul|[None]
+This body may be new but your soul is very old. +1 Karma at the end of every session no matter what.|-[]|-[]|20|||||||||||||||||
+Born Evolved|[None]
+All attributes +1|-[]|-[]|36|||||||||||||||||
+Death's Hand|[Lifespan < 4 - Long]
+Increase Lifespan 2 ranks. If someone in your party must roll to defy death then you must also roll to defy death. You don't recieve a monkey paw but if you roll a 5 or lower then your character is doomed.|-[]|-[]|20|||||||||||||||||
+Eidetic Memory|[None]
+You remember everything you read, hear, or see in great detail with nearly perfect recollection. This should provide substantial bonuses in numerous occasions at GM's discretion. Also you no longer have to roll or spend karma to level up skills at the end of a session. (You can still only gain a max amount of skill points per session based on your learning amount.)|-[]|-[]|30|||||||||||||||||
+Enthralling Aura|[None]
+Enthrall one being of DR of 11 or lower at a time. You have complete control over them. GM makes them a character sheet and plays them but you command them.|[Subsequent Earning]
+Enthrall one being of DR of 18 or lower at a time. You have complete control over them. GM makes them a character sheet and plays them but you command them.|[Subsequent Earning]
+Entrall any non player being. You have complete control over them. GM makes them a character sheet and plays them but you command them.|15|||||||||||||||||
+Flight|[None]
+You have the natural ability of flight. You can fly in any direction at your movement speed.|-[]|-[]|20|||||||||||||||||
+Healing Factor|[None]
+Worn body parts automaticaly heal in 6 seconds or one combat round.|[CON +4]
+Worn and broken body parts heal one condition in 6 seconds or one combat round.|[CON +6]
+Worn and broken body parts heal one condition in 6 seconds or one combat round. Destroyed body parts heal in 1 day.|15|||||||||||||||||
+Magic Negator (X)|[None]
+If (X) school of magic is used within 300 feet of you the spell is instantly countered and you have access to the mana used for that spell. You can store the mana in a catalyst or it must be used within 6 seconds or by the end of the next combat round. (YOU CAN NOT CAST FROM THAT SCHOOL EITHER)|-[]|-[]|17|||||||||||||||||
+Precognition|[None]
+You may at anytime ask the GM to have the last 10 minutes of game time be replayed. The events never happened; you just saw the future. You can't replay the same span of time twice.  (Can only be used once per session)|-[]|-[]|23|||||||||||||||||
+Proof (X)|[None]
+Your body is naturally immune to cold, fire, electricity, or acid|-[]|-[]|18|||||||||||||||||
+Shapeshifter|[None]
+You may change your apperance at will. You can't grow or shrink in size but everything else is free game. Changing is exhausting and every transformation reduces your Fortitude by 5. This can allow the user to change their Beauty stat.|-[]|-[]|15|||||||||||||||||
+The Hunger|Consume the Body: [None]
+Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude.|Drink the Spirit: [Subsequent Earning]
+Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude. Consuming a body gives you Mana equal to the victims KV/100 rounded down. (You must still follow the rules of storing or using mana) You may only recieve Mana from a meal once per day.|Savour the Soul: []
+Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude. When consuming a body you may choose to recieve Mana equal to the victims KV/100 rounded down or Karma equal to their KV/200 rounded down. You may only recieve Karma from a meal once per session and Mana once per day.|14|||||||||||||||||
+The Need for Speed|1.209 Gigawatts: [None]
++2 to APT; + 6 Speed Mod|Give Me Fuel, Give Me Fire: [Subsequent Earning]
++2 to APT; +6 Speed Mod; +8 Healing Mod;|Touch the Speed Force: [Subsequent Earning]
++2 to APT; +7 Speed Mod; +8 Healing Mod; Once a day you can move 99.99% the speed of light for a minute.|14|||||||||||||||||
+They're All Going to Laugh at You!|[None]
+You can create a medium size fire at will within 30 feet of you. In combat this can only be done once per round as an offesnive action. Damage from this fire is 15 Fire.|-[]|-[]|10|||||||||||||||||
+Undead|[None]
+CON levels are reduced to 0 and you can't gain CON. You can't die from having a 0 CON. Regen Mod is reduced to 0 and you can't raise it higher. +300 Stamina Mod.|-[]|-[]|13|||||||||||||||||
+Unnatural Existence|[None]
+You do not need to eat, drink, or sleep. You don't lose Fortitude from a lack of any of these things.|[CON +5]
+You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't lose Fortitude from a lack of any of these things.|[Immortal Life Span]
+You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't lose Fortitude from a lack of any of these things. The only way you can die is if your head is destroyed.|24|||||||||||||||||
+Voice of the Esther|[None]
+You are connected to everything around you, the elements speak to you, and let know you what is happening around you at all times.  You cannot be caught unaware.  Any trap/hidden object, creature, or person is known to you.|-[]|-[]|20|||||||||||||||||
+Leyline of Ascalia|[Special]
+There is a surplus of Mana to draw from this realm. Whenever anyone draws upon this leyline it gives 1d20 worth of mana to be used immedietly. The Mana given then goes down one tier of dice. It goes back up one tier everyday.|-[]|-[]|30|||||||||||||||||
+Iron Mind|[None]
+Your memory cannot be changed or altered by any outside force. You can vividly relive moments from your past and remember details you may not have conciously remembered. |-[]|-[]|10|||||||||||||||||
+Impossible Luck|[None]
++1 Mod to all Basic Skills|-[]|-[]|30|||||||||||||||||
+Esther Locked|[None]
+Magic that targets you automatically fails|-[]|-[]|40|||||||||||||||||
+===SHEET: Super Tech===
+Machine Interfacing|[Neo-Human or GM discretion]
+Your brain is altered in a way so that you can connect directly with computers and AI systems. You May purchase Super Tech Exploits with Karma. This allows you to use certain advanced technologies like nanobots. You can also upload and download data from capable computer systems within 100 feet. |-[]|-[]|15|||||||||||||||||
+Nano Sustenance (Remove)|[Nano Interface MkII]
+Memory Usage 2
+You do not need to eat, drink, or breathe. You don't lose Fortitude from a lack of any of these things|-[]|-[]|20|||||||||||||||||
+Perfect Machine (Interface Upgrade)|[Nano Interface MkI]
+You do not need to eat, drink or sleep to survive. Instead of sleeping you must go through a 1 hour maintenance cycle  each day for your nano systems to perform. If you do not willingly perform this cycle, it automatically begins exactly 24 hrs after the previous one began. |[Nano Interface MkII]
+You do not need to eat, drink or sleep to survive and you are immune to all non-magical poisons and diseases. Instead of sleeping you must go through a 1 hour maintenance cycle  each day for your nano systems to perform. If you do not willingly perform this cycle, it automatically begins exactly 24 hrs after the previous one began|[Nano Interface MkIII]
+You do not need to eat, drink or sleep to survive and you are immune to all non-magical poisons and diseases. Instead of sleeping you must go through a 1 hour maintenance cycle  each day for your nano systems to perform. while in your inactive state, you remain aware of your surroundings. You still cannot move or perform any actions while in this state. Additionally, you can push back the maintenance cycle by  an additional day or more, but you incur the same penalties that a creature would by not sleeping.|10|||||||||||||||||
+Scan & Replicate (Interface Upgrade)|[Nano Interface MkI]
+You may scan a medium object, immediately learning all of its physical traits and store it in your memory banks. By spending 1 minute concentrating, you may replicate an object in your memory banks at a point you can see within 50 feet using the environment, unworn, or uncarried objects. The replicated item loses any magical properties if it has any.|[Nano Interface MkIII]
+You may scan a medium object, immediately learning all of its physical traits and store it in your memory banks. By spending 6 seconds concentrating, you may replicate an object in your memory banks at a point you can see within 100 feet using the environment, unworn, or uncarried objects. The replicated item loses any magical properties if it has any.|[Nano Interface MkV]
+You may scan a large object, immediately learning all of its physical traits and store it in your memory banks. By using a basic action, you may replicate an object in your memory banks at a point you can see within 50 feet using the environment, unworn, or uncarried objects. The replicated item loses any magical properties if it has any. Furthermore, your memory banks become optimized at storing less impressive schematics. Any object scanned up to the Simple Tier of technology costs 0 memory to store.|15|||||||||||||||||
+Matter Manipulation (Interface Upgrade)|[Nano Interface Mk II]
+You may perform a “Raw Cast” using your Nanomachines to create a spell-like effect by rearranging matter on a molecular level. The DR and skill check is based on GM discretion and materials around.|[Nano Interface Mk III]
+You may perform a “Raw Cast” using your Nanomachines to create a spell-like effect by rearranging matter on a molecular level. The DR and skill check is based on GM discretion and materials around. All monkey paws are reduced by 1 tier on a fail.|[Nano Interface Mk IV; Perfect Machine]
+You can create a spell-like effect regardless of materials around by rearranging matter on a subatomic level. The DR and skill check is based on GM discretion. Manipulating matter on a subatomic scale puts a lot of stress on your body. All nano programs are forcibly shut down until your next Maintenance Cycle. All monkey paws are reduced by 1 tier on a fail.|20|||||||||||||||||
+Babel Translation (Interface Upgrade)|[Nano Interface MKI]
+You can understand any spoken language.|[Nano Interface MKII]
+You can speak and understand any language.|[Nano Interface Mk III]
+You can speak, read, write, and understand any language.|10|||||||||||||||||
+Nanokinesis (Interface Upgrade)|[Nano Interface MKI]
+You gain the ability to move or manipulate creatures and objects using only your nanos. You can exert your will on up to 1 large object or creature that weighs 500 lbs or less within 25 feet. You may move the object up to 25 feet. If it is an unwilling creature, you enter a grapple contest using your Physics. The creature is considered grappled while held by this ability.|[Nano Interface MKIII]
+You gain the ability to move or manipulate creatures and objects using only your nanos. You can exert your will on up to 1 Huge object or creature that weighs up to 500 lbs within 50 feet. You may move the object up to 50 feet. If it is an unwilling creature, you enter a grapple contest using your Physics. The creature is considered grappled while held by this ability.|[Nano Interface MKV]
+You gain the ability to move or manipulate creatures and objects using only your nanos. You can exert your will on a number of object/creatures that are collectively up to the size of gargantuan and weigh up to 5000 lbs within 100 feet. You may move the object(s) up to 100 feet. If they are an unwilling creature(s), you enter a grapple contest using your Physics. The creature(s) is considered grappled while held by this ability.|10|||||||||||||||||
+Self-repairing (Interface Upgrade)|[Nano Interface MKI]
+Your nanomachines allow you to heal at an extraordinary rate. Broken or worn body parts repair by one tier per reset cycle.|[Nano Interface MKIII; Perfect Machine]
+Your nanomachines allow you to heal at an extraordinary rate. Broken or worn body parts repair by one tier per reset cycle. You may also spend 8 hours in a maintanence cycle to repair destroyed body parts.|[Nano Interface MKV; Perfect Machine]
+Your nanomachines allow you to heal at an extraordinary rate. Broken or worn body parts repair by one tier per reset cycle. You may also spend 8 hours in a maintanence cycle to repair destroyed body parts. In addition, you regain fortitude equal to your heal rate for each hour spent in a maintanence cycle.|10|||||||||||||||||
+If/Then (Interface Upgrade)|[Nano Interface MKI; Perfect Machine]
+After you finish a maintenance cycle, you may designate one condition. Whenever that condition is met, a Nanomachine program can activate instantly as a spontaneous action. |[Nano Interface MKII; Perfect Machine]
+After you finish a maintenance cycle, you may designate one condition. Whenever that condition is met, a Nanomachine program can activate instantly as a spontaneous action. You may also designate an "Else" condition where an aditional program is active while the "If" condition is not met.|[Nano Interface MKIII; Perfect Machine]
+After you finish a maintenance cycle, you may designate a number of conditions equal to 1/2 you Wit (Minimum of 2). Whenever that condition is met, a Nanomachine program can activate instantly as a spontaneous action. You may also designate an "Else" condition where an aditional program is active while the "If" condition is not met.|10|||||||||||||||||
+Re-Spec the System (Interface Upgrade)|[Nano Interface MKI; Perfect Machine]
+Once per day after completing a maintenance cycle, you may lower one or more stats by up to 6 points (to a minimum score of 1) and re-allocate them to other stats temporarily. You go back to your original stats at the completion of your next cycle. |[Nano Interface MKIII; Perfect Machine]
+Once per day after completing a maintenance cycle, you may lower one or more stats by up to 12 points (to a minimum score of 0) and re-allocate them to other stats temporarily. You go back to your original stats at the completion of your next cycle. |[Nano Interface MKV; Perfect Machine]
+By concentrating for 1 minute, you may lower one or more stats by up to 12 points (to a minimum score of 0) and re-allocate them to other stats temporarily. You go back to your original stats at the completion of your next cycle. You can re-spec your system a number of times equal to ½ your Ingenuity (minimum of 2).|20|||||||||||||||||
+Absorb Light (Loop)|[Nano Interface MKI; 1 Energy, 1 Memory]
+By redirecting photons in the air around you, you can freely control non-magical light. You may increase or reduce non-magical light around you in a 30 foot radius creating up to a bright light source or complete darkness.|[Nano Interface MKII; 1 Energy, 1 Memory]
+By redirecting photons in the air around you, you can freely control non-magical light. You may increase or reduce non-magical light around you in a 30 foot radius creating up to a bright light source or complete darkness. You can also bend light around objects, causing them to seemingly vanish from view. As a basic action, you can render one medium object or creature invisible.|[Nano Interface MKIII; 1 Energy, 1 Memory]
+By redirecting photons in the air around you, you can freely control non-magical light. You may increase or reduce non-magical light around you in a 30 foot radius creating up to a bright light source or complete darkness. You can also bend light around objects, causing them to seemingly vanish from view. As a basic action, you can render one medium object or creature invisible. Additionally, you can release a burst of bright light to temporarily blind a target that is looking at you. Roll a physics check contesting their Virility, on a success, the target is blinded for one round.|5|||||||||||||||||
+Adrenaline Spark (Single Run)|[Nano Interface MKI; 1 Energy, 1 Memory]
+Using your Nanomachines, you can create a surge of adrenaline in a creature that isn’t a Neo-Human. A target creature within 30 Feet immediately gains 1 APT for the next minute.|[Nano Interface MKIII; 1 Energy, 1 Memory]
+Using your Nanomachines, you can create a surge of adrenaline in a creature that isn’t a Neo-Human. A target creature within 30 Feet immediately doubles their movement and gains 1 APT for the next minute. Additionally, you can attempt to create additional surges in a target, granting them 1 additional APT. For every additional APT beyond the first, give a DC 5 Biology check. On a failure, they lose all APT as they become stunned for one round.
+|[Nano Interface MKV; 1 Energy, 1 Memory]
+Using your Nanomachines, you can create a surge of adrenaline in a creature. A target creature within 30 Feet immediately doubles their movement and gains 1 APT for the next minute. You can also attempt to create additional surges in a target, granting them 1 additional APT. For every APT beyond the first, give a DC 5 Biology check. On a failure, they lose all APT as they become stunned for one round. In addition, you can target one enemy and force an adverse reaction. Make a Biology check against the target’s Virility. On a success, the target becomes stunned that round.
+|5|||||||||||||||||
+Firewall (Interface Upgrade)|[Nano Interface MKII; Perfect Machine]
+While in a maintenance cycle, you can set your nanomachines to a hyper-defensive state, protecting you while you would otherwise be helpless. You gain reactive armor with a resist of 50. If the armor is overwhelmed, this program deactivates.|[Nano Interface MKIII; Perfect Machine]
+While in a maintenance cycle, you can set your nanomachines to a hyper-defensive state, protecting you while you would otherwise be helpless. You gain indestructable armor with a resist of 50 that critical hits cannot bypass.|[Nano Interface MKV; Perfect Machine]
+While in a maintenance cycle, you can set your nanomachines to a hyper-defensive state, protecting you while you would otherwise be helpless. You gain indestructable armor with a resist of 50 that critical hits cannot bypass. You gain a retributive strike. When you are attacked, your Nanos can lash out at the attacker using a Mechanical Engineering check. On a hit, the attacker takes damage equal to what they struck you with.|20|||||||||||||||||
+P.R.A. Precise Reaction Analysis (Loop)|[Nano Interface MKI; 2 Energy, 1 Memory]
+Your nanobots make a field around you that reacts to even the smallest movements that intend harm. You gain a layer of armor choosing if it is hard or soft on activation. It has a resist of 10. The program deactivates if damage overpowers the resist.|[Nano Interface MKII; 2 Energy, 1 Memory]
+Your nanobots make a field around you that reacts to even the smallest movements that intend harm. You gain a layer of armor choosing if it is hard or soft on activation. It has a resist of 20.  If the program is overwhelmed you can reactivate it as a spontaneous action, spending the energy cost again.|[Nano Interface MKIV; 2 Energy, 1 Memory]
+Your nanobots make a field around you that reacts to even the smallest movements that intend harm. You gain a layer of armor choosing if it is hard or soft on activation. It has a resist of 30.  If the program is overwhelmed you can reactivate it as a spontaneous action, spending the energy cost again. You can also overcharge the field with an additional activation as a spontaneous action, preventing a critical hit from piercing this layer.|10|||||||||||||||||
+Quantum Memory Resonance (Loop)
+3 Memory|[Nano Interface MKI]
+Burn 3 Energy per Loop Program in Memory: You reduce the upkeep costs of active loops by 2 energy per round while this is on.  |[Nano Interface MKIII]
+Burn 2 Energy per Loop Program in Memory: You reduce the upkeep costs of active loops by a total of 3 energy per round while this is on.|[Nano Interface MKV]
+Burn 1 Energy per Loop Program in Memory: You reduce the upkeep costs of active loops by 4 energy per round while this is on. Additionally, any information that you see or hear while this loop is active can be perfectly recalled.|5|||||||||||||||||
+Diagnostic Scan (Loop)|[Nano Interface MKI; 2 Energy, 2 Memory]
+By switching your perception to the nanomachines, you become hyper-aware of your surroundings. You can hear anything ranging from the flap of a fly wing down to the buzz of a molecule. While this program is active, you cannot be surprised and gain a leverage on perceiving things.|[Nano Interface MKII; 2 Energy, 2 Memory]
+By switching your perception to the nanomachines, you become hyper-aware of your surroundings. You can hear anything ranging from the flap of a fly wing down to the buzz of a molecule. While this program is active, you cannot be surprised and gain a leverage on perceiving things. Traps and other hidden objects or creatures are revealed to you within 25 feet.|[Nano Interface MKIII; 2 Energy, 2 Memory]
+By switching your perception to the nanomachines, you become hyper-aware of your surroundings. You can hear anything ranging from the flap of a fly wing down to the buzz of a molecule. While this program is active, you cannot be surprised and gain a leverage on perceiving things. Traps and other hidden objects or creatures are also revealed to you within 50 feet. Additionally, you may also use this ability in combat. If you make an attack while this loop is active, it automatically becomes a critical on a hit. This program deactivates after being used like this.|15|||||||||||||||||
+Flesh Reweave (Loop)
+5 Memory|[Nano Interface MKIII]
+Burn 3 Energy: You can use your nanomachines to bring someone back from the brink of death. Stabilizes a dying target within 50 feet.|[Nano Interface MKIV]
+Burn 4 Energy: You can use your nanomachines to bring someone back from the brink of death. Stabilizes a dying target within 50 feet. You can also use your nanomachines to repair broken or worn body parts by one tier over the course of 1 hour.|[Nano Interface MKV]
+Burn 5 Energy: You can use your nanomachines to bring someone back from the brink of death. Restore 5 Fortitude to a target within 50 feet. You can also use your nanomachines to repair broken or worn body parts by one tier over the course of 1 hour or a destroyed body part over the course of 24 hours.|15|||||||||||||||||
+Photonic Leap (Single Run)|[Nano Interface MKI; 1 Energy, 2 Memory]
+Using a movement action, your entire body is broken down and beamed via light, teleporting you to a location you can see within your movement distance. |[Nano Interface MKII; 1 Energy, 2 Memory]
+Using a movement action, your entire body is broken down and beamed via light, teleporting you to a location within your movement distance. If you land in an occupied space, you are junted to the nearest unoccupied space. |[Nano Interface MKIII; 1 Energy, 2 Memory]
+Using a movement action, your entire body is broken down and beamed via light, teleporting you to a location within your movement distance. If you land in an occupied space, you are junted to the nearest unoccupied space. You may also use a defense token to teleport as a spontaneous action upon being targeted by an attack or ability. You may do this twice per token.|10|||||||||||||||||
+Mechanical Mimic (Single Run)|[Nano Interface MKIII; Perfect Machine; 3 Energy, 1 Memory]
+You may copy an available combat or utility exploit of anyone around you within 25 feet and store it in your memory (takes up 2 memory units). This exploit is cleared during the next maintenance cycle.  |[Nano Interface MKIV; Perfect Machine; 3 Energy, 1 Memory]
+You may copy an available Combat, Utility, Learning, Social, or Natural exploit of anyone around you within 25 feet and store it in your memory (takes up 2 memory units). This exploit is cleared during the next maintenance cycle.  |[Nano Interface MKV; Perfect Machine; 3 Energy, 1 Memory]
+You may copy an available Combat, Utility, Learning, Social, Natural, or SuperTech exploit of anyone around you within 25 feet and store it in your memory (takes up 2 memory units). This exploit remains in your Memory Bank until you choose to remove it. |15|||||||||||||||||
+Memory Leak (Single Run)|[Nano Interface MKI; Perfect Machine; 1 Energy, 2 Memory]
+You may attempt to drain an opponent’s talent in a skill within 25 feet. Roll a Mechanical Engineering check against their Conviction. On a fail, their skill level is reduced by 1 dice tier on a skill of your choice for 5 minutes.|[Nano Interface MKIII; Perfect Machine; 1 Energy, 2 Memory]
+You may attempt to drain an opponent’s talent in a skill within 25 feet. Roll a Mechanical Engineering check against their Conviction. On a fail, their skill level is reduced by 1 dice tier on a skill of your choice for 5 minutes.  You may add the value lost to your own skill level for the duration|[Nano Interface MKV; Perfect Machine; 1 Energy, 2 Memory]
+You may attempt to drain an opponent’s talent in a skill within 25 feet. Roll a Mechanical Engineering check against their Conviction. On a fail, their skill level is reduced to 0 on a skill of your choice for 5 minutes.  You may add the value lost to your own skill level for the duration.|10|||||||||||||||||
+Nueral Installation Link (Single Run)|[Nano Interface MKII; 3 Energy, 2 Memory]
+You may spend 1 minute carefully planting a nano machine in a willing creature’s cerebrum. For the next 24 hours, you can see and hear what they hear.|[Nano Interface MKIII; 3 Energy, 2 Memory]
+You may spend 1 minute carefully planting a nano machine in a willing creature’s cerebrum. For the next 24 hours, you can see and hear what they hear. You may also create auditory and visual hallucinations in a target you are linked to. Additionally, you can link multiple willing creatures, allowing mental and empathetic communication between them.|[Nano Interface MKIV; 3 Energy, 2 Memory]
+You may spend 1 minute carefully planting a nano machine in a willing creature’s cerebrum. You can see and hear what they hear and may create auditory and visual hallucinations in a target you are linked to. Also, you can link multiple willing creatures, allowing mental and empathetic communication between them. In addition, you may attempt to link to an unwilling target as you would an ally. Roll a Biology check against their Conviction. On a success, the nano is planted. Otherwise it fails and you become unable to try again for 24 hours.|20|||||||||||||||||
+Turbo Injection (Single Run)|[Nano Interface MKIII; 3 Energy, 3 Memory]
+Your nanos push your body to the limit of speed. Your APT is doubled this round. APT Gain Limited to 4 |[Nano Interface MKIV; 3 Energy, 3 Memory]
+Your nanos push your body to the limit of speed. Your APT is doubled. In addition your movements become extremely difficult to track. You gain a +5 Nimbleness Mod this round. APT Gain Limited to 4 |[Nano Interface MKV; 3 Energy, 3 Memory]
+Your nanos push your body to the limit of speed. Your APT is doubled. In addition your movements become extremely difficult to track. You gain a +5 Nimbleness Mod. Activating this program is a Free Spontaneous Action and it changes from a single run program to a Loop. APT Gain Limited to 4 |25|||||||||||||||||
+Down to the Nano (Single Run)|[Nano Interface MKIII; Perfect Machine; 4 Energy, 3 Memory]
+After 1 minute of concentrating, you may cause your body to disintegrate with your consciousness transfering to your nanomachines. As a cloud of nanos, you can move in any direction and can ignore all objects and effects, allowing you to pass unhindered. Creatures cannot perceive or interact with you unless a special ability or magic has given them the ability to. You can reform your body with 10 minutes of concentration.|[Nano Interface MKIV; Perfect Machine; 4 Energy, 3 Memory]
+As a Basic Action, you may cause your body to disintegrate with your consciousness transfering to your nanomachines. As a cloud of nanos, you can move in any direction and can ignore all objects and effects, allowing you to pass unhindered. Creatures cannot perceive or interact with you unless a special ability or magic has given them the ability to. You can reform your body with 10 minutes of concentration.|[Nano Interface MKIV; Perfect Machine; 4 Energy, 3 Memory]
+As a Basic Action, you may cause your body to disintegrate with your consciousness transfering to your nanomachines. As a cloud of nanos, you can move in any direction and can ignore all objects and effects, allowing you to pass unhindered. Creatures cannot perceive or interact with you unless a special ability or magic has given them the ability to. You can reform your body with 10 minutes of concentration. You may also spend 1 hour planting a nanomachine in a location to act as a beacon with the range of 100 miles. If you die while this beacon is active and in range, the program activates spontaneously and the cloud returns to the beacon automatically. If the cloud successfully returns, a new body is created over the next 24 hours. You remain unconscious until the new body is formed.|25|||||||||||||||||
+Level Playing Field (Single Run)|[Nano Interface MKV; Perfect Machine; 10 Energy, 3 Memory]
+You release a wave of quantum energy that both disrupts mana and discombobulates creatures caught within. All creatures of your choice within 500 feet of you cannot use mana and take a -10 Mod to all skill checks for 1 minute. When the ability fades, all nanosystems shut down until your next maintenance cycle and you must make a fate roll. On a failure, you immediately enter a maintenance cycle.  |-[]|-[]|30|||||||||||||||||
+===SHEET: Negative===
+Allergic to (X)|[None]
+When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds).|[Subsequent Earning]
+When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds) and +2 DR to every roll.|[Subsequent Earning]
+When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds) and +2 DR to every roll. If X touches you it causes immediate Death.|-8|||||||||||||||||
+Bad Blood with (X)|[None]
+The person or group doesn't trust you. +2 DR to all checks involved with influencing that person or group.|[Subsequent Earning]
+The person or group hates you. +4 DR to all checks involved with influencing that person or group, and they will be strongly urged to attack you and your party if they notice you.|[Subsequent Earning]
+You can't use social skills against this person or group and they will most certainly attack you on sight.|-5|||||||||||||||||
+Bane (X)|[None]
+When you are within 100 feet of X all your skill rolls get a -5 mod and you lose 5 Fortitude every turn (6 Seconds).|-[]|-[]|-12|||||||||||||||||
+Broken Heart|[Heart is Taken by (X) X Dies]
+Add +2 DR to all Skill Checks you perform. If the GM allows, you may replace this Exploit with a Level in Emotional Scars Exploit after some time has passed.|-[]|-[]|-25|||||||||||||||||
+Emotional Baggage|[None]
+The horrors of your past are hard to let go. Strain reduction from sleep is halved rounded down.|-[]|-[]|-7|||||||||||||||||
+Emotional Scars|[Replaces Emotional Baggage]
+Whatever happend to you left so much damage that when vulnerable you can't help but dwelling on your past wounds.  Strain reduction from sleep is halved rounded down and when Distressed double all Strain acquired.|-[]|-[]|-14|||||||||||||||||
+Emotional Torment|[Replaces Emotional Scars]
+The pain is so bad that death is probably welcomed. Strain isn't reduced from sleep. When Distressed, double all Strain acquired.You may not attempt to defy death.|-[]|-[]|-21|||||||||||||||||
+Heart is Taken by (X)|[None]
+Strain does not reduce from intimate enounters unless it is with the person who has taken your heart. If you are away from this person for more than a month then you'll receive 4 Strain at the end of every session until you see them again. If they die, replace this exploit with the Broken Heart exploit.|-[]|-[]|-20|||||||||||||||||
+I'm Awkward|[None]
+Social ineptness is often a sign of a genius but it also means social situations are extremely taxing and hard to understand.
+Social Perception, and Social Skills cannot be purchased with karma; if you attempt to increase them with a training roll then you must roll a 10 instead of a 6 or higher.|-[]|-[]|-14|||||||||||||||||
+Impaired Taste|[None]
+Eating doesn't restore Fortitude|-[]|-[]|-4|||||||||||||||||
+Karma is a Bitch|[None]
+Remove 1 Karma at the end of each session. This removal does not increase your KV. (This can take you into negative Karma)|-[]|-[]|-25|||||||||||||||||
+Over-Thinker|[None]
+Exerting INT governed skill checks results in double the Strain.|-[]|-[]|-8|||||||||||||||||
+Silver Spoon|[None]
+You are not used to getting your hands dirty or being uncomfortable. You lose double Fortitude whenever you Exert a Skill Check.|-[]|-[]|-15|||||||||||||||||
+Stagnant Vitality|[None]
+Your Heal Rate is always effectively 0. You don't recover Fortitude from Sleeping.|-[]|-[]|-25|||||||||||||||||
+Static|[None]
+All attributes are set to 2 and can't be changed by Roots, Branches, Blossoms, or Thorns|-[]|-[]|-30|||||||||||||||||
+Strange Vibrations|[None]
+You can't use, resist, or gain any positive benefits from magic.|-[]|-[]|-30|||||||||||||||||
+Strange Vibrations (Partial Supression)|[None]
+It is easier to cast negative spell targeting you and harder for possitive. -5 DR to negative spells targeting you. +5 DR to possitive spells targeting you.|-[]|-[]|-15|||||||||||||||||
+Teetotaler|[None]
+You won't drink alcohol willingly. Drinking Alcohol doesn't restore Fortitude.|-[]|-[]|-4|||||||||||||||||
+That's Mine!|[None]
+If you give something away you take strain equal to the value of the object/100. |-[]|-[]|-6|||||||||||||||||
+Weak Weave Connection|[None]
+You may only Raw Cast Empowered Spells and lower (<30 DR). Woven Spells are unaffected.|-[]|-[]|-10|||||||||||||||||
+===SHEET: Natural===
+Ambitious|[Human Seed]
+You may have an additional Value or Goal.|-[]|-[]|15|||||||||||||||||
+Colossal Form|[Nephilim Seed]
+You can use Two-Handed Weapons with one hand. |-[]|-[]|7|||||||||||||||||
+Dark Sight|[None]
+You can see in darkness up to 60ft as grayscale.|-[]|-[]|1|||||||||||||||||
+Dragon Form|[Draconic Seed]
+You may transform into a Dragon as an Other action. Your attributes and exploits change to that of a dragon's. You change back to your humanoid form if you die, are knocked unconcious, or choose to change back as an Other Action. Your Fortitude will be the value it was before transformation - 50 unless your Fortitude is lower than that before changing back, then it becomes that value instead.|-[]|-[]|30|||||||||||||||||
+Eyeshine|[None]
+You can see in darkness as well as you could see in full light|-[]|-[]|3|||||||||||||||||
+Hardy|[None]
+You shrug most things off. +1 Mod to all Saves.|-[]|-[]|9|||||||||||||||||
+Ingenious|[None]
+You are a creative genius. +2 Ingenuity Mod.|-[]|-[]|3|||||||||||||||||
+Limb Reattachment|[None]
+Intact limbs may be reatached using a support action. Destroyed limbs become broken.|-[]|-[]|10|||||||||||||||||
+Manufactured Body (X)|[30 Karma must be spent if this is taken after character creation]
+12 hours of uninterupted work and a chain skill check(5)[Biology and/or Mechanical Engineering] DR 50
+All attributes become (X) where X is equal to the amount of times this exploit is gained. You can no longer receive any attributes from roots, branches, blossoms or passive tasks. Attributes can still be changed by thorns during character creation. (Subsequent earnings adds +1 to all attributes but the chain skill DR goes up by 10 for each earning. If the chain skill check fails the Karma is still spent)|-[]|-[]|0|||||||||||||||||
+Monstrous|[None]
+NPCs of other races besides your own will become hostile towards you if they can see your face.|-[]|-[]|0|||||||||||||||||
+Night Sight|[None]
+You can see in darkness up to 120ft as grayscale.|-[]|-[]|2|||||||||||||||||
+Nimble|[None]
+Lithe and flexible! +2 Nimbleness Mod.|-[]|-[]|3|||||||||||||||||
+Resilient|[None]
+Your mental fortitude is unmatched! +2 Conviction Mod.|-[]|-[]|3|||||||||||||||||
+Robust|[None]
+Your immune system is legendary. +2 Virility Mod.|-[]|-[]|3|||||||||||||||||
+Small Hands|[None]
+One handed weapons must be used by two hands unless they have the Small Modifier. Take a +2 DR to hit with any two-handed weapon. |-[]|-[]|-7|||||||||||||||||
+Tough|[None]
+Strapping Physique! +2 Toughness Mod.|-[]|-[]|3|||||||||||||||||
+Witty|[None]
+Your mind is quick and adaptive. +2 Wit Mod.|-[]|-[]|3|||||||||||||||||
+Old Man Strength|[Lifespan can't be Immortal, Strength Reduced via Age]
++2 Toughness Mod.|[Strength Reduced via Age twice]
++2 Toughness Mod, STR +1|[Strength Reduced via Age three times]
++4 Toughness Mod, STR +1|5|||||||||||||||||
+Human Prestige|[20 Karma removed; Human Seed, KV 400]
+You may remove up to one negative exploit. All Blossom costs are halved for you.|[KV 600]
+You may remove up to one negative exploit. All Blossom costs are halved for you. +1 Mod to all skills. Add +1 Body Attribute and +1 Mind Attribute.|[KV 800]
+You may remove up to one negative exploit. All Blossom costs are halved for you. +1 Mod to all skills. Add +1 Body Attribute and +1 Mind Attribute. Monkey Paws directed at you are reduced one tier.|0|||||||||||||||||
+Neo-Human Prestige|[20 Karma removed; Neo-Human Seed, KV 400]
+Remove Static Negative Exploit.|[KV 600]
+Remove Static Negative Exploit. You may change the race of one willing humanoid to Neo-Human.|[KV 800]
+Remove Static Negative Exploit. You may change the race of one willing humanoid to Neo-Human. Remove Strange Vibrations Negative Exploit.|0|||||||||||||||||
+Cambion Prestige|[20 Karma removed; Cambion Seed, KV 400]
++2 to Strength,
+Anyone you kill with sex gives you a Soul counter. You may use a soul counter to temporarily increase your APT by one for the duration of a battle.|[KV 600]
++2 to Strength,
+Anyone you kill with sex gives you a Soul counter. You may use a soul counter to temporarily increase your APT by one for the duration of a battle. You may exchange 5 Soul tokens to purchase one Supernatural Exploit of your choice.|[KV 800]
++2 to Strength,
+Anyone you kill with sex gives you a Soul counter. You may use a soul counter to temporarily increase your APT by one for the duration of a battle. You may exchange 5 Soul tokens to purchase one Supernatural Exploit of your choice. You may convert 1 Soul token into 20 mana instantly|0|||||||||||||||||
+Elven Prestige|[20 Karma removed; Elven Seed, KV 400]
+You recieve your full heal rate when taking the rest passive. Add 1 skill level to every domain of magic.|[KV 600]
+You recieve your full heal rate when taking the rest passive. Add 1 skill level to every domain of magic. Add +1 Body Attribute. Your injuries heal at double the speed of humans and you can even reattach limbs if they are intact.|[KV 800]
+You recieve your full heal rate when taking the rest passive. Add 1 skill level to every domain of magic. Add +1 Body Attribute. Your injuries heal at double the speed of humans and you can even reatach limbs if they are intact. Increase Lifespan to Immortal|0|||||||||||||||||

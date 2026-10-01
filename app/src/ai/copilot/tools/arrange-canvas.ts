@@ -57,6 +57,8 @@ export const arrangeCanvasTool: JewlTool = {
         try { data = JSON.parse(row.data) as Record<string, unknown>; } catch { /* fresh */ }
         data.canvasX = p.x;
         data.canvasY = p.y;
+        // A JEWL placement newer than the GM's last drag wins over the browser-stored folder position (2026-09-26).
+        data.canvasPlacedAt = Date.now();
         await updateLocation(loc.id, ctx.campaignId, ctx.actorId, ctx.actorRole, { data });
         placed.push({ target: p.target, kind: 'location', id: loc.id });
         continue;
@@ -74,6 +76,7 @@ export const arrangeCanvasTool: JewlTool = {
         try { data = JSON.parse(item.data) as Record<string, unknown>; } catch { /* fresh */ }
         data.x = p.x;
         data.y = p.y;
+        data.placedAt = Date.now();
         await updateCampaignItem(item.id, ctx.campaignId, ctx.actorId, ctx.actorRole, { data });
         placed.push({ target: p.target, kind: 'item', id: item.id });
         continue;
@@ -81,6 +84,9 @@ export const arrangeCanvasTool: JewlTool = {
       const character = await resolveCharacterRef(ctx.campaignId, p.target);
       if (character) {
         await setCanvasPosition(character.id, ctx.actorId, ctx.actorRole, { x: p.x, y: p.y });
+        // canvasPlacedAt: a placement newer than the GM's last drag wins over the browser-stored card position.
+        const cRow = await prisma.character.findUnique({ where: { id: character.id }, select: { data: true } });
+        if (cRow) { let cd: Record<string, unknown> = {}; try { cd = JSON.parse(cRow.data) as Record<string, unknown>; } catch { /* fresh */ } await prisma.character.update({ where: { id: character.id }, data: { data: JSON.stringify({ ...cd, canvasPlacedAt: Date.now() }) } }); }
         placed.push({ target: p.target, kind: 'character', id: character.id });
         continue;
       }

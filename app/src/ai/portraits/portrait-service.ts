@@ -10,6 +10,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { getPortraitProvider, isPortraitGenerationAvailable, getProviderStatuses } from './providers';
 import { diffVisualState } from './state-diff';
+import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { extractPortraitData } from './character-adapter';
 import type {
   PortraitInput,
@@ -85,7 +86,7 @@ export async function generatePortrait(
 
   // 5. Save generation record to DB
   if (result.success && result.imagePath) {
-    await prisma.portraitGeneration.create({
+    const generation = await prisma.portraitGeneration.create({
       data: {
         characterId,
         imagePath: result.imagePath,
@@ -103,6 +104,19 @@ export async function generatePortrait(
         campaignId: character.campaignId,
         status: 'completed',
       },
+    });
+    // Provenance manifest (2026-09-20): a portrait is a COMPOSITE act — the
+    // bearer's identity/reference photos + the generator. Ingredients = the
+    // character (its identity + PersonaLock ride on it); tool = the model.
+    recordProvenanceSafe({
+      assetType: 'portrait',
+      assetId: generation.id,
+      campaignId: character.campaignId,
+      creatorUserId: character.userId,
+      creatorKind: 'composite',
+      tool: `portrait:${result.metadata.model}${result.metadata.styleLoraName ? `+${result.metadata.styleLoraName}` : ''}`,
+      ingredients: [ingredientRef('character', characterId)],
+      content: result.imagePath,
     });
   }
 

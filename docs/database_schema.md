@@ -502,3 +502,53 @@ Durable JEWL job worked across message boundaries; the work-loop fires cycles wh
 - `continueUnattended`: GM answered the spoken hand-off question yes → cycles run with no client connected
 - `cycleCount`/`lastCycleAt` (loop bookkeeping; round-robin ordering), `startedAt`/`endedAt`, `createdBy`, `blockedReason`
 - Indexes: `[status, lastCycleAt]`, `[campaignId, status]`. No Campaign relation field (scalar campaignId only).
+
+## Encounter (Unit 1, migration 20260905095440_encounter_unit1)
+| Field | Type | Notes |
+|---|---|---|
+| id | String | cuid |
+| campaignId | String | FK Campaign |
+| name | String | |
+| status | String | PLANNED / ACTIVE / PAUSED / RESOLVED |
+| round | Int | rounds completed |
+| locationId | String? | reserved (Location link; unused in v0) |
+| state | String | JSON<EncounterState> — participants[], intentions[] (next round), sceneNarration, rounds[] (RoundResult log), lastPlan{} |
+| createdBy | String | user id |
+
+`EncounterState` is defined in `src/sim/encounter/state.ts`; participants/intentions become rows when the canvas card needs them. Each run round also writes a `CampaignEvent` (type game_event, eventType encounter_round) and one `DayaMemoryEntry` (source perception) per participant that has a DayaEntity.
+
+## Provenance (2026-09-20, migration 20260920224102_provenance_consent)
+One manifest per creative act (docs/research/growth-provenance-ledger-briefing-2026-09-18.md).
+| Field | Type | Notes |
+|---|---|---|
+| assetType | String | forge_item / campaign_item / character / portrait / encounter_round / text |
+| assetId | String | e.g. `<encounterId>:<round>` for rounds |
+| campaignId | String? | |
+| creatorUserId | String? | human principal |
+| creatorEntityId | String? | DayaEntity id when an AI being authored/co-authored |
+| creatorKind | String | human / ai / composite |
+| tool | String? | model / lane / adapter |
+| ingredients | String | JSON string[] "assetType:assetId" — the creation DAG |
+| memoryRefs | String | JSON string[] DayaMemoryEntry ids — the ledger bridge |
+| rights | String | JSON { aiTraining (from consent), remix: null, commercial: null } |
+| contentHash | String? | sha256 at creation |
+
+**User** gained `aiTrainingConsent` (Boolean, default false) + `aiTrainingConsentAt`. Set via PUT /api/profile { aiTrainingConsent }.
+
+**Campaign** gained `networkMode` (String, default META): META = consent required to enter, play trains GROWTH; DISCONNECTED = features only, never trains (migration 20260920_campaign_network_mode).
+
+## DayaIdentityProbe (2026-09-20, migration 20260921025242)
+One row per (entity, sweep, question): entityId, runId, probeVersion, questionKey, question, response, model. First run per entity = its IDENTITY_HASH baseline. Metrics (drift-from-self, divergence-between-entities) are computed, not stored. **Responses may carry a protagonist's story — the API never returns them, only metrics.**
+
+**DayaEntity** gained `dreamPressure` (Float, default 0): every ledger write adds salience×10; at 150 (env DAYA_DREAM_PRESSURE_THRESHOLD) the entity dreams and the counter resets.
+
+## CanonEvent (Mike 2026-09-20 — the infallible base reality; migration canon_ledger_truthref)
+Append-only, never edited (no write route). One row per resolved act: campaignId, cycle, seq, kind (encounter_round | check | negate | block | redirect | damage | downed | move | hold | dialogue | declaration…), locationId?, actorId?, targetId?, narration (diegetic, numberless), detail (JSON: the sim's numbers), consequences (JSON: pool/part/item deltas), sourceType/sourceId, parentId (round → its acts), provenanceId. **DayaMemoryEntry** gained `truthRef` (the CanonEvent a lived memory perceived); the round memory's classification also lists `truthRefs[]` for the acts the being could witness. The Watcher reads all of it; players have no route.
+
+## Memory chain + domains (Mike 2026-09-23; migration memory_chain_domains)
+**DayaMemoryEntry** gained `pillar` (MERCY|BALANCE|SEVERITY, null until the seat is ruled), `domain` (primary key from src/daya/domains.ts), `domains` (JSON string[], overlap is the rule), `chain` (JSON<MemoryChain>: truthRefs, entities, items, locationId, goalIds, antecedentId). Classified at write-time by the keyword classifier unless the caller passes an explicit classification.
+**CanonEvent** gained `itemIds`, `goalIds`, `domains` (JSON string[]) — the truth-side chain.
+
+## VineEntry (Mike 2026-09-22; migration vines_godhead_tree)
+The vine is the custodian's memory of a goal: goalId, campaignId, custodianId? (GodHead), custodianPillar? (the coloring), side (custodian | resistance), canonEventId, cycle, reading. Written when canon touches a goal; the resistance's opposing custodians record the same event on the resisting entity's own vines.
+**GodHead** gained `parentId` (custodian tree; null = main seat) and `domainKey` (one of the ten domains; blank until Mike seats them).
