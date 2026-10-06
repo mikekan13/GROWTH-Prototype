@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseTableProse, introducedSubject } from './table-prose';
+import { parseTableProse, introducedSubject, type ParsedProse } from './table-prose';
+import frozenJson from './table-prose.frozen.json';
+
+const frozen = frozenJson as Array<{ text: string; withRoster: boolean; parsed: ParsedProse }>;
 
 const roster = [
   { id: 'ruth', name: 'Ruth' },
@@ -59,6 +62,60 @@ describe('parseTableProse — attribution', () => {
     const p = parseTableProse('The light over the door flickers once.', roster);
     expect(p.quotes).toEqual([]);
     expect(p.narration).toBe('The light over the door flickers once.');
+  });
+});
+
+// ── U2c-1: speech with no quote marks ──────────────────────────────────────
+
+describe('parseTableProse — outputs recorded BEFORE unquoted speech was added stay exactly the same', () => {
+  // table-prose.frozen.json was written by the previous parser (2026-10-06) for
+  // quoted lines, script lines, plain narration and near-misses of the new form.
+  it.each(frozen.map((f) => [f.text, f] as const))('%s', (_text, f) => {
+    expect(parseTableProse(f.text, f.withRoster ? roster : [])).toEqual(f.parsed);
+  });
+  it('covers every existing path', () => {
+    expect(frozen.length).toBeGreaterThanOrEqual(17);
+  });
+});
+
+describe('parseTableProse — unquoted speech (a transcript has no quote marks)', () => {
+  it('a roster name, a said-verb and a comma: the rest is that NPC speaking', () => {
+    const p = parseTableProse('Ruth says, sit down.', roster);
+    expect(p.narration).toBeNull();
+    expect(p.quotes).toEqual([{ text: 'sit down.', speakerId: 'ruth', speakerLabel: 'Ruth', context: null }]);
+    expect(p.full).toBe('Ruth says, sit down.');
+  });
+  it('a colon works too, and so do the other said-verbs and a lead-in', () => {
+    expect(parseTableProse('Ruth says: sit down.', roster).quotes[0]).toMatchObject({ text: 'sit down.', speakerId: 'ruth' });
+    expect(parseTableProse('Danny whispers, not here.', roster).quotes[0]).toMatchObject({ text: 'not here.', speakerId: 'danny' });
+    expect(parseTableProse('And then Ruth asks, what did you see?', roster).quotes[0]).toMatchObject({ text: 'what did you see?', speakerId: 'ruth' });
+    expect(parseTableProse('ruth says, sit down.', roster).quotes[0]).toMatchObject({ speakerId: 'ruth', speakerLabel: 'Ruth' });
+  });
+  it('a title in the name does not cut the sentence', () => {
+    const p = parseTableProse('The stairs creak. Mr. Carrasco shouts, open this door!', roster);
+    expect(p.narration).toBe('The stairs creak.');
+    expect(p.quotes).toEqual([{ text: 'open this door!', speakerId: 'carr', speakerLabel: 'Mr. Carrasco', context: null }]);
+  });
+  it('speech and narration on one line are both kept; several speakers each get their line, in order', () => {
+    const p = parseTableProse('The kettle screams. Ruth says, sit down. Danny replies, in a minute. Nobody moves.', roster);
+    expect(p.narration).toBe('The kettle screams. Nobody moves.');
+    expect(p.quotes.map((q) => [q.speakerId, q.text])).toEqual([['ruth', 'sit down.'], ['danny', 'in a minute.']]);
+  });
+  it.each([
+    'Danny says he never touched it.',
+    'Ruth says nothing and goes back to the dishes.',
+    'The stranger says, sit down.',
+    'You wonder what Ruth says, if anything.',
+    'Ruth looks up, says nothing.',
+  ])('not speech — narration is left exactly as written: %s', (text) => {
+    expect(parseTableProse(text, roster)).toEqual({ full: text, narration: text, quotes: [] });
+  });
+  it('a line that has quote marks anywhere takes the quoted path only', () => {
+    const p = parseTableProse('Ruth says, sit down. "Now," she adds.', roster);
+    expect(p.quotes.map((q) => q.text)).toEqual(['Now,']);
+  });
+  it('with no roster nothing is attributed', () => {
+    expect(parseTableProse('Ruth says, sit down.').quotes).toEqual([]);
   });
 });
 

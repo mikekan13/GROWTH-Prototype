@@ -156,6 +156,18 @@ describe('readTableTalk — dialogue', () => {
     expect(only('Ruth says, Violet, sit down.')).toMatchObject({ kind: 'dialogue', to: { scope: 'named', ids: ['violet'] }, expectsReply: true });
     expect(only('Danny says he never touched it.').kind).toBe('narration');
   });
+  it('unquoted speech keeps its place between narration and the ask', () => {
+    const { utterances } = read('The kettle screams. Ruth says, sit down. What do you do?');
+    expect(utterances.map((u) => [u.kind, u.speaker?.id ?? null, u.text])).toEqual([
+      ['narration', null, 'The kettle screams.'],
+      ['dialogue', 'ruth', 'sit down.'],
+      ['ask-to-party', null, 'What do you do?'],
+    ]);
+  });
+  it('a script line is one speaker from start to finish, whatever its sentences look like', () => {
+    const u = only('Ruth: Sit. Danny says, no.');
+    expect(u).toMatchObject({ kind: 'dialogue', speaker: { id: 'ruth' }, text: 'Sit. Danny says, no.' });
+  });
   it('keeps speech and narration in the order they were said', () => {
     const { utterances } = read('Ruth sets down the tray. “Eat.” Danny pushes it away. “Not hungry.” What do you do?');
     expect(utterances.map((u) => [u.kind, u.speaker?.id ?? null])).toEqual([

@@ -16,10 +16,11 @@
  * `ambiguous`. `settleAmbiguous` is the seam for a small-model second opinion;
  * no model is wired to it (which model answers is undecided).
  *
- * Speech and its attribution come from services/table-prose.ts (reused as is).
+ * Speech and its attribution — quoted, script lines, and unquoted `Ruth says, …`
+ * — come from services/table-prose.ts, so canon and the beings agree on who spoke.
  * Pure functions, no I/O — unit-tested on their own.
  */
-import { parseTableProse, type ProseQuote, type ProseRosterEntry } from './table-prose';
+import { parseTableProse, splitSentences, unquotedSpeech, isScriptLine, type ProseQuote, type ProseRosterEntry } from './table-prose';
 
 export const TABLE_TALK_KINDS = ['narration', 'dialogue', 'ask-to-party', 'ask-to-name', 'check-call', 'result', 'ooc'] as const;
 export type TableTalkKind = (typeof TABLE_TALK_KINDS)[number];
@@ -220,12 +221,6 @@ const RESULT_RE = new RegExp(
   ].join('|'),
   'i',
 );
-// "Ruth says, sit down." — speech with no quote marks, which is how a transcript arrives. table-prose only knows
-// quotes and script lines, so this one is read here: the named speaker, then everything after the tag.
-const SPEECH_VERBS = '(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps)';
-const UNQUOTED_SPEECH_RE = new RegExp(`^${LEAD}(${NAME})\\s+${SPEECH_VERBS}[,:]\\s+\\S`, 'i');
-const UNQUOTED_BODY_RE = new RegExp(`\\b${SPEECH_VERBS}[,:]\\s+(.+)$`, 'i');
-
 interface GmReading {
   kind: TableTalkKind;
   to: TalkTarget | null;
@@ -310,38 +305,23 @@ function readQuote(raw: ProseQuote, names: NameIndex, present: ProseRosterEntry[
   };
 }
 
-function unquotedSpeech(sentence: string, names: NameIndex): ProseQuote | null {
-  const speaker = idsIn(mark(sentence, names).match(UNQUOTED_SPEECH_RE)?.[1], names)[0];
-  const body = sentence.match(UNQUOTED_BODY_RE)?.[1]?.trim();
-  if (!speaker || !body) return null;
-  const entry = names.entries.find((e) => e.id === speaker)!;
-  return { text: body, speakerId: entry.id, speakerLabel: entry.name, context: null };
-}
-
 // ── segmentation ─────────────────────────────────────────────────────────────
 
-const ABBREVIATION_RE = /\b(?:Mr|Mrs|Ms|Dr|St|Sr|Jr|vs|etc)\.$/i;
 // Mirrors table-prose's quote pattern (not exported there) so speech and narration keep their order.
 const QUOTE_RE = /["“]([^"”]+)["”]/g;
 
-export function splitSentences(text: string): string[] {
-  const rough = text.replace(/\s+/g, ' ').trim().split(/(?<=[.!?…]["”')\]]*)\s+/).filter(Boolean);
-  const out: string[] = [];
-  for (const piece of rough) {
-    const prev = out.at(-1);
-    if (prev !== undefined && ABBREVIATION_RE.test(prev)) out[out.length - 1] = `${prev} ${piece}`;
-    else out.push(piece);
-  }
-  return out;
-}
+export { splitSentences };
 
 type Segment = { gm: string } | { quote: ProseQuote };
 
 function segmentLine(line: string, roster: ProseRosterEntry[]): Segment[] {
+  const matches = [...line.matchAll(QUOTE_RE)];
+  // Prose with no quote marks: any speech in it is unquoted (`Ruth says, …`) and is read
+  // sentence by sentence by the caller — with table-prose's own reader — so it keeps its place.
+  if (!matches.length && !isScriptLine(line)) return [{ gm: line }];
   const parsed = parseTableProse(line, roster);
   // No narration left = a script line (`Ruth: …`) or nothing but quotes.
   if (parsed.narration === null) return parsed.quotes.map((quote) => ({ quote }));
-  const matches = [...line.matchAll(QUOTE_RE)];
   if (matches.length !== parsed.quotes.length) return [{ gm: parsed.narration }, ...parsed.quotes.map((quote) => ({ quote }))];
   const out: Segment[] = [];
   let cursor = 0;
@@ -389,7 +369,7 @@ export function readTableTalk(text: string, ctx: TableTalkContext): TableTalkRea
       pending = sentences.pop() ?? null;
     }
     for (const sentence of sentences) {
-      const spoken = unquotedSpeech(sentence, names);
+      const spoken = unquotedSpeech(sentence, speakers);
       if (spoken) {
         if (resultNarrated) awaitingResult = false;
         const said = readQuote(spoken, names, ctx.present);

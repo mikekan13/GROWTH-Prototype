@@ -84,6 +84,47 @@ function firstRosterName(window: string, roster: ProseRosterEntry[]): ProseRoste
   return best?.entry ?? null;
 }
 
+const ABBREVIATION_RE = /\b(?:Mr|Mrs|Ms|Dr|St|Sr|Jr|vs|etc)\.$/i;
+
+/** Sentences of a stretch of prose; a title ("Mr. Carrasco") does not end one. */
+export function splitSentences(text: string): string[] {
+  const rough = text.replace(/\s+/g, ' ').trim().split(/(?<=[.!?…]["”')\]]*)\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const piece of rough) {
+    const prev = out.at(-1);
+    if (prev !== undefined && ABBREVIATION_RE.test(prev)) out[out.length - 1] = `${prev} ${piece}`;
+    else out.push(piece);
+  }
+  return out;
+}
+
+/** `Ruth: …` — a line that is one speaker's words from start to finish. */
+export function isScriptLine(line: string): boolean {
+  const script = line.match(SCRIPT_PREFIX_RE);
+  return !!script && script[2].trim().replace(/^["“]|["”]$/g, '').trim().length > 0;
+}
+
+const QUOTE_CHAR_RE = /["“”]/;
+const SAID_VERBS = '(?:says|asks|shouts|whispers|yells|replies|calls out|mutters|growls|snaps)';
+const SAID_LEAD_IN = '(?:(?:and|so|ok|okay|alright|all right|now|then|but|well|meanwhile)[,\\s]+)*';
+
+/**
+ * Speech with no quote marks, which is how a transcript arrives (2026-10-06):
+ * `Ruth says, sit down.` — a ROSTER name, a said-verb, a comma or colon, then
+ * the words. An unknown name never counts ("The stranger says, sit down."
+ * stays narration), nor does reported speech ("Danny says he never touched it.").
+ */
+export function unquotedSpeech(sentence: string, roster: ProseRosterEntry[]): ProseQuote | null {
+  if (QUOTE_CHAR_RE.test(sentence)) return null;
+  for (const entry of [...roster].sort((a, b) => b.name.length - a.name.length)) {
+    const name = entry.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!name) continue;
+    const m = sentence.match(new RegExp(`^\\s*${SAID_LEAD_IN}${name}\\s+${SAID_VERBS}[,:]\\s+(\\S.*)$`, 'i'));
+    if (m) return { text: m[1].trim(), speakerId: entry.id, speakerLabel: entry.name, context: null };
+  }
+  return null;
+}
+
 export function parseTableProse(message: string, roster: ProseRosterEntry[] = []): ParsedProse {
   const full = message.trim();
   const quotes: ProseQuote[] = [];
@@ -91,6 +132,20 @@ export function parseTableProse(message: string, roster: ProseRosterEntry[] = []
   const narrationParts: string[] = [];
 
   for (const line of lines) {
+    // 0. Unquoted speech (`Ruth says, sit down.`) — only on a line with no quote
+    //    marks, and only when a sentence of it really is one; every other line
+    //    takes the paths below exactly as before.
+    if (roster.length > 0 && !QUOTE_CHAR_RE.test(line) && !SCRIPT_PREFIX_RE.test(line)) {
+      const sentences = splitSentences(line);
+      const said = sentences.map((s) => unquotedSpeech(s, roster));
+      if (said.some(Boolean)) {
+        for (const q of said) if (q) quotes.push(q);
+        const kept = sentences.filter((_, i) => !said[i]).join(' ').trim();
+        if (kept) narrationParts.push(kept);
+        continue;
+      }
+    }
+
     // 1. Script prefix: `Ruth: "…"` / `Ruth: …` — the whole line is speech.
     const script = line.match(SCRIPT_PREFIX_RE);
     const scriptSpeaker = script ? findRosterName(script[1], roster) : null;
