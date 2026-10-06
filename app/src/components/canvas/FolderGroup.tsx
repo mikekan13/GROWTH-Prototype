@@ -899,11 +899,12 @@ export function FolderGroupRect({
                 )}
                 {folder.locationInfo.locationType && (
                   <span
+                    // Phones (< md): 14px world units and brighter, else it is a 10px smudge.
+                    // Desktop keeps 10px / 40% exactly (md: classes).
+                    className="text-[14px] md:text-[10px] text-white/70 md:text-white/40"
                     style={{
                       marginLeft: 'auto',
                       fontFamily: 'var(--font-terminal), Consolas, monospace',
-                      fontSize: 10,
-                      color: 'rgba(255,255,255,0.4)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.12em',
                     }}
