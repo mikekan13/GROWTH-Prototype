@@ -2686,6 +2686,7 @@ export default function RelationsCanvas({
     const HOLD_MS = 280, SLOP_PX = 10;
     let hold: { id: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout>; done: boolean } | null = null;
     let bgTap: { id: number; x: number; y: number } | null = null; // a tap on empty canvas while carrying = drop here
+    let swallowClickUntil = 0; // after a completed hold, the finger lifting must not also count as a tap/click
     const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
     const isControl = (t: Element) => !!t.closest('button, input, textarea, select, a, [role="button"], [data-no-hold]');
     const onDown = (e: PointerEvent) => {
@@ -2761,7 +2762,11 @@ export default function RelationsCanvas({
     const onUp = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
       pointers.delete(e.pointerId);
-      if (hold && hold.id === e.pointerId) { clearTimeout(hold.timer); hold = null; } // a tap: the click still fires
+      if (hold && hold.id === e.pointerId) {
+        clearTimeout(hold.timer);
+        if (hold.done) swallowClickUntil = Date.now() + 700; // the hold was a pick-up, not a tap
+        hold = null;
+      }
       if (bgTap && bgTap.id === e.pointerId) {
         const p = clientToSvgRef.current(e.clientX, e.clientY);
         bgTap = null;
@@ -2777,6 +2782,9 @@ export default function RelationsCanvas({
     // fires on a long press. Empty canvas: let it through — long-press on the
     // background IS "talk to JEWL here" on a phone. A card or a room: the hold
     // means CARRY, so the menu event is swallowed (2026-10-06).
+    const onClickCapture = (e: MouseEvent) => {
+      if (Date.now() < swallowClickUntil) { e.preventDefault(); e.stopPropagation(); swallowClickUntil = 0; }
+    };
     const onContextMenu = (e: MouseEvent) => {
       const t = e.target as Element | null;
       if (!t || !svg.contains(t)) return;
@@ -2788,7 +2796,9 @@ export default function RelationsCanvas({
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
     document.addEventListener('contextmenu', onContextMenu, true);
+    document.addEventListener('click', onClickCapture, true);
     return () => {
+      document.removeEventListener('click', onClickCapture, true);
       document.removeEventListener('pointerdown', onDown, true);
       document.removeEventListener('pointermove', onMove, true);
       document.removeEventListener('pointerup', onUp, true);
