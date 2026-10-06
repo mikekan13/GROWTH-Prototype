@@ -14,6 +14,7 @@ import type { RollResult } from '@/types/dice';
 import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
+import BeingSpeakingLines from './BeingSpeakingLines';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
 
@@ -1058,6 +1059,18 @@ export default function CampaignTerminal({
             </div>
           );
         })}
+        {/* Beings still speaking (U2c): their lines grow here, under the last
+            logged event, and yield to the logged chat row when it lands. */}
+        <BeingSpeakingLines
+          active={terminalMode === 'table'}
+          events={events}
+          onGrow={() => {
+            const el = scrollRef.current;
+            if (!el) return;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            if (nearBottom) el.scrollTop = el.scrollHeight;
+          }}
+        />
       </div>
 
       {/* Input: command line in terminal mode, speak-through-NPC bar at the table */}
