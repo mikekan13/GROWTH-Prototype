@@ -170,7 +170,10 @@ function vocatives(marked: string, names: NameIndex): string[] {
 
 const OOC_PREFIX_RE = /^\s*[([]*\s*(?:ooc\b|out of character\b)/i;
 const OOC_WRAPPED_RE = /^\s*(?:\(\(.*\)\)|\(.*\)|\[.*\])\s*[.!?]*\s*$/;
-const OOC_TABLE_RE = /\b(?:brb|be right back|(?:one|just a|give me a|gimme a) (?:sec|second|minute|moment)|(?:hang|hold) on(?!\s+(?:to|tight|for)\b)|bathroom break|take (?:a (?:quick |short )?break|five)|let me (?:check|look at|find|pull up|grab) (?:my|the) (?:notes|rules|rulebook|book)|where was i|where were we|can (?:you|everyone|everybody|you all) hear me|is (?:this|it) recording|am i muted|you'?re muted)\b/i;
+// Table chatter has to OPEN the sentence ("Hang on, …"); the same words inside narration ("You hold on as the cart lurches") are not it.
+const OOC_TABLE_RE = /^\s*(?:(?:sorry|ok|okay|wait|uh|um|oh|hey|alright|all right|so|guys|everyone)[,.\s]+)*(?:be right back|(?:one|just a|give me a|gimme a) (?:sec|second|minute|moment)|(?:hang|hold) on(?!\s+(?:to|tight|for)\b)|(?:i need a |quick )?bathroom break|(?:let's |lets |i need to |we should )?take (?:a (?:quick |short )?break|five)|let me (?:check|look at|find|pull up|grab) (?:my|the) (?:notes|rules|rulebook|book)|where was i|where were we|can (?:you|everyone|everybody|you all) hear me|is (?:this|it) recording|am i muted|you'?re muted)\b|\bbrb\b/i;
+// "(brb) The door opens." — an aside that opens a sentence is its own utterance, so the narration after it is not swept away with it.
+const LEADING_ASIDE_RE = /^\s*(\(\([^)]*\)\)|\([^)]*\)|\[[^\]]*\])\s+(\S.*)$/;
 const OOC_MAX_WORDS = 12;
 
 const NOT_MOTION = '(?!\\s+(?:over|out|up|down|away|aside|off|into|onto|through|across|back|around|(?:your|his|her|their|its) eyes)\\b)';
@@ -364,7 +367,10 @@ export function readTableTalk(text: string, ctx: TableTalkContext): TableTalkRea
     }
     const span = segment.gm.replace(/^[\s,;:]+/, '').trim();
     if (!/[\p{L}\p{N}]/u.test(span)) return;
-    const sentences = splitSentences(span);
+    const sentences = splitSentences(span).flatMap((sentence) => {
+      const aside = sentence.match(LEADING_ASIDE_RE);
+      return aside ? [aside[1], aside[2]] : [sentence];
+    });
     if (ctx.holdTrailingFragment && at === segments.length - 1 && !TERMINAL_RE.test(sentences.at(-1) ?? '.')) {
       pending = sentences.pop() ?? null;
     }

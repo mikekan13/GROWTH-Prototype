@@ -248,8 +248,27 @@ describe('readTableTalk — out of character', () => {
   it.each(['(brb, phone)', '((who has the snacks))', 'ooc: back in five', 'Hang on, let me check my notes.', 'Give me a second.', 'Where was I?', 'Can everyone hear me?'])('%s', (text) => {
     expect(only(text)).toMatchObject({ kind: 'ooc', to: null, expectsReply: false });
   });
-  it.each(['Hold on to the rope.', 'You hang on tight as the cart lurches.', 'The door (the one from yesterday) is open.'])('in-fiction look-alikes stay narration: %s', (text) => {
+  it.each([
+    'Hold on to the rope.',
+    'You hang on tight as the cart lurches.',
+    'The door (the one from yesterday) is open.',
+    'You hold on as the cart lurches, then it stops.',
+    'The guard says to give me a second look.',
+    'They take a break from the climb.',
+  ])('in-fiction look-alikes stay narration: %s', (text) => {
     expect(only(text).kind).toBe('narration');
+  });
+  it.each(['Sorry, hold on, my dog is barking.', 'Okay where were we.', 'Let\'s take five.', 'Guys, brb.'])('table chatter that opens the sentence: %s', (text) => {
+    expect(only(text).kind).toBe('ooc');
+  });
+  it('an aside that opens a sentence does not take the narration after it down with it', () => {
+    const { utterances } = read('(brb, phone) It will not budge. [ooc one sec] The rain keeps on.');
+    expect(utterances.map((u) => [u.kind, u.text])).toEqual([
+      ['ooc', '(brb, phone)'],
+      ['narration', 'It will not budge.'],
+      ['ooc', '[ooc one sec]'],
+      ['narration', 'The rain keeps on.'],
+    ]);
   });
 });
 

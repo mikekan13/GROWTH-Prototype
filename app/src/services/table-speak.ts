@@ -31,7 +31,11 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
-import { converseWithEntity, type ConverseStatus } from '@/daya/conversation';
+import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus } from '@/daya/conversation';
+import { isDayaEnabled } from '@/daya/events';
+import type { TableAsk } from '@/daya/ensemble';
+import { readTableTalk } from '@/services/table-talk';
+import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, type PlannedStimulus, type TableBeat } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
 import {
   attachTruthToMemory,
@@ -72,7 +76,29 @@ export interface TableProseResult {
   dialogue: Array<{ canonEventId: string; speakerId: string | null; speakerLabel: string; text: string }>;
   narration: string | null;
   responses: ListenerResponse[];
+  /** Split loop only: talk that was not part of the world (out-of-character, check calls) — not recorded, not heard. Listed so the GM can see what was left out. */
+  ignored?: Array<{ kind: string; text: string }>;
 }
+
+/**
+ * ROLLOUT GUARD (orchestrator, 2026-10-06) — not a feature and not a setting.
+ * Off, the default: the table runs the serial loop exactly as it always has.
+ * On (TABLE_SPLIT_LOOP=on in the environment): typed prose, and the GM's mic
+ * while a session is live, go through the split loop — beings listen while the
+ * GM has the floor and answer at the ask (TABLE-RHYTHM-DESIGN-2026-10-01).
+ * This is the ONE place it is read. Delete it, together with the serial path
+ * it guards, once U2d has signed off on a live run.
+ */
+export function tableSplitLoop(): boolean {
+  return process.env.TABLE_SPLIT_LOOP === 'on';
+}
+
+/**
+ * When beings speak on the split path. 'when-asked': only when the turn comes
+ * to them or they are spoken to (TABLE-RHYTHM-DESIGN §1 — proposed default,
+ * Mike's ruling pending). 'always': also after every message, as the serial loop does.
+ */
+const BEINGS_ANSWER = 'when-asked' as 'when-asked' | 'always';
 
 /** Kept for the pre-09-26 narrate-only callers; prose handles it now. */
 export type TableNarrateResult = TableProseResult;
@@ -204,6 +230,7 @@ export async function speakProse(
   }
   const message = input.message.trim();
   if (!message) throw new ValidationError('Nothing to say');
+  if (tableSplitLoop()) return speakProseSplit(campaignId, actor, { ...input, message });
 
   const roster = await prisma.character.findMany({
     where: { campaignId, entityType: 'NPC' },
@@ -273,6 +300,143 @@ export async function speakProse(
 async function recordQuote(campaignId: string, q: ProseQuote) {
   if (q.speakerId) return recordDialogueCanon(campaignId, q.speakerId, q.speakerLabel, q.text);
   return recordUnattributedDialogueCanon(campaignId, q.speakerLabel, q.text, q.context);
+}
+
+/** Talk left out of the world still leaves a trace where JEWL's ambient log keeps the table's chatter, so a wrong call can be found. */
+async function markDropped(campaignId: string, actor: TableActor, kind: string, rule: string, text: string) {
+  try {
+    await prisma.copilotMessage.create({
+      data: {
+        campaignId,
+        role: 'user',
+        content: text,
+        username: '[ambient]',
+        userId: actor.userId,
+        actions: JSON.stringify({ source: 'TABLE_DROPPED', kind, rule }),
+      },
+    });
+  } catch (err) { console.warn('[table-speak] could not mark dropped table talk', err); }
+}
+
+/**
+ * The split loop for one typed message (behind tableSplitLoop). Same truth
+ * writing as speakProse; what changes is who hears what and when anyone
+ * speaks: world content is LISTENED to (not awaited — reflection is off the
+ * clock), and only a turn handed over or a line that expects a reply makes a
+ * being ANSWER. The call returns once the record is written and the answers
+ * are out, not when the listening is done.
+ */
+async function speakProseSplit(
+  campaignId: string,
+  actor: TableActor,
+  input: { message: string; locationId?: string | null; confirmTicketId?: string | null },
+): Promise<TableProseResult> {
+  const message = input.message;
+  const npcRoster = () => prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } });
+  const listeners = await activeListeners(campaignId);
+  let roster = await npcRoster();
+  let parsed = parseTableProse(message, roster);
+  const planFor = (npcs: typeof roster) => planTableTalk(readTableTalk(message, { present: listeners, npcs }).utterances, 'typed');
+  let plan = planFor(roster);
+
+  // 0. JEWL's read still comes BEFORE anything is written on this path (U2c-5 moves it beside the listening).
+  //    A message with nothing in the world (only an ask, only ignored talk) has nothing for him to read.
+  let ticketId: string | null = null;
+  if (input.confirmTicketId) {
+    ticketId = (await takeConfirmed(campaignId, input.confirmTicketId, message)).id;
+    roster = await npcRoster();
+    parsed = parseTableProse(message, roster);
+    plan = planFor(roster);
+  } else if (plan.world.length) {
+    const held = await readNarration(campaignId, actor, message, parsed, listeners);
+    if (held) return { held, canonEventId: null, dialogue: [], narration: parsed.narration, responses: [] };
+  }
+
+  // 1. TRUTH — as speakProse writes it, minus what was not part of the world.
+  const narration = canonNarration(parsed.full, plan);
+  const narrated = plan.world.some((u) => u.kind !== 'dialogue');
+  let canonEventId: string | null = null;
+  const dialogue: TableProseResult['dialogue'] = [];
+  const soloAttributed = !narrated && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
+  if (narration !== null && (narrated || parsed.quotes.length !== 1)) {
+    const declared = await declareCanon(campaignId, actor, { narration, kind: 'narration', locationId: input.locationId ?? null, witnessIds: [] });
+    canonEventId = declared.event.id;
+  }
+  for (const q of parsed.quotes) {
+    try {
+      const ev = await recordQuote(campaignId, q);
+      dialogue.push({ canonEventId: ev.id, speakerId: q.speakerId, speakerLabel: q.speakerLabel, text: q.text });
+    } catch (err) { console.warn('[table-speak] dialogue canon failed', err); }
+  }
+  if (soloAttributed) {
+    const q = parsed.quotes[0];
+    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text);
+  }
+  for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
+
+  // 2. LISTEN and ANSWER, beat by beat.
+  const since = new Date();
+  const truthPrimary = canonEventId ?? dialogue[0]?.canonEventId ?? null;
+  const truthExtra = dialogue.map((d) => d.canonEventId).filter((id) => id !== truthPrimary);
+  const pointAtTruth = async (listenerId: string, memoryEntryId: string | undefined) => {
+    if (truthPrimary) await attachTruth(listenerId, memoryEntryId, truthPrimary, truthExtra, since);
+  };
+  const hear = (listenerId: string, stimulus: PlannedStimulus | null) => {
+    if (!stimulus) return;
+    void listenToTable(listenerId, actor.role, stimulus)
+      .then(async (outcome) => {
+        if (outcome.status !== 'ok') { console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`); return; }
+        // null = an answer took this stretch over; that answer stores it and points it at the truth.
+        if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
+      })
+      .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
+  };
+  const answered = new Map<string, ListenerResponse>();
+  const answer = async (listenerId: string, ask: TableAsk) => {
+    const listener = listeners.find((l) => l.id === listenerId);
+    if (!listener) return;
+    const outcome = await answerAtTable(listenerId, actor.role, ask, {
+      onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }),
+    });
+    const action = outcome.answer?.action;
+    answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: outcome.status, actionKind: action?.kind, detail: outcome.detail });
+    if (outcome.status !== 'ok' || !outcome.answer || !action) return;
+    const line = actionToTableLine(listener.name, action);
+    if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
+    void outcome.answer.after.then((stored) => pointAtTruth(listenerId, stored.memoryEntryId)).catch(() => {});
+  };
+  const askOf = (beat: Extract<TableBeat, { type: 'turn' | 'spoken' }>): TableAsk =>
+    beat.type === 'spoken' ? { kind: 'spoken', by: beat.utterance.speaker?.label ?? 'someone present', text: beat.utterance.text } : { kind: 'turn' };
+
+  for (const beat of plan.beats) {
+    if (beat.type === 'hear') {
+      for (const l of listeners) hear(l.id, stimulusFor(beat.utterances, l.id));
+      continue;
+    }
+    if (beat.type === 'spoken') for (const id of overhearers(beat, listeners)) hear(id, stimulusFor([beat.utterance], id));
+    await Promise.all(answerers(beat, listeners).map((id) => answer(id, askOf(beat))));
+  }
+  if (BEINGS_ANSWER === 'always' && plan.world.length && plan.beats.every((b) => b.type === 'hear')) {
+    await Promise.all(listeners.map((l) => answer(l.id, { kind: 'turn' })));
+  }
+
+  if (ticketId) await attachCanonToTicket(ticketId, truthPrimary);
+  try { await cementCheck(campaignId, actor.userId); } catch (err) { console.warn('[table-speak] cement check failed', err); }
+
+  // A being that only listened is reported as awake; whether its listening went well is not known yet (it is still going).
+  const responses = listeners.map((l) => answered.get(l.id) ?? {
+    characterId: l.id,
+    characterName: l.name,
+    status: (isDayaEnabled() ? 'ok' : 'disabled') as ConverseStatus,
+    ...(plan.world.length ? { detail: 'listening' } : {}),
+  });
+  return {
+    canonEventId,
+    dialogue,
+    narration: narrated ? narration : null,
+    responses,
+    ...(plan.ignored.length ? { ignored: plan.ignored.map((u) => ({ kind: u.kind, text: u.text })) } : {}),
+  };
 }
 
 /** Narrate-only entry (pre-09-26 API shape) — prose covers it. */
