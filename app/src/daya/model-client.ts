@@ -465,6 +465,14 @@ async function callAnthropic(
   };
 }
 
+/** Marks a deliberately stopped stream on its metering row, so its token counts (input unknown, output = pieces received) are never read as a normal call's. */
+export const STREAM_STOPPED_NOTE = 'stream stopped by consumer: tokensIn unknown, tokensOut = pieces received';
+
+export function meteredRationale(rationale: string | undefined, stopped: boolean): string | undefined {
+  if (!stopped) return rationale;
+  return rationale ? `${rationale} | ${STREAM_STOPPED_NOTE}` : STREAM_STOPPED_NOTE;
+}
+
 // ── Entry point ─────────────────────────────────────────────────────────────
 
 /**
@@ -518,7 +526,7 @@ export async function chat(
       usd,
       krma: 0,
       sanitized: params.sanitized ?? false,
-      rationale: params.rationale,
+      rationale: meteredRationale(params.rationale, stopped === true),
     },
   });
 

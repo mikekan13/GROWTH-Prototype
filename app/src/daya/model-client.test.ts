@@ -6,7 +6,7 @@
  * the scripts/test-daya-wp*.ts acceptance scripts against a real DB instead.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { callOpenAiCompatible, parseSseLines, tierProvider, tierAvailability, DayaWarmingTimeoutError, type DayaFetch } from './model-client';
+import { callOpenAiCompatible, parseSseLines, meteredRationale, STREAM_STOPPED_NOTE, tierProvider, tierAvailability, DayaWarmingTimeoutError, type DayaFetch } from './model-client';
 
 const BASE_PARAMS = {
   tier: 'L1' as const,
@@ -274,6 +274,13 @@ describe('callOpenAiCompatible — streamed', () => {
     process.env.DAYA_L1_TIMEOUT_MS = '40';
     const fetchImpl: DayaFetch = async (_url, init) => streamResponse([piece('half')], { hangAfter: true, signal: init.signal });
     await expect(callOpenAiCompatible('L1', { ...BASE_PARAMS, onToken: () => {} }, fetchImpl)).rejects.toBeInstanceOf(DayaWarmingTimeoutError);
+  });
+
+  it('a deliberately stopped stream is marked on its metering row; a normal call is left as it was', () => {
+    expect(meteredRationale(undefined, false)).toBeUndefined();
+    expect(meteredRationale('routed local', false)).toBe('routed local');
+    expect(meteredRationale(undefined, true)).toBe(STREAM_STOPPED_NOTE);
+    expect(meteredRationale('routed local', true)).toBe(`routed local | ${STREAM_STOPPED_NOTE}`);
   });
 
   it('a transport with no readable body falls back to one whole piece', async () => {

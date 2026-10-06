@@ -23,6 +23,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { render, type Observer } from './renderer';
+import { computeSceneContent, computeFidelityLevel, rngFor } from './renderer-math';
 import type { SceneLine, SceneTruth, BiasProfile, VoiceParams } from './renderer-math';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { senseFlagsFromSheet } from '@/sim/senses/field';
@@ -41,11 +42,23 @@ export interface PerceiveResult {
   mirrored: boolean;
   /** The lens this was rendered with — snapshotted on the memory so a later re-render (canon correction) uses the mood of the moment. */
   observer: { mood: { morale: number; stress: number; grief: number }; attunement: number };
+  /** 'full' = the whole room was in the envelope; 'new' = only the stimulus and what was new since the being took this place in. */
+  standing: 'full' | 'new';
+  /** false = the deterministic envelope, no model call (godlike bypass or `voice: false`). */
+  voiced: boolean;
 }
 
 export interface PerceiveOptions {
   /** Re-render with the lens of another moment (canon corrections). */
   observer?: Partial<PerceiveResult['observer']>;
+  /**
+   * 'once' (the listening loop, TABLE-RHYTHM-DESIGN §6): the being takes the
+   * room in on its first stimulus in a place; after that each stimulus carries
+   * only itself and what is NEW there. Default 'always': the whole room every time.
+   */
+  standing?: 'always' | 'once';
+  /** false = skip the voicing call and return the deterministic envelope (an ask that cannot wait for a full listen). */
+  voice?: boolean;
 }
 
 /** Perceptual attunement to one's own surroundings. Flat for now — [QUESTION for Mike]: which attribute governs it (Focus? Wisdom?). */
@@ -110,6 +123,75 @@ export function composeSceneLines(input: SceneInput): SceneTruth {
   return { headline: input.headline, lines };
 }
 
+// ── Taking a place in once ───────────────────────────────────────────────────
+
+/** After this long without a stimulus a being takes the room in again. [PLACEHOLDER] */
+export const SCENE_RETAKE_MS = 10 * 60_000;
+/** How many things lying around a scene lists. */
+export const SCENE_ITEM_CAP = 16;
+
+/** Who and what is in the place by name, as far as this being's senses can tell. null = it cannot tell (blind, deaf, nowhere, too many things to list). */
+export interface SceneRoll {
+  present: string[] | null;
+  items: string[] | null;
+}
+
+export interface SceneTaken {
+  locationId: string | null;
+  /** Standing lines already offered to the being here. What the mirror blurred stays blurred — looking closer is what Attend is for. */
+  seen: Set<string>;
+  /** The people and things that were here the last time it could tell. */
+  present: Set<string>;
+  items: Set<string>;
+  at: number;
+}
+
+/**
+ * Narrow a freshly gathered scene to what is still news to a being that has
+ * already taken this place in: the stimulus itself (headline, speech), any
+ * standing line it has not been offered here — someone who just arrived, a
+ * thing just placed — and a plain absence line for a person or thing that was
+ * here and is gone (a being must not keep talking to someone who walked out).
+ * A new place, or a long gap, is the whole room again. Pure.
+ */
+export function narrowToNew(
+  truth: SceneTruth,
+  taken: SceneTaken | undefined,
+  locationId: string | null,
+  now: number,
+  roll: SceneRoll = { present: null, items: null },
+): { truth: SceneTruth; standing: 'full' | 'new'; taken: SceneTaken } {
+  const fresh = !taken || taken.locationId !== locationId || now - taken.at > SCENE_RETAKE_MS;
+  const seen = fresh ? new Set<string>() : new Set(taken.seen);
+  const lines = fresh ? [...truth.lines] : truth.lines.filter((l) => l.kind === 'speech' || !seen.has(l.text));
+  for (const l of truth.lines) if (l.kind !== 'speech') seen.add(l.text);
+
+  if (!fresh) {
+    if (roll.present) {
+      const here = new Set(roll.present);
+      for (const name of taken.present) if (!here.has(name)) lines.push({ text: `${name} is no longer here.`, salience: 0.9, kind: 'present' });
+    }
+    if (roll.items) {
+      const here = new Set(roll.items);
+      const gone = [...taken.items].filter((name) => !here.has(name));
+      if (gone.length) lines.push({ text: `No longer here: ${gone.join(', ')}.`, salience: 0.45, kind: 'item' });
+    }
+  }
+  // When it cannot tell who or what is here, it keeps what it last knew.
+  const present = roll.present ? new Set(roll.present) : fresh ? new Set<string>() : taken.present;
+  const items = roll.items ? new Set(roll.items) : fresh ? new Set<string>() : taken.items;
+  return { truth: { headline: truth.headline, lines }, standing: fresh ? 'full' : 'new', taken: { locationId, seen, present, items, at: now } };
+}
+
+// In-process, per being; a restart just means the room is taken in again.
+const takenIn = new Map<string, SceneTaken>();
+
+/** Make a being (or every being) take its place in afresh on the next stimulus. */
+export function forgetScene(characterId?: string): void {
+  if (characterId) takenIn.delete(characterId);
+  else takenIn.clear();
+}
+
 function parseLocation(raw: string): GrowthLocation | null {
   try { return JSON.parse(raw) as GrowthLocation; } catch { return null; }
 }
@@ -125,7 +207,7 @@ export async function composeSceneTruth(
   campaignId: string,
   stimulus: string,
   source: 'perception' | 'dialogue',
-): Promise<{ truth: SceneTruth; locationId: string | null }> {
+): Promise<{ truth: SceneTruth; locationId: string | null; roll: SceneRoll }> {
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
   let sheet: { bodyAnatomy?: unknown } | null = null;
   try { sheet = character ? (JSON.parse(character.data) as { bodyAnatomy?: unknown }) : null; } catch { sheet = null; }
@@ -164,7 +246,7 @@ export async function composeSceneTruth(
           return { name: c.name, description };
         });
       }
-      const itemRows = await prisma.campaignItem.findMany({ where: { campaignId, locationId: loc.id, status: 'ACTIVE' }, select: { name: true }, take: 16 });
+      const itemRows = await prisma.campaignItem.findMany({ where: { campaignId, locationId: loc.id, status: 'ACTIVE' }, select: { name: true }, take: SCENE_ITEM_CAP });
       items = itemRows.map((i) => i.name);
 
       const all = await currentFacts(campaignId);
@@ -181,7 +263,17 @@ export async function composeSceneTruth(
     speech: source === 'dialogue' ? [stimulus] : [],
     place, parent, present, items, facts, parentFacts, senses,
   });
-  return { truth, locationId };
+  const roll = sceneRoll({ placed: place !== null, present: present.map((p) => p.name), items, senses });
+  return { truth, locationId, roll };
+}
+
+/** The roll call narrowToNew compares against: only what these senses can account for. Pure. */
+export function sceneRoll(input: { placed: boolean; present: string[]; items: string[]; senses: { canSee: boolean; canHear: boolean } }): SceneRoll {
+  return {
+    present: input.placed && (input.senses.canSee || input.senses.canHear) ? input.present : null,
+    // At the cap the list is a sample, not the room: something missing from it has not necessarily gone.
+    items: input.placed && input.senses.canSee && input.items.length < SCENE_ITEM_CAP ? input.items : null,
+  };
 }
 
 async function observerFor(characterId: string): Promise<{ observer: Observer; godlike: boolean }> {
@@ -213,17 +305,31 @@ export async function perceive(
   overrides: DayaClientOverrides = {},
   opts: PerceiveOptions = {},
 ): Promise<PerceiveResult> {
-  const { truth, locationId } = await composeSceneTruth(characterId, campaignId, stimulus, source);
+  // The scene is gathered fresh every time (a few ms of local reads), so what is in the place is never stale.
+  const { truth: whole, locationId, roll } = await composeSceneTruth(characterId, campaignId, stimulus, source);
+  const narrowed = opts.standing === 'once' ? narrowToNew(whole, takenIn.get(characterId), locationId, Date.now(), roll) : null;
+  const truth = narrowed?.truth ?? whole;
+  const standing = narrowed?.standing ?? 'full';
   const { observer: current, godlike } = await observerFor(characterId);
   const observer: Observer = { ...current, ...(opts.observer?.mood ? { mood: opts.observer.mood } : {}), ...(opts.observer?.attunement != null ? { attunement: opts.observer.attunement } : {}) };
   const snapshot = { mood: observer.mood, attunement: observer.attunement };
+  const subjectKey = `scene:${locationId ?? 'nowhere'}`;
+  const context = source === 'dialogue' ? 'Someone just spoke to you, here, now.' : 'This is happening around you, here, now.';
+  const base = { locationId, truthLines: truth.lines.length, observer: snapshot, standing };
   if (godlike) {
-    return { prose: sceneTruthText(truth), fidelityLevel: 5, distortions: ['godlike:unmirrored'], locationId, truthLines: truth.lines.length, mirrored: false, observer: snapshot };
+    if (narrowed) takenIn.set(characterId, narrowed.taken);
+    return { ...base, prose: sceneTruthText(truth), fidelityLevel: 5, distortions: ['godlike:unmirrored'], mirrored: false, voiced: false };
   }
-  const view = await render(
-    { subject: 'scene', subjectKey: `scene:${locationId ?? 'nowhere'}`, trueData: truth, context: source === 'dialogue' ? 'Someone just spoke to you, here, now.' : 'This is happening around you, here, now.' },
-    observer,
-    overrides,
-  );
-  return { prose: view.prose, fidelityLevel: view.fidelityLevel, distortions: view.distortions, locationId, truthLines: truth.lines.length, mirrored: true, observer: snapshot };
+  if (opts.voice === false) {
+    // The same envelope render() would hand the voicer, unvoiced. Scene keys carry no revision epoch, so the seed matches.
+    const level = computeFidelityLevel('scene', observer.attunement);
+    const content = computeSceneContent({ subject: 'scene', subjectKey, trueData: truth, context }, observer.biasProfile, observer.mood, level, rngFor(characterId, subjectKey, 0));
+    if (narrowed) takenIn.set(characterId, narrowed.taken);
+    // The tilt line is a note to the voicer, not something perceived.
+    const prose = content.prose.split('\n').filter((l) => !l.startsWith('Your mood tilts')).join('\n');
+    return { ...base, prose, fidelityLevel: level, distortions: [...content.distortions, 'unvoiced'], mirrored: true, voiced: false };
+  }
+  const view = await render({ subject: 'scene', subjectKey, trueData: truth, context }, observer, overrides);
+  if (narrowed) takenIn.set(characterId, narrowed.taken);
+  return { ...base, prose: view.prose, fidelityLevel: view.fidelityLevel, distortions: view.distortions, mirrored: true, voiced: true };
 }
