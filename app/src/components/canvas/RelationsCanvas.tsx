@@ -212,13 +212,15 @@ export default function RelationsCanvas({
   // â”€â”€ Zoom constants â”€â”€
   // zoom < 1 = zoomed IN (smaller viewBox), zoom > 1 = zoomed OUT (larger viewBox)
   const BASE_HEIGHT = 924;
-  const MIN_ZOOM = 1.0;   // max zoom IN â€” 1x base magnification
   const MAX_ZOOM = 6.0;   // max zoom OUT
   const ZOOM_IN_FACTOR = 0.9;
   const ZOOM_OUT_FACTOR = 1.1;
 
   // Track container size so viewBox matches actual aspect ratio (prevents SVG letterboxing)
   const [containerSize, setContainerSize] = useState({ width: 1386, height: 924 });
+  // Max zoom IN. 1x on a laptop; a phone may go closer so one 520-wide card
+  // fits its 412 px (2026-10-06: at 1x the floor was 474 world units across).
+  const MIN_ZOOM = containerSize.width < 768 ? 0.45 : 1.0;
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -257,7 +259,8 @@ export default function RelationsCanvas({
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
   const [zoom, setZoom] = useState(() => {
-    const stored = loadJSON('zoom', 1);
+    // Phone default: one 520-wide card fits with margin (2026-10-06); laptop stays 1x.
+    const stored = loadJSON('zoom', typeof window !== 'undefined' && window.innerWidth < 768 ? 1.4 : 1);
     return clampZoom(stored);
   });
   // Semantic zoom (Mike 2026-09-28): what a card renders as depends on how far out the Watcher is.
@@ -271,6 +274,16 @@ export default function RelationsCanvas({
       // Clean up old key after migration
       try { localStorage.removeItem(storageKey('viewBox')); } catch { /* ignore */ }
       return { x: oldVB.x, y: oldVB.y };
+    }
+    // Phone, nothing remembered: open on the people (the scene), not the
+    // world's origin (2026-10-06, Mike: it opened at the block).
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const people = nodes.filter(n => n.type === 'character');
+      if (people.length) {
+        const cx = people.reduce((a, n) => a + n.x, 0) / people.length;
+        const cy = people.reduce((a, n) => a + n.y, 0) / people.length;
+        return { x: cx - (BASE_WIDTH * zoom) / 2, y: cy - (BASE_HEIGHT * zoom) / 2 };
+      }
     }
     return { x: -BASE_WIDTH / 2, y: -BASE_HEIGHT / 2 };
   });
@@ -2456,10 +2469,38 @@ export default function RelationsCanvas({
       const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
       return { mx, my, dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) };
     };
+    // Hold-to-pick-up (2026-10-06, Mike: "easy to accidentally grab a card").
+    // On touch, a finger landing on a card or folder is NOT a drag yet: React
+    // never sees the pointerdown. Move within the hold time → the canvas pans.
+    // Hold still → the original pointerdown is replayed to the target and the
+    // card's own drag takes over, fed by the real pointermoves that follow.
+    const HOLD_MS = 280, SLOP_PX = 10;
+    let hold: { id: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout>; done: boolean } | null = null;
+    const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
+    const isControl = (t: Element) => !!t.closest('button, input, textarea, select, a, [role="button"], [data-no-hold]');
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
+      if (!e.isTrusted) return; // our own replayed pointerdown — let React have it
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const t = e.target as Element;
+      if (pointers.size === 1 && svg.contains(t) && !isBackgroundTarget(t) && !isControl(t)) {
+        e.stopPropagation();
+        const target = t;
+        const timer = setTimeout(() => {
+          if (!hold || hold.id !== e.pointerId || hold.done) return;
+          hold.done = true;
+          const replay = new PointerEvent('pointerdown', {
+            bubbles: true, cancelable: true, composed: true,
+            pointerId: e.pointerId, pointerType: 'touch', isPrimary: true,
+            clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+            button: 0, buttons: 1,
+          });
+          target.dispatchEvent(replay);
+        }, HOLD_MS);
+        hold = { id: e.pointerId, x: e.clientX, y: e.clientY, target, timer, done: false };
+      }
       if (pointers.size === 2) {
+        if (hold) { clearTimeout(hold.timer); hold = null; }
         const rect = svg.getBoundingClientRect();
         const { mx, my, dist } = midAndDist();
         const z = zoomRef.current, cam = cameraRef.current;
@@ -2476,6 +2517,17 @@ export default function RelationsCanvas({
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || !pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (hold && hold.id === e.pointerId && !hold.done) {
+        if (Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SLOP_PX) {
+          // Moved before the hold completed: this finger is panning the canvas.
+          clearTimeout(hold.timer);
+          const cam = cameraRef.current;
+          setPanStart({ x: hold.x, y: hold.y, viewBoxX: cam.x, viewBoxY: cam.y });
+          setIsPanning(true); setIsDragging(true);
+          hold = null;
+        }
+        return;
+      }
       const p = pinchRef.current;
       if (!p || pointers.size < 2) return;
       const rect = svg.getBoundingClientRect();
@@ -2488,6 +2540,7 @@ export default function RelationsCanvas({
     const onUp = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
       pointers.delete(e.pointerId);
+      if (hold && hold.id === e.pointerId) { clearTimeout(hold.timer); hold = null; } // a tap: the click still fires
       if (pointers.size < 2 && pinchRef.current) {
         pinchRef.current = null;
         // The remaining finger does not inherit a gesture — lift and start again.
