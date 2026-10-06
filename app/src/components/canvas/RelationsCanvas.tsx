@@ -412,6 +412,9 @@ export default function RelationsCanvas({
   // cards). Compute every auto-folder's footprint bottom-up — three
   // passes covers three nesting levels; deeper levels converge on
   // later renders.
+  // Folder titles live INSIDE the header bar since ed776ba (UI session,
+  // 2026-10-06), so no headroom is reserved above a child folder any more.
+  const CHILD_LABEL_ALLOWANCE = 0;
   const folderRectById = useMemo(() => {
     const rects = new Map<string, { x: number; y: number; width: number; height: number }>();
     const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
@@ -419,7 +422,7 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
-        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects, folderLabelSize(zoom) + 16);
+        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects, CHILD_LABEL_ALLOWANCE);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
           rect = {
@@ -449,7 +452,7 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
-        const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects, folderLabelSize(zoom) + 16);
+        const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects, CHILD_LABEL_ALLOWANCE);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
           rect = {
@@ -995,7 +998,7 @@ export default function RelationsCanvas({
    *  moved things glide in from where they were. */
   const applySettle = useCallback((priority: SettlePriority, repackLocId?: string) => {
     const { sNodes, sFolders } = buildSettleModel();
-    const labelAllowance = folderLabelSize(zoom) + 16;
+    const labelAllowance = CHILD_LABEL_ALLOWANCE;
     // A dropped card joins the smallest room under it (the same rule the
     // server applies via onDropIntoLocation, whose refresh lands later) —
     // settle against the membership it is ABOUT to have, not the stale one.
