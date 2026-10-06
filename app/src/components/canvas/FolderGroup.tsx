@@ -93,6 +93,18 @@ const SOUL_BLUE = '#002f6c';
 const TILE_W = 560;
 const TILE_H = 150;
 const HANDLE_SIZE = 36;
+/** Finger-sized resize handles on touch devices (2026-10-06, with the mobile
+ *  session). Read through useSyncExternalStore so the server snapshot (false)
+ *  matches the first client render and SVG geometry never hydration-mismatches. */
+const HANDLE_SIZE_COARSE = 52;
+const coarseQuery = () => (typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null);
+function useCoarsePointer(): boolean {
+  return React.useSyncExternalStore(
+    (cb) => { const q = coarseQuery(); q?.addEventListener('change', cb); return () => q?.removeEventListener('change', cb); },
+    () => coarseQuery()?.matches ?? false,
+    () => false,
+  );
+}
 
 /** Compact details strip: one-line essence + the expand affordance. */
 const COMPACT_DETAILS_H = 44;
@@ -279,6 +291,7 @@ export function FolderGroupRect({
   // little box; the header still fits at 280 wide.
   // An EMPTY location is a compact folder — same header and chips as every other place, just small
   // (Mike 2026-09-28: places must all display the same way; the header portrait box is the icon slot).
+  const handleSize = useCoarsePointer() ? HANDLE_SIZE_COARSE : HANDLE_SIZE;
   const isTile = !content && !!folder.locationInfo && !folder.collapsed;
   const MIN_FOLDER_W = isTile ? TILE_W : 280;
   const MIN_FOLDER_H = isTile ? TILE_H : 120;
@@ -1195,9 +1208,9 @@ export function FolderGroupRect({
         <>
           {/* Right edge */}
           <rect
-            x={bounds.x + bounds.width - HANDLE_SIZE / 2}
+            x={bounds.x + bounds.width - handleSize / 2}
             y={bounds.y + displayHeight / 2 - 40}
-            width={HANDLE_SIZE}
+            width={handleSize}
             height={80}
             rx={3}
             fill={`${color}${resizing?.edge === 'right' ? 'aa' : '66'}`}
@@ -1208,9 +1221,9 @@ export function FolderGroupRect({
           />
           {/* Left edge */}
           <rect
-            x={bounds.x - HANDLE_SIZE / 2}
+            x={bounds.x - handleSize / 2}
             y={bounds.y + displayHeight / 2 - 40}
-            width={HANDLE_SIZE}
+            width={handleSize}
             height={80}
             rx={3}
             fill={`${color}${resizing?.edge === 'left' ? 'aa' : '66'}`}
@@ -1222,9 +1235,9 @@ export function FolderGroupRect({
           {/* Bottom edge */}
           <rect
             x={bounds.x + bounds.width / 2 - 40}
-            y={bounds.y + displayHeight - HANDLE_SIZE / 2}
+            y={bounds.y + displayHeight - handleSize / 2}
             width={80}
-            height={HANDLE_SIZE}
+            height={handleSize}
             rx={3}
             fill={`${color}${resizing?.edge === 'bottom' ? 'aa' : '66'}`}
             stroke={`${color}44`}
@@ -1234,10 +1247,10 @@ export function FolderGroupRect({
           />
           {/* Bottom-right corner */}
           <rect
-            x={bounds.x + bounds.width - HANDLE_SIZE}
-            y={bounds.y + displayHeight - HANDLE_SIZE}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
+            x={bounds.x + bounds.width - handleSize}
+            y={bounds.y + displayHeight - handleSize}
+            width={handleSize}
+            height={handleSize}
             rx={3}
             fill={`${color}${resizing?.edge === 'corner' ? 'aa' : '66'}`}
             stroke={`${color}44`}
@@ -1248,9 +1261,9 @@ export function FolderGroupRect({
           {/* Bottom-left corner */}
           <rect
             x={bounds.x}
-            y={bounds.y + displayHeight - HANDLE_SIZE}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
+            y={bounds.y + displayHeight - handleSize}
+            width={handleSize}
+            height={handleSize}
             rx={3}
             fill={`${color}${resizing?.edge === 'left-corner' ? 'aa' : '66'}`}
             stroke={`${color}44`}
@@ -1262,9 +1275,9 @@ export function FolderGroupRect({
               title-bar drag inside the header chrome */}
           <rect
             x={bounds.x + bounds.width / 2 - 40}
-            y={bounds.y - HANDLE_SIZE / 2}
+            y={bounds.y - handleSize / 2}
             width={80}
-            height={HANDLE_SIZE}
+            height={handleSize}
             rx={3}
             fill={`${color}${resizing?.edge === 'top' ? 'aa' : '66'}`}
             stroke={`${color}44`}
@@ -1274,10 +1287,10 @@ export function FolderGroupRect({
           />
           {/* Top-right corner */}
           <rect
-            x={bounds.x + bounds.width - HANDLE_SIZE / 2}
-            y={bounds.y - HANDLE_SIZE / 2}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
+            x={bounds.x + bounds.width - handleSize / 2}
+            y={bounds.y - handleSize / 2}
+            width={handleSize}
+            height={handleSize}
             rx={3}
             fill={`${color}${resizing?.edge === 'top-corner' ? 'aa' : '66'}`}
             stroke={`${color}44`}
@@ -1287,10 +1300,10 @@ export function FolderGroupRect({
           />
           {/* Top-left corner */}
           <rect
-            x={bounds.x - HANDLE_SIZE / 2}
-            y={bounds.y - HANDLE_SIZE / 2}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
+            x={bounds.x - handleSize / 2}
+            y={bounds.y - handleSize / 2}
+            width={handleSize}
+            height={handleSize}
             rx={3}
             fill={`${color}${resizing?.edge === 'top-left-corner' ? 'aa' : '66'}`}
             stroke={`${color}44`}
