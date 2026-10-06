@@ -1385,10 +1385,17 @@ export default function RelationsCanvas({
     }));
   }, []);
   /** Call at the START of any gesture that will change the canvas. Idempotent while a tx is open. */
+  const closeTxRef = useRef<() => void>(() => {});
   const beginTx = useCallback((label: string) => {
-    if (openTxRef.current) return;
-    if (txCloseTimerRef.current) { clearTimeout(txCloseTimerRef.current); txCloseTimerRef.current = null; }
+    // A gesture that changed nothing (a click on a card, a zero-length drag)
+    // never schedules a settle, so its transaction would stay open and the
+    // NEXT gesture would be recorded under its label (orchestrator report
+    // 10-06: a carry showed up as "move"). Close any stale one first — the
+    // close is a no-op when nothing changed — and arm a fallback close.
+    if (openTxRef.current) closeTxRef.current();
+    if (txCloseTimerRef.current) clearTimeout(txCloseTimerRef.current);
     openTxRef.current = { label, before: takeSnapshot() };
+    txCloseTimerRef.current = setTimeout(() => closeTxRef.current(), 1500);
   }, [takeSnapshot]);
   const closeTx = useCallback(() => {
     const open = openTxRef.current;
@@ -1408,6 +1415,7 @@ export default function RelationsCanvas({
     broadcastHistory();
   }, [takeSnapshot, broadcastHistory]);
   /** Schedule the close a beat after the settle's commits have rendered. */
+  closeTxRef.current = closeTx;
   const scheduleTxClose = useCallback(() => {
     if (!openTxRef.current) return;
     if (txCloseTimerRef.current) clearTimeout(txCloseTimerRef.current);
