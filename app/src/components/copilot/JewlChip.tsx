@@ -1130,7 +1130,7 @@ export function JewlChip() {
           {/* The ^v^v undulating chrome — same skin as every context menu.
               JEWL is the OS runner; his overlay IS a Terminal surface.
               count sized up so the strip wraps the full 380x500 panel. */}
-          <CtxMenuBorder count={sheetMode ? 120 : 90} />
+          <CtxMenuBorder count={sheetMode ? 120 : 90} flush={sheetMode} />
           <CtxMenuScanlines />
           {sheetMode && (
             // Drag handle: swipe down ~80 px to dismiss. Pointer events, not
