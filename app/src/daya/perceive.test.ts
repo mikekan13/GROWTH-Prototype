@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { placeKeys, factsForPlace, composeSceneLines, narrowToNew, sceneRoll, SCENE_RETAKE_MS, SCENE_ITEM_CAP } from './perceive';
+import { placeKeys, factsForPlace, composeSceneLines, narrowToNew, sceneRoll, stimulusOnly, SCENE_RETAKE_MS, SCENE_ITEM_CAP } from './perceive';
 import { computeSceneContent, rngFor } from './renderer-math';
 
 const facts = [
@@ -154,6 +154,20 @@ describe('narrowToNew — after the first take, only the stimulus and what chang
     narrowToNew(composeSceneLines(changed), before.taken, 'inn', 2_000, rollOf(changed));
     expect(before.taken.seen.size).toBe(seenBefore);
     expect(before.truth).toEqual(whole);
+  });
+});
+
+describe('stimulusOnly — re-rendering a memory made from one stretch', () => {
+  it('narration: the headline alone, none of the room', () => {
+    expect(stimulusOnly(composeSceneLines(base))).toEqual({ headline: base.headline, lines: [] });
+  });
+  it('speech: the spoken line alone', () => {
+    const said = composeSceneLines({ ...base, headline: null, speech: ['Danny: "You new here?"'] });
+    expect(stimulusOnly(said)).toEqual({ headline: null, lines: [{ text: 'Danny: "You new here?"', salience: 0.95, kind: 'speech' }] });
+  });
+  it('a deaf being still gets no speech', () => {
+    const deaf = composeSceneLines({ ...base, headline: null, speech: ['Danny: "You new here?"'], senses: { canSee: true, canHear: false } });
+    expect(stimulusOnly(deaf)).toEqual({ headline: null, lines: [] });
   });
 });
 

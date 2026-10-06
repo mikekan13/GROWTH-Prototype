@@ -431,8 +431,10 @@ export async function correctCanon(
     try { cls = JSON.parse(m.classification) as Record<string, unknown>; } catch { cls = {}; }
     if (cls.rationaleTag === 'failed recall attempt') continue; // not a perception of the event
     const snapshot = (cls.mirror as { observer?: { mood?: { morale: number; stress: number; grief: number }; attunement?: number } } | undefined)?.observer;
+    // A memory made from one stretch of listening (U2b: the room was already taken in) is re-rendered as that stretch alone, not with the whole room.
+    const fromStretch = (cls.mirror as { standing?: string } | undefined)?.standing === 'new';
     try {
-      const p = await perceive(m.entity.characterId, campaignId, narration, m.source === 'dialogue' ? 'dialogue' : 'perception', {}, { observer: snapshot });
+      const p = await perceive(m.entity.characterId, campaignId, narration, m.source === 'dialogue' ? 'dialogue' : 'perception', {}, { observer: snapshot, standing: fromStretch ? 'stimulus' : 'always' });
       const history = Array.isArray(cls.revisions) ? (cls.revisions as unknown[]) : [];
       history.push({ at: new Date().toISOString(), previous: m.content, canonEventId: event.id });
       await prisma.dayaMemoryEntry.update({

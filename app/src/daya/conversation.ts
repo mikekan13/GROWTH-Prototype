@@ -14,6 +14,8 @@
  */
 import 'server-only';
 import '@/daya/ensemble';
+import { listenAtTable, answerAsk, type TableStimulus, type TableAsk, type ListenResult, type AnswerResult } from '@/daya/ensemble';
+import type { BeingSpeakingEvent } from '@/daya/listening';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
@@ -82,6 +84,78 @@ export async function converseWithEntity(
     if (err instanceof DayaTierUnavailableError) {
       return { status: 'core_offline', detail: err.message };
     }
+    throw err;
+  }
+}
+
+// ── The split loop at the table (U2c) ──────────────────────────────────────
+// Same gates and the same graceful states as converseWithEntity, for the two
+// halves of the split loop: a being LISTENS while someone has the floor and
+// ANSWERS at the ask (ensemble.ts listenAtTable / answerAsk).
+
+async function tableGate(characterId: string, actorRole: string): Promise<ConverseStatus | null> {
+  if (!isWatcherOrAbove(actorRole)) {
+    throw new ForbiddenError('GM/ADMIN only — the persona-harness conversation surface is Watcher-console-and-above');
+  }
+  const character = await prisma.character.findUnique({ where: { id: characterId }, select: { id: true } });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!isDayaEnabled()) return 'disabled';
+  const entity = await prisma.dayaEntity.findUnique({ where: { characterId } });
+  if (!entity || entity.status !== 'ACTIVE') return 'dormant';
+  return null;
+}
+
+function laneState(err: unknown): { status: ConverseStatus; detail: string } | null {
+  if (err instanceof DayaWarmingTimeoutError) return { status: 'warming', detail: err.message };
+  if (err instanceof DayaTierUnavailableError) return { status: 'core_offline', detail: err.message };
+  return null;
+}
+
+export interface TableListenOutcome {
+  status: ConverseStatus;
+  /** null = an answer took the stretch over before it started (it is digested and stored by that answer). */
+  listened?: ListenResult | null;
+  detail?: string;
+}
+
+/** Hand a being one stretch of what is happening at the table. Nothing is said in return. */
+export async function listenToTable(
+  characterId: string,
+  actorRole: string,
+  stimulus: TableStimulus,
+  overrides: DayaClientOverrides = {},
+): Promise<TableListenOutcome> {
+  const gated = await tableGate(characterId, actorRole);
+  if (gated) return { status: gated };
+  try {
+    return { status: 'ok', listened: await listenAtTable(characterId, stimulus, overrides) };
+  } catch (err) {
+    const state = laneState(err);
+    if (state) return state;
+    throw err;
+  }
+}
+
+export interface TableAnswerOutcome {
+  status: ConverseStatus;
+  answer?: AnswerResult;
+  detail?: string;
+}
+
+/** The moment has turned to a being: one short streamed line. */
+export async function answerAtTable(
+  characterId: string,
+  actorRole: string,
+  ask: TableAsk,
+  opts: { onEvent?: (event: BeingSpeakingEvent) => void; overrides?: DayaClientOverrides } = {},
+): Promise<TableAnswerOutcome> {
+  const gated = await tableGate(characterId, actorRole);
+  if (gated) return { status: gated };
+  try {
+    return { status: 'ok', answer: await answerAsk(characterId, ask, opts) };
+  } catch (err) {
+    const state = laneState(err);
+    if (state) return state;
     throw err;
   }
 }

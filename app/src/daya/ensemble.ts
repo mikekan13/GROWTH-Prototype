@@ -1042,8 +1042,11 @@ export async function answerAsk(
   const ctx = await loadEntityContext(characterId);
   const mirrored = isMirrored(ctx);
   // Through the mirror with no model call: nothing raw reaches the being, and nothing here waits on the lane.
-  const unvoiced = async (s: TableStimulus, standing: 'once' | 'always' = 'once') =>
-    mirrored ? (await perceive(characterId, ctx.campaignId!, s.content, s.source, overrides, { standing, voice: false })).prose : s.content;
+  const unvoiced = async (s: TableStimulus, standing: 'once' | 'always' = 'once'): Promise<{ prose: string; standing: 'full' | 'new' }> => {
+    if (!mirrored) return { prose: s.content, standing: 'new' };
+    const p = await perceive(characterId, ctx.campaignId!, s.content, s.source, overrides, { standing, voice: false });
+    return { prose: p.prose, standing: p.standing };
+  };
 
   // A listen may still be in flight for the last thing the GM said. Wait for it, but only so long.
   const settled = await settledWithin(listenQueue.idle(characterId), ANSWER_LISTEN_CAP_MS);
@@ -1053,22 +1056,23 @@ export async function answerAsk(
 
   // What the listen had not delivered yet. The in-flight stretch will store itself; the taken-back ones are stored below.
   const lateHeard: string[] = [];
-  for (const s of inFlight) lateHeard.push(await unvoiced(s));
-  const takenBackHeard: Array<{ source: TableStimulus['source']; prose: string }> = [];
-  for (const s of takenBack) takenBackHeard.push({ source: s.source, prose: await unvoiced(s) });
+  for (const s of inFlight) lateHeard.push((await unvoiced(s)).prose);
+  const takenBackHeard: Array<{ source: TableStimulus['source']; prose: string; standing: 'full' | 'new' }> = [];
+  for (const s of takenBack) takenBackHeard.push({ source: s.source, ...(await unvoiced(s)) });
 
-  let spokenHeard: string | null = null;
+  let spoken: { source: 'dialogue'; prose: string; standing: 'full' | 'new' } | null = null;
   let askArg: SpiritAsk = { kind: 'turn' };
   if (ask.kind === 'spoken') {
-    spokenHeard = await unvoiced({ source: 'dialogue', content: `${ask.by}: ${ask.text}` });
-    askArg = { kind: 'spoken', heard: spokenHeard || 'Someone is speaking to you, but you cannot make out the words.' };
+    spoken = { source: 'dialogue', ...(await unvoiced({ source: 'dialogue', content: `${ask.by}: ${ask.text}` })) };
+    askArg = { kind: 'spoken', heard: spoken.prose || 'Someone is speaking to you, but you cannot make out the words.' };
   }
+  const spokenHeard = spoken?.prose || null;
 
   let state = getListening(characterId);
   const listen: AnswerTimings['listen'] = !settled ? 'capped' : state ? 'complete' : 'none';
   if (!state) {
     // Nothing was listened to (a cold ask): the place through the unvoiced mirror, and no felt-state call.
-    const scene = await unvoiced({ source: 'perception', content: '' }, 'always');
+    const scene = (await unvoiced({ source: 'perception', content: '' }, 'always')).prose;
     const cold: ListeningState = {
       locationId: null, standingScene: scene, heard: [], innerState: '', feltStateBrief: FELT_FALLBACK, feltAt: 0,
       recallBlock: '', desiresBlock: await buildDesiresBlockForCharacter(characterId), updatedAt: Date.now(),
@@ -1149,10 +1153,10 @@ export async function answerAsk(
   const after = (async () => {
     const out: { memoryEntryId?: string; spokenMemoryId?: string } = {};
     try {
-      const unstored = [...takenBackHeard, ...(spokenHeard ? [{ source: 'dialogue' as const, prose: spokenHeard }] : [])];
+      const unstored = [...takenBackHeard, ...(spoken ? [spoken] : [])];
       for (const h of unstored) {
         if (!h.prose) continue;
-        const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: h.source, content: h.prose, extraClassification: { mirror: { voiced: false } } }, overrides);
+        const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: h.source, content: h.prose, extraClassification: { mirror: { voiced: false, standing: h.standing } } }, overrides);
         if (ingest.persisted) out.memoryEntryId = ingest.memoryEntryId;
       }
       if (line.kind === 'speak') {

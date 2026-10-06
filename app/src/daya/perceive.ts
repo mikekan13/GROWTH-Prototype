@@ -55,8 +55,10 @@ export interface PerceiveOptions {
    * 'once' (the listening loop, TABLE-RHYTHM-DESIGN §6): the being takes the
    * room in on its first stimulus in a place; after that each stimulus carries
    * only itself and what is NEW there. Default 'always': the whole room every time.
+   * 'stimulus': the stimulus alone, no room, and what the being has taken in is left
+   * as it was — for re-rendering a memory that was made from one stretch (canon corrections).
    */
-  standing?: 'always' | 'once';
+  standing?: 'always' | 'once' | 'stimulus';
   /** false = skip the voicing call and return the deterministic envelope (an ask that cannot wait for a full listen). */
   voice?: boolean;
 }
@@ -181,6 +183,11 @@ export function narrowToNew(
   const present = roll.present ? new Set(roll.present) : fresh ? new Set<string>() : taken.present;
   const items = roll.items ? new Set(roll.items) : fresh ? new Set<string>() : taken.items;
   return { truth: { headline: truth.headline, lines }, standing: fresh ? 'full' : 'new', taken: { locationId, seen, present, items, at: now } };
+}
+
+/** The stimulus with none of the standing scene: the narration, or the words spoken. Pure. */
+export function stimulusOnly(truth: SceneTruth): SceneTruth {
+  return { headline: truth.headline, lines: truth.lines.filter((l) => l.kind === 'speech') };
 }
 
 // In-process, per being; a restart just means the room is taken in again.
@@ -308,8 +315,8 @@ export async function perceive(
   // The scene is gathered fresh every time (a few ms of local reads), so what is in the place is never stale.
   const { truth: whole, locationId, roll } = await composeSceneTruth(characterId, campaignId, stimulus, source);
   const narrowed = opts.standing === 'once' ? narrowToNew(whole, takenIn.get(characterId), locationId, Date.now(), roll) : null;
-  const truth = narrowed?.truth ?? whole;
-  const standing = narrowed?.standing ?? 'full';
+  const truth = narrowed?.truth ?? (opts.standing === 'stimulus' ? stimulusOnly(whole) : whole);
+  const standing = narrowed?.standing ?? (opts.standing === 'stimulus' ? 'new' : 'full');
   const { observer: current, godlike } = await observerFor(characterId);
   const observer: Observer = { ...current, ...(opts.observer?.mood ? { mood: opts.observer.mood } : {}), ...(opts.observer?.attunement != null ? { attunement: opts.observer.attunement } : {}) };
   const snapshot = { mood: observer.mood, attunement: observer.attunement };

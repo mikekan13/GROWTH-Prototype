@@ -217,6 +217,26 @@ export interface JewlHighlightEvent {
   durationMs: number;
 }
 
+// ── A being's line as it is spoken (U2c, TABLE-RHYTHM-DESIGN-2026-10-01) ──
+
+/**
+ * One step of a being's line growing at the table. Order per utterance:
+ * start → partial… → [retract] → final. `partial.text` is always the WHOLE
+ * line so far, so a client that missed a piece is still right. `retract`
+ * withdraws everything shown for that utterance (a rule is named, the words
+ * that tripped it never are); the `final` that follows carries the line as
+ * stored. A `final` always closes a `start`, also when the being stays silent
+ * (`kind: 'rest'`, empty text). Only `kind: 'speak'` ever has partials.
+ */
+export type BeingSpeakingPhase =
+  | { phase: 'start'; utteranceId: string; characterId: string; characterName: string }
+  | { phase: 'partial'; utteranceId: string; characterId: string; text: string; delta: string }
+  | { phase: 'retract'; utteranceId: string; characterId: string; reason: 'seal'; rule: string }
+  | { phase: 'final'; utteranceId: string; characterId: string; kind: 'speak' | 'act' | 'attend' | 'rest'; text: string; revoiced: boolean };
+
+/** Transient: never persisted. The spoken line itself still arrives as a `terminal_event` chat. */
+export type BeingSpeakingStreamEvent = { kind: 'being_speaking' } & BeingSpeakingPhase;
+
 // ── Heartbeat ─────────────────────────────────────────────────────────────
 
 export interface HeartbeatEvent {
@@ -241,6 +261,7 @@ export type StreamEventData =
   | DayaWorkSessionEvent
   | JewlFocusEvent
   | JewlHighlightEvent
+  | BeingSpeakingStreamEvent
   | HeartbeatEvent;
 
 /** The envelope sent over SSE */

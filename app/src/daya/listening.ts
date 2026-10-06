@@ -14,6 +14,7 @@
  * The orchestration that calls the models lives in ensemble.ts.
  */
 import { sealLint, hasHardHit } from './seal';
+import type { BeingSpeakingPhase } from '@/types/campaign-events';
 
 // ── Tunables ─────────────────────────────────────────────────────────────────
 
@@ -154,17 +155,8 @@ export async function settledWithin(work: Promise<unknown>, capMs: number): Prom
 
 // ── The line as it is spoken (what U2c puts on the wire) ─────────────────────
 
-/**
- * A being's line growing at the table. `partial.text` is always the whole line
- * so far, so a client that missed a piece is still right. A `retract` withdraws
- * everything shown for that utterance; the `final` that follows carries the
- * line as stored (re-voiced). Rules are named, matched words never are.
- */
-export type BeingSpeakingEvent =
-  | { phase: 'start'; utteranceId: string; characterId: string; characterName: string }
-  | { phase: 'partial'; utteranceId: string; characterId: string; text: string; delta: string }
-  | { phase: 'retract'; utteranceId: string; characterId: string; reason: 'seal'; rule: string }
-  | { phase: 'final'; utteranceId: string; characterId: string; kind: 'speak' | 'act' | 'attend' | 'rest'; text: string; revoiced: boolean };
+/** A being's line growing at the table — the shape is defined once, with the stream events it travels as. */
+export type BeingSpeakingEvent = BeingSpeakingPhase;
 
 // ── Speech gate ──────────────────────────────────────────────────────────────
 
