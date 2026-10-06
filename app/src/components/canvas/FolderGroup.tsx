@@ -457,11 +457,6 @@ export function FolderGroupRect({
   const lod = lodForZoom(zoom);
   const headerFill = folder.locationInfo ? depthHeaderFill(depth) : color;
   const bodyFill = folder.locationInfo ? depthBodyFill(depth) : '#19191930';
-  const labelFill = folder.locationInfo ? '#CBD9E8' : color;
-  // Cap the label to the folder's width so zoomed-out names never run into a sibling's.
-  const labelChars = folder.name.length + (depth ?? 0) + 6;
-  const labelFontSize = Math.max(28, Math.min(folderLabelSize(zoom), Math.floor((bounds.width + 140) / (labelChars * 0.62))));
-  const countFontSize = Math.round(labelFontSize * 0.85);
   const btnW = 160;
   const btnH = 42;
   const btnFontSize = 20;
@@ -469,6 +464,32 @@ export function FolderGroupRect({
 
   // TKV: sum of all characters' TKV in this folder
   const folderChars = characters.filter(c => folder.nodeIds.includes(c.id));
+
+  // Title lives INSIDE the header bar (Mike 2026-10-06: "the title should be
+  // within the header bar"). Near: a tidy first row beside the portrait, with
+  // the action row under it. Mid/far: the action row hides (unreadable that
+  // small anyway) and the title scales up with zoom, centred on the bar, so a
+  // place stays legible zoomed out. Width is capped so it never runs into the
+  // who-is-here chips or the collapse toggle; overflow ellipsises.
+  const showActionRow = !!folder.locationInfo && lod === 'near';
+  const showPortrait = !!folder.locationInfo && lod !== 'far';
+  const chipCount = (!collapsed && folder.locationInfo && folderChars.length > 0)
+    ? Math.min(folderChars.length, 6) + (folderChars.length > 6 ? 1 : 0) : 0;
+  const titleLeft = showPortrait ? 84 : folder.type === 'party' ? btnW + 24 : 16;
+  const titleRightReserve = toggleSize + 28 + chipCount * 60;
+  const titleAvailW = Math.max(60, bounds.width - titleLeft - titleRightReserve);
+  // Styled like the rulebook's section headers (Mike 2026-10-06: "gold text
+  // and blue backgrounds"): Bebas Neue caps in --accent-gold on a Soul-blue
+  // (#002f6c) badge that hugs the text like a tape strip (VISUAL-DESIGN-SPEC §5).
+  const TITLE_PAD_X = 12;
+  const titleChars = folder.name.length + (depth ?? 0) + String(folder.nodeIds.length).length + (folder.type === 'party' ? 7 : 4);
+  const titleMax = lod === 'near' ? 32 : lod === 'mid' ? Math.min(folderLabelSize(zoom), 60) : folderLabelSize(zoom);
+  // Bebas Neue is condensed: ~0.5em per char including the tracking.
+  const titleFont = Math.max(18, Math.min(titleMax, Math.floor((titleAvailW - 2 * TITLE_PAD_X) / (titleChars * 0.5))));
+  const titleLineH = Math.ceil(titleFont * 1.1) + 4;
+  const titleTop = showActionRow ? 4 : (HEADER_HEIGHT - titleLineH) / 2;
+  /** Rough rendered width — the TKV / KRMA tiles slide right of it. */
+  const titleEstW = titleChars * titleFont * 0.5 + 2 * TITLE_PAD_X;
   const totalTKV = folderChars.reduce((sum, c) => {
     const val = c.data?.tkv;
     return sum + (typeof val === 'number' ? val : typeof val === 'string' ? parseFloat(val) || 0 : 0);
@@ -563,31 +584,54 @@ export function FolderGroupRect({
         />
       )}
 
-      {/* Folder label — above the folder box */}
-      <text
-        x={bounds.x + 8}
-        y={bounds.y - 6}
-        fill={folder.type === 'party' ? 'var(--terminal-prime)' : labelFill}
-        fontSize={labelFontSize}
-        fontWeight={700}
-        fontFamily="var(--font-terminal), Consolas, monospace"
-        letterSpacing="0.12em"
-        style={{ pointerEvents: 'none' }}
+      {/* Folder title — INSIDE the header bar (2026-10-06). Locations drop the
+          □ glyph: the portrait box is the icon slot. The depth prefix (one ▸
+          per level) stays, dimmed, so "inside inside" still reads. */}
+      <foreignObject
+        x={bounds.x + titleLeft}
+        y={bounds.y + titleTop}
+        width={titleAvailW}
+        height={titleLineH}
+        style={{ pointerEvents: 'none', overflow: 'visible' }}
       >
-        {folder.type === 'party' ? <><tspan letterSpacing="-0.53em">{'\u265F'}<tspan fontSize="1.15em">{'\u265F'}</tspan>{'\u265F'}</tspan>{' '}</> : '\u25A1 '}<tspan fill={headerFill}>{depthPrefix(depth)}</tspan>{folder.name.toUpperCase()}
-        <tspan fill={`${folder.type === 'party' ? '#22ab94' : color}99`} fontSize={countFontSize} dx={6}>
-          ({folder.nodeIds.length})
-        </tspan>
-      </text>
+        <div style={{ width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <div
+            style={{
+              display: 'inline-block',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              background: SOUL_BLUE, // #002f6c — Mike 2026-10-06: the badge blue is Soul blue, not surface-dark
+              color: 'var(--accent-gold, #D0A030)',
+              fontFamily: 'var(--font-bebas-neue), "Bebas Neue", Impact, sans-serif',
+              fontSize: titleFont,
+              fontWeight: 400,
+              letterSpacing: '0.05em',
+              lineHeight: 1.1,
+              padding: `2px ${TITLE_PAD_X}px`,
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              verticalAlign: 'top',
+              // Tape-strip edge: a hair off square, like the rulebook badges.
+              clipPath: 'polygon(0 3%, 100% 0, 99.7% 100%, 0.3% 96%)',
+            }}
+            title={folder.name}
+          >
+            {folder.type === 'party'
+              ? <><span style={{ letterSpacing: '-0.53em' }}>{'\u265F'}<span style={{ fontSize: '1.15em' }}>{'\u265F'}</span>{'\u265F'}</span>{' '}</>
+              : folder.locationInfo ? null : '\u25A1 '}
+            {depthPrefix(depth) && <span style={{ opacity: 0.55 }}>{depthPrefix(depth)}</span>}
+            {folder.name}
+            <span style={{ opacity: 0.6, fontSize: '0.8em', marginLeft: '0.35em' }}>({folder.nodeIds.length})</span>
+          </div>
+        </div>
+      </foreignObject>
 
       {/* TKV readout (party folders only) — standard red label over purple number, slides right if label is too close */}
       {folder.type === 'party' && (() => {
         const tkvW = 320;
-        // Approximate label width: Consolas 36px + 0.12em letter-spacing ≈ 25px per char
-        const charWidth = labelFontSize * 0.7;
-        const labelChars = folder.name.length + ` (${folder.nodeIds.length})`.length;
-        const chessPieceW = folder.type === 'party' ? 50 : 0; // ♟♟♟ prefix
-        const labelRight = bounds.x + 8 + chessPieceW + labelChars * charWidth + 16;
+        const labelRight = bounds.x + titleLeft + titleEstW + 16;
         const centeredX = bounds.x + bounds.width / 2 - tkvW / 2;
         const tkvX = Math.max(centeredX, labelRight);
         return (
@@ -618,7 +662,7 @@ export function FolderGroupRect({
           counts. Renders only for Location auto-folders (those with
           locationInfo). Sits inside the 80 px header rectangle to the left
           of the KRMA reserve. */}
-      {folder.locationInfo && lod !== 'far' && (
+      {showPortrait && folder.locationInfo && (
         <>
           {/* Portrait box */}
           <foreignObject
@@ -653,177 +697,167 @@ export function FolderGroupRect({
             </div>
           </foreignObject>
 
-          {/* AI Generate button (stub — pipeline TBD). The unified AI image
-              generation is the SOLE path for getting visuals onto entities.
-              No file upload — generation is the design constraint. */}
-          <foreignObject
-            x={bounds.x + 80}
-            y={bounds.y + 8}
-            width={120}
-            height={30}
-            style={{ pointerEvents: 'auto', overflow: 'visible' }}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                window.dispatchEvent(
-                  new CustomEvent('growth:ai-generate-image', {
-                    detail: {
-                      entityType: 'location',
-                      entityId: folder.locationInfo?.locationId,
-                      target: 'portrait',
-                    },
-                  }),
-                );
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              style={{
-                padding: '5px 10px',
-                background: 'rgba(0,0,0,0.6)',
-                border: '1px solid rgba(34,171,148,0.6)',
-                color: 'var(--terminal-prime)',
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                fontSize: 11,
-                letterSpacing: '0.08em',
-                cursor: 'pointer',
-                borderRadius: 2,
-                textShadow: '0 0 4px rgba(34,171,148,0.4)',
-              }}
-              title="Generate location portrait via the AI image pipeline"
-            >
-              ✨ GENERATE
-            </button>
-          </foreignObject>
-
-          {/* CRYSTALLIZE button — visible only when the location is in
-              PLANNING status. Fires a custom event the canvas catches
-              and turns into a confirmation modal. */}
-          {folder.locationInfo.status === 'PLANNING' && (
+          {/* Action row + content counts — the bar's second line, under the
+              title (2026-10-06). Near LOD only: at mid/far these 11px buttons
+              are unreadable and the title takes the whole bar. The row's own
+              surface passes pointer events through so the header still drags;
+              only the buttons catch them. */}
+          {showActionRow && folder.locationInfo && (
             <foreignObject
-              x={bounds.x + 340}
-              y={bounds.y + 8}
-              width={170}
-              height={30}
-              style={{ pointerEvents: 'auto', overflow: 'visible' }}
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.dispatchEvent(
-                    new CustomEvent('growth:crystallize-location', {
-                      detail: {
-                        locationId: folder.locationInfo?.locationId,
-                        locationName: folder.name,
-                        krmaReserve: folder.locationInfo?.krmaReserve,
-                        contentCounts: folder.locationInfo?.contentCounts,
-                      },
-                    }),
-                  );
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                style={{
-                  padding: '5px 10px',
-                  background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
-                  border: '1px solid var(--krma-gold)',
-                  color: '#000',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  boxShadow: '0 0 12px rgba(255,204,120,0.5)',
-                }}
-                title="Crystallize: commit this location and its subtree to the active world"
-              >
-                ✦ CRYSTALLIZE
-              </button>
-            </foreignObject>
-          )}
-
-          {/* Drill-in button — re-focuses the canvas on this location's
-              interior. The drilled-in view shows only this location's
-              immediate children + a breadcrumb at the top of the canvas. */}
-          {onDrillIn && folder.locationInfo.locationId && (
-            <foreignObject
-              x={bounds.x + 210}
-              y={bounds.y + 8}
-              width={120}
-              height={30}
-              style={{ pointerEvents: 'auto', overflow: 'visible' }}
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDrillIn(folder.locationInfo!.locationId);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                style={{
-                  padding: '5px 10px',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,204,120,0.6)',
-                  color: 'var(--krma-gold)',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  textShadow: '0 0 4px rgba(255,204,120,0.4)',
-                }}
-                title="Drill in: focus the canvas on this location's interior"
-              >
-                ▸ ENTER
-              </button>
-            </foreignObject>
-          )}
-
-          {/* Content-type count row */}
-          {folder.locationInfo.contentCounts && (
-            <foreignObject
-              x={bounds.x + 80}
+              x={bounds.x + 84}
               y={bounds.y + 44}
-              width={500}
-              height={28}
+              width={titleAvailW}
+              height={32}
               style={{ pointerEvents: 'none', overflow: 'visible' }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 18,
-                  alignItems: 'center',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 22,
-                  color: 'rgba(255,255,255,0.8)',
-                }}
-              >
-                {(folder.locationInfo.contentCounts.locations ?? 0) > 0 && (
-                  <span title="Sub-locations">
-                    <span style={{ color: 'var(--terminal-prime)', marginRight: 4 }}>⌂</span>
-                    {folder.locationInfo.contentCounts.locations}
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 30, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                {/* AI Generate button (stub — pipeline TBD). The unified AI image
+                    generation is the SOLE path for getting visuals onto entities.
+                    No file upload — generation is the design constraint. */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.dispatchEvent(
+                      new CustomEvent('growth:ai-generate-image', {
+                        detail: {
+                          entityType: 'location',
+                          entityId: folder.locationInfo?.locationId,
+                          target: 'portrait',
+                        },
+                      }),
+                    );
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  style={{
+                    pointerEvents: 'auto',
+                    padding: '5px 10px',
+                    background: 'rgba(0,0,0,0.6)',
+                    border: '1px solid rgba(34,171,148,0.6)',
+                    color: 'var(--terminal-prime)',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    cursor: 'pointer',
+                    borderRadius: 2,
+                    textShadow: '0 0 4px rgba(34,171,148,0.4)',
+                  }}
+                  title="Generate location portrait via the AI image pipeline"
+                >
+                  ✨ GENERATE
+                </button>
+
+                {/* Drill-in button — re-focuses the canvas on this location's
+                    interior. The drilled-in view shows only this location's
+                    immediate children + a breadcrumb at the top of the canvas. */}
+                {onDrillIn && folder.locationInfo.locationId && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDrillIn(folder.locationInfo!.locationId);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    style={{
+                      pointerEvents: 'auto',
+                      padding: '5px 10px',
+                      background: 'rgba(0,0,0,0.6)',
+                      border: '1px solid rgba(255,204,120,0.6)',
+                      color: 'var(--krma-gold)',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      fontSize: 11,
+                      letterSpacing: '0.08em',
+                      cursor: 'pointer',
+                      borderRadius: 2,
+                      textShadow: '0 0 4px rgba(255,204,120,0.4)',
+                    }}
+                    title="Drill in: focus the canvas on this location's interior"
+                  >
+                    ▸ ENTER
+                  </button>
                 )}
-                {(folder.locationInfo.contentCounts.characters ?? 0) > 0 && (
-                  <span title="Characters / PCs">
-                    <span style={{ color: 'var(--pillar-body)', marginRight: 4 }}>✴</span>
-                    {folder.locationInfo.contentCounts.characters}
-                  </span>
+
+                {/* CRYSTALLIZE button — visible only when the location is in
+                    PLANNING status. Fires a custom event the canvas catches
+                    and turns into a confirmation modal. */}
+                {folder.locationInfo.status === 'PLANNING' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(
+                        new CustomEvent('growth:crystallize-location', {
+                          detail: {
+                            locationId: folder.locationInfo?.locationId,
+                            locationName: folder.name,
+                            krmaReserve: folder.locationInfo?.krmaReserve,
+                            contentCounts: folder.locationInfo?.contentCounts,
+                          },
+                        }),
+                      );
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    style={{
+                      pointerEvents: 'auto',
+                      padding: '5px 10px',
+                      background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
+                      border: '1px solid var(--krma-gold)',
+                      color: '#000',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      fontSize: 11,
+                      letterSpacing: '0.12em',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      borderRadius: 2,
+                      boxShadow: '0 0 12px rgba(255,204,120,0.5)',
+                    }}
+                    title="Crystallize: commit this location and its subtree to the active world"
+                  >
+                    ✦ CRYSTALLIZE
+                  </button>
                 )}
-                {(folder.locationInfo.contentCounts.npcs ?? 0) > 0 && (
-                  <span title="NPCs">
-                    <span style={{ color: 'var(--krma-gold)', marginRight: 4 }}>✴</span>
-                    {folder.locationInfo.contentCounts.npcs}
-                  </span>
-                )}
-                {(folder.locationInfo.contentCounts.items ?? 0) > 0 && (
-                  <span title="Items">
-                    <span style={{ color: '#8e7cc3', marginRight: 4 }}>❖</span>
-                    {folder.locationInfo.contentCounts.items}
-                  </span>
+
+                {/* Content-type counts, same line, after the actions */}
+                {folder.locationInfo.contentCounts && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 18,
+                      alignItems: 'center',
+                      marginLeft: 10,
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      fontSize: 22,
+                      color: 'rgba(255,255,255,0.8)',
+                    }}
+                  >
+                    {(folder.locationInfo.contentCounts.locations ?? 0) > 0 && (
+                      <span title="Sub-locations">
+                        <span style={{ color: 'var(--terminal-prime)', marginRight: 4 }}>⌂</span>
+                        {folder.locationInfo.contentCounts.locations}
+                      </span>
+                    )}
+                    {(folder.locationInfo.contentCounts.characters ?? 0) > 0 && (
+                      <span title="Characters / PCs">
+                        <span style={{ color: 'var(--pillar-body)', marginRight: 4 }}>✴</span>
+                        {folder.locationInfo.contentCounts.characters}
+                      </span>
+                    )}
+                    {(folder.locationInfo.contentCounts.npcs ?? 0) > 0 && (
+                      <span title="NPCs">
+                        <span style={{ color: 'var(--krma-gold)', marginRight: 4 }}>✴</span>
+                        {folder.locationInfo.contentCounts.npcs}
+                      </span>
+                    )}
+                    {(folder.locationInfo.contentCounts.items ?? 0) > 0 && (
+                      <span title="Items">
+                        <span style={{ color: '#8e7cc3', marginRight: 4 }}>❖</span>
+                        {folder.locationInfo.contentCounts.items}
+                      </span>
+                    )}
+                  </div>
                 )}
                 {folder.locationInfo.locationType && (
                   <span
                     style={{
                       marginLeft: 'auto',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
                       fontSize: 10,
                       color: 'rgba(255,255,255,0.4)',
                       textTransform: 'uppercase',
@@ -1032,9 +1066,7 @@ export function FolderGroupRect({
           return n.toLocaleString();
         };
         const kW = 320;
-        const charWidth = labelFontSize * 0.7;
-        const labelChars = folder.name.length + ` (${folder.nodeIds.length})`.length;
-        const labelRight = bounds.x + 8 + labelChars * charWidth + 16;
+        const labelRight = bounds.x + titleLeft + titleEstW + 16;
         const centeredX = bounds.x + bounds.width / 2 - kW / 2;
         const kX = Math.max(centeredX, labelRight);
         return (
