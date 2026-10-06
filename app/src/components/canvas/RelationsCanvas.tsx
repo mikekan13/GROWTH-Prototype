@@ -2463,6 +2463,53 @@ export default function RelationsCanvas({
   cameraRef.current = camera;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+
+  // ── Carry mode (touch) — Mike 2026-10-06: "a grab being a long press… then
+  // something else to drop but having all the movement functionality intact
+  // while holding something." A long press picks a card or a room up into a
+  // tray; pan and pinch work exactly as if nothing were held; a tap on empty
+  // canvas (or DROP HERE for the screen centre) puts it down there, with the
+  // same room-membership and settle rules as a desktop drop.
+  const [carried, setCarried] = useState<{ kind: 'node' | 'folder'; id: string; label: string } | null>(null);
+  const carriedRef = useRef(carried);
+  carriedRef.current = carried;
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const clientToSvgRef = useRef(clientToSvg);
+  clientToSvgRef.current = clientToSvg;
+  const dropCarriedAt = useCallback((wx: number, wy: number) => {
+    const c = carriedRef.current;
+    if (!c) return;
+    setCarried(null);
+    if (c.kind === 'node') {
+      const n = nodesRef.current.find(nn => nn.id === c.id);
+      if (!n) return;
+      const movedAt = Date.now();
+      setNodePositions(prev => { const next = new Map(prev); next.set(c.id, { x: wx, y: wy, movedAt }); return next; });
+      onNodePositionChange?.(c.id, wx, wy);
+      bringNodeToFront(c.id);
+      if (n.type !== 'location') {
+        const hit = pickAutoDropTarget(wx, wy);
+        const cur = currentAutoParentOf(c.id);
+        if (hit && hit !== cur) onDropIntoLocation?.(c.id, n.type === 'item' ? 'item' : 'character', hit);
+      }
+      setPendingLayoutPass({ priority: { kind: 'node', id: c.id } });
+      return;
+    }
+    const rect = committedFolderRectById.get(c.id);
+    const f = foldersRef.current.find(ff => ff.id === `auto-${c.id}`);
+    if (!rect || !f) return;
+    const dx = wx - (rect.x + rect.width / 2);
+    let dy = wy - (rect.y + rect.height / 2);
+    // A drafting place never crosses the crystallization line by being carried.
+    if (f.locationInfo && f.locationInfo.status !== 'ACTIVE' && rect.y + dy < 0) dy = -rect.y;
+    const updated = shiftFolderTree(c.id, dx, dy, foldersRef.current);
+    onFoldersChange?.(updated.map(ff => (ff.id === f.id ? { ...ff, movedAt: Date.now() } : ff)));
+    setPendingLayoutPass({ priority: { kind: 'folder', id: c.id } });
+  }, [onNodePositionChange, bringNodeToFront, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, committedFolderRectById, shiftFolderTree, onFoldersChange]);
+  const dropCarriedRef = useRef(dropCarriedAt);
+  dropCarriedRef.current = dropCarriedAt;
+
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -2479,6 +2526,7 @@ export default function RelationsCanvas({
     // card's own drag takes over, fed by the real pointermoves that follow.
     const HOLD_MS = 280, SLOP_PX = 10;
     let hold: { id: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout>; done: boolean } | null = null;
+    let bgTap: { id: number; x: number; y: number } | null = null; // a tap on empty canvas while carrying = drop here
     const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
     const isControl = (t: Element) => !!t.closest('button, input, textarea, select, a, [role="button"], [data-no-hold]');
     const onDown = (e: PointerEvent) => {
@@ -2486,19 +2534,29 @@ export default function RelationsCanvas({
       if (!e.isTrusted) return; // our own replayed pointerdown — let React have it
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const t = e.target as Element;
+      if (pointers.size === 1 && carriedRef.current && svg.contains(t) && isBackgroundTarget(t)) {
+        bgTap = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      }
       if (pointers.size === 1 && svg.contains(t) && !isBackgroundTarget(t) && !isControl(t)) {
         e.stopPropagation();
         const target = t;
         const timer = setTimeout(() => {
           if (!hold || hold.id !== e.pointerId || hold.done) return;
           hold.done = true;
-          const replay = new PointerEvent('pointerdown', {
-            bubbles: true, cancelable: true, composed: true,
-            pointerId: e.pointerId, pointerType: 'touch', isPrimary: true,
-            clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
-            button: 0, buttons: 1,
-          });
-          target.dispatchEvent(replay);
+          if (carriedRef.current) return; // already carrying something
+          const wrap = target.closest('[data-card-wrapper]');
+          const nid = wrap?.getAttribute('data-node-id');
+          if (nid) {
+            const n = nodesRef.current.find(nn => nn.id === nid);
+            setCarried({ kind: 'node', id: nid, label: n?.name ?? 'card' });
+          } else {
+            const fl = target.closest('[data-folder-location-id]');
+            const locId = fl?.getAttribute('data-folder-location-id');
+            if (!locId) return;
+            const f = foldersRef.current.find(ff => ff.id === `auto-${locId}`);
+            setCarried({ kind: 'folder', id: locId, label: f?.name ?? 'place' });
+          }
+          try { navigator.vibrate?.(30); } catch { /* no haptics */ }
         }, HOLD_MS);
         hold = { id: e.pointerId, x: e.clientX, y: e.clientY, target, timer, done: false };
       }
@@ -2520,6 +2578,7 @@ export default function RelationsCanvas({
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || !pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (bgTap && bgTap.id === e.pointerId && Math.hypot(e.clientX - bgTap.x, e.clientY - bgTap.y) > SLOP_PX) bgTap = null; // it became a pan
       if (hold && hold.id === e.pointerId && !hold.done) {
         if (Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SLOP_PX) {
           // Moved before the hold completed: this finger is panning the canvas.
@@ -2544,6 +2603,11 @@ export default function RelationsCanvas({
       if (e.pointerType !== 'touch') return;
       pointers.delete(e.pointerId);
       if (hold && hold.id === e.pointerId) { clearTimeout(hold.timer); hold = null; } // a tap: the click still fires
+      if (bgTap && bgTap.id === e.pointerId) {
+        const p = clientToSvgRef.current(e.clientX, e.clientY);
+        bgTap = null;
+        dropCarriedRef.current(p.x, p.y);
+      }
       if (pointers.size < 2 && pinchRef.current) {
         pinchRef.current = null;
         // The remaining finger does not inherit a gesture — lift and start again.
@@ -3023,6 +3087,7 @@ export default function RelationsCanvas({
 
         <foreignObject
           key={`card-${node.id}`}
+          opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
           x={visualX - cardWidth / 2 - viewBox.width}
           y={visualY - cardHeight / 2 - viewBox.height}
           width={cardWidth + viewBox.width * 2}
@@ -4065,7 +4130,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <LocationCard
                     node={{
                       id: node.id,
@@ -4167,6 +4232,7 @@ export default function RelationsCanvas({
               )}
               <foreignObject
                 key={`item-${node.id}`}
+                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
                 x={visualX - cardWidth / 2 - viewBox.width}
                 y={visualY - cardHeight / 2 - viewBox.height}
                 width={cardWidth + viewBox.width * 2}
@@ -4174,7 +4240,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <WorldItemCard
                     node={{
                       id: node.id,
@@ -4413,6 +4479,33 @@ export default function RelationsCanvas({
         )}
       </svg>
 
+      {/* Carry mode (touch): what you hold rides along; the world moves under it. */}
+      {carried && (
+        <div className="absolute pointer-events-none z-[96]" style={{ left: '50%', top: '50%', width: 28, height: 28, marginLeft: -14, marginTop: -14, border: '2px solid #ffcc78', borderRadius: '50%', boxShadow: '0 0 12px rgba(255,204,120,0.6)' }} />
+      )}
+      {carried && (
+        <div data-no-hold className="absolute left-0 right-0 z-[97] flex items-center gap-3 px-4 py-3" style={{ bottom: 0, background: 'rgba(0,0,0,0.92)', borderTop: '1px solid #ffcc78', touchAction: 'manipulation' }}>
+          <div className="flex-1 min-w-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255,204,120,0.9)', fontSize: 13 }}>
+            <div className="uppercase tracking-widest" style={{ fontSize: 11, opacity: 0.7 }}>Carrying</div>
+            <div className="truncate">{carried.label}</div>
+            <div style={{ fontSize: 11, opacity: 0.7 }}>Move the canvas, then tap where it goes.</div>
+          </div>
+          <button
+            onClick={() => { const r = svgRef.current?.getBoundingClientRect(); if (!r) return; const p = clientToSvg(r.left + r.width / 2, r.top + r.height / 2); dropCarriedAt(p.x, p.y); }}
+            className="px-3 py-2 text-[13px] uppercase tracking-wider"
+            style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#0a0a1a', backgroundColor: '#ffcc78', borderRadius: 2 }}
+          >
+            Drop here
+          </button>
+          <button
+            onClick={() => setCarried(null)}
+            className="px-3 py-2 text-[13px] uppercase tracking-wider"
+            style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#CBD9E8', border: '1px solid rgba(203,217,232,0.35)', borderRadius: 2 }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       {/* One-time teaching toast — the single retrained habit (S-5). */}
       {showPanToast && (
         <div
