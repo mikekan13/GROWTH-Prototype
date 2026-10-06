@@ -1053,7 +1053,7 @@ export function JewlChip() {
             border: '2px solid var(--krma-gold, #ffcc78)',
             boxShadow: '0 0 14px rgba(255,204,120,0.45), 0 6px 18px rgba(0,0,0,0.6)',
             color: 'var(--krma-gold, #ffcc78)',
-            fontSize: 22,
+            fontSize: 'calc(22px * var(--jewl-fs, 1))',
             lineHeight: 1,
             display: 'flex',
             alignItems: 'center',
@@ -1084,7 +1084,12 @@ export function JewlChip() {
           role="dialog"
           aria-label="Co-pilot"
           data-no-hold
+          data-jewl-sheet={sheetMode ? '1' : undefined}
           style={{
+            // Phone readability knob (2026-10-06): every font size in the panel
+            // is calc(Npx * var(--jewl-fs)); the sheet turns the knob to 1.3
+            // (8→10.4, 9→11.7, 11→14.3, 12→15.6). Desktop stays at 1 = today's px.
+            ...({ '--jewl-fs': sheetMode ? 1.3 : 1 } as React.CSSProperties),
             position: 'fixed',
             ...(sheetMode ? sheetStyle : { ...anchoredPos, width: PANEL_W, height: PANEL_H, maxHeight: 'calc(100vh - 120px)' }),
             background: '#000',
@@ -1130,7 +1135,7 @@ export function JewlChip() {
             <div
               style={{
                 color: '#fff',
-                fontSize: 12,
+                fontSize: 'calc(12px * var(--jewl-fs, 1))',
                 fontFamily: "'Inknut Antiqua', serif",
               }}
             >
@@ -1143,7 +1148,7 @@ export function JewlChip() {
                   whenever the chip is mounted; mute is the privacy lever. */}
               <span
                 style={{
-                  fontSize: 8,
+                  fontSize: 'calc(8px * var(--jewl-fs, 1))',
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
                   color:
@@ -1172,7 +1177,7 @@ export function JewlChip() {
                     border: '1px solid rgba(255,255,255,0.2)',
                     color: audioMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
                     cursor: 'pointer',
-                    fontSize: 11,
+                    fontSize: 'calc(11px * var(--jewl-fs, 1))',
                     padding: '2px 6px',
                     fontFamily: 'Consolas, monospace',
                     lineHeight: 1,
@@ -1196,7 +1201,7 @@ export function JewlChip() {
                   border: '1px solid rgba(255,255,255,0.2)',
                   color: voiceMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
                   cursor: 'pointer',
-                  fontSize: 11,
+                  fontSize: 'calc(11px * var(--jewl-fs, 1))',
                   padding: '2px 6px',
                   fontFamily: 'Consolas, monospace',
                   lineHeight: 1,
@@ -1212,7 +1217,7 @@ export function JewlChip() {
                   border: 'none',
                   color: 'rgba(255,255,255,0.4)',
                   cursor: 'pointer',
-                  fontSize: 14,
+                  fontSize: 'calc(14px * var(--jewl-fs, 1))',
                   padding: '0 4px',
                   fontFamily: 'Consolas, monospace',
                   lineHeight: 1,
@@ -1244,7 +1249,7 @@ export function JewlChip() {
           >
             <div
               style={{
-                fontSize: 8,
+                fontSize: 'calc(8px * var(--jewl-fs, 1))',
                 letterSpacing: '0.25em',
                 textTransform: 'uppercase',
                 color: 'rgba(34, 171, 148, 0.65)',
@@ -1253,7 +1258,7 @@ export function JewlChip() {
               now
             </div>
             {nowTick && (
-              <div style={{ fontSize: 9, color: '#ffcc78', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'calc(9px * var(--jewl-fs, 1))', color: '#ffcc78', lineHeight: 1.5 }}>
                 ⟳ {nowTick.label}
               </div>
             )}
@@ -1261,7 +1266,7 @@ export function JewlChip() {
               <div key={s.id} style={{ lineHeight: 1.5 }}>
                 <div
                   style={{
-                    fontSize: 9,
+                    fontSize: 'calc(9px * var(--jewl-fs, 1))',
                     color: s.status === 'blocked' ? 'rgba(231, 76, 60, 0.85)' : 'rgba(34, 171, 148, 0.85)',
                   }}
                 >
@@ -1271,7 +1276,7 @@ export function JewlChip() {
                 {(s.status === 'blocked' ? s.blockedReason : s.lastNote) && (
                   <div
                     style={{
-                      fontSize: 8.5,
+                      fontSize: 'calc(8.5px * var(--jewl-fs, 1))',
                       color: 'rgba(255,255,255,0.45)',
                       paddingLeft: 12,
                       display: '-webkit-box',
@@ -1286,7 +1291,7 @@ export function JewlChip() {
               </div>
             ))}
             {!nowTick && workSessions.length === 0 && (
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ fontSize: 'calc(9px * var(--jewl-fs, 1))', color: 'rgba(255,255,255,0.3)' }}>
                 ◦ idle — watching
               </div>
             )}
@@ -1310,7 +1315,7 @@ export function JewlChip() {
                   textAlign: 'center',
                   marginTop: 40,
                   color: 'rgba(255,255,255,0.3)',
-                  fontSize: 10,
+                  fontSize: 'calc(10px * var(--jewl-fs, 1))',
                   padding: '0 20px',
                   lineHeight: 1.7,
                 }}
@@ -1318,7 +1323,7 @@ export function JewlChip() {
                 <div
                   style={{
                     color: 'rgba(208, 160, 48, 0.5)',
-                    fontSize: 9,
+                    fontSize: 'calc(9px * var(--jewl-fs, 1))',
                     letterSpacing: '0.25em',
                     textTransform: 'uppercase',
                     marginBottom: 10,
@@ -1339,7 +1344,7 @@ export function JewlChip() {
                       alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                       maxWidth: '88%',
                       padding: '6px 10px',
-                      fontSize: 11,
+                      fontSize: 'calc(11px * var(--jewl-fs, 1))',
                       lineHeight: 1.5,
                       background:
                         m.role === 'user'
@@ -1357,7 +1362,7 @@ export function JewlChip() {
                     {m.role === 'assistant' && (
                       <div
                         style={{
-                          fontSize: 8,
+                          fontSize: 'calc(8px * var(--jewl-fs, 1))',
                           color: 'rgba(208, 160, 48, 0.65)',
                           textTransform: 'uppercase',
                           letterSpacing: '0.18em',
@@ -1370,7 +1375,7 @@ export function JewlChip() {
                     {m.role === 'user' && m.username && (
                       <div
                         style={{
-                          fontSize: 8,
+                          fontSize: 'calc(8px * var(--jewl-fs, 1))',
                           color: 'rgba(34, 171, 148, 0.65)',
                           textTransform: 'uppercase',
                           letterSpacing: '0.18em',
@@ -1400,7 +1405,7 @@ export function JewlChip() {
                         <summary
                           style={{
                             cursor: 'pointer',
-                            fontSize: 9,
+                            fontSize: 'calc(9px * var(--jewl-fs, 1))',
                             fontFamily: 'Consolas, monospace',
                             color: toolCalls.some(tc => tc.error)
                               ? 'rgba(231, 76, 60, 0.85)'
@@ -1418,7 +1423,7 @@ export function JewlChip() {
                             <div
                               key={i}
                               style={{
-                                fontSize: 9,
+                                fontSize: 'calc(9px * var(--jewl-fs, 1))',
                                 color: tc.error
                                   ? 'rgba(231, 76, 60, 0.85)'
                                   : 'rgba(208, 160, 48, 0.75)',
@@ -1474,7 +1479,7 @@ export function JewlChip() {
                               return (
                                 <span
                                   style={{
-                                    fontSize: 8,
+                                    fontSize: 'calc(8px * var(--jewl-fs, 1))',
                                     color,
                                     letterSpacing: '0.15em',
                                     textTransform: 'uppercase',
@@ -1501,7 +1506,7 @@ export function JewlChip() {
                                 background: 'transparent',
                                 border: 'none',
                                 color: 'rgba(255,255,255,0.3)',
-                                fontSize: 9,
+                                fontSize: 'calc(9px * var(--jewl-fs, 1))',
                                 cursor: 'pointer',
                                 letterSpacing: '0.1em',
                                 padding: '0 2px',
@@ -1556,7 +1561,7 @@ export function JewlChip() {
                                   color: selected
                                     ? 'rgba(231, 76, 60, 0.95)'
                                     : 'rgba(255,255,255,0.55)',
-                                  fontSize: 9,
+                                  fontSize: 'calc(9px * var(--jewl-fs, 1))',
                                   letterSpacing: '0.1em',
                                   textTransform: 'uppercase',
                                   padding: '4px 4px',
@@ -1565,7 +1570,7 @@ export function JewlChip() {
                                 }}
                               >
                                 {sev}
-                                <div style={{ fontSize: 7, opacity: 0.7, marginTop: 1 }}>
+                                <div style={{ fontSize: 'calc(7px * var(--jewl-fs, 1))', opacity: 0.7, marginTop: 1 }}>
                                   {bounty} K
                                 </div>
                               </button>
@@ -1581,7 +1586,8 @@ export function JewlChip() {
                             background: 'rgba(0,0,0,0.5)',
                             border: '1px solid rgba(231, 76, 60, 0.2)',
                             color: 'rgba(255,255,255,0.85)',
-                            fontSize: 10,
+                            // 16px on phones: below that iOS zooms the page when the note box is tapped.
+                            fontSize: sheetMode ? 16 : 'calc(10px * var(--jewl-fs, 1))',
                             padding: 4,
                             fontFamily: 'Consolas, monospace',
                             resize: 'none',
@@ -1596,7 +1602,7 @@ export function JewlChip() {
                               background: 'transparent',
                               border: '1px solid rgba(255,255,255,0.15)',
                               color: 'rgba(255,255,255,0.55)',
-                              fontSize: 9,
+                              fontSize: 'calc(9px * var(--jewl-fs, 1))',
                               letterSpacing: '0.1em',
                               textTransform: 'uppercase',
                               padding: '3px 8px',
@@ -1613,7 +1619,7 @@ export function JewlChip() {
                               background: 'rgba(231, 76, 60, 0.2)',
                               border: '1px solid rgba(231, 76, 60, 0.5)',
                               color: 'rgba(231, 76, 60, 0.95)',
-                              fontSize: 9,
+                              fontSize: 'calc(9px * var(--jewl-fs, 1))',
                               letterSpacing: '0.1em',
                               textTransform: 'uppercase',
                               padding: '3px 8px',
@@ -1637,7 +1643,7 @@ export function JewlChip() {
                   alignSelf: 'flex-start',
                   maxWidth: '88%',
                   padding: '6px 10px',
-                  fontSize: 11,
+                  fontSize: 'calc(11px * var(--jewl-fs, 1))',
                   background: 'rgba(255,255,255,0.05)',
                   border: '1px solid rgba(34, 171, 148, 0.3)',
                   color: 'rgba(34, 171, 148, 0.85)',
@@ -1698,7 +1704,7 @@ export function JewlChip() {
                       border: '1px solid rgba(208, 160, 48, 0.6)',
                       color: '#D0A030',
                       cursor: 'pointer',
-                      fontSize: 9,
+                      fontSize: 'calc(9px * var(--jewl-fs, 1))',
                       lineHeight: 1,
                       padding: 0,
                       fontFamily: 'Consolas, monospace',
@@ -1744,7 +1750,7 @@ export function JewlChip() {
                 background: 'transparent',
                 border: '1px solid rgba(208, 160, 48, 0.25)',
                 color: 'rgba(208, 160, 48, 0.8)',
-                fontSize: 13,
+                fontSize: 'calc(13px * var(--jewl-fs, 1))',
                 width: 28,
                 height: 28,
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -1796,7 +1802,7 @@ export function JewlChip() {
                 background: 'rgba(34, 171, 148, 0.2)',
                 color: 'var(--terminal-prime)',
                 border: '1px solid rgba(34, 171, 148, 0.4)',
-                fontSize: 9,
+                fontSize: 'calc(9px * var(--jewl-fs, 1))',
                 letterSpacing: '0.15em',
                 textTransform: 'uppercase',
                 padding: '0 12px',
@@ -1818,6 +1824,8 @@ export function JewlChip() {
               0%, 100% { opacity: 0.45; }
               50% { opacity: 1; }
             }
+            /* Sheet mode only: every control is at least a fingertip tall. */
+            [data-jewl-sheet="1"] button { min-height: 36px; }
           `}</style>
         </div>
       )}
