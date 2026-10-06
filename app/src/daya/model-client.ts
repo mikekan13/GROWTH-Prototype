@@ -48,7 +48,7 @@ export interface DayaChatParams {
    * is generated. Return `false` to stop the generation there (the seal gate does
    * this on a hit). L1/L2 stream over SSE; a Claude-backed tier calls it once
    * with the whole text. The metering row is written the same either way. */
-  onToken?: (delta: string) => void | false;
+  onToken?: (delta: string) => boolean | void;
 }
 
 export interface DayaChatResult {
