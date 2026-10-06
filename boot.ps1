@@ -65,12 +65,18 @@ if (Test-Port 3000) {
     Write-Host '[boot] dev server already up on :3000 — leaving it.' -ForegroundColor DarkGray
 } else {
     Write-Host '[boot] starting Next.js dev (logs -> logs\dev-server.*.log)...' -ForegroundColor Cyan
+    # Heap cap for the dev server only (2026-10-06, orchestrator): the machine
+    # has 16 GB and four Claude sessions share it; Node's default ceiling here
+    # is ~4.3 GB. 3072 MB keeps compile spikes safe (RSS sat at 1.5 GB) while
+    # stopping a runaway. Set just for this launch; whisper is unaffected.
+    $env:NODE_OPTIONS = '--max-old-space-size=3072'
     Start-Process -FilePath 'npm.cmd' `
         -ArgumentList 'run', 'dev' `
         -WorkingDirectory $AppDir `
         -RedirectStandardOutput (Join-Path $LogDir 'dev-server.out.log') `
         -RedirectStandardError  (Join-Path $LogDir 'dev-server.err.log') `
         -WindowStyle Hidden | Out-Null
+    Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
 }
 
 # --- Smoke check -------------------------------------------------------------
