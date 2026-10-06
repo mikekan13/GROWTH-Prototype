@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // my phone"). Next 16 rejects dev-mode requests for /_next/* from any origin
   // but localhost unless it is allowlisted. Dev only; production is unaffected.
   allowedDevOrigins: ["10.20.0.61", "localhost", "127.0.0.1", "100.76.149.121", "christophoros.taila59e25.ts.net"],
+  // The dev badge sat on the carry tray's text at phone width (bottom-left);
+  // top-left keeps it off the tray and the header's tiles (2026-10-06).
+  devIndicators: { position: "top-left" },
   webpack: (config) => {
     const existing = config.watchOptions?.ignored;
     const baseIgnored: string[] = Array.isArray(existing)
