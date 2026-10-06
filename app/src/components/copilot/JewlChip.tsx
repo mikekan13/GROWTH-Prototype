@@ -118,6 +118,15 @@ function extractCampaignId(pathname: string): string | null {
 }
 
 /** Phone layout threshold: below this the JEWL window becomes a bottom sheet. */
+/** Always-on audio chunk length. Each chunk is a standalone recording (stop +
+ *  restart), transcribed on its own. DEFAULT = today's behaviour. LIVE is the
+ *  value to use while a GameSession is live AND the engine's split loop is on
+ *  (U2c): shorter chunks = beings hear the table sooner. Set at runtime via the
+ *  window event growth:recorder-chunk { ms } — the recorder restarts cleanly. */
+export const RECORDER_CHUNK_MS_DEFAULT = 5_000;
+export const RECORDER_CHUNK_MS_LIVE = 3_000;
+export const RECORDER_CHUNK_EVENT = 'growth:recorder-chunk';
+
 const SHEET_QUERY = '(max-width: 599px)';
 const sheetMq = () => (typeof window !== 'undefined' ? window.matchMedia(SHEET_QUERY) : null);
 function useSheetMode(): boolean {
@@ -182,7 +191,7 @@ export function JewlChip() {
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   // Always-on audio per [[jewl-always-on-audio-when-active]]. The chip mounts
   // on every campaign page; the moment it mounts, we try to start the mic
-  // and run a continuous MediaRecorder. Chunks emit every 10s, hit /copilot
+  // and run a continuous MediaRecorder. Chunks emit every RECORDER_CHUNK_MS_DEFAULT ms (5 s), hit /copilot
   // with source=TABLE_AMBIENT. Mute toggles whether chunks actually fire.
   const [audioStatus, setAudioStatus] = useState<
     'idle' | 'requesting' | 'listening' | 'muted' | 'denied' | 'unsupported'
@@ -230,6 +239,23 @@ export function JewlChip() {
   // track it so the input row stays pinned ABOVE the keyboard.
   const kb = useKeyboardInset(open && sheetMode);
   const sheetDragRef = useRef<{ y0: number } | null>(null);
+  // Recorder chunk length (see RECORDER_CHUNK_MS_*). Read per cycle from a ref
+  // so a change never restarts the mic; it only shortens the cycle in flight.
+  const chunkMsRef = useRef<number>(RECORDER_CHUNK_MS_DEFAULT);
+  useEffect(() => {
+    const onChunk = (e: Event) => {
+      const ms = Number((e as CustomEvent<{ ms?: number }>).detail?.ms);
+      if (!Number.isFinite(ms) || ms < 1000 || ms > 60_000 || ms === chunkMsRef.current) return;
+      chunkMsRef.current = ms;
+      // Cut the cycle in flight short: stop() sends what was said so far and
+      // onstop chains the next cycle at the new length — same stream, same
+      // permission, never two recorders.
+      const rec = mediaRecorderRef.current;
+      try { if (rec && rec.state === 'recording') rec.stop(); } catch { /* ignore */ }
+    };
+    window.addEventListener(RECORDER_CHUNK_EVENT, onChunk);
+    return () => window.removeEventListener(RECORDER_CHUNK_EVENT, onChunk);
+  }, []);
   // Floating ◈ summon button for fingers (2026-10-06). Hidden while JEWL is
   // open and while the campaign terminal drawer is open (CampaignCanvas
   // broadcasts growth:terminal-drawer {open}) so it never sits on the table log.
@@ -837,7 +863,7 @@ export function JewlChip() {
     }
   }, [campaignId]);
 
-  // Always-on audio: every CHUNK_MS we stop and restart the MediaRecorder
+  // Always-on audio: every chunkMsRef.current ms we stop and restart the MediaRecorder
   // so each emitted blob is a complete, standalone container (valid webm
   // header etc.) that the server can decode in isolation. Using
   // `MediaRecorder.start(timeslice)` produces header-less fragment chunks
@@ -854,9 +880,6 @@ export function JewlChip() {
       return;
     }
 
-    // 5s chunks — halves worst-case latency from end-of-speech to JEWL
-    // reply. Doubles chunk count but each is cheap.
-    const CHUNK_MS = 5_000;
     let cancelled = false;
     let stream: MediaStream | null = null;
     let currentRecorder: MediaRecorder | null = null;
@@ -897,7 +920,7 @@ export function JewlChip() {
         try {
           if (recorder.state === 'recording') recorder.stop();
         } catch { /* ignore */ }
-      }, CHUNK_MS);
+      }, chunkMsRef.current);
     };
 
     (async () => {
@@ -928,8 +951,10 @@ export function JewlChip() {
       if (cycleTimer) clearTimeout(cycleTimer);
       try {
         if (currentRecorder && currentRecorder.state !== 'inactive') {
-          // Detach onstop so it doesn't restart a new cycle after cleanup.
-          currentRecorder.onstop = null;
+          // Keep onstop attached: it SENDS the chunk in flight (the words said
+          // in the last few seconds are not thrown away on a chunk-length change
+          // or on leaving the page). It will not chain a new cycle, because
+          // startCycle checks the `cancelled` flag, which is already true here.
           currentRecorder.stop();
         }
       } catch { /* ignore */ }

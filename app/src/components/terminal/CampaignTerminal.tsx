@@ -15,6 +15,7 @@ import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import BeingSpeakingLines from './BeingSpeakingLines';
+import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE } from '@/components/copilot/JewlChip';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
 
@@ -108,6 +109,29 @@ export default function CampaignTerminal({
   // the canvas is in session mode").
   const isGM = _userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN';
   const tableAvailable = isGM && !!activeSession;
+
+  // Recorder chunk length (U2c): while a session is live AND the engine's split
+  // loop is on, the always-on mic sends shorter chunks so beings hear the table
+  // sooner. `splitLoop` comes from GET /table (a missing field = false), so this
+  // is a no-op until the server exposes it and the switch is on.
+  const [splitLoop, setSplitLoop] = useState(false);
+  useEffect(() => {
+    if (!activeSession || !isGM) { setSplitLoop(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/table`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { splitLoop?: boolean };
+        if (!cancelled) setSplitLoop(data.splitLoop === true);
+      } catch { /* leave false */ }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId, activeSession, isGM]);
+  useEffect(() => {
+    const ms = activeSession && splitLoop ? RECORDER_CHUNK_MS_LIVE : RECORDER_CHUNK_MS_DEFAULT;
+    window.dispatchEvent(new CustomEvent(RECORDER_CHUNK_EVENT, { detail: { ms } }));
+  }, [activeSession, splitLoop]);
 
   // If the session ends (or role loads late) while sitting on TABLE, fall back.
   useEffect(() => {
