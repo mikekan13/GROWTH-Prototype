@@ -128,6 +128,18 @@ function useSheetMode(): boolean {
   );
 }
 
+/** Finger device: the only way to summon JEWL without a right-click is the
+ *  long-press on empty canvas, which is undiscoverable — so coarse pointers get
+ *  a floating ◈ summon button. */
+const coarseMq = () => (typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null);
+function useCoarsePointer(): boolean {
+  return useSyncExternalStore(
+    cb => { const q = coarseMq(); q?.addEventListener('change', cb); return () => q?.removeEventListener('change', cb); },
+    () => coarseMq()?.matches ?? false,
+    () => false,
+  );
+}
+
 /** Soft-keyboard tracking via visualViewport: how far the visible bottom sits
  *  above the layout bottom (inset) and how tall the visible area is. */
 function useKeyboardInset(active: boolean): { inset: number; viewportHeight: number } {
@@ -218,6 +230,16 @@ export function JewlChip() {
   // track it so the input row stays pinned ABOVE the keyboard.
   const kb = useKeyboardInset(open && sheetMode);
   const sheetDragRef = useRef<{ y0: number } | null>(null);
+  // Floating ◈ summon button for fingers (2026-10-06). Hidden while JEWL is
+  // open and while the campaign terminal drawer is open (CampaignCanvas
+  // broadcasts growth:terminal-drawer {open}) so it never sits on the table log.
+  const coarsePointer = useCoarsePointer();
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  useEffect(() => {
+    const onDrawer = (e: Event) => setTerminalOpen(!!(e as CustomEvent<{ open?: boolean }>).detail?.open);
+    window.addEventListener('growth:terminal-drawer', onDrawer);
+    return () => window.removeEventListener('growth:terminal-drawer', onDrawer);
+  }, []);
 
   // Summoned, not resident: clicking anywhere OUTSIDE the panel dismisses
   // it (a right-click outside dismisses-then-resummons at the new spot via
@@ -1009,8 +1031,41 @@ export function JewlChip() {
 
   return (
     <>
-      {/* No corner chip — JEWL is summoned by right-click (anywhere in the
-          campaign) or "/" / Ctrl-K. He appears where you call him. */}
+      {/* No corner chip on desktop — JEWL is summoned by right-click (anywhere
+          in the campaign) or "/" / Ctrl-K. He appears where you call him.
+          Fingers get a floating ◈ (above the carry tray, clear of the terminal
+          toggle); tap = click, per the canvas touch tracker's contract. */}
+      {!open && coarsePointer && !terminalOpen && (
+        <button
+          type="button"
+          onClick={() => { setAnchor(null); setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
+          aria-label="Summon JEWL"
+          title="Summon JEWL"
+          data-no-hold
+          style={{
+            position: 'fixed',
+            right: 14,
+            bottom: 'calc(160px + env(safe-area-inset-bottom))',
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: '#000',
+            border: '2px solid var(--krma-gold, #ffcc78)',
+            boxShadow: '0 0 14px rgba(255,204,120,0.45), 0 6px 18px rgba(0,0,0,0.6)',
+            color: 'var(--krma-gold, #ffcc78)',
+            fontSize: 22,
+            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9996,
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+          }}
+        >
+          ◈
+        </button>
+      )}
       {open && sheetMode && (
         // Backdrop: dims the canvas and SWALLOWS the tap-away, so dismissing
         // JEWL on a phone never lands as a tap on the canvas (which would

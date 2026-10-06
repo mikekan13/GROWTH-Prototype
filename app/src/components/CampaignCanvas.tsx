@@ -153,6 +153,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [activeTab]);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
+  // Tell floating chrome (the phone JEWL summon button in JewlChip) whether the
+  // terminal drawer is open, so nothing floats over the table log during play.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('growth:terminal-drawer', { detail: { open: showTerminal } }));
+  }, [showTerminal]);
   const [pendingWager, setPendingWager] = useState<EffortWagerPromptEvent | null>(null);
   // Stores check result data until the die settles, then posts to terminal
   const pendingCheckResultRef = useRef<Record<string, unknown> | null>(null);
