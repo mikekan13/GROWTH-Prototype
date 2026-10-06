@@ -1118,7 +1118,7 @@ export async function answerAsk(
     call = await answerCall({ stream: gate.push });
   } catch (err) {
     // Close what 'start' opened; the caller maps the error (warming / offline) for the GM's eyes.
-    emit({ phase: 'final', utteranceId, characterId, kind: 'rest', text: '', revoiced: false });
+    emit({ phase: 'final', utteranceId, characterId, action: 'rest', text: '', revoiced: false });
     throw err;
   }
   const streamed = gate.end();
@@ -1142,7 +1142,7 @@ export async function answerAsk(
     revoiced = true;
   }
   const lineMs = Date.now() - t0;
-  emit({ phase: 'final', utteranceId, characterId, kind: line.kind, text: line.content, revoiced });
+  emit({ phase: 'final', utteranceId, characterId, action: line.kind, text: line.content, revoiced });
 
   // What it just did is part of what it carries into the next stretch.
   const own = line.kind === 'speak' ? `You said: "${line.content}"` : line.kind === 'act' ? `You: ${line.content}` : null;

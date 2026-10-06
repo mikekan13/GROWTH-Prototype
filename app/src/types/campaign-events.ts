@@ -226,13 +226,15 @@ export interface JewlHighlightEvent {
  * withdraws everything shown for that utterance (a rule is named, the words
  * that tripped it never are); the `final` that follows carries the line as
  * stored. A `final` always closes a `start`, also when the being stays silent
- * (`kind: 'rest'`, empty text). Only `kind: 'speak'` ever has partials.
+ * (`action: 'rest'`, empty text). Only `action: 'speak'` ever has partials.
+ * What the being did is `action`, never `kind`: on the wire `kind` is the
+ * stream's own discriminator ('being_speaking').
  */
 export type BeingSpeakingPhase =
   | { phase: 'start'; utteranceId: string; characterId: string; characterName: string }
   | { phase: 'partial'; utteranceId: string; characterId: string; text: string; delta: string }
   | { phase: 'retract'; utteranceId: string; characterId: string; reason: 'seal'; rule: string }
-  | { phase: 'final'; utteranceId: string; characterId: string; kind: 'speak' | 'act' | 'attend' | 'rest'; text: string; revoiced: boolean };
+  | { phase: 'final'; utteranceId: string; characterId: string; action: 'speak' | 'act' | 'attend' | 'rest'; text: string; revoiced: boolean };
 
 /** Transient: never persisted. The spoken line itself still arrives as a `terminal_event` chat. */
 export type BeingSpeakingStreamEvent = { kind: 'being_speaking' } & BeingSpeakingPhase;

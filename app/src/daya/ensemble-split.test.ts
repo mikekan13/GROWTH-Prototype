@@ -219,7 +219,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
 
     expect(events.map((e) => e.phase)).toEqual(['start', 'partial', 'partial', 'partial', 'final']);
     expect(events.filter((e) => e.phase === 'partial').map((e) => (e as { text: string }).text)).toEqual(['Who', 'Who are', 'Who are you?']);
-    expect(events.at(-1)).toMatchObject({ phase: 'final', kind: 'speak', text: 'Who are you?', revoiced: false });
+    expect(events.at(-1)).toMatchObject({ phase: 'final', action: 'speak', text: 'Who are you?', revoiced: false });
     expect(new Set(events.map((e) => e.utteranceId)).size).toBe(1);
 
     expect(result.action).toEqual({ kind: 'speak', content: 'Who are you?' });
@@ -241,7 +241,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     expect(events.map((e) => e.phase)).toEqual(['start', 'partial', 'partial', 'partial', 'partial', 'retract', 'final']);
     expect(events.find((e) => e.phase === 'retract')).toMatchObject({ reason: 'seal', rule: 'numeric-mechanics' });
     expect(JSON.stringify(events.find((e) => e.phase === 'retract'))).not.toContain('14');
-    expect(events.at(-1)).toMatchObject({ phase: 'final', kind: 'speak', text: 'That was a hard climb.', revoiced: true });
+    expect(events.at(-1)).toMatchObject({ phase: 'final', action: 'speak', text: 'That was a hard climb.', revoiced: true });
 
     expect(lane.calls.map((c) => [c.kind, c.stream, c.hinted])).toEqual([['answer', true, false], ['answer', false, true]]);
     expect(result.action).toEqual({ kind: 'speak', content: 'That was a hard climb.' });
@@ -259,7 +259,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     await listened(lane);
     const { events, onEvent } = collect();
     const result = await answerAsk('mara', { kind: 'turn' }, { onEvent, overrides: { fetchImpl: lane.fetchImpl } });
-    expect(events.at(-1)).toMatchObject({ phase: 'final', kind: 'rest', text: '', revoiced: true });
+    expect(events.at(-1)).toMatchObject({ phase: 'final', action: 'rest', text: '', revoiced: true });
     expect(result.action).toEqual({ kind: 'rest' });
     await result.after;
     expect(store.memories).toEqual([]);
@@ -281,7 +281,7 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const { events, onEvent } = collect();
     const result = await answerAsk('mara', { kind: 'turn' }, { onEvent, overrides: { fetchImpl: lane.fetchImpl } });
     expect(events.map((e) => e.phase)).toEqual(['start', 'final']);
-    expect(events.at(-1)).toMatchObject({ kind: 'act', text: 'steps back from the door' });
+    expect(events.at(-1)).toMatchObject({ action: 'act', text: 'steps back from the door' });
     expect(result.action).toEqual({ kind: 'act', content: 'steps back from the door' });
     expect(result.timings.firstWordMs).toBeNull();
     await result.after;
@@ -354,6 +354,6 @@ describe('answerAsk — one short streamed call at the ask', () => {
     const failing: DayaFetch = async () => ({ ok: false, status: 500, text: async () => 'boom', json: async () => ({}) });
     await expect(answerAsk('mara', { kind: 'turn' }, { onEvent, overrides: { fetchImpl: failing } })).rejects.toThrow(/500/);
     expect(events.map((e) => e.phase)).toEqual(['start', 'final']);
-    expect(events.at(-1)).toMatchObject({ kind: 'rest', text: '' });
+    expect(events.at(-1)).toMatchObject({ action: 'rest', text: '' });
   });
 });
