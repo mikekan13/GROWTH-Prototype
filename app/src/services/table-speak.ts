@@ -33,7 +33,7 @@ import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus } from '@/daya/conversation';
 import { isDayaEnabled } from '@/daya/events';
-import type { TableAsk } from '@/daya/ensemble';
+import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState } from '@/services/table-talk';
 import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
@@ -319,6 +319,28 @@ async function markDropped(campaignId: string, actor: TableActor, kind: string, 
 }
 
 /**
+ * One measurement off the split loop (U2d): which being, what happened, how
+ * long each stage took. Timings and counts only — never what was perceived,
+ * thought or said — so it is safe in a log and in a report.
+ */
+export type TableTiming =
+  | { kind: 'listen'; characterId: string; outcome: 'listened' | 'not_lived' | 'taken_over' | ConverseStatus; timings?: ListenTimings }
+  | { kind: 'answer'; characterId: string; outcome: ConverseStatus; action?: string; timings?: AnswerTimings };
+
+const timingWatchers = new Set<(timing: TableTiming) => void>();
+
+/** Subscribe to the split loop's measurements (the U2d harness). Returns the unsubscribe. */
+export function watchTableTimings(watcher: (timing: TableTiming) => void): () => void {
+  timingWatchers.add(watcher);
+  return () => { timingWatchers.delete(watcher); };
+}
+
+function reportTiming(timing: TableTiming): void {
+  console.log(`[table-timing] ${JSON.stringify(timing)}`);
+  for (const watcher of timingWatchers) { try { watcher(timing); } catch { /* a watcher must not break the table */ } }
+}
+
+/**
  * Play a plan's beats to the awake beings: world content is handed over to be
  * listened to (never awaited — reflection is off the clock); a turn or a line
  * that expects a reply is answered, streamed as `being_speaking`, and posted
@@ -342,7 +364,12 @@ async function runBeats(
     if (!stimulus) return;
     void listenToTable(listenerId, actor.role, stimulus)
       .then(async (outcome) => {
-        if (outcome.status !== 'ok') { console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`); return; }
+        if (outcome.status !== 'ok') {
+          console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`);
+          reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.status });
+          return;
+        }
+        reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings });
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
       })
@@ -357,6 +384,7 @@ async function runBeats(
     });
     const action = outcome.answer?.action;
     answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: outcome.status, actionKind: action?.kind, detail: outcome.detail });
+    reportTiming({ kind: 'answer', characterId: listenerId, outcome: outcome.status, action: action?.kind, timings: outcome.answer?.timings });
     if (outcome.status !== 'ok' || !outcome.answer || !action) return;
     const line = actionToTableLine(listener.name, action);
     if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
