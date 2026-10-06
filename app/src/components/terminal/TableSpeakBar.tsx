@@ -35,6 +35,10 @@ interface ProseResponse {
   /** JEWL stopped the table — answer him (continue = improvising; take it back = mistake). */
   held?: ReconTicket;
   canonEventId: string | null;
+  /** Split loop (U2c-3): typed lines that were NOT recorded and NOT heard by
+   *  beings — out-of-character asides, check calls. The GM must see these, or
+   *  a dropped line looks like the table swallowed the narration. */
+  ignored?: Array<{ kind: string; text: string }>;
   dialogue: Array<{ canonEventId: string; speakerId: string | null; speakerLabel: string; text: string }>;
   narration: string | null;
   responses: Array<{
@@ -60,6 +64,8 @@ export default function TableSpeakBar({
   const [sending, setSending] = useState(false);
   const [coreStatus, setCoreStatus] = useState<CoreStatus>('unknown');
   const [note, setNote] = useState<string | null>(null);
+  /** Lines the last send dropped on purpose (see ProseResponse.ignored). Cleared on the next send. */
+  const [ignored, setIgnored] = useState<string[] | null>(null);
   const [held, setHeld] = useState<ReconTicket | null>(null);
   const [answering, setAnswering] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -115,6 +121,7 @@ export default function TableSpeakBar({
 
   async function send(message: string, confirmTicketId: string | null) {
     setNote(null);
+    setIgnored(null);
     setSending(true);
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/table`, {
@@ -134,7 +141,11 @@ export default function TableSpeakBar({
         setHeld(result.held);
         return;
       }
-      setCoreStatus((prev) => (result.responses.some((r) => r.status === 'ok') ? 'ready' : prev));
+      // A being that only LISTENED answers ok with detail 'listening' — that says
+      // nothing about its core, so it must not flip the indicator to ready; the
+      // first real ask then reports warming correctly.
+      setCoreStatus((prev) => (result.responses.some((r) => r.status === 'ok' && r.detail !== 'listening') ? 'ready' : prev));
+      if (result.ignored && result.ignored.length > 0) setIgnored(result.ignored.map((u) => u.text));
       const notes: string[] = [];
       const unattributed = result.dialogue.filter((d) => !d.speakerId);
       if (unattributed.length > 0) {
@@ -222,6 +233,13 @@ export default function TableSpeakBar({
           {sending
             ? `The table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
             : note ?? 'The core is warming up from a cold start…'}
+        </div>
+      )}
+      {/* Lines the table did not hear (out-of-character asides, check calls):
+          shown quietly so a dropped line never looks swallowed; clears on the next send. */}
+      {ignored && ignored.length > 0 && !sending && (
+        <div data-not-heard className="px-3 pt-1.5 text-[12px] italic" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(203, 217, 232, 0.45)' }}>
+          not heard: {ignored.map((t) => (t.length > 60 ? t.slice(0, 57) + '…' : t)).join(' · ')}
         </div>
       )}
       <div className="flex items-end gap-2 px-3 py-2">
