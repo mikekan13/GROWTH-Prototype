@@ -1340,13 +1340,162 @@ export default function RelationsCanvas({
   }, [nodes, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, onNodePositionChange]);
 
 
+  // ── Undo / redo for the planning layer (Mike 2026-10-06: "We need an undo
+  // feature on the canvas (obviously for just planning (aka below the line)").
+  // One transaction = one gesture AND its consequences (the settle pushes, a
+  // repack, a room-membership change). A snapshot is taken when a gesture
+  // begins (beginTx) and again a beat after the settle lands (closeTx); the
+  // pair goes on the stack. Undo restores the BEFORE snapshot against the
+  // current state — positions, folder geometry, and membership (through the
+  // same onDropIntoLocation path, so the server follows). Crystallized places
+  // (status ACTIVE) and anything above the line are left alone: not planning.
+  type CanvasSnapshot = {
+    positions: Map<string, { x: number; y: number }>;
+    folders: Map<string, { posX?: number; posY?: number; userWidth?: number; userHeight?: number; collapsed?: boolean }>;
+    membership: Map<string, string | null>;
+  };
+  type CanvasTx = { label: string; before: CanvasSnapshot; after: CanvasSnapshot };
+  const HISTORY_LIMIT = 50;
+  const historyRef = useRef<{ undo: CanvasTx[]; redo: CanvasTx[] }>({ undo: [], redo: [] });
+  const openTxRef = useRef<{ label: string; before: CanvasSnapshot } | null>(null);
+  const txCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const takeSnapshot = useCallback((): CanvasSnapshot => {
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const n of nodes) {
+      const p = nodePositionsRef.current.get(n.id) ?? { x: n.x, y: n.y };
+      positions.set(n.id, { x: p.x, y: p.y });
+    }
+    const folders = new Map<string, { posX?: number; posY?: number; userWidth?: number; userHeight?: number; collapsed?: boolean }>();
+    for (const f of foldersRef.current) folders.set(f.id, { posX: f.posX, posY: f.posY, userWidth: f.userWidth, userHeight: f.userHeight, collapsed: f.collapsed });
+    const membership = new Map<string, string | null>();
+    for (const n of nodes) if (n.type !== 'location') membership.set(n.id, currentAutoParentOf(n.id));
+    return { positions, folders, membership };
+  }, [nodes, currentAutoParentOf]);
+  const broadcastHistory = useCallback(() => {
+    const h = historyRef.current;
+    window.dispatchEvent(new CustomEvent('growth:canvas-history', {
+      detail: { canUndo: h.undo.length > 0, canRedo: h.redo.length > 0, undoLabel: h.undo[h.undo.length - 1]?.label ?? null, redoLabel: h.redo[h.redo.length - 1]?.label ?? null },
+    }));
+  }, []);
+  /** Call at the START of any gesture that will change the canvas. Idempotent while a tx is open. */
+  const beginTx = useCallback((label: string) => {
+    if (openTxRef.current) return;
+    if (txCloseTimerRef.current) { clearTimeout(txCloseTimerRef.current); txCloseTimerRef.current = null; }
+    openTxRef.current = { label, before: takeSnapshot() };
+  }, [takeSnapshot]);
+  const closeTx = useCallback(() => {
+    const open = openTxRef.current;
+    openTxRef.current = null;
+    txCloseTimerRef.current = null;
+    if (!open) return;
+    const after = takeSnapshot();
+    let changed = false;
+    for (const [id, a] of after.positions) { const b = open.before.positions.get(id); if (!b || b.x !== a.x || b.y !== a.y) { changed = true; break; } }
+    if (!changed) for (const [id, a] of after.folders) { const b = open.before.folders.get(id); if (!b || b.posX !== a.posX || b.posY !== a.posY || b.userWidth !== a.userWidth || b.userHeight !== a.userHeight || b.collapsed !== a.collapsed) { changed = true; break; } }
+    if (!changed) for (const [id, a] of after.membership) { if (open.before.membership.get(id) !== a) { changed = true; break; } }
+    if (!changed) return;
+    const h = historyRef.current;
+    h.undo.push({ label: open.label, before: open.before, after });
+    if (h.undo.length > HISTORY_LIMIT) h.undo.shift();
+    h.redo = [];
+    broadcastHistory();
+  }, [takeSnapshot, broadcastHistory]);
+  /** Schedule the close a beat after the settle's commits have rendered. */
+  const scheduleTxClose = useCallback(() => {
+    if (!openTxRef.current) return;
+    if (txCloseTimerRef.current) clearTimeout(txCloseTimerRef.current);
+    txCloseTimerRef.current = setTimeout(closeTx, 350);
+  }, [closeTx]);
+  /** Restore a snapshot against the current state — planning layer only. */
+  const applySnapshot = useCallback((target: CanvasSnapshot) => {
+    const activeLocIds = new Set(foldersRef.current.filter(f => f.locationInfo?.status === 'ACTIVE').map(f => f.id.slice('auto-'.length)));
+    const movedAt = Date.now();
+    // Positions (skip anything above the line, before or after).
+    const posMoves: Array<[string, { x: number; y: number }]> = [];
+    for (const [id, t] of target.positions) {
+      const cur = nodePositionsRef.current.get(id);
+      if (!cur || (cur.x === t.x && cur.y === t.y)) continue;
+      if (cur.y < 0 || t.y < 0) continue;
+      posMoves.push([id, t]);
+    }
+    if (posMoves.length) {
+      setNodePositions(prev => {
+        const next = new Map(prev);
+        for (const [id, t] of posMoves) { next.set(id, { x: t.x, y: t.y, movedAt }); onNodePositionChange?.(id, t.x, t.y); }
+        return next;
+      });
+    }
+    // Folder geometry (skip crystallized places).
+    let foldersChanged = false;
+    const updated = foldersRef.current.map(f => {
+      const t = target.folders.get(f.id);
+      if (!t) return f;
+      const locId = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
+      if (locId && activeLocIds.has(locId)) return f;
+      if (f.posX === t.posX && f.posY === t.posY && f.userWidth === t.userWidth && f.userHeight === t.userHeight && f.collapsed === t.collapsed) return f;
+      foldersChanged = true;
+      return { ...f, posX: t.posX, posY: t.posY, userWidth: t.userWidth, userHeight: t.userHeight, collapsed: t.collapsed, movedAt };
+    });
+    if (foldersChanged) onFoldersChange?.(updated);
+    // Membership (through the server path; a crystallized target room is left alone).
+    for (const [id, loc] of target.membership) {
+      const cur = currentAutoParentOf(id);
+      if (cur === loc) continue;
+      if (loc && activeLocIds.has(loc)) continue;
+      const n = nodes.find(nn => nn.id === id);
+      if (!n || n.type === 'location') continue;
+      onDropIntoLocation?.(id, n.type === 'item' ? 'item' : 'character', loc);
+    }
+    setDragOffsets(new Map());
+    gestureOffsetsRef.current = new Map();
+  }, [nodes, currentAutoParentOf, onNodePositionChange, onFoldersChange, onDropIntoLocation]);
+  const undoCanvas = useCallback(() => {
+    if (openTxRef.current) closeTx();
+    const h = historyRef.current;
+    const tx = h.undo.pop();
+    if (!tx) return;
+    applySnapshot(tx.before);
+    h.redo.push(tx);
+    broadcastHistory();
+  }, [closeTx, applySnapshot, broadcastHistory]);
+  const redoCanvas = useCallback(() => {
+    const h = historyRef.current;
+    const tx = h.redo.pop();
+    if (!tx) return;
+    applySnapshot(tx.after);
+    h.undo.push(tx);
+    broadcastHistory();
+  }, [applySnapshot, broadcastHistory]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoCanvas(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoCanvas(); }
+    };
+    const onUndo = () => undoCanvas();
+    const onRedo = () => redoCanvas();
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('growth:canvas-undo', onUndo);
+    window.addEventListener('growth:canvas-redo', onRedo);
+    broadcastHistory();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('growth:canvas-undo', onUndo);
+      window.removeEventListener('growth:canvas-redo', onRedo);
+    };
+  }, [undoCanvas, redoCanvas, broadcastHistory]);
+
   // Settle runs one render AFTER a commit so the refs hold fresh geometry.
   useEffect(() => {
     if (!pendingLayoutPass) return;
     const { priority, repack } = pendingLayoutPass;
     setPendingLayoutPass(null);
     applySettle(priority, repack);
-  }, [pendingLayoutPass, applySettle]);
+    scheduleTxClose();
+  }, [pendingLayoutPass, applySettle, scheduleTxClose]);
 
 
   // Refs for RAF throttling
@@ -2151,6 +2300,7 @@ export default function RelationsCanvas({
     }
     // â”€â”€ Finish folder drag (moves all member nodes) â”€â”€
     if (dragFolderId) {
+      beginTx('move place'); // undo (2026-10-06)
       const folder = foldersRef.current.find(f => f.id === dragFolderId);
       if (folder) {
         if (folder.nodeIds.length > 0) {
@@ -2333,6 +2483,7 @@ export default function RelationsCanvas({
 
     // â”€â”€ Finish node drag â”€â”€
     if (dragNodeId) {
+      beginTx('move'); // undo (2026-10-06)
       // Group drag (S-5): commit the whole selection when the dragged
       // card is part of it.
       const sel = selectedNodeIdsRef.current;
@@ -2481,6 +2632,7 @@ export default function RelationsCanvas({
     const c = carriedRef.current;
     if (!c) return;
     setCarried(null);
+    beginTx('carry');
     if (c.kind === 'node') {
       const n = nodesRef.current.find(nn => nn.id === c.id);
       if (!n) return;
@@ -3115,6 +3267,7 @@ export default function RelationsCanvas({
             onInventoryToggle={toggleInventory}
             onPanelToggle={togglePanel}
             onPositionChange={(nodeId, x, y) => {
+              beginTx('move'); // undo (2026-10-06)
               commitGroupDrag(nodeId);
               // Clamp party folder nodes above KRMA line
               let clampedY = y;
@@ -3959,7 +4112,7 @@ export default function RelationsCanvas({
                 );
                 onFoldersChange?.(updated);
               }}
-              onFolderResizeStart={() => { resizeActiveRef.current = true; }}
+              onFolderResizeStart={() => { resizeActiveRef.current = true; beginTx('resize'); }}
               onFolderResizeEnd={(folderId) => {
                 resizeActiveRef.current = false;
                 if (folderId.startsWith('auto-')) {
@@ -4145,6 +4298,7 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteLocation}
                     onPositionChange={(nodeId, x, y) => {
+                      beginTx('move'); // undo (2026-10-06)
                       commitGroupDrag(nodeId);
                       setNodePositions((prev) => {
                         const next = new Map(prev);
@@ -4257,6 +4411,7 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteItem}
                     onPositionChange={(nodeId, x, y) => {
+                      beginTx('move'); // undo (2026-10-06)
                       commitGroupDrag(nodeId);
                       // ANY overlap between the dragged item and a target = droppable (Mike 2026-05-14)
                       const itemHalf = getCardHalfWidth(nodeId);
