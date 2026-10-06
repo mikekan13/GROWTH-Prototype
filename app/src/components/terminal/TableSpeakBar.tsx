@@ -207,10 +207,10 @@ export default function TableSpeakBar({
             </div>
           )}
           <div className="flex gap-2 mt-2">
-            <button onClick={() => void answerJewl('confirm')} disabled={answering} className="px-3 py-1 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#0a0a1a', backgroundColor: '#ffcc78', border: '1px solid rgba(255, 204, 120, 0.6)', borderRadius: '2px' }}>
+            <button onClick={() => void answerJewl('confirm')} disabled={answering} className="px-3 py-1 min-h-[36px] md:min-h-0 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#0a0a1a', backgroundColor: '#ffcc78', border: '1px solid rgba(255, 204, 120, 0.6)', borderRadius: '2px' }}>
               {answering ? '…' : "We're going somewhere new"}
             </button>
-            <button onClick={() => void answerJewl('dismiss')} disabled={answering} className="px-3 py-1 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#CBD9E8', backgroundColor: 'transparent', border: '1px solid rgba(203, 217, 232, 0.35)', borderRadius: '2px' }}>
+            <button onClick={() => void answerJewl('dismiss')} disabled={answering} className="px-3 py-1 min-h-[36px] md:min-h-0 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#CBD9E8', backgroundColor: 'transparent', border: '1px solid rgba(203, 217, 232, 0.35)', borderRadius: '2px' }}>
               My mistake — take it back
             </button>
           </div>
@@ -238,7 +238,8 @@ export default function TableSpeakBar({
           }}
           placeholder={awake ? `Narrate. Put speech in quotes, or Name: line. ${awake} will live it. (Shift+Enter for a new line)` : 'Narrate. Put speech in quotes, or Name: line. No one is awake at the table yet.'}
           disabled={sending || !!held}
-          className="flex-1 px-2 py-1 text-[13px] outline-none resize-none"
+          // 16px below md: anything smaller makes iOS zoom the page when the GM taps in to narrate.
+          className="flex-1 px-2 py-1 text-[16px] md:text-[13px] outline-none resize-none"
           style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
             backgroundColor: '#0a0a1a',
@@ -250,7 +251,7 @@ export default function TableSpeakBar({
         <button
           onClick={() => void handleSubmit()}
           disabled={sending || !!held || !value.trim()}
-          className="px-3 py-1 text-[12px] uppercase tracking-wider"
+          className="px-3 py-1 min-h-[36px] md:min-h-0 text-[12px] uppercase tracking-wider"
           style={{
             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
             color: sending ? '#666' : '#0a0a1a',
