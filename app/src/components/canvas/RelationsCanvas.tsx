@@ -412,6 +412,13 @@ export default function RelationsCanvas({
   // cards). Compute every auto-folder's footprint bottom-up — three
   // passes covers three nesting levels; deeper levels converge on
   // later renders.
+  // Display names for everything a folder can hold (items + sub-locations
+  // arrive as ids) — the UI session's folder tooltips list them (10-06 ask).
+  const nodeNamesById = useMemo(() => {
+    const m = new Map<string, string>(nodes.map(n => [n.id, n.name]));
+    for (const f of folders) if (f.locationInfo?.locationId) m.set(f.locationInfo.locationId, f.name);
+    return m;
+  }, [nodes, folders]);
   // Folder titles live INSIDE the header bar since ed776ba (UI session,
   // 2026-10-06), so no headroom is reserved above a child folder any more.
   const CHILD_LABEL_ALLOWANCE = 0;
@@ -4085,6 +4092,7 @@ export default function RelationsCanvas({
             <FolderGroupRect
               key={`folder-bg-${folder.id}`}
               folder={folder}
+              nodeNames={nodeNamesById}
               nodePositions={nodePositions}
               dragOffsets={dragOffsets}
               nodeTypes={nodeTypes}
