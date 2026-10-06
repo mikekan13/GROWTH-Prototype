@@ -2766,15 +2766,27 @@ export default function RelationsCanvas({
         setIsPanning(false); setIsDragging(false);
       }
     };
+    // JEWL is summoned by the browser's contextmenu event, which Android also
+    // fires on a long press. Empty canvas: let it through — long-press on the
+    // background IS "talk to JEWL here" on a phone. A card or a room: the hold
+    // means CARRY, so the menu event is swallowed (2026-10-06).
+    const onContextMenu = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (!t || !svg.contains(t)) return;
+      const touchHold = (hold && hold.target === t) || (hold && t.contains(hold.target)) || pointers.size > 0;
+      if (touchHold && !isBackgroundTarget(t)) { e.preventDefault(); e.stopPropagation(); }
+    };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('pointermove', onMove, true);
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
+    document.addEventListener('contextmenu', onContextMenu, true);
     return () => {
       document.removeEventListener('pointerdown', onDown, true);
       document.removeEventListener('pointermove', onMove, true);
       document.removeEventListener('pointerup', onUp, true);
       document.removeEventListener('pointercancel', onUp, true);
+      document.removeEventListener('contextmenu', onContextMenu, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- BASE_WIDTH/clampZoom are stable per container size
   }, [BASE_WIDTH]);
