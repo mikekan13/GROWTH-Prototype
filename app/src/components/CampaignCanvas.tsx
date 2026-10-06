@@ -1412,18 +1412,23 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           <span className="text-[var(--accent-teal)]/30 text-[8px]">&#x2298; &#x2295;</span>
         </div>
 
-        {/* Main header content */}
-        <div className="px-4 py-2 flex items-center justify-between">
+        {/* Main header content.
+            Phone stacking (2026-10-06, < md): the single row becomes
+              row 1  ← name
+              row 2  tabs + undo/redo (scrolls sideways if it must)
+              row 3  clock · KRMA / FLD / CRY (compact) · settings
+            Desktop (md+) keeps the original one-row layout untouched. */}
+        <div className="px-3 md:px-4 py-2 flex flex-wrap md:flex-nowrap items-center justify-between gap-y-2">
           {/* Left: back + campaign name */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <Link
               href="/terminal"
               className="text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] text-sm font-[family-name:var(--font-terminal)] transition-colors"
             >
               &larr;
             </Link>
-            <div>
-              <h1 className="text-white text-sm font-[family-name:var(--font-header)] uppercase tracking-[0.15em]">
+            <div className="min-w-0">
+              <h1 className="text-white text-sm font-[family-name:var(--font-header)] uppercase tracking-[0.15em] truncate">
                 {campaign.name}
               </h1>
               {campaign.genre && (
@@ -1439,13 +1444,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             </div>
           </div>
 
-          {/* Center: tab navigation */}
-          <div className="flex">
+          {/* Center: tab navigation (row 2 on phones, full width, finger-high) */}
+          <div className="flex order-2 md:order-none w-full md:w-auto justify-center overflow-x-auto [scrollbar-width:none]">
             {tabs.map((tab, i) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`py-1.5 px-4 text-xs uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] border border-[var(--accent-teal)]/40 transition-colors ${
+                className={`py-2 md:py-1.5 px-3 md:px-4 text-xs uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] border border-[var(--accent-teal)]/40 transition-colors whitespace-nowrap ${
                   i > 0 ? 'border-l-0' : ''
                 } ${
                   activeTab === tab.key
@@ -1461,52 +1466,53 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             {activeTab === 'canvas' && <CanvasHistoryControls className="ml-3" />}
           </div>
 
-          {/* Right: clock + KRMA readout + invite code */}
-          <div className="text-right flex items-center gap-4">
+          {/* Right: clock + KRMA readout + settings (row 3 on phones; the
+              KRMA tiles shrink to fit beside the clock) */}
+          <div className="text-right flex flex-wrap md:flex-nowrap items-center justify-between md:justify-end gap-2 md:gap-4 order-3 md:order-none w-full md:w-auto">
             <CampaignClock campaignId={campaign.id} isGM={isGM} />
             {isGM && economy && (
               <div className="flex items-center gap-0">
                 {/* Gold KRMA bar — purple text */}
                 <div
-                  className="px-5 py-2 flex items-center gap-3"
+                  className="px-3 py-1 md:px-5 md:py-2 flex items-center gap-2 md:gap-3"
                   style={{ background: 'linear-gradient(90deg, #D4A830, #E8C848, #D4A830)' }}
                 >
                   <span
-                    className="uppercase leading-none"
-                    style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '-0.01em' }}
+                    className="uppercase leading-none text-[20px] md:text-[32px]"
+                    style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '-0.01em' }}
                   >
                     {formatKrma(economy.total)}
                   </span>
-                  <span className="leading-none" style={{ fontSize: '28px', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '0.02em' }}>
-                    <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '22px', fontWeight: 900 }}>Ҝ</span>
+                  <span className="leading-none text-[18px] md:text-[28px]" style={{ color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+                    <span className="text-[14px] md:text-[22px]" style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontWeight: 900 }}>Ҝ</span>
                     <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
                   </span>
                 </div>
                 {/* Purple box — fluid */}
                 <div
-                  className="h-16 min-w-16 px-3 flex flex-col items-center justify-center"
+                  className="h-10 md:h-16 min-w-12 md:min-w-16 px-2 md:px-3 flex flex-col items-center justify-center"
                   style={{ background: 'var(--pillar-spirit)' }}
                 >
-                  <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.fluid)}</span>
-                  <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">FLD</span>
+                  <span className="text-white text-[13px] md:text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.fluid)}</span>
+                  <span className="text-white/50 text-[8px] md:text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">FLD</span>
                 </div>
                 {/* Red box with ] */}
                 <div
-                  className="h-16 flex items-center"
+                  className="h-10 md:h-16 flex items-center"
                   style={{ background: '#E8585A' }}
                 >
-                  <div className="flex flex-col items-center justify-center px-3">
-                    <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.crystallized)}</span>
-                    <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">CRY</span>
+                  <div className="flex flex-col items-center justify-center px-2 md:px-3">
+                    <span className="text-white text-[13px] md:text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.crystallized)}</span>
+                    <span className="text-white/50 text-[8px] md:text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">CRY</span>
                   </div>
-                  <span className="text-white font-bold font-[family-name:var(--font-terminal)] text-[32px] leading-none pr-1.5">]</span>
+                  <span className="text-white font-bold font-[family-name:var(--font-terminal)] text-[22px] md:text-[32px] leading-none pr-1.5">]</span>
                 </div>
               </div>
             )}
             {isGM && (
               <Link
                 href={`/watcher/campaign/${campaign.id}/settings`}
-                className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--accent-teal)]/30 text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] hover:border-[var(--accent-teal)]/60 transition-colors"
+                className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full border border-[var(--accent-teal)]/30 text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] hover:border-[var(--accent-teal)]/60 transition-colors"
                 title="Campaign Settings"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
