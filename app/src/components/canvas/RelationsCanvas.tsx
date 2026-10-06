@@ -811,8 +811,8 @@ export default function RelationsCanvas({
         cy: Math.round(viewBox.y + fy * viewBox.height),
       });
     };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox is derived from camera+zoom; using those deps directly avoids infinite loops
   }, [showDebug, camera.x, camera.y, zoom]);
 
@@ -1845,7 +1845,7 @@ export default function RelationsCanvas({
   // â”€â”€ Pan handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent) => {
       const target = e.target as Element;
       const isBackground =
         target === svgRef.current ||
@@ -1856,7 +1856,10 @@ export default function RelationsCanvas({
       if (isBackground) {
         // OS-grade gesture map (S-5): middle-drag or Space+drag = pan;
         // plain left-drag = marquee select (the desktop convention).
-        if (e.button === 1 || spaceHeldRef.current) {
+        // Touch (2026-10-06, Mike on his phone: "the canvas I cant even
+        // navigate"): one finger on the background pans; two fingers pinch
+        // (see the pinch tracker below). There is no middle button to pan with.
+        if (e.button === 1 || spaceHeldRef.current || e.pointerType === 'touch') {
           setIsPanning(true);
           setIsDragging(true);
           setPanStart({ x: e.clientX, y: e.clientY, viewBoxX: camera.x, viewBoxY: camera.y });
@@ -1886,6 +1889,7 @@ export default function RelationsCanvas({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       stampGesture();
+      if (pinchRef.current) return; // two fingers own the gesture
       // Marquee select (S-5): live-track the band.
       if (marquee) {
         const cur = clientToSvg(e.clientX, e.clientY);
@@ -2371,11 +2375,11 @@ export default function RelationsCanvas({
   useEffect(() => {
     const needListeners = (isPanning && isDragging) || dragNodeId !== null || dragFolderId !== null || marquee !== null;
     if (needListeners) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener("pointermove", handleMouseMove);
+      document.addEventListener("pointerup", handleMouseUp);
       return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
+        document.removeEventListener("pointermove", handleMouseMove);
+        document.removeEventListener("pointerup", handleMouseUp);
       };
     }
   }, [isPanning, isDragging, dragNodeId, dragFolderId, marquee, handleMouseMove, handleMouseUp]);
@@ -2430,6 +2434,78 @@ export default function RelationsCanvas({
     svg.addEventListener('wheel', onWheel, { passive: false });
     return () => svg.removeEventListener('wheel', onWheel);
   }, []);
+
+  // ── Touch: two-finger pinch zoom + pan (2026-10-06) ──
+  // Pointer ids are tracked document-wide; the moment a second finger lands,
+  // whatever gesture the first finger started (pan, marquee, a card or folder
+  // drag) is abandoned and the pair becomes a pinch. Zoom math mirrors the
+  // wheel handler: the world point under the fingers' midpoint stays put, so
+  // moving both fingers together pans.
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ dist: number; worldMidX: number; worldMidY: number; zoom: number } | null>(null);
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const pointers = activePointersRef.current;
+    const midAndDist = () => {
+      const pts = [...pointers.values()];
+      const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+      return { mx, my, dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) };
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const rect = svg.getBoundingClientRect();
+        const { mx, my, dist } = midAndDist();
+        const z = zoomRef.current, cam = cameraRef.current;
+        const fx = (mx - rect.left) / rect.width, fy = (my - rect.top) / rect.height;
+        pinchRef.current = { dist: Math.max(1, dist), worldMidX: cam.x + fx * BASE_WIDTH * z, worldMidY: cam.y + fy * BASE_HEIGHT * z, zoom: z };
+        // Abandon whatever the first finger started.
+        setIsPanning(false); setIsDragging(false); setMarquee(null);
+        setDragNodeId(null); setDragStartSvg(null);
+        setDragFolderId(null); setFolderDragStartSvg(null);
+        setDragOffsets(new Map());
+        gestureOffsetsRef.current = new Map();
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const p = pinchRef.current;
+      if (!p || pointers.size < 2) return;
+      const rect = svg.getBoundingClientRect();
+      const { mx, my, dist } = midAndDist();
+      const newZoom = clampZoom(p.zoom * (p.dist / Math.max(1, dist)));
+      const fx = (mx - rect.left) / rect.width, fy = (my - rect.top) / rect.height;
+      setZoom(newZoom);
+      setCamera({ x: p.worldMidX - fx * BASE_WIDTH * newZoom, y: p.worldMidY - fy * BASE_HEIGHT * newZoom });
+    };
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2 && pinchRef.current) {
+        pinchRef.current = null;
+        // The remaining finger does not inherit a gesture — lift and start again.
+        setIsPanning(false); setIsDragging(false);
+      }
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('pointermove', onMove, true);
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('pointercancel', onUp, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('pointermove', onMove, true);
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('pointercancel', onUp, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- BASE_WIDTH/clampZoom are stable per container size
+  }, [BASE_WIDTH]);
 
   // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -3050,7 +3126,7 @@ export default function RelationsCanvas({
                 <div
                   ref={measurePanelRef(invHeightKey)}
                   style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     if (e.button !== 0) return;
                     e.preventDefault();
                     e.stopPropagation();
@@ -3095,12 +3171,12 @@ export default function RelationsCanvas({
                     };
 
                     const onUp = () => {
-                      document.removeEventListener('mousemove', onMove);
-                      document.removeEventListener('mouseup', onUp);
+                      document.removeEventListener('pointermove', onMove);
+                      document.removeEventListener('pointerup', onUp);
                     };
 
-                    document.addEventListener('mousemove', onMove);
-                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
                   }}
                 >
                   <InventoryCard
@@ -3345,7 +3421,7 @@ export default function RelationsCanvas({
                 <div
                   ref={measurePanelRef(offsetKey)}
                   style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     if (e.button !== 0) return;
                     e.preventDefault();
                     e.stopPropagation();
@@ -3390,12 +3466,12 @@ export default function RelationsCanvas({
                     };
 
                     const onUp = () => {
-                      document.removeEventListener('mousemove', onMove);
-                      document.removeEventListener('mouseup', onUp);
+                      document.removeEventListener('pointermove', onMove);
+                      document.removeEventListener('pointerup', onUp);
                     };
 
-                    document.addEventListener('mousemove', onMove);
-                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
                   }}
                 >
                   {panelContent}
@@ -3423,7 +3499,7 @@ export default function RelationsCanvas({
         ref={svgRef}
         className="w-full h-full"
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         onContextMenu={(e) => {
           // Only fire for clicks on the empty canvas or a folder background
           // — let cards keep their own right-click menus.
@@ -3467,7 +3543,7 @@ export default function RelationsCanvas({
             setCanvasMenu(null);
           }
         }}
-        style={{ cursor: isPanning ? "grabbing" : spaceHeld ? "grab" : "default" }}
+        style={{ cursor: isPanning ? "grabbing" : spaceHeld ? "grab" : "default", touchAction: "none" }}
       >
         {/* â”€â”€ Definitions â”€â”€ */}
         <defs>
@@ -4167,7 +4243,7 @@ export default function RelationsCanvas({
                   onClick={() => { setSelectedNode(node.id); onNodeClick?.(node); bringNodeToFront(node.id); }}
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     const svgCoords = clientToSvg(e.clientX, e.clientY);
                     setDragNodeId(node.id);
@@ -4309,7 +4385,7 @@ export default function RelationsCanvas({
           <div
             className="fixed z-[100]"
             style={{ left: canvasMenu.screenX, top: canvasMenu.screenY, width: 220 }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             <CtxMenuPanel title={f?.name ?? 'Location'}>
               <button
@@ -5282,7 +5358,7 @@ function CanvasCreateDialog({
   return (
     <div
       ref={ref}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       data-jewl-subject={existing ? `Location edit dialog — ${existing.name}` : 'Location create dialog'}
       className="fixed z-[100]"
       style={{ left, top, width: FORM_W }}

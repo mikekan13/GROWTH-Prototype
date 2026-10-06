@@ -439,11 +439,11 @@ export function FolderGroupRect({
       onFolderResizeEnd?.(folder.id);
     };
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
+    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointerup', handleUp);
     return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup', handleUp);
     };
   }, [resizing, content, folder.id, onFolderResize, svgRef, viewBox]);
 
@@ -522,7 +522,7 @@ export function FolderGroupRect({
         strokeWidth={isDropTarget ? 3 : 0}
         data-folder-location-id={folder.locationInfo?.locationId || undefined}
         style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
-        onMouseDown={handleHeaderDrag}
+        onPointerDown={handleHeaderDrag}
       />
       {/* Drop affordance: unmistakable "this is where it lands" pill —
           the tint alone read as "strange highlight" (Mike 2026-08-03). */}
@@ -676,7 +676,7 @@ export function FolderGroupRect({
                   }),
                 );
               }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               style={{
                 padding: '5px 10px',
                 background: 'rgba(0,0,0,0.6)',
@@ -720,7 +720,7 @@ export function FolderGroupRect({
                     }),
                   );
                 }}
-                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 style={{
                   padding: '5px 10px',
                   background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
@@ -757,7 +757,7 @@ export function FolderGroupRect({
                   e.stopPropagation();
                   onDrillIn(folder.locationInfo!.locationId);
                 }}
-                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 style={{
                   padding: '5px 10px',
                   background: 'rgba(0,0,0,0.6)',
@@ -1172,7 +1172,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'right')}
+            onPointerDown={(e) => handleResizeStart(e, 'right')}
           />
           {/* Left edge */}
           <rect
@@ -1185,7 +1185,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'left')}
+            onPointerDown={(e) => handleResizeStart(e, 'left')}
           />
           {/* Bottom edge */}
           <rect
@@ -1198,7 +1198,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'bottom')}
+            onPointerDown={(e) => handleResizeStart(e, 'bottom')}
           />
           {/* Bottom-right corner */}
           <rect
@@ -1211,7 +1211,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'corner')}
+            onPointerDown={(e) => handleResizeStart(e, 'corner')}
           />
           {/* Bottom-left corner */}
           <rect
@@ -1224,7 +1224,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'left-corner')}
+            onPointerDown={(e) => handleResizeStart(e, 'left-corner')}
           />
           {/* Top edge — straddles the boundary so it never fights the
               title-bar drag inside the header chrome */}
@@ -1238,7 +1238,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'top')}
+            onPointerDown={(e) => handleResizeStart(e, 'top')}
           />
           {/* Top-right corner */}
           <rect
@@ -1251,7 +1251,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'top-corner')}
+            onPointerDown={(e) => handleResizeStart(e, 'top-corner')}
           />
           {/* Top-left corner */}
           <rect
@@ -1264,7 +1264,7 @@ export function FolderGroupRect({
             stroke={`${color}44`}
             strokeWidth={1}
             style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'top-left-corner')}
+            onPointerDown={(e) => handleResizeStart(e, 'top-left-corner')}
           />
         </>
       )}

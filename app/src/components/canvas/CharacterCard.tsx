@@ -225,11 +225,11 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
     const onUp = () => {
       setIsDragging(false);
       onDragStateChange?.(false);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, [editable, attrName, max, onAttributeChange, onDragStateChange]);
 
   const inner = (
@@ -275,7 +275,7 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
               zIndex: 3,
               padding: '0 8px',
             }}
-            onMouseDown={handleLeverMouseDown}
+            onPointerDown={handleLeverMouseDown}
           >
             <div style={{
               width: '4px',
@@ -302,7 +302,7 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
             if (e.key === 'Enter') { e.preventDefault(); commitMaxEdit(); }
             else if (e.key === 'Escape') { e.preventDefault(); setMaxEditing(false); }
           }}
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           className="text-xl font-bold text-white bg-black/60 border border-white/30 rounded px-1"
           style={{ fontFamily: 'Consolas, monospace', minWidth: '60px', textAlign: 'right' }}
         />
@@ -621,8 +621,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handleMouseMove);
+      document.removeEventListener('pointerup', handleMouseUp);
       if (!dragStartPosRef.current) return;
       const final = screenToSVG(upEvent.clientX, upEvent.clientY);
       onDragOffsetChange(node.id, 0, 0);
@@ -631,8 +631,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       dragStartPosRef.current = null;
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handleMouseUp);
   };
 
   // ── Context Menu Portal ───────────────────────────────────────────────────
@@ -1029,7 +1029,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const aiTogglePill = isGM ? (
     <button
       onClick={handleControllerClick}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       disabled={controllerSaving}
       title={
         aiActionOn
@@ -1069,7 +1069,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         top: controllerMenuPos.y,
         zIndex: 1000,
       }}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <CtxMenuPanel title="Controller">
         <CtxMenuStreamLabel />
@@ -1138,7 +1138,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   ? 'drop-shadow(0 0 4px rgba(255, 204, 120, 0.35)) drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5))'
                   : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
           }}
-          onMouseDown={handleMouseDown}
+          onPointerDown={handleMouseDown}
           onContextMenu={handleContextMenu}
         >
           {/* Portrait - 160px */}
@@ -1248,7 +1248,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {onToggleExpand && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               className="absolute bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center text-white cursor-pointer transition-all shadow-lg hover:shadow-xl"
               style={{ width: '36px', height: '36px', bottom: '-16px', right: '-18px', fontSize: '24px', lineHeight: '1', zIndex: 10 }}
               title="Expand character sheet"
@@ -1309,7 +1309,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 ? 'drop-shadow(0 0 5px rgba(255, 204, 120, 0.4)) drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5))'
                 : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
         }}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         onContextMenu={handleContextMenu}
       >
         {/* ── Top Header Bar ── */}
@@ -1764,7 +1764,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           const Btn = ({ icon, label, isOpen, onClick }: { icon: string; label: string; isOpen: boolean; onClick: () => void }) => (
             <button
               onClick={(e) => { e.stopPropagation(); onClick(); }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               className="flex items-center gap-1 hover:brightness-110 transition-all cursor-pointer shadow-lg"
               style={btnStyle(isOpen)}
             >
@@ -1807,7 +1807,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         {onToggleExpand && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             className="absolute bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center text-white cursor-pointer transition-all shadow-lg hover:shadow-xl"
             style={{ width: '36px', height: '36px', top: '574px', right: '-15px', fontSize: '24px', lineHeight: '1', zIndex: 10 }}
             title="Compact character sheet"
@@ -1840,7 +1840,7 @@ function ControllerMenuItem({
   return (
     <button
       onClick={onClick}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       disabled={disabled}
       title={hint}
       style={{
