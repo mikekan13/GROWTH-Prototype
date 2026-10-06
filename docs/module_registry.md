@@ -150,7 +150,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Profile | profile/ProfileEditForm, profile/ProfileSummary, profile/WatcherProfileForm | Trailblazer and Watcher profile edit + display |
 | KRMA | krma/TransactionHistory | Transaction history display component (paginated, filterable) |
 | 3D Dice | DiceOverlay, DiceOverlayLoader, DiceResultBar, DiceToggle | Full 3D dice rolling visualization. Three.js + Cannon-es physics. Lazy-loaded via next/dynamic. Mounted in root layout. Auto-subscribes to DiceService events. Snap-to-result after physics settle. Death save dramatic effects. Toggle ON/OFF via localStorage |
-| UI | ComplexTooltip | 500ms lock-on-hover tooltip with nested tooltip support via createPortal |
+| UI | ComplexTooltip | Dynamic tooltip with an "inception" layer. Mouse: follows cursor, 500ms lock, nested source panel to the side. Touch (2026-10-06): plain tap on the trigger opens it anchored + locked (never hold-triggered — hold is CARRY), nested sources open inline as accordions, bottom sheet under 600px, tap-away / ✕ closes. Props: inline, hideTotal, triggerStyle, onTriggerPointerDown |
+| Canvas | folder-tooltips.ts | Pure tooltip models for Location folder headers: title badge (type/status/depth/env/population/tags, sub-locations/people/items with nested lists, KRMA reserve footer), content counts, who-is-here chips (pillars as nested rows), dETAILS strip (full description, GM notes nested). Takes optional nodeNames map for item/sub-location names |
 | UI | ConfirmDialog, Modal, ContextMenu | Reusable dialog/modal primitives and right-click context menu |
 | Branding | GrowthLogo | Canonical logo rendering, scalable via `scale` prop. DO NOT modify without Mike's approval |
 | Branding | GlitchText | Glitch text effect component for reality layer transitions |

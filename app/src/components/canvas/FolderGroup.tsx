@@ -4,6 +4,8 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import RestPanel from './RestPanel';
 import type { CanvasFolder } from '@/types/canvas';
 import { lodForZoom, folderLabelSize, depthHeaderFill, depthBodyFill, depthPrefix } from './canvas-lod';
+import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
+import { locationTitleTooltip, countTooltip, characterChipTooltip, detailsTooltip, memberNames, subLocationNames } from './folder-tooltips';
 import type { GrowthCharacter } from '@/types/growth';
 
 interface NodePosition {
@@ -219,6 +221,7 @@ export function getDisplayBounds(content: ContentBounds, folder: CanvasFolder) {
 // ── SVG Background Rect + Resize Handles ──
 
 export function FolderGroupRect({
+  nodeNames,
   folder,
   nodePositions,
   dragOffsets,
@@ -247,6 +250,10 @@ export function FolderGroupRect({
   expandedNodes: Set<string>;
   childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>;
   characters: CharacterInfo[];
+  /** Every canvas node id → display name (plus location folders keyed by
+   *  locationInfo.locationId). Optional: the header tooltips list items and
+   *  sub-locations by name when it is present, by count when it is not. */
+  nodeNames?: Map<string, string>;
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number, posY?: number) => void;
   /** Fired once when a resize gesture ENDS — compaction/overlap pass. */
   onFolderResizeEnd?: (folderId: string) => void;
@@ -503,6 +510,17 @@ export function FolderGroupRect({
   const titleTop = showActionRow ? 4 : (HEADER_HEIGHT - titleLineH) / 2;
   /** Rough rendered width — the TKV / KRMA tiles slide right of it. */
   const titleEstW = titleChars * titleFont * 0.5 + 2 * TITLE_PAD_X;
+
+  // Header tooltips (Mike 2026-10-06): the dynamic ComplexTooltip with its
+  // inception layer, on the title badge, the content counts, the who-is-here
+  // chips and the dETAILS strip. Models live in folder-tooltips.ts. They close
+  // while the folder is being dragged.
+  const isFolderDragging = dragOffsets.has(`__folder__${folder.id}`);
+  const li = folder.locationInfo;
+  const itemNames = memberNames(folder, nodeTypes, 'item', nodeNames);
+  const subNames = subLocationNames(folder, childFolderRects, nodeNames);
+  const titleTip = li ? locationTitleTooltip(folder, li, folderChars, itemNames, subNames) : null;
+  const tipTriggerStyle: React.CSSProperties = { pointerEvents: 'auto', cursor: 'help' };
   const totalTKV = folderChars.reduce((sum, c) => {
     const val = c.data?.tkv;
     return sum + (typeof val === 'number' ? val : typeof val === 'string' ? parseFloat(val) || 0 : 0);
@@ -607,7 +625,26 @@ export function FolderGroupRect({
         height={titleLineH}
         style={{ pointerEvents: 'none', overflow: 'visible' }}
       >
-        <div style={{ width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        {/* The badge is a tooltip trigger AND still a drag handle: pointerdown
+            is forwarded to the header drag. data-folder-location-id lets the
+            touch carry gesture find the folder from a finger on the title. */}
+        <div
+          style={{ width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}
+          data-folder-location-id={li?.locationId || undefined}
+          data-folder-id={folder.id}
+        >
+          <ComplexTooltip
+            inline
+            disabled={!titleTip || isFolderDragging}
+            title={titleTip?.title ?? folder.name}
+            modifiers={titleTip?.modifiers ?? []}
+            totalValue={0}
+            totalLabel={titleTip?.totalLabel}
+            totalText={titleTip?.totalText}
+            hideTotal={titleTip?.hideTotal}
+            triggerStyle={{ ...tipTriggerStyle, maxWidth: '100%', verticalAlign: 'top', cursor: 'grab' }}
+            onTriggerPointerDown={handleHeaderDrag}
+          >
           <div
             style={{
               display: 'inline-block',
@@ -638,6 +675,7 @@ export function FolderGroupRect({
             {folder.name}
             <span style={{ opacity: 0.6, fontSize: '0.8em', marginLeft: '0.35em' }}>({folder.nodeIds.length})</span>
           </div>
+          </ComplexTooltip>
         </div>
       </foreignObject>
 
@@ -840,30 +878,23 @@ export function FolderGroupRect({
                       color: 'rgba(255,255,255,0.8)',
                     }}
                   >
-                    {(folder.locationInfo.contentCounts.locations ?? 0) > 0 && (
-                      <span title="Sub-locations">
-                        <span style={{ color: 'var(--terminal-prime)', marginRight: 4 }}>⌂</span>
-                        {folder.locationInfo.contentCounts.locations}
-                      </span>
-                    )}
-                    {(folder.locationInfo.contentCounts.characters ?? 0) > 0 && (
-                      <span title="Characters / PCs">
-                        <span style={{ color: 'var(--pillar-body)', marginRight: 4 }}>✴</span>
-                        {folder.locationInfo.contentCounts.characters}
-                      </span>
-                    )}
-                    {(folder.locationInfo.contentCounts.npcs ?? 0) > 0 && (
-                      <span title="NPCs">
-                        <span style={{ color: 'var(--krma-gold)', marginRight: 4 }}>✴</span>
-                        {folder.locationInfo.contentCounts.npcs}
-                      </span>
-                    )}
-                    {(folder.locationInfo.contentCounts.items ?? 0) > 0 && (
-                      <span title="Items">
-                        <span style={{ color: '#8e7cc3', marginRight: 4 }}>❖</span>
-                        {folder.locationInfo.contentCounts.items}
-                      </span>
-                    )}
+                    {([
+                      { kind: 'locations' as const, glyph: '⌂', color: 'var(--terminal-prime)', count: folder.locationInfo.contentCounts.locations ?? 0, names: subNames, chars: undefined },
+                      { kind: 'characters' as const, glyph: '✴', color: 'var(--pillar-body)', count: folder.locationInfo.contentCounts.characters ?? 0, names: null, chars: folderChars },
+                      { kind: 'npcs' as const, glyph: '✴', color: 'var(--krma-gold)', count: folder.locationInfo.contentCounts.npcs ?? 0, names: null, chars: folderChars },
+                      { kind: 'items' as const, glyph: '❖', color: '#8e7cc3', count: folder.locationInfo.contentCounts.items ?? 0, names: itemNames, chars: undefined },
+                    ]).filter(c => c.count > 0).map(c => {
+                      const tip = countTooltip(c.kind, c.count, c.names, c.chars);
+                      return (
+                        <ComplexTooltip key={c.kind} inline title={tip.title} modifiers={tip.modifiers} totalValue={0} hideTotal
+                          disabled={isFolderDragging} triggerStyle={tipTriggerStyle} onTriggerPointerDown={handleHeaderDrag}>
+                          <span>
+                            <span style={{ color: c.color, marginRight: 4 }}>{c.glyph}</span>
+                            {c.count}
+                          </span>
+                        </ComplexTooltip>
+                      );
+                    })}
                   </div>
                 )}
                 {folder.locationInfo.locationType && (
@@ -918,9 +949,15 @@ export function FolderGroupRect({
                 >
                   {'▸'} dETAILS
                 </button>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {folder.locationInfo.description || <span style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>(no description)</span>}
-                </span>
+                {(() => {
+                  const tip = detailsTooltip(folder.locationInfo);
+                  return (
+                    <ComplexTooltip title={tip.title} modifiers={tip.modifiers} totalValue={0} hideTotal disabled={isFolderDragging}
+                      triggerStyle={{ flex: 1, minWidth: 0, width: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'help' }}>
+                      {folder.locationInfo.description || <span style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>(no description)</span>}
+                    </ComplexTooltip>
+                  );
+                })()}
               </div>
             </foreignObject>
           )}
@@ -1178,28 +1215,50 @@ export function FolderGroupRect({
         const CHIP = 26, STEP = 60, MAX = 6;
         const shown = folderChars.slice(0, MAX);
         const extra = folderChars.length - shown.length;
+        const slots = shown.length + (extra > 0 ? 1 : 0);
         const rightEdge = bounds.x + bounds.width - toggleSize - 28;
-        const cy = bounds.y + 40;
+        const rowW = slots * STEP;
+        // HTML chips (not SVG circles) so each one can be a ComplexTooltip
+        // trigger — hover for the person's pillars, inception into each pillar.
         return (
-          <g style={{ pointerEvents: 'none' }}>
-            {shown.map((c, i) => {
-              const cx = rightEdge - (shown.length - i) * STEP + (extra > 0 ? -STEP : 0);
-              const initials = c.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-              return (
-                <g key={c.id}>
-                  <circle cx={cx} cy={cy} r={CHIP} fill="#0d0d1a" stroke="var(--krma-gold)" strokeWidth={3} />
-                  {c.portrait ? (
-                    <image href={c.portrait} x={cx - CHIP + 3} y={cy - CHIP + 3} width={2 * CHIP - 6} height={2 * CHIP - 6} preserveAspectRatio="xMidYMid slice" style={{ clipPath: `circle(${CHIP - 3}px at 50% 50%)` }} />
-                  ) : (
-                    <text x={cx} y={cy + CHIP * 0.38} textAnchor="middle" fontSize={CHIP * 1.05} fontWeight={700} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif">{initials}</text>
-                  )}
-                </g>
-              );
-            })}
-            {extra > 0 && (
-              <text x={rightEdge - CHIP} y={cy + 8} textAnchor="middle" fontSize={22} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace">+{extra}</text>
-            )}
-          </g>
+          <foreignObject
+            x={rightEdge - rowW - CHIP}
+            y={bounds.y + 40 - CHIP - 4}
+            width={rowW}
+            height={2 * CHIP + 8}
+            style={{ pointerEvents: 'none', overflow: 'visible' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: STEP - 2 * CHIP, height: 2 * CHIP + 8 }}>
+              {shown.map((c) => {
+                const initials = c.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const tip = characterChipTooltip(c);
+                return (
+                  <ComplexTooltip key={c.id} inline title={tip.title} modifiers={tip.modifiers} totalValue={0}
+                    totalLabel={tip.totalLabel} totalText={tip.totalText} disabled={isFolderDragging}
+                    triggerStyle={tipTriggerStyle} onTriggerPointerDown={handleHeaderDrag}>
+                    <div
+                      title={c.name}
+                      style={{
+                        width: 2 * CHIP, height: 2 * CHIP, borderRadius: '50%', boxSizing: 'border-box',
+                        background: '#0d0d1a', border: '3px solid var(--krma-gold)', overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {c.portrait ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.portrait} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontWeight: 700, fontSize: CHIP * 1.05, color: 'var(--krma-gold)', lineHeight: 1 }}>{initials}</span>
+                      )}
+                    </div>
+                  </ComplexTooltip>
+                );
+              })}
+              {extra > 0 && (
+                <span style={{ width: 2 * CHIP, textAlign: 'center', fontSize: 22, color: '#CBD9E8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>+{extra}</span>
+              )}
+            </div>
+          </foreignObject>
         );
       })()}
 
