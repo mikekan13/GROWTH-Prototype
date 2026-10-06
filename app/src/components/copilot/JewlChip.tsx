@@ -16,7 +16,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { CtxMenuBorder, CtxMenuScanlines, ctxMenuStyle } from '@/components/ui/ContextMenu';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
@@ -117,6 +117,38 @@ function extractCampaignId(pathname: string): string | null {
   return null;
 }
 
+/** Phone layout threshold: below this the JEWL window becomes a bottom sheet. */
+const SHEET_QUERY = '(max-width: 599px)';
+const sheetMq = () => (typeof window !== 'undefined' ? window.matchMedia(SHEET_QUERY) : null);
+function useSheetMode(): boolean {
+  return useSyncExternalStore(
+    cb => { const q = sheetMq(); q?.addEventListener('change', cb); return () => q?.removeEventListener('change', cb); },
+    () => sheetMq()?.matches ?? false,
+    () => false,
+  );
+}
+
+/** Soft-keyboard tracking via visualViewport: how far the visible bottom sits
+ *  above the layout bottom (inset) and how tall the visible area is. */
+function useKeyboardInset(active: boolean): { inset: number; viewportHeight: number } {
+  const [state, setState] = useState({ inset: 0, viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 800 });
+  useEffect(() => {
+    if (!active || typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    const update = () => {
+      if (!vv) { setState({ inset: 0, viewportHeight: window.innerHeight }); return; }
+      const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setState({ inset, viewportHeight: Math.round(vv.height) });
+    };
+    update();
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => { vv?.removeEventListener('resize', update); vv?.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+  }, [active]);
+  return state;
+}
+
 export function JewlChip() {
   const pathname = usePathname();
   const router = useRouter();
@@ -176,11 +208,23 @@ export function JewlChip() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Phones (2026-10-06, with the mobile session): below 600 px the fixed
+  // 380×500 window is wider than the screen, so JEWL becomes a BOTTOM SHEET —
+  // full width, ~70vh, drag handle + ⊗ to dismiss, a backdrop that swallows
+  // the tap-away so closing him never drops a carried card. The anchor is
+  // kept only for the seed text. useSyncExternalStore so SSR (false) matches.
+  const sheetMode = useSheetMode();
+  // The soft keyboard shrinks the visual viewport, not the layout viewport:
+  // track it so the input row stays pinned ABOVE the keyboard.
+  const kb = useKeyboardInset(open && sheetMode);
+  const sheetDragRef = useRef<{ y0: number } | null>(null);
+
   // Summoned, not resident: clicking anywhere OUTSIDE the panel dismisses
   // it (a right-click outside dismisses-then-resummons at the new spot via
   // the contextmenu listener). Esc already closes via the hotkey handler.
+  // Sheet mode uses a backdrop instead, so the outside tap never reaches the canvas.
   useEffect(() => {
-    if (!open) return;
+    if (!open || sheetMode) return;
     function onDocMouseDown(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -188,7 +232,7 @@ export function JewlChip() {
     }
     document.addEventListener('mousedown', onDocMouseDown);
     return () => document.removeEventListener('mousedown', onDocMouseDown);
-  }, [open]);
+  }, [open, sheetMode]);
 
   // Hotkeys
   useEffect(() => {
@@ -949,21 +993,45 @@ export function JewlChip() {
       }
     : { bottom: 84, right: 20 };
 
+  // Sheet geometry: sits on the visual viewport's bottom (above the soft
+  // keyboard), 70% of the visible height, never taller than what is visible.
+  const sheetStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: kb.inset,
+    width: '100%',
+    height: `min(70vh, ${Math.max(240, kb.viewportHeight - 24)}px)`,
+    maxHeight: `${Math.max(240, kb.viewportHeight - 24)}px`,
+    borderRadius: '12px 12px 0 0',
+    paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
+  };
+
   return (
     <>
       {/* No corner chip — JEWL is summoned by right-click (anywhere in the
           campaign) or "/" / Ctrl-K. He appears where you call him. */}
+      {open && sheetMode && (
+        // Backdrop: dims the canvas and SWALLOWS the tap-away, so dismissing
+        // JEWL on a phone never lands as a tap on the canvas (which would
+        // drop a carried card or move the camera).
+        <div
+          aria-hidden
+          onClick={() => setOpen(false)}
+          onPointerDown={e => e.stopPropagation()}
+          data-no-hold
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9997 }}
+        />
+      )}
       {open && (
         <div
           ref={panelRef}
           role="dialog"
           aria-label="Co-pilot"
+          data-no-hold
           style={{
             position: 'fixed',
-            ...anchoredPos,
-            width: PANEL_W,
-            height: PANEL_H,
-            maxHeight: 'calc(100vh - 120px)',
+            ...(sheetMode ? sheetStyle : { ...anchoredPos, width: PANEL_W, height: PANEL_H, maxHeight: 'calc(100vh - 120px)' }),
             background: '#000',
             border: 'none',
             boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
@@ -977,8 +1045,22 @@ export function JewlChip() {
           {/* The ^v^v undulating chrome — same skin as every context menu.
               JEWL is the OS runner; his overlay IS a Terminal surface.
               count sized up so the strip wraps the full 380x500 panel. */}
-          <CtxMenuBorder count={90} />
+          <CtxMenuBorder count={sheetMode ? 120 : 90} />
           <CtxMenuScanlines />
+          {sheetMode && (
+            // Drag handle: swipe down ~80 px to dismiss. Pointer events, not
+            // touch events, so the canvas's touch tracker contract holds.
+            <div
+              onPointerDown={e => { sheetDragRef.current = { y0: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
+              onPointerMove={e => { const d = sheetDragRef.current; if (d && e.clientY - d.y0 > 80) { sheetDragRef.current = null; setOpen(false); } }}
+              onPointerUp={() => { sheetDragRef.current = null; }}
+              onPointerCancel={() => { sheetDragRef.current = null; }}
+              aria-label="Drag down to close"
+              style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '8px 0 2px', cursor: 'grab', touchAction: 'none' }}
+            >
+              <div style={{ width: 44, height: 4, borderRadius: 2, background: 'rgba(208, 160, 48, 0.55)' }} />
+            </div>
+          )}
           {/* Header */}
           <div
             style={{
@@ -1634,11 +1716,13 @@ export function JewlChip() {
               disabled={loading}
               style={{
                 flex: 1,
+                minWidth: 0,
                 background: 'rgba(0,0,0,0.5)',
                 border: '1px solid rgba(208, 160, 48, 0.25)',
                 color: '#fff',
-                fontSize: 11,
-                padding: '6px 8px',
+                // 16px on phones: anything smaller makes iOS zoom the page on focus.
+                fontSize: sheetMode ? 16 : 11,
+                padding: sheetMode ? '10px 10px' : '6px 8px',
                 fontFamily: 'Consolas, monospace',
                 outline: 'none',
                 transition: 'border-color 0.15s ease',
