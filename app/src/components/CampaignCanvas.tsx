@@ -13,6 +13,7 @@ import { recomputeAugments } from '@/lib/character-actions';
 import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignClock from '@/components/time/CampaignClock';
+import CanvasHistoryControls from '@/components/canvas/CanvasHistoryControls';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
 import type { TerminalEvent } from '@/types/terminal';
 
@@ -1455,6 +1456,9 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 {tab.label}
               </button>
             ))}
+            {/* Undo / redo for planning-layer canvas changes — canvas tab only.
+                Listens to the canvas's growth:canvas-history broadcast. */}
+            {activeTab === 'canvas' && <CanvasHistoryControls className="ml-3" />}
           </div>
 
           {/* Right: clock + KRMA readout + invite code */}
