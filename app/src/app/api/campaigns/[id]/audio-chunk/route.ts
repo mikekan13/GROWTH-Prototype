@@ -2,8 +2,9 @@
  * Ambient audio chunk ingestion.
  *
  * Per [[jewl-always-on-audio-when-active]] JEWL listens continuously while
- * the GM is on a campaign page. The chip pushes a 10-second audio chunk
- * here every tick. We transcribe via the STT pipe, and — if the transcript
+ * the GM is on a campaign page. The chip pushes an audio chunk here every
+ * tick (5 s; 3 s while a session is live and the table's split loop is on).
+ * We transcribe via the STT pipe, and — if the transcript
  * is non-empty — append it to the campaign's copilot history as a user
  * message tagged `[ambient]`. JEWL sees it the next time he reasons (via
  * an autonomous tick, an explicit prompt, or an observation event). We do
@@ -22,6 +23,7 @@ import { prisma } from '@/lib/db';
 import { transcribeAudio } from '@/ai/providers/stt';
 import { maybeFireClassifier } from '@/ai/copilot/classifier';
 import { buildSttVocabulary } from '@/services/stt-vocabulary';
+import { hearSpoken, type SpokenTableResult } from '@/services/table-speak';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,6 +165,23 @@ export async function POST(
       },
     });
 
+    // U2c-4: while a session is live, what the GM says is table talk too —
+    // the beings listen and answer at the ask. Behind the rollout switch in
+    // table-speak.ts (off = this returns at once and nothing else changes),
+    // and never allowed to break the ambient path above.
+    let table: SpokenTableResult | undefined;
+    if (!looksLikeMarker) {
+      try {
+        table = await hearSpoken(
+          campaignId,
+          { userId: session.user.id, username: session.user.username, role: session.user.role, runsCampaign: isGM || session.user.role === 'ADMIN' },
+          transcript,
+        );
+      } catch (err) {
+        console.error('[audio-chunk] table feed failed:', err);
+      }
+    }
+
     // Per [[jewl-always-on-audio-when-active]] there is no wake word — JEWL
     // is supposed to decide moment-by-moment whether to react. We delegate
     // that decision to a cheap Haiku classifier (see classifier.ts). The
@@ -192,6 +211,8 @@ export async function POST(
       provider: stt.provider,
       length: transcript.length,
       classifierVerdict,
+      // Present only when the mic fed the table: what was heard, asked and left out.
+      ...(table?.fed ? { table } : {}),
     });
   } catch (error) {
     return errorResponse(error);

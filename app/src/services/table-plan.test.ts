@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readTableTalk } from './table-talk';
-import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, type TableBeat } from './table-plan';
+import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type TableBeat } from './table-plan';
 
 const listeners = [{ id: 'mara', name: 'Mara' }, { id: 'oren', name: 'Oren' }];
 const npcs = [{ id: 'oren', name: 'Oren' }, { id: 'tess', name: 'Tess' }];
@@ -103,6 +103,19 @@ describe('answerers / overhearers', () => {
     const b = beat('Oren: Anyone seen the ferryman?') as Extract<TableBeat, { type: 'spoken' }>;
     expect(answerers(b, listeners)).toEqual(['mara']);
     expect(overhearers(b, listeners)).toEqual([]);
+  });
+});
+
+describe('narrationSentences — spoken narration on the record, one statement per sentence', () => {
+  it('each completed sentence is its own statement; speech, asks and ignored talk are not among them', () => {
+    const p = plan('The lock is old. It will not budge. Tess says, leave it. Roll perception. What do you do?', 'spoken');
+    expect(narrationSentences(p)).toEqual(['The lock is old.', 'It will not budge.']);
+  });
+  it('a title does not cut a sentence, and a result counts as narration', () => {
+    expect(narrationSentences(plan('Mr. Hale waits by the door. You succeed.', 'spoken'))).toEqual(['Mr. Hale waits by the door.', 'You succeed.']);
+  });
+  it('nothing narrated, nothing to record', () => {
+    expect(narrationSentences(plan('What do you do?', 'spoken'))).toEqual([]);
   });
 });
 

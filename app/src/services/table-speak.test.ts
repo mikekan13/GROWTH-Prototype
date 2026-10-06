@@ -14,7 +14,9 @@ const w = vi.hoisted(() => ({
   broadcasts: [] as Array<Record<string, unknown>>,
   dropped: [] as Array<{ content: string; actions: string }>,
   attached: [] as Array<{ memoryId: string; canonEventId: string }>,
+  extras: {} as Record<string, string[]>,
   held: null as { id: string } | null,
+  session: { id: 'session-1' } as { id: string } | null,
   converse: vi.fn(),
   listen: vi.fn(),
   answer: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock('@/lib/db', () => ({
     },
     dayaEntity: { findMany: vi.fn(async () => w.active.map((characterId) => ({ characterId }))) },
     copilotMessage: { create: vi.fn(async (args: { data: { content: string; actions: string } }) => { w.dropped.push(args.data); return {}; }) },
+    gameSession: { findFirst: vi.fn(async () => w.session) },
   },
 }));
 vi.mock('@/services/campaign-event', () => ({
@@ -45,7 +48,7 @@ vi.mock('@/services/canon', () => ({
   declareCanon: vi.fn(async (_c: string, _a: unknown, input: { narration: string }) => { w.canon.push({ kind: 'narration', narration: input.narration }); return { event: { id: `canon-${w.canon.length}` } }; }),
   recordDialogueCanon: vi.fn(async (_c: string, speakerId: string, _label: string, text: string) => { w.canon.push({ kind: 'dialogue', speaker: speakerId, text }); return { id: `canon-${w.canon.length}` }; }),
   recordUnattributedDialogueCanon: vi.fn(async (_c: string, label: string, text: string) => { w.canon.push({ kind: 'dialogue', speaker: label, text }); return { id: `canon-${w.canon.length}` }; }),
-  attachTruthToMemory: vi.fn(async (memoryId: string, canonEventId: string) => { w.attached.push({ memoryId, canonEventId }); return true; }),
+  attachTruthToMemory: vi.fn(async (memoryId: string, canonEventId: string, extra: string[] = []) => { w.attached.push({ memoryId, canonEventId }); w.extras[memoryId] = extra; return true; }),
   attachTruthToRecentMemories: vi.fn(async () => 0),
 }));
 vi.mock('@/services/reconciliation', () => ({
@@ -55,7 +58,7 @@ vi.mock('@/services/reconciliation', () => ({
   cementCheck: vi.fn(async () => {}),
 }));
 
-import { speakProse, tableSplitLoop } from './table-speak';
+import { speakProse, hearSpoken, forgetSpokenTable, getTableRoster, tableSplitLoop } from './table-speak';
 
 const actor = { userId: 'gm', username: 'watcher', role: 'WATCHER' };
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -90,6 +93,14 @@ describe('the rollout switch', () => {
     for (const v of ['1', 'true', 'ON', 'off', '']) { process.env.TABLE_SPLIT_LOOP = v; expect(tableSplitLoop()).toBe(false); }
     process.env.TABLE_SPLIT_LOOP = 'on';
     expect(tableSplitLoop()).toBe(true);
+  });
+});
+
+describe('getTableRoster — tells the recorder where the switch stands', () => {
+  it('splitLoop follows the one switch', async () => {
+    expect((await getTableRoster('camp', 'WATCHER')).splitLoop).toBe(false);
+    process.env.TABLE_SPLIT_LOOP = 'on';
+    expect((await getTableRoster('camp', 'WATCHER')).splitLoop).toBe(true);
   });
 });
 
@@ -235,5 +246,116 @@ describe('speakProse — switch ON: listen while the GM has the floor, answer at
 
   it('only a Watcher runs the table, on either path', async () => {
     await expect(speakProse('camp', { ...actor, role: 'TRAILBLAZER' }, { message: 'The door opens.' })).rejects.toThrow(/GM\/ADMIN only/);
+  });
+});
+
+// ── U2c-4: the GM's mic ────────────────────────────────────────────────────
+
+const gm = { ...actor, runsCampaign: true };
+
+describe('hearSpoken — switch OFF, or the wrong moment: the mic does not feed the table', () => {
+  beforeEach(() => { forgetSpokenTable(); w.session = { id: 'session-1' }; });
+
+  it('switch off: nothing is read, written or woken — not even a session lookup', async () => {
+    const result = await hearSpoken('camp', gm, 'The door bangs open. What do you do?');
+    expect(result).toEqual({ fed: false, why: 'switch_off', heard: 0, asked: 0, ignored: [], holding: false });
+    expect(w.canon).toEqual([]);
+    expect(w.listen).not.toHaveBeenCalled();
+    expect(w.answer).not.toHaveBeenCalled();
+    expect(w.dropped).toEqual([]);
+  });
+  it('switch on but no session is live', async () => {
+    process.env.TABLE_SPLIT_LOOP = 'on';
+    w.session = null;
+    expect(await hearSpoken('camp', gm, 'The door bangs open.')).toMatchObject({ fed: false, why: 'no_session' });
+    expect(w.canon).toEqual([]);
+    expect(w.listen).not.toHaveBeenCalled();
+  });
+  it('switch on but the speaker does not run this campaign, or is a player', async () => {
+    process.env.TABLE_SPLIT_LOOP = 'on';
+    expect(await hearSpoken('camp', { ...gm, runsCampaign: false }, 'The door bangs open.')).toMatchObject({ fed: false, why: 'not_the_gm' });
+    expect(await hearSpoken('camp', { ...gm, role: 'TRAILBLAZER' }, 'The door bangs open.')).toMatchObject({ fed: false, why: 'not_the_gm' });
+    expect(w.listen).not.toHaveBeenCalled();
+  });
+});
+
+describe('hearSpoken — switch ON, session live: the mic is table talk', () => {
+  beforeEach(() => { process.env.TABLE_SPLIT_LOOP = 'on'; forgetSpokenTable(); w.session = { id: 'session-1' }; });
+
+  it('narration is recorded sentence by sentence and listened to; nobody speaks', async () => {
+    const result = await hearSpoken('camp', gm, 'The door bangs open. Rain comes in with it.');
+    expect(result).toEqual({ fed: true, heard: 1, asked: 0, ignored: [], holding: false });
+    expect(w.canon).toEqual([{ kind: 'narration', narration: 'The door bangs open.' }, { kind: 'narration', narration: 'Rain comes in with it.' }]);
+    expect(w.listen.mock.calls.map((c) => [c[0], c[2]])).toEqual([
+      ['mara', { source: 'perception', content: 'The door bangs open. Rain comes in with it.' }],
+      ['oren', { source: 'perception', content: 'The door bangs open. Rain comes in with it.' }],
+    ]);
+    expect(w.answer).not.toHaveBeenCalled();
+    await flush();
+    // The listen's memory rests on every sentence it covered.
+    expect(w.attached.filter((a) => a.memoryId === 'listen-mem-mara')).toEqual([{ memoryId: 'listen-mem-mara', canonEventId: 'canon-1' }]);
+    expect(w.extras['listen-mem-mara']).toEqual(['canon-2']);
+  });
+
+  it('an ask is answered without the call waiting for it: the GM is still talking', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    w.answer.mockImplementation(async (id: string) => { await gate; return { status: 'ok', answer: { utteranceId: `u-${id}`, action: { kind: 'speak', content: 'Me?' }, timings: {}, after: Promise.resolve({}) } }; });
+    const result = await hearSpoken('camp', gm, 'Mara, what do you do?');
+    expect(result).toMatchObject({ fed: true, heard: 0, asked: 1 });
+    expect(w.answer.mock.calls.map((c) => [c[0], c[2]])).toEqual([['mara', { kind: 'turn' }]]);
+    expect(w.chats).toEqual([]);
+    release();
+    await flush();
+    await flush();
+    expect(w.chats).toEqual([{ actor: 'ai_copilot', characterId: 'mara', message: 'Me?' }]);
+    // The ask itself is table talk: it is never recorded as something that happened in the world.
+    expect(w.canon).toEqual([]);
+  });
+
+  it('who the GM addressed carries from one chunk to the next', async () => {
+    await hearSpoken('camp', gm, 'Mara, the door is locked.');
+    await hearSpoken('camp', gm, 'What do you do?');
+    expect(w.answer.mock.calls.map((c) => c[0])).toEqual(['mara']);
+  });
+
+  it('a sentence the chunk cut off is held and finished by the next chunk', async () => {
+    const first = await hearSpoken('camp', gm, 'The rain stops. Then the door at the end of');
+    expect(first).toMatchObject({ heard: 1, holding: true });
+    expect(w.canon.map((c) => c.narration)).toEqual(['The rain stops.']);
+    const second = await hearSpoken('camp', gm, 'the hall opens.');
+    expect(second).toMatchObject({ heard: 1, holding: false });
+    expect(w.canon.map((c) => c.narration)).toEqual(['The rain stops.', 'Then the door at the end of the hall opens.']);
+  });
+
+  it('chunks are read in the order they arrived even when they overlap', async () => {
+    const both = Promise.all([hearSpoken('camp', gm, 'Mara, the door is locked.'), hearSpoken('camp', gm, 'What do you do?')]);
+    await both;
+    expect(w.answer.mock.calls.map((c) => c[0])).toEqual(['mara']);
+  });
+
+  it('unquoted speech is that NPC speaking, on the record and in what is heard', async () => {
+    await hearSpoken('camp', gm, 'The fire pops. Tess says, sit down.');
+    expect(w.canon).toEqual([{ kind: 'narration', narration: 'The fire pops.' }, { kind: 'dialogue', speaker: 'tess', text: 'sit down.' }]);
+    expect(w.listen.mock.calls[0][2]).toEqual({ source: 'perception', content: 'The fire pops.\nTess: sit down.' });
+  });
+
+  it('a check call is left out and marked; guessed table chatter is kept as narration, never silently lost', async () => {
+    const result = await hearSpoken('camp', gm, 'Hang on, let me check my notes. Roll perception. The lock is old.');
+    expect(result.ignored).toEqual([{ kind: 'check-call', text: 'Roll perception.' }]);
+    expect(w.canon.map((c) => c.narration)).toEqual(['Hang on, let me check my notes.', 'The lock is old.']);
+    expect(w.dropped.map((d) => [d.content, JSON.parse(d.actions).source])).toEqual([['Roll perception.', 'TABLE_DROPPED']]);
+  });
+
+  it('an explicit "out of character" is dropped on this path too', async () => {
+    const result = await hearSpoken('camp', gm, 'Out of character, I need five minutes.');
+    expect(result).toMatchObject({ fed: true, heard: 0, ignored: [{ kind: 'ooc', text: 'Out of character, I need five minutes.' }] });
+    expect(w.canon).toEqual([]);
+    expect(w.listen).not.toHaveBeenCalled();
+  });
+
+  it('JEWL does not read each chunk (no cloud call per few seconds of speech)', async () => {
+    await hearSpoken('camp', gm, 'You are suddenly on a ship.');
+    expect(w.readNarration).not.toHaveBeenCalled();
   });
 });

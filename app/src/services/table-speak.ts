@@ -34,8 +34,8 @@ import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus } from '@/daya/conversation';
 import { isDayaEnabled } from '@/daya/events';
 import type { TableAsk } from '@/daya/ensemble';
-import { readTableTalk } from '@/services/table-talk';
-import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, type PlannedStimulus, type TableBeat } from '@/services/table-plan';
+import { readTableTalk, type TableTalkState } from '@/services/table-talk';
+import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
 import {
   attachTruthToMemory,
@@ -319,6 +319,71 @@ async function markDropped(campaignId: string, actor: TableActor, kind: string, 
 }
 
 /**
+ * Play a plan's beats to the awake beings: world content is handed over to be
+ * listened to (never awaited — reflection is off the clock); a turn or a line
+ * that expects a reply is answered, streamed as `being_speaking`, and posted
+ * as chat. Returns what each being that answered did. With
+ * `waitForAnswers: false` (the mic: the GM is still talking) the answers run
+ * on their own and the map comes back empty.
+ */
+async function runBeats(
+  campaignId: string,
+  actor: TableActor,
+  beats: TableBeat[],
+  listeners: Array<{ id: string; name: string }>,
+  truth: { primary: string | null; extra: string[] },
+  opts: { waitForAnswers: boolean; answerAfterWorldOnly: boolean },
+): Promise<Map<string, ListenerResponse>> {
+  const since = new Date();
+  const pointAtTruth = async (listenerId: string, memoryEntryId: string | undefined) => {
+    if (truth.primary) await attachTruth(listenerId, memoryEntryId, truth.primary, truth.extra, since);
+  };
+  const hear = (listenerId: string, stimulus: PlannedStimulus | null) => {
+    if (!stimulus) return;
+    void listenToTable(listenerId, actor.role, stimulus)
+      .then(async (outcome) => {
+        if (outcome.status !== 'ok') { console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`); return; }
+        // null = an answer took this stretch over; that answer stores it and points it at the truth.
+        if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
+      })
+      .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
+  };
+  const answered = new Map<string, ListenerResponse>();
+  const answer = async (listenerId: string, ask: TableAsk) => {
+    const listener = listeners.find((l) => l.id === listenerId);
+    if (!listener) return;
+    const outcome = await answerAtTable(listenerId, actor.role, ask, {
+      onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }),
+    });
+    const action = outcome.answer?.action;
+    answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: outcome.status, actionKind: action?.kind, detail: outcome.detail });
+    if (outcome.status !== 'ok' || !outcome.answer || !action) return;
+    const line = actionToTableLine(listener.name, action);
+    if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
+    void outcome.answer.after.then((stored) => pointAtTruth(listenerId, stored.memoryEntryId)).catch(() => {});
+  };
+  const answerAll = async (ids: string[], ask: TableAsk) => {
+    const work = Promise.all(ids.map((id) => answer(id, ask))).catch((err) => console.error('[table-speak] answering failed (non-fatal):', err));
+    if (opts.waitForAnswers) await work;
+  };
+  const askOf = (beat: Extract<TableBeat, { type: 'turn' | 'spoken' }>): TableAsk =>
+    beat.type === 'spoken' ? { kind: 'spoken', by: beat.utterance.speaker?.label ?? 'someone present', text: beat.utterance.text } : { kind: 'turn' };
+
+  for (const beat of beats) {
+    if (beat.type === 'hear') {
+      for (const l of listeners) hear(l.id, stimulusFor(beat.utterances, l.id));
+      continue;
+    }
+    if (beat.type === 'spoken') for (const id of overhearers(beat, listeners)) hear(id, stimulusFor([beat.utterance], id));
+    await answerAll(answerers(beat, listeners), askOf(beat));
+  }
+  if (opts.answerAfterWorldOnly && beats.length > 0 && beats.every((b) => b.type === 'hear')) {
+    await answerAll(listeners.map((l) => l.id), { kind: 'turn' });
+  }
+  return answered;
+}
+
+/**
  * The split loop for one typed message (behind tableSplitLoop). Same truth
  * writing as speakProse; what changes is who hears what and when anyone
  * speaks: world content is LISTENED to (not awaited — reflection is off the
@@ -375,50 +440,12 @@ async function speakProseSplit(
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
 
   // 2. LISTEN and ANSWER, beat by beat.
-  const since = new Date();
   const truthPrimary = canonEventId ?? dialogue[0]?.canonEventId ?? null;
   const truthExtra = dialogue.map((d) => d.canonEventId).filter((id) => id !== truthPrimary);
-  const pointAtTruth = async (listenerId: string, memoryEntryId: string | undefined) => {
-    if (truthPrimary) await attachTruth(listenerId, memoryEntryId, truthPrimary, truthExtra, since);
-  };
-  const hear = (listenerId: string, stimulus: PlannedStimulus | null) => {
-    if (!stimulus) return;
-    void listenToTable(listenerId, actor.role, stimulus)
-      .then(async (outcome) => {
-        if (outcome.status !== 'ok') { console.warn(`[table-speak] ${listenerId} could not listen: ${outcome.status}${outcome.detail ? ` (${outcome.detail})` : ''}`); return; }
-        // null = an answer took this stretch over; that answer stores it and points it at the truth.
-        if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
-      })
-      .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
-  };
-  const answered = new Map<string, ListenerResponse>();
-  const answer = async (listenerId: string, ask: TableAsk) => {
-    const listener = listeners.find((l) => l.id === listenerId);
-    if (!listener) return;
-    const outcome = await answerAtTable(listenerId, actor.role, ask, {
-      onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }),
-    });
-    const action = outcome.answer?.action;
-    answered.set(listenerId, { characterId: listenerId, characterName: listener.name, status: outcome.status, actionKind: action?.kind, detail: outcome.detail });
-    if (outcome.status !== 'ok' || !outcome.answer || !action) return;
-    const line = actionToTableLine(listener.name, action);
-    if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
-    void outcome.answer.after.then((stored) => pointAtTruth(listenerId, stored.memoryEntryId)).catch(() => {});
-  };
-  const askOf = (beat: Extract<TableBeat, { type: 'turn' | 'spoken' }>): TableAsk =>
-    beat.type === 'spoken' ? { kind: 'spoken', by: beat.utterance.speaker?.label ?? 'someone present', text: beat.utterance.text } : { kind: 'turn' };
-
-  for (const beat of plan.beats) {
-    if (beat.type === 'hear') {
-      for (const l of listeners) hear(l.id, stimulusFor(beat.utterances, l.id));
-      continue;
-    }
-    if (beat.type === 'spoken') for (const id of overhearers(beat, listeners)) hear(id, stimulusFor([beat.utterance], id));
-    await Promise.all(answerers(beat, listeners).map((id) => answer(id, askOf(beat))));
-  }
-  if (BEINGS_ANSWER === 'always' && plan.world.length && plan.beats.every((b) => b.type === 'hear')) {
-    await Promise.all(listeners.map((l) => answer(l.id, { kind: 'turn' })));
-  }
+  const answered = await runBeats(campaignId, actor, plan.beats, listeners, { primary: truthPrimary, extra: truthExtra }, {
+    waitForAnswers: true,
+    answerAfterWorldOnly: BEINGS_ANSWER === 'always',
+  });
 
   if (ticketId) await attachCanonToTicket(ticketId, truthPrimary);
   try { await cementCheck(campaignId, actor.userId); } catch (err) { console.warn('[table-speak] cement check failed', err); }
@@ -437,6 +464,117 @@ async function speakProseSplit(
     responses,
     ...(plan.ignored.length ? { ignored: plan.ignored.map((u) => ({ kind: u.kind, text: u.text })) } : {}),
   };
+}
+
+// ── The GM's mic (U2c-4, behind tableSplitLoop) ───────────────────────────────
+// While a session is live the GM's transcript chunks are table talk too: read
+// with the same detector, played to the beings by the same beats. Nothing here
+// waits on a being — the GM is still talking.
+
+/** After this long with nothing said, an unfinished sentence is not glued onto the next chunk. [PLACEHOLDER] */
+const SPOKEN_FRAGMENT_KEEP_MS = 20_000;
+/** After this long with nothing said, who the GM was addressing and a check awaiting its result are forgotten. [PLACEHOLDER] */
+const SPOKEN_STATE_KEEP_MS = 5 * 60_000;
+
+interface SpokenTable {
+  talk: TableTalkState;
+  pending: string | null;
+  lastAt: number;
+  /** Chunks are read one at a time, in the order they arrived: each needs the state the one before left. */
+  queue: Promise<unknown>;
+}
+// In-process, per campaign; a restart only loses an unfinished sentence and who was last addressed.
+const spokenTables = new Map<string, SpokenTable>();
+
+export interface SpokenTableResult {
+  /** false = the mic did not feed the table; `why` names the gate. */
+  fed: boolean;
+  why?: 'switch_off' | 'not_the_gm' | 'no_session';
+  /** Utterances handed to the beings to listen to. */
+  heard: number;
+  /** Turns handed over and lines that expected a reply. */
+  asked: number;
+  ignored: Array<{ kind: string; text: string }>;
+  /** An unfinished sentence is being held for the next chunk. */
+  holding: boolean;
+}
+
+const NOT_FED = { heard: 0, asked: 0, ignored: [], holding: false };
+
+/**
+ * How spoken world content goes on the record. PROVISIONAL (2026-10-06): one
+ * narration row per sentence the GM completed, speech as dialogue rows. The
+ * grain is a question with Mike ("sentence by sentence, grouped into beats"
+ * versus "one row per beat"), and this function is the one place that decides
+ * it. Rows are not yet tagged with a beat.
+ */
+async function recordSpoken(campaignId: string, actor: TableActor, plan: TablePlan): Promise<{ primary: string | null; extra: string[] }> {
+  const ids: string[] = [];
+  for (const sentence of narrationSentences(plan)) {
+    try {
+      ids.push((await declareCanon(campaignId, actor, { narration: sentence, kind: 'narration', locationId: null, witnessIds: [] })).event.id);
+    } catch (err) { console.warn('[table-speak] spoken narration canon failed', err); }
+  }
+  for (const u of plan.world) {
+    if (u.kind !== 'dialogue') continue;
+    try {
+      ids.push((await recordQuote(campaignId, { text: u.text, speakerId: u.speaker?.id ?? null, speakerLabel: u.speaker?.label ?? 'someone present', context: null })).id);
+    } catch (err) { console.warn('[table-speak] spoken dialogue canon failed', err); }
+  }
+  return { primary: ids[0] ?? null, extra: ids.slice(1) };
+}
+
+async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript: string, table: SpokenTable): Promise<SpokenTableResult> {
+  const now = Date.now();
+  if (now - table.lastAt > SPOKEN_STATE_KEEP_MS) table.talk = { focusIds: [], checkPending: false };
+  const carried = table.pending && now - table.lastAt <= SPOKEN_FRAGMENT_KEEP_MS ? `${table.pending} ` : '';
+  const [listeners, npcs] = await Promise.all([
+    activeListeners(campaignId),
+    prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } }),
+  ]);
+  const reading = readTableTalk(`${carried}${transcript}`.trim(), { present: listeners, npcs, state: table.talk, holdTrailingFragment: true });
+  table.talk = reading.state;
+  table.pending = reading.pending;
+  table.lastAt = now;
+
+  const plan = planTableTalk(reading.utterances, 'spoken');
+  const truth = await recordSpoken(campaignId, actor, plan);
+  for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
+  await runBeats(campaignId, actor, plan.beats, listeners, truth, { waitForAnswers: false, answerAfterWorldOnly: BEINGS_ANSWER === 'always' });
+  const asked = plan.beats.filter((b) => b.type !== 'hear').length;
+  // The table builds on what was said when it hands the turn over: that is when improvisations can settle.
+  if (asked > 0) { try { await cementCheck(campaignId, actor.userId); } catch (err) { console.warn('[table-speak] cement check failed', err); } }
+  return { fed: true, heard: plan.world.length, asked, ignored: plan.ignored.map((u) => ({ kind: u.kind, text: u.text })), holding: reading.pending !== null };
+}
+
+/**
+ * One transcript chunk from the mic. Feeds the table only when the rollout
+ * switch is on, the speaker runs this campaign, and a session is live;
+ * otherwise it does nothing and says why (the transcript still goes to the
+ * copilot's ambient log, as it always has — that is the caller's business).
+ */
+export async function hearSpoken(
+  campaignId: string,
+  actor: TableActor & { runsCampaign: boolean },
+  transcript: string,
+): Promise<SpokenTableResult> {
+  if (!tableSplitLoop()) return { fed: false, why: 'switch_off', ...NOT_FED };
+  if (!actor.runsCampaign || !isWatcherOrAbove(actor.role)) return { fed: false, why: 'not_the_gm', ...NOT_FED };
+  const live = await prisma.gameSession.findFirst({ where: { campaignId, endedAt: null }, select: { id: true } });
+  if (!live) return { fed: false, why: 'no_session', ...NOT_FED };
+
+  let table = spokenTables.get(campaignId);
+  if (!table) { table = { talk: { focusIds: [], checkPending: false }, pending: null, lastAt: 0, queue: Promise.resolve() }; spokenTables.set(campaignId, table); }
+  const mine = table;
+  const run = mine.queue.then(() => hearSpokenChunk(campaignId, actor, transcript, mine));
+  mine.queue = run.catch(() => {});
+  return run;
+}
+
+/** Forget what the mic was in the middle of (tests; a session ending). */
+export function forgetSpokenTable(campaignId?: string): void {
+  if (campaignId) spokenTables.delete(campaignId);
+  else spokenTables.clear();
 }
 
 /** Narrate-only entry (pre-09-26 API shape) — prose covers it. */
@@ -524,5 +662,7 @@ export async function getTableRoster(campaignId: string, actorRole: string) {
       .filter((c) => c.entityType === 'NPC' && !isTableHidden(c.data))
       .map((c) => ({ id: c.id, name: c.name })),
     dayaActive: characters.filter((c) => activeIds.has(c.id)).map((c) => ({ id: c.id, name: c.name })),
+    /** The rollout switch, for the recorder: shorter chunks only make sense when the mic feeds the table. */
+    splitLoop: tableSplitLoop(),
   };
 }

@@ -16,7 +16,7 @@
  *
  * Pure functions, no I/O — unit-tested on their own.
  */
-import type { ProseRosterEntry } from './table-prose';
+import { splitSentences, type ProseRosterEntry } from './table-prose';
 import { addressees, type TableUtterance } from './table-talk';
 
 export type TableBeat =
@@ -119,4 +119,14 @@ export function canonNarration(full: string, plan: TablePlan): string | null {
   if (!plan.world.length) return null;
   if (!plan.ignored.length) return full;
   return plan.world.map((u) => (u.kind === 'dialogue' ? `${u.speaker?.label ?? 'someone present'}: "${u.text}"` : u.text)).join(' ');
+}
+
+/**
+ * The narration of a stretch of SPOKEN talk as the record keeps it: one
+ * statement per sentence the GM completed (speech is recorded separately, as
+ * dialogue). A sentence is how a GM thinks about a mistake, so it is the unit
+ * a correction addresses; the recorder's chunk boundaries never show.
+ */
+export function narrationSentences(plan: TablePlan): string[] {
+  return plan.world.filter((u) => u.kind !== 'dialogue').flatMap((u) => splitSentences(u.text));
 }
