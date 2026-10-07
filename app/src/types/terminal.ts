@@ -76,6 +76,8 @@ export interface GameEventPayload {
   kind: 'game_event';
   eventType: string;             // "session_start", "session_end", "combat_begin", etc.
   description: string;
+  /** Spoken narration is recorded sentence by sentence (U2c, Mike 2026-10-06); rows of one beat share this id so the feed can read them as one. */
+  beatId?: string;
 }
 
 export type TerminalPayload =

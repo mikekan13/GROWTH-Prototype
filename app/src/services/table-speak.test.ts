@@ -15,6 +15,7 @@ const w = vi.hoisted(() => ({
   dropped: [] as Array<{ content: string; actions: string }>,
   attached: [] as Array<{ memoryId: string; canonEventId: string }>,
   extras: {} as Record<string, string[]>,
+  beats: [] as Array<string | undefined>,
   held: null as { id: string } | null,
   session: { id: 'session-1' } as { id: string } | null,
   converse: vi.fn(),
@@ -45,9 +46,9 @@ vi.mock('@/daya/conversation', () => ({ converseWithEntity: w.converse, listenTo
 vi.mock('@/daya/events', () => ({ isDayaEnabled: () => true }));
 vi.mock('@/daya/l1-keepalive', () => ({ ensureKeepalive: vi.fn(async () => {}) }));
 vi.mock('@/services/canon', () => ({
-  declareCanon: vi.fn(async (_c: string, _a: unknown, input: { narration: string }) => { w.canon.push({ kind: 'narration', narration: input.narration }); return { event: { id: `canon-${w.canon.length}` } }; }),
-  recordDialogueCanon: vi.fn(async (_c: string, speakerId: string, _label: string, text: string) => { w.canon.push({ kind: 'dialogue', speaker: speakerId, text }); return { id: `canon-${w.canon.length}` }; }),
-  recordUnattributedDialogueCanon: vi.fn(async (_c: string, label: string, text: string) => { w.canon.push({ kind: 'dialogue', speaker: label, text }); return { id: `canon-${w.canon.length}` }; }),
+  declareCanon: vi.fn(async (_c: string, _a: unknown, input: { narration: string; beatId?: string | null }) => { w.canon.push({ kind: 'narration', narration: input.narration }); w.beats.push(input.beatId ?? undefined); return { event: { id: `canon-${w.canon.length}` } }; }),
+  recordDialogueCanon: vi.fn(async (_c: string, speakerId: string, _label: string, text: string, beatId?: string | null) => { w.canon.push({ kind: 'dialogue', speaker: speakerId, text }); w.beats.push(beatId ?? undefined); return { id: `canon-${w.canon.length}` }; }),
+  recordUnattributedDialogueCanon: vi.fn(async (_c: string, label: string, text: string, _context: unknown, beatId?: string | null) => { w.canon.push({ kind: 'dialogue', speaker: label, text }); w.beats.push(beatId ?? undefined); return { id: `canon-${w.canon.length}` }; }),
   attachTruthToMemory: vi.fn(async (memoryId: string, canonEventId: string, extra: string[] = []) => { w.attached.push({ memoryId, canonEventId }); w.extras[memoryId] = extra; return true; }),
   attachTruthToRecentMemories: vi.fn(async () => 0),
 }));
@@ -76,7 +77,7 @@ function answerWith(lines: Record<string, { kind: string; content?: string }>) {
 
 beforeEach(() => {
   delete process.env.TABLE_SPLIT_LOOP;
-  w.canon.length = 0; w.chats.length = 0; w.broadcasts.length = 0; w.dropped.length = 0; w.attached.length = 0;
+  w.canon.length = 0; w.beats.length = 0; w.chats.length = 0; w.broadcasts.length = 0; w.dropped.length = 0; w.attached.length = 0;
   w.converse.mockReset().mockResolvedValue({ status: 'ok', action: { kind: 'speak', content: 'Hm.' }, memoryEntryId: 'serial-mem' });
   w.listen.mockReset().mockImplementation(async (id: string) => ({ status: 'ok', listened: { status: 'listened', memoryEntryId: `listen-mem-${id}` } }));
   w.answer.mockReset();
@@ -116,6 +117,7 @@ describe('speakProse — switch OFF: the serial loop, as before', () => {
     expect(w.answer).not.toHaveBeenCalled();
     expect(w.broadcasts.some((b) => b.kind === 'being_speaking')).toBe(false);
     expect(w.canon).toEqual([{ kind: 'narration', narration: 'The door bangs open. What do you do?' }]);
+    expect(w.beats).toEqual([undefined]); // typed prose is one row per message; beats are for spoken narration
     expect(w.chats.map((c) => c.message)).toEqual(['Hm.', 'Hm.']);
     expect(result.responses.map((r) => [r.characterId, r.status, r.actionKind])).toEqual([['mara', 'ok', 'speak'], ['oren', 'ok', 'speak']]);
     expect(result.ignored).toBeUndefined();
@@ -354,6 +356,21 @@ describe('hearSpoken — switch ON, session live: the mic is table talk', () => 
     expect(w.listen).not.toHaveBeenCalled();
   });
 
+  it('every spoken row carries its beat; the GM handing the turn over starts the next beat (Mike 2026-10-06)', async () => {
+    await hearSpoken('camp', gm, 'The desk lamp flickers. Somewhere a door closes.');
+    await hearSpoken('camp', gm, 'Tess says, sit down. Mara, what do you do?');
+    await hearSpoken('camp', gm, 'The blinds stir.');
+    expect(w.canon.map((c) => c.kind)).toEqual(['narration', 'narration', 'dialogue', 'narration']);
+    expect(w.beats.every(Boolean)).toBe(true);
+    expect(new Set(w.beats.slice(0, 3)).size).toBe(1);
+    expect(w.beats[3]).not.toBe(w.beats[0]);
+  });
+  it('a long silence starts a new beat', async () => {
+    await hearSpoken('camp', gm, 'The desk lamp flickers.');
+    forgetSpokenTable();
+    await hearSpoken('camp', gm, 'The blinds stir.');
+    expect(w.beats[1]).not.toBe(w.beats[0]);
+  });
   it('JEWL does not read each chunk (no cloud call per few seconds of speech)', async () => {
     await hearSpoken('camp', gm, 'You are suddenly on a ship.');
     expect(w.readNarration).not.toHaveBeenCalled();

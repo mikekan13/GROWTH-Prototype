@@ -53,7 +53,9 @@ import {
   titleCase,
   type PlanItem,
   type ReconKind,
+  textToRerender,
 } from '@/services/reconciliation-rules';
+import { parseChain } from '@/daya/chain';
 
 export interface TableActorLike { userId: string; username?: string; role: string }
 
@@ -423,18 +425,31 @@ export async function correctCanon(
   // Re-render every memory resting on it, through each being's own mirror, with the lens of the moment.
   const rows = await prisma.dayaMemoryEntry.findMany({
     where: { OR: [{ truthRef: event.id }, { chain: { contains: event.id } }], source: { in: ['perception', 'dialogue'] } },
-    select: { id: true, entityId: true, source: true, content: true, classification: true, entity: { select: { characterId: true } } },
+    select: { id: true, entityId: true, source: true, content: true, classification: true, chain: true, entity: { select: { characterId: true } } },
+  });
+  // The one rule (Mike 2026-10-06): a memory is a rendering of EVERY canon row in its chain, so it is re-rendered
+  // from the current text of all of them, in order — the corrected row among them. Nothing is deleted or
+  // superseded, and a memory of a stretch keeps the rest of that stretch exactly as it was.
+  const refsOf = (raw: string | null) => { const refs = parseChain(raw).truthRefs; return refs.length ? refs : [event.id]; };
+  const needed = [...new Set(rows.flatMap((m) => refsOf(m.chain)))];
+  const current = await prisma.canonEvent.findMany({ where: { id: { in: needed } }, select: { id: true, kind: true, narration: true, detail: true } });
+  const rowsNow = current.map((r) => {
+    let message: string | null = null;
+    try { message = (JSON.parse(r.detail) as { message?: string }).message ?? null; } catch { message = null; }
+    return { id: r.id, kind: r.kind, narration: r.narration, message };
   });
   let rerendered = 0;
   for (const m of rows) {
     let cls: Record<string, unknown> = {};
     try { cls = JSON.parse(m.classification) as Record<string, unknown>; } catch { cls = {}; }
     if (cls.rationaleTag === 'failed recall attempt') continue; // not a perception of the event
+    const textNow = textToRerender(refsOf(m.chain), rowsNow);
+    if (!textNow) continue;
     const snapshot = (cls.mirror as { observer?: { mood?: { morale: number; stress: number; grief: number }; attunement?: number } } | undefined)?.observer;
     // A memory made from one stretch of listening (U2b: the room was already taken in) is re-rendered as that stretch alone, not with the whole room.
     const fromStretch = (cls.mirror as { standing?: string } | undefined)?.standing === 'new';
     try {
-      const p = await perceive(m.entity.characterId, campaignId, narration, m.source === 'dialogue' ? 'dialogue' : 'perception', {}, { observer: snapshot, standing: fromStretch ? 'stimulus' : 'always' });
+      const p = await perceive(m.entity.characterId, campaignId, textNow, m.source === 'dialogue' ? 'dialogue' : 'perception', {}, { observer: snapshot, standing: fromStretch ? 'stimulus' : 'always' });
       const history = Array.isArray(cls.revisions) ? (cls.revisions as unknown[]) : [];
       history.push({ at: new Date().toISOString(), previous: m.content, canonEventId: event.id });
       await prisma.dayaMemoryEntry.update({

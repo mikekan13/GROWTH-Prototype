@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchCandidate, presenceNeeds, estimatePlan, isCemented, titleCase, IMPROV_TUNING, type PlanItem } from './reconciliation-rules';
+import { matchCandidate, presenceNeeds, estimatePlan, isCemented, titleCase, textToRerender, IMPROV_TUNING, type PlanItem } from './reconciliation-rules';
 import { parseTableProse } from './table-prose';
 
 const places = [
@@ -46,5 +46,25 @@ describe('isCemented — the GM locks it in by building on it', () => {
   it('nothing resting on it = fluid; enough memories/vines/events = cemented', () => {
     expect(isCemented({ memories: 0, vines: 0, laterEvents: 0 })).toBe(false);
     expect(isCemented({ memories: 1, vines: 1, laterEvents: 1 })).toBe(true);
+  });
+});
+
+describe('textToRerender — a memory is a rendering of every row in its chain (Mike 2026-10-06)', () => {
+  const rows = [
+    { id: 'c1', kind: 'narration', narration: 'The lamp goes out.' },
+    { id: 'c2', kind: 'narration', narration: 'A door closes down the hall — corrected.' },
+    { id: 'c3', kind: 'dialogue', narration: 'Tess says: "Sit down."', message: 'Sit down.' },
+  ];
+  it('joins the current text of the rows, in chain order, the corrected one among them', () => {
+    expect(textToRerender(['c1', 'c2', 'c3'], rows)).toBe('The lamp goes out.\nA door closes down the hall — corrected.\nTess says: "Sit down."');
+    expect(textToRerender(['c2'], rows)).toBe('A door closes down the hall — corrected.');
+  });
+  it('a typed message says its speech once: the dialogue row is skipped when the narration row already carries the words', () => {
+    const typed = [{ id: 't1', kind: 'narration', narration: 'Tess sets down the tray. "Sit down."' }, rows[2]];
+    expect(textToRerender(['t1', 'c3'], typed)).toBe('Tess sets down the tray. "Sit down."');
+  });
+  it('rows the chain names but that are gone are skipped; nothing left means nothing to render', () => {
+    expect(textToRerender(['gone', 'c1'], rows)).toBe('The lamp goes out.');
+    expect(textToRerender(['gone'], rows)).toBe('');
   });
 });

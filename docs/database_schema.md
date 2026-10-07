@@ -552,3 +552,5 @@ Append-only, never edited (no write route). One row per resolved act: campaignId
 ## VineEntry (Mike 2026-09-22; migration vines_godhead_tree)
 The vine is the custodian's memory of a goal: goalId, campaignId, custodianId? (GodHead), custodianPillar? (the coloring), side (custodian | resistance), canonEventId, cycle, reading. Written when canon touches a goal; the resistance's opposing custodians record the same event on the resisting entity's own vines.
 **GodHead** gained `parentId` (custodian tree; null = main seat) and `domainKey` (one of the ten domains; blank until Mike seats them).
+
+**CanonEvent.detail** (2026-10-06, U2c-4, Mike's ruling "sentences grouped into beats"): spoken narration is one row per completed sentence; its `detail` JSON carries `beatId` (a uuid shared by every row of one beat — narration up to the GM handing the turn over), and the `game_event` CampaignEvent it posts carries the same `beatId` in its payload. Typed prose rows have no beatId. No column, no migration.

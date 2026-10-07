@@ -233,8 +233,8 @@ export async function memoryVersusTruth(campaignId: string, actor: { userId: str
 
 // ── Other writers of truth (MEMORY-DESIGN §5: canon writers) ─────────────────
 
-async function postCanonGameEvent(campaignId: string, actor: { userId: string; username?: string }, eventType: string, description: string) {
-  const payload: TerminalPayload = { kind: 'game_event', eventType, description };
+async function postCanonGameEvent(campaignId: string, actor: { userId: string; username?: string }, eventType: string, description: string, beatId?: string | null) {
+  const payload: TerminalPayload = { kind: 'game_event', eventType, description, ...(beatId ? { beatId } : {}) };
   const event = await createCampaignEvent({ campaignId, type: 'game_event', actor: 'gm', actorUserId: actor.userId, actorName: actor.username ?? 'Watcher', payload });
   const terminalEvent: TerminalEvent = {
     id: `ev-${event.id}`, type: 'game_event',
@@ -255,7 +255,11 @@ async function postCanonGameEvent(campaignId: string, actor: { userId: string; u
 export async function declareCanon(
   campaignId: string,
   actor: { userId: string; username?: string; role: string },
-  input: { narration: string; kind?: string; actorId?: string | null; targetId?: string | null; locationId?: string | null; witnessIds?: string[] },
+  input: {
+    narration: string; kind?: string; actorId?: string | null; targetId?: string | null; locationId?: string | null; witnessIds?: string[];
+    /** Spoken narration comes one sentence per row; the rows of one beat (up to the GM handing the turn over) share this id. */
+    beatId?: string | null;
+  },
 ) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true, currentCycle: true } });
   if (!campaign) throw new NotFoundError('Campaign not found');
@@ -268,11 +272,11 @@ export async function declareCanon(
   const event = await recordCanonEvent({
     campaignId, cycle, seq: 0, kind: input.kind ?? 'declaration',
     locationId: input.locationId ?? null, actorId: input.actorId ?? null, targetId: input.targetId ?? null,
-    narration: input.narration, detail: { declaredBy: actor.userId }, consequences: {},
+    narration: input.narration, detail: { declaredBy: actor.userId, ...(input.beatId ? { beatId: input.beatId } : {}) }, consequences: {},
     sourceType: 'gm', goalIds, domains,
   });
   if (goalIds.length) recordVineEntriesSafe({ campaignId, canonEventId: event.id, cycle, narration: input.narration, goalIds });
-  try { await postCanonGameEvent(campaignId, actor, 'declaration', input.narration); } catch (err) { console.warn('[canon] declaration event failed', err); }
+  try { await postCanonGameEvent(campaignId, actor, 'declaration', input.narration, input.beatId); } catch (err) { console.warn('[canon] declaration event failed', err); }
 
   // Everyone present perceives it — engine-authored, no confabulation.
   // witnessIds undefined = every ACTIVE being in the campaign; an explicit
@@ -311,14 +315,14 @@ export async function declareCanon(
 }
 
 /** Table dialogue is truth too: what an NPC said, recorded once. */
-export async function recordDialogueCanon(campaignId: string, speakerId: string, speakerName: string, message: string) {
+export async function recordDialogueCanon(campaignId: string, speakerId: string, speakerName: string, message: string, beatId?: string | null) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } });
   const cycle = campaign?.currentCycle ?? 0;
   const goals = await prisma.goal.findMany({ where: { characterId: speakerId, status: 'ACTIVE' }, select: { id: true, description: true } });
   const goalIds = goalsTouched(message, goals);
   const event = await recordCanonEvent({
     campaignId, cycle, seq: 0, kind: 'dialogue', actorId: speakerId,
-    narration: `${speakerName} says: "${message}"`, detail: { message }, consequences: {},
+    narration: `${speakerName} says: "${message}"`, detail: { message, ...(beatId ? { beatId } : {}) }, consequences: {},
     sourceType: 'table', goalIds, domains: classifyDomains(message).all,
   });
   if (goalIds.length) recordVineEntriesSafe({ campaignId, canonEventId: event.id, cycle, narration: event.narration, goalIds });
@@ -326,12 +330,12 @@ export async function recordDialogueCanon(campaignId: string, speakerId: string,
 }
 
 /** Speech the GM wrote into prose with no campaign NPC to pin it on ("a bright eyed lass behind the bar"): truth too, actor unknown, label + introducing sentence kept. */
-export async function recordUnattributedDialogueCanon(campaignId: string, speakerLabel: string, message: string, context: string | null) {
+export async function recordUnattributedDialogueCanon(campaignId: string, speakerLabel: string, message: string, context: string | null, beatId?: string | null) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } });
   const cycle = campaign?.currentCycle ?? 0;
   return recordCanonEvent({
     campaignId, cycle, seq: 0, kind: 'dialogue', actorId: null,
-    narration: `${speakerLabel} says: "${message}"`, detail: { message, speakerLabel, context }, consequences: {},
+    narration: `${speakerLabel} says: "${message}"`, detail: { message, speakerLabel, context, ...(beatId ? { beatId } : {}) }, consequences: {},
     sourceType: 'table', goalIds: [], domains: classifyDomains(message).all,
   });
 }

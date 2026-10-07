@@ -101,6 +101,29 @@ export function estimatePlan(plan: PlanItem[]): { real: number; held: number } {
 }
 
 /** A canon event is cemented when enough rests on it (Mike 09-26: the GM locks it in by building on it). */
+/** The little of a canon row a correction needs: its text now, and, for speech, the words said. */
+export interface CanonRowNow { id: string; kind: string; narration: string; message?: string | null }
+
+/**
+ * What a memory is a rendering of (Mike 2026-10-06, the one rule): the CURRENT
+ * text of every canon row in its chain, in chain order — the corrected row
+ * among them. A typed message records its speech twice (inside the narration
+ * row, and as its own dialogue row): a dialogue row whose words are already in
+ * an earlier row's text is said once. Rows the chain names but that no longer
+ * exist are skipped. Pure.
+ */
+export function textToRerender(refs: string[], rows: CanonRowNow[]): string {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const texts: string[] = [];
+  for (const id of refs) {
+    const row = byId.get(id);
+    if (!row) continue;
+    if (row.kind === 'dialogue' && row.message && texts.some((t) => t.includes(row.message!))) continue;
+    texts.push(row.narration);
+  }
+  return texts.join('\n');
+}
+
 export function isCemented(load: { memories: number; vines: number; laterEvents: number }): boolean {
   return load.memories + load.vines + load.laterEvents >= IMPROV_TUNING.cementLoad;
 }

@@ -297,9 +297,9 @@ export async function speakProse(
   return { canonEventId, dialogue, narration: parsed.narration, responses };
 }
 
-async function recordQuote(campaignId: string, q: ProseQuote) {
-  if (q.speakerId) return recordDialogueCanon(campaignId, q.speakerId, q.speakerLabel, q.text);
-  return recordUnattributedDialogueCanon(campaignId, q.speakerLabel, q.text, q.context);
+async function recordQuote(campaignId: string, q: ProseQuote, beatId?: string | null) {
+  if (q.speakerId) return recordDialogueCanon(campaignId, q.speakerId, q.speakerLabel, q.text, beatId);
+  return recordUnattributedDialogueCanon(campaignId, q.speakerLabel, q.text, q.context, beatId);
 }
 
 /** Talk left out of the world still leaves a trace where JEWL's ambient log keeps the table's chatter, so a wrong call can be found. */
@@ -508,6 +508,8 @@ interface SpokenTable {
   talk: TableTalkState;
   pending: string | null;
   lastAt: number;
+  /** The beat the next spoken sentence belongs to: narration up to the GM handing the turn over (Mike 2026-10-06). */
+  beatId: string;
   /** Chunks are read one at a time, in the order they arrived: each needs the state the one before left. */
   queue: Promise<unknown>;
 }
@@ -530,31 +532,39 @@ export interface SpokenTableResult {
 const NOT_FED = { heard: 0, asked: 0, ignored: [], holding: false };
 
 /**
- * How spoken world content goes on the record. PROVISIONAL (2026-10-06): one
- * narration row per sentence the GM completed, speech as dialogue rows. The
- * grain is a question with Mike ("sentence by sentence, grouped into beats"
- * versus "one row per beat"), and this function is the one place that decides
- * it. Rows are not yet tagged with a beat.
+ * How spoken world content goes on the record (Mike 2026-10-06: sentences,
+ * grouped into beats): one narration row per sentence the GM completed,
+ * speech as dialogue rows, in the order said, every row carrying the beat it
+ * belongs to. A beat is the narration up to the GM handing the turn over; the
+ * handover itself is table talk and is not recorded, and what follows it
+ * starts the next beat. Returns the rows in order and the beat now current.
  */
-async function recordSpoken(campaignId: string, actor: TableActor, plan: TablePlan): Promise<{ primary: string | null; extra: string[] }> {
+async function recordSpoken(campaignId: string, actor: TableActor, plan: TablePlan, beatId: string): Promise<{ primary: string | null; extra: string[]; beatId: string }> {
   const ids: string[] = [];
-  for (const sentence of narrationSentences(plan)) {
-    try {
-      ids.push((await declareCanon(campaignId, actor, { narration: sentence, kind: 'narration', locationId: null, witnessIds: [] })).event.id);
-    } catch (err) { console.warn('[table-speak] spoken narration canon failed', err); }
+  let beat = beatId;
+  for (const b of plan.beats) {
+    if (b.type === 'turn') { beat = crypto.randomUUID(); continue; }
+    const utterances = b.type === 'hear' ? b.utterances : [b.utterance];
+    for (const u of utterances) {
+      if (u.kind === 'dialogue') {
+        try {
+          ids.push((await recordQuote(campaignId, { text: u.text, speakerId: u.speaker?.id ?? null, speakerLabel: u.speaker?.label ?? 'someone present', context: null }, beat)).id);
+        } catch (err) { console.warn('[table-speak] spoken dialogue canon failed', err); }
+        continue;
+      }
+      for (const sentence of narrationSentences({ beats: [], ignored: [], world: [u] })) {
+        try {
+          ids.push((await declareCanon(campaignId, actor, { narration: sentence, kind: 'narration', locationId: null, witnessIds: [], beatId: beat })).event.id);
+        } catch (err) { console.warn('[table-speak] spoken narration canon failed', err); }
+      }
+    }
   }
-  for (const u of plan.world) {
-    if (u.kind !== 'dialogue') continue;
-    try {
-      ids.push((await recordQuote(campaignId, { text: u.text, speakerId: u.speaker?.id ?? null, speakerLabel: u.speaker?.label ?? 'someone present', context: null })).id);
-    } catch (err) { console.warn('[table-speak] spoken dialogue canon failed', err); }
-  }
-  return { primary: ids[0] ?? null, extra: ids.slice(1) };
+  return { primary: ids[0] ?? null, extra: ids.slice(1), beatId: beat };
 }
 
 async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript: string, table: SpokenTable): Promise<SpokenTableResult> {
   const now = Date.now();
-  if (now - table.lastAt > SPOKEN_STATE_KEEP_MS) table.talk = { focusIds: [], checkPending: false };
+  if (now - table.lastAt > SPOKEN_STATE_KEEP_MS) { table.talk = { focusIds: [], checkPending: false }; table.beatId = crypto.randomUUID(); }
   const carried = table.pending && now - table.lastAt <= SPOKEN_FRAGMENT_KEEP_MS ? `${table.pending} ` : '';
   const [listeners, npcs] = await Promise.all([
     activeListeners(campaignId),
@@ -566,7 +576,8 @@ async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript
   table.lastAt = now;
 
   const plan = planTableTalk(reading.utterances, 'spoken');
-  const truth = await recordSpoken(campaignId, actor, plan);
+  const truth = await recordSpoken(campaignId, actor, plan, table.beatId);
+  table.beatId = truth.beatId;
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
   await runBeats(campaignId, actor, plan.beats, listeners, truth, { waitForAnswers: false, answerAfterWorldOnly: BEINGS_ANSWER === 'always' });
   const asked = plan.beats.filter((b) => b.type !== 'hear').length;
@@ -592,7 +603,7 @@ export async function hearSpoken(
   if (!live) return { fed: false, why: 'no_session', ...NOT_FED };
 
   let table = spokenTables.get(campaignId);
-  if (!table) { table = { talk: { focusIds: [], checkPending: false }, pending: null, lastAt: 0, queue: Promise.resolve() }; spokenTables.set(campaignId, table); }
+  if (!table) { table = { talk: { focusIds: [], checkPending: false }, pending: null, lastAt: 0, beatId: crypto.randomUUID(), queue: Promise.resolve() }; spokenTables.set(campaignId, table); }
   const mine = table;
   const run = mine.queue.then(() => hearSpokenChunk(campaignId, actor, transcript, mine));
   mine.queue = run.catch(() => {});
