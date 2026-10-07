@@ -2799,6 +2799,16 @@ export default function RelationsCanvas({
     const onClickCapture = (e: MouseEvent) => {
       if (Date.now() < swallowClickUntil) { e.preventDefault(); e.stopPropagation(); swallowClickUntil = 0; }
     };
+    // The finger lifting after a completed hold also makes the browser fire
+    // its compatibility mousedown/mouseup (measured 2026-10-06: pointerup at
+    // 501 ms, mousedown 505, mouseup 520, then a [settle] at 538). A card's
+    // mouse-driven drag start saw that pair as a zero-length drag, committed
+    // it and scheduled a settle at PICK-UP — before anything was dropped, and
+    // outside the carry transaction so undo could not reach it. Swallow the
+    // pair in the same window as the click; the click itself clears it.
+    const onCompatMouse = (e: MouseEvent) => {
+      if (Date.now() < swallowClickUntil) { e.preventDefault(); e.stopPropagation(); }
+    };
     const onContextMenu = (e: MouseEvent) => {
       const t = e.target as Element | null;
       if (!t || !svg.contains(t)) return;
@@ -2810,9 +2820,13 @@ export default function RelationsCanvas({
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
     document.addEventListener('contextmenu', onContextMenu, true);
+    document.addEventListener('mousedown', onCompatMouse, true);
+    document.addEventListener('mouseup', onCompatMouse, true);
     document.addEventListener('click', onClickCapture, true);
     return () => {
       document.removeEventListener('click', onClickCapture, true);
+      document.removeEventListener('mousedown', onCompatMouse, true);
+      document.removeEventListener('mouseup', onCompatMouse, true);
       document.removeEventListener('pointerdown', onDown, true);
       document.removeEventListener('pointermove', onMove, true);
       document.removeEventListener('pointerup', onUp, true);
