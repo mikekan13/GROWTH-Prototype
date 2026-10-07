@@ -25,7 +25,15 @@ interface ClockState {
 
 const mono: React.CSSProperties = { fontFamily: 'var(--font-terminal), Consolas, monospace' };
 
-export default function CampaignClock({ campaignId, isGM }: { campaignId: string; isGM: boolean }) {
+/**
+ * `tone` — how the chip reads on the surface it sits on:
+ *   chip  = the original gold-framed black chip;
+ *   paper = order voice on off-white (ink date, soul-blue cycles) — phone header row;
+ *   soul  = order voice on the soul-blue bar (white date, gold cycles) — desktop header.
+ */
+type ClockTone = 'chip' | 'paper' | 'soul';
+
+export default function CampaignClock({ campaignId, isGM, tone = 'chip' }: { campaignId: string; isGM: boolean; tone?: ClockTone }) {
   const [clock, setClock] = useState<ClockState | null>(null);
   const [open, setOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -81,38 +89,76 @@ export default function CampaignClock({ campaignId, isGM }: { campaignId: string
   if (!clock) return null;
   const { localDate } = clock;
 
-  return (
-    <div style={{ position: 'relative' }}>
-      {/* The chip — current presented date. Gold-framed black bar, terminal type. */}
-      <button
-        onClick={() => isGM && setOpen(o => !o)}
-        title={isGM ? 'Campaign clock — click to advance time' : 'Campaign clock'}
-        style={{
-          ...mono,
-          background: 'rgba(0,0,0,0.7)',
-          border: '1px solid rgba(255,204,120,0.5)',
-          color: 'var(--krma-gold)',
-          padding: '6px 12px',
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          cursor: isGM ? 'pointer' : 'default',
-          whiteSpace: 'nowrap',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}
-      >
-        <span style={{ opacity: 0.6 }}>⧗</span>
-        <span>{localDate.formatted}</span>
-        {localDate.holidays.length > 0 && (
-          <span style={{ color: 'var(--terminal-prime)' }} title={localDate.holidays.map(h => h.name).join(', ')}>✦ {localDate.holidays[0].name}</span>
-        )}
-        <span style={{ opacity: 0.4, fontSize: 9 }}>{clock.currentCycle.toFixed(3)} cyc</span>
-      </button>
+  const holidayTitle = localDate.holidays.map(h => h.name).join(', ');
+  const title = isGM ? 'Campaign clock — click to advance time' : 'Campaign clock';
 
-      {/* Advance popover */}
+  return (
+    <div style={{ position: 'relative', minWidth: 0 }}>
+      {tone === 'chip' ? (
+        /* The chip — current presented date. Gold-framed black bar, terminal type. */
+        <button
+          onClick={() => isGM && setOpen(o => !o)}
+          title={title}
+          style={{
+            ...mono,
+            background: 'rgba(0,0,0,0.7)',
+            border: '1px solid rgba(255,204,120,0.5)',
+            color: 'var(--krma-gold)',
+            padding: '6px 12px',
+            fontSize: 11,
+            letterSpacing: '0.08em',
+            cursor: isGM ? 'pointer' : 'default',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span style={{ opacity: 0.6 }}>⧗</span>
+          <span>{localDate.formatted}</span>
+          {localDate.holidays.length > 0 && (
+            <span style={{ color: 'var(--terminal-prime)' }} title={holidayTitle}>✦ {localDate.holidays[0].name}</span>
+          )}
+          <span style={{ opacity: 0.4, fontSize: 9 }}>{clock.currentCycle.toFixed(3)} cyc</span>
+        </button>
+      ) : (
+        /* Order voice — plain reading text on the header surface. */
+        <button
+          onClick={() => isGM && setOpen(o => !o)}
+          title={title}
+          style={{
+            fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
+            background: 'transparent',
+            border: 0,
+            padding: 0,
+            height: 36,
+            maxWidth: '100%',
+            fontSize: tone === 'soul' ? 14 : 12.5,
+            color: tone === 'soul' ? 'var(--surface-calm)' : '#14213d',
+            cursor: isGM ? 'pointer' : 'default',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'block',
+            textAlign: 'left',
+            touchAction: 'manipulation',
+          }}
+        >
+          <b style={{ fontWeight: 700, color: tone === 'soul' ? '#fff' : undefined }}>{localDate.formatted}</b>
+          {localDate.holidays.length > 0 && (
+            <span title={holidayTitle}> ✦ {localDate.holidays[0].name}</span>
+          )}
+          {' · '}
+          <span style={{ ...mono, fontSize: tone === 'soul' ? 13.5 : 12, color: tone === 'soul' ? 'var(--krma-gold)' : 'var(--pillar-soul)' }}>
+            {clock.currentCycle.toFixed(3)} cyc
+          </span>
+        </button>
+      )}
+
+      {/* Advance popover — in the header's order voice the clock sits at the
+          left of its row, so the popover opens rightward instead. */}
       {open && isGM && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200, width: 280 }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', ...(tone === 'chip' ? { right: 0 } : { left: 0 }), zIndex: 200, width: 280 }}>
           <CtxMenuPanel title="Jewl — Advance Time">
             <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>

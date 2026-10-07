@@ -13,6 +13,10 @@ import React, { useEffect, useState } from 'react';
  * Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are handled by the canvas itself; these
  * buttons are the discoverable (and the only touch) path. Planning layer only:
  * ACTIVE places and anything above the line are never in the stack.
+ *
+ * Rendered as two icon buttons in the campaign header's order voice
+ * (2026-10-07): `tone` = the ink colour for the surface they sit on
+ * (soul blue on the powder tab row, powder on the soul-blue bar).
  */
 
 interface HistoryState {
@@ -24,7 +28,17 @@ interface HistoryState {
 
 const EMPTY: HistoryState = { canUndo: false, canRedo: false, undoLabel: null, redoLabel: null };
 
-export function CanvasHistoryControls({ className }: { className?: string }) {
+const TONE = { soul: 'var(--pillar-soul, #002f6c)', powder: 'var(--surface-calm, #CBD9E8)' } as const;
+
+export function CanvasHistoryControls({
+  className,
+  tone = 'soul',
+  size = 40,
+}: {
+  className?: string;
+  tone?: keyof typeof TONE;
+  size?: number;
+}) {
   const [h, setH] = useState<HistoryState>(EMPTY);
 
   useEffect(() => {
@@ -46,29 +60,25 @@ export function CanvasHistoryControls({ className }: { className?: string }) {
   };
 
   const btn = (enabled: boolean): React.CSSProperties => ({
-    minWidth: 44,
-    minHeight: 32,
-    padding: '0 10px',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    width: size,
+    height: Math.max(36, size),
+    flex: 'none',
+    display: 'grid',
+    placeItems: 'center',
+    padding: 0,
     background: 'transparent',
-    border: '1px solid rgba(34,171,148,0.4)',
-    color: enabled ? 'var(--accent-teal, #22ab94)' : 'rgba(34,171,148,0.3)',
-    fontFamily: 'var(--font-terminal), Consolas, monospace',
-    fontSize: 14,
-    letterSpacing: '0.08em',
+    border: 0,
+    color: TONE[tone],
     cursor: enabled ? 'pointer' : 'default',
-    opacity: enabled ? 1 : 0.6,
-    transition: 'color 120ms, background 120ms',
+    opacity: enabled ? 1 : 0.35,
+    transition: 'opacity 120ms',
     touchAction: 'manipulation',
   });
 
   return (
     <div
       className={className}
-      style={{ display: 'inline-flex', alignItems: 'stretch' }}
+      style={{ display: 'inline-flex', alignItems: 'center', flex: 'none' }}
       role="group"
       aria-label="Canvas history"
       data-no-hold
@@ -81,10 +91,10 @@ export function CanvasHistoryControls({ className }: { className?: string }) {
         title={h.undoLabel ? `Undo ${h.undoLabel} (Ctrl+Z)` : 'Nothing to undo'}
         style={btn(h.canUndo)}
       >
-        <span aria-hidden style={{ fontSize: 18, lineHeight: 1 }}>{'↶'}</span>
-        <span className="hidden md:inline" style={{ textTransform: 'uppercase', fontSize: 11 }}>
-          {h.canUndo && h.undoLabel ? h.undoLabel : 'undo'}
-        </span>
+        <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 14 4 9l5-5" />
+          <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+        </svg>
       </button>
       <button
         type="button"
@@ -92,12 +102,12 @@ export function CanvasHistoryControls({ className }: { className?: string }) {
         disabled={!h.canRedo}
         aria-label={h.redoLabel ? `Redo ${h.redoLabel}` : 'Redo'}
         title={h.redoLabel ? `Redo ${h.redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo'}
-        style={{ ...btn(h.canRedo), borderLeft: 'none' }}
+        style={btn(h.canRedo)}
       >
-        <span className="hidden md:inline" style={{ textTransform: 'uppercase', fontSize: 11 }}>
-          {h.canRedo && h.redoLabel ? h.redoLabel : 'redo'}
-        </span>
-        <span aria-hidden style={{ fontSize: 18, lineHeight: 1 }}>{'↷'}</span>
+        <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m15 14 5-5-5-5" />
+          <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+        </svg>
       </button>
     </div>
   );
