@@ -275,14 +275,14 @@ export function FolderGroupRect({
   /** Canvas zoom (1 = in, 6 = out) — semantic zoom + label scaling (canvas-lod). */
   zoom?: number;
 }) {
+  // ONE resize handle, bottom-right (Mike 2026-10-06: "remove all the resize
+  // areas around a folder and instead place one only in the lower right
+  // corner"). The anchor is the top-left, so resizing never moves the folder.
   const [resizing, setResizing] = useState<{
-    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner';
     startX: number;
     startY: number;
     startW: number;
     startH: number;
-    startPosX: number;
-    startPosY: number;
   } | null>(null);
 
   const content = useMemo(
@@ -347,34 +347,22 @@ export function FolderGroupRect({
     return clampDraftingRect(folder, { x: anchorX, y: anchorY, width, height });
   }, [content, folder, dragOffsets]);
 
-  // Resize mouse handlers
-  const handleResizeStart = useCallback((
-    e: React.MouseEvent,
-    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner',
-  ) => {
+  // Resize handlers (pointer events — touch depends on it)
+  const handleResizeStart = useCallback((e: React.PointerEvent | React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (!bounds) return;
     onFolderResizeStart?.(folder.id);
-    // Capture the folder's TRUE origin and user-padded size — not the
-    // content-clamped display values. The resize math writes posX/userWidth
-    // directly, so the start values must match what we're modifying;
-    // otherwise drags silently no-op (when posX > content.x) and produce
-    // unexpected jumps on subsequent drags. Falls back to displayed bounds
-    // on first resize (no posX/userWidth stored yet).
+    // The drawn rect IS the gesture's baseline — user sizes are measured
+    // from the drawn anchor, so starting anywhere else makes the first
+    // frame jump (2026-10-01).
     setResizing({
-      edge,
       startX: e.clientX,
       startY: e.clientY,
-      // The drawn rect IS the gesture's baseline — user sizes are measured
-      // from the drawn anchor, so starting anywhere else makes the first
-      // frame jump (2026-10-01).
       startW: bounds.width,
       startH: bounds.height,
-      startPosX: bounds.x,
-      startPosY: bounds.y,
     });
-  }, [bounds, folder.id, folder.posX, folder.posY, folder.userWidth, folder.userHeight, onFolderResizeStart]);
+  }, [bounds, folder.id, onFolderResizeStart]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -396,60 +384,17 @@ export function FolderGroupRect({
       const dx = (e.clientX - resizing.startX) * scaleX;
       const dy = (e.clientY - resizing.startY) * scaleY;
 
-      let newW = resizing.startW;
-      let newH = resizing.startH;
-      let newPosX: number | undefined;
-      let newPosY: number | undefined;
-
-      if (resizing.edge === 'right' || resizing.edge === 'corner' || resizing.edge === 'top-corner') {
-        newW = Math.max(minW, resizing.startW + dx);
-      }
-      if (resizing.edge === 'left' || resizing.edge === 'left-corner' || resizing.edge === 'top-left-corner') {
-        // Left edge: dragging left increases width, dragging right decreases.
-        // The right edge must stay anchored at startPosX + startW.
-        const startRight = resizing.startPosX + resizing.startW;
-        newW = Math.max(minW, resizing.startW - dx);
-        newPosX = startRight - newW;
-        // Folder must encompass content — posX can't exceed content.x
-        // (visual left edge is anchored to leftmost member). Clamp the user
-        // intent to that limit so the drag stops where the visual stops,
-        // instead of silently writing an unreachable posX that breaks the
-        // next drag's start values.
-        if (!isLocation && content && newPosX > content.x) {
-          newPosX = content.x;
-          newW = startRight - newPosX;
-        }
-      }
-      if (resizing.edge === 'bottom' || resizing.edge === 'corner' || resizing.edge === 'left-corner') {
-        newH = Math.max(minH, resizing.startH + dy);
-        // Party folders: bottom edge can't cross the KRMA line (y=0)
-        if (folder.type === 'party') {
-          const maxH = -boundsY; // bottom edge flush with KRMA line
-          if (maxH > 0 && newH > maxH) newH = maxH;
-        }
-      }
-      if (resizing.edge === 'top' || resizing.edge === 'top-corner' || resizing.edge === 'top-left-corner') {
-        // Top edge: dragging up grows the folder upward, dragging down
-        // shrinks it. The bottom edge stays anchored at startPosY + startH.
-        const startBottom = resizing.startPosY + resizing.startH;
-        newH = Math.max(minH, resizing.startH - dy);
-        newPosY = startBottom - newH;
-        // Encompass clamp (mirror of the left edge): non-location folders
-        // can't push their top edge below the topmost member.
-        if (!isLocation && content && newPosY > content.y) {
-          newPosY = content.y;
-          newH = startBottom - newPosY;
-        }
-        // Drafting locations live BELOW the crystallization line — the top
-        // edge never crosses above y=0 as a resize side effect.
-        const isDrafting = !!folder.locationInfo && folder.locationInfo.status !== 'ACTIVE';
-        if (isDrafting && newPosY < 0) {
-          newPosY = 0;
-          newH = startBottom;
-        }
+      // Bottom-right corner: width and height grow from the top-left anchor;
+      // the folder never moves while resizing.
+      const newW = Math.max(minW, resizing.startW + dx);
+      let newH = Math.max(minH, resizing.startH + dy);
+      // Party folders: bottom edge can't cross the KRMA line (y=0)
+      if (folder.type === 'party') {
+        const maxH = -boundsY; // bottom edge flush with KRMA line
+        if (maxH > 0 && newH > maxH) newH = maxH;
       }
 
-      onFolderResize?.(folder.id, newW, newH, newPosX, newPosY);
+      onFolderResize?.(folder.id, newW, newH);
     };
 
     const handleUp = () => {
@@ -1263,116 +1208,40 @@ export function FolderGroupRect({
         );
       })()}
 
-      {/* Resize handles — only when expanded */}
-      {!collapsed && (
-        <>
-          {/* Right edge */}
-          <rect
-            x={bounds.x + bounds.width - handleSize / 2}
-            y={bounds.y + displayHeight / 2 - 40}
-            width={handleSize}
-            height={80}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'right' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'right')}
-          />
-          {/* Left edge */}
-          <rect
-            x={bounds.x - handleSize / 2}
-            y={bounds.y + displayHeight / 2 - 40}
-            width={handleSize}
-            height={80}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'left' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'left')}
-          />
-          {/* Bottom edge */}
-          <rect
-            x={bounds.x + bounds.width / 2 - 40}
-            y={bounds.y + displayHeight - handleSize / 2}
-            width={80}
-            height={handleSize}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'bottom' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'bottom')}
-          />
-          {/* Bottom-right corner */}
-          <rect
-            x={bounds.x + bounds.width - handleSize}
-            y={bounds.y + displayHeight - handleSize}
-            width={handleSize}
-            height={handleSize}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'corner')}
-          />
-          {/* Bottom-left corner */}
-          <rect
-            x={bounds.x}
-            y={bounds.y + displayHeight - handleSize}
-            width={handleSize}
-            height={handleSize}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'left-corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'left-corner')}
-          />
-          {/* Top edge — straddles the boundary so it never fights the
-              title-bar drag inside the header chrome */}
-          <rect
-            x={bounds.x + bounds.width / 2 - 40}
-            y={bounds.y - handleSize / 2}
-            width={80}
-            height={handleSize}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'top' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'top')}
-          />
-          {/* Top-right corner */}
-          <rect
-            x={bounds.x + bounds.width - handleSize / 2}
-            y={bounds.y - handleSize / 2}
-            width={handleSize}
-            height={handleSize}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'top-corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'top-corner')}
-          />
-          {/* Top-left corner */}
-          <rect
-            x={bounds.x - handleSize / 2}
-            y={bounds.y - handleSize / 2}
-            width={handleSize}
-            height={handleSize}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'top-left-corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
-            onPointerDown={(e) => handleResizeStart(e, 'top-left-corner')}
-          />
-        </>
-      )}
+      {/* THE resize handle — bottom-right corner only (Mike 2026-10-06). The
+          hit area is handleSize square (52 on a finger, 36 on a mouse); the
+          visible grip is three short diagonal strokes tucked into the corner,
+          brighter while dragging. Only when expanded. */}
+      {!collapsed && (() => {
+        const hx = bounds.x + bounds.width - handleSize;
+        const hy = bounds.y + displayHeight - handleSize;
+        const gripAlpha = resizing ? 'ee' : '99';
+        const grip = (inset: number) => ({
+          x1: bounds.x + bounds.width - 6 - inset, y1: bounds.y + displayHeight - 6,
+          x2: bounds.x + bounds.width - 6, y2: bounds.y + displayHeight - 6 - inset,
+        });
+        return (
+          <g data-resize-handle="corner">
+            {/* data-no-hold: the canvas touch tracker must leave this pointerdown
+                alone (no pan, no carry) so a finger can resize from the corner. */}
+            <rect
+              x={hx}
+              y={hy}
+              width={handleSize}
+              height={handleSize}
+              rx={4}
+              fill={resizing ? `${color}33` : 'transparent'}
+              style={{ cursor: 'nwse-resize', pointerEvents: 'auto', touchAction: 'none' }}
+              data-no-hold
+              onPointerDown={handleResizeStart}
+            />
+            {[8, 15, 22].map(inset => {
+              const g = grip(inset);
+              return <line key={inset} {...g} stroke={`${color}${gripAlpha}`} strokeWidth={2} strokeLinecap="round" style={{ pointerEvents: 'none' }} />;
+            })}
+          </g>
+        );
+      })()}
     </g>
   );
 }
