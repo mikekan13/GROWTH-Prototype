@@ -10,17 +10,20 @@ import CanvasHistoryControls from '@/components/canvas/CanvasHistoryControls';
  * Mockups: tmp/screens/2026-10-06-header-v2-alt-412.html (phone) and
  * 2026-10-06-header-v2-order-1800.html (desktop strip).
  *
- * Phone (< 768 px), ≈129 px:
- *   row 1  Soul-blue bar — campaign name (gold Bebas) · KRMA tile · settings gear
- *   row 2  powder tab row — FORGE / CANVAS / TAPESTRY · undo / redo
- *   row 3  off-white row — clock · FLD tile · CRY tile
+ * Phone (< 768 px), 155 px:
+ *   row 1  Soul-blue bar — campaign name (gold Bebas) over the clock · settings gear
+ *   row 2  off-white row — the KRMA / FLD / CRY strip
+ *   row 3  powder tab row — FORGE / CANVAS / TAPESTRY · undo / redo
+ *   (the strip, ~245 px, does not fit beside the clock at 412, so the clock
+ *   rides the bar under the name — Mike 2026-10-07.)
  * Desktop (≥ 768 px), one strip:
  *   bar  name · clock · … · undo / redo · gear
- *   row  tabs · … · KRMA / FLD / CRY tiles
+ *   row  tabs · … · KRMA / FLD / CRY strip
  *   768–1399 px = compact sizes (≈89 px), ≥ 1400 px = full mockup sizes (≈101 px).
  *
  * KRMA / FLD / CRY keep the live header's coloured tiles (Mike 2026-10-07):
- * gold KRMA, purple FLD, red CRY — the same tile at every width.
+ * gold KRMA (navy numerals), purple FLD, red CRY — one contiguous strip, tiles
+ * touching, the same at every width.
  * The invite code, genre and the way back to the Terminal live behind a tap
  * on the campaign name.
  */
@@ -59,8 +62,13 @@ const CSS = `
 .gh-tab[aria-current="page"]{background:var(--pillar-soul);color:var(--krma-gold);clip-path:polygon(1% 4%,99% 0,100% 94%,0 100%)}
 .gh-four .gh-tab{font-size:17px;letter-spacing:.06em}
 .gh-sep{width:2px;height:22px;background:var(--pillar-soul);opacity:.25;margin:0 2px;flex:none}
-.gh-mid{display:flex;align-items:center;height:40px;padding:0 6px 0 14px;gap:6px;background:#FAFAF8}
-.gh-mid>.gh-clock{flex:1 1 auto;min-width:0}
+.gh-bar.gh-bar2{height:72px;align-items:stretch;padding:0 4px}
+.gh-stack{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.gh-stack>.gh-clock{padding-left:10px;min-width:0}
+.gh-stack .gh-name{height:36px;padding-top:4px}
+.gh-bar2>.gh-ic{align-self:center}
+.gh-mid{display:flex;align-items:center;justify-content:flex-end;height:40px;padding:0 6px 0 14px;background:#FAFAF8}
+.gh-strip{display:flex;align-items:stretch;height:36px;flex:none}
 .gh-spacer{flex:1}
 .gh-t{height:36px;flex:none;display:flex;align-items:center}
 .gh-t-col{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px;min-width:46px}
@@ -69,7 +77,7 @@ const CSS = `
 .gh-fld{background:var(--pillar-spirit)}
 .gh-cry{background:var(--pillar-body)}
 .gh-cry>u{text-decoration:none;font-family:var(--font-terminal);font-weight:700;font-size:22px;color:#fff;line-height:1;padding-right:6px}
-.gh-krma{gap:6px;padding:0 10px;background:linear-gradient(90deg,#D4A830,#E8C848,#D4A830);color:#8e7cc3;font-weight:700;line-height:1}
+.gh-krma{gap:6px;padding:0 10px;background:linear-gradient(90deg,#D4A830,#E8C848,#D4A830);color:var(--pillar-soul);font-weight:700;line-height:1}
 .gh-krma b{font-family:var(--font-bebas-neue),'Bebas Neue',Impact,sans-serif;font-size:20px;letter-spacing:-.01em;padding-top:2px}
 .gh-krma span{font-size:18px;letter-spacing:.02em;padding-top:2px}
 .gh-krma em{font-style:normal;font-family:var(--font-inknut-antiqua),"Inknut Antiqua",serif;font-weight:900;font-size:14px}
@@ -86,7 +94,7 @@ const CSS = `
 .gh-wide .gh-bar>.gh-clock{margin-left:14px;min-width:0}
 .gh-row{display:flex;align-items:center;height:40px;padding:0 0 0 10px}
 .gh-wide .gh-tab{flex:none;padding:2px 18px 0}
-.gh-ledger{display:flex;gap:10px;align-items:center;align-self:stretch;background:#FAFAF8;margin-left:auto;padding:0 14px}
+.gh-ledger{display:flex;align-items:center;align-self:stretch;background:#FAFAF8;margin-left:auto;padding:0 14px}
 @media (min-width:1400px){
  .gh-wide .gh-bar{height:52px;padding-left:16px}
  .gh-wide .gh-name{font-size:32px;letter-spacing:.05em}
@@ -94,7 +102,7 @@ const CSS = `
  .gh-wide .gh-ic{width:42px;height:42px}
  .gh-row{height:46px;padding-left:20px}
  .gh-wide .gh-tab{font-size:22px;letter-spacing:.14em;padding:2px 26px 0}
- .gh-ledger{gap:14px;padding:0 28px 0 22px}
+ .gh-ledger{padding:0 28px 0 22px}
 }
 `;
 
@@ -140,7 +148,7 @@ export default function CampaignHeader({
   }, [infoOpen]);
 
   const name = (
-    <div ref={nameRef} style={{ position: 'relative', display: 'flex', minWidth: 0, flex: wide ? '0 1 auto' : '1 1 auto' }}>
+    <div ref={nameRef} style={{ position: 'relative', display: 'flex', minWidth: 0, flex: wide ? '0 1 auto' : 'none' }}>
       <button
         type="button"
         className="gh-name"
@@ -162,7 +170,7 @@ export default function CampaignHeader({
 
   const clock = (
     <div className="gh-clock">
-      <CampaignClock campaignId={campaign.id} isGM={isGM} tone={wide ? 'soul' : 'paper'} />
+      <CampaignClock campaignId={campaign.id} isGM={isGM} tone="soul" />
     </div>
   );
 
@@ -183,6 +191,10 @@ export default function CampaignHeader({
       <div className="gh-t-col"><b>{formatKrma(economy.crystallized)}</b><i>CRY</i></div>
       <u aria-hidden>]</u>
     </div>
+  ) : null;
+  // One contiguous ledger strip — the three tiles share edges (Mike 2026-10-07).
+  const strip = showTiles ? (
+    <div className="gh-strip" role="group" aria-label="KRMA ledger">{krmaTile}{fldTile}{cryTile}</div>
   ) : null;
 
   const gear = isGM ? (
@@ -220,27 +232,25 @@ export default function CampaignHeader({
           <nav className="gh-row" aria-label="Campaign views">
             {tabButtons}
             {showTiles && (
-              <div className="gh-ledger">{krmaTile}{fldTile}{cryTile}</div>
+              <div className="gh-ledger">{strip}</div>
             )}
           </nav>
         </>
       ) : (
         <>
-          <div className="gh-bar">
-            {name}
-            {krmaTile}
+          <div className="gh-bar gh-bar2">
+            <div className="gh-stack">
+              {name}
+              {clock}
+            </div>
             {gear}
           </div>
+          {showTiles && <div className="gh-mid">{strip}</div>}
           <nav className={`gh-tabs${tabs.length > 3 ? ' gh-four' : ''}`} aria-label="Campaign views">
             {tabButtons}
             {onCanvas && <span className="gh-sep" aria-hidden />}
             {onCanvas && <CanvasHistoryControls tone="soul" size={38} />}
           </nav>
-          <div className="gh-mid">
-            {clock}
-            {fldTile}
-            {cryTile}
-          </div>
         </>
       )}
     </header>
