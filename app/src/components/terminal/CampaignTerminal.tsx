@@ -15,6 +15,7 @@ import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import BeingSpeakingLines from './BeingSpeakingLines';
+import SpokenBeatBlock, { foldSpokenBeats } from './SpokenBeatBlock';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE } from '@/components/copilot/JewlChip';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
@@ -1070,10 +1071,15 @@ export default function CampaignTerminal({
               {/* Events (hidden if session is collapsed) */}
               {!isCollapsed && (
                 <div className="space-y-1">
-                  {group.events.map(event => (
+                  {/* Spoken narration (voice on) arrives one declaration per
+                      sentence; consecutive sentences of one beat fold into a
+                      single dim SpokenBeatBlock. Everything else renders as today. */}
+                  {foldSpokenBeats(group.events).map(row => row.kind === 'beat' ? (
+                    <SpokenBeatBlock key={`beat-${row.beatId}-${row.events[0].id}`} beatId={row.beatId} events={row.events} />
+                  ) : (
                     <TerminalEventRow
-                      key={event.id}
-                      event={event}
+                      key={row.event.id}
+                      event={row.event}
                       onRevert={handleRevert}
                       reverting={reverting}
                     />
