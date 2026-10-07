@@ -14,6 +14,7 @@ import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignClock from '@/components/time/CampaignClock';
 import CanvasHistoryControls from '@/components/canvas/CanvasHistoryControls';
+import { TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
 import type { TerminalEvent } from '@/types/terminal';
 
@@ -153,6 +154,18 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [activeTab]);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
+  // P1 mirror: the JEWL header shows "◆ table" while the mic feeds the table;
+  // the TERMINAL toggle tab shows the same glyph so the GM sees it with JEWL
+  // closed. Blue = feeding, gold = holding an unfinished sentence.
+  const [tableFeed, setTableFeed] = useState<{ holding: boolean } | null>(null);
+  useEffect(() => {
+    const onFeed = (e: Event) => {
+      const d = (e as CustomEvent<{ fed?: boolean; holding?: boolean }>).detail;
+      setTableFeed(d?.fed ? { holding: !!d.holding } : null);
+    };
+    window.addEventListener(TABLE_FEED_EVENT, onFeed);
+    return () => window.removeEventListener(TABLE_FEED_EVENT, onFeed);
+  }, []);
   // Tell floating chrome (the phone JEWL summon button in JewlChip) whether the
   // terminal drawer is open, so nothing floats over the table log during play.
   useEffect(() => {
@@ -1912,6 +1925,15 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               zIndex: 51,
             }}
           >
+            {tableFeed && (
+              <span
+                aria-label={tableFeed.holding ? 'The table is holding an unfinished sentence' : 'The mic is feeding the table'}
+                title={tableFeed.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table \u2014 what you say becomes the world. Mute JEWL to stop.'}
+                style={{ color: tableFeed.holding ? 'var(--krma-gold, #ffcc78)' : '#6fa8dc', marginRight: 6, fontSize: 11 }}
+              >
+                {'\u25C6'}
+              </span>
+            )}
             {showTerminal ? '\u25BC TERMINAL' : '\u25B2 TERMINAL'}
           </button>
 

@@ -126,6 +126,12 @@ function extractCampaignId(pathname: string): string | null {
 export const RECORDER_CHUNK_MS_DEFAULT = 5_000;
 export const RECORDER_CHUNK_MS_LIVE = 3_000;
 export const RECORDER_CHUNK_EVENT = 'growth:recorder-chunk';
+/** Fired after every mic chunk the TABLE heard (U2c-4): { fed, heard, asked, holding }.
+ *  fed:false is sent when the feed stops (mute, or no fed chunk for TABLE_FEED_TTL_MS)
+ *  so mirrors (the TERMINAL tab) can clear their glyph. */
+export const TABLE_FEED_EVENT = 'growth:table-feed';
+/** How long the ◆ indicator stays lit after the last fed chunk (2–3 chunk lengths). */
+export const TABLE_FEED_TTL_MS = 12_000;
 
 const SHEET_QUERY = '(max-width: 599px)';
 const sheetMq = () => (typeof window !== 'undefined' ? window.matchMedia(SHEET_QUERY) : null);
@@ -242,6 +248,19 @@ export function JewlChip() {
   // Recorder chunk length (see RECORDER_CHUNK_MS_*). Read per cycle from a ref
   // so a change never restarts the mic; it only shortens the cycle in flight.
   const chunkMsRef = useRef<number>(RECORDER_CHUNK_MS_DEFAULT);
+  // P1 — "the mic is feeding the table": set from the audio-chunk response
+  // (table.fed), cleared by mute or by silence longer than TABLE_FEED_TTL_MS.
+  // The GM must see at a glance that what he says is becoming the world.
+  const [tableFeed, setTableFeed] = useState<{ heard: number; asked: number; holding: boolean } | null>(null);
+  const tableFeedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const announceTableFeed = useCallback((feed: { heard: number; asked: number; holding: boolean } | null) => {
+    setTableFeed(feed);
+    window.dispatchEvent(new CustomEvent(TABLE_FEED_EVENT, { detail: feed ? { fed: true, ...feed } : { fed: false } }));
+    if (tableFeedTimerRef.current) clearTimeout(tableFeedTimerRef.current);
+    tableFeedTimerRef.current = feed ? setTimeout(() => announceTableFeedRef.current(null), TABLE_FEED_TTL_MS) : null;
+  }, []);
+  const announceTableFeedRef = useRef(announceTableFeed);
+  useEffect(() => { announceTableFeedRef.current = announceTableFeed; }, [announceTableFeed]);
   useEffect(() => {
     const onChunk = (e: Event) => {
       const ms = Number((e as CustomEvent<{ ms?: number }>).detail?.ms);
@@ -851,6 +870,9 @@ export function JewlChip() {
         // a silently-failed dispatch can't lock the indicator on forever.
         try {
           const data = await res.json();
+          // U2c-4: present only when the mic fed the table (switch on, GM, live session).
+          const t = data?.table as { fed?: boolean; heard?: number; asked?: number; holding?: boolean } | undefined;
+          if (t?.fed) announceTableFeedRef.current({ heard: t.heard ?? 0, asked: t.asked ?? 0, holding: !!t.holding });
           const v = data?.classifierVerdict as string | undefined;
           if (v && v !== 'silent') {
             setThinking(true);
@@ -1177,7 +1199,8 @@ export function JewlChip() {
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
                   color:
-                    audioStatus === 'listening' ? 'rgba(34, 171, 148, 0.8)'
+                    audioStatus === 'listening' && tableFeed ? (tableFeed.holding ? 'var(--krma-gold, #ffcc78)' : '#6fa8dc')
+                    : audioStatus === 'listening' ? 'rgba(34, 171, 148, 0.8)'
                     : audioStatus === 'muted' ? 'rgba(255,255,255,0.4)'
                     : audioStatus === 'denied' ? 'rgba(231, 76, 60, 0.8)'
                     : audioStatus === 'unsupported' ? 'rgba(231, 76, 60, 0.6)'
@@ -1185,7 +1208,8 @@ export function JewlChip() {
                     : 'rgba(255,255,255,0.3)',
                 }}
               >
-                {audioStatus === 'listening' ? '● live'
+                {audioStatus === 'listening' && tableFeed ? `◆ table · ${tableFeed.heard}${tableFeed.holding ? ' …' : ''}`
+                  : audioStatus === 'listening' ? '● live'
                   : audioStatus === 'muted' ? '◌ muted'
                   : audioStatus === 'denied' ? '✕ mic blocked'
                   : audioStatus === 'unsupported' ? '✕ no mic'
@@ -1194,7 +1218,11 @@ export function JewlChip() {
               </span>
               {(audioStatus === 'listening' || audioStatus === 'muted') && (
                 <button
-                  onClick={() => setAudioMuted(m => !m)}
+                  onClick={() => {
+                    setAudioMuted(m => !m);
+                    // Mute is the STOP for the table feed: nothing said while muted is heard.
+                    if (!audioMuted) announceTableFeedRef.current(null);
+                  }}
                   aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
                   title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
                   style={{
