@@ -187,6 +187,9 @@ async function main(): Promise<void> {
     for (const key of ['DAYA_L1_PROVIDER', 'DAYA_L1_API_KEY', 'AI_LOCAL_API_KEY', 'RUNPOD_API_KEY']) delete process.env[key];
   }
   process.env.DAYA_ENABLED = 'enabled';
+  // A cold worker takes ~340 s to start and the model client's default timeout is 240 s: the first real run
+  // died on exactly that. The probe is allowed the whole cold start, plus some.
+  if (GO && !process.env.DAYA_L1_TIMEOUT_MS) process.env.DAYA_L1_TIMEOUT_MS = '540000';
 
   const { prisma } = await import('../src/lib/db');
   const { seedDayaRoom } = await import('./seed-daya-room');
