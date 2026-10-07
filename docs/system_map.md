@@ -428,4 +428,5 @@ Tracks paying GMs and runs the monthly KRMA injection schedule.
 
 - **Zero external services** during alpha/beta
 - SQLite for data (file-based, no server needed)
+- Dev SQLite runs in **WAL** mode with a **5 s busy timeout**, primed on every fresh libsql connection by `lib/db.ts` (2026-10-06; two processes writing dev.db used to fail instantly with "Operation has timed out"). `dev.db` therefore has `-wal`/`-shm` sidecars: a file-copy backup must copy all three, or run `PRAGMA wal_checkpoint(TRUNCATE)` first.
 - ComfyUI for portraits (local, optional — system works without it)
