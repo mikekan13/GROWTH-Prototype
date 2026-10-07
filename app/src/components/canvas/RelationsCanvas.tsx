@@ -1293,6 +1293,39 @@ export default function RelationsCanvas({
     );
   }, []);
 
+  /** Every canvas room change goes through here (drop, carry, group drop,
+   *  take-out, undo/redo). The server write (onDropIntoLocation → the
+   *  location route) is async and the folder membership only follows on the
+   *  refresh, so the canvas remembers what it ASKED for until the folders
+   *  agree: undo snapshots and undo/redo comparisons read that intent. Before
+   *  this (10-06, Ruth): a drop changed her located_at, the undo fired before
+   *  the refresh, saw "same room" and never restored the edge. Writes for one
+   *  card are chained so an undo can't overtake the drop it reverses. */
+  const intendedParentRef = useRef(new Map<string, { loc: string | null; at: number }>());
+  const dropChainRef = useRef(new Map<string, Promise<unknown>>());
+  const onDropIntoLocationRef = useRef(onDropIntoLocation);
+  onDropIntoLocationRef.current = onDropIntoLocation;
+  const dropIntoLocation = useCallback((nodeId: string, nodeType: 'character' | 'item', locationId: string | null) => {
+    intendedParentRef.current.set(nodeId, { loc: locationId, at: Date.now() });
+    const prev = dropChainRef.current.get(nodeId) ?? Promise.resolve();
+    const next = prev.then(() => onDropIntoLocationRef.current?.(nodeId, nodeType, locationId)).catch(() => {});
+    dropChainRef.current.set(nodeId, next);
+  }, []);
+  /** The room a card belongs to as far as this canvas knows: a pending
+   *  request wins over the not-yet-refreshed folders (expires after 15 s so
+   *  a failed write falls back to server truth). */
+  const membershipOf = useCallback((nodeId: string): string | null => {
+    const want = intendedParentRef.current.get(nodeId);
+    if (want && Date.now() - want.at < 15000) return want.loc;
+    return currentAutoParentOf(nodeId);
+  }, [currentAutoParentOf]);
+  useEffect(() => {
+    const now = Date.now();
+    for (const [id, want] of intendedParentRef.current) {
+      if (now - want.at >= 15000 || currentAutoParentOf(id) === want.loc) intendedParentRef.current.delete(id);
+    }
+  }, [folders, currentAutoParentOf]);
+
   // "Take out" (Mike 2026-08-03): a right-click context action that
   // moves a card ONE level up the hierarchy — room → apartment,
   // apartment-level → loose on the canvas. Cards dispatch the event
@@ -1303,14 +1336,14 @@ export default function RelationsCanvas({
       const n = nodes.find(nn => nn.id === nodeId);
       if (!n) return;
       const nodeType = n.type === 'item' ? ('item' as const) : ('character' as const);
-      const curParent = currentAutoParentOf(nodeId);
+      const curParent = membershipOf(nodeId);
       if (!curParent) return; // already loose
       const grandParent = currentAutoParentOf(curParent);
-      onDropIntoLocation?.(nodeId, nodeType, grandParent);
+      dropIntoLocation(nodeId, nodeType, grandParent);
     };
     window.addEventListener('growth:take-out', handler);
     return () => window.removeEventListener('growth:take-out', handler);
-  }, [nodes, currentAutoParentOf, onDropIntoLocation]);
+  }, [nodes, currentAutoParentOf, membershipOf, dropIntoLocation]);
 
   /** Commit a group drag: move every OTHER selected member by the same
    *  delta AND persist their room membership by final position — the
@@ -1344,12 +1377,12 @@ export default function RelationsCanvas({
       const n = nodes.find(nn => nn.id === m.id);
       if (!n || n.type === 'location') continue;
       const hit = pickAutoDropTarget(m.fx, m.fy);
-      const cur = currentAutoParentOf(m.id);
+      const cur = membershipOf(m.id);
       if (hit && hit !== cur) {
-        onDropIntoLocation?.(m.id, n.type === 'item' ? 'item' : 'character', hit);
+        dropIntoLocation(m.id, n.type === 'item' ? 'item' : 'character', hit);
       }
     }
-  }, [nodes, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, onNodePositionChange]);
+  }, [nodes, pickAutoDropTarget, membershipOf, dropIntoLocation, onNodePositionChange]);
 
 
   // ── Undo / redo for the planning layer (Mike 2026-10-06: "We need an undo
@@ -1380,9 +1413,9 @@ export default function RelationsCanvas({
     const folders = new Map<string, { posX?: number; posY?: number; userWidth?: number; userHeight?: number; collapsed?: boolean }>();
     for (const f of foldersRef.current) folders.set(f.id, { posX: f.posX, posY: f.posY, userWidth: f.userWidth, userHeight: f.userHeight, collapsed: f.collapsed });
     const membership = new Map<string, string | null>();
-    for (const n of nodes) if (n.type !== 'location') membership.set(n.id, currentAutoParentOf(n.id));
+    for (const n of nodes) if (n.type !== 'location') membership.set(n.id, membershipOf(n.id));
     return { positions, folders, membership };
-  }, [nodes, currentAutoParentOf]);
+  }, [nodes, membershipOf]);
   const broadcastHistory = useCallback(() => {
     const h = historyRef.current;
     window.dispatchEvent(new CustomEvent('growth:canvas-history', {
@@ -1459,16 +1492,16 @@ export default function RelationsCanvas({
     if (foldersChanged) onFoldersChange?.(updated);
     // Membership (through the server path; a crystallized target room is left alone).
     for (const [id, loc] of target.membership) {
-      const cur = currentAutoParentOf(id);
+      const cur = membershipOf(id);
       if (cur === loc) continue;
       if (loc && activeLocIds.has(loc)) continue;
       const n = nodes.find(nn => nn.id === id);
       if (!n || n.type === 'location') continue;
-      onDropIntoLocation?.(id, n.type === 'item' ? 'item' : 'character', loc);
+      dropIntoLocation(id, n.type === 'item' ? 'item' : 'character', loc);
     }
     setDragOffsets(new Map());
     gestureOffsetsRef.current = new Map();
-  }, [nodes, currentAutoParentOf, onNodePositionChange, onFoldersChange, onDropIntoLocation]);
+  }, [nodes, membershipOf, onNodePositionChange, onFoldersChange, dropIntoLocation]);
   const undoCanvas = useCallback(() => {
     if (openTxRef.current) closeTx();
     const h = historyRef.current;
@@ -1697,7 +1730,7 @@ export default function RelationsCanvas({
     // (same room). The old first-match loop lit up the enclosing
     // apartment while you hovered a room.
     const autoHit = pickAutoDropTarget(dropX, dropY);
-    const curParent = currentAutoParentOf(nodeId);
+    const curParent = membershipOf(nodeId);
     if (autoHit && autoHit !== curParent) {
       const id = `auto-${autoHit}`;
       setDropTargetFolderId(id);
@@ -1722,7 +1755,7 @@ export default function RelationsCanvas({
     }
     setDropTargetFolderId(hitFolder);
     dropTargetRef.current = hitFolder;
-  }, [nodes, pickAutoDropTarget, currentAutoParentOf]);
+  }, [nodes, pickAutoDropTarget, membershipOf]);
 
   // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card.
   // For crystallized panels (above line), the BOTTOM edge (panelY + panelHeight) must not cross below the line.
@@ -2662,8 +2695,8 @@ export default function RelationsCanvas({
       bringNodeToFront(c.id);
       if (n.type !== 'location') {
         const hit = pickAutoDropTarget(wx, wy);
-        const cur = currentAutoParentOf(c.id);
-        if (hit && hit !== cur) onDropIntoLocation?.(c.id, n.type === 'item' ? 'item' : 'character', hit);
+        const cur = membershipOf(c.id);
+        if (hit && hit !== cur) dropIntoLocation(c.id, n.type === 'item' ? 'item' : 'character', hit);
       }
       setPendingLayoutPass({ priority: { kind: 'node', id: c.id } });
       return;
@@ -2678,7 +2711,7 @@ export default function RelationsCanvas({
     const updated = shiftFolderTree(c.id, dx, dy, foldersRef.current);
     onFoldersChange?.(updated.map(ff => (ff.id === f.id ? { ...ff, movedAt: Date.now() } : ff)));
     setPendingLayoutPass({ priority: { kind: 'folder', id: c.id } });
-  }, [onNodePositionChange, bringNodeToFront, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, committedFolderRectById, shiftFolderTree, onFoldersChange]);
+  }, [onNodePositionChange, bringNodeToFront, pickAutoDropTarget, membershipOf, dropIntoLocation, committedFolderRectById, shiftFolderTree, onFoldersChange]);
   const dropCarriedRef = useRef(dropCarriedAt);
   dropCarriedRef.current = dropCarriedAt;
 
@@ -3351,9 +3384,9 @@ export default function RelationsCanvas({
               // Drop-in adds; taking OUT is the right-click "take out"
               // action, never a drag side-effect (Mike 2026-08-03).
               const autoHit = pickAutoDropTarget(x, clampedY);
-              const curParent = currentAutoParentOf(nodeId);
+              const curParent = membershipOf(nodeId);
               if (autoHit && autoHit !== curParent) {
-                onDropIntoLocation?.(nodeId, 'character', autoHit);
+                dropIntoLocation(nodeId, 'character', autoHit);
               } else if (!autoHit) {
                 // Party/manual folders keep client-side membership.
                 const curFolders = foldersRef.current;
@@ -4517,9 +4550,9 @@ export default function RelationsCanvas({
                         // Drop-in adds; taking OUT is the right-click "take
                         // out" action, never a drag side-effect (Mike 2026-08-03).
                         const itemAutoHit = pickAutoDropTarget(x, y);
-                        const itemCurParent = currentAutoParentOf(nodeId);
+                        const itemCurParent = membershipOf(nodeId);
                         if (itemAutoHit && itemAutoHit !== itemCurParent) {
-                          onDropIntoLocation?.(nodeId, 'item', itemAutoHit);
+                          dropIntoLocation(nodeId, 'item', itemAutoHit);
                         }
                       }
                       setDraggingItemId(null);
