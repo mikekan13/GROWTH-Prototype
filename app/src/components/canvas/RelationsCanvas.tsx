@@ -1175,13 +1175,19 @@ export default function RelationsCanvas({
       if (key.startsWith('__folder__auto-')) folderMoves.set(key.slice('__folder__auto-'.length), o);
       else if (!key.startsWith('__folder__')) nodeMoves.set(key, o);
     }
+    // movedAt marks these as the GM's own drag: without it the stored-position
+    // rule (`placedAt > (movedAt ?? 0)`) handed the members straight back to
+    // the server's placement on the next refresh — a dragged room snapped
+    // home after its settle had already pushed the neighbours (measured
+    // 2026-10-06: Kitchen −300 → kitchen back, Main Room −176).
+    const movedAt = Date.now();
     if (nodeMoves.size) {
       setNodePositions(prev => {
         const next = new Map(prev);
         for (const [id, o] of nodeMoves) {
           const base = prev.get(id);
           if (!base) continue;
-          next.set(id, { x: base.x + o.x, y: base.y + o.y });
+          next.set(id, { x: base.x + o.x, y: base.y + o.y, movedAt });
           onNodePositionChange?.(id, base.x + o.x, base.y + o.y);
         }
         return next;
@@ -1193,7 +1199,7 @@ export default function RelationsCanvas({
         const o = locId ? folderMoves.get(locId) : undefined;
         if (!o) return f;
         const rect = committedFolderRectById.get(locId!);
-        return { ...f, posX: (f.posX ?? rect?.x ?? 0) + o.x, posY: (f.posY ?? rect?.y ?? 0) + o.y };
+        return { ...f, posX: (f.posX ?? rect?.x ?? 0) + o.x, posY: (f.posY ?? rect?.y ?? 0) + o.y, movedAt };
       });
       onFoldersChange?.(updated);
     }
@@ -2338,7 +2344,7 @@ export default function RelationsCanvas({
                   if (folder.type === 'party' && newY > -130) {
                     newY = Math.min(newY, -130);
                   }
-                  next.set(nodeId, { x: basePos.x + offset.x, y: newY });
+                  next.set(nodeId, { x: basePos.x + offset.x, y: newY, movedAt: Date.now() });
                   onNodePositionChange?.(nodeId, basePos.x + offset.x, newY);
                 }
               }
