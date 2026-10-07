@@ -100,8 +100,9 @@ describe('deriveFolderRects / packFolder', () => {
     expect(r.height).toBe(240 + 60 + 96);
   });
 
-  it('packFolder repacks overflowing members into rows and reports the new height', () => {
-    const nodes = [card('a', 0, 0, 'room', 300, 80, 80), card('b', 320, 0, 'room', 300, 80, 80), card('c', 640, 0, 'room', 300, 80, 80)];
+  it('packFolder moves the overflowing member to a new row and reports the new height', () => {
+    // Below the line (y ≥ 0), as a drafting folder's cards always are.
+    const nodes = [card('a', 0, 500, 'room', 300, 80, 80), card('b', 320, 500, 'room', 300, 80, 80), card('c', 640, 500, 'room', 300, 80, 80)];
     const res = packFolder('room', 700, nodes, [folder('room')]);
     expect(res).not.toBeNull();
     expect(res!.nodeMoves.size).toBeGreaterThan(0);
@@ -117,20 +118,86 @@ describe('deriveFolderRects / packFolder', () => {
   });
 });
 
-describe('settle — cross-level', () => {
-  it('a card filed under the building, dropped on a card inside a room, pushes the room block clear', () => {
-    // Violet is a member of the BUILDING; Danny is in the MAIN ROOM inside the APARTMENT inside the building.
+describe('settle — cross-level (option a, 2026-10-06: a card never moves a room)', () => {
+  it('a card filed under the building, dropped on a card inside a room, is laid out as that room\'s member: it pushes the card, never the room', () => {
+    // Violet's EDGE says building; her card lands in the MAIN ROOM inside the APARTMENT inside the building.
     const nodes = [card('violet', 0, 2360, 'bldg'), card('danny', 60, 2380, 'room')];
     const folders = [folder('bldg'), folder('apt', 'bldg'), folder('room', 'apt')];
     const r = settle(nodes, folders, { kind: 'node', id: 'violet' });
     expect(r.nodeMoves.has('violet')).toBe(false);
-    const v = { x: -260, y: 2240, width: 520, height: 240 };
-    expect(overlaps(v, r.folderRects.get('room')!)).toBe(false);
-    expect(overlaps(v, r.folderRects.get('apt')!)).toBe(false);
-    // Danny moved with his room, and the building still contains everything.
-    expect(r.nodeMoves.has('danny')).toBe(true);
-    const b = r.folderRects.get('bldg')!, a = r.folderRects.get('apt')!;
-    expect(b.x <= a.x && b.x + b.width >= a.x + a.width).toBe(true);
+    expect(r.folderShifts.size).toBe(0);
+    // Danny is pushed clear by a card-vs-card push (down: y overlap 220 < x overlap 460).
+    const d = r.nodeMoves.get('danny')!;
+    expect(d).toBeDefined();
+    expect(d.y).toBeGreaterThanOrEqual(2360 + 240 + 16);
+    // The room grew to hold both; the apartment and the building still contain it.
+    const room = r.folderRects.get('room')!, apt = r.folderRects.get('apt')!, b = r.folderRects.get('bldg')!;
+    const contains = (p: { x: number; y: number; width: number; height: number }, c: { x: number; y: number; width: number; height: number }) =>
+      p.x <= c.x && p.y <= c.y && p.x + p.width >= c.x + c.width && p.y + p.height >= c.y + c.height;
+    expect(contains(room, { x: -260, y: 2240, width: 520, height: 240 })).toBe(true);
+    expect(contains(apt, room)).toBe(true);
+    expect(contains(b, apt)).toBe(true);
+  });
+
+  it('a stray card drawn inside a room (edge: the apartment) moves nothing when something else is dragged — measured 10-06 as a 286 px jump of a 19-card room', () => {
+    // Violet's edge = apt; her card sits among the room's cards. Danny (room) is dragged elsewhere in the room, no overlap.
+    const nodes = [card('violet', 0, 2360, 'apt'), card('danny', 600, 2360, 'room'), card('ruth', 1200, 2360, 'room')];
+    const folders = [folder('apt'), folder('room', 'apt')];
+    const r = settle(nodes, folders, { kind: 'node', id: 'danny' });
+    expect(r.nodeMoves.size).toBe(0);
+    expect(r.folderShifts.size).toBe(0);
+    // And when the ROOM is the thing moved (a resize), the stray card still does not move it.
+    const r2 = settle(nodes, folders, { kind: 'folder', id: 'room' });
+    expect(r2.folderShifts.size).toBe(0);
+    expect(r2.nodeMoves.size).toBe(0);
+  });
+
+  it('a loose card overlapping a room block (centre outside it) is pushed out of the room; the room stays', () => {
+    const nodes = [card('a', 0, 500, 'room'), card('loose', 500, 520, null)];
+    const folders = [folder('room')];
+    // The room is what moved (resized); the loose card has no business inside it.
+    const r = settle(nodes, folders, { kind: 'folder', id: 'room' });
+    expect(r.folderShifts.size).toBe(0);
+    expect(r.nodeMoves.has('a')).toBe(false);
+    const l = r.nodeMoves.get('loose')!;
+    expect(l).toBeDefined();
+    expect(overlaps({ x: l.x - 260, y: l.y - 120, width: 520, height: 240 }, r.folderRects.get('room')!)).toBe(false);
+  });
+
+  it('the card in hand yields to nothing: held over a sibling room\'s header band, neither moves', () => {
+    // Loose card dropped so that its centre is OUTSIDE the room box (no adoption) but its body overlaps it.
+    const nodes = [card('a', 0, 500, 'room'), card('held', 700, 500, null)];
+    const folders = [folder('room')];
+    const r = settle(nodes, folders, { kind: 'node', id: 'held' });
+    expect(r.nodeMoves.size).toBe(0);
+    expect(r.folderShifts.size).toBe(0);
+  });
+
+  it('rooms still push rooms, carrying their cards', () => {
+    const nodes = [card('a', 0, 500, 'r1'), card('b', 300, 520, 'r2')];
+    const folders = [folder('r1', 'apt'), folder('r2', 'apt'), folder('apt')];
+    const r = settle(nodes, folders, { kind: 'folder', id: 'r1' });
+    expect(r.folderShifts.has('r1')).toBe(false);
+    expect(r.folderShifts.has('r2')).toBe(true);
+    expect(overlaps(r.folderRects.get('r1')!, r.folderRects.get('r2')!)).toBe(false);
+    const s = r.folderShifts.get('r2')!;
+    expect(r.nodeMoves.get('b')).toEqual({ x: 300 + s.dx, y: 520 + s.dy });
+  });
+});
+
+describe('packFolder — only the overflowing members move (option a, 2026-10-06)', () => {
+  it('a shrink that cuts off one card relocates that card only; the others stay exactly where they were', () => {
+    const nodes = [card('a', 0, 500, 'room', 300, 80, 80), card('b', 320, 500, 'room', 300, 80, 80), card('c', 640, 500, 'room', 300, 80, 80), card('d', 0, 700, 'room', 300, 80, 80)];
+    const res = packFolder('room', 700, nodes, [folder('room')]);
+    expect(res).not.toBeNull();
+    expect([...res!.nodeMoves.keys()]).toEqual(['c']);
+    const c = res!.nodeMoves.get('c')!;
+    // c landed in free space, clear of a, b and d (with the gap), inside the new width.
+    const rc = { x: c.x - 150, y: c.y - 80, width: 300, height: 160 };
+    for (const o of nodes.filter((n) => n.id !== 'c')) {
+      expect(overlaps({ x: rc.x - 20, y: rc.y - 20, width: rc.width + 40, height: rc.height + 40 }, { x: o.x - 150, y: o.y - 80, width: 300, height: 160 })).toBe(false);
+    }
+    expect(rc.x + rc.width).toBeLessThanOrEqual(-180 + 700 - 30);
   });
 });
 

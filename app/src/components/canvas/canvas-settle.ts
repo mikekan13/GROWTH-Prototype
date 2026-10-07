@@ -22,6 +22,15 @@
  * re-derived from members after every move (a folder grows to contain its
  * members + padding; never shrinks below them). A drafting folder is never
  * pushed across the crystallization line (y < 0) — it deflects sideways.
+ *
+ * Option (a), Mike 2026-10-06 — the two-line rule:
+ *   1. Only true overlaps are resolved, and only between peers: a card
+ *      pushes a card, a room pushes a room; a card never moves a room, and
+ *      the thing in your hand never moves.
+ *   2. A card drawn inside a room's box is laid out as that room's member
+ *      whatever its edge says, and if it must yield it is pushed out of the
+ *      room, never the room out from under it; a resize repacks only the
+ *      members that overflow, the rest stay put.
  */
 
 export interface SettleNode {
@@ -158,10 +167,17 @@ function pushVector(a: Rect, b: Rect, gap: number): { dx: number; dy: number } {
  *  already-pinned) rect becomes pinned for the rest of the call, so a rect
  *  squeezed between the moved thing and a neighbour is never ping-ponged
  *  (measured 10-01: 32 pushes per round, forever). Between two unpinned
- *  rects the later one in `ids` yields (deterministic). */
+ *  rects the later one in `ids` yields (deterministic).
+ *
+ *  Peers only (Mike 2026-10-06, option a): a card pushes a card, a room
+ *  pushes a room. A card never moves a room — a card overlapping a sibling
+ *  room block is itself pushed out of it; if that card is the one in hand,
+ *  nothing moves. Measured before this rule: one stray card relocated a
+ *  19-card room by 286 px on every gesture. */
 function resolveGroup(
   ids: string[],
   rectOf: (id: string) => Rect,
+  isFolder: (id: string) => boolean,
   fixed: Set<string>,
   gap: number,
   apply: (id: string, dx: number, dy: number) => void,
@@ -174,16 +190,25 @@ function resolveGroup(
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const A = ids[i], B = ids[j];
-        const aPinned = pinned.has(A), bPinned = pinned.has(B);
-        if (aPinned && bPinned) continue; // over-constrained: both already settled this pass
+        const aFolder = isFolder(A), bFolder = isFolder(B);
         let anchor = A, mover = B;
-        if (bPinned && !aPinned) { anchor = B; mover = A; }
+        if (aFolder !== bFolder) {
+          // Card vs room: the card yields, never the room. The held card
+          // (fixed) yields to nothing, so that pair simply stays as it is.
+          const cardId = aFolder ? B : A;
+          if (fixed.has(cardId)) continue;
+          anchor = aFolder ? A : B; mover = cardId;
+        } else {
+          const aPinned = pinned.has(A), bPinned = pinned.has(B);
+          if (aPinned && bPinned) continue; // over-constrained: both already settled this pass
+          if (bPinned && !aPinned) { anchor = B; mover = A; }
+        }
         const v = pushVector(rectOf(anchor), rectOf(mover), gap);
         if (v.dx === 0 && v.dy === 0) continue;
         const c = constrain ? constrain(mover, rectOf(mover), v.dx, v.dy) : v;
         if (c.dx === 0 && c.dy === 0) continue;
         apply(mover, c.dx, c.dy);
-        if (aPinned || bPinned) pinned.add(mover); // pushed by something settled → settled
+        if (aFolder !== bFolder || pinned.has(anchor)) pinned.add(mover); // pushed by something settled → settled
         moved = true; movedAny = true;
       }
     }
@@ -204,6 +229,38 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
     childrenOf.set(p ?? '__root__', [...(childrenOf.get(p ?? '__root__') ?? []), f.id]);
   }
   const folderShifts = new Map<string, { dx: number; dy: number }>();
+
+  let rects = deriveFolderRects(nodes, folders, opts);
+
+  // A card drawn inside a room's box is laid out as that room's member,
+  // whatever its edge says (Mike 2026-10-06, option a). Measured before
+  // this: Violet's edge pointed at the apartment while her card sat in the
+  // Main Room, and every settle shoved her — or the whole room — 286 px.
+  // Only a POPULATED room can adopt (an empty room's box is a placeholder
+  // the canvas draws elsewhere), and only one strictly smaller than the
+  // card's own folder, so two rooms of equal size that happen to overlap
+  // keep their members (their boxes are what the folder pass resolves).
+  // Layout-only: the returned moves never change membership.
+  {
+    const populated = new Set<string>();
+    for (const n of nodes) if (n.folderId && folderById.has(n.folderId)) populated.add(n.folderId);
+    for (const f of folders) if (f.parentId && folderById.has(f.parentId)) populated.add(f.parentId);
+    let adopted = false;
+    for (const n of nodes) {
+      const own = n.folderId && folderById.has(n.folderId) ? rects.get(n.folderId) : undefined;
+      const ownArea = own ? own.width * own.height : Infinity;
+      let best: { id: string; area: number } | null = null;
+      for (const f of folders) {
+        if (f.id === n.folderId || !populated.has(f.id) || f.collapsed) continue;
+        const r = rects.get(f.id);
+        if (!r || n.x <= r.x || n.x >= r.x + r.width || n.y <= r.y || n.y >= r.y + r.height) continue;
+        const area = r.width * r.height;
+        if (area < ownArea && (!best || area < best.area)) best = { id: f.id, area };
+      }
+      if (best) { n.folderId = best.id; adopted = true; }
+    }
+    if (adopted) rects = deriveFolderRects(nodes, folders, opts);
+  }
 
   // The priority chain: the moved thing and every ancestor folder never yield
   // at their own level (the thing in your hand wins; the room it sits in wins
@@ -233,7 +290,6 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
     }
   };
 
-  let rects = deriveFolderRects(nodes, folders, opts);
   let rounds = 0;
   const roundMoves: number[] = [];
   let pushes = 0;
@@ -265,6 +321,7 @@ export function settle(nodesIn: SettleNode[], foldersIn: SettleFolder[], priorit
       const movedHere = resolveGroup(
         ids,
         (id) => (isFolder(id) ? rects.get(id)! : nodeRect(nodeById.get(id)!)),
+        isFolder,
         fixed,
         opts.gap,
         (id, dx, dy) => {
@@ -381,20 +438,35 @@ export function packFolder(
   const changed = folderSizes.size > 0 || nodeMoves.size > 0;
   if (!members.length) return changed ? { nodeMoves, folderShifts, folderSizes, height: self.height } : null;
   const anchorX = self.x, anchorY = self.y;
-  const fitRight = anchorX + targetWidth - opts.padding;
-  const overflows = members.some((m) => m.x + m.w > fitRight || m.x < anchorX + opts.padding);
-  if (!overflows) return changed ? { nodeMoves, folderShifts, folderSizes, height: self.height } : null;
-  members.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-  const GAP = 20;
-  let cx = anchorX + opts.padding, cy = anchorY + f.headerH + opts.padding, rowH = 0;
-  for (const m of members) {
-    if (cx + m.w > anchorX + targetWidth - opts.padding && cx > anchorX + opts.padding) { cx = anchorX + opts.padding; cy += rowH + GAP; rowH = 0; }
-    const dx = cx - m.x, dy = cy - m.y;
+  const left = anchorX + opts.padding, fitRight = anchorX + targetWidth - opts.padding;
+  const isOverflow = (m: Member) => m.x + m.w > fitRight || m.x < left;
+  if (!members.some(isOverflow)) return changed ? { nodeMoves, folderShifts, folderSizes, height: self.height } : null;
+  // Only the members that overflow move (Mike 2026-10-06, option a: "a
+  // resize repacks only the members that overflow, the rest stay put").
+  // Each one takes the first free spot scanning the interior row by row,
+  // below everything already placed if there is none; measured before
+  // this, a 250 px shrink re-laid all six kitchen cards into fresh rows.
+  const GAP = 20, STEP = 20;
+  const placed: Member[] = members.filter((m) => !isOverflow(m));
+  const clear = (x: number, y: number, w: number, h: number) =>
+    !placed.some((p) => x < p.x + p.w + GAP && p.x < x + w + GAP && y < p.y + p.h + GAP && p.y < y + h + GAP);
+  const top = anchorY + f.headerH + opts.padding;
+  for (const m of members.filter(isOverflow).sort((a, b) => (a.y - b.y) || (a.x - b.x))) {
+    const bottomOfPlaced = placed.reduce((b, p) => Math.max(b, p.y + p.h), top);
+    let spot: { x: number; y: number } | null = null;
+    for (let y = top; y <= bottomOfPlaced + GAP && !spot; y += STEP) {
+      for (let x = left; x + m.w <= fitRight; x += STEP) {
+        if (clear(x, y, m.w, m.h)) { spot = { x, y }; break; }
+      }
+    }
+    if (!spot) spot = { x: left, y: bottomOfPlaced + GAP };
+    const dx = spot.x - m.x, dy = spot.y - m.y;
     if (dx !== 0 || dy !== 0) {
       if (m.kind === 'node') { const n = nodeById.get(m.id)!; n.x += dx; n.y += dy; nodeMoves.set(m.id, { x: n.x, y: n.y }); }
       else applyShift(m.id, dx, dy);
     }
-    cx += m.w + GAP; rowH = Math.max(rowH, m.h);
+    placed.push({ ...m, x: spot.x, y: spot.y });
   }
-  return { nodeMoves, folderShifts, folderSizes, height: (cy + rowH + opts.padding) - anchorY };
+  const bottom = placed.reduce((b, p) => Math.max(b, p.y + p.h), top);
+  return { nodeMoves, folderShifts, folderSizes, height: (bottom + opts.padding) - anchorY };
 }
