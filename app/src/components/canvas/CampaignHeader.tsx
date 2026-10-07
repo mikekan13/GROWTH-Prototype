@@ -10,9 +10,9 @@ import CanvasHistoryControls from '@/components/canvas/CanvasHistoryControls';
  * Mockups: tmp/screens/2026-10-06-header-v2-alt-412.html (phone) and
  * 2026-10-06-header-v2-order-1800.html (desktop strip).
  *
- * Phone (< 768 px), 155 px:
+ * Phone (< 768 px), 151 px:
  *   row 1  Soul-blue bar — campaign name (gold Bebas) over the clock · settings gear
- *   row 2  off-white row — the KRMA / FLD / CRY strip
+ *   row 2  the KRMA / FLD / CRY strip, edge to edge, 36 px (no row padding)
  *   row 3  powder tab row — FORGE / CANVAS / TAPESTRY · undo / redo
  *   (the strip, ~245 px, does not fit beside the clock at 412, so the clock
  *   rides the bar under the name — Mike 2026-10-07.)
@@ -67,8 +67,14 @@ const CSS = `
 .gh-stack>.gh-clock{padding-left:10px;min-width:0}
 .gh-stack .gh-name{height:36px;padding-top:4px}
 .gh-bar2>.gh-ic{align-self:center}
-.gh-mid{display:flex;align-items:center;justify-content:flex-end;height:40px;padding:0 6px 0 14px;background:#FAFAF8}
+.gh-mid{display:flex;align-items:stretch;height:36px;padding:0}
 .gh-strip{display:flex;align-items:stretch;height:36px;flex:none}
+.gh-mid>.gh-strip{flex:1 1 auto;height:100%}
+.gh-mid .gh-t{justify-content:center;min-width:0}
+.gh-mid .gh-krma{flex:2.2 1 0}
+.gh-mid .gh-fld{flex:1.2 1 0}
+.gh-mid .gh-cry{flex:1 1 0}
+.gh-mid .gh-t-col{flex:1 1 auto}
 .gh-spacer{flex:1}
 .gh-t{height:36px;flex:none;display:flex;align-items:center}
 .gh-t-col{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px;min-width:46px}
@@ -94,7 +100,9 @@ const CSS = `
 .gh-wide .gh-bar>.gh-clock{margin-left:14px;min-width:0}
 .gh-row{display:flex;align-items:center;height:40px;padding:0 0 0 10px}
 .gh-wide .gh-tab{flex:none;padding:2px 18px 0}
-.gh-ledger{display:flex;align-items:center;align-self:stretch;background:#FAFAF8;margin-left:auto;padding:0 14px}
+.gh-ledger{display:flex;align-items:stretch;align-self:stretch;margin-left:auto;padding:0}
+.gh-ledger>.gh-strip{height:auto}
+.gh-ledger .gh-t{height:auto}
 @media (min-width:1400px){
  .gh-wide .gh-bar{height:52px;padding-left:16px}
  .gh-wide .gh-name{font-size:32px;letter-spacing:.05em}
@@ -102,7 +110,6 @@ const CSS = `
  .gh-wide .gh-ic{width:42px;height:42px}
  .gh-row{height:46px;padding-left:20px}
  .gh-wide .gh-tab{font-size:22px;letter-spacing:.14em;padding:2px 26px 0}
- .gh-ledger{padding:0 28px 0 22px}
 }
 `;
 
