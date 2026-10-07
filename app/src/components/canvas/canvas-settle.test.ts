@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { settle, packFolder, deriveFolderRects, type SettleNode, type SettleFolder } from './canvas-settle';
+import { settle, packFolder, deriveFolderRects, pickRoomAt, type SettleNode, type SettleFolder } from './canvas-settle';
 
 const card = (id: string, x: number, y: number, folderId: string | null = null, w = 520, topH = 120, bottomH = 120): SettleNode => ({ id, x, y, w, topH, bottomH, folderId });
 const folder = (id: string, parentId: string | null = null, extra: Partial<SettleFolder> = {}): SettleFolder => ({ id, parentId, drafting: true, headerH: 96, ...extra });
@@ -220,5 +220,34 @@ describe('packFolder — a sub-folder is never larger than its parent', () => {
     const nodes = [card('a', 0, 0, 'room')];
     const folders = [folder('apt'), folder('room', 'apt')];
     expect(packFolder('apt', 2000, nodes, folders)).toBeNull();
+  });
+});
+
+describe('pickRoomAt — the room a dropped card is filed with', () => {
+  // Apartment holding a Main Room, as drawn (Violet/Ruth geometry, 10-06).
+  const apt = { id: 'apt', rect: { x: -1600, y: 1000, width: 2600, height: 2000 } };
+  const main = { id: 'main', rect: { x: -1300, y: 1200, width: 2060, height: 1600 } };
+  const rooms = [apt, main];
+
+  it('a card centre hugging the room edge (inside the box) files with the room, not the parent', () => {
+    // 4 px inside the right edge — the old 12 px inset filed this with the apartment.
+    expect(pickRoomAt(main.rect.x + main.rect.width - 4, 2530, rooms)).toBe('main');
+    expect(pickRoomAt(main.rect.x + 2, 2530, rooms)).toBe('main');
+    expect(pickRoomAt(0, main.rect.y + main.rect.height - 1, rooms)).toBe('main');
+  });
+
+  it('a card centre on the room header band files with the room', () => {
+    // 40 px below the top edge — inside the old 96 px header exclusion.
+    expect(pickRoomAt(0, main.rect.y + 40, rooms)).toBe('main');
+  });
+
+  it('a card centre outside the room box but inside the apartment files with the apartment', () => {
+    expect(pickRoomAt(main.rect.x + main.rect.width + 20, 2530, rooms)).toBe('apt');
+    expect(pickRoomAt(0, main.rect.y - 10, rooms)).toBe('apt');
+  });
+
+  it('outside every room box → null (membership left alone); collapsed rooms never capture', () => {
+    expect(pickRoomAt(5000, 5000, rooms)).toBeNull();
+    expect(pickRoomAt(0, 2530, [apt, { ...main, collapsed: true }])).toBe('apt');
   });
 });

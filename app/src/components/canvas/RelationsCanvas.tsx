@@ -30,7 +30,7 @@ import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
-import { settle, packFolder, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
+import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import { lodForZoom, folderLabelSize } from "./canvas-lod";
 import FolderGroup from "./FolderGroup";
 
@@ -1263,27 +1263,24 @@ export default function RelationsCanvas({
     return () => clearInterval(t);
   }, [jewlHighlights.size]);
 
-  /** Smallest AUTO (location) folder whose interior contains the point —
-   *  dropping into a room inside an apartment targets the ROOM. Interior
-   *  excludes the header band so hovering the title doesn't capture.
+  /** Smallest AUTO (location) folder whose drawn box contains the card
+   *  centre — dropping into a room inside an apartment targets the ROOM.
+   *  The whole box counts, header band and edges included (2026-10-06:
+   *  the old 12 px inset + header exclusion filed edge-hugging cards with
+   *  the parent while they visibly sat in the room). Rule: pickRoomAt.
    *  Membership is NOT excluded here — callers compare against the
    *  node's current parent and no-op on a same-room move (excluding it
    *  made every within-room drag fall through to the enclosing
    *  apartment and silently re-parent, 2026-08-03). */
   const pickAutoDropTarget = useCallback((px: number, py: number): string | null => {
-    let best: { locId: string; area: number } | null = null;
+    const rooms: Array<{ id: string; rect: { x: number; y: number; width: number; height: number }; collapsed?: boolean }> = [];
     for (const f of foldersRef.current) {
-      if (!f.id.startsWith('auto-') || f.collapsed) continue;
+      if (!f.id.startsWith('auto-')) continue;
       const locId = f.id.slice('auto-'.length);
       const r = folderRectById.get(locId);
-      if (!r) continue;
-      const inset = 12;
-      if (px >= r.x + inset && px <= r.x + r.width - inset && py >= r.y + 96 && py <= r.y + r.height - inset) {
-        const area = r.width * r.height;
-        if (!best || area < best.area) best = { locId, area };
-      }
+      if (r) rooms.push({ id: locId, rect: r, collapsed: f.collapsed });
     }
-    return best?.locId ?? null;
+    return pickRoomAt(px, py, rooms);
   }, [folderRectById]);
   pickAutoDropTargetRef.current = pickAutoDropTarget;
 

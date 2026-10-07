@@ -93,6 +93,31 @@ export interface SettleResult {
 // every settle nudges every grid and the pass never converges (10-01).
 const DEFAULTS = { gap: 16, padding: 30, labelAllowance: 0, maxRounds: 10, emptyFolderSize: { width: 560, height: 150 } };
 
+/**
+ * The room a dropped card is filed with: the smallest room whose DRAWN box
+ * contains the card centre — whole box, header band and edges included
+ * (Mike 2026-10-06: "where she is should be where she is"). The old 12 px
+ * inset + 96 px header exclusion filed an edge-hugging card with the
+ * parent while it visibly sat in the room, so its room on the canvas and
+ * its located_at edge disagreed (Violet, Ruth). A point outside every box
+ * returns null (the caller leaves membership alone). Pure.
+ */
+export function pickRoomAt(
+  px: number,
+  py: number,
+  rooms: Iterable<{ id: string; rect: Rect; collapsed?: boolean }>,
+): string | null {
+  let best: { id: string; area: number } | null = null;
+  for (const room of rooms) {
+    if (room.collapsed) continue;
+    const r = room.rect;
+    if (px < r.x || px > r.x + r.width || py < r.y || py > r.y + r.height) continue;
+    const area = r.width * r.height;
+    if (!best || area < best.area) best = { id: room.id, area };
+  }
+  return best?.id ?? null;
+}
+
 function nodeRect(n: SettleNode): Rect {
   return { x: n.x - n.w / 2, y: n.y - n.topH, width: n.w, height: n.topH + n.bottomH };
 }
