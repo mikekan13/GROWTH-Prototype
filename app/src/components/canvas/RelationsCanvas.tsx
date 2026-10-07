@@ -2733,6 +2733,7 @@ export default function RelationsCanvas({
     let hold: { id: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout>; done: boolean } | null = null;
     let bgTap: { id: number; x: number; y: number } | null = null; // a tap on empty canvas while carrying = drop here
     let swallowClickUntil = 0; // after a completed hold, the finger lifting must not also count as a tap/click
+    let swallowMenuUntil = 0; // after a completed hold, a late touch contextmenu must not open a menu either
     const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
     const isControl = (t: Element) => !!t.closest('button, input, textarea, select, a, [role="button"], [data-no-hold]');
     const onDown = (e: PointerEvent) => {
@@ -2810,7 +2811,7 @@ export default function RelationsCanvas({
       pointers.delete(e.pointerId);
       if (hold && hold.id === e.pointerId) {
         clearTimeout(hold.timer);
-        if (hold.done) swallowClickUntil = Date.now() + 700; // the hold was a pick-up, not a tap
+        if (hold.done) { swallowClickUntil = Date.now() + 700; swallowMenuUntil = Date.now() + 700; } // the hold was a pick-up, not a tap
         hold = null;
       }
       if (bgTap && bgTap.id === e.pointerId) {
@@ -2841,17 +2842,29 @@ export default function RelationsCanvas({
     const onCompatMouse = (e: MouseEvent) => {
       if (Date.now() < swallowClickUntil) { e.preventDefault(); e.stopPropagation(); }
     };
+    // Registered on WINDOW capture (2026-10-07, Mike on his phone: "when I long
+    // press to pick something up the old dice menu appears"). DiceOverlay owns
+    // a document-capture contextmenu listener that opens the spawn-dice menu
+    // for anything in the canvas that is not inside [data-card-wrapper] (room
+    // boxes, card frames outside the wrapper). A document-capture swallow here
+    // could not stop it — stopPropagation does not stop another listener on the
+    // same node, and DiceOverlay mounted first so it ran first. Window capture
+    // runs before every document listener, so stopping here reaches nothing.
+    // Touch only: `pointers` and `hold` only ever hold touch pointers, and the
+    // post-hold window covers a phone that fires the menu event at lift.
     const onContextMenu = (e: MouseEvent) => {
       const t = e.target as Element | null;
       if (!t || !svg.contains(t)) return;
-      const touchHold = (hold && hold.target === t) || (hold && t.contains(hold.target)) || pointers.size > 0;
-      if (touchHold && !isBackgroundTarget(t)) { e.preventDefault(); e.stopPropagation(); }
+      if (isBackgroundTarget(t)) return; // empty canvas: long-press = JEWL here
+      const touchHold = (hold && hold.target === t) || (hold && t.contains(hold.target)) || pointers.size > 0
+        || Date.now() < swallowMenuUntil;
+      if (touchHold) { e.preventDefault(); e.stopImmediatePropagation(); }
     };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('pointermove', onMove, true);
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
-    document.addEventListener('contextmenu', onContextMenu, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
     document.addEventListener('mousedown', onCompatMouse, true);
     document.addEventListener('mouseup', onCompatMouse, true);
     document.addEventListener('click', onClickCapture, true);
@@ -2863,7 +2876,7 @@ export default function RelationsCanvas({
       document.removeEventListener('pointermove', onMove, true);
       document.removeEventListener('pointerup', onUp, true);
       document.removeEventListener('pointercancel', onUp, true);
-      document.removeEventListener('contextmenu', onContextMenu, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- BASE_WIDTH/clampZoom are stable per container size
   }, [BASE_WIDTH]);
