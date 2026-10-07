@@ -67,9 +67,11 @@ if (Test-Port 3000) {
     Write-Host '[boot] starting Next.js dev (logs -> logs\dev-server.*.log)...' -ForegroundColor Cyan
     # Heap cap for the dev server only (2026-10-06, orchestrator): the machine
     # has 16 GB and four Claude sessions share it; Node's default ceiling here
-    # is ~4.3 GB. 3072 MB keeps compile spikes safe (RSS sat at 1.5 GB) while
-    # stopping a runaway. Set just for this launch; whisper is unaffected.
-    $env:NODE_OPTIONS = '--max-old-space-size=3072'
+    # is ~4.3 GB. Next recycles its worker (dropping SSE streams and timers)
+    # once used heap passes 80% of this limit; at 3072 that fired three times
+    # in an afternoon, so 4096 (threshold ~3.3 GB) — still stops a runaway.
+    # Set just for this launch; whisper is unaffected.
+    $env:NODE_OPTIONS = '--max-old-space-size=4096'
     Start-Process -FilePath 'npm.cmd' `
         -ArgumentList 'run', 'dev' `
         -WorkingDirectory $AppDir `
