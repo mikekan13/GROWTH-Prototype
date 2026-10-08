@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { requireCampaignMember } from '@/services/campaign-access';
 import { startSession, endSession, listSessions, getActiveSession } from '@/services/campaign-event';
 
 export async function GET(
@@ -8,8 +9,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const { id: campaignId } = await params;
+    await requireCampaignMember(campaignId, session.user);
     const sessions = await listSessions(campaignId);
     const active = await getActiveSession(campaignId);
     return NextResponse.json({ sessions, active });

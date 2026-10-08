@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { requireCampaignMember } from '@/services/campaign-access';
 import { queryChangeLog } from '@/services/changelog';
 import type { ChangeActor, ChangeCategory } from '@/types/changelog';
 
@@ -8,13 +9,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const params = req.nextUrl.searchParams;
 
     const campaignId = params.get('campaignId');
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId required' }, { status: 400 });
     }
+    await requireCampaignMember(campaignId, session.user);
 
     const result = await queryChangeLog({
       campaignId,

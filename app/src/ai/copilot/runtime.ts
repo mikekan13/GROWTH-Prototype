@@ -10,6 +10,7 @@
 
 import 'server-only';
 import { z } from 'zod';
+import { replyRecipientId } from './history-privacy';
 import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
@@ -216,16 +217,18 @@ async function saveUserPrompt(prompt: JewlPrompt): Promise<string> {
   return row.id;
 }
 
-/** Save JEWL's response as a CopilotMessage. */
+/** Save JEWL's response as a CopilotMessage, stamped with its recipient. */
 async function saveAssistantResponse(
   campaignId: string,
   response: JewlResponse,
+  recipientUserId: string | null,
 ): Promise<string> {
   const row = await prisma.copilotMessage.create({
     data: {
       campaignId,
       role: 'assistant',
       content: response.message,
+      userId: recipientUserId,
       actions: JSON.stringify({
         toolCalls: response.toolCalls.map(tc => ({
           name: tc.name,
@@ -258,7 +261,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     assembleContext(prompt.campaignId, prompt.text || prompt.canvasAction?.intent || ''),
     prisma.campaign.findUnique({
       where: { id: prompt.campaignId },
-      select: { name: true },
+      select: { name: true, gmUserId: true },
     }),
     loadJewlMemoryForCampaign(prompt.campaignId),
     loadTimeAwareness(prompt.campaignId),
@@ -518,7 +521,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     },
   };
 
-  await saveAssistantResponse(prompt.campaignId, response);
+  await saveAssistantResponse(prompt.campaignId, response, replyRecipientId(prompt, campaignRow?.gmUserId));
 
   // ai/network: unified metering (per-GM cost attribution) + fine-tune trace
   // capture (Mike 2026-08-23: dev-era dispatches ARE the distillation corpus

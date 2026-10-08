@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
+import { requireCampaignMember } from '@/services/campaign-access';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
 
@@ -12,8 +13,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const { id: campaignId } = await params;
+    await requireCampaignMember(campaignId, session.user);
     const sp = request.nextUrl.searchParams;
 
     const types = sp.get('types')?.split(',').filter(Boolean) as TerminalEventType[] | undefined;

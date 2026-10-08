@@ -76,7 +76,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 |--------|------|---------|
 | Auth | `lib/auth.ts` | Password hashing, session management, cookie handling, typed auth/forbidden errors |
 | Database | `lib/db.ts` | Prisma client singleton with LibSQL adapter |
-| Permissions | `lib/permissions.ts` | Reusable role/ownership checks |
+| Permissions | `lib/permissions.ts` | Reusable role/ownership checks; `canViewCampaign` (GM / member / ADMIN read access, 2026-10-08), `canSeeCopilotRow` (JEWL history private per user) |
+| CampaignAccess | `services/campaign-access.ts` | `requireCampaignMember(campaignId, user)` — 404 unknown campaign, 403 non-member; gates GET events / changelog / sessions / copilot history (2026-10-08) |
 | Errors | `lib/errors.ts` | Typed error classes (AppError, ValidationError, etc.) |
 | API Utils | `lib/api.ts` | Error-to-HTTP-response conversion |
 | Defaults | `lib/defaults.ts` | Default GrowthCharacter factory |
@@ -211,7 +212,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 
 | Module | File | Purpose |
 |--------|------|---------|
-| CopilotService | `ai/copilot/copilot-service.ts` | Main JEWL inference dispatcher: builds context, selects tools, streams response to campaign |
+| CopilotService | `ai/copilot/copilot-service.ts` | `getCopilotHistory(campaignId, viewer)` — JEWL history PRIVATE PER USER (viewer's own rows + JEWL replies to them; unattributed rows ADMIN-only) |
+| CopilotHistoryPrivacy | `ai/copilot/history-privacy.ts` | Pure: `replyRecipientId` (JEWL reply `userId` = the human who prompted; JEWL's own ticks/work cycles → campaign GM) + `copilotHistoryWhere` |
 | Classifier | `ai/copilot/classifier.ts` | Haiku-powered no-wake-word intent classifier. Routes to CopilotService (Sonnet) only when GM/player input warrants; idle audio dropped |
 | Runtime | `ai/copilot/runtime.ts` | Claude API call wrapper with retry, streaming, tool-use loop |
 | ContextAssembler | `ai/copilot/context-assembler.ts` | `buildTableState` — injects TABLE STATE block: all non-draft character attributes, conditions, traits + rollModifiers, held/equipped items. Soft cap 15 characters |
@@ -335,7 +337,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/characters/[id]/backstory | POST, PATCH | BackstoryService |
 | /api/access-codes | GET, POST | AccessCodeService |
 | /api/access-codes/redeem | POST | AccessCodeService |
-| /api/changelog | GET | ChangeLogService (query with filters: campaignId, characterId, actor, category, pagination) |
+| /api/changelog | GET | ChangeLogService (query with filters: campaignId, characterId, actor, category, pagination); campaign members only (2026-10-08) |
 | /api/changelog/[id]/revert | POST | ChangeLogService (revert entry with conflict detection) |
 | /api/campaigns/[id]/events | GET, POST | CampaignEventService (create + query campaign events with type/session filters). POST now broadcasts via SSE |
 | /api/campaigns/[id]/stream | GET (SSE) | Campaign real-time stream. SSE endpoint for live events (dice, checks, state changes, chat, connections) |
@@ -405,7 +407,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/campaigns/[id]/contested-check | POST | DiceService (contested skill check between two characters) |
 | /api/campaigns/[id]/context | GET | Context service (build token-efficient campaign context for AI) |
 | /api/campaigns/[id]/copilot | POST | JEWL copilot chat (main inference endpoint) |
-| /api/campaigns/[id]/copilot/history | GET | CopilotMessage history for campaign |
+| /api/campaigns/[id]/copilot/history | GET | CopilotMessage history — campaign members only, and only the caller's own turns + JEWL's replies to them (2026-10-08) |
 | /api/campaigns/[id]/entities | GET, POST | EntityService (list campaign entities, create draft entity) |
 | /api/campaigns/[id]/entities/[entityId] | GET, PATCH, DELETE | EntityService (get/update/delete entity, step save/load for wizard) |
 | /api/campaigns/[id]/entities/[entityId]/crystallize | POST | EntityService crystallizeEntity (TKV debit, GM wallet → character wallet, LOCK) |

@@ -307,6 +307,12 @@ ADMIN-tunable economy constants. Key-value store; service layer falls back to co
 - `value`: String — JSON shape varies per key (e.g. `DripConfig` for "drip")
 - `updatedBy`: String? — ADMIN userId of last edit
 
+### CopilotMessage
+JEWL conversation rows (`role` user | assistant). No schema change on 2026-10-08, but `userId` now carries meaning on BOTH roles:
+- user rows: the human who wrote it (or JEWL's own id for `[system]` triggers)
+- assistant rows (from 2026-10-08): the RECIPIENT — the human who prompted; JEWL's own autonomous ticks / work cycles → the campaign GM. Older assistant rows have `userId = null`.
+- Read rule (JEWL history is private per user): a viewer is served only rows whose `userId` is theirs; `null` rows are ADMIN-only. See `ai/copilot/history-privacy.ts`.
+
 ### JewlMistake
 GM mistake-bounty flagging corpus. A GM flags a JEWL CopilotMessage as wrong; the flag is a CLAIM — no KRMA moves until resolved (transfer-on-acceptance, T19). JEWL acknowledges (bounty pays JEWL→GM) or disputes (Et'herling adjudicates: upheld pays, overturned pays nothing).
 - `copilotMessageId` + `gmUserId`: unique pair (same GM can't double-flag)
