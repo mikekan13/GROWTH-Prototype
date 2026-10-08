@@ -17,7 +17,9 @@ import BeingSpeakingLines from './BeingSpeakingLines';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
 import { pageCutoff, keepFrom, mergeEvents, withoutLoggedSessionLines } from './table-feed/feed-paging';
-import { matchEvent } from './table-feed/feed-tree';
+import { matchEvent, type FoldKeep } from './table-feed/feed-tree';
+import { withNarration, feedKeep, isFeedLine } from './table-feed/feed-split';
+import MechanicalLog from './MechanicalLog';
 import type { FeedEntity } from './table-feed/TableFeedRows';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
@@ -60,6 +62,9 @@ interface CampaignTerminalProps {
 /** Rows per source per page of the one feed's history. */
 const FEED_PAGE = 60;
 
+/** The Terminal feed shows narrative lines only (Mike 2026-10-08); the mechanics are in the jEWL tab's Log. */
+const FEED_KEEP: FoldKeep = (e) => feedKeep(e);
+
 
 // Map filter keys to event types for querying
 function filterToTypes(filter: TerminalFilter): string[] | undefined {
@@ -96,6 +101,15 @@ export default function CampaignTerminal({
 }: CampaignTerminalProps) {
   // 'terminal' = the one feed (TERMINAL and TABLE merged, Mike 2026-10-08).
   const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot'>('terminal');
+  // Inside the jEWL tab: the conversation, or the mechanical Log (Mike 2026-10-08).
+  const [jewlView, setJewlView] = useState<'conversation' | 'log'>('conversation');
+  /** The Log rows a feed line's link jumped to. */
+  const [logReveal, setLogReveal] = useState<Set<string> | null>(null);
+  const openLog = useCallback((ids: string[]) => {
+    setLogReveal(new Set(ids));
+    setJewlView('log');
+    setTerminalMode('copilot');
+  }, []);
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   // No filter chips (Mike 2026-10-08): the one feed is searched, not filtered.
@@ -854,11 +868,14 @@ export default function CampaignTerminal({
   const emptyFrom = olderCursor ? (events[0]?.timestamp ?? null) : null;
   const [query, setQuery] = useState('');
   const searching = query.trim().length > 0;
+  // Narrative only, play only: mechanical rows become numberless lines where the
+  // mapper knows them, and every feed line links to the mechanics behind it.
+  const narrated = useMemo(() => withNarration(feedEvents, sessions), [feedEvents, sessions]);
   const hits = useMemo(() => {
     if (!searching) return 0;
     const q = query.trim().toLowerCase();
-    return feedEvents.filter(e => matchEvent(e, q)).length;
-  }, [feedEvents, query, searching]);
+    return narrated.events.filter(e => isFeedLine(e, sessions) && matchEvent(e, q)).length;
+  }, [narrated, sessions, query, searching]);
 
   const refreshEvents = useCallback(() => { void fetchEvents(); }, [fetchEvents]);
 
@@ -956,14 +973,45 @@ export default function CampaignTerminal({
         )}
       </div>
 
-      {/* JEWL — his own tab (Mike 2026-10-08) */}
+      {/* JEWL — his own tab (Mike 2026-10-08): the conversation, or the Log of mechanics. */}
       {terminalMode === 'copilot' && (
+        <div role="tablist" aria-label="jEWL view" data-jewl-view style={{
+          display: 'flex', flex: 'none', gap: 6, padding: '6px 10px 6px 14px', background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)',
+        }}>
+          {(['conversation', 'log'] as const).map(v => (
+            <button key={v} role="tab" aria-selected={jewlView === v} data-no-hold onClick={() => { setJewlView(v); if (v === 'conversation') setLogReveal(null); }} style={{
+              minHeight: 36, padding: '2px 10px 0', border: 0, cursor: 'pointer', fontFamily: bebas, fontSize: 17, letterSpacing: '0.06em',
+              background: jewlView === v ? '#000' : 'transparent', color: jewlView === v ? '#f5f4ef' : '#002f6c',
+              boxShadow: jewlView === v ? undefined : 'inset 0 0 0 1.5px #002f6c',
+            }}>
+              {v === 'conversation' ? 'Conversation' : 'Log'}
+            </button>
+          ))}
+        </div>
+      )}
+      {terminalMode === 'copilot' && jewlView === 'conversation' && (
         <CopilotChat
           campaignId={campaignId}
           visible={visible && terminalMode === 'copilot'}
           userId={_userId}
           username={_username}
           userRole={_userRole}
+        />
+      )}
+      {terminalMode === 'copilot' && jewlView === 'log' && (
+        <MechanicalLog
+          campaignId={campaignId}
+          events={feedEvents}
+          sessions={sessions}
+          entities={tableEntities ?? []}
+          emptyFrom={emptyFrom}
+          isGM={isGM}
+          onRevert={handleRevert}
+          reverting={reverting}
+          reveal={logReveal}
+          hasOlder={!!olderCursor}
+          loadingOlder={loadingOlder}
+          onLoadOlder={() => void loadOlder()}
         />
       )}
 
@@ -1021,7 +1069,11 @@ export default function CampaignTerminal({
           )}
           <TableFeed
             campaignId={campaignId}
-            events={feedEvents}
+            events={narrated.events}
+            keep={FEED_KEEP}
+            dropBetween
+            logRefs={narrated.logRefs}
+            onOpenLog={openLog}
             entities={tableEntities ?? []}
             loading={loading}
             onRevert={handleRevert}

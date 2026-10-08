@@ -18,7 +18,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TerminalEvent, GameSessionInfo } from '@/types/terminal';
 import { presentCycle, type FeedTimescale } from '@/lib/feed-segments';
 import { buildFeedRows, type RosterName } from './feed-rows';
-import { buildFoldTree, openByDefaultKeys, filterTree, type FoldNode, type FoldItem } from './feed-tree';
+import { buildFoldTree, openByDefaultKeys, filterTree, revealKeys, type FoldNode, type FoldItem, type FoldKeep } from './feed-tree';
 import { FeedRow, TableFeedProvider, type FeedEntity } from './TableFeedRows';
 import { TABLE_FEED_CSS } from './styles';
 
@@ -119,6 +119,7 @@ interface TreeCtx {
   encounterSlot: React.ReactNode;
   /** No encounter fold is live: the controls go at the end of the live session instead. */
   slotInSession: boolean;
+  logRefs?: Map<string, string[]>;
 }
 
 function Fold({ node, num, ctx }: { node: FoldNode; num: string; ctx: TreeCtx }) {
@@ -144,7 +145,7 @@ function Fold({ node, num, ctx }: { node: FoldNode; num: string; ctx: TreeCtx })
         <div className="fb">
           {runs(node.items).map((r) => r.type === 'node'
             ? <Fold key={r.node.key} node={r.node} num={nums.get(r.node.key) ?? num} ctx={ctx} />
-            : <React.Fragment key={r.key}>{buildFeedRows(r.events, ctx.roster).map((row) => <FeedRow key={row.key} row={row} />)}</React.Fragment>)}
+            : <React.Fragment key={r.key}>{buildFeedRows(r.events, ctx.roster, ctx.logRefs).map((row) => <FeedRow key={row.key} row={row} />)}</React.Fragment>)}
           {showSlot && !liveEnc && (
             <section className="fold k-encounter live" data-fold="encounter" data-open="1">
               <div className="fh h-encounter static"><span className="cb-bar">{'=== [ENCOUNTER] ==='}</span></div>
@@ -170,6 +171,13 @@ export default function TableFeed({
   foldKey,
   query = '',
   encounter,
+  keep,
+  dropBetween = false,
+  prune = false,
+  logRefs,
+  onOpenLog,
+  reveal,
+  emptyText = '[THE TABLE IS QUIET]',
   children,
 }: {
   campaignId: string;
@@ -189,6 +197,18 @@ export default function TableFeed({
   query?: string;
   /** The live encounter (GM, live session): matched to its fold, whose body carries `render()`. */
   encounter?: { live: { id: string | null; name: string } | null; render: () => React.ReactNode };
+  /** Which lines show (feed-split.ts: feedKeep / logKeep); structure is built from every event. */
+  keep?: FoldKeep;
+  /** Leave out the between-sessions stretches (the Terminal feed shows play only). */
+  dropBetween?: boolean;
+  /** Drop folds left with no lines (the Log). */
+  prune?: boolean;
+  /** Feed line id → mechanical rows behind it; with `onOpenLog`, the line links to them. */
+  logRefs?: Map<string, string[]>;
+  onOpenLog?: (ids: string[]) => void;
+  /** Rows to open the folds of and mark (a feed link's targets, in the Log). */
+  reveal?: Set<string> | null;
+  emptyText?: string;
   /** Rendered under the last row, inside the feed's styles (the growing line). */
   children?: React.ReactNode;
 }) {
@@ -212,11 +232,20 @@ export default function TableFeed({
 
   const roster = useMemo(() => entities.filter((e) => e.kind === 'npc').map((e) => ({ id: e.id, name: e.name })), [entities]);
   const liveEncounter = encounter?.live ?? null;
-  const tree = useMemo(() => (sessions ? buildFoldTree(events, sessions, { emptyFrom, liveEncounter }) : null), [events, sessions, emptyFrom, liveEncounter]);
+  const tree = useMemo(
+    () => (sessions ? buildFoldTree(events, sessions, { emptyFrom, liveEncounter, keep, dropBetween, prune }) : null),
+    [events, sessions, emptyFrom, liveEncounter, keep, dropBetween, prune],
+  );
+  const revealed = useMemo(() => (tree && reveal && reveal.size ? revealKeys(tree, reveal) : null), [tree, reveal]);
+  // A link jumped here: open the folds holding its rows (once — the viewer can fold them again).
+  useEffect(() => {
+    if (!revealed || revealed.size === 0) return;
+    setFolds((prev) => { const next = { ...prev }; revealed.forEach((k) => { next[k] = true; }); return next; });
+  }, [revealed]);
   const defaults = useMemo(() => (tree ? openByDefaultKeys(tree) : new Set<string>()), [tree]);
   const searching = !!query.trim();
   const found = useMemo(() => (tree && searching ? filterTree(tree, query) : null), [tree, searching, query]);
-  const flatRows = useMemo(() => (tree ? [] : buildFeedRows(events, roster)), [tree, events, roster]);
+  const flatRows = useMemo(() => (tree ? [] : buildFeedRows(events, roster, logRefs)), [tree, events, roster, logRefs]);
 
   const toggle = useCallback((n: FoldNode, open: boolean) => {
     setFolds((prev) => { const next = { ...prev, [n.key]: !open }; writeFolds(foldKey, next); return next; });
@@ -234,15 +263,16 @@ export default function TableFeed({
     timescale,
     encounterSlot: encounter && !searching ? encounter.render() : null,
     slotInSession: !anyLiveEncounterFold,
+    logRefs,
   };
 
   const empty = shown ? shown.length === 0 : flatRows.length === 0;
 
   return (
-    <TableFeedProvider entities={entities} timescale={timescale} onRevert={onRevert} reverting={reverting}>
+    <TableFeedProvider entities={entities} timescale={timescale} onRevert={onRevert} reverting={reverting} onOpenLog={onOpenLog} highlight={reveal ?? undefined}>
       <style>{TABLE_FEED_CSS}</style>
       <div className={`tf${searching ? ' searching' : ''}`} data-table-feed data-hits={found ? found.hits : undefined}>
-        {empty && <div className="empty">{loading ? 'Loading…' : searching ? '[NO LINE MATCHES]' : '[THE TABLE IS QUIET]'}</div>}
+        {empty && <div className="empty">{loading ? 'Loading…' : searching ? '[NO LINE MATCHES]' : emptyText}</div>}
         {!shown && flatRows.map((row) => <FeedRow key={row.key} row={row} />)}
         {shown && shown.map((n) => <Fold key={n.key} node={n} num={String(n.chapter?.number ?? 1)} ctx={ctx} />)}
         {children}

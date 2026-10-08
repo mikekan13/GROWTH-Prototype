@@ -34,13 +34,19 @@ interface FeedContextValue {
   /** Revert a character change (changelog entry id); absent = no revert control. */
   onRevert?: (entryId: string) => void;
   reverting?: string | null;
+  /** A feed line's link to the mechanical rows behind it (opens the jEWL tab's Log). */
+  onOpenLog?: (ids: string[]) => void;
+  /** Rows to mark (the Log rows a feed link jumped to). */
+  highlight?: Set<string>;
 }
 
 const FeedContext = createContext<FeedContextValue>({ entities: new Map(), names: [], timescale: null });
 
-export function TableFeedProvider({ entities, timescale, onRevert, reverting, children }: {
+export function TableFeedProvider({ entities, timescale, onRevert, reverting, onOpenLog, highlight, children }: {
   entities: FeedEntity[]; timescale: FeedTimescale | null;
-  onRevert?: (entryId: string) => void; reverting?: string | null; children: React.ReactNode;
+  onRevert?: (entryId: string) => void; reverting?: string | null;
+  onOpenLog?: (ids: string[]) => void; highlight?: Set<string>;
+  children: React.ReactNode;
 }) {
   const value = useMemo<FeedContextValue>(() => ({
     entities: new Map(entities.map((e) => [e.id, e])),
@@ -48,7 +54,9 @@ export function TableFeedProvider({ entities, timescale, onRevert, reverting, ch
     timescale,
     onRevert,
     reverting,
-  }), [entities, timescale, onRevert, reverting]);
+    onOpenLog,
+    highlight,
+  }), [entities, timescale, onRevert, reverting, onOpenLog, highlight]);
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;
 }
 
@@ -208,19 +216,45 @@ function PortraitChip({ row }: { row: CharacterRowModel }) {
   );
 }
 
+/** The small link from a feed line to the mechanical rows behind it in the Log. */
+function LogLink({ refs }: { refs?: string[] }) {
+  const { onOpenLog } = useContext(FeedContext);
+  if (!refs || refs.length === 0 || !onOpenLog) return null;
+  return (
+    <button
+      type="button"
+      className="md loglink"
+      aria-label={`Show the ${refs.length} mechanical row${refs.length === 1 ? '' : 's'} behind this line in the Log`}
+      title="Show in the Log"
+      data-no-hold
+      data-log-link={refs.join(',')}
+      onClick={(e) => { e.stopPropagation(); onOpenLog(refs); }}
+    >
+      <span className="tg lg">{'⌗'}{refs.length > 1 ? refs.length : ''}</span>
+    </button>
+  );
+}
+
+/** Row attributes: the key (for jumping to it) and the mark when a link jumped here. */
+function useRowAttrs(key: string): { 'data-key': string; 'data-hl'?: '' } {
+  const { highlight } = useContext(FeedContext);
+  return highlight?.has(key) ? { 'data-key': key, 'data-hl': '' } : { 'data-key': key };
+}
+
 // ── rows ─────────────────────────────────────────────────────────────────────
 
 export function CharacterRow({ row, caret, withdrawn }: { row: CharacterRowModel; caret?: boolean; withdrawn?: boolean }) {
   const [rawOpen, setRawOpen] = useState(false);
   const exclude = useMemo(() => (row.characterId ? [row.characterId] : []), [row.characterId]);
+  const attrs = useRowAttrs(row.key);
   return (
-    <div className={`row cl${withdrawn ? ' gone' : ''}`} data-row="character" data-via={row.via}>
+    <div className={`row cl${withdrawn ? ' gone' : ''}`} data-row="character" data-via={row.via} {...attrs}>
       <PortraitChip row={row} />
       <div className="body">
         <Segments segments={row.segments} exclude={exclude} name={row.name} at={hhmm(row.timestamp)} caret={caret} />
         {withdrawn && <span className="fix">Line withdrawn</span>}
       </div>
-      <div className="side">{!caret && !withdrawn && <RawToggle via={row.via} open={rawOpen} onToggle={() => setRawOpen((o) => !o)} />}</div>
+      <div className="side">{!caret && !withdrawn && <RawToggle via={row.via} open={rawOpen} onToggle={() => setRawOpen((o) => !o)} />}{!caret && <LogLink refs={row.logRefs} />}</div>
       {rawOpen && <RawBlock raw={row.raw} via={row.via} cycle={row.cycle} timestamp={row.timestamp} />}
     </div>
   );
@@ -228,10 +262,11 @@ export function CharacterRow({ row, caret, withdrawn }: { row: CharacterRowModel
 
 export function NarrationRow({ row }: { row: NarrationRowModel }) {
   const [rawOpen, setRawOpen] = useState(false);
+  const attrs = useRowAttrs(row.key);
   return (
-    <div className="row nx" data-row="narration" data-via={row.via}>
-      <div className="body"><div className="line"><EntityText text={row.text} source={`from narration · ${hhmm(row.timestamp)}`} /></div></div>
-      <div className="side"><RawToggle via={row.via} open={rawOpen} onToggle={() => setRawOpen((o) => !o)} /></div>
+    <div className={`row nx${row.mechanical ? ' told' : ''}`} data-row="narration" data-via={row.mechanical ? 'mechanical' : row.via} {...attrs}>
+      <div className="body"><div className="line"><EntityText text={row.text} source={`from ${row.mechanical ? 'the record' : 'narration'} · ${hhmm(row.timestamp)}`} /></div></div>
+      <div className="side">{!row.mechanical && <RawToggle via={row.via} open={rawOpen} onToggle={() => setRawOpen((o) => !o)} />}<LogLink refs={row.logRefs} /></div>
       {rawOpen && <RawBlock raw={row.raw} via={row.via} cycle={row.cycle} timestamp={row.timestamp} />}
     </div>
   );
@@ -242,8 +277,9 @@ const BAR_CLASS: Record<BarRowModel['type'], string> = { check: 'check', event: 
 export function BarRow({ row }: { row: BarRowModel }) {
   const { onRevert, reverting } = useContext(FeedContext);
   const canRevert = !!(row.revertId && onRevert);
+  const attrs = useRowAttrs(row.key);
   return (
-    <div className={`row bx bars ${BAR_CLASS[row.type]}`} data-row={row.type}>
+    <div className={`row bx bars ${BAR_CLASS[row.type]}`} data-row={row.type} {...attrs}>
       <div className="body">
         {row.lines.map((l, i) => (
           <div className="line" key={i}>
@@ -265,14 +301,16 @@ export function BarRow({ row }: { row: BarRowModel }) {
             <span className="tg rv">{reverting === row.revertId ? '…' : '↶'}</span>
           </button>
         )}
+        <LogLink refs={row.logRefs} />
       </div>
     </div>
   );
 }
 
 export function WithdrawnRow({ row }: { row: WithdrawnRowModel }) {
+  const attrs = useRowAttrs(row.key);
   return (
-    <div className="row bx gone" data-row="withdrawn">
+    <div className="row bx gone" data-row="withdrawn" {...attrs}>
       <div className="body">
         <div className="line">{row.text}</div>
         <span className="fix">{row.fix}</span>

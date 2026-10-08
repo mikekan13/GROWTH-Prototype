@@ -62,6 +62,10 @@ export const TABLE_FEED_CSS = `
 .tf .md:focus-visible .tg{box-shadow:inset 0 0 0 2px var(--tf-navy)}
 .tf .md .tg.rv::after{content:""}
 .tf .md .tg.rv{color:#b0303b;box-shadow:inset 0 0 0 1.5px #b0303b}
+.tf .md .tg.lg::after{content:""}
+.tf .md .tg.lg{color:var(--tf-navy);box-shadow:inset 0 0 0 1.5px var(--tf-navy);font-family:var(--font-terminal)}
+.tf .row.nx.told .line{font-style:italic}
+.tf .row[data-hl]{box-shadow:inset 4px 0 0 var(--tf-gold);background:rgba(255,204,120,0.28);padding-left:6px}
 
 /* raw reveal: the p 2 stream, Consolas on #383837 bars, contiguous */
 .tf .rawbox{grid-column:1/-1;margin:6px 0 2px}
