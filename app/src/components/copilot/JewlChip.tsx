@@ -292,13 +292,15 @@ export function JewlChip() {
   // Sheet mode uses a backdrop instead, so the outside tap never reaches the canvas.
   useEffect(() => {
     if (!open || sheetMode) return;
-    function onDocMouseDown(e: MouseEvent) {
+    // pointerdown in the capture phase: the canvas cancels the compatibility
+    // mousedown, so a click on empty canvas never reached a mousedown listener.
+    function onDocPointerDown(e: PointerEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
+    document.addEventListener('pointerdown', onDocPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onDocPointerDown, true);
   }, [open, sheetMode]);
 
   // Hotkeys
