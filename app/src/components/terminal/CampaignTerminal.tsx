@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import TerminalEventRow from './TerminalEventRow';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import CommandInput from './CommandInput';
 import type { CommandInputHandle } from './CommandInput';
 import type { TerminalEvent, TerminalFilter, ChangeLogPayload, GameSessionInfo } from '@/types/terminal';
@@ -15,9 +14,9 @@ import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import BeingSpeakingLines from './BeingSpeakingLines';
-import SpokenBeatBlock, { foldSpokenBeats } from './SpokenBeatBlock';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
+import { pageCutoff, keepFrom, mergeEvents, sessionMarkers, withoutLoggedSessionLines } from './table-feed/feed-paging';
 import type { FeedEntity } from './table-feed/TableFeedRows';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
@@ -51,9 +50,14 @@ interface CampaignTerminalProps {
   campaignCharacters?: Array<{ id: string; name: string }>;
   /** Characters, places and items of the campaign — the TABLE feed's portraits and entity spans. */
   tableEntities?: FeedEntity[];
+  /** Fold the drawer (the ▾ at the end of the tab row). */
+  onClose?: () => void;
 }
 
 // ── Filter Config ──────────────────────────────────────────────────────────
+
+/** Rows per source per page of the one feed's history. */
+const FEED_PAGE = 60;
 
 const FILTERS: { key: TerminalFilter; label: string; icon: string }[] = [
   { key: 'all', label: 'All', icon: '' },
@@ -94,15 +98,16 @@ export default function CampaignTerminal({
   connectedUsers,
   campaignCharacters,
   tableEntities,
+  onClose,
 }: CampaignTerminalProps) {
-  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'table' | 'encounter'>('terminal');
+  // 'terminal' = the one feed (TERMINAL and TABLE merged, Mike 2026-10-08).
+  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'encounter'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<TerminalFilter>('all');
   const [reverting, setReverting] = useState<string | null>(null);
   const [sessions, setSessions] = useState<GameSessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<GameSessionInfo | null>(null);
-  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
   // Session-start loading screen (Mike 2026-10-01): shown once per active
   // session, for the GM, while the self-hosted core cold-starts.
   const [warmup, setWarmup] = useState<{ startedAt: string; number: number } | null>(null);
@@ -153,7 +158,7 @@ export default function CampaignTerminal({
 
   // If the session ends (or role loads late) while sitting on TABLE, fall back.
   useEffect(() => {
-    if ((terminalMode === 'table' || terminalMode === 'encounter') && !tableAvailable) setTerminalMode('terminal');
+    if (terminalMode === 'encounter' && !tableAvailable) setTerminalMode('terminal');
   }, [terminalMode, tableAvailable]);
 
   // A session just became active (started here, or already live on a reload):
@@ -180,22 +185,33 @@ export default function CampaignTerminal({
 
   // ── Fetch merged events ──────────────────────────────────────────────────
 
-  const fetchEvents = useCallback(async () => {
-    try {
+  // One feed, paged (Mike 2026-10-08): the newest page on open, earlier
+  // sessions as the reader scrolls back. `olderCursor` = where the next older
+  // page starts; null = the campaign's beginning is loaded.
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  /** Set right before older rows are prepended, so the view can hold its place. */
+  const prependAnchorRef = useRef<{ height: number; top: number } | null>(null);
+
+  const fetchPage = useCallback(async (cursor?: string): Promise<{ rows: TerminalEvent[]; cutoff: string | null }> => {
       const filterTypes = filterToTypes(activeFilter);
+      const wantEvents = activeFilter !== 'changes';
+      const wantChanges = activeFilter === 'all' || activeFilter === 'changes';
 
       // Fetch changelog entries
-      const clParams = new URLSearchParams({ campaignId, limit: '100' });
-      const clRes = await fetch(`/api/changelog?${clParams}`, { cache: 'no-store' });
-      const clData = clRes.ok ? await clRes.json() : { entries: [] };
+      const clParams = new URLSearchParams({ campaignId, limit: String(FEED_PAGE) });
+      if (cursor) clParams.set('cursor', cursor);
+      const clRes = wantChanges ? await fetch(`/api/changelog?${clParams}`, { cache: 'no-store' }) : null;
+      const clData = clRes?.ok ? await clRes.json() : { entries: [], nextCursor: null };
 
       // Fetch campaign events
-      const evParams = new URLSearchParams({ limit: '100' });
+      const evParams = new URLSearchParams({ limit: String(FEED_PAGE) });
+      if (cursor) evParams.set('cursor', cursor);
       if (filterTypes && activeFilter !== 'changes') {
         evParams.set('types', filterTypes.filter(t => t !== 'changelog').join(','));
       }
-      const evRes = await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' });
-      const evData = evRes.ok ? await evRes.json() : { events: [] };
+      const evRes = wantEvents ? await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' }) : null;
+      const evData = evRes?.ok ? await evRes.json() : { events: [], nextCursor: null };
 
       // Wrap changelog entries as TerminalEvents
       const changelogEvents: TerminalEvent[] = (clData.entries || []).map((entry: ChangeLogEntry) => ({
@@ -256,12 +272,40 @@ export default function CampaignTerminal({
 
       merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-      setEvents(merged);
-      setLoading(false);
-    } catch {
-      setLoading(false);
-    }
+      // Both sources come newest-first; keep only what is newer than the later
+      // of their oldest rows (while a source has more), so no gap shows.
+      const evRows = (evData.events || []) as Array<{ createdAt: string }>;
+      const clRows = (clData.entries || []) as Array<{ createdAt: string }>;
+      const cutoff = pageCutoff([
+        { oldest: evRows.length ? evRows[evRows.length - 1].createdAt : null, hasMore: wantEvents && !!evData.nextCursor },
+        { oldest: clRows.length ? clRows[clRows.length - 1].createdAt : null, hasMore: wantChanges && !!clData.nextCursor },
+      ]);
+      return { rows: keepFrom(merged, cutoff), cutoff };
   }, [campaignId, activeFilter]);
+
+  /** The newest page. `reset` (open / filter change) replaces the feed; otherwise new rows merge in and older pages stay. */
+  const fetchEvents = useCallback(async (reset = false) => {
+    try {
+      const { rows, cutoff } = await fetchPage();
+      setEvents(prev => (reset ? rows : mergeEvents(prev, rows)));
+      if (reset) setOlderCursor(cutoff);
+    } catch { /* keep what is shown */ }
+    setLoading(false);
+  }, [fetchPage]);
+
+  /** Scrolled back to the top: the next older page, held in place. */
+  const loadOlder = useCallback(async () => {
+    if (!olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const { rows, cutoff } = await fetchPage(olderCursor);
+      const el = scrollRef.current;
+      if (el) prependAnchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
+      setEvents(prev => mergeEvents(prev, rows));
+      setOlderCursor(cutoff);
+    } catch { /* try again on the next scroll */ }
+    setLoadingOlder(false);
+  }, [olderCursor, loadingOlder, fetchPage]);
 
   // ── Fetch sessions ─────────────────────────────────────────────────────
 
@@ -277,7 +321,7 @@ export default function CampaignTerminal({
 
   useEffect(() => {
     if (visible) {
-      fetchEvents();
+      fetchEvents(true);
       fetchSessions();
     }
   }, [visible, fetchEvents, fetchSessions]);
@@ -305,12 +349,25 @@ export default function CampaignTerminal({
     return () => clearInterval(interval);
   }, [visible, fetchEvents, fetchSessions]);
 
-  // Auto-scroll to bottom on new events
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Newest at the bottom: new rows pin the view to the bottom — unless older
+  // rows were just prepended (scrolling back), then the view holds its place.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const anchor = prependAnchorRef.current;
+    if (anchor) {
+      prependAnchorRef.current = null;
+      el.scrollTop = anchor.top + (el.scrollHeight - anchor.height);
+      return;
     }
+    el.scrollTop = el.scrollHeight;
   }, [events.length]);
+
+  // Scrolled to the top of what is loaded → the next older page.
+  const onFeedScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (el && el.scrollTop < 80 && olderCursor && !loadingOlder) void loadOlder();
+  }, [olderCursor, loadingOlder, loadOlder]);
 
   // Listen for roll-skill events from SkillsCard
   useEffect(() => {
@@ -798,64 +855,50 @@ export default function CampaignTerminal({
     fetchEvents();
   }, [campaignId, character, onCharacterUpdate, onRestComplete, fetchEvents, fetchSessions, executeDiceApiCall]);
 
-  const toggleSessionCollapse = (sessionId: string) => {
-    setCollapsedSessions(prev => {
-      const next = new Set(prev);
-      if (next.has(sessionId)) next.delete(sessionId);
-      else next.add(sessionId);
-      return next;
-    });
-  };
+  // ── The one feed (Mike 2026-10-08) ─────────────────────────────────────────
+  // TERMINAL and TABLE are one feed in the rulebook's row grammar, there
+  // whether or not a session is live. Session boundaries are teal system rows
+  // built from the session list (only within what is loaded, unless the whole
+  // record is). The filter chips narrow it.
+  const feedEvents = useMemo(() => {
+    if (activeFilter !== 'all' && activeFilter !== 'events') return events;
+    const oldest = events.length ? new Date(events[0].timestamp).getTime() : null;
+    const markers = sessionMarkers(sessions, campaignId)
+      .filter(m => !olderCursor || oldest === null || new Date(m.timestamp).getTime() >= oldest);
+    return mergeEvents(withoutLoggedSessionLines(events), markers);
+  }, [events, sessions, campaignId, olderCursor, activeFilter]);
 
-  // ── Group events by session ──────────────────────────────────────────────
+  const refreshEvents = useCallback(() => { void fetchEvents(); }, [fetchEvents]);
 
-  interface EventGroup {
-    sessionId: string | null;
-    sessionInfo: GameSessionInfo | null;
-    label: string;
-    events: TerminalEvent[];
-  }
+  // No text input when no session is live (Mike 2026-10-08: "No need for
+  // inputs when not in play… They work with JEWL for any of that"). The
+  // session itself still needs a switch, and `/session` typed into the old
+  // input was the only one — so the GM gets a button that runs that same path.
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const toggleSession = useCallback(async () => {
+    if (sessionBusy) return;
+    if (activeSession && !window.confirm(`End session ${activeSession.number}? Improvisations settle at session end.`)) return;
+    setSessionBusy(true);
+    try { await handleCommandSubmit(activeSession ? '/session end' : '/session start'); } finally { setSessionBusy(false); }
+  }, [sessionBusy, activeSession, handleCommandSubmit]);
 
-  const groupedEvents: EventGroup[] = (() => {
-    if (sessions.length === 0) {
-      // No sessions — show all events flat
-      return [{ sessionId: null, sessionInfo: null, label: 'All Activity', events }];
-    }
-
-    const groups: EventGroup[] = [];
-
-    // Group events by sessionId
-    const bySession = new Map<string | null, TerminalEvent[]>();
-    for (const ev of events) {
-      const sid = ev.sessionId ?? null;
-      if (!bySession.has(sid)) bySession.set(sid, []);
-      bySession.get(sid)!.push(ev);
-    }
-
-    // Build ordered groups: between-session events come between sessions
-    // For now, simple: null session first, then each session in order
-    const betweenEvents = bySession.get(null) || [];
-    if (betweenEvents.length > 0) {
-      groups.push({ sessionId: null, sessionInfo: null, label: 'Between Sessions', events: betweenEvents });
-    }
-
-    for (const session of sessions) {
-      const sessionEvents = bySession.get(session.id) || [];
-      groups.push({
-        sessionId: session.id,
-        sessionInfo: session,
-        label: `Session ${session.number}${session.name ? `: ${session.name}` : ''}`,
-        events: sessionEvents,
-      });
-    }
-
-    return groups;
-  })();
+  const bebas = 'var(--font-bebas-neue), Bebas Neue, sans-serif';
+  const mono = 'var(--font-terminal), Consolas, monospace';
+  const tabStyle = (on: boolean): React.CSSProperties => ({
+    fontFamily: bebas, fontSize: 19, letterSpacing: '0.07em', height: 36, padding: '3px 9px 0', border: 0,
+    whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none',
+    background: on ? '#002f6c' : 'none', color: on ? '#ffcc78' : '#002f6c', transform: on ? 'rotate(-1deg)' : undefined,
+  });
+  const chipStyle = (on: boolean): React.CSSProperties => ({
+    fontFamily: bebas, fontSize: 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: '2px 8px 0', border: 0,
+    whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none',
+    background: on ? '#002f6c' : 'none', color: on ? '#ffcc78' : '#002f6c',
+  });
 
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: '#0a0a1a' }}>
+    <div className="h-full flex flex-col" style={{ backgroundColor: '#cfe2f2' }} data-drawer>
       {warmup && isGM && (
         <SessionWarmupOverlay
           campaignId={campaignId}
@@ -865,151 +908,33 @@ export default function CampaignTerminal({
           onDismiss={closeWarmup}
         />
       )}
-      {/* Header */}
-      <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span style={{ color: connected ? 'var(--terminal-prime)' : '#666', fontSize: '14px' }} title={connected ? 'Connected (live)' : 'Disconnected (polling)'}>
-              {connected ? '\u25C8' : '\u25CB'}
-            </span>
-            <h2 className="text-sm uppercase tracking-widest" style={{
-              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-              color: 'var(--terminal-prime)',
-              fontSize: '18px',
-            }}>CAMPAIGN TERMINAL</h2>
-            {connectedUsers && connectedUsers.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5" style={{
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                color: '#22ab9480',
-                border: '1px solid rgba(34,171,148,0.2)',
-              }} title={connectedUsers.map(u => u.username).join(', ')}>
-                {connectedUsers.length} online
-              </span>
-            )}
-            {activeSession && (
-              <span className="text-[13px] px-2 py-0.5" style={{
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                color: 'var(--terminal-prime)',
-                border: '1px solid rgba(34,171,148,0.4)',
-                borderRadius: '2px',
-              }}>
-                SESSION {activeSession.number} ACTIVE
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Mode toggle: Terminal / Co-pilot */}
-            <div className="flex" style={{ border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}>
-              <button
-                onClick={() => setTerminalMode('terminal')}
-                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                style={{
-                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                  letterSpacing: '0.05em',
-                  color: terminalMode === 'terminal' ? '#0a0a1a' : '#888',
-                  backgroundColor: terminalMode === 'terminal' ? 'var(--terminal-prime)' : 'transparent',
-                }}
-              >
-                Terminal
-              </button>
-              <button
-                onClick={() => setTerminalMode('copilot')}
-                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                style={{
-                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                  letterSpacing: '0.05em',
-                  color: terminalMode === 'copilot' ? '#0a0a1a' : '#D0A030',
-                  backgroundColor: terminalMode === 'copilot' ? '#D0A030' : 'transparent',
-                  borderLeft: '1px solid rgba(34,171,148,0.4)',
-                }}
-              >
-                JEWL
-              </button>
-              {/* TABLE — GM speaks through NPCs; session-mode only */}
-              {tableAvailable && (
-                <button
-                  onClick={() => setTerminalMode('table')}
-                  className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                  style={{
-                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                    letterSpacing: '0.05em',
-                    color: terminalMode === 'table' ? '#ffcc78' : '#CBD9E8',
-                    backgroundColor: terminalMode === 'table' ? '#002f6c' : 'transparent',
-                    borderLeft: '1px solid rgba(34,171,148,0.4)',
-                    whiteSpace: 'nowrap',
-                  }}
-                  aria-label={tableFeedLive ? `Table — the mic is feeding it (${tableFeedLive.heard} heard)` : 'Table'}
-                >
-                  {tableFeedLive && (
-                    <span
-                      data-table-feed-indicator
-                      title={tableFeedLive.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table'}
-                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: tableFeedLive.holding ? '#ffcc78' : '#6fa8dc', marginRight: 3, fontSize: '0.8em', verticalAlign: '1px' }}
-                    >
-                      {'◆'}
-                    </span>
-                  )}
-                  Table{tableFeedLive ? ` · ${tableFeedLive.heard}` : ''}
-                </button>
-              )}
-              {/* ENCOUNTER — one round through the reality simulation; session-mode, GM only */}
-              {tableAvailable && (
-                <button
-                  onClick={() => setTerminalMode('encounter')}
-                  className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                  style={{
-                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                    letterSpacing: '0.05em',
-                    color: terminalMode === 'encounter' ? '#0a0a1a' : '#f7525f',
-                    backgroundColor: terminalMode === 'encounter' ? '#f7525f' : 'transparent',
-                    borderLeft: '1px solid rgba(34,171,148,0.4)',
-                  }}
-                >
-                  Encounter
-                </button>
-              )}
-            </div>
-            {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (
-              <button
-                onClick={() => { fetchEvents(); fetchSessions(); }}
-                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                style={{
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  color: 'var(--terminal-prime)',
-                  border: '1px solid rgba(34, 171, 148, 0.4)',
-                  backgroundColor: 'transparent',
-                }}
-                onMouseOver={e => (e.currentTarget.style.backgroundColor = 'rgba(34, 171, 148, 0.15)')}
-                onMouseOut={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-              >
-                REFRESH
-              </button>
-            )}
-          </div>
-        </div>
 
-        {/* Filter buttons (terminal mode only) */}
-        {terminalMode === 'terminal' && (
-        <div className="flex gap-1 flex-wrap">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setActiveFilter(f.key)}
-              className="px-2 py-1 text-[13px] uppercase tracking-wider transition-colors"
-              style={{
-                fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                letterSpacing: '0.05em',
-                color: activeFilter === f.key ? '#0a0a1a' : '#888',
-                backgroundColor: activeFilter === f.key ? 'var(--terminal-prime)' : 'transparent',
-                border: `1px solid ${activeFilter === f.key ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.1)'}`,
-                borderRadius: '2px',
-              }}
-            >
-              {f.icon && <span className="mr-1">{f.icon}</span>}
-              {f.label}
-            </button>
-          ))}
-        </div>
+      {/* The drawer's header = the mockup's tab row (v7): the feed, JEWL,
+          the encounter (GM, live session), the ◆ state, fold. */}
+      <div role="tablist" aria-label="Terminal drawer" data-drawer-tabs style={{
+        display: 'flex', alignItems: 'center', height: 42, flex: 'none', padding: '0 0 0 6px', gap: 2,
+        background: '#CBD9E8', borderBottom: '3px solid #002f6c', overflow: 'hidden',
+      }}>
+        <button role="tab" aria-selected={terminalMode === 'terminal'} onClick={() => setTerminalMode('terminal')} style={tabStyle(terminalMode === 'terminal')}>Terminal</button>
+        <button role="tab" aria-selected={terminalMode === 'copilot'} onClick={() => setTerminalMode('copilot')} style={tabStyle(terminalMode === 'copilot')}>jEWL</button>
+        {tableAvailable && (
+          <button role="tab" aria-selected={terminalMode === 'encounter'} onClick={() => setTerminalMode('encounter')} style={tabStyle(terminalMode === 'encounter')}>Encounter</button>
+        )}
+        <span style={{ flex: 1, minWidth: 4 }} />
+        {(tableFeedLive || activeSession) && (
+          <span
+            data-table-feed-indicator={tableFeedLive ? '' : undefined}
+            title={tableFeedLive
+              ? (tableFeedLive.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table')
+              : `Session ${activeSession!.number} is live`}
+            style={{ fontFamily: bebas, fontSize: 17, letterSpacing: '0.05em', color: '#002f6c', whiteSpace: 'nowrap', flex: 'none', paddingTop: 3 }}
+          >
+            <span style={{ fontFamily: mono, fontSize: 13, verticalAlign: '1px', marginRight: 3, color: tableFeedLive ? (tableFeedLive.holding ? '#b07a00' : '#2f6fb0') : '#0f6e5e' }}>{'◆'}</span>
+            {tableFeedLive ? `Table · ${tableFeedLive.heard}` : `Live · S${activeSession!.number}`}
+          </span>
+        )}
+        {onClose && (
+          <button aria-label="Fold the terminal" data-no-hold onClick={onClose} style={{ width: 40, height: 36, flex: 'none', border: 0, background: 'none', color: '#002f6c', fontSize: 16, cursor: 'pointer' }}>{'▾'}</button>
         )}
       </div>
 
@@ -1026,132 +951,85 @@ export default function CampaignTerminal({
 
       {/* Encounter — the round engine's GM surface */}
       {terminalMode === 'encounter' && (
-        <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={fetchEvents} />
+        <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={refreshEvents} />
       )}
 
-      {/* Event Feed (terminal + table modes — the table shares the record) */}
-      {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (<>
-      {/* Event Feed */}
-      <div
-        ref={scrollRef}
-        className={terminalMode === 'table' ? 'flex-1 overflow-y-auto overflow-x-hidden' : 'flex-1 overflow-y-auto p-2 space-y-1'}
-        style={terminalMode === 'table' ? { backgroundColor: '#cfe2f2' } : undefined}
-      >
-        {/* TABLE: the shared record in the rulebook's row grammar (ruling 2026-10-07). */}
-        {terminalMode === 'table' && (
-          <TableFeed campaignId={campaignId} events={events} entities={tableEntities ?? []} loading={loading} />
-        )}
-        {terminalMode !== 'table' && (<>
-        {loading && events.length === 0 && (
-          <div className="text-center py-8 text-[13px]" style={{
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
-            color: 'rgba(34, 171, 148, 0.5)',
-          }}>Loading...</div>
-        )}
+      {terminalMode === 'terminal' && (<>
+        {/* Filter chips narrow the one feed; the GM's session switch; connection. */}
+        <div role="toolbar" aria-label="Narrow the feed" style={{
+          display: 'flex', alignItems: 'center', gap: 2, flex: 'none', padding: '0 8px 0 8px',
+          background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)', overflowX: 'auto', overflowY: 'hidden',
+        }}>
+          {FILTERS.map(f => (
+            <button key={f.key} aria-pressed={activeFilter === f.key} onClick={() => setActiveFilter(f.key)} style={chipStyle(activeFilter === f.key)}>
+              {f.label}
+            </button>
+          ))}
+          <span style={{ flex: 1, minWidth: 4 }} />
+          {isGM && (
+            <button onClick={() => void toggleSession()} disabled={sessionBusy} data-no-hold style={{
+              ...chipStyle(false), color: activeSession ? '#b0303b' : '#0f6e5e',
+              boxShadow: `inset 0 0 0 2px ${activeSession ? '#b0303b' : '#0f6e5e'}`,
+            }}>
+              {sessionBusy ? '…' : activeSession ? '■ End' : '▶ Session'}
+            </button>
+          )}
+          <span
+            title={connected ? `Live${connectedUsers?.length ? ` — ${connectedUsers.map(u => u.username).join(', ')}` : ''}` : 'Disconnected (polling)'}
+            style={{ fontFamily: mono, fontSize: 12, color: connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
+          >
+            {connected ? '◈' : '○'}{connectedUsers && connectedUsers.length > 0 ? ` ${connectedUsers.length}` : ''}
+          </span>
+        </div>
 
-        {!loading && events.length === 0 && (
-          <div className="text-center py-8">
-            <div className="text-[13px] mb-1" style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: 'rgba(34, 171, 148, 0.4)',
-            }}>Terminal ready</div>
-            <div className="text-[13px]" style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: 'rgba(255,255,255,0.2)',
-            }}>Type a message or use /commands. Activity will appear here.</div>
-          </div>
-        )}
-
-        {groupedEvents.map((group, gi) => {
-          const isCollapsed = group.sessionId ? collapsedSessions.has(group.sessionId) : false;
-
-          return (
-            <div key={group.sessionId || `between-${gi}`}>
-              {/* Session header (only show if there are sessions) */}
-              {sessions.length > 0 && (
-                <div
-                  className="flex items-center gap-2 px-2 py-1 cursor-pointer my-1"
-                  onClick={() => group.sessionId && toggleSessionCollapse(group.sessionId)}
-                  style={{
-                    backgroundColor: 'rgba(34,171,148,0.08)',
-                    borderRadius: '2px',
-                    border: '1px solid rgba(34,171,148,0.15)',
-                  }}
-                >
-                  {group.sessionId && (
-                    <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      {isCollapsed ? '\u25B6' : '\u25BC'}
-                    </span>
-                  )}
-                  <span className="text-[12px] uppercase tracking-wider flex-1" style={{
-                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                    color: 'var(--terminal-prime)',
-                    letterSpacing: '0.1em',
-                  }}>
-                    {group.label}
-                  </span>
-                  <span className="text-[12px]" style={{
-                    fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    color: 'rgba(255,255,255,0.2)',
-                  }}>
-                    {group.events.length} events
-                  </span>
-                  {group.sessionInfo?.endedAt && (
-                    <span className="text-[12px]" style={{
-                      fontFamily: 'var(--font-terminal), Consolas, monospace',
-                      color: 'rgba(255,255,255,0.15)',
-                    }}>ended</span>
-                  )}
-                </div>
-              )}
-
-              {/* Events (hidden if session is collapsed) */}
-              {!isCollapsed && (
-                <div className="space-y-1">
-                  {/* Spoken narration (voice on) arrives one declaration per
-                      sentence; consecutive sentences of one beat fold into a
-                      single dim SpokenBeatBlock. Everything else renders as today. */}
-                  {foldSpokenBeats(group.events).map(row => row.kind === 'beat' ? (
-                    <SpokenBeatBlock key={`beat-${row.beatId}-${row.events[0].id}`} beatId={row.beatId} events={row.events} />
-                  ) : (
-                    <TerminalEventRow
-                      key={row.event.id}
-                      event={row.event}
-                      onRevert={handleRevert}
-                      reverting={reverting}
-                    />
-                  ))}
-                </div>
-              )}
+        <div
+          ref={scrollRef}
+          onScroll={onFeedScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden"
+          style={{ backgroundColor: '#cfe2f2', minHeight: 0 }}
+          data-feed-scroll
+        >
+          {olderCursor && (
+            <div style={{ padding: '8px 12px 0 14px' }}>
+              <button onClick={() => void loadOlder()} disabled={loadingOlder} data-no-hold style={{
+                minHeight: 36, padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left',
+                fontFamily: mono, fontWeight: 700, fontSize: 13, lineHeight: 1.62,
+              }}>
+                <span style={{ background: '#000', color: '#f5f4ef', padding: '1px 5px' }}>{loadingOlder ? '[...LOADING EARLIER...]' : '[...EARLIER SESSIONS...]'}</span>
+              </button>
             </div>
-          );
-        })}
-        </>)}
-        {/* Beings still speaking (U2c): their lines grow here, under the last
-            logged event, and yield to the logged chat row when it lands. */}
-        <BeingSpeakingLines
-          active={terminalMode === 'table'}
-          events={events}
-          entities={tableEntities}
-          onGrow={() => {
-            const el = scrollRef.current;
-            if (!el) return;
-            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-            if (nearBottom) el.scrollTop = el.scrollHeight;
-          }}
-        />
-      </div>
+          )}
+          {!olderCursor && !loading && feedEvents.length > 0 && (
+            <div style={{ padding: '10px 14px 0', fontFamily: mono, fontSize: 12, color: '#393937' }}>[BEGINNING OF THE RECORD]</div>
+          )}
+          <TableFeed campaignId={campaignId} events={feedEvents} entities={tableEntities ?? []} loading={loading} onRevert={handleRevert} reverting={reverting} />
+          {/* Beings still speaking (U2c): their lines grow here, under the last
+              logged event, and yield to the logged chat row when it lands. */}
+          <BeingSpeakingLines
+            active={!!activeSession}
+            events={events}
+            entities={tableEntities}
+            onGrow={() => {
+              const el = scrollRef.current;
+              if (!el) return;
+              const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+              if (nearBottom) el.scrollTop = el.scrollHeight;
+            }}
+          />
+        </div>
 
-      {/* Input: command line in terminal mode, speak-through-NPC bar at the table */}
-      {terminalMode === 'table' ? (
-        <TableSpeakBar campaignId={campaignId} onEvent={fetchEvents} />
-      ) : (
-        <CommandInput
-          ref={commandInputRef}
-          onSubmit={handleCommandSubmit}
-          placeholder={character ? `Type a message or /command as ${character.name}...` : 'Type a message or /command...'}
-        />
-      )}
+        {/* Input only in play: the GM narrates through the speak bar; a
+            Trailblazer speaks as their character. Out of play there is none
+            (the /command path lives on in handleCommandSubmit + CommandInput). */}
+        {activeSession && (isGM ? (
+          <TableSpeakBar campaignId={campaignId} onEvent={refreshEvents} />
+        ) : (
+          <CommandInput
+            ref={commandInputRef}
+            onSubmit={handleCommandSubmit}
+            placeholder={character ? `Speak or act as ${character.name}…` : 'Type a message…'}
+          />
+        ))}
       </>)}
     </div>
   );
