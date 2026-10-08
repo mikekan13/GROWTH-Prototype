@@ -1810,30 +1810,39 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           }}
         >
           {/* Toggle tab */}
+          {/* Pull tab \u2014 the drawer's header voice (Bebas gold on navy, 2026-10-08) */}
           <button
             onClick={() => setShowTerminal(prev => !prev)}
-            className="absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1 text-[9px] uppercase tracking-[0.2em] transition-colors"
+            aria-expanded={showTerminal}
+            data-no-hold
+            className="absolute left-1/2 -translate-x-1/2"
             style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: showTerminal ? '#0a0a1a' : 'var(--terminal-prime)',
-              backgroundColor: showTerminal ? 'var(--terminal-prime)' : 'rgba(10, 10, 26, 0.9)',
-              border: '1px solid rgba(34, 171, 148, 0.4)',
-              borderBottom: showTerminal ? 'none' : undefined,
-              borderRadius: '3px 3px 0 0',
+              top: -36,
+              height: 36,
+              padding: '4px 16px 0',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+              fontSize: 17,
+              letterSpacing: '0.08em',
+              whiteSpace: 'nowrap',
+              color: '#ffcc78',
+              backgroundColor: '#002f6c',
+              border: 0,
+              boxShadow: '0 -2px 8px rgba(0,0,0,.3)',
               pointerEvents: 'auto',
               zIndex: 51,
+              cursor: 'pointer',
             }}
           >
             {tableFeed && (
               <span
                 aria-label={tableFeed.holding ? 'The table is holding an unfinished sentence' : 'The mic is feeding the table'}
                 title={tableFeed.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table \u2014 what you say becomes the world. Mute JEWL to stop.'}
-                style={{ color: tableFeed.holding ? 'var(--krma-gold, #ffcc78)' : '#6fa8dc', marginRight: 6, fontSize: 11 }}
+                style={{ color: tableFeed.holding ? 'var(--krma-gold, #ffcc78)' : '#6fa8dc', marginRight: 6, fontSize: 12, fontFamily: 'var(--font-terminal), Consolas, monospace' }}
               >
                 {'\u25C6'}
               </span>
             )}
-            {showTerminal ? '\u25BC TERMINAL' : '\u25B2 TERMINAL'}
+            {showTerminal ? '\u25BE Terminal' : '\u25B4 Terminal'}
           </button>
 
           {/* Resize handle */}
@@ -1846,18 +1855,18 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 backgroundColor: 'transparent',
               }}
             >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[3px] rounded-full" style={{
-                backgroundColor: 'rgba(34, 171, 148, 0.4)',
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[3px]" style={{
+                backgroundColor: 'rgba(255, 204, 120, 0.7)',
                 marginTop: '1px',
               }} />
             </div>
           )}
 
           {/* Panel content — always mounted so event listeners stay active */}
-          <div className="h-full border-t" style={{
-            borderColor: 'rgba(34, 171, 148, 0.4)',
-            backgroundColor: 'rgba(10, 10, 26, 0.95)',
-            backdropFilter: 'blur(8px)',
+          <div className="h-full" style={{
+            borderTop: '3px solid #002f6c',
+            backgroundColor: '#cfe2f2',
+            boxShadow: '0 -6px 18px rgba(0,0,0,.3)',
             display: showTerminal ? 'block' : 'none',
           }}>
             <CampaignTerminal
@@ -1876,6 +1885,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               connectedUsers={connectedUsers}
               campaignCharacters={nodes.filter(n => n.type === 'character' || n.type === 'npc').map(n => ({ id: n.id, name: n.name }))}
               tableEntities={tableEntities}
+              onClose={() => setShowTerminal(false)}
             />
           </div>
         </div>
