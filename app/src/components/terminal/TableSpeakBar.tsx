@@ -204,32 +204,39 @@ export default function TableSpeakBar({
 
   const awake = dayaActive.map((d) => d.name).join(', ');
 
+  // Look: the approved drawer mockup (2026-10-07 v7) — off-white bar under a
+  // black rule; JEWL's held question on the book's grey aside bar (p 64);
+  // white input with a navy rule; navy/gold Bebas buttons. Behaviour unchanged.
+  const mono = 'var(--font-terminal), Consolas, monospace';
+  const bebas = 'var(--font-bebas-neue), Bebas Neue, sans-serif';
+  const strip: React.CSSProperties = { fontFamily: mono, fontSize: 12, lineHeight: 1.5, margin: '0 0 6px' };
   return (
-    <div className="border-t" style={{ borderColor: 'rgba(34, 171, 148, 0.3)', backgroundColor: '#0d0d1a' }}>
+    <div style={{ flex: 'none', backgroundColor: '#fafaf8', borderTop: '3px solid #000', padding: '8px 10px 10px' }}>
       {/* JEWL's catch — the table holds until the Watcher answers (Mike 09-26) */}
       {held && (
-        <div className="mx-3 mt-2 px-3 py-2" style={{ border: '1px solid rgba(255, 204, 120, 0.55)', borderRadius: '2px', backgroundColor: 'rgba(255, 204, 120, 0.06)' }}>
-          <div className="text-[11px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#ffcc78' }}>JEWL</div>
-          <div className="text-[13px] mt-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#CBD9E8' }}>{held.question}</div>
+        <div data-jewl-held style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <p style={{ flex: 1, minWidth: 0, margin: 0, fontFamily: mono, fontWeight: 700, fontSize: 13, lineHeight: 1.55 }}>
+              <span style={{ background: '#383837', color: '#f5f4ef', padding: '1px 5px', WebkitBoxDecorationBreak: 'clone', boxDecorationBreak: 'clone' }}>[jEWL]: {held.question}</span>
+            </p>
+            <button onClick={() => void answerJewl('confirm')} disabled={answering} title="We're going somewhere new — JEWL spins it up" style={{ fontFamily: bebas, fontSize: 18, letterSpacing: '0.05em', height: 36, padding: '3px 10px 0', border: 0, whiteSpace: 'nowrap', background: '#002f6c', color: '#ffcc78', cursor: 'pointer' }}>
+              {answering ? '…' : 'New'}
+            </button>
+            <button onClick={() => void answerJewl('dismiss')} disabled={answering} title="My mistake — take it back" style={{ fontFamily: bebas, fontSize: 18, letterSpacing: '0.05em', height: 36, padding: '3px 10px 0', border: 0, whiteSpace: 'nowrap', background: 'none', color: '#002f6c', boxShadow: 'inset 0 0 0 2px #002f6c', cursor: 'pointer' }}>
+              My mistake
+            </button>
+          </div>
           {held.plan.length > 0 && (
-            <div className="text-[12px] mt-1" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(203, 217, 232, 0.7)' }}>
+            <div style={{ ...strip, margin: '4px 0 0', color: '#393937' }}>
               {held.plan.map((p) => (p.matchId ? `${p.name} → ${p.matchName} (already here)` : `${p.name} → new ${p.kind}`)).join(' · ')}
               {held.estimateKrma > 0 && ` · hold ${held.estimateKrma} of ${held.fluidKrma} fluid KRMA`}
             </div>
           )}
-          <div className="flex gap-2 mt-2">
-            <button onClick={() => void answerJewl('confirm')} disabled={answering} className="px-3 py-1 min-h-[36px] md:min-h-0 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#0a0a1a', backgroundColor: '#ffcc78', border: '1px solid rgba(255, 204, 120, 0.6)', borderRadius: '2px' }}>
-              {answering ? '…' : "We're going somewhere new"}
-            </button>
-            <button onClick={() => void answerJewl('dismiss')} disabled={answering} className="px-3 py-1 min-h-[36px] md:min-h-0 text-[12px] uppercase tracking-wider" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#CBD9E8', backgroundColor: 'transparent', border: '1px solid rgba(203, 217, 232, 0.35)', borderRadius: '2px' }}>
-              My mistake — take it back
-            </button>
-          </div>
         </div>
       )}
       {/* GM-only status strip — infra truth, never part of the table record */}
       {(note || coreStatus === 'warming' || sending) && (
-        <div className="px-3 pt-1.5 text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255, 204, 120, 0.75)' }}>
+        <div style={{ ...strip, color: '#7a4a00' }}>
           {sending
             ? `The table is responding…${coreStatus !== 'ready' ? ' (core warming from cold, first response can take minutes)' : ''}`
             : note ?? 'The core is warming up from a cold start…'}
@@ -238,11 +245,11 @@ export default function TableSpeakBar({
       {/* Lines the table did not hear (out-of-character asides, check calls):
           shown quietly so a dropped line never looks swallowed; clears on the next send. */}
       {ignored && ignored.length > 0 && !sending && (
-        <div data-not-heard className="px-3 pt-1.5 text-[12px] italic" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(203, 217, 232, 0.45)' }}>
+        <div data-not-heard style={{ ...strip, fontStyle: 'italic', color: '#4a5560' }}>
           not heard: {ignored.map((t) => (t.length > 60 ? t.slice(0, 57) + '…' : t)).join(' · ')}
         </div>
       )}
-      <div className="flex items-end gap-2 px-3 py-2">
+      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
         <textarea
           ref={inputRef}
           value={value}
@@ -254,28 +261,25 @@ export default function TableSpeakBar({
               void handleSubmit();
             }
           }}
-          placeholder={awake ? `Narrate. Put speech in quotes, or Name: line. ${awake} will live it. (Shift+Enter for a new line)` : 'Narrate. Put speech in quotes, or Name: line. No one is awake at the table yet.'}
+          placeholder={awake ? `Narrate · "speech" · Name: line — ${awake} will live it` : 'Narrate · "speech" · Name: line — no one is awake yet'}
+          title="Shift+Enter for a new line"
           disabled={sending || !!held}
           // 16px below md: anything smaller makes iOS zoom the page when the GM taps in to narrate.
-          className="flex-1 px-2 py-1 text-[16px] md:text-[13px] outline-none resize-none"
+          className="text-[16px] md:text-[14px]"
           style={{
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
-            backgroundColor: '#0a0a1a',
-            color: '#CBD9E8',
-            border: '1px solid rgba(34, 171, 148, 0.25)',
-            borderRadius: '2px',
+            flex: 1, minWidth: 0, height: 48, resize: 'none', outline: 0,
+            fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', lineHeight: 1.4,
+            color: '#000', backgroundColor: '#fff', border: 0, borderLeft: '4px solid #002f6c', padding: '6px 8px',
           }}
         />
         <button
           onClick={() => void handleSubmit()}
           disabled={sending || !!held || !value.trim()}
-          className="px-3 py-1 min-h-[36px] md:min-h-0 text-[12px] uppercase tracking-wider"
           style={{
-            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-            color: sending ? '#666' : '#0a0a1a',
-            backgroundColor: sending ? 'transparent' : 'var(--terminal-prime)',
-            border: '1px solid rgba(34, 171, 148, 0.4)',
-            borderRadius: '2px',
+            width: 68, minHeight: 36, border: 0, cursor: 'pointer',
+            fontFamily: bebas, fontSize: 22, letterSpacing: '0.06em',
+            backgroundColor: '#002f6c', color: '#ffcc78',
+            opacity: sending || !!held || !value.trim() ? 0.55 : 1,
           }}
         >
           {sending ? '…' : 'Send'}

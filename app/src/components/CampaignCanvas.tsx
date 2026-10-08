@@ -13,6 +13,7 @@ import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
 import { TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
+import type { FeedEntity } from '@/components/terminal/table-feed/TableFeedRows';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
 import type { TerminalEvent } from '@/types/terminal';
 
@@ -160,6 +161,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     window.addEventListener(TABLE_FEED_EVENT, onFeed);
     return () => window.removeEventListener(TABLE_FEED_EVENT, onFeed);
   }, []);
+  // The TABLE feed's world: portraits for the chips, names for the entity spans.
+  const tableEntities = useMemo<FeedEntity[]>(() => nodes.flatMap((n): FeedEntity[] => {
+    if (n.type === 'character' || n.type === 'npc') return [{ id: n.id, name: n.name, kind: n.type, portrait: n.portrait ?? null, status: n.status }];
+    if (n.type === 'location') return [{ id: n.id, name: n.name, kind: 'location', subtype: n.locationType, description: n.locationData?.description }];
+    if (n.type === 'item') return [{ id: n.id, name: n.name, kind: 'item', subtype: n.itemType, where: n.holderName ?? n.locationName, description: n.itemData?.description }];
+    return [];
+  }), [nodes]);
   // Tell floating chrome (the phone JEWL summon button in JewlChip) whether the
   // terminal drawer is open, so nothing floats over the table log during play.
   useEffect(() => {
@@ -1852,6 +1860,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               connected={connected}
               connectedUsers={connectedUsers}
               campaignCharacters={nodes.filter(n => n.type === 'character' || n.type === 'npc').map(n => ({ id: n.id, name: n.name }))}
+              tableEntities={tableEntities}
             />
           </div>
         </div>

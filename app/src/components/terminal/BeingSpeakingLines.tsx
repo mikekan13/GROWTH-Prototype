@@ -10,8 +10,12 @@
  * as the window event `growth:being-speaking` (detail = BeingSpeakingPhase):
  *   start   — open a line for utteranceId
  *   partial — `text` is the WHOLE line so far; render it (delta ignored)
- *   retract — the line is withdrawn (sealed): collapse to a quiet
- *             "— line withdrawn —", fade, close the slot. The rule is never shown.
+ *   retract — the line is withdrawn (sealed): struck through with the coral
+ *             LINE WITHDRAWN correction (rulebook p 63), fade, close the slot.
+ *             The rule is never shown.
+ *
+ * Drawn as a TABLE feed character row (ruling-feed-segment-colours-pillars,
+ * 2026-10-07): portrait chip, pillar bars parsed from the words so far, caret.
  *   final   — always closes a start. kind=rest → the being stayed silent, the
  *             line just goes away. Otherwise hold the final text until the
  *             logged chat event for the same line arrives, then yield to it
@@ -21,6 +25,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { BeingSpeakingPhase } from '@/types/campaign-events';
 import type { TerminalEvent } from '@/types/terminal';
+import { parseSegments } from '@/lib/feed-segments';
+import { CharacterRow, TableFeedProvider, type FeedEntity } from './table-feed/TableFeedRows';
+import type { CharacterRowModel } from './table-feed/feed-rows';
 
 export const BEING_SPEAKING_EVENT = 'growth:being-speaking';
 
@@ -57,7 +64,7 @@ export default function BeingSpeakingLines({
   active,
   events,
   onGrow,
-  color = 'var(--terminal-prime)',
+  entities,
 }: {
   /** Only the TABLE tab shows growing lines. */
   active: boolean;
@@ -65,7 +72,8 @@ export default function BeingSpeakingLines({
   events: TerminalEvent[];
   /** Fired after the block grows so the parent can keep the bottom pinned. */
   onGrow?: () => void;
-  color?: string;
+  /** The campaign's world (portraits, entity spans) — the line is drawn as a TABLE feed character row. */
+  entities?: FeedEntity[];
 }) {
   const [lines, setLines] = useState<Map<string, GrowingLine>>(() => new Map());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -134,56 +142,43 @@ export default function BeingSpeakingLines({
 
   if (!active || lines.size === 0) return null;
 
+  // Drawn as a TABLE feed character row (ruling 2026-10-07): chip + pillar
+  // bars parsed from the line so far, a caret while it grows; a withdrawn
+  // line is struck through with the coral LINE WITHDRAWN correction, then fades.
   return (
-    <div className="space-y-1" data-being-speaking aria-live="polite">
-      {Array.from(lines.values()).map(line => (
-        <div key={line.utteranceId} className="flex items-start gap-2 px-2 py-1.5" data-utterance-id={line.utteranceId} data-state={line.state}>
-          <span className="text-[12px] font-bold px-1.5 py-0.5 flex-shrink-0" style={{
-            backgroundColor: line.state === 'withdrawn' ? 'transparent' : color,
-            color: line.state === 'withdrawn' ? color : '#fff',
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
-            borderRadius: '1px', minWidth: '28px', textAlign: 'center',
-            opacity: line.state === 'withdrawn' ? 0.6 : 1,
-          }}>
-            NPC
-          </span>
-          <div className="flex-1 min-w-0">
-            {line.state === 'withdrawn' ? (
-              <span
-                className="text-[12px] italic"
-                style={{
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  color,
-                  opacity: 0.55,
-                  display: 'inline-block',
-                  animation: reducedMotion ? undefined : `being-withdrawn ${WITHDRAWN_MS - 200}ms ease-out forwards`,
-                }}
-              >
-                — line withdrawn —
-              </span>
-            ) : (
-              <span className="text-[12px]" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: '#ccc' }}>
-                <span style={{ color, fontWeight: 'bold' }}>{line.characterName || '…'}</span>
-                {': '}
-                {line.text}
-                {line.state === 'speaking' && (
-                  <span aria-hidden style={{ color, marginLeft: 1, animation: reducedMotion ? undefined : 'being-caret 1s steps(1) infinite' }}>▍</span>
-                )}
-              </span>
-            )}
-          </div>
-          <span className="text-[12px] flex-shrink-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255,255,255,0.25)' }}>
-            {line.state === 'speaking' ? 'speaking' : line.state === 'final' ? '…' : ''}
-          </span>
-        </div>
-      ))}
-      <style>{`
-        @keyframes being-caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-        @keyframes being-withdrawn { 0% { opacity: 0.55; } 100% { opacity: 0; } }
-      `}</style>
-    </div>
+    <TableFeedProvider entities={entities ?? NO_ENTITIES} timescale={null}>
+      <div className="tf tf-tail" data-being-speaking aria-live="polite">
+        {Array.from(lines.values()).map(line => {
+          const row: CharacterRowModel = {
+            type: 'character',
+            key: line.utteranceId,
+            timestamp: new Date(line.startedAt).toISOString(),
+            characterId: line.characterId || null,
+            name: line.characterName || '…',
+            segments: parseSegments(line.text, { growing: line.state === 'speaking' }),
+            raw: line.text,
+            via: 'being',
+            voice: 'Being',
+            voicedBy: null,
+            fromNarration: false,
+          };
+          return (
+            <div
+              key={line.utteranceId}
+              data-utterance-id={line.utteranceId}
+              data-state={line.state}
+              className={line.state === 'withdrawn' && !reducedMotion ? 'fading' : undefined}
+            >
+              <CharacterRow row={row} caret={line.state === 'speaking'} withdrawn={line.state === 'withdrawn'} />
+            </div>
+          );
+        })}
+      </div>
+    </TableFeedProvider>
   );
 }
+
+const NO_ENTITIES: FeedEntity[] = [];
 
 /** prefers-reduced-motion, SSR-safe (false on the server). */
 function useReducedMotion(): boolean {

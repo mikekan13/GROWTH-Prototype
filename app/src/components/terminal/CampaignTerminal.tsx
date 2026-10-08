@@ -16,7 +16,9 @@ import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
 import BeingSpeakingLines from './BeingSpeakingLines';
 import SpokenBeatBlock, { foldSpokenBeats } from './SpokenBeatBlock';
-import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE } from '@/components/copilot/JewlChip';
+import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
+import TableFeed from './table-feed/TableFeed';
+import type { FeedEntity } from './table-feed/TableFeedRows';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
 
@@ -47,6 +49,8 @@ interface CampaignTerminalProps {
   connectedUsers?: Array<{ userId: string; username: string; role: string }>;
   /** All characters in this campaign (for GM skill check targeting) */
   campaignCharacters?: Array<{ id: string; name: string }>;
+  /** Characters, places and items of the campaign — the TABLE feed's portraits and entity spans. */
+  tableEntities?: FeedEntity[];
 }
 
 // ── Filter Config ──────────────────────────────────────────────────────────
@@ -89,6 +93,7 @@ export default function CampaignTerminal({
   connected,
   connectedUsers,
   campaignCharacters,
+  tableEntities,
 }: CampaignTerminalProps) {
   const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'table' | 'encounter'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
@@ -133,6 +138,18 @@ export default function CampaignTerminal({
     const ms = activeSession && splitLoop ? RECORDER_CHUNK_MS_LIVE : RECORDER_CHUNK_MS_DEFAULT;
     window.dispatchEvent(new CustomEvent(RECORDER_CHUNK_EVENT, { detail: { ms } }));
   }, [activeSession, splitLoop]);
+
+  // P1 ◆ on the TABLE tab while the mic feeds the table (same source as the
+  // JEWL header and the TERMINAL toggle; JewlChip owns the 12 s TTL).
+  const [tableFeedLive, setTableFeedLive] = useState<{ heard: number; holding: boolean } | null>(null);
+  useEffect(() => {
+    const onFeed = (e: Event) => {
+      const d = (e as CustomEvent<{ fed?: boolean; heard?: number; holding?: boolean }>).detail;
+      setTableFeedLive(d?.fed ? { heard: d.heard ?? 0, holding: !!d.holding } : null);
+    };
+    window.addEventListener(TABLE_FEED_EVENT, onFeed);
+    return () => window.removeEventListener(TABLE_FEED_EVENT, onFeed);
+  }, []);
 
   // If the session ends (or role loads late) while sitting on TABLE, fall back.
   useEffect(() => {
@@ -916,12 +933,23 @@ export default function CampaignTerminal({
                   style={{
                     fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
                     letterSpacing: '0.05em',
-                    color: terminalMode === 'table' ? '#0a0a1a' : '#CBD9E8',
-                    backgroundColor: terminalMode === 'table' ? '#CBD9E8' : 'transparent',
+                    color: terminalMode === 'table' ? '#ffcc78' : '#CBD9E8',
+                    backgroundColor: terminalMode === 'table' ? '#002f6c' : 'transparent',
                     borderLeft: '1px solid rgba(34,171,148,0.4)',
+                    whiteSpace: 'nowrap',
                   }}
+                  aria-label={tableFeedLive ? `Table — the mic is feeding it (${tableFeedLive.heard} heard)` : 'Table'}
                 >
-                  Table
+                  {tableFeedLive && (
+                    <span
+                      data-table-feed-indicator
+                      title={tableFeedLive.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table'}
+                      style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: tableFeedLive.holding ? '#ffcc78' : '#6fa8dc', marginRight: 3, fontSize: '0.8em', verticalAlign: '1px' }}
+                    >
+                      {'◆'}
+                    </span>
+                  )}
+                  Table{tableFeedLive ? ` · ${tableFeedLive.heard}` : ''}
                 </button>
               )}
               {/* ENCOUNTER — one round through the reality simulation; session-mode, GM only */}
@@ -1004,7 +1032,16 @@ export default function CampaignTerminal({
       {/* Event Feed (terminal + table modes — the table shares the record) */}
       {terminalMode !== 'copilot' && terminalMode !== 'encounter' && (<>
       {/* Event Feed */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div
+        ref={scrollRef}
+        className={terminalMode === 'table' ? 'flex-1 overflow-y-auto overflow-x-hidden' : 'flex-1 overflow-y-auto p-2 space-y-1'}
+        style={terminalMode === 'table' ? { backgroundColor: '#cfe2f2' } : undefined}
+      >
+        {/* TABLE: the shared record in the rulebook's row grammar (ruling 2026-10-07). */}
+        {terminalMode === 'table' && (
+          <TableFeed campaignId={campaignId} events={events} entities={tableEntities ?? []} loading={loading} />
+        )}
+        {terminalMode !== 'table' && (<>
         {loading && events.length === 0 && (
           <div className="text-center py-8 text-[13px]" style={{
             fontFamily: 'var(--font-terminal), Consolas, monospace',
@@ -1089,11 +1126,13 @@ export default function CampaignTerminal({
             </div>
           );
         })}
+        </>)}
         {/* Beings still speaking (U2c): their lines grow here, under the last
             logged event, and yield to the logged chat row when it lands. */}
         <BeingSpeakingLines
           active={terminalMode === 'table'}
           events={events}
+          entities={tableEntities}
           onGrow={() => {
             const el = scrollRef.current;
             if (!el) return;
