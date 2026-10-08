@@ -831,11 +831,28 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     if (typeof window === 'undefined') return 350;
     try {
       const stored = localStorage.getItem(storageKey);
-      return stored ? parseInt(stored) : 350;
+      const n = stored ? parseInt(stored, 10) : NaN;
+      return Number.isFinite(n) && n >= 150 ? n : 350;
     } catch { return 350; }
   });
   const isResizing = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
+  // <main>'s live height — the drawer can never exceed a fraction of it
+  // (rotation / mobile URL-bar changes re-clamp via the observer).
+  const [mainHeight, setMainHeight] = useState(0);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    setMainHeight(el.clientHeight);
+    const ro = new ResizeObserver(() => setMainHeight(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const clampTerminalHeight = useCallback((h: number, mainH: number) => {
+    if (!mainH) return h;
+    return Math.max(Math.min(MIN_TERMINAL_HEIGHT, mainH * MAX_TERMINAL_FRACTION), Math.min(mainH * MAX_TERMINAL_FRACTION, h));
+  }, []);
+  const effectiveTerminalHeight = clampTerminalHeight(terminalHeight, mainHeight);
 
   // Persist terminal height
   useEffect(() => {
@@ -1354,15 +1371,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     isResizing.current = true;
 
     const startY = e.clientY;
-    const startHeight = terminalHeight;
+    const startHeight = effectiveTerminalHeight;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isResizing.current) return;
       const dy = startY - moveEvent.clientY;
       const mainEl = mainRef.current;
-      const maxHeight = mainEl ? mainEl.clientHeight * MAX_TERMINAL_FRACTION : 600;
-      const newHeight = Math.max(MIN_TERMINAL_HEIGHT, Math.min(maxHeight, startHeight + dy));
-      setTerminalHeight(newHeight);
+      setTerminalHeight(clampTerminalHeight(startHeight + dy, mainEl ? mainEl.clientHeight : 0));
     };
 
     const handleMouseUp = () => {
@@ -1377,7 +1392,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [terminalHeight]);
+  }, [effectiveTerminalHeight, clampTerminalHeight]);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'forge', label: 'Forge' },
@@ -1387,7 +1402,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   ];
 
   return (
-    <div className="h-screen bg-[var(--surface-dark)] flex flex-col overflow-hidden">
+    <div className="h-dvh bg-[var(--surface-dark)] flex flex-col overflow-hidden">
       {/* ── JEWL construction site — visible while he lays work down (F-2).
           The ⚒ badge names the last committed piece; page data refreshes
           progressively underneath so his builds materialize live. */}
@@ -1788,7 +1803,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         <div
           className="absolute bottom-0 left-0 right-0"
           style={{
-            height: showTerminal ? `${terminalHeight}px` : '0',
+            height: showTerminal ? `${effectiveTerminalHeight}px` : '0',
             zIndex: 50,
             pointerEvents: showTerminal ? 'auto' : 'none',
             transition: showTerminal ? 'none' : 'height 0.3s ease-in-out',
