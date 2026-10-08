@@ -121,7 +121,7 @@ export const TABLE_FEED_CSS = `
 .tf .h-encounter .arw{color:#f7525f}
 .tf .fb > .row:first-child{margin-top:6px}
 .tf .fold .row{margin-right:0}
-.tf .encslot{margin:8px 0 0;background:#0a0a1a;max-height:55vh;overflow-y:auto;display:flex;flex-direction:column}
+.tf .encslot{margin:8px 0 0;background:#000;max-height:55vh;overflow-y:auto;display:flex;flex-direction:column}
 /* search: every line shown is a hit */
 .tf.searching .row{box-shadow:inset 3px 0 0 var(--tf-gold);padding-left:4px}
 .tf .empty{font:700 13px/1.6 var(--font-terminal);color:var(--tf-g3);padding:24px 12px 0 0;text-align:center}

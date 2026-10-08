@@ -42,19 +42,84 @@ interface IntentionDraft {
 
 const KINDS: Kind[] = ['attack', 'skill', 'move', 'negate', 'block', 'reserve', 'hold'];
 const PILLARS: Pillar[] = ['body', 'spirit', 'soul'];
-const mono = { fontFamily: 'var(--font-terminal), Consolas, monospace' } as const;
-const btn = (active = false): React.CSSProperties => ({
-  ...mono, fontSize: 12, padding: '3px 8px', cursor: 'pointer', borderRadius: 2,
-  color: active ? '#0a0a1a' : 'var(--terminal-prime)',
-  backgroundColor: active ? 'var(--terminal-prime)' : 'transparent',
-  border: '1px solid rgba(34,171,148,0.5)',
-});
-const field: React.CSSProperties = { ...mono, fontSize: 12, background: '#0a0a1a', color: '#CBD9E8', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 2, padding: '2px 4px' };
+// Look (2026-10-08): the book's combat voice (p 131) — ONE black-void block per
+// encounter, inside it Consolas on black, the record's kinds as pillar bars
+// (damage/down = Body red, negate = Spirit purple, block/redirect = Terminal
+// teal), sides and pools as the book's pillar tags (p 21), Bebas buttons
+// outlined in paper, the one forward move (Run round) in KRMA gold. Phone:
+// ≥ 12 px text, 16 px fields, 36 px targets. Behaviour unchanged.
+const btnCls = (active = false) => (active ? 'ep-b on' : 'ep-b');
+/** Fields stay 16 px below md so iOS never zooms the page on focus. */
+const fieldCls = 'ep-f text-[16px] md:text-[13px]';
 
-const KIND_COLOR: Record<string, string> = {
-  order: '#888', check: '#CBD9E8', damage: '#f7525f', downed: '#f7525f', negate: '#582a72',
-  redirect: '#22ab94', block: '#22ab94', skip: '#666', action: '#aaa', note: '#aaa',
+const KIND_CLS: Record<string, string> = {
+  check: 'k-check', damage: 'k-body', downed: 'k-body', negate: 'k-spirit',
+  redirect: 'k-teal', block: 'k-teal', skip: 'k-dim', action: 'k-dim', note: 'k-dim',
 };
+
+const ENCOUNTER_CSS = `
+.ep{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;background:#000;color:#f5f4ef;padding:10px 12px 14px;font:400 13px/1.5 var(--font-terminal),Consolas,monospace}
+.ep *{box-sizing:border-box}
+.ep>*+*{margin-top:12px}
+.ep>*{max-width:760px}
+.ep-hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.ep-title{font:700 14px/1.4 var(--font-terminal),Consolas,monospace;color:#f5f4ef}
+.ep-state{font:400 15px/1 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.05em;padding:3px 6px 1px;background:#ffcc78;color:#000}
+.ep-state.off{background:#393937;color:#f5f4ef}
+.ep-round{font:700 13px/1.4 var(--font-terminal),Consolas,monospace;color:#f5f4ef}
+.ep-row{display:flex;flex-wrap:wrap;gap:6px}
+.ep-b{font:400 17px/1 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.06em;min-height:36px;padding:3px 10px 0;border:0;cursor:pointer;white-space:nowrap;background:none;color:#f5f4ef;box-shadow:inset 0 0 0 1.5px #8d97a5}
+.ep-b.on{background:#f5f4ef;color:#000;box-shadow:none}
+.ep-b:disabled{opacity:.45;cursor:default}
+.ep-b:focus-visible,.ep-go:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.ep-go{display:block;width:100%;min-height:44px;border:0;cursor:pointer;font:400 22px/1 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.06em;padding:4px 12px 0;background:#ffcc78;color:#000}
+.ep-go:disabled{opacity:.5;cursor:default}
+.ep-sec{font:700 13px/1.4 var(--font-terminal),Consolas,monospace;color:#8d97a5;letter-spacing:.04em;text-transform:uppercase}
+.ep-who{border-top:1px solid #393937}
+.ep-p{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:8px 0;border-bottom:1px solid #393937}
+.ep-p.down{opacity:.55}
+.ep-name{min-height:36px;padding:2px 8px;border:0;background:#222;color:#f5f4ef;font:700 14px/1.3 var(--font-terminal),Consolas,monospace;text-align:left;cursor:pointer;overflow-wrap:anywhere;justify-self:start;max-width:100%}
+.ep-name.on{background:#f5f4ef;color:#000}
+.ep-name:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.ep-tags{display:flex;flex-wrap:wrap;gap:4px;grid-column:1/-1;align-items:center}
+.ep-t{font:700 12px/1 var(--font-terminal),Consolas,monospace;padding:4px 5px;white-space:nowrap}
+.t-hostile,.t-body{background:#f7525f;color:#000}
+.t-party{background:#22ab94;color:#000}
+.t-other,.t-ctl{background:#393937;color:#f5f4ef}
+.t-spirit{background:#582a72;color:#f5f4ef}
+.t-soul{background:#002f6c;color:#f5f4ef}
+.t-freq{background:#ffcc78;color:#000}
+.t-freq.zero{background:#f7525f}
+.t-down{background:#f7525f;color:#000;font-family:var(--font-bebas-neue),'Bebas Neue',sans-serif;font-size:15px;font-weight:400;letter-spacing:.06em;padding:3px 6px 1px}
+.ep-sub{grid-column:1/-1;font:400 12px/1.5 var(--font-terminal),Consolas,monospace;color:#8d97a5;overflow-wrap:anywhere}
+.ep-sub b{color:#ffcc78;font-weight:700}
+.ep-ed{border-left:4px solid #ffcc78;padding:2px 0 2px 10px}
+.ep-ed>*+*{margin-top:8px}
+.ep-d{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-bottom:8px;border-bottom:1px solid #393937}
+.ep-f{min-height:36px;background:#222;color:#f5f4ef;border:0;border-bottom:2px solid #8d97a5;padding:2px 6px;font-family:var(--font-terminal),Consolas,monospace;outline:0;border-radius:0}
+.ep-f:focus{border-bottom-color:#ffcc78}
+.ep-f::placeholder{color:#8d97a5}
+.ep-f.wide{width:100%}
+.ep-f.desc{flex:1 1 160px;min-width:0}
+.ep-f.num{width:56px}
+.ep-lb{display:inline-flex;align-items:center;gap:4px;font:400 12px var(--font-terminal),Consolas,monospace;color:#8d97a5}
+.ep-hint{font:400 12px/1.5 var(--font-terminal),Consolas,monospace;color:#8d97a5}
+.ep-err{font:700 13px/1.5 var(--font-terminal),Consolas,monospace}
+.ep-err span{background:#f7525f;color:#000;padding:1px 5px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.ep-cast{display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.ep-cast .who{font:700 14px/1.3 var(--font-terminal),Consolas,monospace;color:#f5f4ef;padding-top:4px}
+.ep-log{display:flex;flex-direction:column;gap:3px}
+.ep-log .order{font:700 13px/1.5 var(--font-terminal),Consolas,monospace;color:#8d97a5;margin-top:4px}
+.ep-log .ln{font:400 13px/1.62 var(--font-terminal),Consolas,monospace;color:#f5f4ef;overflow-wrap:anywhere;padding-left:10px}
+.ep-log .k{font-weight:700;padding:1px 5px;margin-right:6px}
+.k-check{background:#393937;color:#f5f4ef}
+.k-body{background:#f7525f;color:#000}
+.k-spirit{background:#582a72;color:#f5f4ef}
+.k-teal{background:#22ab94;color:#000}
+.k-dim{background:#222;color:#8d97a5}
+.ep-log .downed{font:700 13px/1.62 var(--font-terminal),Consolas,monospace}
+.ep-log .downed span{background:#f7525f;color:#000;padding:1px 5px}
+`;
 
 export default function EncounterPanel({
   campaignId,
@@ -124,29 +189,33 @@ export default function EncounterPanel({
   if (!enc) {
     const chosen = Object.entries(sides).filter(([, s]) => s);
     return (
-      <div className="flex-1 overflow-y-auto p-3 space-y-3" style={mono}>
-        <div style={{ color: 'var(--terminal-prime)', fontSize: 13 }}>NEW ENCOUNTER — six seconds at a time</div>
+      <div className="ep" data-encounter-panel="new">
+        <style>{ENCOUNTER_CSS}</style>
+        <div className="ep-sec">New encounter — six seconds at a time</div>
         {list.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="ep-row">
             {list.map(e => (
-              <button key={e.id} style={btn()} onClick={() => load(e.id)}>{e.name} · {e.status} · r{e.round}</button>
+              <button key={e.id} className={btnCls()} data-no-hold onClick={() => load(e.id)}>{e.name} · {e.status} · r{e.round}</button>
             ))}
           </div>
         )}
-        <input style={{ ...field, width: '100%' }} placeholder="Encounter name" value={name} onChange={e => setName(e.target.value)} />
-        <textarea style={{ ...field, width: '100%', minHeight: 60 }} placeholder="Scene setup (what the GM narrates — everyone perceives this through their own senses)" value={scene} onChange={e => setScene(e.target.value)} />
-        <div className="space-y-1">
+        <input className={`${fieldCls} wide`} placeholder="Encounter name" value={name} onChange={e => setName(e.target.value)} />
+        <textarea className={`${fieldCls} wide`} style={{ minHeight: 64, resize: 'vertical' }} placeholder="Scene setup (what the GM narrates — everyone perceives this through their own senses)" value={scene} onChange={e => setScene(e.target.value)} />
+        <div className="ep-cast">
           {campaignCharacters.map(c => (
-            <div key={c.id} className="flex items-center gap-2">
-              <span style={{ color: '#CBD9E8', fontSize: 12, minWidth: 140 }}>{c.name}</span>
-              {['', 'party', 'hostile', 'other'].map(s => (
-                <button key={s || 'out'} style={btn((sides[c.id] ?? '') === s)} onClick={() => setSides(prev => ({ ...prev, [c.id]: s }))}>{s || 'out'}</button>
-              ))}
+            <div key={c.id}>
+              <div className="who">{c.name}</div>
+              <div className="ep-row" style={{ marginTop: 4 }}>
+                {['', 'party', 'hostile', 'other'].map(s => (
+                  <button key={s || 'out'} className={btnCls((sides[c.id] ?? '') === s)} data-no-hold onClick={() => setSides(prev => ({ ...prev, [c.id]: s }))}>{s || 'out'}</button>
+                ))}
+              </div>
             </div>
           ))}
         </div>
         <button
-          style={btn(true)}
+          className="ep-go"
+          data-no-hold
           disabled={!name || chosen.length === 0 || !!busy}
           onClick={() => run('create', async () => {
             const j = await api('', { method: 'POST', body: JSON.stringify({ name, sceneNarration: scene || undefined, participants: chosen.map(([characterId, side]) => ({ characterId, side })) }) });
@@ -158,7 +227,7 @@ export default function EncounterPanel({
         >
           {busy === 'create' ? 'Creating…' : 'Create + go ACTIVE'}
         </button>
-        {error && <div style={{ color: '#f7525f', fontSize: 12 }}>{error}</div>}
+        {error && <p className="ep-err" style={{ margin: 0 }}><span>{error}</span></p>}
       </div>
     );
   }
@@ -169,86 +238,97 @@ export default function EncounterPanel({
   const declaredFor = (id: string) => enc.state.intentions.filter(i => i.participantId === id).length;
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 space-y-3" style={mono}>
-      <div className="flex items-center gap-2 flex-wrap">
-        <span style={{ color: 'var(--terminal-prime)', fontSize: 13 }}>{enc.name}</span>
-        <span style={{ color: '#888', fontSize: 12 }}>{enc.status} · round {enc.round} done</span>
-        <button style={btn()} onClick={() => load(enc.id)}>refresh</button>
-        {enc.status !== 'ACTIVE' && <button style={btn()} onClick={() => run('status', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'ACTIVE' }) })).encounter))}>activate</button>}
-        {enc.status === 'ACTIVE' && <button style={btn()} onClick={() => run('status', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'PAUSED' }) })).encounter))}>pause</button>}
-        <button style={btn()} onClick={() => run('status', async () => { await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'RESOLVED' }) }); setEnc(null); await refreshList(); })}>resolve</button>
-        <button style={btn()} onClick={() => setEnc(null)}>new</button>
+    <div className="ep" data-encounter-panel="live">
+      <style>{ENCOUNTER_CSS}</style>
+      <div className="ep-hd">
+        <span className="ep-title">{enc.name}</span>
+        <span className={enc.status === 'ACTIVE' ? 'ep-state' : 'ep-state off'}>{enc.status}</span>
+        <span className="ep-round">Round {enc.round} done</span>
+      </div>
+      <div className="ep-row">
+        <button className={btnCls()} data-no-hold onClick={() => load(enc.id)}>refresh</button>
+        {enc.status !== 'ACTIVE' && <button className={btnCls()} data-no-hold onClick={() => run('status', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'ACTIVE' }) })).encounter))}>activate</button>}
+        {enc.status === 'ACTIVE' && <button className={btnCls()} data-no-hold onClick={() => run('status', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'PAUSED' }) })).encounter))}>pause</button>}
+        <button className={btnCls()} data-no-hold onClick={() => run('status', async () => { await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'RESOLVED' }) }); setEnc(null); await refreshList(); })}>resolve</button>
+        <button className={btnCls()} data-no-hold onClick={() => setEnc(null)}>new</button>
       </div>
 
-      {/* Participants */}
-      <div className="space-y-1">
+      {/* Participants — name (tap to declare), then the book's pillar tags */}
+      <div className="ep-who">
         {enc.state.participants.map(p => (
-          <div key={p.id} className="flex items-center gap-2 flex-wrap" style={{ fontSize: 12, color: p.downed ? '#666' : '#CBD9E8' }}>
-            <button style={btn(who === p.id)} onClick={() => { setWho(p.id); setDrafts([]); }}>{p.name}</button>
-            <span style={{ color: p.side === 'hostile' ? '#f7525f' : '#22ab94' }}>{p.side}</span>
-            <span style={{ color: '#888' }}>{p.control}</span>
-            <span>B{p.pools.body} S{p.pools.spirit} So{p.pools.soul}</span>
-            <span style={{ color: '#888' }}>cel {p.gauges.celerity} · frq {p.gauges.frequency} · wis {p.gauges.wisdom}</span>
-            {p.attrs?.frequency && <span style={{ color: p.attrs.frequency.current <= 0 ? '#f7525f' : '#D0A030' }}>Frequency {p.attrs.frequency.current}/{p.attrs.frequency.max}</span>}
-            {p.heldItemName && <span style={{ color: '#888' }}>holds {p.heldItemName} (r{p.heldResist}{p.heldCondition !== undefined ? `, c${p.heldCondition}` : ''})</span>}
-            {p.downed && <span style={{ color: '#f7525f' }}>DOWN</span>}
-            {enc.status === 'ACTIVE' && (
-              <button style={btn()} onClick={() => run('downed', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ participantId: p.id, downed: !p.downed }) })).encounter))}>
+          <div key={p.id} className={p.downed ? 'ep-p down' : 'ep-p'} data-combatant={p.id}>
+            <button className={who === p.id ? 'ep-name on' : 'ep-name'} data-no-hold onClick={() => { setWho(p.id); setDrafts([]); }}>{p.name}</button>
+            {enc.status === 'ACTIVE' ? (
+              <button className={btnCls()} data-no-hold onClick={() => run('downed', async () => setEnc((await api(`/${enc.id}`, { method: 'PATCH', body: JSON.stringify({ participantId: p.id, downed: !p.downed }) })).encounter))}>
                 {p.downed ? 'stand up' : 'put down'}
               </button>
-            )}
-            {declaredFor(p.id) > 0 && <span style={{ color: '#D0A030' }}>declared {declaredFor(p.id)}</span>}
-            {enc.state.lastPlan[p.id] && <span style={{ color: '#666' }}>last: {enc.state.lastPlan[p.id].source}{enc.state.lastPlan[p.id].note ? ` — ${enc.state.lastPlan[p.id].note}` : ''}</span>}
+            ) : <span />}
+            <div className="ep-tags">
+              {p.downed && <span className="ep-t t-down">Down</span>}
+              <span className={`ep-t ${p.side === 'hostile' ? 't-hostile' : p.side === 'party' ? 't-party' : 't-other'}`}>{p.side}</span>
+              <span className="ep-t t-ctl">{p.control}</span>
+              <span className="ep-t t-body" title="Body pool">B {p.pools.body}</span>
+              <span className="ep-t t-spirit" title="Spirit pool">S {p.pools.spirit}</span>
+              <span className="ep-t t-soul" title="Soul pool">So {p.pools.soul}</span>
+              {p.attrs?.frequency && <span className={p.attrs.frequency.current <= 0 ? 'ep-t t-freq zero' : 'ep-t t-freq'}>Frequency {p.attrs.frequency.current}/{p.attrs.frequency.max}</span>}
+            </div>
+            <div className="ep-sub">
+              cel {p.gauges.celerity} · frq {p.gauges.frequency} · wis {p.gauges.wisdom}
+              {p.heldItemName && <> · holds {p.heldItemName} (r{p.heldResist}{p.heldCondition !== undefined ? `, c${p.heldCondition}` : ''})</>}
+              {declaredFor(p.id) > 0 && <> · <b>declared {declaredFor(p.id)}</b></>}
+              {enc.state.lastPlan[p.id] && <> · last: {enc.state.lastPlan[p.id].source}{enc.state.lastPlan[p.id].note ? ` — ${enc.state.lastPlan[p.id].note}` : ''}</>}
+            </div>
           </div>
         ))}
       </div>
 
       {/* Intention editor (GM override for anyone) */}
       {selected && !selected.downed && enc.status === 'ACTIVE' && (
-        <div className="space-y-1" style={{ border: '1px solid rgba(34,171,148,0.3)', padding: 6 }}>
-          <div style={{ color: 'var(--terminal-prime)', fontSize: 12 }}>
+        <div className="ep-ed">
+          <div className="ep-sec" style={{ color: '#ffcc78', textTransform: 'none' }}>
             Declare for {selected.name} — B {draftCounts.body}/{selected.pools.body} · S {draftCounts.spirit}/{selected.pools.spirit} · So {draftCounts.soul}/{selected.pools.soul}
           </div>
           {drafts.map((d, i) => (
-            <div key={i} className="flex items-center gap-1 flex-wrap">
-              <select style={field} value={d.pillar} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, pillar: e.target.value as Pillar } : x))}>
+            <div key={i} className="ep-d">
+              <select className={fieldCls} value={d.pillar} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, pillar: e.target.value as Pillar } : x))}>
                 {PILLARS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <select style={field} value={d.kind} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, kind: e.target.value as Kind } : x))}>
+              <select className={fieldCls} value={d.kind} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, kind: e.target.value as Kind } : x))}>
                 {KINDS.map(k => <option key={k} value={k}>{k}</option>)}
               </select>
-              <input style={{ ...field, width: 180 }} placeholder="what they do" value={d.description} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} />
-              <select style={field} value={d.skillName ?? ''} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, skillName: e.target.value || undefined } : x))}>
+              <input className={`${fieldCls} desc`} placeholder="what they do" value={d.description} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} />
+              <select className={fieldCls} value={d.skillName ?? ''} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, skillName: e.target.value || undefined } : x))}>
                 <option value="">unskilled</option>
                 {selected.skills.map(s => <option key={s.name} value={s.name}>{s.name} ({s.level}; {s.governors.join('/')})</option>)}
               </select>
-              <select style={field} value={d.targetId ?? ''} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, targetId: e.target.value || undefined } : x))}>
+              <select className={fieldCls} value={d.targetId ?? ''} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, targetId: e.target.value || undefined } : x))}>
                 <option value="">no target</option>
                 {enc.state.participants.filter(p => p.id !== selected.id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               {d.kind === 'attack' && (<>
-                <select style={field} value={d.damageType ?? 'bashing'} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, damageType: e.target.value as IntentionDraft['damageType'] } : x))}>
+                <select className={fieldCls} value={d.damageType ?? 'bashing'} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, damageType: e.target.value as IntentionDraft['damageType'] } : x))}>
                   {['bashing', 'slashing', 'piercing'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <input style={{ ...field, width: 44 }} type="number" min={1} max={20} title="base damage" value={d.baseDamage ?? 2} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, baseDamage: Number(e.target.value) } : x))} />
+                <input className={`${fieldCls} num`} type="number" min={1} max={20} title="base damage" value={d.baseDamage ?? 2} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, baseDamage: Number(e.target.value) } : x))} />
               </>)}
               {(d.kind === 'attack' || d.kind === 'skill') && (
-                <label style={{ color: '#888', fontSize: 11 }} title="situational difficulty — the GM's call">
-                  DR <input style={{ ...field, width: 40 }} type="number" min={1} max={60} value={d.dr ?? 10} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, dr: Number(e.target.value) || 10 } : x))} />
+                <label className="ep-lb" title="situational difficulty — the GM's call">
+                  DR <input className={`${fieldCls} num`} type="number" min={1} max={60} value={d.dr ?? 10} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, dr: Number(e.target.value) || 10 } : x))} />
                 </label>
               )}
               {(d.kind === 'attack' || d.kind === 'skill' || d.kind === 'negate' || d.kind === 'block') && (
-                <label style={{ color: '#888', fontSize: 11 }}>
-                  effort <input style={{ ...field, width: 40 }} type="number" min={0} max={50} value={d.effort ?? 0} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, effort: Number(e.target.value) || 0 } : x))} />
+                <label className="ep-lb">
+                  effort <input className={`${fieldCls} num`} type="number" min={0} max={50} value={d.effort ?? 0} onChange={e => setDrafts(ds => ds.map((x, j) => j === i ? { ...x, effort: Number(e.target.value) || 0 } : x))} />
                 </label>
               )}
-              <button style={btn()} onClick={() => setDrafts(ds => ds.filter((_, j) => j !== i))}>×</button>
+              <button className={btnCls()} data-no-hold aria-label="Remove this action" style={{ minWidth: 36 }} onClick={() => setDrafts(ds => ds.filter((_, j) => j !== i))}>×</button>
             </div>
           ))}
-          <div className="flex gap-1 flex-wrap">
-            <button style={btn()} onClick={() => setDrafts(ds => [...ds, { pillar: 'body', kind: 'attack', description: '', damageType: 'bashing', baseDamage: 2, redirectTo: selected.heldResist > 0 ? 'held' : undefined }])}>+ action</button>
+          <div className="ep-row" style={{ alignItems: 'center' }}>
+            <button className={btnCls()} data-no-hold onClick={() => setDrafts(ds => [...ds, { pillar: 'body', kind: 'attack', description: '', damageType: 'bashing', baseDamage: 2, redirectTo: selected.heldResist > 0 ? 'held' : undefined }])}>+ action</button>
             <button
-              style={btn(true)}
+              className={btnCls(true)}
+              data-no-hold
               disabled={
                 !!busy || drafts.length === 0
                 || drafts.some(d => !d.description)
@@ -263,33 +343,33 @@ export default function EncounterPanel({
             >
               {busy === 'declare' ? 'Declaring…' : 'Declare'}
             </button>
-            <span style={{ color: '#666', fontSize: 11 }}>Undeclared participants plan their own round (their branch). Declaring overrides the ACT step.</span>
+            <span className="ep-hint">Undeclared participants plan their own round (their branch). Declaring overrides the ACT step.</span>
           </div>
         </div>
       )}
 
       {/* Run */}
       {enc.status === 'ACTIVE' && (
-        <button style={btn(true)} disabled={!!busy} onClick={() => run('round', async () => { const j = await api(`/${enc.id}/round`, { method: 'POST' }); setEnc(j.encounter); })}>
+        <button className="ep-go" data-no-hold disabled={!!busy} onClick={() => run('round', async () => { const j = await api(`/${enc.id}/round`, { method: 'POST' }); setEnc(j.encounter); })}>
           {busy === 'round' ? 'Six seconds passing…' : `Run round ${enc.round + 1}`}
         </button>
       )}
-      {error && <div style={{ color: '#f7525f', fontSize: 12 }}>{error}</div>}
+      {error && <p className="ep-err" style={{ margin: 0 }}><span>{error}</span></p>}
 
       {/* Record */}
       {last && (
-        <div className="space-y-0.5" style={{ fontSize: 12 }}>
-          <div style={{ color: 'var(--terminal-prime)' }}>Round {last.round} — the record</div>
-          {last.log.map((l, i) => (
-            <div key={i} style={{ color: KIND_COLOR[l.kind] ?? '#CBD9E8', paddingLeft: l.kind === 'order' ? 0 : 12 }}>
-              {l.kind === 'order' ? l.text : `[${l.kind}] ${l.text}`}
-            </div>
-          ))}
-          {last.downed.length > 0 && <div style={{ color: '#f7525f' }}>Down: {last.downed.map(pName).join(', ')}</div>}
+        <div className="ep-log" data-encounter-record>
+          <div className="ep-sec">Round {last.round} — the record</div>
+          {last.log.map((l, i) => (l.kind === 'order' ? (
+            <div key={i} className="order">{l.text}</div>
+          ) : (
+            <div key={i} className="ln"><span className={`k ${KIND_CLS[l.kind] ?? 'k-check'}`}>[{l.kind}]</span>{l.text}</div>
+          )))}
+          {last.downed.length > 0 && <div className="downed"><span>Down: {last.downed.map(pName).join(', ')}</span></div>}
         </div>
       )}
       {enc.state.rounds.length > 1 && (
-        <div style={{ color: '#666', fontSize: 11 }}>{enc.state.rounds.length} rounds recorded — earlier rounds are in the terminal feed.</div>
+        <div className="ep-hint">{enc.state.rounds.length} rounds recorded — earlier rounds are in the terminal feed.</div>
       )}
     </div>
   );
