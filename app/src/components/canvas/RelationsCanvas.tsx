@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import CharacterCard from "./CharacterCard";
 import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
@@ -32,6 +32,7 @@ import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
 import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
 import { lodForZoom, folderLabelSize } from "./canvas-lod";
+import { clampCameraToContent, contentBoxOf, maxZoomForContent, type Rect as WorldRect } from "./camera-bounds";
 import FolderGroup from "./FolderGroup";
 
 // â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -218,6 +219,9 @@ export default function RelationsCanvas({
 
   // Track container size so viewBox matches actual aspect ratio (prevents SVG letterboxing)
   const [containerSize, setContainerSize] = useState({ width: 1386, height: 924 });
+  // True once the ResizeObserver has reported the real container (phone
+  // floor + phone opening view depend on it — scout 2026-10-08).
+  const [measured, setMeasured] = useState(false);
   // Max zoom IN. 1x on a laptop; a phone may go closer so one 520-wide card
   // fits its 412 px (2026-10-06: at 1x the floor was 474 world units across).
   const MIN_ZOOM = containerSize.width < 768 ? 0.45 : 1.0;
@@ -226,7 +230,7 @@ export default function RelationsCanvas({
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
-      if (width > 0 && height > 0) setContainerSize({ width, height });
+      if (width > 0 && height > 0) { setContainerSize({ width, height }); setMeasured(true); }
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -235,7 +239,10 @@ export default function RelationsCanvas({
   const BASE_WIDTH = Math.round(BASE_HEIGHT * (containerSize.width / containerSize.height));
 
   // Round zoom to 4 decimal places to prevent floating-point drift
-  const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) * 1e4) / 1e4;
+  // Zoom-out ceiling from the content (Mike 2026-10-08): never further out than
+  // the whole world + margin. Set by the camera-bounds effect below.
+  const zoomCeilRef = useRef(MAX_ZOOM);
+  const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomCeilRef.current, z)) * 1e4) / 1e4;
 
   // â”€â”€ localStorage helpers â”€â”€
   const storageKey = (key: string) => `canvas-${campaignId}-${key}`;
@@ -263,19 +270,27 @@ export default function RelationsCanvas({
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
+  // The remembered zoom before any clamp — re-clamped once the container is
+  // measured, so a phone's 0.45 floor (not the desktop 1.0) applies.
+  const rawStoredZoomRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(() => {
     // Phone default: one 520-wide card fits with margin (2026-10-06); laptop stays 1x.
     const stored = loadJSON('zoom', typeof window !== 'undefined' && window.innerWidth < 768 ? 1.4 : 1);
+    rawStoredZoomRef.current = typeof stored === 'number' && Number.isFinite(stored) ? stored : null;
     return clampZoom(stored);
   });
+  // Whether the opening camera came from storage (else the phone opening view
+  // is recomputed after measurement with the real width).
+  const cameraWasStoredRef = useRef(false);
   // Semantic zoom (Mike 2026-09-28): what a card renders as depends on how far out the Watcher is.
   const lod = lodForZoom(zoom);
   const [camera, setCamera] = useState(() => {
     // Migrate from old viewBox storage or load camera position
     const oldVB = loadJSON<{ x: number; y: number; width?: number; height?: number } | null>('viewBox', null);
     const cam = loadJSON<{ x: number; y: number } | null>('camera', null);
-    if (cam) return cam;
+    if (cam) { cameraWasStoredRef.current = true; return cam; }
     if (oldVB) {
+      cameraWasStoredRef.current = true;
       // Clean up old key after migration
       try { localStorage.removeItem(storageKey('viewBox')); } catch { /* ignore */ }
       return { x: oldVB.x, y: oldVB.y };
@@ -566,6 +581,80 @@ export default function RelationsCanvas({
   useEffect(() => {
     persistState();
   }, [persistState]);
+
+  // ── Camera bounded by content (Mike 2026-10-08) ──
+  // "you can only scroll so far away from stuff if it doesn't exist … the
+  // canvas can keep getting larger if stuff exists to fill it." The world box
+  // = every card + every place's drawn rect. The viewport may stray past it by
+  // min(half a viewport, CAMERA_PAD); zoom-out stops where box + pad fits.
+  // One layout effect clamps every camera write (load, pan, pinch, wheel,
+  // focus, #reset-view) and re-clamps when the content grows or shrinks.
+  const CAMERA_PAD = BASE_HEIGHT / 2;
+  const contentRects = useMemo(() => {
+    const rects: WorldRect[] = [];
+    for (const n of nodes) {
+      if (n.type === 'location') continue; // places draw as folders
+      const p = nodePositions.get(n.id) ?? { x: n.x, y: n.y };
+      const d = getNodeDimensions(n.type, expandedNodes.has(n.id));
+      rects.push({ x: p.x - d.width / 2, y: p.y - d.topH, width: d.width, height: d.topH + d.bottomH });
+    }
+    for (const r of folderRectById.values()) rects.push(r);
+    return rects;
+  }, [nodes, nodePositions, expandedNodes, folderRectById]);
+  const contentBox = useMemo(() => contentBoxOf(contentRects), [contentRects]);
+  useLayoutEffect(() => {
+    const ceil = maxZoomForContent(contentBox, BASE_WIDTH, BASE_HEIGHT, CAMERA_PAD);
+    zoomCeilRef.current = Math.max(MIN_ZOOM, ceil);
+    const z = clampZoom(zoom);
+    if (z !== zoom) { setZoom(z); return; } // re-runs with the new zoom
+    const c = clampCameraToContent(camera, z, { baseW: BASE_WIDTH, baseH: BASE_HEIGHT }, contentRects, CAMERA_PAD);
+    if (Math.abs(c.x - camera.x) > 0.01 || Math.abs(c.y - camera.y) > 0.01) setCamera(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera, zoom, contentBox, contentRects, BASE_WIDTH, MIN_ZOOM]);
+
+  // First real container measurement (scout 2026-10-08): before it, BASE_WIDTH
+  // and the zoom floor are the desktop defaults. Once measured: re-clamp the
+  // remembered zoom with the real floor, recompute the phone's opening view on
+  // the people with the real width, clamp to content, and as a backstop centre
+  // on the people if no card is in view. Declared AFTER the bounds effect so
+  // its writes win this commit; the bounds effect re-validates next render.
+  const firstMeasureDoneRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!measured || firstMeasureDoneRef.current) return;
+    firstMeasureDoneRef.current = true;
+    const vp = { baseW: BASE_WIDTH, baseH: BASE_HEIGHT };
+    zoomCeilRef.current = Math.max(MIN_ZOOM, maxZoomForContent(contentBox, BASE_WIDTH, BASE_HEIGHT, CAMERA_PAD));
+    const z = clampZoom(rawStoredZoomRef.current ?? zoom);
+    const drawn = nodes.filter(n => n.type !== 'location');
+    const people = drawn.filter(n => n.type === 'character');
+    const posOf = (n: CanvasNode) => nodePositions.get(n.id) ?? { x: n.x, y: n.y };
+    const centreOn = (): { x: number; y: number } | null => {
+      const set = people.length ? people : drawn;
+      if (set.length) {
+        const cx = set.reduce((a, n) => a + posOf(n).x, 0) / set.length;
+        const cy = set.reduce((a, n) => a + posOf(n).y, 0) / set.length;
+        return { x: cx - (BASE_WIDTH * z) / 2, y: cy - (BASE_HEIGHT * z) / 2 };
+      }
+      if (contentBox) {
+        return { x: (contentBox.minX + contentBox.maxX) / 2 - (BASE_WIDTH * z) / 2, y: (contentBox.minY + contentBox.maxY) / 2 - (BASE_HEIGHT * z) / 2 };
+      }
+      return null;
+    };
+    let c = camera;
+    if (!cameraWasStoredRef.current && containerSize.width < 768) c = centreOn() ?? c;
+    c = clampCameraToContent(c, z, vp, contentRects, CAMERA_PAD);
+    if (drawn.length) {
+      const vw = BASE_WIDTH * z, vh = BASE_HEIGHT * z;
+      const anyInView = drawn.some(n => {
+        const p = posOf(n);
+        return p.x >= c.x && p.x <= c.x + vw && p.y >= c.y && p.y <= c.y + vh;
+      });
+      if (!anyInView) c = clampCameraToContent(centreOn() ?? c, z, vp, contentRects, CAMERA_PAD);
+    }
+    if (z !== zoom) setZoom(z);
+    if (c.x !== camera.x || c.y !== camera.y) setCamera(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measured]);
 
   // ── Measure possession-row positions ──────────────────────────────────────
   // Walks `[data-possession-row]` elements each animation frame while a
