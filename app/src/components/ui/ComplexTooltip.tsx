@@ -39,6 +39,18 @@ interface ComplexTooltipProps {
   /** Forwarded to the trigger so a host can keep its own gesture (e.g. the
    *  folder-header drag) alive while the tooltip listens for hover/tap. */
   onTriggerPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
+  /** A free-form body in place of the pool/base/augment/total sections —
+   *  info cards (a TABLE feed line, a thing in the world). Hides the footer. */
+  content?: React.ReactNode;
+  /** 'terminal' = the rulebook's Terminal output: black panel, gold rule on
+   *  top, Bebas gold title, grab bar on the phone sheet (TABLE feed, 2026-10-07). */
+  skin?: 'default' | 'terminal';
+  /** 'span' when the trigger sits inside running text (a div there is invalid). */
+  triggerAs?: 'div' | 'span';
+  /** Extra attributes on the trigger (role, tabIndex, aria-*, data-*). */
+  triggerProps?: React.HTMLAttributes<HTMLElement> & { [data: `data-${string}`]: string | undefined };
+  /** Told when the tooltip opens and closes (the host can mark its trigger as open). */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /** True when the primary pointer is a finger. Read at event time, not render time. */
@@ -63,6 +75,11 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   triggerClassName,
   triggerStyle,
   onTriggerPointerDown,
+  content,
+  skin = 'default',
+  triggerAs = 'div',
+  triggerProps,
+  onOpenChange,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -83,7 +100,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   const [touchSide, setTouchSide] = useState<'below' | 'above'>('below');
   /** Narrow screens (phones): the touch tooltip is a bottom sheet instead of a floating panel. */
   const [touchSheet, setTouchSheet] = useState(false);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const nestedRef = useRef<HTMLDivElement>(null);
   const lockStartTimeRef = useRef<number>(0);
@@ -117,6 +134,16 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
       animationFrameRef.current = requestAnimationFrame(updateLockProgress);
     }
   };
+
+  // Tell the host when we open / close (it may mark its trigger as open).
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => { onOpenChangeRef.current = onOpenChange; }, [onOpenChange]);
+  const reportedOpenRef = useRef(false);
+  useEffect(() => {
+    if (reportedOpenRef.current === isVisible) return;
+    reportedOpenRef.current = isVisible;
+    onOpenChangeRef.current?.(isVisible);
+  }, [isVisible]);
 
   // Close tooltip when disabled changes to true (e.g. drag started)
   useEffect(() => {
@@ -207,6 +234,20 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
   const handleClick = (e: React.MouseEvent) => {
     if (disabled || !isCoarsePointer()) return;
     e.stopPropagation();
+    openAnchored();
+  };
+
+  /** Keyboard (a trigger with role=button): Enter / Space opens it the touch way, Escape closes. */
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    if (e.key === 'Escape' && isVisible) { closeAll(); return; }
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation();
+    openAnchored();
+  };
+
+  const openAnchored = () => {
     if (isVisible) { closeAll(); return; }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -357,28 +398,35 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
     </React.Fragment>
   );
 
+  const isSheet = touchOpen && touchSheet;
+  const terminal = skin === 'terminal';
+
   return (
     <>
-      <div
-        ref={triggerRef}
-        className={triggerClassName}
-        onMouseEnter={handleMouseEnter}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleClick}
-        onPointerDown={onTriggerPointerDown}
-        style={inline
-          ? { display: 'inline-block', ...triggerStyle }
-          : { display: 'block', width: '100%', ...triggerStyle }}
-      >
-        {children}
-      </div>
+      {React.createElement(
+        triggerAs,
+        {
+          ...triggerProps,
+          ref: triggerRef,
+          className: triggerClassName,
+          onMouseEnter: handleMouseEnter,
+          onMouseMove: handleMouseMove,
+          onMouseLeave: handleMouseLeave,
+          onClick: handleClick,
+          onKeyDown: triggerProps?.role === 'button' ? handleKeyDown : undefined,
+          onPointerDown: onTriggerPointerDown,
+          style: inline
+            ? { display: 'inline-block', ...triggerStyle }
+            : { display: 'block', width: '100%', ...triggerStyle },
+        },
+        children,
+      )}
 
       {isVisible && typeof window !== 'undefined' && createPortal(
         <div
           ref={tooltipRef}
           className={`fixed z-[9999] select-none ${isPositionLocked ? 'pointer-events-auto' : 'pointer-events-none'}`}
-          style={touchOpen && touchSheet
+          style={isSheet
             ? { left: 0, right: 0, bottom: 0 }
             : {
               left: `${position.x}px`,
@@ -387,7 +435,42 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
             }}
           onMouseEnter={handleTooltipMouseEnter}
           onMouseLeave={handleTooltipMouseLeave}
+          role={content !== undefined ? 'dialog' : undefined}
+          aria-label={content !== undefined ? title : undefined}
         >
+          {terminal ? (
+            <div
+              className="shadow-2xl"
+              data-tooltip-skin="terminal"
+              style={{
+                background: '#000',
+                color: '#f5f4ef',
+                fontFamily: 'var(--font-terminal), Consolas, monospace',
+                borderTop: `3px solid rgba(255, 204, 120, ${isSheet ? 1 : Math.max(lockProgress, 0.35)})`,
+                boxShadow: '0 -8px 24px rgba(0,0,0,.4)',
+                ...(isSheet
+                  ? { width: '100%', maxHeight: '60vh', overflowY: 'auto', padding: '6px 16px', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }
+                  : { minWidth: 280, maxWidth: 400, padding: '8px 14px 12px' }),
+              }}
+            >
+              {isSheet && <div aria-hidden style={{ width: 44, height: 4, background: '#5b6170', margin: '2px auto 8px' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: isSheet ? 26 : 22, lineHeight: 1.1, color: '#ffcc78', letterSpacing: '0.03em', overflowWrap: 'anywhere' }}>
+                  {title}
+                </span>
+                {touchOpen && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeAll(); }}
+                    aria-label="Close"
+                    style={{ width: 40, height: 40, flex: 'none', border: 0, background: 'none', color: '#f5f4ef', fontSize: 18, cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {content}
+            </div>
+          ) : (
           <div
             className={`bg-gray-900 shadow-2xl p-3 transition-all ${touchOpen && touchSheet ? 'rounded-t-xl w-full' : 'rounded-lg min-w-[280px] max-w-[400px]'}`}
             style={{
@@ -477,8 +560,10 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
             {/* (Legacy flat block removed 2026-08-21 — it double-rendered
                 every row of info-only tooltips alongside the neutral block.) */}
 
+            {content}
+
             {/* Total / Max */}
-            {!hideTotal && (
+            {!hideTotal && content === undefined && (
               <div className="flex justify-between text-sm font-bold border-t border-yellow-600/40 pt-2">
                 <span className="text-yellow-400" style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.03em' }}>
                   {totalLabel ?? (currentValue !== undefined ? 'Max Pool:' : 'Total:')}
@@ -487,6 +572,7 @@ export const ComplexTooltip: React.FC<ComplexTooltipProps> = ({
               </div>
             )}
           </div>
+          )}
         </div>,
         document.body
       )}
