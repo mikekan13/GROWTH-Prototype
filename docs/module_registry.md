@@ -77,7 +77,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Auth | `lib/auth.ts` | Password hashing, session management, cookie handling, typed auth/forbidden errors |
 | Database | `lib/db.ts` | Prisma client singleton with LibSQL adapter |
 | Permissions | `lib/permissions.ts` | Reusable role/ownership checks; `canViewCampaign` (GM / member / ADMIN read access, 2026-10-08), `canSeeCopilotRow` (JEWL history private per user) |
-| CampaignAccess | `services/campaign-access.ts` | `requireCampaignMember(campaignId, user)` — 404 unknown campaign, 403 non-member; gates GET events / changelog / sessions / copilot history (2026-10-08) |
+| CampaignAccess | `services/campaign-access.ts` | `requireCampaignMember(campaignId, user)` — 404 unknown campaign, 403 non-member; gates GET events / changelog / sessions / copilot history (2026-10-08); `requireCampaignGM(campaignId, user)` — campaign GM or ADMIN/GODHEAD only (403 otherwise); gates POST sessions start/end |
 | Errors | `lib/errors.ts` | Typed error classes (AppError, ValidationError, etc.) |
 | API Utils | `lib/api.ts` | Error-to-HTTP-response conversion |
 | Defaults | `lib/defaults.ts` | Default GrowthCharacter factory |

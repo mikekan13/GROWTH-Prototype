@@ -8,7 +8,27 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ForbiddenError } from '@/lib/errors';
-import { canViewCampaign } from '@/lib/permissions';
+import { canViewCampaign, canManageCampaign } from '@/lib/permissions';
+
+/**
+ * Campaign GM gate (2026-10-08): only the campaign's own GM/Watcher and ADMIN
+ * (rule: `lib/permissions.ts#canManageCampaign`) may run the table — start or
+ * end its session. A member or another Watcher gets 403.
+ */
+export async function requireCampaignGM(
+  campaignId: string,
+  user: { id: string; role: string },
+): Promise<{ id: string; gmUserId: string }> {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, gmUserId: true },
+  });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (!canManageCampaign(user.id, user.role, campaign)) {
+    throw new ForbiddenError('Only the campaign GM can do this');
+  }
+  return campaign;
+}
 
 export async function requireCampaignMember(
   campaignId: string,
