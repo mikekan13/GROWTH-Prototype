@@ -53,6 +53,18 @@ describe('parseSegments — colour marks WHAT, never WHO (Mike 2026-10-07)', () 
     expect(parseSegments('::half an action')).toEqual([{ kind: 'speech', text: '::half an action' }]);
   });
 
+  it('a growing line: words after an unclosed opener already belong to it', () => {
+    expect(parseSegments('*steps back* "If you open that', { growing: true })).toEqual([
+      { kind: 'action', text: 'steps back' },
+      { kind: 'speech', text: 'If you open that' },
+    ]);
+    expect(parseSegments('Wait ((he knows', { growing: true })).toEqual([
+      { kind: 'speech', text: 'Wait' },
+      { kind: 'thought', text: 'he knows' },
+    ]);
+    expect(parseSegments('"Sit."', { growing: true })).toEqual([{ kind: 'speech', text: 'Sit.' }]);
+  });
+
   it('draws each kind with its own marks', () => {
     expect(segmentMarks('action')).toEqual(['::', '::']);
     expect(segmentMarks('speech')).toEqual(['“', '”']);

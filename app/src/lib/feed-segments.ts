@@ -44,7 +44,7 @@ function hasSpeechMarks(text: string): boolean {
  * the same kind join with a space. Fragments with no letters or digits (the
  * space or comma between two marked runs) are dropped.
  */
-export function parseSegments(text: string, opts: { bare?: SegmentKind } = {}): FeedSegment[] {
+export function parseSegments(text: string, opts: { bare?: SegmentKind; growing?: boolean } = {}): FeedSegment[] {
   const src = (text ?? '').trim();
   if (!src) return [];
   const bare: SegmentKind = opts.bare ?? (hasSpeechMarks(src) ? 'action' : 'speech');
@@ -66,9 +66,20 @@ export function parseSegments(text: string, opts: { bare?: SegmentKind } = {}): 
     else if (m[4] !== undefined) push('action', m[4]);
     cursor = at + m[0].length;
   }
-  push(bare, src.slice(cursor));
+  const tail = src.slice(cursor);
+  // A line still being spoken (the growing line) may end inside a marker it
+  // has not closed yet: the words after the opener already belong to it.
+  const open = opts.growing ? tail.match(/::|\(\(|["“]|\*/) : null;
+  if (open && open.index !== undefined) {
+    push(bare, tail.slice(0, open.index));
+    push(OPENER_KIND[open[0]], tail.slice(open.index + open[0].length));
+  } else {
+    push(bare, tail);
+  }
   return out;
 }
+
+const OPENER_KIND: Record<string, SegmentKind> = { '::': 'action', '((': 'thought', '"': 'speech', '“': 'speech', '*': 'action' };
 
 /** The marks a segment is drawn with (open, close). */
 export function segmentMarks(kind: SegmentKind): [string, string] {
