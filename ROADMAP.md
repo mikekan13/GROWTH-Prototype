@@ -1,6 +1,19 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-08-26
+Last updated: 2026-10-08
+
+> 2026-10-06..08 (orchestrator + worker sessions, ~75 commits on merge/fork-portrait-pipeline):
+> MOBILE — Tailscale HTTPS, touch pan/pinch/carry/undo, camera bounded to content, drawer height clamp.
+> CHROME in the rulebook's language — campaign header (Option 2, contiguous KRMA/FLD/CRY strip), one
+> narrative TABLE feed (portrait chip + <Name>: tag, ::action::/"speech"/((thought)) pillar bars, black
+> entity spans = tooltips, raw toggle, fold tree chapter>session>rest>encounter with rulebook headings,
+> search), jEWL tab Conversation + mechanical Log, JEWL sheet, encounter block. ENGINE — U2 listen/answer
+> loop behind TABLE_SPLIT_LOOP (live run ~1 s answers), sentence-grain canon with beatId, SQLite WAL +
+> busy timeout, sim clock entry point. SECURITY — JEWL history private per user; campaign-membership
+> checks on feed APIs; GM-only session start/end. NEXT: perception design (per-Trailblazer feed), time
+> durations + narrated jumps + harvest events, engine extraction of NPC actions from narration, recording
+> relocations/item moves/planning changes, U2c-5 (JEWL read after canon — ruled), remaining chrome
+> (carry tray, folder badges, tooltips). Rulings: memory/ruling-*-2026-10-0{6,7,8}.md.
 
 > 2026-08-26: stock-catalog structure+balance compliance pass (487 items: structured
 > effects[]/expiry across all traits, scene/minutes purged per r-2026-08-26-01,
