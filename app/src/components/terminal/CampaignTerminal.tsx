@@ -16,7 +16,8 @@ import TableSpeakBar from './TableSpeakBar';
 import BeingSpeakingLines from './BeingSpeakingLines';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
-import { pageCutoff, keepFrom, mergeEvents, sessionMarkers, withoutLoggedSessionLines } from './table-feed/feed-paging';
+import { pageCutoff, keepFrom, mergeEvents, withoutLoggedSessionLines } from './table-feed/feed-paging';
+import { matchEvent } from './table-feed/feed-tree';
 import type { FeedEntity } from './table-feed/TableFeedRows';
 import EncounterPanel from './EncounterPanel';
 import SessionWarmupOverlay from './SessionWarmupOverlay';
@@ -59,13 +60,6 @@ interface CampaignTerminalProps {
 /** Rows per source per page of the one feed's history. */
 const FEED_PAGE = 60;
 
-const FILTERS: { key: TerminalFilter; label: string; icon: string }[] = [
-  { key: 'all', label: 'All', icon: '' },
-  { key: 'chat', label: 'Chat', icon: '\uD83D\uDCAC' },
-  { key: 'dice', label: 'Dice', icon: '\uD83C\uDFB2' },
-  { key: 'changes', label: 'Changes', icon: '\u25C8' },
-  { key: 'events', label: 'Events', icon: '\u2550' },
-];
 
 // Map filter keys to event types for querying
 function filterToTypes(filter: TerminalFilter): string[] | undefined {
@@ -101,10 +95,11 @@ export default function CampaignTerminal({
   onClose,
 }: CampaignTerminalProps) {
   // 'terminal' = the one feed (TERMINAL and TABLE merged, Mike 2026-10-08).
-  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot' | 'encounter'>('terminal');
+  const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot'>('terminal');
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<TerminalFilter>('all');
+  // No filter chips (Mike 2026-10-08): the one feed is searched, not filtered.
+  const activeFilter = 'all' as TerminalFilter;
   const [reverting, setReverting] = useState<string | null>(null);
   const [sessions, setSessions] = useState<GameSessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<GameSessionInfo | null>(null);
@@ -156,10 +151,6 @@ export default function CampaignTerminal({
     return () => window.removeEventListener(TABLE_FEED_EVENT, onFeed);
   }, []);
 
-  // If the session ends (or role loads late) while sitting on TABLE, fall back.
-  useEffect(() => {
-    if (terminalMode === 'encounter' && !tableAvailable) setTerminalMode('terminal');
-  }, [terminalMode, tableAvailable]);
 
   // A session just became active (started here, or already live on a reload):
   // one lane check; if the core is not answering yet, raise the loading screen.
@@ -856,19 +847,40 @@ export default function CampaignTerminal({
   }, [campaignId, character, onCharacterUpdate, onRestComplete, fetchEvents, fetchSessions, executeDiceApiCall]);
 
   // ── The one feed (Mike 2026-10-08) ─────────────────────────────────────────
-  // TERMINAL and TABLE are one feed in the rulebook's row grammar, there
-  // whether or not a session is live. Session boundaries are teal system rows
-  // built from the session list (only within what is loaded, unless the whole
-  // record is). The filter chips narrow it.
-  const feedEvents = useMemo(() => {
-    if (activeFilter !== 'all' && activeFilter !== 'events') return events;
-    const oldest = events.length ? new Date(events[0].timestamp).getTime() : null;
-    const markers = sessionMarkers(sessions, campaignId)
-      .filter(m => !olderCursor || oldest === null || new Date(m.timestamp).getTime() >= oldest);
-    return mergeEvents(withoutLoggedSessionLines(events), markers);
-  }, [events, sessions, campaignId, olderCursor, activeFilter]);
+  // One feed, laid out as a fold tree (chapter > session > rest > encounter),
+  // with one search field. The logged session_start/_end lines give way to the
+  // session folds.
+  const feedEvents = useMemo(() => withoutLoggedSessionLines(events), [events]);
+  const emptyFrom = olderCursor ? (events[0]?.timestamp ?? null) : null;
+  const [query, setQuery] = useState('');
+  const searching = query.trim().length > 0;
+  const hits = useMemo(() => {
+    if (!searching) return 0;
+    const q = query.trim().toLowerCase();
+    return feedEvents.filter(e => matchEvent(e, q)).length;
+  }, [feedEvents, query, searching]);
 
   const refreshEvents = useCallback(() => { void fetchEvents(); }, [fetchEvents]);
+
+  // The encounter folds into the tree (no tab): its running state is matched to
+  // its fold, whose body carries the full EncounterPanel. GM, live session only.
+  const [liveEncounter, setLiveEncounter] = useState<{ id: string | null; name: string } | null>(null);
+  const refreshEncounter = useCallback(async () => {
+    if (!tableAvailable) { setLiveEncounter(null); return; }
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/encounters`);
+      if (!res.ok) return;
+      const j = (await res.json()) as { encounters?: Array<{ id: string; name: string; status: string }> };
+      const live = (j.encounters ?? []).find(e => e.status === 'ACTIVE' || e.status === 'PAUSED');
+      setLiveEncounter(live ? { id: live.id, name: live.name } : null);
+    } catch { /* the fold just shows the create form */ }
+  }, [campaignId, tableAvailable]);
+  useEffect(() => { void refreshEncounter(); }, [refreshEncounter]);
+  const onEncounterEvent = useCallback(() => { void refreshEncounter(); void fetchEvents(); }, [refreshEncounter, fetchEvents]);
+  const encounter = useMemo(() => (tableAvailable ? {
+    live: liveEncounter,
+    render: () => <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={onEncounterEvent} />,
+  } : undefined), [tableAvailable, liveEncounter, campaignId, campaignCharacters, onEncounterEvent]);
 
   // No text input when no session is live (Mike 2026-10-08: "No need for
   // inputs when not in play… They work with JEWL for any of that"). The
@@ -889,11 +901,6 @@ export default function CampaignTerminal({
     whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none',
     background: on ? '#002f6c' : 'none', color: on ? '#ffcc78' : '#002f6c', transform: on ? 'rotate(-1deg)' : undefined,
   });
-  const chipStyle = (on: boolean): React.CSSProperties => ({
-    fontFamily: bebas, fontSize: 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: '2px 8px 0', border: 0,
-    whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none',
-    background: on ? '#002f6c' : 'none', color: on ? '#ffcc78' : '#002f6c',
-  });
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -909,17 +916,13 @@ export default function CampaignTerminal({
         />
       )}
 
-      {/* The drawer's header = the mockup's tab row (v7): the feed, JEWL,
-          the encounter (GM, live session), the ◆ state, fold. */}
+      {/* Header (v7 tab row): the feed · JEWL · ◆ state · session switch (GM) · fold. */}
       <div role="tablist" aria-label="Terminal drawer" data-drawer-tabs style={{
         display: 'flex', alignItems: 'center', height: 42, flex: 'none', padding: '0 0 0 6px', gap: 2,
         background: '#CBD9E8', borderBottom: '3px solid #002f6c', overflow: 'hidden',
       }}>
         <button role="tab" aria-selected={terminalMode === 'terminal'} onClick={() => setTerminalMode('terminal')} style={tabStyle(terminalMode === 'terminal')}>Terminal</button>
         <button role="tab" aria-selected={terminalMode === 'copilot'} onClick={() => setTerminalMode('copilot')} style={tabStyle(terminalMode === 'copilot')}>jEWL</button>
-        {tableAvailable && (
-          <button role="tab" aria-selected={terminalMode === 'encounter'} onClick={() => setTerminalMode('encounter')} style={tabStyle(terminalMode === 'encounter')}>Encounter</button>
-        )}
         <span style={{ flex: 1, minWidth: 4 }} />
         {(tableFeedLive || activeSession) && (
           <span
@@ -933,12 +936,27 @@ export default function CampaignTerminal({
             {tableFeedLive ? `Table · ${tableFeedLive.heard}` : `Live · S${activeSession!.number}`}
           </span>
         )}
+        {isGM && (
+          <button onClick={() => void toggleSession()} disabled={sessionBusy} data-no-hold title={activeSession ? 'End the session' : 'Start a session'} style={{
+            fontFamily: bebas, fontSize: 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: '2px 8px 0', border: 0, cursor: 'pointer', flex: 'none',
+            whiteSpace: 'nowrap', background: 'none', color: activeSession ? '#b0303b' : '#0f6e5e',
+            boxShadow: `inset 0 0 0 2px ${activeSession ? '#b0303b' : '#0f6e5e'}`, marginLeft: 4,
+          }}>
+            {sessionBusy ? '…' : activeSession ? '■ End' : '▶ Session'}
+          </button>
+        )}
+        <span
+          title={connected ? `Live${connectedUsers?.length ? ` — ${connectedUsers.map(u => u.username).join(', ')}` : ''}` : 'Disconnected (polling)'}
+          style={{ fontFamily: mono, fontSize: 12, color: connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
+        >
+          {connected ? '◈' : '○'}
+        </span>
         {onClose && (
           <button aria-label="Fold the terminal" data-no-hold onClick={onClose} style={{ width: 40, height: 36, flex: 'none', border: 0, background: 'none', color: '#002f6c', fontSize: 16, cursor: 'pointer' }}>{'▾'}</button>
         )}
       </div>
 
-      {/* Co-pilot Chat */}
+      {/* JEWL — his own tab (Mike 2026-10-08) */}
       {terminalMode === 'copilot' && (
         <CopilotChat
           campaignId={campaignId}
@@ -949,37 +967,36 @@ export default function CampaignTerminal({
         />
       )}
 
-      {/* Encounter — the round engine's GM surface */}
-      {terminalMode === 'encounter' && (
-        <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={refreshEvents} />
-      )}
-
       {terminalMode === 'terminal' && (<>
-        {/* Filter chips narrow the one feed; the GM's session switch; connection. */}
-        <div role="toolbar" aria-label="Narrow the feed" style={{
-          display: 'flex', alignItems: 'center', gap: 2, flex: 'none', padding: '0 8px 0 8px',
-          background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)', overflowX: 'auto', overflowY: 'hidden',
-        }}>
-          {FILTERS.map(f => (
-            <button key={f.key} aria-pressed={activeFilter === f.key} onClick={() => setActiveFilter(f.key)} style={chipStyle(activeFilter === f.key)}>
-              {f.label}
-            </button>
-          ))}
-          <span style={{ flex: 1, minWidth: 4 }} />
-          {isGM && (
-            <button onClick={() => void toggleSession()} disabled={sessionBusy} data-no-hold style={{
-              ...chipStyle(false), color: activeSession ? '#b0303b' : '#0f6e5e',
-              boxShadow: `inset 0 0 0 2px ${activeSession ? '#b0303b' : '#0f6e5e'}`,
-            }}>
-              {sessionBusy ? '…' : activeSession ? '■ End' : '▶ Session'}
-            </button>
+        {/* One search field over the feed: matching lines, their folds opened. */}
+        <div style={{ flex: 'none', padding: '6px 10px 6px 14px', background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search the record"
+              aria-label="Search the record"
+              className="text-[16px] md:text-[14px]"
+              data-feed-search
+              style={{
+                flex: 1, minWidth: 0, height: 36, outline: 0, padding: '0 8px',
+                fontFamily: mono, color: '#000', background: '#fff', border: 0, borderLeft: '4px solid #002f6c',
+              }}
+            />
+          </div>
+          {searching && (
+            <div data-search-status style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, fontFamily: mono, fontSize: 12, color: '#393937' }}>
+              <span>{hits} match{hits === 1 ? '' : 'es'} in loaded history{olderCursor ? ' — earlier history is not searched yet' : ''}</span>
+              {olderCursor && (
+                <button onClick={() => void loadOlder()} disabled={loadingOlder} data-no-hold style={{
+                  minHeight: 36, padding: '0 4px', border: 0, background: 'none', cursor: 'pointer', fontFamily: mono, fontWeight: 700, fontSize: 12,
+                }}>
+                  <span style={{ background: '#000', color: '#f5f4ef', padding: '1px 5px' }}>{loadingOlder ? '[...LOADING...]' : '[SEARCH EARLIER]'}</span>
+                </button>
+              )}
+            </div>
           )}
-          <span
-            title={connected ? `Live${connectedUsers?.length ? ` — ${connectedUsers.map(u => u.username).join(', ')}` : ''}` : 'Disconnected (polling)'}
-            style={{ fontFamily: mono, fontSize: 12, color: connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
-          >
-            {connected ? '◈' : '○'}{connectedUsers && connectedUsers.length > 0 ? ` ${connectedUsers.length}` : ''}
-          </span>
         </div>
 
         <div
@@ -989,24 +1006,36 @@ export default function CampaignTerminal({
           style={{ backgroundColor: '#cfe2f2', minHeight: 0 }}
           data-feed-scroll
         >
-          {olderCursor && (
+          {olderCursor && !searching && (
             <div style={{ padding: '8px 12px 0 14px' }}>
               <button onClick={() => void loadOlder()} disabled={loadingOlder} data-no-hold style={{
                 minHeight: 36, padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left',
                 fontFamily: mono, fontWeight: 700, fontSize: 13, lineHeight: 1.62,
               }}>
-                <span style={{ background: '#000', color: '#f5f4ef', padding: '1px 5px' }}>{loadingOlder ? '[...LOADING EARLIER...]' : '[...EARLIER SESSIONS...]'}</span>
+                <span style={{ background: '#000', color: '#f5f4ef', padding: '1px 5px' }}>{loadingOlder ? '[...LOADING EARLIER...]' : '[...EARLIER HISTORY...]'}</span>
               </button>
             </div>
           )}
-          {!olderCursor && !loading && feedEvents.length > 0 && (
+          {!olderCursor && !loading && !searching && feedEvents.length > 0 && (
             <div style={{ padding: '10px 14px 0', fontFamily: mono, fontSize: 12, color: '#393937' }}>[BEGINNING OF THE RECORD]</div>
           )}
-          <TableFeed campaignId={campaignId} events={feedEvents} entities={tableEntities ?? []} loading={loading} onRevert={handleRevert} reverting={reverting} />
+          <TableFeed
+            campaignId={campaignId}
+            events={feedEvents}
+            entities={tableEntities ?? []}
+            loading={loading}
+            onRevert={handleRevert}
+            reverting={reverting}
+            sessions={sessions}
+            emptyFrom={emptyFrom}
+            foldKey={`growth:feed-folds:${campaignId}`}
+            query={query}
+            encounter={encounter}
+          />
           {/* Beings still speaking (U2c): their lines grow here, under the last
               logged event, and yield to the logged chat row when it lands. */}
           <BeingSpeakingLines
-            active={!!activeSession}
+            active={!!activeSession && !searching}
             events={events}
             entities={tableEntities}
             onGrow={() => {
