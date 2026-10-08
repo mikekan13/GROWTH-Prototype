@@ -253,10 +253,10 @@ export async function setEncounterStatus(encounterId: string, actor: EncounterAc
   if (enc.status === 'RESOLVED') throw new ValidationError('A resolved encounter cannot be reopened');
   await prisma.encounter.update({ where: { id: encounterId }, data: { status } });
   if (status === 'ACTIVE' && enc.status !== 'ACTIVE') {
-    await postGameEvent(enc.campaignId, actor, 'encounter_begin', `Encounter begins: ${enc.name}. Six seconds at a time.`);
+    await postGameEvent(enc.campaignId, actor, 'encounter_begin', `Encounter begins: ${enc.name}. Six seconds at a time.`, enc);
   }
   if (status === 'RESOLVED') {
-    await postGameEvent(enc.campaignId, actor, 'encounter_end', `Encounter resolved: ${enc.name}.`);
+    await postGameEvent(enc.campaignId, actor, 'encounter_end', `Encounter resolved: ${enc.name}.`, enc);
   }
   return getEncounter(encounterId, actor);
 }
@@ -379,14 +379,19 @@ export async function setParticipantDowned(encounterId: string, actor: Encounter
   p.downed = downed;
   if (!downed) state.intentions = state.intentions.filter(i => i.participantId !== participantId);
   await prisma.encounter.update({ where: { id: encounterId }, data: { state: serialize(state) } });
-  await postGameEvent(enc.campaignId, actor, downed ? 'encounter_down' : 'encounter_up', downed ? `${p.name} is down.` : `${p.name} is back on their feet.`);
+  await postGameEvent(enc.campaignId, actor, downed ? 'encounter_down' : 'encounter_up', downed ? `${p.name} is down.` : `${p.name} is back on their feet.`, enc);
   return getEncounter(encounterId, actor);
 }
 
 // ── The round ───────────────────────────────────────────────────────────────
 
-async function postGameEvent(campaignId: string, actor: EncounterActor, eventType: string, description: string) {
-  const payload: TerminalPayload = { kind: 'game_event', eventType, description };
+/** The feed row of an encounter event: which encounter it belongs to rides along, so the feed can fold begin → end (2026-10-08). Pure. */
+export function encounterEventPayload(eventType: string, description: string, enc?: { id: string; name: string }): TerminalPayload {
+  return { kind: 'game_event', eventType, description, ...(enc ? { encounterId: enc.id, encounterName: enc.name } : {}) };
+}
+
+async function postGameEvent(campaignId: string, actor: EncounterActor, eventType: string, description: string, enc?: { id: string; name: string }) {
+  const payload: TerminalPayload = encounterEventPayload(eventType, description, enc);
   const event = await createCampaignEvent({
     campaignId, type: 'game_event', actor: 'system', actorUserId: actor.userId, actorName: 'Simulation', payload,
   });
@@ -589,7 +594,7 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   // The round is committed above; everything after is best-effort record-keeping
   // that must never turn a resolved round into a 500.
   try {
-    await postGameEvent(enc.campaignId, actor, 'encounter_round', `${enc.name} — ${summary}`);
+    await postGameEvent(enc.campaignId, actor, 'encounter_round', `${enc.name} — ${summary}`, enc);
   } catch (err) { console.warn('[encounter] round event failed', err); }
   try {
     await advanceClock(enc.campaignId, actor.userId, actor.role, { amount: 1, unit: 'round', note: `${enc.name} round ${round}` });

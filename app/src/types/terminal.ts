@@ -96,6 +96,9 @@ export interface GameEventPayload extends TableFeedFields {
   narration?: string | null;
   /** …and each line of speech it pulled out, with who the record says spoke it. The feed draws these as that character's own rows. */
   speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  /** Encounter lines (encounter_begin/round/down/up/end, since 2026-10-08): which encounter, so the feed folds begin → end. */
+  encounterId?: string;
+  encounterName?: string;
 }
 
 export type TerminalPayload =
