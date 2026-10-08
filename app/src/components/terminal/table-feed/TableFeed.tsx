@@ -34,17 +34,69 @@ function writeFolds(key: string | undefined, folds: Folds) {
 }
 
 const dateOf = (cycle: number, ts: FeedTimescale | null) => presentCycle(cycle, ts).split(' · ')[0];
-const PREFIX: Partial<Record<FoldNode['kind'], string>> = { rest: '☾ ', encounter: '⚔ ' };
+function roman(n: number): string {
+  const table: Array<[number, string]> = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let out = '';
+  for (const [v, r] of table) while (n >= v) { out += r; n -= v; }
+  return out || '0';
+}
 
-function headerTitle(n: FoldNode, ts: FeedTimescale | null): string {
+/** "in-world range · N lines" — the meta that every level carries. */
+function meta(n: FoldNode, ts: FeedTimescale | null): string {
   const lines = `${n.lines} line${n.lines === 1 ? '' : 's'}`;
-  if (n.kind === 'chapter' && n.chapter) {
-    const h = n.chapter.harvest;
-    const when = h ? `harvest ${h.cycle !== null ? dateOf(h.cycle, ts) : new Date(h.timestamp).toLocaleDateString()}` : 'current';
-    return [n.label, when, `${n.chapter.sessions} session${n.chapter.sessions === 1 ? '' : 's'}`].join(' · ');
-  }
   const span = n.cycles ? (() => { const a = dateOf(n.cycles[0], ts), b = dateOf(n.cycles[1], ts); return a === b ? a : `${a} – ${b}`; })() : null;
-  return [`${PREFIX[n.kind] ?? ''}${n.label}`, span, lines].filter(Boolean).join(' · ');
+  return [span, lines].filter(Boolean).join(' · ');
+}
+
+/**
+ * Each level in the Core Rulebook's own heading voice (v0.4.5):
+ *   chapter   = the chapter opener, p 20 ("II: New Beginnings…"): Inknut Antiqua on the coral bar,
+ *               centred, a short rule, and the Bebas italic navy line under it;
+ *   session   = the section heading, p 20 "2.1 GROWING A CHARACTER": Bebas gold on a navy strip
+ *               that hugs the text, decimal-numbered (chapter.session);
+ *   rest      = the sub-section heading, p 20 "2.1.1 SEEDS, ROOTS & BRANCHES": the same strip, smaller;
+ *   encounter = the combat heading, p 131 "=== [THE THREE PHASES] ===": Consolas bold white on black.
+ * The hierarchy reads by type and number, so there is no indentation.
+ */
+function Heading({ node, num, open, ts }: { node: FoldNode; num: string; open: boolean; ts: FeedTimescale | null }) {
+  const arw = <span className="arw" aria-hidden>{open ? '▾' : '▸'}</span>;
+  // "Live" only where play is happening (a live session or encounter) — an open-by-default stretch is not live.
+  const live = node.live && (node.kind === 'session' || node.kind === 'encounter') ? <span className="livetag">Live</span> : null;
+  switch (node.kind) {
+    case 'chapter': {
+      const c = node.chapter;
+      const h = c?.harvest;
+      const when = h ? `harvest ${h.cycle !== null ? dateOf(h.cycle, ts) : new Date(h.timestamp).toLocaleDateString()}` : 'the current chapter';
+      const sessions = c ? `${c.sessions} session${c.sessions === 1 ? '' : 's'}` : '';
+      return (
+        <>
+          <span className="ch-bar">{arw}Chapter {roman(c?.number ?? 1)}</span>
+          <span className="ch-rule" aria-hidden>{'———'}</span>
+          <span className="ch-sub">{[when, sessions, `${node.lines} line${node.lines === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</span>
+        </>
+      );
+    }
+    case 'encounter':
+      return (
+        <>
+          <span className="cb-bar">{arw}{'=== ['}{node.label.toUpperCase()}{'] ==='}</span>
+          <span className="meta">{meta(node, ts)}</span>
+          {live}
+        </>
+      );
+    default: {
+      const title = node.kind === 'session' && node.session
+        ? `${num} ${node.session.name ?? `Session ${node.session.number}`}`
+        : node.kind === 'rest' ? `${num} ${node.label}` : node.label;
+      return (
+        <>
+          <span className="badge">{arw}{title}</span>
+          <span className="meta">{meta(node, ts)}</span>
+          {live}
+        </>
+      );
+    }
+  }
 }
 
 /** Consecutive lines render together so a spoken beat still folds as one row. */
@@ -69,32 +121,33 @@ interface TreeCtx {
   slotInSession: boolean;
 }
 
-function Fold({ node, depth, ctx }: { node: FoldNode; depth: number; ctx: TreeCtx }) {
+function Fold({ node, num, ctx }: { node: FoldNode; num: string; ctx: TreeCtx }) {
   const open = ctx.isOpen(node);
   const liveEnc = node.kind === 'encounter' && node.live;
   const showSlot = !!ctx.encounterSlot && (liveEnc || (ctx.slotInSession && node.kind === 'session' && node.live));
+  // The book's decimal numbering: chapter 1 → session 1.6 → rest 1.6.1.
+  const nums = new Map<string, string>();
+  let restN = 0;
+  for (const it of node.items) {
+    if (it.type !== 'node') continue;
+    const child = it.node;
+    if (child.kind === 'session' && child.session) nums.set(child.key, `${num}.${child.session.number}`);
+    else if (child.kind === 'rest') { restN += 1; nums.set(child.key, `${num}.${restN}`); }
+    else nums.set(child.key, num);
+  }
   return (
     <section className={`fold k-${node.kind}${node.live ? ' live' : ''}`} data-fold={node.kind} data-open={open ? '1' : '0'}>
-      <button
-        type="button"
-        className="fh"
-        style={{ marginLeft: depth * 8, width: `calc(100% - ${depth * 8}px)` }}
-        aria-expanded={open}
-        data-no-hold
-        onClick={() => ctx.toggle(node, open)}
-      >
-        <span className="arw" aria-hidden>{open ? '▾' : '▸'}</span>
-        <span className="ttl">{headerTitle(node, ctx.timescale)}</span>
-        {node.live && node.kind !== 'chapter' && <span className="livetag">Live</span>}
+      <button type="button" className={`fh h-${node.kind}`} aria-expanded={open} data-no-hold onClick={() => ctx.toggle(node, open)}>
+        <Heading node={node} num={num} open={open} ts={ctx.timescale} />
       </button>
       {open && (
         <div className="fb">
           {runs(node.items).map((r) => r.type === 'node'
-            ? <Fold key={r.node.key} node={r.node} depth={depth + 1} ctx={ctx} />
+            ? <Fold key={r.node.key} node={r.node} num={nums.get(r.node.key) ?? num} ctx={ctx} />
             : <React.Fragment key={r.key}>{buildFeedRows(r.events, ctx.roster).map((row) => <FeedRow key={row.key} row={row} />)}</React.Fragment>)}
           {showSlot && !liveEnc && (
             <section className="fold k-encounter live" data-fold="encounter" data-open="1">
-              <div className="fh static" style={{ marginLeft: (depth + 1) * 8, width: `calc(100% - ${(depth + 1) * 8}px)` }}><span className="arw" aria-hidden>{'▾'}</span><span className="ttl">{'⚔ '}Encounter</span></div>
+              <div className="fh h-encounter static"><span className="cb-bar">{'=== [ENCOUNTER] ==='}</span></div>
               <div className="encslot">{ctx.encounterSlot}</div>
             </section>
           )}
@@ -191,7 +244,7 @@ export default function TableFeed({
       <div className={`tf${searching ? ' searching' : ''}`} data-table-feed data-hits={found ? found.hits : undefined}>
         {empty && <div className="empty">{loading ? 'Loading…' : searching ? '[NO LINE MATCHES]' : '[THE TABLE IS QUIET]'}</div>}
         {!shown && flatRows.map((row) => <FeedRow key={row.key} row={row} />)}
-        {shown && shown.map((n) => <Fold key={n.key} node={n} depth={0} ctx={ctx} />)}
+        {shown && shown.map((n) => <Fold key={n.key} node={n} num={String(n.chapter?.number ?? 1)} ctx={ctx} />)}
         {children}
       </div>
     </TableFeedProvider>

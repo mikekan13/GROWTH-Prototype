@@ -33,6 +33,8 @@ export interface FoldNode {
   cycles: [number, number] | null;
   /** Encounter only: its id or name, so the live one can be matched to the running encounter. */
   encounter?: { id: string | null; name: string; ended: boolean };
+  /** Session only: its number and name, for the book's decimal heading (1.6 Name). */
+  session?: { number: number; name: string | null };
   /** Chapter only: sessions inside, and the harvest that closed it (null = the current chapter). */
   chapter?: { number: number; sessions: number; harvest: { timestamp: string; cycle: number | null } | null };
 }
@@ -132,6 +134,7 @@ export function buildFoldTree(
       label: s.kind === 'between' ? 'Between sessions' : `Session ${s.session!.number}${s.session!.name ? ` · ${s.session!.name}` : ''}`,
       live: s.live || (s.kind === 'between' && !anyLive && si === sections.length - 1),
       items: [], lines: 0, cycles: null,
+      ...(s.session ? { session: { number: s.session.number, name: s.session.name } } : {}),
     };
     s.parts.forEach((part, pi) => {
       const ctx = { liveSession: s.live, liveEncounter: opts.liveEncounter ?? null };

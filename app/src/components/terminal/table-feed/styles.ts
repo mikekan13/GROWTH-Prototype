@@ -91,21 +91,31 @@ export const TABLE_FEED_CSS = `
 .tf .foldbtn span{background:#000;color:var(--tf-paper);padding:1px 5px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .tf .foldbtn:focus-visible span{box-shadow:inset 0 -3px 0 var(--tf-gold)}
 
-/* the fold tree: one header style at every level (Bebas gold on navy), indented by depth */
-.tf .fold{margin:6px 12px 0 0}
+/* the fold tree in the Core Rulebook's own heading voices (v0.4.5), no indentation:
+   chapter = p 20 chapter opener; session = p 20 section "2.1"; rest = p 20 sub-section "2.1.1";
+   encounter = p 131 combat heading. Every heading is a full-width tap target (>= 36 px). */
+.tf .fold{margin:8px 12px 0 0}
 .tf .fold .fold{margin-right:0}
-.tf > .fold{margin-top:10px}
-.tf .fh{display:flex;align-items:center;gap:6px;width:auto;min-height:38px;padding:3px 10px 0;border:0;cursor:pointer;text-align:left;box-sizing:border-box;
-  background:var(--tf-navy);color:var(--tf-gold);font:400 17px/1.15 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.04em}
-.tf .k-between > .fh{background:var(--tf-g3);color:var(--tf-paper)}
-.tf .k-encounter > .fh{background:#000;color:#f5f4ef}
-.tf .k-encounter > .fh .arw{color:#f7525f}
+.tf .fh{display:flex;flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:2px;width:100%;min-height:36px;padding:2px 0;border:0;background:none;cursor:pointer;text-align:left;box-sizing:border-box}
 .tf .fh.static{cursor:default}
-.tf .fh .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tf .fh .arw{flex:none;font-family:var(--font-terminal);font-size:13px}
-.tf .fh .livetag{flex:none;font-size:14px;background:var(--tf-gold);color:var(--tf-navy);padding:1px 6px 0}
-.tf .fh:focus-visible{outline:3px solid var(--tf-gold);outline-offset:-3px}
-.tf .fb > .row:first-child{margin-top:8px}
+.tf .fh .arw{font-family:var(--font-terminal);font-size:.62em;margin-right:6px;vertical-align:.18em}
+.tf .fh .meta{font:400 12px/1.4 var(--font-terminal);color:var(--tf-g3)}
+.tf .fh .livetag{font:400 14px/1 var(--font-bebas-neue),'Bebas Neue',sans-serif;background:var(--tf-gold);color:var(--tf-navy);padding:3px 6px 1px;letter-spacing:.04em}
+.tf .fh:focus-visible{outline:3px solid var(--tf-gold);outline-offset:2px}
+/* chapter: Inknut Antiqua on the coral bar, centred; a short rule; the Bebas italic navy line */
+.tf .h-chapter{flex-direction:column;justify-content:center;padding:6px 0 4px}
+.tf .ch-bar{font:600 22px/1.25 var(--font-inknut-antiqua),'Inknut Antiqua',Georgia,serif;color:#fff;background:#f6525e;padding:0 10px;text-align:center;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.tf .ch-rule{font:12px/1 var(--font-terminal);color:var(--tf-navy);letter-spacing:-.05em}
+.tf .ch-sub{font:italic 400 16px/1.2 var(--font-bebas-neue),'Bebas Neue',sans-serif;color:var(--tf-navy);letter-spacing:.03em;text-align:center}
+/* session: section heading — Bebas gold on a navy strip that hugs the text */
+.tf .h-session .badge,.tf .h-between .badge,.tf .h-rest .badge{font:400 24px/1.12 var(--font-bebas-neue),'Bebas Neue',sans-serif;color:var(--tf-gold);background:var(--tf-navy);padding:2px 6px 0;letter-spacing:.01em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.tf .h-between .badge{background:var(--tf-g3);color:var(--tf-paper)}
+/* rest: sub-section — the same strip, smaller */
+.tf .h-rest .badge{font-size:18px;padding:1px 5px 0}
+/* encounter: the combat heading — Consolas bold white on black */
+.tf .cb-bar{font:700 13px/1.62 var(--font-terminal);color:#f5f4ef;background:#000;padding:1px 6px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.tf .h-encounter .arw{color:#f7525f}
+.tf .fb > .row:first-child{margin-top:6px}
 .tf .fold .row{margin-right:0}
 .tf .encslot{margin:8px 0 0;background:#0a0a1a;max-height:55vh;overflow-y:auto;display:flex;flex-direction:column}
 /* search: every line shown is a hit */
