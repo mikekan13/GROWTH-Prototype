@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { CtxMenuBorder, CtxMenuScanlines, ctxMenuStyle } from '@/components/ui/ContextMenu';
+import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 
 /**
@@ -27,7 +27,7 @@ import { useCampaignStream } from '@/hooks/useCampaignStream';
  * flag set show "JEWL". The hotkey hint stays identity-neutral either way.
  */
 const REVEAL_JEWL = process.env.NEXT_PUBLIC_REVEAL_JEWL === 'true';
-const COPILOT_LABEL = REVEAL_JEWL ? 'JEWL' : 'Copilot';
+const JEWL_TAG = REVEAL_JEWL ? 'jEWL' : 'Copilot';
 
 /**
  * Collapse a mistake row's (status, resolution) into the single string the
@@ -1073,8 +1073,32 @@ export function JewlChip() {
     height: `min(70vh, ${Math.max(240, kb.viewportHeight - 24)}px)`,
     maxHeight: `${Math.max(240, kb.viewportHeight - 24)}px`,
     borderRadius: '12px 12px 0 0',
-    paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
+    // safe-area inset lives on the input row (JEWL_OVERLAY_CSS) so the white
+    // bar runs to the bottom edge; same total height as before.
   };
+
+  const visibleMessages = messages.filter(m => m.username !== '[system]' && m.username !== '[ui]');
+  const feeding = audioStatus === 'listening' ? tableFeed : null;
+  // The mic state in the drawer header's grammar: a coloured ◆/● glyph + navy Bebas words.
+  const audioGlyph = feeding ? '◆'
+    : audioStatus === 'listening' ? '●'
+    : audioStatus === 'muted' ? '◌'
+    : audioStatus === 'denied' || audioStatus === 'unsupported' ? '✕'
+    : audioStatus === 'requesting' ? '…'
+    : '○';
+  const audioGlyphColour = feeding ? (feeding.holding ? '#b07a00' : '#2f6fb0')
+    : audioStatus === 'listening' ? '#0f6e5e'
+    : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#b0303b'
+    : audioStatus === 'requesting' ? '#b07a00'
+    : '#6b7380';
+  const audioWords = feeding ? `Table · ${feeding.heard}${feeding.holding ? ' …' : ''}`
+    : audioStatus === 'listening' ? 'Live'
+    : audioStatus === 'muted' ? 'Muted'
+    : audioStatus === 'denied' ? 'Mic blocked'
+    : audioStatus === 'unsupported' ? 'No mic'
+    : audioStatus === 'requesting' ? 'Mic'
+    : 'Off';
+  const sendDisabled = loading || (!input.trim() && pendingImages.length === 0);
 
   return (
     <>
@@ -1096,10 +1120,10 @@ export function JewlChip() {
             width: 48,
             height: 48,
             borderRadius: '50%',
-            background: '#000',
-            border: '2px solid var(--krma-gold, #ffcc78)',
-            boxShadow: '0 0 14px rgba(255,204,120,0.45), 0 6px 18px rgba(0,0,0,0.6)',
-            color: 'var(--krma-gold, #ffcc78)',
+            background: '#002f6c',
+            border: '2px solid #ffcc78',
+            boxShadow: '0 4px 14px rgba(0,47,108,0.45), 0 1px 3px rgba(0,0,0,0.3)',
+            color: '#ffcc78',
             fontSize: 'calc(22px * var(--jewl-fs, 1))',
             lineHeight: 1,
             display: 'flex',
@@ -1126,476 +1150,227 @@ export function JewlChip() {
         />
       )}
       {open && (
+        // Look (2026-10-08): the drawer's jEWL Conversation, floating — same
+        // shared CSS (terminal/jewlChatCss). Powder-blue page under a navy
+        // frame; the header is the drawer's tab row (navy/gold title, ◆ mic
+        // state in navy Bebas); NOW and the mistake flags speak the same calm
+        // row language. Behaviour unchanged.
         <div
           ref={panelRef}
           role="dialog"
           aria-label="Co-pilot"
           data-no-hold
           data-jewl-sheet={sheetMode ? '1' : undefined}
+          data-jewl-overlay
+          className={`jc jo ${sheetMode ? 'jo-sheet' : 'jo-win'}`}
           style={{
-            // Phone readability knob (2026-10-06): every font size in the panel
-            // is calc(Npx * var(--jewl-fs)); the sheet turns the knob to 1.3
-            // (8→10.4, 9→11.7, 11→14.3, 12→15.6). Desktop stays at 1 = today's px.
-            ...({ '--jewl-fs': sheetMode ? 1.3 : 1 } as React.CSSProperties),
+            // Readability knob: every type size in the panel is
+            // calc(Npx * var(--jewl-fs)). The shared look is already sized for
+            // a phone (≥ 12 px everywhere), so both modes sit at 1; turn it up
+            // here if the sheet needs to read bigger.
+            ...({ '--jewl-fs': 1 } as React.CSSProperties),
             position: 'fixed',
             ...(sheetMode ? sheetStyle : { ...anchoredPos, width: PANEL_W, height: PANEL_H, maxHeight: 'calc(100vh - 120px)' }),
-            background: '#000',
-            border: 'none',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
             zIndex: 9998,
-            display: 'flex',
-            flexDirection: 'column',
-            fontFamily: 'Consolas, monospace',
-            padding: '6px',
           }}
         >
-          {/* The ^v^v undulating chrome — same skin as every context menu.
-              JEWL is the OS runner; his overlay IS a Terminal surface.
-              count sized up so the strip wraps the full 380x500 panel. */}
-          <CtxMenuBorder count={sheetMode ? 120 : 90} flush={sheetMode} />
-          <CtxMenuScanlines />
+          <style>{JEWL_CHAT_CSS}</style>
+          <style>{JEWL_OVERLAY_CSS}</style>
           {sheetMode && (
             // Drag handle: swipe down ~80 px to dismiss. Pointer events, not
             // touch events, so the canvas's touch tracker contract holds.
             <div
+              className="jo-grip"
               onPointerDown={e => { sheetDragRef.current = { y0: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
               onPointerMove={e => { const d = sheetDragRef.current; if (d && e.clientY - d.y0 > 80) { sheetDragRef.current = null; setOpen(false); } }}
               onPointerUp={() => { sheetDragRef.current = null; }}
               onPointerCancel={() => { sheetDragRef.current = null; }}
               aria-label="Drag down to close"
-              style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '8px 0 2px', cursor: 'grab', touchAction: 'none' }}
             >
-              <div style={{ width: 44, height: 4, borderRadius: 2, background: 'rgba(208, 160, 48, 0.55)' }} />
+              <i />
             </div>
           )}
-          {/* Header */}
-          <div
-            style={{
-              padding: '10px 14px',
-              borderBottom: '1px solid #333',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                color: '#fff',
-                fontSize: 'calc(12px * var(--jewl-fs, 1))',
-                fontFamily: "'Inknut Antiqua', serif",
-              }}
-            >
-              {ctxMenuStyle(COPILOT_LABEL)}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Audio status label + mute toggle. Always rendered so the
-                  GM knows the mic state at a glance. Per
-                  [[jewl-always-on-audio-when-active]]: audio runs
-                  whenever the chip is mounted; mute is the privacy lever. */}
-              <span
-                style={{
-                  fontSize: 'calc(8px * var(--jewl-fs, 1))',
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color:
-                    audioStatus === 'listening' && tableFeed ? (tableFeed.holding ? 'var(--krma-gold, #ffcc78)' : '#6fa8dc')
-                    : audioStatus === 'listening' ? 'rgba(34, 171, 148, 0.8)'
-                    : audioStatus === 'muted' ? 'rgba(255,255,255,0.4)'
-                    : audioStatus === 'denied' ? 'rgba(231, 76, 60, 0.8)'
-                    : audioStatus === 'unsupported' ? 'rgba(231, 76, 60, 0.6)'
-                    : audioStatus === 'requesting' ? 'rgba(208, 160, 48, 0.6)'
-                    : 'rgba(255,255,255,0.3)',
-                }}
-              >
-                {audioStatus === 'listening' && tableFeed ? `◆ table · ${tableFeed.heard}${tableFeed.holding ? ' …' : ''}`
-                  : audioStatus === 'listening' ? '● live'
-                  : audioStatus === 'muted' ? '◌ muted'
-                  : audioStatus === 'denied' ? '✕ mic blocked'
-                  : audioStatus === 'unsupported' ? '✕ no mic'
-                  : audioStatus === 'requesting' ? '... mic'
-                  : '○ off'}
-              </span>
-              {(audioStatus === 'listening' || audioStatus === 'muted') && (
-                <button
-                  onClick={() => {
-                    setAudioMuted(m => !m);
-                    // Mute is the STOP for the table feed: nothing said while muted is heard.
-                    if (!audioMuted) announceTableFeedRef.current(null);
-                  }}
-                  aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
-                  title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    color: audioMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
-                    cursor: 'pointer',
-                    fontSize: 'calc(11px * var(--jewl-fs, 1))',
-                    padding: '2px 6px',
-                    fontFamily: 'Consolas, monospace',
-                    lineHeight: 1,
-                  }}
-                >
-                  {audioMuted ? '🎤̸' : '🎤'}
-                </button>
-              )}
+          {/* Header — the drawer's tab row */}
+          <div className="jo-head">
+            <h2 className="jo-title">{JEWL_TAG}</h2>
+            <span className="jo-spacer" />
+            {/* Audio status + mute toggle. Always rendered so the GM knows the
+                mic state at a glance. Per [[jewl-always-on-audio-when-active]]:
+                audio runs whenever the chip is mounted; mute is the privacy lever. */}
+            <span className="jo-audio" data-jewl-audio={audioStatus}>
+              <i style={{ color: audioGlyphColour }}>{audioGlyph}</i>{audioWords}
+            </span>
+            {(audioStatus === 'listening' || audioStatus === 'muted') && (
               <button
                 onClick={() => {
-                  setVoiceMuted(v => !v);
-                  // If muting, stop any currently-speaking utterance.
-                  if (!voiceMuted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                  }
+                  setAudioMuted(m => !m);
+                  // Mute is the STOP for the table feed: nothing said while muted is heard.
+                  if (!audioMuted) announceTableFeedRef.current(null);
                 }}
-                aria-label={voiceMuted ? 'Unmute voice output' : 'Mute voice output'}
-                title={voiceMuted ? 'Voice output OFF — JEWL will not speak aloud' : 'Voice output ON — click to silence'}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  color: voiceMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
-                  cursor: 'pointer',
-                  fontSize: 'calc(11px * var(--jewl-fs, 1))',
-                  padding: '2px 6px',
-                  fontFamily: 'Consolas, monospace',
-                  lineHeight: 1,
-                }}
+                aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
+                aria-pressed={audioMuted}
+                title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
+                className={`jo-tool${audioMuted ? ' jo-off' : ''}`}
               >
-                {voiceMuted ? '🔇' : '🔊'}
+                Mic
               </button>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'rgba(255,255,255,0.4)',
-                  cursor: 'pointer',
-                  fontSize: 'calc(14px * var(--jewl-fs, 1))',
-                  padding: '0 4px',
-                  fontFamily: 'Consolas, monospace',
-                  lineHeight: 1,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = '#fff';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
-                }}
-              >
-                ⊗
-              </button>
-            </div>
+            )}
+            <button
+              onClick={() => {
+                setVoiceMuted(v => !v);
+                // If muting, stop any currently-speaking utterance.
+                if (!voiceMuted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                }
+              }}
+              aria-label={voiceMuted ? 'Unmute voice output' : 'Mute voice output'}
+              aria-pressed={voiceMuted}
+              title={voiceMuted ? 'Voice output OFF — JEWL will not speak aloud' : 'Voice output ON — click to silence'}
+              className={`jo-tool${voiceMuted ? ' jo-off' : ''}`}
+            >
+              Voice
+            </button>
+            <button onClick={() => setOpen(false)} aria-label="Close" className="jo-x">⊗</button>
           </div>
 
           {/* NOW — live view of what JEWL is doing right now: in-flight
               dispatch ticks + his open jobs. Always rendered so the GM can
-              right-click any time and see where his hands are. */}
-          <div
-            style={{
-              padding: '6px 14px 7px',
-              borderBottom: '1px solid #222',
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 'calc(8px * var(--jewl-fs, 1))',
-                letterSpacing: '0.25em',
-                textTransform: 'uppercase',
-                color: 'rgba(34, 171, 148, 0.65)',
-              }}
-            >
-              now
+              summon him any time and see where his hands are. */}
+          <div className="jo-now" data-jewl-now>
+            <div className="jo-now-head">
+              <span className="jc-kind">Now</span>
+              {!nowTick && workSessions.length === 0 && <span className="jo-idle">idle — watching</span>}
             </div>
             {nowTick && (
-              <div style={{ fontSize: 'calc(9px * var(--jewl-fs, 1))', color: '#ffcc78', lineHeight: 1.5 }}>
-                ⟳ {nowTick.label}
-              </div>
+              <p className="jc-note"><span className="jc-bar">[⟳ {nowTick.label}]</span></p>
             )}
-            {workSessions.map(s => (
-              <div key={s.id} style={{ lineHeight: 1.5 }}>
-                <div
-                  style={{
-                    fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                    color: s.status === 'blocked' ? 'rgba(231, 76, 60, 0.85)' : 'rgba(34, 171, 148, 0.85)',
-                  }}
-                >
-                  {s.status === 'blocked' ? '◼' : '⟳'} {formatGoal(s.goal)}
-                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · cycle {s.cycleCount}</span>
-                </div>
-                {(s.status === 'blocked' ? s.blockedReason : s.lastNote) && (
-                  <div
-                    style={{
-                      fontSize: 'calc(8.5px * var(--jewl-fs, 1))',
-                      color: 'rgba(255,255,255,0.45)',
-                      paddingLeft: 12,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {s.status === 'blocked' ? `waiting on you — ${s.blockedReason}` : s.lastNote}
+            {workSessions.map(s => {
+              const blocked = s.status === 'blocked';
+              const note = blocked ? s.blockedReason : s.lastNote;
+              return (
+                <div key={s.id} className={`jo-job${blocked ? ' jo-blocked' : ''}`} data-work-session={s.status}>
+                  <div className="jc-who">
+                    <span className="jo-goal">{formatGoal(s.goal)}</span>
+                    <span className="jc-time">cycle {s.cycleCount}</span>
                   </div>
-                )}
-              </div>
-            ))}
-            {!nowTick && workSessions.length === 0 && (
-              <div style={{ fontSize: 'calc(9px * var(--jewl-fs, 1))', color: 'rgba(255,255,255,0.3)' }}>
-                ◦ idle — watching
-              </div>
-            )}
+                  {note && (
+                    <p className="jo-jobnote">{blocked ? <><b>waiting on you —</b> {note}</> : note}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Messages */}
-          <div
-            ref={scrollRef}
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '10px 12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            {messages.filter(m => m.username !== '[system]' && m.username !== '[ui]').length === 0 && !loading ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  marginTop: 40,
-                  color: 'rgba(255,255,255,0.3)',
-                  fontSize: 'calc(10px * var(--jewl-fs, 1))',
-                  padding: '0 20px',
-                  lineHeight: 1.7,
-                }}
-              >
-                <div
-                  style={{
-                    color: 'rgba(208, 160, 48, 0.5)',
-                    fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                    letterSpacing: '0.25em',
-                    textTransform: 'uppercase',
-                    marginBottom: 10,
-                  }}
-                >
-                  ✦ {COPILOT_LABEL}
-                </div>
-                Ask. I&apos;ve been watching.
+          <div ref={scrollRef} className="jc-scroll">
+            {visibleMessages.length === 0 && !loading ? (
+              <div className="jc-turn jc-jewl">
+                <p className="jc-msg"><span className="jc-aside"><b>[{JEWL_TAG}]:</b> Ask. I&apos;ve been watching.</span></p>
               </div>
             ) : (
-              messages.filter(m => m.username !== '[system]' && m.username !== '[ui]').map(m => {
+              visibleMessages.map(m => {
                 const toolCalls = m.role === 'assistant' ? parseAssistantActions(m.actions) : null;
                 const userAction = m.role === 'user' ? parseUserAction(m.actions) : null;
+                const persisted = !m.id.startsWith('temp-') && !m.id.startsWith('resp-') && !m.id.startsWith('err-');
+                if (m.role === 'user') {
+                  return (
+                    <div key={m.id} className="jc-turn jc-user">
+                      <div className="jc-who">
+                        <span className="jc-tag">
+                          {m.username || 'You'}:
+                          {userAction?.source === 'GM_CANVAS_ACTION' && userAction.canvasAction?.kind ? (
+                            <span className="jo-via"> · {userAction.canvasAction.kind}</span>
+                          ) : null}
+                        </span>
+                        <span className="jc-time">{fmtTime(m.createdAt)}</span>
+                      </div>
+                      <p className="jc-said">{m.content}</p>
+                    </div>
+                  );
+                }
+                const failed = toolCalls ? toolCalls.filter(tc => tc.error).length : 0;
                 return (
-                  <div
-                    key={m.id}
-                    style={{
-                      alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                      maxWidth: '88%',
-                      padding: '6px 10px',
-                      fontSize: 'calc(11px * var(--jewl-fs, 1))',
-                      lineHeight: 1.5,
-                      background:
-                        m.role === 'user'
-                          ? 'rgba(34, 171, 148, 0.12)'
-                          : 'rgba(255,255,255,0.05)',
-                      border:
-                        m.role === 'user'
-                          ? '1px solid rgba(34, 171, 148, 0.25)'
-                          : '1px solid rgba(255,255,255,0.1)',
-                      color:
-                        m.role === 'user' ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.88)',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {m.role === 'assistant' && (
-                      <div
-                        style={{
-                          fontSize: 'calc(8px * var(--jewl-fs, 1))',
-                          color: 'rgba(208, 160, 48, 0.65)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.18em',
-                          marginBottom: 2,
-                        }}
-                      >
-                        {COPILOT_LABEL}
-                      </div>
-                    )}
-                    {m.role === 'user' && m.username && (
-                      <div
-                        style={{
-                          fontSize: 'calc(8px * var(--jewl-fs, 1))',
-                          color: 'rgba(34, 171, 148, 0.65)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.18em',
-                          marginBottom: 2,
-                        }}
-                      >
-                        {m.username}
-                        {userAction?.source === 'GM_CANVAS_ACTION' && userAction.canvasAction?.kind ? (
-                          <span style={{ marginLeft: 6, color: 'rgba(208, 160, 48, 0.7)' }}>
-                            · {userAction.canvasAction.kind}
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
-                    {m.content}
+                  <div key={m.id} className="jc-turn jc-jewl" data-jewl-msg={m.id}>
+                    <p className="jc-msg"><span className="jc-aside"><b>[{JEWL_TAG}]:</b> {m.content}</span></p>
                     {/* Collapsed by default (Mike 2026-08-21): the action log
                         is a click away, never a wall in the chat. Errors are
                         flagged in the summary so failures stay visible. */}
                     {toolCalls && toolCalls.length > 0 && (
-                      <details
-                        style={{
-                          marginTop: 6,
-                          paddingTop: 6,
-                          borderTop: '1px dashed rgba(208, 160, 48, 0.2)',
-                        }}
-                      >
-                        <summary
-                          style={{
-                            cursor: 'pointer',
-                            fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                            fontFamily: 'Consolas, monospace',
-                            color: toolCalls.some(tc => tc.error)
-                              ? 'rgba(231, 76, 60, 0.85)'
-                              : 'rgba(208, 160, 48, 0.55)',
-                            listStyle: 'none',
-                          }}
-                        >
-                          ⚙ {toolCalls.length} action{toolCalls.length === 1 ? '' : 's'}
-                          {toolCalls.some(tc => tc.error)
-                            ? ` · ${toolCalls.filter(tc => tc.error).length} failed`
-                            : ''}
+                      <details className="jo-tools">
+                        <summary>
+                          <span className="jc-bar">[⚙ {toolCalls.length} action{toolCalls.length === 1 ? '' : 's'}]</span>
+                          {failed > 0 && <span className="jo-fail">[{failed} failed]</span>}
                         </summary>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
-                          {toolCalls.map((tc, i) => (
-                            <div
-                              key={i}
-                              style={{
-                                fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                                color: tc.error
-                                  ? 'rgba(231, 76, 60, 0.85)'
-                                  : 'rgba(208, 160, 48, 0.75)',
-                                fontFamily: 'Consolas, monospace',
-                              }}
-                            >
-                              {tc.error ? '✗' : '→'} {tc.name}
-                              {tc.input ? `(${Object.entries(tc.input)
-                                .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-                                .join(', ')})` : '()'}
-                              {tc.error ? ` — ${tc.error}` : ''}
-                            </div>
-                          ))}
-                        </div>
+                        {toolCalls.map((tc, i) => (
+                          <p key={i} className={`jo-toolrow${tc.error ? ' jo-err' : ''}`}>
+                            {tc.error ? '✗' : '→'} {tc.name}
+                            {tc.input ? `(${Object.entries(tc.input)
+                              .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+                              .join(', ')})` : '()'}
+                            {tc.error ? ` — ${tc.error}` : ''}
+                          </p>
+                        ))}
                       </details>
                     )}
                     {/* Mistake-bounty: flag affordance on persisted assistant
                         messages. Temp ids (temp-/resp-/err-) get skipped — they
                         aren't in the DB yet so a flag would 404. */}
-                    {m.role === 'assistant' &&
-                      !m.id.startsWith('temp-') &&
-                      !m.id.startsWith('resp-') &&
-                      !m.id.startsWith('err-') && (
-                        <div
-                          style={{
-                            marginTop: 6,
-                            paddingTop: 4,
-                            borderTop: '1px dashed rgba(255,255,255,0.06)',
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          {flagStatusById.has(m.id) ? (
-                            (() => {
-                              const [status, resolution] = flagStatusById.get(m.id)!.split(':');
-                              const label =
-                                status === 'acknowledged' ? '✓ owned'
-                                : status === 'disputed' ? '⚡ disputed'
-                                : status === 'resolved'
-                                  ? (resolution === 'upheld' ? '⚖ upheld'
-                                    : resolution === 'overturned' ? '⚖ overturned'
-                                    : '⚖ resolved')
-                                : '⚐ flagged';
-                              const color =
-                                status === 'acknowledged' ? 'rgba(34, 171, 148, 0.85)'
-                                : status === 'disputed' ? 'rgba(208, 160, 48, 0.85)'
-                                : status === 'resolved'
-                                  ? (resolution === 'upheld' ? 'rgba(34, 171, 148, 0.85)'
-                                    : 'rgba(255,255,255,0.4)')
-                                : 'rgba(231, 76, 60, 0.75)';
-                              return (
-                                <span
-                                  style={{
-                                    fontSize: 'calc(8px * var(--jewl-fs, 1))',
-                                    color,
-                                    letterSpacing: '0.15em',
-                                    textTransform: 'uppercase',
-                                  }}
-                                  title={
-                                    status === 'acknowledged' ? 'JEWL acknowledged the mistake — bounty paid'
-                                    : status === 'disputed' ? 'JEWL disputes the flag — Et\'erling adjudicating'
-                                    : status === 'resolved'
-                                      ? (resolution === 'upheld' ? 'Et\'erling upheld the flag — bounty paid'
-                                        : resolution === 'overturned' ? 'Et\'erling overturned the flag — no bounty'
-                                        : 'Adjudicated by Et\'erling')
-                                    : 'Flagged — bounty pending JEWL\'s response'
-                                  }
-                                >
-                                  {label}
-                                </span>
-                              );
-                            })()
-                          ) : flagTarget === m.id ? null : (
-                            <button
-                              onClick={() => openFlagPicker(m.id)}
-                              title="Flag a copilot mistake — KRMA bounty"
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'rgba(255,255,255,0.3)',
-                                fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                                cursor: 'pointer',
-                                letterSpacing: '0.1em',
-                                padding: '0 2px',
-                                fontFamily: 'Consolas, monospace',
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.color = 'rgba(231, 76, 60, 0.85)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
-                              }}
-                            >
-                              ⚐ flag
-                            </button>
-                          )}
-                        </div>
-                      )}
+                    {persisted && flagTarget !== m.id && (
+                      <div className="jo-flagrow">
+                        {flagStatusById.has(m.id) ? (
+                          (() => {
+                            const [status, resolution] = flagStatusById.get(m.id)!.split(':');
+                            const label =
+                              status === 'acknowledged' ? '✓ owned'
+                              : status === 'disputed' ? '⚡ disputed'
+                              : status === 'resolved'
+                                ? (resolution === 'upheld' ? '⚖ upheld'
+                                  : resolution === 'overturned' ? '⚖ overturned'
+                                  : '⚖ resolved')
+                              : '⚐ flagged';
+                            const tone =
+                              status === 'acknowledged' ? 'good'
+                              : status === 'disputed' ? 'gold'
+                              : status === 'resolved' ? (resolution === 'upheld' ? 'good' : 'plain')
+                              : 'red';
+                            return (
+                              <span
+                                className={`jo-badge jo-b-${tone}`}
+                                data-jewl-flag={status}
+                                title={
+                                  status === 'acknowledged' ? 'JEWL acknowledged the mistake — bounty paid'
+                                  : status === 'disputed' ? 'JEWL disputes the flag — Et\'erling adjudicating'
+                                  : status === 'resolved'
+                                    ? (resolution === 'upheld' ? 'Et\'erling upheld the flag — bounty paid'
+                                      : resolution === 'overturned' ? 'Et\'erling overturned the flag — no bounty'
+                                      : 'Adjudicated by Et\'erling')
+                                  : 'Flagged — bounty pending JEWL\'s response'
+                                }
+                              >
+                                [{label}]
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <button
+                            onClick={() => openFlagPicker(m.id)}
+                            title="Flag a copilot mistake — KRMA bounty"
+                            className="jo-flag"
+                          >
+                            ⚐ Flag
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {/* The flag picker is a held question (p 64): navy/gold kind
+                        tag + the grey aside bar, answers in navy/gold Bebas. */}
                     {flagTarget === m.id && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          padding: 6,
-                          background: 'rgba(231, 76, 60, 0.06)',
-                          border: '1px solid rgba(231, 76, 60, 0.25)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 5,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: 4,
-                            justifyContent: 'space-between',
-                          }}
-                        >
+                      <div className="jc-ask jo-picker" data-jewl-flag-picker>
+                        <p className="jc-msg">
+                          <span className="jc-kind">Flag a mistake</span>
+                          <span className="jc-aside">How bad was it? The bounty pays if the flag stands.</span>
+                        </p>
+                        <div className="jc-answers" role="group" aria-label="Severity">
                           {(['minor', 'major', 'critical'] as const).map(sev => {
                             const selected = flagSeverity === sev;
                             const bounty = { minor: 10, major: 100, critical: 1000 }[sev];
@@ -1603,29 +1378,10 @@ export function JewlChip() {
                               <button
                                 key={sev}
                                 onClick={() => setFlagSeverity(sev)}
-                                style={{
-                                  flex: 1,
-                                  background: selected
-                                    ? 'rgba(231, 76, 60, 0.2)'
-                                    : 'rgba(255,255,255,0.04)',
-                                  border: selected
-                                    ? '1px solid rgba(231, 76, 60, 0.6)'
-                                    : '1px solid rgba(255,255,255,0.1)',
-                                  color: selected
-                                    ? 'rgba(231, 76, 60, 0.95)'
-                                    : 'rgba(255,255,255,0.55)',
-                                  fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                                  letterSpacing: '0.1em',
-                                  textTransform: 'uppercase',
-                                  padding: '4px 4px',
-                                  cursor: 'pointer',
-                                  fontFamily: 'Consolas, monospace',
-                                }}
+                                aria-pressed={selected}
+                                className={selected ? 'jc-yes' : 'jc-no'}
                               >
-                                {sev}
-                                <div style={{ fontSize: 'calc(7px * var(--jewl-fs, 1))', opacity: 0.7, marginTop: 1 }}>
-                                  {bounty} K
-                                </div>
+                                {sev} · {bounty} K
                               </button>
                             );
                           })}
@@ -1634,54 +1390,18 @@ export function JewlChip() {
                           value={flagNote}
                           onChange={e => setFlagNote(e.target.value.slice(0, 1000))}
                           placeholder="Why? (optional — helps the copilot learn)"
+                          aria-label="Why it was a mistake"
                           rows={2}
-                          style={{
-                            background: 'rgba(0,0,0,0.5)',
-                            border: '1px solid rgba(231, 76, 60, 0.2)',
-                            color: 'rgba(255,255,255,0.85)',
-                            // 16px on phones: below that iOS zooms the page when the note box is tapped.
-                            fontSize: sheetMode ? 16 : 'calc(10px * var(--jewl-fs, 1))',
-                            padding: 4,
-                            fontFamily: 'Consolas, monospace',
-                            resize: 'none',
-                            outline: 'none',
-                          }}
+                          className="jo-note"
+                          // 16px on phones: below that iOS zooms the page when the note box is tapped.
+                          style={{ fontSize: sheetMode ? 16 : 14 }}
                         />
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                          <button
-                            onClick={cancelFlag}
-                            disabled={flagSubmitting}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid rgba(255,255,255,0.15)',
-                              color: 'rgba(255,255,255,0.55)',
-                              fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                              letterSpacing: '0.1em',
-                              textTransform: 'uppercase',
-                              padding: '3px 8px',
-                              cursor: 'pointer',
-                              fontFamily: 'Consolas, monospace',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={submitFlag}
-                            disabled={flagSubmitting}
-                            style={{
-                              background: 'rgba(231, 76, 60, 0.2)',
-                              border: '1px solid rgba(231, 76, 60, 0.5)',
-                              color: 'rgba(231, 76, 60, 0.95)',
-                              fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                              letterSpacing: '0.1em',
-                              textTransform: 'uppercase',
-                              padding: '3px 8px',
-                              cursor: flagSubmitting ? 'wait' : 'pointer',
-                              fontFamily: 'Consolas, monospace',
-                              opacity: flagSubmitting ? 0.5 : 1,
-                            }}
-                          >
+                        <div className="jc-answers">
+                          <button onClick={submitFlag} disabled={flagSubmitting} className="jc-yes" style={{ cursor: flagSubmitting ? 'wait' : undefined }}>
                             {flagSubmitting ? 'Submitting…' : 'Submit flag'}
+                          </button>
+                          <button onClick={cancelFlag} disabled={flagSubmitting} className="jc-no">
+                            Cancel
                           </button>
                         </div>
                       </div>
@@ -1691,77 +1411,29 @@ export function JewlChip() {
               })
             )}
             {(loading || thinking) && (
-              <div
-                style={{
-                  alignSelf: 'flex-start',
-                  maxWidth: '88%',
-                  padding: '6px 10px',
-                  fontSize: 'calc(11px * var(--jewl-fs, 1))',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(34, 171, 148, 0.3)',
-                  color: 'rgba(34, 171, 148, 0.85)',
-                }}
-              >
-                <span
-                  style={{ animation: 'jewlchip-pulse 1.4s ease-in-out infinite' }}
-                >
-                  {/* Snappy ack (Mike 2026-08-21): instant "On it", then the
-                      live jewl_working tick narrates what he's actually doing
-                      tool-by-tool until the real reply replaces this bubble. */}
-                  {loading
-                    ? (nowTick?.label ? `On it — ${nowTick.label}` : 'On it.')
-                    : 'Reasoning on what you said...'}
+              // Snappy ack (Mike 2026-08-21): instant "On it", then the live
+              // jewl_working tick narrates what he's doing tool-by-tool until
+              // the real reply replaces this bar.
+              <p className="jc-note" data-jewl-thinking>
+                <span className="jc-bar">
+                  [{loading
+                    ? (nowTick?.label ? `ON IT — ${nowTick.label}` : 'ON IT')
+                    : `${JEWL_TAG} IS THINKING`}<span className="jc-caret">_</span>]
                 </span>
-              </div>
+              </p>
             )}
           </div>
 
           {/* Pending image thumbnails */}
           {pendingImages.length > 0 && (
-            <div
-              style={{
-                flexShrink: 0,
-                padding: '6px 12px',
-                borderTop: '1px solid rgba(208, 160, 48, 0.15)',
-                display: 'flex',
-                gap: 6,
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className="jo-thumbs">
               {pendingImages.map((url, idx) => (
-                <div key={idx} style={{ position: 'relative' }}>
+                <div key={idx} className="jo-thumb">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`attachment ${idx + 1}`}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      objectFit: 'cover',
-                      border: '1px solid rgba(208, 160, 48, 0.4)',
-                    }}
-                  />
+                  <img src={url} alt={`attachment ${idx + 1}`} />
                   <button
-                    onClick={() =>
-                      setPendingImages(prev => prev.filter((_, i) => i !== idx))
-                    }
+                    onClick={() => setPendingImages(prev => prev.filter((_, i) => i !== idx))}
                     aria-label="Remove attachment"
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      background: 'rgba(0,0,0,0.85)',
-                      border: '1px solid rgba(208, 160, 48, 0.6)',
-                      color: '#D0A030',
-                      cursor: 'pointer',
-                      fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                      lineHeight: 1,
-                      padding: 0,
-                      fontFamily: 'Consolas, monospace',
-                    }}
                   >
                     ×
                   </button>
@@ -1770,17 +1442,8 @@ export function JewlChip() {
             </div>
           )}
 
-          {/* Input */}
-          <div
-            style={{
-              flexShrink: 0,
-              padding: '10px 12px',
-              borderTop: '1px solid rgba(208, 160, 48, 0.2)',
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-            }}
-          >
+          {/* Input — the speak bar's shape: ⊕ attach, white field under a navy rule, navy/gold Send */}
+          <div className="jc-input">
             <input
               ref={fileInputRef}
               type="file"
@@ -1799,18 +1462,7 @@ export function JewlChip() {
               disabled={loading}
               aria-label="Attach image"
               title="Attach image (or paste one)"
-              style={{
-                background: 'transparent',
-                border: '1px solid rgba(208, 160, 48, 0.25)',
-                color: 'rgba(208, 160, 48, 0.8)',
-                fontSize: 'calc(13px * var(--jewl-fs, 1))',
-                width: 28,
-                height: 28,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'Consolas, monospace',
-                lineHeight: 1,
-                padding: 0,
-              }}
+              className="jo-attach"
             >
               ⊕
             </button>
@@ -1826,62 +1478,77 @@ export function JewlChip() {
                   handleSend();
                 }
               }}
-              placeholder="Ask the co-pilot..."
+              placeholder={`Ask ${JEWL_TAG}…`}
+              aria-label={`Ask ${JEWL_TAG}`}
               disabled={loading}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: 'rgba(0,0,0,0.5)',
-                border: '1px solid rgba(208, 160, 48, 0.25)',
-                color: '#fff',
-                // 16px on phones: anything smaller makes iOS zoom the page on focus.
-                fontSize: sheetMode ? 16 : 11,
-                padding: sheetMode ? '10px 10px' : '6px 8px',
-                fontFamily: 'Consolas, monospace',
-                outline: 'none',
-                transition: 'border-color 0.15s ease',
-              }}
-              onFocus={e => {
-                e.currentTarget.style.borderColor = 'rgba(208, 160, 48, 0.6)';
-              }}
-              onBlur={e => {
-                e.currentTarget.style.borderColor = 'rgba(208, 160, 48, 0.25)';
-              }}
+              // 16px on phones: anything smaller makes iOS zoom the page on focus.
+              style={{ fontSize: sheetMode ? 16 : 14 }}
             />
-            <button
-              onClick={handleSend}
-              disabled={loading || (!input.trim() && pendingImages.length === 0)}
-              style={{
-                background: 'rgba(34, 171, 148, 0.2)',
-                color: 'var(--terminal-prime)',
-                border: '1px solid rgba(34, 171, 148, 0.4)',
-                fontSize: 'calc(9px * var(--jewl-fs, 1))',
-                letterSpacing: '0.15em',
-                textTransform: 'uppercase',
-                padding: '0 12px',
-                fontFamily: 'Consolas, monospace',
-                cursor:
-                  loading || (!input.trim() && pendingImages.length === 0)
-                    ? 'not-allowed'
-                    : 'pointer',
-                opacity:
-                  loading || (!input.trim() && pendingImages.length === 0) ? 0.4 : 1,
-              }}
-            >
-              Send
+            <button onClick={handleSend} disabled={sendDisabled}>
+              {loading ? '…' : 'Send'}
             </button>
           </div>
-
-          <style>{`
-            @keyframes jewlchip-pulse {
-              0%, 100% { opacity: 0.45; }
-              50% { opacity: 1; }
-            }
-            /* Sheet mode only: every control is at least a fingertip tall. */
-            [data-jewl-sheet="1"] button { min-height: 36px; }
-          `}</style>
         </div>
       )}
     </>
   );
 }
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Overlay-only rules on top of the shared jEWL conversation CSS. */
+const JEWL_OVERLAY_CSS = `
+.jo{overflow:hidden}
+.jo-win{border:3px solid #002f6c;box-shadow:0 12px 32px rgba(0,47,108,.35),0 2px 6px rgba(0,0,0,.25)}
+.jo-sheet{border-top:3px solid #002f6c;box-shadow:0 -8px 28px rgba(0,0,0,.35)}
+.jo-sheet .jc-input{padding-bottom:calc(10px + max(6px, env(safe-area-inset-bottom)))}
+.jo button{min-height:36px;min-width:36px}
+.jo button:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.jo-grip{flex:none;display:flex;justify-content:center;padding:8px 0 4px;cursor:grab;touch-action:none;background:#CBD9E8}
+.jo-grip i{display:block;width:44px;height:4px;border-radius:2px;background:#002f6c;opacity:.45}
+.jo-head{flex:none;display:flex;align-items:stretch;gap:4px;height:44px;background:#CBD9E8;border-bottom:3px solid #002f6c;padding:0 4px 0 0}
+.jo-title{display:flex;align-items:center;margin:0;padding:3px 14px 0;background:#002f6c;color:#ffcc78;font:400 ${fs(22)}/1 ${BEBAS};letter-spacing:.05em}
+.jo-spacer{flex:1;min-width:4px}
+.jo-audio{align-self:center;white-space:nowrap;padding-top:3px;color:#002f6c;font:400 ${fs(17)}/1 ${BEBAS};letter-spacing:.05em}
+.jo-audio i{font:400 ${fs(13)}/1 ${MONO};font-style:normal;margin-right:3px;vertical-align:1px}
+.jo-tool{align-self:center;height:36px;padding:3px 8px 0;border:0;cursor:pointer;background:none;white-space:nowrap;color:#002f6c;box-shadow:inset 0 0 0 2px #002f6c;font:400 ${fs(16)}/1 ${BEBAS};letter-spacing:.06em}
+.jo-tool.jo-off{color:#b0303b;box-shadow:inset 0 0 0 2px #b0303b;text-decoration:line-through;text-decoration-thickness:2px}
+.jo-x{align-self:center;width:40px;height:36px;border:0;background:none;cursor:pointer;color:#002f6c;font:400 ${fs(20)}/1 ${MONO}}
+.jo-tool:hover,.jo-x:hover{background:rgba(0,47,108,.08)}
+.jo-now{flex:none;max-height:34%;overflow-y:auto;overflow-x:hidden;padding:8px 12px 10px 14px;background:#CBD9E8;border-bottom:1px solid rgba(0,47,108,.35)}
+.jo-now-head{display:flex;align-items:baseline;gap:4px}
+.jo-idle{font:400 ${fs(13)}/1.5 ${MONO};color:#393937}
+.jo-now .jc-note{margin:6px 0 0}
+.jo-job{margin:8px 0 0;border-left:4px solid #22ab94;padding:0 0 0 10px}
+.jo-job.jo-blocked{border-left-color:#b0303b}
+.jo-goal{min-width:0;overflow-wrap:anywhere;font:400 ${fs(14)}/1.5 ${READ}}
+.jo-jobnote{margin:2px 0 0;font:400 ${fs(13)}/1.5 ${MONO};color:#393937;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.jo-blocked .jo-jobnote{color:#000}
+.jo-blocked .jo-jobnote b{color:#b0303b}
+.jo-tools{margin:6px 0 0}
+.jo-tools summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:36px;font:700 ${fs(13)}/1.62 ${MONO}}
+.jo-tools summary::-webkit-details-marker{display:none}
+.jo-tools summary:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.jo-fail{background:#f7525f;color:#000;padding:1px 5px}
+.jo-toolrow{margin:4px 0 0;padding:0 0 0 8px;border-left:2px solid #393937;color:#222;overflow-wrap:anywhere;font:400 ${fs(12)}/1.5 ${MONO}}
+.jo-toolrow.jo-err{border-left-color:#b0303b;color:#8a1c26}
+.jo-flagrow{display:flex;justify-content:flex-end;align-items:center;min-height:36px;margin:2px 0 0}
+.jo-flag{padding:3px 8px 0;border:0;background:none;cursor:pointer;color:#393937;font:400 ${fs(16)}/1 ${BEBAS};letter-spacing:.06em}
+.jo-flag:hover{color:#b0303b}
+.jo-badge{padding:1px 5px;text-transform:uppercase;font:700 ${fs(12)}/1.62 ${MONO}}
+.jo-b-good{background:#22ab94;color:#222}
+.jo-b-gold{background:#ffcc78;color:#000}
+.jo-b-red{background:#f7525f;color:#000}
+.jo-b-plain{background:#000;color:#f5f4ef}
+.jo-note{display:block;width:100%;min-height:64px;margin:8px 0 0;padding:8px;border:0;border-left:4px solid #002f6c;background:#fff;color:#000;font-family:${READ};resize:none;outline:0}
+.jo-note:focus-visible{outline:2px solid #002f6c}
+.jo-via{color:#393937;font-weight:400}
+.jo-thumbs{flex:none;display:flex;flex-wrap:wrap;gap:8px;padding:8px 10px;background:#fafaf8;border-top:1px solid rgba(0,47,108,.35)}
+.jo-thumb{position:relative;width:64px;height:64px}
+.jo-thumb img{display:block;width:64px;height:64px;object-fit:cover;border:2px solid #002f6c}
+.jo-thumb button{position:absolute;top:0;right:0;width:36px;height:36px;padding:0;border:0;cursor:pointer;background:#002f6c;color:#ffcc78;font:400 ${fs(20)}/1 ${MONO}}
+.jc-input .jo-attach{width:44px;background:none;color:#002f6c;box-shadow:inset 0 0 0 2px #002f6c;font:400 ${fs(20)}/1 ${MONO}}
+`;
