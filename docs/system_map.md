@@ -164,10 +164,24 @@ days, hours/day, epoch, holidays; ruling r-2026-06-09-06 requires GM control
 of presentation at release).
 
 - Math + types: `types/time.ts` (cycleToLocalDate, localUnitsToCycles incl.
-  6 s combat rounds, dualAge, STANDARD_CALENDAR, SECONDS_PER_META_CYCLE)
+  6 s combat rounds, secondsToCycles — the one seconds→cycles conversion,
+  through the campaign calendar; 'round' = secondsToCycles(ROUND_SECONDS),
+  dualAge, STANDARD_CALENDAR)
 - Service: `services/time.ts` (timescale CRUD, getClock/advanceClock/setClock,
   ensureDefaultTimescale, resolveTimescaleForLocation — inheritance walks
   located_at upward, characterDualAge)
+- **The simulation keeps time (ruling 2026-10-07, step 1 built 2026-10-08):**
+  `advanceClockBySim(campaignId, seconds, cause)` — no role check (the sim is
+  not a user). `Campaign.currentCycle` moves on every call; the clock_advance
+  HistoryEntry + blossom-expiry + mana-residue sweeps are BATCHED and flush
+  when pending ≥ `SIM_CLOCK_FLUSH_SECONDS` (60 s = ten rounds) or on
+  `flushSimClock(campaignId)` — called at encounter pause/resolve, after a
+  continuity bridge, and before any GM advanceClock/setClock (so history reads
+  in order). Pending map is in-process (globalThis); a restart loses at most
+  the un-flushed history line and <60 s of residue fade, never the clock.
+  Callers: encounter round (6 s, whoever resolved it), bridge (travel span).
+  `advanceClock`/`setClock` stay GM-only = the manual OVERRIDE. Not built yet:
+  per-action durations, narrated jumps ("seven weeks pass").
 - Routes: `/api/campaigns/[id]/timescales` (+ `[timescaleId]`),
   `/api/campaigns/[id]/clock`, `/api/campaigns/[id]/history`
 - UI: `components/time/CampaignClock.tsx` — clock chip in the canvas header

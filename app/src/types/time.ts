@@ -109,8 +109,10 @@ export const STANDARD_CALENDAR: CalendarSpec = {
   epochYear: 1,
 };
 
-/** Seconds in one meta cycle, for combat-round (6 s) contribution math.
- *  1 cycle ≈ 1 standard year (Julian). */
+/** Seconds in one Julian year. Kept for reference only — clock math goes
+ *  through secondsToCycles (the campaign calendar), which the 'round' unit
+ *  used to bypass via this constant (365.25 d vs a 365-d calendar, and it
+ *  ignored unitsPerMetaCycle). */
 export const SECONDS_PER_META_CYCLE = 31_557_600;
 
 /** Total local days in one local year of a calendar. */
@@ -179,8 +181,26 @@ export function localUnitsToCycles(
     }
     case 'day': return (amount / daysPerLocalYear(cal)) * cyclesPerLocalYear;
     case 'hour': return (amount / ((cal.hoursPerDay ?? 24) * daysPerLocalYear(cal))) * cyclesPerLocalYear;
-    case 'round': return (amount * 6) / SECONDS_PER_META_CYCLE; // combat: 6 s per round
+    case 'round': return secondsToCycles(amount * ROUND_SECONDS, ts); // combat: 6 s per round
   }
+}
+
+/** One combat round, in seconds of game time. */
+export const ROUND_SECONDS = 6;
+
+/**
+ * Seconds of game time → meta cycles, through the campaign's own calendar
+ * (a local hour is 3600 local seconds; the day/year lengths and
+ * unitsPerMetaCycle come from the timescale). The simulation's moment-to-
+ * moment clock (services/time.advanceClockBySim) and the manual 'round'
+ * unit both convert here, so a sim round and a GM's "1 round" are the same
+ * instant on every calendar.
+ */
+export function secondsToCycles(
+  seconds: number,
+  ts: { unitsPerMetaCycle: number; calendar: CalendarSpec | null },
+): number {
+  return localUnitsToCycles(seconds / 3600, 'hour', ts);
 }
 
 /** Dual-age render: meta cycles + resolved local timescale. */

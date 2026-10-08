@@ -30,7 +30,7 @@ import { perceive } from '@/daya/perceive';
 import { writeMemoryEntry } from '@/daya/memory';
 import { classifyDomains } from '@/daya/domains';
 import { recordCanonEvent } from '@/services/canon';
-import { advanceClock } from '@/services/time';
+import { advanceClockBySim, flushSimClock } from '@/services/time';
 import { currentCycleOf } from '@/services/history';
 
 export interface BridgeStep {
@@ -160,8 +160,10 @@ export async function bridgeContinuity(args: {
   const hours = plan.elapsedMinutes / 60;
   let endCycle = startCycle;
   try {
-    const clock = await advanceClock(args.campaignId, args.actor.userId, args.actor.role, { amount: Math.max(hours, 1 / 60), unit: 'hour', note: `Continuity bridge (reconciliation ${args.reconciliationId}): ${plan.elapsedMinutes} minutes pass between ${from.name ?? 'where they were'} and ${to.name ?? 'the narrated place'}` });
-    endCycle = (clock as { currentCycle?: number }).currentCycle ?? (await currentCycleOf(args.campaignId));
+    // The simulation keeps time (ruling 2026-10-07): the interval moves the clock itself.
+    const clock = await advanceClockBySim(args.campaignId, Math.max(hours, 1 / 60) * 3600, `Continuity bridge (reconciliation ${args.reconciliationId}): ${plan.elapsedMinutes} minutes pass between ${from.name ?? 'where they were'} and ${to.name ?? 'the narrated place'}`);
+    endCycle = clock.currentCycle;
+    await flushSimClock(args.campaignId);
   } catch (err) {
     console.warn('[bridge] clock advance failed; bridge recorded at the current cycle', err);
   }

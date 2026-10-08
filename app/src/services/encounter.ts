@@ -35,7 +35,8 @@ import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { applyDamageToCharacter } from '@/services/damage';
 import { applyAttributeDamage } from '@/services/character-attribute';
-import { advanceClock, getClock } from '@/services/time';
+import { advanceClockBySim, flushSimClock, getClock } from '@/services/time';
+import { ROUND_SECONDS } from '@/types/time';
 import { writeMemoryEntry } from '@/daya/memory';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { recordRoundCanon } from '@/services/canon';
@@ -257,6 +258,10 @@ export async function setEncounterStatus(encounterId: string, actor: EncounterAc
   }
   if (status === 'RESOLVED') {
     await postGameEvent(enc.campaignId, actor, 'encounter_end', `Encounter resolved: ${enc.name}.`, enc);
+  }
+  if (status !== 'ACTIVE') {
+    // The fight's elapsed seconds land in the record as one line when it stops.
+    try { await flushSimClock(enc.campaignId); } catch (err) { console.warn('[encounter] clock flush failed', err); }
   }
   return getEncounter(encounterId, actor);
 }
@@ -596,9 +601,11 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   try {
     await postGameEvent(enc.campaignId, actor, 'encounter_round', `${enc.name} — ${summary}`, enc);
   } catch (err) { console.warn('[encounter] round event failed', err); }
+  // The simulation keeps time (ruling 2026-10-07): the round's six seconds
+  // move the clock whoever resolved it — no GM check, the sim is the author.
   try {
-    await advanceClock(enc.campaignId, actor.userId, actor.role, { amount: 1, unit: 'round', note: `${enc.name} round ${round}` });
-  } catch { /* clock advance is best-effort in v0 */ }
+    await advanceClockBySim(enc.campaignId, ROUND_SECONDS, `${enc.name} round ${round}`);
+  } catch (err) { console.warn('[encounter] clock advance failed', err); }
 
   // Every participant's ledger receives the round as lived experience — what
   // its body could sense (its field) plus what it WITNESSED, in diegetic
