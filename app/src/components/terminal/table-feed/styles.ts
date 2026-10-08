@@ -91,6 +91,25 @@ export const TABLE_FEED_CSS = `
 .tf .foldbtn span{background:#000;color:var(--tf-paper);padding:1px 5px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .tf .foldbtn:focus-visible span{box-shadow:inset 0 -3px 0 var(--tf-gold)}
 
+/* the fold tree: one header style at every level (Bebas gold on navy), indented by depth */
+.tf .fold{margin:6px 12px 0 0}
+.tf .fold .fold{margin-right:0}
+.tf > .fold{margin-top:10px}
+.tf .fh{display:flex;align-items:center;gap:6px;width:auto;min-height:38px;padding:3px 10px 0;border:0;cursor:pointer;text-align:left;box-sizing:border-box;
+  background:var(--tf-navy);color:var(--tf-gold);font:400 17px/1.15 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.04em}
+.tf .k-between > .fh{background:var(--tf-g3);color:var(--tf-paper)}
+.tf .k-encounter > .fh{background:#000;color:#f5f4ef}
+.tf .k-encounter > .fh .arw{color:#f7525f}
+.tf .fh.static{cursor:default}
+.tf .fh .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tf .fh .arw{flex:none;font-family:var(--font-terminal);font-size:13px}
+.tf .fh .livetag{flex:none;font-size:14px;background:var(--tf-gold);color:var(--tf-navy);padding:1px 6px 0}
+.tf .fh:focus-visible{outline:3px solid var(--tf-gold);outline-offset:-3px}
+.tf .fb > .row:first-child{margin-top:8px}
+.tf .fold .row{margin-right:0}
+.tf .encslot{margin:8px 0 0;background:#0a0a1a;max-height:55vh;overflow-y:auto;display:flex;flex-direction:column}
+/* search: every line shown is a hit */
+.tf.searching .row{box-shadow:inset 3px 0 0 var(--tf-gold);padding-left:4px}
 .tf .empty{font:700 13px/1.6 var(--font-terminal);color:var(--tf-g3);padding:24px 12px 0 0;text-align:center}
 
 /* tooltip bodies (portaled to <body>) */
