@@ -17,6 +17,8 @@ const w = vi.hoisted(() => ({
   extras: {} as Record<string, string[]>,
   beats: [] as Array<string | undefined>,
   held: null as { id: string } | null,
+  feeds: [] as Array<Record<string, unknown> | undefined>,
+  payloads: [] as Array<Record<string, unknown>>,
   session: { id: 'session-1' } as { id: string } | null,
   converse: vi.fn(),
   listen: vi.fn(),
@@ -33,11 +35,13 @@ vi.mock('@/lib/db', () => ({
     dayaEntity: { findMany: vi.fn(async () => w.active.map((characterId) => ({ characterId }))) },
     copilotMessage: { create: vi.fn(async (args: { data: { content: string; actions: string } }) => { w.dropped.push(args.data); return {}; }) },
     gameSession: { findFirst: vi.fn(async () => w.session) },
+    campaign: { findUnique: vi.fn(async () => ({ currentCycle: 0.25 })) },
   },
 }));
 vi.mock('@/services/campaign-event', () => ({
   createCampaignEvent: vi.fn(async (e: { actor: string; characterId: string; payload: { message: string } }) => {
     w.chats.push({ actor: e.actor, characterId: e.characterId, message: e.payload.message });
+    w.payloads.push(e.payload as unknown as Record<string, unknown>);
     return { id: `ev-${w.chats.length}`, createdAt: new Date(0), sessionId: null };
   }),
 }));
@@ -46,7 +50,7 @@ vi.mock('@/daya/conversation', () => ({ converseWithEntity: w.converse, listenTo
 vi.mock('@/daya/events', () => ({ isDayaEnabled: () => true }));
 vi.mock('@/daya/l1-keepalive', () => ({ ensureKeepalive: vi.fn(async () => {}) }));
 vi.mock('@/services/canon', () => ({
-  declareCanon: vi.fn(async (_c: string, _a: unknown, input: { narration: string; beatId?: string | null }) => { w.canon.push({ kind: 'narration', narration: input.narration }); w.beats.push(input.beatId ?? undefined); return { event: { id: `canon-${w.canon.length}` } }; }),
+  declareCanon: vi.fn(async (_c: string, _a: unknown, input: { narration: string; beatId?: string | null; feed?: Record<string, unknown> }) => { w.canon.push({ kind: 'narration', narration: input.narration }); w.beats.push(input.beatId ?? undefined); w.feeds.push(input.feed); return { event: { id: `canon-${w.canon.length}` } }; }),
   recordDialogueCanon: vi.fn(async (_c: string, speakerId: string, _label: string, text: string, beatId?: string | null) => { w.canon.push({ kind: 'dialogue', speaker: speakerId, text }); w.beats.push(beatId ?? undefined); return { id: `canon-${w.canon.length}` }; }),
   recordUnattributedDialogueCanon: vi.fn(async (_c: string, label: string, text: string, _context: unknown, beatId?: string | null) => { w.canon.push({ kind: 'dialogue', speaker: label, text }); w.beats.push(beatId ?? undefined); return { id: `canon-${w.canon.length}` }; }),
   attachTruthToMemory: vi.fn(async (memoryId: string, canonEventId: string, extra: string[] = []) => { w.attached.push({ memoryId, canonEventId }); w.extras[memoryId] = extra; return true; }),
@@ -77,7 +81,7 @@ function answerWith(lines: Record<string, { kind: string; content?: string }>) {
 
 beforeEach(() => {
   delete process.env.TABLE_SPLIT_LOOP;
-  w.canon.length = 0; w.beats.length = 0; w.chats.length = 0; w.broadcasts.length = 0; w.dropped.length = 0; w.attached.length = 0;
+  w.canon.length = 0; w.beats.length = 0; w.chats.length = 0; w.feeds.length = 0; w.payloads.length = 0; w.broadcasts.length = 0; w.dropped.length = 0; w.attached.length = 0;
   w.converse.mockReset().mockResolvedValue({ status: 'ok', action: { kind: 'speak', content: 'Hm.' }, memoryEntryId: 'serial-mem' });
   w.listen.mockReset().mockImplementation(async (id: string) => ({ status: 'ok', listened: { status: 'listened', memoryEntryId: `listen-mem-${id}` } }));
   w.answer.mockReset();
@@ -374,5 +378,43 @@ describe('hearSpoken — switch ON, session live: the mic is table talk', () => 
   it('JEWL does not read each chunk (no cloud call per few seconds of speech)', async () => {
     await hearSpoken('camp', gm, 'You are suddenly on a ship.');
     expect(w.readNarration).not.toHaveBeenCalled();
+  });
+});
+
+describe('the TABLE feed fields (ruling-feed-segment-colours-pillars, 2026-10-07)', () => {
+  it('typed prose: the declaration carries the raw message and the preprocessor split', async () => {
+    await speakProse('camp', actor, { message: 'Tess sets the lamp down.  "Sit."' });
+    expect(w.feeds[0]).toEqual({
+      via: 'typed',
+      raw: 'Tess sets the lamp down.  "Sit."',
+      narration: 'Tess sets the lamp down.',
+      speech: [{ text: 'Sit.', speakerId: 'tess', speakerLabel: 'Tess', context: 'Tess sets the lamp down.' }],
+    });
+  });
+
+  it("a being's line says it came from a being, the cycle it happened at, and the engine's raw action", async () => {
+    await speakProse('camp', actor, { message: 'The door bangs open.' });
+    expect(w.payloads[0]).toEqual({ kind: 'chat', message: 'Hm.', via: 'being', cycle: 0.25, raw: 'Say: Hm.' });
+  });
+
+  it('a lone typed line through an NPC is typed, raw kept when it differs', async () => {
+    w.converse.mockResolvedValue({ status: 'ok', action: { kind: 'rest' } });
+    await speakProse('camp', actor, { message: 'Tess: Sit down.' });
+    expect(w.payloads[0]).toEqual({ kind: 'chat', message: 'Sit down.', via: 'typed', cycle: 0.25, raw: 'Tess: Sit down.' });
+  });
+
+  it('switch on, typed: the same split reaches the declaration', async () => {
+    process.env.TABLE_SPLIT_LOOP = 'on';
+    await speakProse('camp', actor, { message: 'Rain on the glass. "Who is there?"' });
+    expect(w.feeds[0]).toMatchObject({ via: 'typed', narration: 'Rain on the glass.', speech: [{ text: 'Who is there?', speakerLabel: 'someone present' }] });
+  });
+
+  it('spoken: every sentence row is marked spoken and carries what was heard', async () => {
+    process.env.TABLE_SPLIT_LOOP = 'on'; forgetSpokenTable(); w.session = { id: 'session-1' };
+    await hearSpoken('camp', gm, 'The door bangs open. Rain comes in with it.');
+    expect(w.feeds).toEqual([
+      { via: 'spoken', raw: 'The door bangs open. Rain comes in with it.' },
+      { via: 'spoken', raw: 'The door bangs open. Rain comes in with it.' },
+    ]);
   });
 });

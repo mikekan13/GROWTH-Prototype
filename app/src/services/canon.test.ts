@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roundLogToCanon } from './canon';
+import { roundLogToCanon, declarationPayload } from './canon';
 import type { RoundLogEntry } from '@/sim/round/types';
 
 const log: RoundLogEntry[] = [
@@ -43,5 +43,28 @@ describe('roundLogToCanon', () => {
   it('order lines and unnarrated bookkeeping are not events', () => {
     const events = roundLogToCanon({ campaignId: 'c', cycle: 0, encounterId: 'e', round: 1, log: log.filter(l => l.kind === 'order' || (l.kind === 'action' && !l.narration)), parentId: 'p' });
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('declarationPayload — the TABLE feed row of a declaration (2026-10-07)', () => {
+  it('without feed fields it is the row it always was', () => {
+    expect(declarationPayload('declaration', 'The door opens.')).toEqual({ kind: 'game_event', eventType: 'declaration', description: 'The door opens.' });
+    expect(declarationPayload('declaration', 'The door opens.', { beatId: 'b1' })).toEqual({ kind: 'game_event', eventType: 'declaration', description: 'The door opens.', beatId: 'b1' });
+  });
+
+  it('adds the cycle, how it arrived, the split and the speech (without the context sentence)', () => {
+    expect(declarationPayload('declaration', 'Rain. "Who?"', {
+      cycle: 0.004,
+      feed: { via: 'typed', raw: 'Rain.   "Who?"', narration: 'Rain.', speech: [{ speakerId: null, speakerLabel: 'someone present', text: 'Who?', context: 'Rain.' } as never] },
+    })).toEqual({
+      kind: 'game_event', eventType: 'declaration', description: 'Rain. "Who?"',
+      cycle: 0.004, via: 'typed', raw: 'Rain.   "Who?"', narration: 'Rain.',
+      speech: [{ speakerId: null, speakerLabel: 'someone present', text: 'Who?' }],
+    });
+  });
+
+  it('raw is dropped when it is the description already; a cycle of 0 is kept', () => {
+    expect(declarationPayload('declaration', 'The door opens.', { cycle: 0, feed: { via: 'spoken', raw: ' The door opens. ' } }))
+      .toEqual({ kind: 'game_event', eventType: 'declaration', description: 'The door opens.', cycle: 0, via: 'spoken' });
   });
 });

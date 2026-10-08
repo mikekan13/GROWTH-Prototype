@@ -36,7 +36,7 @@ import { isDayaEnabled } from '@/daya/events';
 import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState } from '@/services/table-talk';
 import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
-import type { TerminalEvent, TerminalActor, TerminalPayload } from '@/types/terminal';
+import type { TerminalEvent, TerminalActor, TerminalPayload, TableFeedFields } from '@/types/terminal';
 import {
   attachTruthToMemory,
   attachTruthToRecentMemories,
@@ -103,6 +103,20 @@ const BEINGS_ANSWER = 'when-asked' as 'when-asked' | 'always';
 /** Kept for the pre-09-26 narrate-only callers; prose handles it now. */
 export type TableNarrateResult = TableProseResult;
 
+/** The campaign clock for a feed row; a row without it still posts (the feed shows "not recorded"). */
+async function feedCycle(campaignId: string): Promise<number | undefined> {
+  try {
+    const c = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } });
+    return typeof c?.currentCycle === 'number' ? c.currentCycle : undefined;
+  } catch { return undefined; }
+}
+
+/** A being's action as the engine produced it, before the table line was made of it ("Say: …", "Do: …") — the feed's raw text. */
+function rawBeingAction(action: { kind: string; content?: string }): string {
+  const label = ({ speak: 'Say', act: 'Do', attend: 'Attend', rest: 'Rest' } as Record<string, string>)[action.kind] ?? action.kind;
+  return action.content ? `${label}: ${action.content}` : label;
+}
+
 async function postChat(
   campaignId: string,
   actor: TerminalActor,
@@ -111,8 +125,15 @@ async function postChat(
   characterId: string,
   characterName: string,
   message: string,
+  feed: TableFeedFields = {},
 ) {
-  const payload: TerminalPayload = { kind: 'chat', message };
+  const cycle = await feedCycle(campaignId);
+  const payload: TerminalPayload = {
+    kind: 'chat', message,
+    ...(feed.via ? { via: feed.via } : {}),
+    ...(cycle !== undefined ? { cycle } : {}),
+    ...(feed.raw !== undefined && feed.raw.trim() !== message.trim() ? { raw: feed.raw } : {}),
+  };
   const event = await createCampaignEvent({
     campaignId,
     type: 'chat',
@@ -209,7 +230,7 @@ async function deliverToTable(
     if (result.status === 'ok' && result.action) {
       const line = actionToTableLine(listener.name, result.action);
       if (line) {
-        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
+        await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(result.action) });
       }
     }
   }
@@ -264,6 +285,7 @@ export async function speakProse(
       kind: 'narration',
       locationId: input.locationId ?? null,
       witnessIds: [],
+      feed: { via: 'typed', raw: message, narration: parsed.narration, speech: parsed.quotes },
     });
     canonEventId = declared.event.id;
   }
@@ -276,7 +298,7 @@ export async function speakProse(
   // A lone attributed line ("Ruth: Sit down.") reads at the table as that NPC speaking.
   if (soloAttributed) {
     const q = parsed.quotes[0];
-    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text);
+    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text, { via: 'typed', raw: message });
   }
 
   // 2 + 3. PERCEPTION through the mirror, then responses.
@@ -387,7 +409,7 @@ async function runBeats(
     reportTiming({ kind: 'answer', characterId: listenerId, outcome: outcome.status, action: action?.kind, timings: outcome.answer?.timings });
     if (outcome.status !== 'ok' || !outcome.answer || !action) return;
     const line = actionToTableLine(listener.name, action);
-    if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line);
+    if (line) await postChat(campaignId, 'ai_copilot', actor.userId, listener.name, listener.id, listener.name, line, { via: 'being', raw: rawBeingAction(action) });
     void outcome.answer.after.then((stored) => pointAtTruth(listenerId, stored.memoryEntryId)).catch(() => {});
   };
   const answerAll = async (ids: string[], ask: TableAsk) => {
@@ -452,7 +474,10 @@ async function speakProseSplit(
   const dialogue: TableProseResult['dialogue'] = [];
   const soloAttributed = !narrated && parsed.quotes.length === 1 && parsed.quotes[0].speakerId;
   if (narration !== null && (narrated || parsed.quotes.length !== 1)) {
-    const declared = await declareCanon(campaignId, actor, { narration, kind: 'narration', locationId: input.locationId ?? null, witnessIds: [] });
+    const declared = await declareCanon(campaignId, actor, {
+      narration, kind: 'narration', locationId: input.locationId ?? null, witnessIds: [],
+      feed: { via: 'typed', raw: message, narration: narrated ? parsed.narration : null, speech: parsed.quotes },
+    });
     canonEventId = declared.event.id;
   }
   for (const q of parsed.quotes) {
@@ -463,7 +488,7 @@ async function speakProseSplit(
   }
   if (soloAttributed) {
     const q = parsed.quotes[0];
-    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text);
+    await postChat(campaignId, 'gm', actor.userId, actor.username, q.speakerId!, q.speakerLabel, q.text, { via: 'typed', raw: message });
   }
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
 
@@ -539,7 +564,7 @@ const NOT_FED = { heard: 0, asked: 0, ignored: [], holding: false };
  * handover itself is table talk and is not recorded, and what follows it
  * starts the next beat. Returns the rows in order and the beat now current.
  */
-async function recordSpoken(campaignId: string, actor: TableActor, plan: TablePlan, beatId: string): Promise<{ primary: string | null; extra: string[]; beatId: string }> {
+async function recordSpoken(campaignId: string, actor: TableActor, plan: TablePlan, beatId: string, heard?: string): Promise<{ primary: string | null; extra: string[]; beatId: string }> {
   const ids: string[] = [];
   let beat = beatId;
   for (const b of plan.beats) {
@@ -554,7 +579,10 @@ async function recordSpoken(campaignId: string, actor: TableActor, plan: TablePl
       }
       for (const sentence of narrationSentences({ beats: [], ignored: [], world: [u] })) {
         try {
-          ids.push((await declareCanon(campaignId, actor, { narration: sentence, kind: 'narration', locationId: null, witnessIds: [], beatId: beat })).event.id);
+          ids.push((await declareCanon(campaignId, actor, {
+            narration: sentence, kind: 'narration', locationId: null, witnessIds: [], beatId: beat,
+            feed: { via: 'spoken', ...(heard !== undefined ? { raw: heard } : {}) },
+          })).event.id);
         } catch (err) { console.warn('[table-speak] spoken narration canon failed', err); }
       }
     }
@@ -570,13 +598,14 @@ async function hearSpokenChunk(campaignId: string, actor: TableActor, transcript
     activeListeners(campaignId),
     prisma.character.findMany({ where: { campaignId, entityType: 'NPC' }, select: { id: true, name: true } }),
   ]);
-  const reading = readTableTalk(`${carried}${transcript}`.trim(), { present: listeners, npcs, state: table.talk, holdTrailingFragment: true });
+  const heard = `${carried}${transcript}`.trim();
+  const reading = readTableTalk(heard, { present: listeners, npcs, state: table.talk, holdTrailingFragment: true });
   table.talk = reading.state;
   table.pending = reading.pending;
   table.lastAt = now;
 
   const plan = planTableTalk(reading.utterances, 'spoken');
-  const truth = await recordSpoken(campaignId, actor, plan, table.beatId);
+  const truth = await recordSpoken(campaignId, actor, plan, table.beatId, heard);
   table.beatId = truth.beatId;
   for (const u of plan.ignored) await markDropped(campaignId, actor, u.kind, u.rule, u.text);
   await runBeats(campaignId, actor, plan.beats, listeners, truth, { waitForAnswers: false, answerAfterWorldOnly: BEINGS_ANSWER === 'always' });
@@ -653,7 +682,7 @@ export async function speakThroughNpc(
   }
 
   // 1. The NPC's line hits the table record first, like normal tabletop.
-  await postChat(campaignId, 'gm', actor.userId, actor.username, npc.id, npc.name, input.message);
+  await postChat(campaignId, 'gm', actor.userId, actor.username, npc.id, npc.name, input.message, { via: 'typed' });
   // Truth first (Mike 09-20/23): what was said is canon; listeners' memories will point at it.
   let dialogueCanonId: string | null = null;
   try { dialogueCanonId = (await recordDialogueCanon(campaignId, npc.id, npc.name, input.message)).id; } catch (err) { console.warn('[table-speak] dialogue canon failed', err); }

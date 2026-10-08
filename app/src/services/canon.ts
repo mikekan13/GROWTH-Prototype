@@ -24,7 +24,7 @@ import { writeMemoryEntry } from '@/daya/memory';
 import { perceive } from '@/daya/perceive';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
-import type { TerminalEvent, TerminalPayload } from '@/types/terminal';
+import type { GameEventPayload, TerminalEvent, TerminalPayload } from '@/types/terminal';
 
 export interface CanonEventInput {
   campaignId: string;
@@ -233,8 +233,30 @@ export async function memoryVersusTruth(campaignId: string, actor: { userId: str
 
 // ── Other writers of truth (MEMORY-DESIGN §5: canon writers) ─────────────────
 
-async function postCanonGameEvent(campaignId: string, actor: { userId: string; username?: string }, eventType: string, description: string, beatId?: string | null) {
-  const payload: TerminalPayload = { kind: 'game_event', eventType, description, ...(beatId ? { beatId } : {}) };
+/** What a table writer hands declareCanon for the feed row only (types/terminal TableFeedFields). Never read back by the engine. */
+export interface DeclarationFeed {
+  via?: 'typed' | 'spoken';
+  raw?: string;
+  narration?: string | null;
+  speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+}
+
+/** The feed row's payload for a declaration: the canon text, its beat, the cycle it happened at, and what the table writer passed for the feed. Pure. */
+export function declarationPayload(eventType: string, description: string, opts: { beatId?: string | null; cycle?: number; feed?: DeclarationFeed } = {}): GameEventPayload {
+  const f = opts.feed ?? {};
+  return {
+    kind: 'game_event', eventType, description,
+    ...(opts.beatId ? { beatId: opts.beatId } : {}),
+    ...(typeof opts.cycle === 'number' ? { cycle: opts.cycle } : {}),
+    ...(f.via ? { via: f.via } : {}),
+    ...(f.raw !== undefined && f.raw.trim() !== description.trim() ? { raw: f.raw } : {}),
+    ...(f.narration !== undefined ? { narration: f.narration } : {}),
+    ...(f.speech ? { speech: f.speech.map((s) => ({ speakerId: s.speakerId, speakerLabel: s.speakerLabel, text: s.text })) } : {}),
+  };
+}
+
+async function postCanonGameEvent(campaignId: string, actor: { userId: string; username?: string }, eventType: string, description: string, beatId?: string | null, extra: { cycle?: number; feed?: DeclarationFeed } = {}) {
+  const payload: TerminalPayload = declarationPayload(eventType, description, { beatId, ...extra });
   const event = await createCampaignEvent({ campaignId, type: 'game_event', actor: 'gm', actorUserId: actor.userId, actorName: actor.username ?? 'Watcher', payload });
   const terminalEvent: TerminalEvent = {
     id: `ev-${event.id}`, type: 'game_event',
@@ -259,6 +281,8 @@ export async function declareCanon(
     narration: string; kind?: string; actorId?: string | null; targetId?: string | null; locationId?: string | null; witnessIds?: string[];
     /** Spoken narration comes one sentence per row; the rows of one beat (up to the GM handing the turn over) share this id. */
     beatId?: string | null;
+    /** For the TABLE feed row only (raw text, typed/spoken, the narration/speech split). Not part of the canon row. */
+    feed?: DeclarationFeed;
   },
 ) {
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true, currentCycle: true } });
@@ -276,7 +300,7 @@ export async function declareCanon(
     sourceType: 'gm', goalIds, domains,
   });
   if (goalIds.length) recordVineEntriesSafe({ campaignId, canonEventId: event.id, cycle, narration: input.narration, goalIds });
-  try { await postCanonGameEvent(campaignId, actor, 'declaration', input.narration, input.beatId); } catch (err) { console.warn('[canon] declaration event failed', err); }
+  try { await postCanonGameEvent(campaignId, actor, 'declaration', input.narration, input.beatId, { cycle, feed: input.feed }); } catch (err) { console.warn('[canon] declaration event failed', err); }
 
   // Everyone present perceives it — engine-authored, no confabulation.
   // witnessIds undefined = every ACTIVE being in the campaign; an explicit

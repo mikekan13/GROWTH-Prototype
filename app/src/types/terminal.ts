@@ -52,7 +52,21 @@ export interface DiceRollPayload {
   physicalDice?: Array<{ dieType: string; value: number }>;
 }
 
-export interface ChatPayload {
+/**
+ * What the TABLE feed needs to draw a line the way the ruling says
+ * (ruling-feed-segment-colours-pillars, 2026-10-07). All optional: rows written
+ * before 2026-10-07 have none of it and the feed falls back.
+ */
+export interface TableFeedFields {
+  /** How the line reached the table: typed by a person, spoken into the mic, or answered by a being (DAYA). */
+  via?: 'typed' | 'spoken' | 'being';
+  /** The campaign clock (meta cycles) when the line was recorded — the in-world time shown before the real one. */
+  cycle?: number;
+  /** The pre-processed text, exactly as typed or transcribed, when it differs from the cleaned text. */
+  raw?: string;
+}
+
+export interface ChatPayload extends TableFeedFields {
   kind: 'chat';
   message: string;
 }
@@ -72,12 +86,16 @@ export interface AIMessagePayload {
   requiresConfirmation?: boolean;
 }
 
-export interface GameEventPayload {
+export interface GameEventPayload extends TableFeedFields {
   kind: 'game_event';
   eventType: string;             // "session_start", "session_end", "combat_begin", etc.
   description: string;
   /** Spoken narration is recorded sentence by sentence (U2c, Mike 2026-10-06); rows of one beat share this id so the feed can read them as one. */
   beatId?: string;
+  /** A table declaration's split, as the preprocessor (table-prose) made it: the pure narration (null = the message was speech alone)… */
+  narration?: string | null;
+  /** …and each line of speech it pulled out, with who the record says spoke it. The feed draws these as that character's own rows. */
+  speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
 }
 
 export type TerminalPayload =
