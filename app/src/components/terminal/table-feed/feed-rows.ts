@@ -63,6 +63,8 @@ export interface BarRowModel extends RowBase {
   lines: string[];
   /** Bracketed lead tag ("[ENCOUNTER ROUND]", "[jEWL]:"). */
   tag?: string;
+  /** A character change that can still be reverted: its changelog entry id. */
+  revertId?: string;
 }
 
 export interface WithdrawnRowModel extends RowBase {
@@ -181,7 +183,7 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
       const c = p as ChangeLogPayload;
       const who = e.characterName ? `${e.characterName} · ` : '';
       if (c.reverted) return [{ type: 'withdrawn', key: e.id, timestamp: e.timestamp, text: `${who}${c.description}`, fix: 'REVERTED' }];
-      return [{ type: 'system', key: e.id, timestamp: e.timestamp, lines: [`[CHANGE] ${who}${c.description}`] }];
+      return [{ type: 'system', key: e.id, timestamp: e.timestamp, lines: [`[CHANGE] ${who}${c.description}`], ...(c.revertible ? { revertId: c.entryId } : {}) }];
     }
     default: return [];
   }

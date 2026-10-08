@@ -55,17 +55,17 @@ export function mergeEvents(prev: TerminalEvent[], incoming: TerminalEvent[]): T
 export function sessionMarkers(sessions: GameSessionInfo[], campaignId: string): TerminalEvent[] {
   const out: TerminalEvent[] = [];
   for (const s of sessions) {
-    const label = `Session ${s.number}${s.name ? `: ${s.name}` : ''}`;
+    const named = s.name ? ` · ${s.name}` : '';
     out.push({
       id: `session-start-${s.id}`, type: 'game_event', timestamp: s.startedAt, campaignId, sessionId: s.id,
       actor: 'system', actorUserId: '', actorName: 'system',
-      payload: { kind: 'game_event', eventType: 'session_start', description: `${label} started` },
+      payload: { kind: 'game_event', eventType: 'session_start', description: `Session ${s.number} started${named}` },
     });
     if (s.endedAt) {
       out.push({
         id: `session-end-${s.id}`, type: 'game_event', timestamp: s.endedAt, campaignId, sessionId: s.id,
         actor: 'system', actorUserId: '', actorName: 'system',
-        payload: { kind: 'game_event', eventType: 'session_end', description: `${label} ended` },
+        payload: { kind: 'game_event', eventType: 'session_end', description: `Session ${s.number} ended${named}` },
       });
     }
   }

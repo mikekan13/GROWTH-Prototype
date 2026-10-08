@@ -19,12 +19,17 @@ export default function TableFeed({
   events,
   entities,
   loading,
+  onRevert,
+  reverting,
   children,
 }: {
   campaignId: string;
   events: TerminalEvent[];
   entities: FeedEntity[];
   loading?: boolean;
+  /** Revert a character change (the old TERMINAL row's REVERT, kept in the one feed). */
+  onRevert?: (entryId: string) => void;
+  reverting?: string | null;
   /** Rendered under the last row, inside the feed's styles (the growing line). */
   children?: React.ReactNode;
 }) {
@@ -48,7 +53,7 @@ export default function TableFeed({
   const rows = useMemo(() => buildFeedRows(events, roster), [events, roster]);
 
   return (
-    <TableFeedProvider entities={entities} timescale={timescale}>
+    <TableFeedProvider entities={entities} timescale={timescale} onRevert={onRevert} reverting={reverting}>
       <style>{TABLE_FEED_CSS}</style>
       <div className="tf" data-table-feed>
         {rows.length === 0 && <div className="empty">{loading ? 'Loading…' : '[THE TABLE IS QUIET]'}</div>}

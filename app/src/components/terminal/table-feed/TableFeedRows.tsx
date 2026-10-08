@@ -31,16 +31,24 @@ interface FeedContextValue {
   entities: Map<string, FeedEntity>;
   names: EntityName[];
   timescale: FeedTimescale | null;
+  /** Revert a character change (changelog entry id); absent = no revert control. */
+  onRevert?: (entryId: string) => void;
+  reverting?: string | null;
 }
 
 const FeedContext = createContext<FeedContextValue>({ entities: new Map(), names: [], timescale: null });
 
-export function TableFeedProvider({ entities, timescale, children }: { entities: FeedEntity[]; timescale: FeedTimescale | null; children: React.ReactNode }) {
+export function TableFeedProvider({ entities, timescale, onRevert, reverting, children }: {
+  entities: FeedEntity[]; timescale: FeedTimescale | null;
+  onRevert?: (entryId: string) => void; reverting?: string | null; children: React.ReactNode;
+}) {
   const value = useMemo<FeedContextValue>(() => ({
     entities: new Map(entities.map((e) => [e.id, e])),
     names: entities.map((e) => ({ id: e.id, name: e.name })),
     timescale,
-  }), [entities, timescale]);
+    onRevert,
+    reverting,
+  }), [entities, timescale, onRevert, reverting]);
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;
 }
 
@@ -232,6 +240,8 @@ export function NarrationRow({ row }: { row: NarrationRowModel }) {
 const BAR_CLASS: Record<BarRowModel['type'], string> = { check: 'check', event: 'event', jewl: 'jewl', system: 'sys' };
 
 export function BarRow({ row }: { row: BarRowModel }) {
+  const { onRevert, reverting } = useContext(FeedContext);
+  const canRevert = !!(row.revertId && onRevert);
   return (
     <div className={`row bx bars ${BAR_CLASS[row.type]}`} data-row={row.type}>
       <div className="body">
@@ -241,7 +251,21 @@ export function BarRow({ row }: { row: BarRowModel }) {
           </div>
         ))}
       </div>
-      <div className="side" />
+      <div className="side">
+        {canRevert && (
+          <button
+            type="button"
+            className="md"
+            aria-label="Revert this change"
+            title="Revert this change"
+            data-no-hold
+            disabled={reverting === row.revertId}
+            onClick={(e) => { e.stopPropagation(); onRevert!(row.revertId!); }}
+          >
+            <span className="tg rv">{reverting === row.revertId ? '…' : '↶'}</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

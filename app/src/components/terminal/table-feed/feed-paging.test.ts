@@ -43,7 +43,7 @@ describe('session boundaries', () => {
     expect(rows.map((r) => [r.id, (r.payload as { description: string }).description])).toEqual([
       ['session-start-s1', 'Session 1 started'],
       ['session-end-s1', 'Session 1 ended'],
-      ['session-start-s2', 'Session 2: The stair started'],
+      ['session-start-s2', 'Session 2 started · The stair'],
     ]);
   });
   it('the logged session lines give way to them', () => {

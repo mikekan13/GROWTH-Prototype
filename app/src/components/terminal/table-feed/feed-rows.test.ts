@@ -80,7 +80,8 @@ describe('the other row types (feed-grammar sheet)', () => {
     expect(eventRows(ev({ kind: 'ai_message', message: 'Upstairs now?', severity: 'question' }), roster)[0]).toMatchObject({ type: 'jewl', tag: '[jEWL]:' });
     expect(eventRows(ev({ kind: 'command', input: '/roll d8', result: 'ok\nmore', success: true }), roster)[0]).toMatchObject({ type: 'system', lines: ['> /roll d8', 'ok', 'more'] });
     const change = { kind: 'changelog' as const, entryId: 'x', category: 'attribute' as const, description: 'Clout 3 → 2', changes: [], source: null, revertible: true };
-    expect(eventRows(ev({ ...change, reverted: false }, { characterName: 'Ash' }), roster)[0]).toMatchObject({ type: 'system', lines: ['[CHANGE] Ash · Clout 3 → 2'] });
+    expect(eventRows(ev({ ...change, reverted: false }, { characterName: 'Ash' }), roster)[0]).toMatchObject({ type: 'system', lines: ['[CHANGE] Ash · Clout 3 → 2'], revertId: 'x' });
+    expect(eventRows(ev({ ...change, revertible: false, reverted: false }), roster)[0]).not.toHaveProperty('revertId');
     expect(eventRows(ev({ ...change, reverted: true }), roster)[0]).toMatchObject({ type: 'withdrawn', fix: 'REVERTED' });
   });
 
