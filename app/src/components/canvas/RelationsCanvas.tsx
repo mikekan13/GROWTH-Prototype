@@ -240,8 +240,13 @@ export default function RelationsCanvas({
   // â”€â”€ localStorage helpers â”€â”€
   const storageKey = (key: string) => `canvas-${campaignId}-${key}`;
 
+  // `#reset-view` on the URL drops the remembered camera + zoom once (a phone
+  // lost in the void has no other way back — 2026-10-08).
+  const resetView = typeof window !== 'undefined' && window.location.hash === '#reset-view';
+
   function loadJSON<T>(key: string, fallback: T): T {
     if (typeof window === 'undefined') return fallback;
+    if (resetView && (key === 'camera' || key === 'zoom' || key === 'viewBox')) return fallback;
     try {
       const raw = localStorage.getItem(storageKey(key));
       if (raw) return JSON.parse(raw) as T;
@@ -533,6 +538,15 @@ export default function RelationsCanvas({
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced save â€” batches rapid state changes into one write
+  // Consume `#reset-view` so a later reload keeps the new camera.
+  useEffect(() => {
+    if (!resetView) return;
+    saveJSON('camera', camera);
+    saveJSON('zoom', zoom);
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const persistState = useCallback(() => {
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
