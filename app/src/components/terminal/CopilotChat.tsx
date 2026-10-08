@@ -268,123 +268,120 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
 
   const isGM = userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD';
 
+  // Look (2026-10-08): the drawer's own language. Powder-blue page; JEWL speaks
+  // in the book's margin voice — `[jEWL]:` + Consolas on the #383837 aside bar
+  // (feed-grammar sheet §7, p 70); his asks for a yes/no are the p 64 held
+  // question on that same bar with navy/gold Bebas answers; the person's turn is
+  // ordinary reading text (Comfortaa) under a navy rule. Behaviour unchanged.
   return (
-    <div className="flex flex-col h-full" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+    <div className="jc" data-jewl-conversation>
+      <style>{JEWL_CHAT_CSS}</style>
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+      <div ref={scrollRef} className="jc-scroll">
         {loadingHistory ? (
-          <div className="text-center text-white/20 text-[10px] py-4">Loading history...</div>
+          <p className="jc-note"><span className="jc-bar">[...LOADING THE CONVERSATION...]</span></p>
         ) : messages.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-[var(--accent-teal)]/40 text-[10px] tracking-[0.2em] uppercase mb-2">
-              ✦ JEWL
-            </div>
-            <div className="text-white/20 text-[9px] max-w-xs mx-auto">
-              Ask. I&apos;ve been watching.
-            </div>
+          <div className="jc-turn jc-jewl">
+            <p className="jc-msg"><span className="jc-aside"><b>[jEWL]:</b> Ask. I&apos;ve been watching.</span></p>
           </div>
         ) : (
           messages.map(msg => (
-            <div key={msg.id}>
-              {/* Message bubble */}
-              <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-2.5 py-1.5 text-[11px] leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-[var(--accent-teal)]/15 text-[var(--accent-teal)] border border-[var(--accent-teal)]/20'
-                    : 'bg-white/5 text-white/80 border border-white/10'
-                }`}>
-                  {msg.role === 'user' && msg.username && (
-                    <div className="text-[8px] text-[var(--accent-teal)]/50 uppercase tracking-wider mb-0.5">
-                      {msg.username}
-                    </div>
-                  )}
-                  {msg.role === 'assistant' && (
-                    <div className="text-[8px] text-[var(--accent-gold)]/60 uppercase tracking-wider mb-0.5">
-                      JEWL
-                    </div>
-                  )}
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                </div>
-              </div>
-
-              {/* Action cards */}
-              {msg.actions.length > 0 && (
-                <div className="mt-1 space-y-1">
-                  {msg.actions.map(action => (
-                    <div key={action.id} className={`mx-2 p-2 border text-[10px] ${
-                      action.status === 'confirmed' ? 'border-[var(--accent-teal)]/30 bg-[var(--accent-teal)]/5'
-                      : action.status === 'cancelled' ? 'border-white/10 bg-white/3 opacity-40'
-                      : 'border-[var(--accent-gold)]/30 bg-[var(--accent-gold)]/5'
-                    }`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[var(--accent-gold)] uppercase tracking-wider text-[8px]">
-                            {action.type.replace(/_/g, ' ')}
-                          </span>
-                          <div className="text-white/70 mt-0.5">{action.description}</div>
-                        </div>
-                        {action.status === 'pending' && isGM && (
-                          <div className="flex gap-1 ml-2">
-                            <button
-                              onClick={() => handleAction(action, true)}
-                              className="px-2 py-0.5 bg-[var(--accent-teal)] text-black text-[8px] uppercase tracking-wider hover:brightness-110"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => handleAction(action, false)}
-                              className="px-2 py-0.5 bg-white/10 text-white/40 text-[8px] uppercase tracking-wider hover:bg-white/20"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        )}
-                        {action.status === 'confirmed' && (
-                          <span className="text-[var(--accent-teal)] text-[8px] uppercase">Done</span>
-                        )}
-                        {action.status === 'cancelled' && (
-                          <span className="text-white/30 text-[8px] uppercase">Cancelled</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div key={msg.id} className={`jc-turn ${msg.role === 'user' ? 'jc-user' : 'jc-jewl'}`}>
+              {msg.role === 'assistant' ? (
+                <p className="jc-msg"><span className="jc-aside"><b>[jEWL]:</b> {msg.content}</span></p>
+              ) : (
+                <>
+                  <div className="jc-who">
+                    <span className="jc-tag">{msg.username || 'You'}:</span>
+                    <span className="jc-time">{fmtTime(msg.createdAt)}</span>
+                  </div>
+                  <p className="jc-said">{msg.content}</p>
+                </>
               )}
+
+              {/* JEWL's asks — the p 64 held question on the grey bar */}
+              {msg.actions.length > 0 && msg.actions.map(action => (
+                <div key={action.id} className={`jc-ask jc-${action.status}`} data-jewl-action={action.status}>
+                  <p className="jc-msg">
+                    <span className="jc-kind">{action.type.replace(/_/g, ' ')}</span>
+                    <span className="jc-aside">{action.description}</span>
+                  </p>
+                  {action.status === 'pending' && isGM && (
+                    <div className="jc-answers">
+                      <button onClick={() => handleAction(action, true)} className="jc-yes" data-no-hold>Confirm</button>
+                      <button onClick={() => handleAction(action, false)} className="jc-no" data-no-hold>Cancel</button>
+                    </div>
+                  )}
+                  {action.status === 'confirmed' && <p className="jc-state"><span className="jc-done">[DONE]</span></p>}
+                  {action.status === 'cancelled' && <p className="jc-state"><span className="jc-bar">[CANCELLED]</span></p>}
+                </div>
+              ))}
             </div>
           ))
         )}
 
         {loading && (
-          <div className="flex justify-start">
-            <div className="px-2.5 py-1.5 bg-white/5 border border-white/10 text-[11px] text-white/30">
-              <span className="animate-pulse">Thinking...</span>
-            </div>
-          </div>
+          <p className="jc-note"><span className="jc-bar">[jEWL IS THINKING<span className="jc-caret">_</span>]</span></p>
         )}
       </div>
 
-      {/* Input */}
-      <div className="flex-shrink-0 border-t border-[var(--accent-teal)]/20 px-3 py-2">
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask the co-pilot..."
-            disabled={loading}
-            className="flex-1 bg-black/30 border border-[var(--accent-teal)]/20 text-white text-[11px] px-2 py-1.5 placeholder:text-white/20 focus:outline-none focus:border-[var(--accent-teal)]/50 disabled:opacity-50"
-          />
-          <button
-            onClick={handleSend}
-            disabled={loading || !input.trim()}
-            className="px-3 py-1.5 bg-[var(--accent-teal)]/20 text-[var(--accent-teal)] text-[10px] uppercase tracking-wider border border-[var(--accent-teal)]/30 hover:bg-[var(--accent-teal)]/30 disabled:opacity-30"
-          >
-            Send
-          </button>
-        </div>
+      {/* Input — the speak bar's shape: white field under a navy rule, navy/gold Send */}
+      <div className="jc-input">
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask jEWL…"
+          aria-label="Ask jEWL"
+          disabled={loading}
+          className="text-[16px] md:text-[14px]"
+        />
+        <button onClick={handleSend} disabled={loading || !input.trim()} data-no-hold>
+          {loading ? '…' : 'Send'}
+        </button>
       </div>
     </div>
   );
 }
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+const JEWL_CHAT_CSS = `
+.jc{flex:1;min-height:0;display:flex;flex-direction:column;background:#cfe2f2;color:#000;font-family:var(--font-comfortaa),Comfortaa,sans-serif}
+.jc *{box-sizing:border-box}
+.jc-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 12px 14px 14px}
+.jc-turn{margin:12px 0 0}
+.jc-msg{margin:0;font:700 14px/1.62 var(--font-terminal),Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.jc-aside{background:#383837;color:#f5f4ef;padding:1px 5px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.jc-aside b{font-weight:700;color:#ffcc78}
+.jc-user{border-left:4px solid #002f6c;padding:0 0 0 10px}
+.jc-who{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.jc-tag{font:700 13px/1.5 var(--font-terminal),Consolas,monospace;color:#002f6c}
+.jc-time{font:400 12px/1.5 var(--font-terminal),Consolas,monospace;color:#393937;flex:none}
+.jc-said{margin:2px 0 0;font:400 15px/1.6 var(--font-comfortaa),Comfortaa,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.jc-ask{margin:8px 0 0}
+.jc-kind{display:inline-block;font:400 15px/1.2 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.04em;color:#ffcc78;background:#002f6c;padding:2px 6px 0;margin-right:6px}
+.jc-answers{display:flex;gap:8px;margin:6px 0 0}
+.jc-answers button{font:400 18px/1 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.05em;height:36px;padding:3px 12px 0;border:0;cursor:pointer;white-space:nowrap}
+.jc-yes{background:#002f6c;color:#ffcc78}
+.jc-no{background:none;color:#002f6c;box-shadow:inset 0 0 0 2px #002f6c}
+.jc-answers button:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.jc-state{margin:4px 0 0;font:700 13px/1.62 var(--font-terminal),Consolas,monospace}
+.jc-done{background:#22ab94;color:#222;padding:1px 5px}
+.jc-cancelled .jc-aside{text-decoration:line-through;text-decoration-thickness:2px;opacity:.7}
+.jc-note{margin:12px 0 0;font:700 13px/1.62 var(--font-terminal),Consolas,monospace}
+.jc-bar{background:#000;color:#f5f4ef;padding:1px 5px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.jc-caret{animation:jc-caret 1s steps(1) infinite}
+@keyframes jc-caret{0%,49%{opacity:1}50%,100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.jc-caret{animation:none}}
+.jc-input{flex:none;display:flex;gap:8px;align-items:stretch;background:#fafaf8;border-top:3px solid #000;padding:8px 10px 10px}
+.jc-input input{flex:1;min-width:0;height:44px;outline:0;padding:0 8px;font-family:var(--font-comfortaa),Comfortaa,sans-serif;color:#000;background:#fff;border:0;border-left:4px solid #002f6c}
+.jc-input input:disabled{opacity:.6}
+.jc-input button{width:68px;min-height:36px;border:0;cursor:pointer;font:400 22px/1 var(--font-bebas-neue),'Bebas Neue',sans-serif;letter-spacing:.06em;background:#002f6c;color:#ffcc78}
+.jc-input button:disabled{opacity:.55;cursor:default}
+`;
