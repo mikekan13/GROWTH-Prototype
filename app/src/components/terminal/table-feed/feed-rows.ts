@@ -33,6 +33,8 @@ interface RowBase {
   timestamp: string;
   /** Campaign cycle when recorded (absent on rows written before 2026-10-07). */
   cycle?: number;
+  /** Mechanical rows behind this line, in the jEWL tab's Log (feed-split.ts). */
+  logRefs?: string[];
 }
 
 export interface CharacterRowModel extends RowBase {
@@ -55,6 +57,8 @@ export interface NarrationRowModel extends RowBase {
   raw: string;
   via: Via;
   voicedBy: string | null;
+  /** Told from a mechanical row (feed-split.ts) — no raw text behind it; the Log holds the numbers. */
+  mechanical?: boolean;
 }
 
 export interface BarRowModel extends RowBase {
@@ -156,6 +160,9 @@ function diceRow(e: TerminalEvent, p: DiceRollPayload): BarRowModel {
 function gameEventRow(e: TerminalEvent, p: GameEventPayload): FeedRowModel | null {
   const text = p.description?.trim();
   if (!text || !p.eventType) return null;
+  if (p.eventType === 'narrated') {
+    return { type: 'narration', key: e.id, timestamp: e.timestamp, cycle: p.cycle, text, raw: text, via: 'typed', voicedBy: null, mechanical: true };
+  }
   if (p.eventType === 'session_start' || p.eventType === 'session_end') {
     return { type: 'system', key: e.id, timestamp: e.timestamp, cycle: p.cycle, lines: [`[${text.toUpperCase()}]`] };
   }
@@ -193,11 +200,18 @@ export function eventRows(e: TerminalEvent, roster: RosterName[]): FeedRowModel[
  * The whole feed. Spoken declarations of one beat fold into one beat row
  * (the same grouping as SpokenBeatBlock: consecutive rows sharing payload.beatId).
  */
-export function buildFeedRows(events: TerminalEvent[], roster: RosterName[] = []): FeedRowModel[] {
+export function buildFeedRows(events: TerminalEvent[], roster: RosterName[] = [], logRefs?: Map<string, string[]>): FeedRowModel[] {
   const out: FeedRowModel[] = [];
+  /** The first row of an event carries its log link. */
+  const rowsOf = (ev: TerminalEvent) => {
+    const rows = eventRows(ev, roster);
+    const refs = logRefs?.get(ev.id);
+    if (refs && rows.length) rows[0] = { ...rows[0], logRefs: refs };
+    return rows;
+  };
   for (const row of foldSpokenBeats(events)) {
-    if (row.kind === 'event') { out.push(...eventRows(row.event, roster)); continue; }
-    const groups = row.events.map((ev) => eventRows(ev, roster) as Array<NarrationRowModel | CharacterRowModel>).filter((g) => g.length > 0);
+    if (row.kind === 'event') { out.push(...rowsOf(row.event)); continue; }
+    const groups = row.events.map((ev) => rowsOf(ev) as Array<NarrationRowModel | CharacterRowModel>).filter((g) => g.length > 0);
     if (groups.length === 0) continue;
     if (groups.length === 1) { out.push(...groups[0]); continue; }
     const first = row.events[0];

@@ -66,7 +66,11 @@ function addCycle(node: FoldNode, c: unknown) {
   node.cycles = node.cycles ? [Math.min(node.cycles[0], c), Math.max(node.cycles[1], c)] : [c, c];
 }
 
-function pushEvent(node: FoldNode, e: TerminalEvent) {
+/** Which lines a tree shows (Terminal: narrative in sessions; Log: mechanics + between sessions). */
+export type FoldKeep = (e: TerminalEvent, where: 'session' | 'between') => boolean;
+
+function pushEvent(node: FoldNode, e: TerminalEvent, keep?: (e: TerminalEvent) => boolean) {
+  if (keep && !keep(e)) return;
   node.items.push({ type: 'event', event: e });
   node.lines += 1;
   addCycle(node, (e.payload as { cycle?: unknown }).cycle);
@@ -79,7 +83,8 @@ function pushNode(parent: FoldNode, child: FoldNode) {
 }
 
 /** Lines of one stretch, with every encounter (begin → end) folded into its own node. */
-function withEncounters(parent: FoldNode, events: TerminalEvent[], live: { liveSession: boolean; liveEncounter: { id: string | null; name: string } | null }) {
+function withEncounters(parent: FoldNode, events: TerminalEvent[], live: { liveSession: boolean; liveEncounter: { id: string | null; name: string } | null; keep?: (e: TerminalEvent) => boolean }) {
+  const keep = live.keep;
   let enc: FoldNode | null = null;
   const close = () => { if (enc) { pushNode(parent, enc); enc = null; } };
   for (const e of events) {
@@ -88,15 +93,15 @@ function withEncounters(parent: FoldNode, events: TerminalEvent[], live: { liveS
       close();
       const who = encounterOf(e);
       enc = { key: `enc-${e.id}`, kind: 'encounter', label: who.name, live: false, items: [], lines: 0, cycles: null, encounter: { ...who, ended: false } };
-      pushEvent(enc, e);
+      pushEvent(enc, e, keep);
       continue;
     }
     if (enc) {
-      pushEvent(enc, e);
+      pushEvent(enc, e, keep);
       if (p?.eventType === 'encounter_end') { enc.encounter!.ended = true; close(); }
       continue;
     }
-    pushEvent(parent, e);
+    pushEvent(parent, e, keep);
   }
   if (enc) {
     const node = enc as FoldNode;
@@ -116,7 +121,15 @@ function withEncounters(parent: FoldNode, events: TerminalEvent[], live: { liveS
 export function buildFoldTree(
   events: TerminalEvent[],
   sessions: GameSessionInfo[],
-  opts: { emptyFrom?: string | null; liveEncounter?: { id: string | null; name: string } | null; chapterOffset?: number } = {},
+  opts: {
+    emptyFrom?: string | null; liveEncounter?: { id: string | null; name: string } | null; chapterOffset?: number;
+    /** Lines to show; structure (sessions, rests, encounters, harvests) is built from every event either way. */
+    keep?: FoldKeep;
+    /** Leave out the "Between sessions" stretches (the Terminal feed: play only — Mike 2026-10-08). */
+    dropBetween?: boolean;
+    /** Drop folds with no lines left after `keep` (the Log). */
+    prune?: boolean;
+  } = {},
 ): FoldNode[] {
   const chapters: FoldNode[] = [];
   const newChapter = (): FoldNode => {
@@ -137,7 +150,8 @@ export function buildFoldTree(
       ...(s.session ? { session: { number: s.session.number, name: s.session.name } } : {}),
     };
     s.parts.forEach((part, pi) => {
-      const ctx = { liveSession: s.live, liveEncounter: opts.liveEncounter ?? null };
+      const k = opts.keep;
+      const ctx = { liveSession: s.live, liveEncounter: opts.liveEncounter ?? null, keep: k ? (e: TerminalEvent) => k(e, s.kind) : undefined };
       if (!part.rest) { withEncounters(node, part.events, ctx); return; }
       const rp = part.rest.payload as GameEventPayload;
       const rest: FoldNode = {
@@ -149,7 +163,7 @@ export function buildFoldTree(
       withEncounters(rest, part.events, ctx);
       pushNode(node, rest);
     });
-    pushNode(chapter, node);
+    if (!(opts.dropBetween && s.kind === 'between')) pushNode(chapter, node);
     if (s.kind === 'session') chapter.chapter!.sessions += 1;
     const harvest = [...s.parts.flatMap((p) => p.events)].reverse().find(isHarvest);
     if (harvest && si < sections.length - 1) {
@@ -161,10 +175,35 @@ export function buildFoldTree(
       chapter.chapter!.harvest = { timestamp: harvest.timestamp, cycle: typeof c === 'number' ? c : null };
     }
   });
+  if (opts.prune) chapters.forEach(pruneEmpty);
   // The current chapter (the last one) is on the live path.
   const kept = chapters.filter((c) => c.items.length > 0);
   if (kept.length) kept[kept.length - 1].live = true;
   return kept;
+}
+
+/** Remove folds that hold no lines (after `keep`), depth first. */
+function pruneEmpty(n: FoldNode) {
+  n.items = n.items.filter((it) => {
+    if (it.type === 'event') return true;
+    pruneEmpty(it.node);
+    return it.node.lines > 0;
+  });
+}
+
+/** The folds holding any of `ids` (to open them, e.g. when a feed link jumps to its Log rows). */
+export function revealKeys(tree: FoldNode[], ids: Set<string>): Set<string> {
+  const keys = new Set<string>();
+  const walk = (n: FoldNode): boolean => {
+    let found = false;
+    for (const it of n.items) {
+      if (it.type === 'event' ? ids.has(it.event.id) : walk(it.node)) found = true;
+    }
+    if (found) keys.add(n.key);
+    return found;
+  };
+  tree.forEach(walk);
+  return keys;
 }
 
 /** Every node on the live path, plus anything containing a live node. */

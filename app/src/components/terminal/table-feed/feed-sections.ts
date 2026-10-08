@@ -44,7 +44,7 @@ export interface FeedSection {
 
 const t = (iso: string) => new Date(iso).getTime();
 
-function sessionFor(e: TerminalEvent, sessions: GameSessionInfo[]): GameSessionInfo | null {
+export function sessionFor(e: TerminalEvent, sessions: GameSessionInfo[]): GameSessionInfo | null {
   if (e.sessionId) {
     const s = sessions.find((x) => x.id === e.sessionId);
     if (s) return s;
