@@ -17,6 +17,7 @@ import BeingSpeakingLines from './BeingSpeakingLines';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
 import { perceptionFeedOn, PERCEIVED_FEED_STALE_EVENT } from '@/lib/perception-feed';
+import ViewAsPicker, { readViewAs, writeViewAs, type ViewAsCharacter } from './table-feed/ViewAsPicker';
 import { pageCutoff, keepFrom, mergeEvents, withoutLoggedSessionLines } from './table-feed/feed-paging';
 import { matchEvent, type FoldKeep } from './table-feed/feed-tree';
 import { withNarration, feedKeep, isFeedLine } from './table-feed/feed-split';
@@ -116,6 +117,18 @@ export default function CampaignTerminal({
   // Perception unit 9 (NEXT_PUBLIC_PERCEPTION_FEED): the server says whether this feed is the viewer's
   // perceived one (a Trailblazer) — it filters; the client only renders the tokens and re-reads on a nudge.
   const [perceivedFeed, setPerceivedFeed] = useState(false);
+  // Unit 10: the Watcher's "view as character" — null = the truth record. Remembered per viewer (localStorage only).
+  const [viewAs, setViewAsState] = useState<string | null>(null);
+  const viewAsOffered = perceptionFeedOn() && (_userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN');
+  const viewer = _userId ?? 'anon';
+  useEffect(() => { if (viewAsOffered) setViewAsState(readViewAs(campaignId, viewer)); }, [viewAsOffered, campaignId, viewer]);
+  const setViewAs = useCallback((id: string | null) => { writeViewAs(campaignId, viewer, id); setViewAsState(id); }, [campaignId, viewer]);
+  const viewAsRef = useRef<string | null>(null);
+  viewAsRef.current = viewAs;
+  const viewAsCharacters = useMemo<ViewAsCharacter[]>(() => (tableEntities ?? [])
+    .filter((e) => e.kind === 'character' || e.kind === 'npc')
+    .map((e) => ({ id: e.id, name: e.name, kind: e.kind as ViewAsCharacter['kind'] }))
+    .sort((a, b) => a.name.localeCompare(b.name)), [tableEntities]);
   // No filter chips (Mike 2026-10-08): the one feed is searched, not filtered.
   const activeFilter = 'all' as TerminalFilter;
   const [reverting, setReverting] = useState<string | null>(null);
@@ -210,16 +223,20 @@ export default function CampaignTerminal({
       // Fetch changelog entries
       const clParams = new URLSearchParams({ campaignId, limit: String(FEED_PAGE) });
       if (cursor) clParams.set('cursor', cursor);
+      if (viewAs) clParams.set('viewAs', viewAs);
       const clRes = wantChanges ? await fetch(`/api/changelog?${clParams}`, { cache: 'no-store' }) : null;
       const clData = clRes?.ok ? await clRes.json() : { entries: [], nextCursor: null };
 
       // Fetch campaign events
       const evParams = new URLSearchParams({ limit: String(FEED_PAGE) });
       if (cursor) evParams.set('cursor', cursor);
+      if (viewAs) evParams.set('viewAs', viewAs);
       if (filterTypes && activeFilter !== 'changes') {
         evParams.set('types', filterTypes.filter(t => t !== 'changelog').join(','));
       }
       const evRes = wantEvents ? await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' }) : null;
+      // A view the server refuses (not this campaign's Watcher, character gone) falls back to the truth record.
+      if (viewAs && evRes && (evRes.status === 403 || evRes.status === 404)) { setViewAs(null); return { rows: [], cutoff: null }; }
       const evData = evRes?.ok ? await evRes.json() : { events: [], nextCursor: null };
       if (perceptionFeedOn() && evRes?.ok) setPerceivedFeed(evData.perceived === true);
 
@@ -291,12 +308,14 @@ export default function CampaignTerminal({
         { oldest: clRows.length ? clRows[clRows.length - 1].createdAt : null, hasMore: wantChanges && !!clData.nextCursor },
       ]);
       return { rows: keepFrom(merged, cutoff), cutoff };
-  }, [campaignId, activeFilter]);
+  }, [campaignId, activeFilter, viewAs, setViewAs]);
 
   /** The newest page. `reset` (open / filter change) replaces the feed; otherwise new rows merge in and older pages stay. */
   const fetchEvents = useCallback(async (reset = false) => {
     try {
+      const asked = viewAsRef.current;
       const { rows, cutoff } = await fetchPage();
+      if (asked !== viewAsRef.current) return; // the view changed meanwhile — never mix two views' rows
       setEvents(prev => (reset ? rows : mergeEvents(prev, rows)));
       if (reset) setOlderCursor(cutoff);
     } catch { /* keep what is shown */ }
@@ -308,7 +327,9 @@ export default function CampaignTerminal({
     if (!olderCursor || loadingOlder) return;
     setLoadingOlder(true);
     try {
+      const asked = viewAsRef.current;
       const { rows, cutoff } = await fetchPage(olderCursor);
+      if (asked !== viewAsRef.current) { setLoadingOlder(false); return; }
       const el = scrollRef.current;
       if (el) prependAnchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
       setEvents(prev => mergeEvents(prev, rows));
@@ -339,6 +360,8 @@ export default function CampaignTerminal({
   // Merge stream events into the event list (replaces 5s polling)
   useEffect(() => {
     if (!streamEvents || streamEvents.length === 0) return;
+    // Viewing as a character: the Watcher's stream carries the truth — the view re-reads on the memory push instead.
+    if (viewAsRef.current) return;
     setEvents(prev => {
       const existingIds = new Set(prev.map(e => e.id));
       const newEvents = streamEvents.filter(e => !existingIds.has(e.id));
@@ -365,7 +388,10 @@ export default function CampaignTerminal({
   useEffect(() => {
     if (!visible || !perceptionFeedOn() || !perceivedFeed) return;
     let t: ReturnType<typeof setTimeout> | null = null;
-    const onStale = () => {
+    const onStale = (e: Event) => {
+      // Viewing as a character: only that character's memory moving matters.
+      const cid = (e as CustomEvent<{ characterId?: string | null }>).detail?.characterId;
+      if (viewAsRef.current && cid && cid !== viewAsRef.current) return;
       if (t) clearTimeout(t);
       t = setTimeout(() => { void fetchEvents(); }, 150);
     };
@@ -1052,6 +1078,9 @@ export default function CampaignTerminal({
                 fontFamily: mono, color: '#000', background: '#fff', border: 0, borderLeft: '4px solid #002f6c',
               }}
             />
+            {viewAsOffered && (
+              <ViewAsPicker characters={viewAsCharacters} value={viewAs} onChange={setViewAs} />
+            )}
           </div>
           {searching && (
             <div data-search-status style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, fontFamily: mono, fontSize: 12, color: '#393937' }}>
@@ -1108,7 +1137,7 @@ export default function CampaignTerminal({
           {/* Beings still speaking (U2c): their lines grow here, under the last
               logged event, and yield to the logged chat row when it lands. */}
           <BeingSpeakingLines
-            active={!!activeSession && !searching}
+            active={!!activeSession && !searching && !viewAs}
             events={events}
             entities={tableEntities}
             onGrow={() => {

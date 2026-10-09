@@ -29,7 +29,10 @@ vi.mock('@/lib/db', () => {
     campaign: { findUnique: async ({ where }: { where: { id: string } }) => (where.id === 'c1' ? { id: 'c1', gmUserId: 'gm', currentCycle: 1 } : null) },
     campaignMember: { findUnique: async ({ where }: { where: { campaignId_userId: { userId: string } } }) => (['p1', 'p2'].includes(where.campaignId_userId.userId) ? { id: 'm' } : null) },
     character: {
-      findFirst: async ({ where }: { where: { userId: string } }) => (OWN[where.userId] ? { id: OWN[where.userId][0] } : null),
+      findFirst: async ({ where }: { where: { userId?: string; id?: string } }) => {
+        if (where.id) { const u = Object.keys(OWN).find((k) => OWN[k].includes(where.id!)); return u ? { id: where.id, userId: u, entityType: 'PLAYER_CHARACTER' } : null; }
+        return OWN[where.userId ?? ''] ? { id: OWN[where.userId!][0] } : null;
+      },
       findMany: async ({ where }: { where: { userId?: string; id?: { in: string[] } } }) => {
         if (where.userId) return (OWN[where.userId] ?? []).map((id) => ({ id }));
         const all = Object.entries(OWN).flatMap(([u, ids]) => ids.map((id) => ({ id, userId: u })));
@@ -132,6 +135,17 @@ describe('PRIVACY beyond the feed (PERCEPTION_FEED on)', () => {
     expect(status).toBe(200);
     expect(raw).toContain('Violet swings at Ruth');
     expect(raw).not.toContain('SECRET');
+  });
+
+  it('unit 10: changelog viewed as a character — Watcher gets that character\'s rows; a Trailblazer cannot ask for another\'s', async () => {
+    as('gm', 'WATCHER');
+    const v = await changelog('&viewAs=danny');
+    expect(v.raw).toContain('SECRET-DANNY');
+    expect(v.raw).not.toContain('Clout 3');
+    as('p1', 'TRAILBLAZER');
+    const peek = await changelog('&viewAs=danny');
+    expect(peek.status).toBe(403);
+    expect(peek.raw).not.toContain('SECRET-DANNY');
   });
 
   it('the campaign\'s Watcher and ADMIN keep the truth on every route', async () => {

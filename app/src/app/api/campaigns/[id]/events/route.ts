@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
 import { requireCampaignMember } from '@/services/campaign-access';
-import { feedViewerFor, queryPerceivedFeed } from '@/services/perceived-feed';
+import { feedViewerFor, queryPerceivedFeed, viewAsViewer } from '@/services/perceived-feed';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
 
@@ -27,9 +27,13 @@ export async function GET(
 
     // Perception unit 9 (PERCEPTION_FEED): a Trailblazer reads their character's memory, filtered HERE —
     // truth text of an unperceived line never leaves the server. Flag off / Watcher / ADMIN: unchanged.
-    const viewer = await feedViewerFor(campaignId, session.user);
+    // Unit 10: `viewAs=<characterId>` — the Watcher (or ADMIN) reads the feed exactly as that character's
+    // memory, through the same path; anyone else asking for another character's view → 403.
+    const viewAs = sp.get('viewAs') || undefined;
+    const viewer = viewAs ? await viewAsViewer(campaignId, session.user, viewAs) : await feedViewerFor(campaignId, session.user);
     if (viewer.mode === 'perceived') {
-      return NextResponse.json(await queryPerceivedFeed({ campaignId, viewer, types, sessionId, after, cursor, limit }));
+      const page = await queryPerceivedFeed({ campaignId, viewer, types, sessionId, after, cursor, limit });
+      return NextResponse.json(viewAs ? { ...page, viewAs: viewer.characterId } : page);
     }
 
     const result = await queryCampaignEvents({

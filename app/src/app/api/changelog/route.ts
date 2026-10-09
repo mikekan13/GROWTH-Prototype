@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { requireCampaignMember } from '@/services/campaign-access';
 import { queryChangeLog } from '@/services/changelog';
-import { ownRecordScope } from '@/services/perceived-feed';
+import { ownRecordScope, viewAsViewer } from '@/services/perceived-feed';
 import type { ChangeActor, ChangeCategory } from '@/types/changelog';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
 
     // Perception (PERCEPTION_FEED): a Trailblazer reads only their own characters' changes — another
     // being's sheet changes are truth their character did not perceive. Watcher / ADMIN / flag off: unchanged.
-    const scope = await ownRecordScope(campaignId, session.user);
+    // Unit 10: viewing as a character (Watcher / ADMIN only, or one's own) → that character's rows.
+    const viewAs = params.get('viewAs');
+    const asViewer = viewAs ? await viewAsViewer(campaignId, session.user, viewAs) : null;
+    const scope = asViewer?.mode === 'perceived' ? (asViewer.characterId ? [asViewer.characterId] : []) : await ownRecordScope(campaignId, session.user);
 
     const result = await queryChangeLog({
       campaignId,

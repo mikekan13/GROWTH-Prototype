@@ -37,7 +37,10 @@ vi.mock('@/lib/db', () => {
     campaign: { findUnique: async ({ where }: { where: { id: string } }) => (where.id === 'c1' ? { id: 'c1', gmUserId: 'gm', currentCycle: 1 } : null) },
     campaignMember: { findUnique: async ({ where }: { where: { campaignId_userId: { userId: string } } }) => (['p1', 'p2'].includes(where.campaignId_userId.userId) ? { id: 'm' } : null) },
     character: {
-      findFirst: async ({ where }: { where: { userId: string } }) => ({ p1: { id: 'violet' }, p2: { id: 'danny' } } as Record<string, { id: string }>)[where.userId] ?? null,
+      findFirst: async ({ where }: { where: { userId?: string; id?: string; campaignId?: string } }) => {
+        if (where.id) return ({ violet: { id: 'violet', userId: 'p1', entityType: 'PLAYER_CHARACTER' }, danny: { id: 'danny', userId: 'p2', entityType: 'PLAYER_CHARACTER' }, ruth: { id: 'ruth', userId: 'gm', entityType: 'NPC' } } as Record<string, unknown>)[where.id] ?? null;
+        return ({ p1: { id: 'violet' }, p2: { id: 'danny' } } as Record<string, { id: string }>)[where.userId ?? ''] ?? null;
+      },
       findMany: async () => [
         { id: 'violet', name: 'Violet', data: '{}', entityType: 'PLAYER_CHARACTER' },
         { id: 'danny', name: 'Danny', data: '{}', entityType: 'PLAYER_CHARACTER' },
@@ -96,11 +99,11 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); });
 
-async function get(user: { id: string; role: string }) {
+async function get(user: { id: string; role: string }, extra = '') {
   currentUser = user;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const res = await GET({ nextUrl: new URL('http://x/api/campaigns/c1/events?limit=50') } as any, { params: Promise.resolve({ id: 'c1' }) });
-  return { status: res.status, body: await res.json() as { events: Array<{ id: string; type: string; payload: Record<string, unknown> }>; nextCursor: string | null; perceived?: boolean } };
+  const res = await GET({ nextUrl: new URL(`http://x/api/campaigns/c1/events?limit=50${extra}`) } as any, { params: Promise.resolve({ id: 'c1' }) });
+  return { status: res.status, body: await res.json() as { events: Array<{ id: string; type: string; payload: Record<string, unknown> }>; nextCursor: string | null; perceived?: boolean; viewAs?: string } };
 }
 
 describe('GET events — per-viewer feed (PERCEPTION_FEED)', () => {
@@ -145,6 +148,42 @@ describe('GET events — per-viewer feed (PERCEPTION_FEED)', () => {
     const direct = await queryCampaignEvents({ campaignId: 'c1', limit: 50 });
     expect(body).toEqual(JSON.parse(JSON.stringify(direct)));
     expect(body.perceived).toBeUndefined();
+  });
+
+  it('unit 10: the Watcher (and ADMIN) viewing as a character get exactly that character\'s feed', async () => {
+    vi.stubEnv('PERCEPTION_FEED', 'on');
+    const mine = await get({ id: 'p1', role: 'TRAILBLAZER' });
+    for (const u of [{ id: 'gm', role: 'WATCHER' }, { id: 'mike', role: 'ADMIN' }]) {
+      const as = await get(u, '&viewAs=violet');
+      expect(as.status).toBe(200);
+      expect(as.body.perceived).toBe(true);
+      expect(as.body.viewAs).toBe('violet');
+      expect(JSON.stringify(as.body)).not.toContain('SECRET');
+      expect(as.body.events).toEqual(mine.body.events); // the same server path a Trailblazer reads
+    }
+  });
+
+  it('unit 10: only the campaign\'s Watcher or ADMIN may view as another character', async () => {
+    vi.stubEnv('PERCEPTION_FEED', 'on');
+    const peek = await get({ id: 'p1', role: 'TRAILBLAZER' }, '&viewAs=danny');
+    expect(peek.status).toBe(403);
+    expect(JSON.stringify(peek.body)).not.toContain('SECRET');
+    const otherWatcher = await get({ id: 'p2', role: 'WATCHER' }, '&viewAs=violet'); // a Watcher, not this campaign's
+    expect(otherWatcher.status).toBe(403);
+    expect((await get({ id: 'p1', role: 'TRAILBLAZER' }, '&viewAs=violet')).status).toBe(200); // one's own = the default
+    expect((await get({ id: 'gm', role: 'WATCHER' }, '&viewAs=nobody')).status).toBe(404);
+  });
+
+  it('unit 10: viewing as an NPC carries no player\'s lines; flag OFF ignores viewAs', async () => {
+    vi.stubEnv('PERCEPTION_FEED', 'on');
+    const npc = await get({ id: 'gm', role: 'WATCHER' }, '&viewAs=ruth');
+    expect(npc.status).toBe(200);
+    expect(JSON.stringify(npc.body)).not.toContain('SECRET-PLAN');
+    expect(JSON.stringify(npc.body)).not.toContain('I wave.');
+    vi.stubEnv('PERCEPTION_FEED', '');
+    vi.stubEnv('NEXT_PUBLIC_PERCEPTION_FEED', '');
+    const off = await get({ id: 'gm', role: 'WATCHER' }, '&viewAs=violet');
+    expect(off.body).toEqual(JSON.parse(JSON.stringify(await queryCampaignEvents({ campaignId: 'c1', limit: 50 }))));
   });
 
   it('NEXT_PUBLIC_PERCEPTION_FEED alone turns the server side on too (one shared switch)', async () => {

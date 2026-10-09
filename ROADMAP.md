@@ -1,6 +1,13 @@
 # GRO.WTH Roadmap
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
+
+> 2026-10-09 (overnight, Mike asleep): PERCEPTION units 1–10 built behind PERCEPTION_FEED / PERCEPTION_REACH
+> (default OFF) — familiarity store + aspects + skill→domain relevance, organ condition, LLM reach/notice,
+> visible form, per-viewer feed (a Trailblazer reads their character's memory), hardening (no truth text on
+> changelog / history / encounter / SSE for Trailblazers; own doings in full; tooltip aspect values at
+> fidelity; push on memory write), unit 10 Watcher "view as character". NEXT: Mike's [QUESTION]s
+> (memory/perception-build-progress-2026-10-09.md), a live run with both flags on.
 
 > 2026-10-06..08 (orchestrator + worker sessions, ~75 commits on merge/fork-portrait-pipeline):
 > MOBILE — Tailscale HTTPS, touch pan/pinch/carry/undo, camera bounded to content, drawer height clamp.

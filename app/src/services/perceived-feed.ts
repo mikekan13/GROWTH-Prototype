@@ -17,6 +17,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { seesTruthRecord } from '@/lib/permissions';
+import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { perceptionFeedOn } from '@/lib/perception-feed';
 import { entityToken, GAP } from '@/lib/perceived-text';
 import { renderViewerFeed, characterDescription, VISIBLE_FORM_TUNING, type VisibleForm, type VisiblePiece, type VisibleRow, type VisibleEntity } from '@/services/visible-form';
@@ -39,6 +40,29 @@ export async function feedViewerFor(campaignId: string, user: { id: string; role
     select: { id: true },
   });
   return { mode: 'perceived', userId: user.id, characterId: ch?.id ?? null };
+}
+
+/** Own-line filter value for a viewed being with no player account (an NPC): matches no event. */
+const NO_ACCOUNT = '\u0000no-account';
+
+/**
+ * UNIT 10 — "view as character" (ruling Q6: the GM can switch their feed to any character's memory view).
+ * The feed exactly as `characterId`'s memory, through the same server path a Trailblazer reads. Only the
+ * campaign's Watcher or ADMIN may ask for another character's view (a Trailblazer may name only their own
+ * character, which is their default anyway). Flag off → the request is ignored (the viewer's normal feed).
+ */
+export async function viewAsViewer(campaignId: string, user: { id: string; role: string }, characterId: string): Promise<FeedViewer> {
+  if (!perceptionFeedOn()) return feedViewerFor(campaignId, user);
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (!seesTruthRecord(user.id, user.role, campaign)) {
+    const own = await feedViewerFor(campaignId, user);
+    if (own.mode === 'perceived' && own.characterId === characterId) return own;
+    throw new ForbiddenError("Only the campaign's Watcher can view the record as another character");
+  }
+  const ch = await prisma.character.findFirst({ where: { id: characterId, campaignId }, select: { id: true, userId: true, entityType: true } });
+  if (!ch) throw new NotFoundError('Character not found in this campaign');
+  return { mode: 'perceived', userId: ch.entityType === 'PLAYER_CHARACTER' && ch.userId ? ch.userId : NO_ACCOUNT, characterId: ch.id };
 }
 
 /**
