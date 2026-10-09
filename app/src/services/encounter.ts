@@ -39,6 +39,7 @@ import { advanceClockBySim, flushSimClock, getClock } from '@/services/time';
 import { ROUND_SECONDS } from '@/types/time';
 import { writeMemoryEntry } from '@/daya/memory';
 import { perceptionFeedOn } from '@/lib/perception-feed';
+import { labelFor, characterDescription, type EntityKind } from '@/services/visible-form';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { recordRoundCanon } from '@/services/canon';
 import { perceptionReachOn, judgeRoundReach, writeUnnoticed, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
@@ -208,13 +209,33 @@ export interface EncounterView {
 /** The being aspects the encounter view can show, in display order. */
 export const PARTICIPANT_ASPECTS = [...BEING_ASPECTS];
 
-/** One other participant → what the viewer knows of it (`fidelity`: aspect key → F-level, absent = unknown). Pure. */
-export function perceivedParticipant(p: Participant, fidelity: Record<string, number>): ParticipantSeen {
+/**
+ * One other participant → what the viewer knows of it (`fidelity`: aspect key → F-level, absent = unknown). Pure.
+ * Its NAME follows the feed's visible-form rule (`labelFor`, by the identity aspect): "a figure" / a short
+ * description / the real name only once known. `description` = what can be seen of it (sheet appearance).
+ */
+export function perceivedParticipant(
+  p: Participant,
+  fidelity: Record<string, number>,
+  seen: { kind?: EntityKind; description?: string | null } = {},
+): ParticipantSeen {
   const known = PARTICIPANT_ASPECTS.filter((k) => (fidelity[k] ?? 0) >= 1).map((k) => ({ aspectKind: k, fidelity: fidelity[k] }));
+  const name = labelFor({ id: p.id, kind: seen.kind ?? 'CHARACTER', name: p.name, description: seen.description ?? null }, fidelity.identity ?? 0, '');
   return {
-    id: p.id, name: p.name, side: p.side, control: p.control, downed: p.downed, perceived: true,
+    id: p.id, name, side: p.side, control: p.control, downed: p.downed, perceived: true,
     known: aspectFacts(known, { being: { attrs: p.attrs, pools: p.pools } }),
   };
+}
+
+/** What can be SEEN of each other participant (its sheet's appearance) + its entity kind — for the roster label. */
+async function participantLooks(ids: string[]): Promise<Map<string, { kind: EntityKind; description: string | null }>> {
+  const out = new Map<string, { kind: EntityKind; description: string | null }>();
+  if (!ids.length) return out;
+  const rows = await prisma.character.findMany({ where: { id: { in: ids } }, select: { id: true, data: true, entityType: true } });
+  for (const r of rows) {
+    out.set(r.id, { kind: r.entityType === 'NPC' ? 'NPC' : 'CHARACTER', description: characterDescription(parseSheet(r.data ?? '') as Parameters<typeof characterDescription>[0]) });
+  }
+  return out;
 }
 
 /** The viewer's characters' best familiarity with each other participant's being aspects (faded to now). */
@@ -225,7 +246,7 @@ async function participantFidelity(campaignId: string, viewerCharacterIds: strin
   if (!beings.length) return out;
   const [rows, nowCycle] = await Promise.all([
     prisma.familiarity.findMany({
-      where: { campaignId, perceiverId: { in: beings.map((b) => b.id) }, subjectId: { in: subjectIds }, aspectKind: { in: PARTICIPANT_ASPECTS } },
+      where: { campaignId, perceiverId: { in: beings.map((b) => b.id) }, subjectId: { in: subjectIds }, aspectKind: { in: [...PARTICIPANT_ASPECTS, 'identity'] } },
       select: { subjectId: true, aspectKind: true, score: true, lastCycle: true },
     }),
     currentCycleOf(campaignId),
@@ -280,8 +301,11 @@ async function viewFor(enc: { id: string; campaignId: string; name: string; stat
         viewers = own.map((c) => c.id);
       }
       const others = state.participants.filter((p) => !mine.has(p.id));
-      const fid = await participantFidelity(enc.campaignId, viewers, others.map((p) => p.id));
-      const participants = state.participants.map((p) => (mine.has(p.id) ? p : perceivedParticipant(p, fid.get(p.id) ?? {})));
+      const [fid, looks] = await Promise.all([
+        participantFidelity(enc.campaignId, viewers, others.map((p) => p.id)),
+        participantLooks(others.map((p) => p.id)),
+      ]);
+      const participants = state.participants.map((p) => (mine.has(p.id) ? p : perceivedParticipant(p, fid.get(p.id) ?? {}, looks.get(p.id))));
       return { id: enc.id, campaignId: enc.campaignId, name: enc.name, status: enc.status, round: enc.round, state: { ...state, participants } };
     }
   }

@@ -16,6 +16,7 @@ const w = vi.hoisted(() => ({
   changes: [] as Array<Record<string, unknown> & { characterId: string; createdAt: Date }>,
   history: [] as Array<{ id: string; campaignId: string; subjectType: string; subjectId: string; summary: string; visibility: string; timestampCycle: number; realTime: Date }>,
   encounterState: '',
+  ruthIdentity: null as number | null,
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn(async () => ({ user: currentUser })) }));
@@ -35,7 +36,10 @@ vi.mock('@/lib/db', () => {
       },
       findMany: async ({ where }: { where: { userId?: string; id?: { in: string[] } } }) => {
         if (where.userId) return (OWN[where.userId] ?? []).map((id) => ({ id }));
-        const all = Object.entries(OWN).flatMap(([u, ids]) => ids.map((id) => ({ id, userId: u })));
+        const all: Array<Record<string, unknown> & { id: string }> = [
+          ...Object.entries(OWN).flatMap(([u, ids]) => ids.map((id) => ({ id, userId: u, entityType: 'PLAYER_CHARACTER', data: '{}' }))),
+          { id: 'ruth', userId: 'gm', entityType: 'NPC', data: JSON.stringify({ _npc: { appearance: 'Tall woman in a grey coat. Scar.' } }) },
+        ];
         return all.filter((c) => !where.id || where.id.in.includes(c.id));
       },
     },
@@ -54,6 +58,7 @@ vi.mock('@/lib/db', () => {
       findMany: async ({ where }: { where: { perceiverId: { in: string[] }; subjectId: { in: string[] } } }) => [
         { perceiverId: 'ent-violet', subjectId: 'ruth', aspectKind: 'attribute:clout', score: 0.99, lastCycle: null },
         { perceiverId: 'ent-violet', subjectId: 'ruth', aspectKind: 'attribute:wit', score: 0.45, lastCycle: null },
+        ...(w.ruthIdentity === null ? [] : [{ perceiverId: 'ent-violet', subjectId: 'ruth', aspectKind: 'identity', score: w.ruthIdentity, lastCycle: null }]),
       ].filter((r) => where.perceiverId.in.includes(r.perceiverId) && where.subjectId.in.includes(r.subjectId)),
     },
     encounter: {
@@ -74,6 +79,7 @@ const change = (id: string, characterId: string, description: string, s: number)
 });
 
 beforeEach(() => {
+  w.ruthIdentity = null;
   w.changes = [change('ch1', 'violet', 'Violet: Clout 3 → 2', 1), change('ch2', 'danny', 'SECRET-DANNY Frequency 4 → 1', 2)];
   w.history = [
     { id: 'h1', campaignId: 'c1', subjectType: 'character', subjectId: 'violet', summary: 'Violet arrived at the alley', visibility: 'public', timestampCycle: 1, realTime: T(1) },
@@ -161,6 +167,33 @@ describe('PRIVACY beyond the feed (PERCEPTION_FEED on)', () => {
     ]);
     expect(JSON.stringify(ruth)).not.toContain('777');
     expect(JSON.stringify(ruth)).not.toContain('31'); // unknown Wisdom absent
+  });
+
+  it('encounter roster: another participant is named as the Trailblazer knows them — never the real name unless known', async () => {
+    as('p1', 'TRAILBLAZER');
+    const ruthSeen = async () => JSON.parse((await encounter()).raw).encounter.state.participants[1];
+    let ruth = await ruthSeen(); // no identity familiarity → F0
+    expect(ruth.name).toBe('a figure');
+    expect(JSON.stringify(ruth)).not.toContain('Ruth');
+    w.ruthIdentity = 0.45; // F2 → short description from what can be seen
+    ruth = await ruthSeen();
+    expect(ruth.name).toBe('a tall woman in a grey coat');
+    expect(JSON.stringify(ruth)).not.toContain('Ruth');
+    w.ruthIdentity = 0.99; // known → the name
+    expect((await ruthSeen()).name).toBe('Ruth');
+    // Own character keeps its own name.
+    expect(JSON.parse((await encounter()).raw).encounter.state.participants[0].name).toBe('Violet');
+  });
+
+  it('encounter roster: the Watcher and ADMIN see real names; flag OFF a Trailblazer does too (unchanged)', async () => {
+    for (const [id, role] of [['gm', 'WATCHER'], ['mike', 'ADMIN']]) {
+      as(id, role);
+      expect(JSON.parse((await encounter()).raw).encounter.state.participants[1].name).toBe('Ruth');
+    }
+    vi.stubEnv('PERCEPTION_FEED', '');
+    vi.stubEnv('NEXT_PUBLIC_PERCEPTION_FEED', '');
+    as('p1', 'TRAILBLAZER');
+    expect(JSON.parse((await encounter()).raw).encounter.state.participants[1].name).toBe('Ruth');
   });
 
   it('unit 10: changelog viewed as a character — Watcher gets that character\'s rows; a Trailblazer cannot ask for another\'s', async () => {
