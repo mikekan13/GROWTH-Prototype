@@ -162,6 +162,10 @@ export interface WriteMemoryParams {
   pillar?: string | null;
   /** The chain that backs the memory (Mike 09-23). Omit for an empty chain. */
   chain?: Partial<MemoryChain>;
+  /** Perception units 6+7: false = sensed-but-unnoticed (kept out of normal recall). Omit = the column default (true). */
+  noticed?: boolean;
+  /** Senses that carried it (sim/senses/reach.ts). Omit = the column default ([]). */
+  perceivedVia?: string[];
 }
 
 /**
@@ -200,6 +204,9 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
       clusterId: params.clusterId ?? null,
       parentMemoryId: params.parentMemoryId ?? null,
       truthRef: params.truthRef ?? null,
+      // Only when the reach pass set them — otherwise the row is written exactly as before (column defaults).
+      ...(params.noticed !== undefined ? { noticed: params.noticed } : {}),
+      ...(params.perceivedVia !== undefined ? { perceivedVia: JSON.stringify(params.perceivedVia) } : {}),
     },
   });
   // Event-driven dream trigger (2026-09-20): lived experience raises dream

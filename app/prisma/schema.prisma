@@ -1207,6 +1207,12 @@ model DayaMemoryEntry {
   domain         String?    // primary domain key (src/daya/domains.ts)
   domains        String     @default("[]") // JSON string[] — all matched domains (overlap is the rule)
   chain          String     @default("{}") // JSON<MemoryChain> — see src/daya/chain.ts
+  // Perception units 6+7 (Mike 2026-10-09, Q8): the world-sim's noticing verdict.
+  // false = SENSED-BUT-UNNOTICED: stored, kept out of normal recall surfacing,
+  // retrievable by an explicit look / recall (RecallRequest.includeUnnoticed).
+  // A thing that never reached the being has NO row at all.
+  noticed        Boolean    @default(true)
+  perceivedVia   String     @default("[]") // JSON string[] — senses that carried it (sight, hearing… a mind sense, 'self')
 
   @@index([entityId, narrativeCycle])
   @@index([entityId, salience])

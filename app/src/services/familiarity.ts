@@ -228,3 +228,41 @@ export async function recordExposure(input: RecordExposureInput): Promise<Famili
   });
   return toRecord(row);
 }
+
+/** The aspects a passive exposure touches — what the senses take in of a thing, never its stats (Mike Q1). */
+export const PASSIVE_ASPECTS = ['identity', 'appearance'] as const;
+/** Bound on one being's writes per pass (subjects × PASSIVE_ASPECTS). */
+export const EXPOSURE_BATCH_CAP = 48;
+
+export interface ExposureSubject { subjectId: string; subjectKind: SubjectKind; source: 'exposure' | 'own' }
+
+/**
+ * Perception units 6+7: one being's passive exposures for one pass (a round /
+ * a beat), in ONE transaction — every noticed subject's passive aspects grow
+ * once ('own' for its own items). Duplicates fold; the being itself is skipped
+ * (self-perception is seeded, not exposed). Returns the rows written.
+ */
+export async function recordExposureBatch(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: ExposureSubject[] }): Promise<number> {
+  const seen = new Map<string, ExposureSubject>();
+  for (const s of input.subjects) {
+    if (!s.subjectId || s.subjectId === input.perceiverCharacterId) continue;
+    const prior = seen.get(s.subjectId);
+    if (!prior || (s.source === 'own' && prior.source !== 'own')) seen.set(s.subjectId, s);
+  }
+  const writes = [...seen.values()].flatMap((s) => PASSIVE_ASPECTS.map((aspectKind) => ({ ...s, aspectKind }))).slice(0, EXPOSURE_BATCH_CAP);
+  if (!writes.length) return 0;
+  const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
+  await prisma.$transaction(async (tx) => {
+    for (const w of writes) {
+      const key = { perceiverId: input.perceiverId, subjectId: w.subjectId, aspectKind: w.aspectKind };
+      const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+      const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle) : 0, w.source);
+      await tx.familiarity.upsert({
+        where: { perceiverId_subjectId_aspectKind: key },
+        create: { ...key, campaignId: input.campaignId, subjectKind: w.subjectKind, score, lastSource: w.source, lastCycle },
+        update: { score, lastSource: w.source, subjectKind: w.subjectKind, lastCycle },
+      });
+    }
+  });
+  return writes.length;
+}

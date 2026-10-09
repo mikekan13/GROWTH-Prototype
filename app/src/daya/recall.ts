@@ -56,6 +56,16 @@ export interface RecallRequest {
   /** Ladder recall (Mike 09-23): the being's ACTIVE goals and its derived survival situation. */
   goals?: Array<{ id: string; description: string }>;
   situation?: { threatened: boolean; frequencyLow: boolean };
+  /**
+   * Perception units 6+7 (Mike Q8): true = an explicit look / recall — sensed-but-unnoticed memories
+   * (noticed=false) may surface too ("now that you think about it, there were blue books"). Default false.
+   */
+  includeUnnoticed?: boolean;
+}
+
+/** Drop sensed-but-unnoticed rows unless asked for. Rows without the column (pre-migration mocks) count as noticed. Pure. */
+export function visibleToRecall<T extends { noticed?: boolean | null }>(rows: T[], includeUnnoticed: boolean): T[] {
+  return includeUnnoticed ? rows : rows.filter((r) => r.noticed !== false);
 }
 
 export interface SurfacedMemory {
@@ -410,7 +420,8 @@ function mergeClassification(raw: string, patch: Record<string, unknown>): strin
 
 export async function recall(req: RecallRequest, overrides: DayaClientOverrides = {}): Promise<RecallResult> {
   const cueRefs = req.cueRefs ?? [];
-  const rows = await prisma.dayaMemoryEntry.findMany({ where: { entityId: req.entityId } });
+  // Sensed-but-unnoticed rows (perception units 6+7) stay out of normal surfacing; an explicit look/recall asks for them.
+  const rows = visibleToRecall(await prisma.dayaMemoryEntry.findMany({ where: { entityId: req.entityId } }), req.includeUnnoticed === true);
   const classificationById = new Map(rows.map((r) => [r.id, r.classification]));
 
   const parsed: ParsedMemory[] = rows.map((r) => ({

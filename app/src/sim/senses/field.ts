@@ -101,6 +101,23 @@ export interface SenseProfile {
   organs: SenseOrgan[];
   /** Per sense: the BEST organ's effectiveness (0 = the sense is gone). */
   effectiveness: Record<SenseKind, number>;
+  /**
+   * Senses that are not organs (perception units 6+7, Mike Q7 2026-10-09: "mind reading spell") — e.g. a
+   * spell or blossom that lets a being perceive THOUGHTS. Absent / empty = none (the default: no being reads
+   * minds by nature). Nothing on the sheet grants one yet; the caller adds it.
+   */
+  nonPhysical?: NonPhysicalSense[];
+}
+
+/** A non-organ sense. `reaches` names what it can carry that no organ can ('thought' = another being's thoughts). */
+export interface NonPhysicalSense {
+  /** Free name shown to the world-sim, e.g. 'mind reading'. */
+  name: string;
+  reaches: 'thought';
+  /** 0..1, like an organ's. */
+  effectiveness: number;
+  /** Where it comes from (spell / blossom / ability id or label). */
+  source: string | null;
 }
 
 function assumedOrgan(sense: SenseKind): SenseOrgan {
