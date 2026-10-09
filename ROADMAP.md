@@ -11,7 +11,10 @@ Last updated: 2026-10-09
 > minimal planning board → ordinary skilled/unskilled check → familiarity), unit 12 use teaches. All 12
 > perception units built. Then: introductions teach names (caught "I'm Ruth" / "this is Ruth" → identity
 > F3; a gapped name teaches nothing) + Watcher PUT familiarity ("they know each other"); party membership
-> seeds nothing (Mike: GM's story). NEXT: Mike's [QUESTION]s
+> seeds nothing (Mike: GM's story). Morning rulings A–E built: Wit = retention (fade scales with Wit),
+> sense grants from any source (mind sense from organs/items/abilities/traits), wrong impressions stored and
+> shown as received until fixed, inspection writes the inspector's feed line, known category by item tags.
+> Planning-board chip UI (U3 of TABLE-RHYTHM) ruled "yes" — not built yet. NEXT: Mike's [QUESTION]s
 > (memory/perception-build-progress-2026-10-09.md), a live run with both flags on.
 
 > 2026-10-06..08 (orchestrator + worker sessions, ~75 commits on merge/fork-portrait-pipeline):
