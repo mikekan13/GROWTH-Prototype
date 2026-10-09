@@ -8,7 +8,8 @@
  * salience (a bang, sudden movement) pops out for free.
  *
  * v0 filters by body only coarsely: an entity with no working eye/ear part is
- * told so. Everything else at the scene is in the field (theater-of-mind
+ * told so. Unit 5 (below) lists every sensing organ with its condition and
+ * gives each sense an effectiveness; the round engine still reads the flags. Everything else at the scene is in the field (theater-of-mind
  * encounter; no grid positions yet). The field is deliberately plain,
  * diegetic text — it is what the branch's planner reads and what gets
  * ledgered as the perception memory, so it must contain nothing the body
@@ -38,23 +39,118 @@ export interface FieldInput {
   body?: { canSee: boolean; canHear: boolean };
 }
 
-/** v0 sense flags from anatomy: an eye/ear part with condition > 0 means the sense works; no anatomy = human default.
+// ── Sensing organs (perception unit 5) ──────────────────────────────────────
+//
+// Mike 2026-10-09 (Q9): the world sim receives each organ with its condition +
+// properties; condition degrades the sense — "when something is broken its
+// effectiveness is halved in everything." Canon tiers
+// (03_ITEMS_CRAFTING/Equipment_Conditions.md): 4 Indestructible, 3 Undamaged,
+// 2 Worn, 1 Broken (halved), 0 Destroyed. Body parts are items with a
+// condition (body-parts-are-items ruling), so an organ is just a part whose
+// name says what it senses.
+
+export type SenseKind = 'sight' | 'hearing' | 'smell' | 'taste' | 'touch';
+export const SENSE_KINDS: readonly SenseKind[] = ['sight', 'hearing', 'smell', 'taste', 'touch'];
+
+/** Part name → the sense it carries. Word-bounded: "Heart" must not read as an ear. */
+const ORGAN_PATTERNS: Record<SenseKind, RegExp> = {
+  sight: /\beyes?\b/,
+  hearing: /\bears?\b/,
+  smell: /\b(nose|nostrils?)\b/,
+  taste: /\btongue\b/,
+  touch: /\bskin\b/,
+};
+
+/** The organ a default human has for each sense (used when anatomy does not model one). */
+const DEFAULT_HUMAN_ORGAN: Record<SenseKind, string> = { sight: 'Eyes', hearing: 'Ears', smell: 'Nose', taste: 'Tongue', touch: 'Skin' };
+
+const CONDITION_LABEL: Record<number, string> = { 4: 'Indestructible', 3: 'Undamaged', 2: 'Worn', 1: 'Broken', 0: 'Destroyed' };
+
+/**
+ * Canon condition → how effective the organ is. Destroyed 0, Broken halved,
+ * Worn/Undamaged/Indestructible full (Equipment_Conditions.md gives Worn only
+ * "minor penalties to precision tasks" — no number, so none is invented here).
+ */
+export function conditionEffectiveness(condition: number): number {
+  if (condition <= 0) return 0;
+  if (condition < 2) return 0.5;
+  return 1;
+}
+
+/** One sensing organ, serialisable — what unit 6 hands the world-sim LLM. */
+export interface SenseOrgan {
+  sense: SenseKind;
+  /** The part's name as on the sheet ('Left Eye'), or the default human organ ('Eyes'). */
+  partName: string;
+  /** partName segments from the anatomy root, joined by '/' ('Body/Head/Left Eye'); null for an assumed organ. */
+  path: string | null;
+  condition: number;
+  conditionLabel: string;
+  /** The part's item properties (Sharp, Brittle… or sense-specific ones a GM writes, e.g. 'Low-light'). */
+  properties: string[];
+  primaryMaterial: string | null;
+  effectiveness: number;
+  /** true = not modelled on the sheet; a default human organ, Undamaged. */
+  assumed: boolean;
+}
+
+/** Every sense a being has, from its organs. JSON-safe. */
+export interface SenseProfile {
+  /** false = the sheet has no anatomy; every organ is the default human one. */
+  anatomyModelled: boolean;
+  organs: SenseOrgan[];
+  /** Per sense: the BEST organ's effectiveness (0 = the sense is gone). */
+  effectiveness: Record<SenseKind, number>;
+}
+
+function assumedOrgan(sense: SenseKind): SenseOrgan {
+  return { sense, partName: DEFAULT_HUMAN_ORGAN[sense], path: null, condition: 3, conditionLabel: 'Undamaged', properties: [], primaryMaterial: null, effectiveness: 1, assumed: true };
+}
+
+/**
+ * The being's sensing organs and per-sense effectiveness from its sheet.
+ * No anatomy → a default human (every sense at 1). Anatomy that models no organ
+ * for a sense → that sense is the default human one (as v0 did for eyes/ears:
+ * a head with no eye parts still sees). Several organs for one sense → the best
+ * one counts (one good eye sees). Pure.
+ */
+export function senseProfileFromSheet(sheet: { bodyAnatomy?: unknown } | null | undefined): SenseProfile {
+  type Part = { partName?: string; condition?: number; properties?: unknown; primaryMaterial?: string; contains?: Part[] };
+  const root = sheet?.bodyAnatomy as Part | undefined;
+  const organs: SenseOrgan[] = [];
+  if (root && typeof root === 'object') {
+    const walk = (n: Part, parentPath: string[]) => {
+      const partName = n.partName ?? '';
+      const path = [...parentPath, partName];
+      const name = partName.toLowerCase();
+      for (const sense of SENSE_KINDS) {
+        if (!ORGAN_PATTERNS[sense].test(name)) continue;
+        const condition = typeof n.condition === 'number' ? n.condition : 3;
+        organs.push({
+          sense, partName, path: path.join('/'), condition,
+          conditionLabel: CONDITION_LABEL[condition] ?? 'Unknown',
+          properties: Array.isArray(n.properties) ? n.properties.filter((p): p is string => typeof p === 'string') : [],
+          primaryMaterial: n.primaryMaterial ?? null,
+          effectiveness: conditionEffectiveness(condition),
+          assumed: false,
+        });
+      }
+      for (const c of n.contains ?? []) walk(c, path);
+    };
+    walk(root, []);
+  }
+  for (const sense of SENSE_KINDS) if (!organs.some((o) => o.sense === sense)) organs.push(assumedOrgan(sense));
+  const effectiveness = Object.fromEntries(
+    SENSE_KINDS.map((s) => [s, Math.max(...organs.filter((o) => o.sense === s).map((o) => o.effectiveness))]),
+  ) as Record<SenseKind, number>;
+  return { anatomyModelled: !!root && typeof root === 'object', organs, effectiveness };
+}
+
+/** v0 sense flags, now derived from organ effectiveness (> 0 = the sense works); no anatomy = human default.
  *  Shared by the round engine and the perception composer (daya/perceive.ts). */
 export function senseFlagsFromSheet(sheet: { bodyAnatomy?: unknown } | null | undefined): { canSee: boolean; canHear: boolean } {
-  type Part = { partName?: string; condition?: number; contains?: Part[] };
-  const root = sheet?.bodyAnatomy as Part | undefined;
-  if (!root) return { canSee: true, canHear: true };
-  const found = { eye: false, ear: false, anyEye: false, anyEar: false };
-  const walk = (n: Part) => {
-    const name = (n.partName ?? '').toLowerCase();
-    const ok = (n.condition ?? 3) > 0;
-    // Word-bounded: "Heart" must not read as an ear.
-    if (/\beyes?\b/.test(name)) { found.anyEye = true; if (ok) found.eye = true; }
-    if (/\bears?\b/.test(name)) { found.anyEar = true; if (ok) found.ear = true; }
-    for (const c of n.contains ?? []) walk(c);
-  };
-  walk(root);
-  return { canSee: found.anyEye ? found.eye : true, canHear: found.anyEar ? found.ear : true };
+  const { effectiveness } = senseProfileFromSheet(sheet);
+  return { canSee: effectiveness.sight > 0, canHear: effectiveness.hearing > 0 };
 }
 
 export function buildSensoryField(input: FieldInput): SensoryField {

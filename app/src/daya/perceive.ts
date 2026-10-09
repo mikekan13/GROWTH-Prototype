@@ -26,11 +26,9 @@ import { render, type Observer } from './renderer';
 import { computeSceneContent, computeFidelityLevel, rngFor } from './renderer-math';
 import type { SceneLine, SceneTruth, BiasProfile, VoiceParams } from './renderer-math';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
-import { senseFlagsFromSheet } from '@/sim/senses/field';
+import { senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
 import type { DayaClientOverrides } from './model-client';
 import type { GrowthLocation } from '@/types/location';
-import { familiarityAt } from '@/services/familiarity';
-import { currentCycleOf } from '@/services/history';
 
 export interface PerceiveResult {
   /** What the being actually perceived — the stimulus content to ingest. */
@@ -65,32 +63,14 @@ export interface PerceiveOptions {
   voice?: boolean;
 }
 
-/** Perceptual attunement to one's own surroundings. Flat for now — [QUESTION for Mike]: which attribute governs it (Focus? Wisdom?). The FALLBACK when the being has no stored familiarity of the place (perception unit 4). */
-export const SCENE_ATTUNEMENT = 0.8;
-
-/** The place's aspects (sim/perception/aspects) whose familiarity sets how clearly a being takes the scene in. */
-export const SCENE_ASPECTS = ['appearance', 'identity'] as const;
-
 /**
- * The scene attunement from a being's stored familiarity of the place: the
- * best-known scene aspect, faded to `nowCycle`; no rows → SCENE_ATTUNEMENT
- * (unchanged behaviour for unseeded pairs). Pure.
+ * The base clarity with which a being takes in its surroundings. Flat — [QUESTION for Mike]: which attribute
+ * governs it (Focus? Wisdom?). Perception unit 5 (orchestrator D1, 2026-10-09): familiarity does NOT set this
+ * — it governs how much a being KNOWS about a thing's aspects, not how clearly its senses take in a room
+ * (reality default: you see a new room fine). Scene clarity comes from the senses: each line is dimmed by the
+ * effectiveness of the sense that carries it (organ condition, sim/senses/field.ts).
  */
-export function sceneAttunementFrom(rows: Array<{ score: number; lastCycle: number | null }>, nowCycle: number): number {
-  if (rows.length === 0) return SCENE_ATTUNEMENT;
-  return Math.max(...rows.map((r) => familiarityAt(r, nowCycle)));
-}
-
-/** Stored familiarity of the place → attunement; null when there is none (or the store cannot be read — the mirror never fails on it). */
-async function storedSceneAttunement(entityId: string, locationId: string, campaignId: string): Promise<number | null> {
-  try {
-    const rows = await prisma.familiarity.findMany({ where: { perceiverId: entityId, subjectId: locationId, aspectKind: { in: [...SCENE_ASPECTS] } }, select: { score: true, lastCycle: true } });
-    if (rows.length === 0) return null;
-    return sceneAttunementFrom(rows, await currentCycleOf(campaignId));
-  } catch {
-    return null;
-  }
-}
+export const SCENE_ATTUNEMENT = 0.8;
 
 const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'on', 'at', 'to', 'fourth', 'floor', 'walkup', 'room', 'street', 'branch']);
 
@@ -118,11 +98,45 @@ export interface SceneInput {
   items: string[];
   facts: WorldFactRecord[];
   parentFacts: WorldFactRecord[];
-  senses: { canSee: boolean; canHear: boolean };
+  senses: { canSee: boolean; canHear: boolean; effectiveness?: Partial<Record<SenseKind, number>> };
+}
+
+/**
+ * Which sense carries a scene line (perception unit 5). Lines carry no modality
+ * of their own, so it is inferred from their kind: speech → hearing; the place,
+ * its features, standing facts and things lying around → sight (they are only
+ * composed when the being can see); a person present → sight OR hearing, the
+ * better of the two (you can tell someone is there by either). 'sense' lines
+ * (the "you cannot see" notes) and the headline (the GM's narration) carry none
+ * and are not dimmed.
+ */
+export function lineModality(kind: SceneLine['kind']): SenseKind[] {
+  switch (kind) {
+    case 'speech': return ['hearing'];
+    case 'present': return ['sight', 'hearing'];
+    case 'place': case 'fact': case 'item': return ['sight'];
+    default: return [];
+  }
+}
+
+/** Tag each line with the clarity of its sense when that sense is impaired (< 1). Intact lines are left untouched. Pure. */
+export function dimBySenses(lines: SceneLine[], effectiveness: Partial<Record<SenseKind, number>> | undefined): SceneLine[] {
+  if (!effectiveness) return lines;
+  return lines.map((l) => {
+    const senses = lineModality(l.kind);
+    if (!senses.length) return l;
+    const clarity = Math.max(...senses.map((s) => effectiveness[s] ?? 1));
+    return clarity < 1 ? { ...l, clarity } : l;
+  });
 }
 
 /** Deterministic composition of the truth the being is standing in. Pure. */
 export function composeSceneLines(input: SceneInput): SceneTruth {
+  const truth = composeUndimmed(input);
+  return { headline: truth.headline, lines: dimBySenses(truth.lines, input.senses.effectiveness) };
+}
+
+function composeUndimmed(input: SceneInput): SceneTruth {
   const lines: SceneLine[] = [];
   const { canSee, canHear } = input.senses;
   if (!canSee && !canHear) lines.push({ text: 'You cannot see or hear. You feel the ground and the air.', salience: 1, kind: 'sense' });
@@ -244,7 +258,8 @@ export async function composeSceneTruth(
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
   let sheet: { bodyAnatomy?: unknown } | null = null;
   try { sheet = character ? (JSON.parse(character.data) as { bodyAnatomy?: unknown }) : null; } catch { sheet = null; }
-  const senses = senseFlagsFromSheet(sheet);
+  const profile = senseProfileFromSheet(sheet);
+  const senses = { canSee: profile.effectiveness.sight > 0, canHear: profile.effectiveness.hearing > 0, effectiveness: profile.effectiveness };
 
   const locationId = await locationOf(characterId);
   let place: SceneInput['place'] = null;
@@ -309,13 +324,12 @@ export function sceneRoll(input: { placed: boolean; present: string[]; items: st
   };
 }
 
-async function observerFor(characterId: string): Promise<{ observer: Observer; godlike: boolean; entityId: string | null }> {
+async function observerFor(characterId: string): Promise<{ observer: Observer; godlike: boolean }> {
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true, personaProfile: true, affect: { select: { morale: true, stress: true, grief: true } } } });
   let persona: { bias?: BiasProfile; voice?: VoiceParams; godlike?: boolean; omniscient?: boolean } = {};
   try { persona = entity ? JSON.parse(entity.personaProfile) : {}; } catch { persona = {}; }
   const mood = entity?.affect ? { morale: entity.affect.morale, stress: entity.affect.stress, grief: entity.affect.grief } : { morale: 0, stress: 0, grief: 0 };
   return {
-    entityId: entity?.id ?? null,
     godlike: persona.godlike === true || persona.omniscient === true,
     observer: { entityId: characterId, attunement: SCENE_ATTUNEMENT, biasProfile: persona.bias ?? {}, mood, voice: persona.voice ?? {} },
   };
@@ -344,18 +358,12 @@ export async function perceive(
   const narrowed = opts.standing === 'once' ? narrowToNew(whole, takenIn.get(characterId), locationId, Date.now(), roll) : null;
   const truth = narrowed?.truth ?? (opts.standing === 'stimulus' ? stimulusOnly(whole) : whole);
   const standing = narrowed?.standing ?? (opts.standing === 'stimulus' ? 'new' : 'full');
-  const { observer: current, godlike, entityId } = await observerFor(characterId);
-  // Unit 4: the being's stored familiarity of the place replaces the flat SCENE_ATTUNEMENT when it has any.
-  // Godlike beings bypass the mirror below (Terminal tier = F5); a caller-given attunement (canon re-render) wins.
-  if (!godlike && opts.observer?.attunement == null && entityId && locationId) {
-    const stored = await storedSceneAttunement(entityId, locationId, campaignId);
-    if (stored != null) current.attunement = stored;
-  }
-  // TODO(perception unit 4/8): record exposure here — the place, the people present and the things lying
+  const { observer: current, godlike } = await observerFor(characterId);
+  // Scene clarity = SCENE_ATTUNEMENT dimmed per line by the senses (composeSceneLines); familiarity of the
+  // place does not set it (D1, unit 5) — familiarity will name entities/aspects (later units).
+  // TODO(perception unit 8): record exposure here — the place, the people present and the things lying
   // around (source 'exposure'; 'own' for held items) with seedOnFirstContact (services/familiarity-seed) first.
-  // NOT wired: it is N writes per stimulus per being in the listening loop (SQLite contention), and a fresh
-  // exposure row for the PLACE (0.01 → F0) would replace the 0.8 fallback and blank the scene. Needs a seed
-  // policy for places [QUESTION] and batching before it goes in.
+  // NOT wired: it is N writes per stimulus per being in the listening loop (SQLite contention); needs batching.
   const observer: Observer = { ...current, ...(opts.observer?.mood ? { mood: opts.observer.mood } : {}), ...(opts.observer?.attunement != null ? { attunement: opts.observer.attunement } : {}) };
   const snapshot = { mood: observer.mood, attunement: observer.attunement };
   const subjectKey = `scene:${locationId ?? 'nowhere'}`;

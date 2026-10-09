@@ -31,6 +31,9 @@ export interface SceneLine {
   /** 0..1 — how much this would draw notice; low lines are the first to blur. */
   salience: number;
   kind: 'place' | 'present' | 'item' | 'fact' | 'speech' | 'sense';
+  /** 0..1 — how well the sense that carries this line works (organ condition, perception unit 5).
+   *  Absent = 1. The line is judged at floor(level × clarity) instead of the scene's level. */
+  clarity?: number;
 }
 export interface SceneTruth {
   headline: string | null;
@@ -123,6 +126,16 @@ export function computeSceneContent(
   if (req.trueData.headline) kept.push(req.trueData.headline.trim());
   let dropped = 0;
   for (const line of req.trueData.lines) {
+    if (line.clarity != null && line.clarity < 1) {
+      // A dimmed sense: the line is taken in at a lower fidelity level (Broken eye at F4 → F2; Destroyed → F0, gone).
+      const lineLevel = Math.floor(level * Math.max(0, line.clarity));
+      const lineFloor = lineLevel <= 0 ? Infinity : SCENE_SALIENCE_FLOOR[Math.min(5, lineLevel)] ?? 0;
+      const lineMurk = Math.max(0, 5 - lineLevel) * 0.1;
+      const survives = line.salience >= lineFloor && (line.salience >= 0.9 || rng() >= lineMurk);
+      if (survives) kept.push(line.text.trim());
+      else dropped++;
+      continue;
+    }
     const survives = line.salience >= floor && (line.salience >= 0.9 || rng() >= murk);
     if (survives) kept.push(line.text.trim());
     else dropped++;

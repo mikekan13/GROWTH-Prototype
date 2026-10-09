@@ -1,7 +1,7 @@
 /**
- * perceive() × the familiarity store (perception unit 4). The first block pins
- * the as-built behaviour (flat SCENE_ATTUNEMENT 0.8 → F4) for a being with no
- * stored familiarity of the place — written BEFORE the store was wired in.
+ * perceive() × the familiarity store. The first block pins the base behaviour
+ * (flat SCENE_ATTUNEMENT 0.8 → F4); unit 5 (D1) pins that stored familiarity
+ * of the place no longer changes it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -35,7 +35,7 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('./world-ledger', () => ({ currentFacts: async () => [] }));
 
-import { perceive, forgetScene, SCENE_ATTUNEMENT, sceneAttunementFrom } from './perceive';
+import { perceive, forgetScene, SCENE_ATTUNEMENT } from './perceive';
 
 beforeEach(() => {
   db.familiarityRows = [];
@@ -74,36 +74,29 @@ describe('fallback — no stored familiarity of the place (as-built behaviour, p
   });
 });
 
-describe('the mirror reads the store when a row exists', () => {
-  it('uses the stored familiarity of the place instead of the flat 0.8', async () => {
-    db.familiarityRows = [{ score: 0.45, lastCycle: null }];
+// Unit 5 / orchestrator D1 (2026-10-09): unit 4 let stored familiarity of the place set scene clarity.
+// Reverted — familiarity governs what a being KNOWS of a thing's aspects, not how clearly its senses take in
+// a room (reality default: you see a new room fine). Scene clarity = 0.8 base, dimmed by the senses.
+describe('familiarity of the place does NOT set scene clarity (D1)', () => {
+  it('a low stored familiarity leaves the scene at 0.8 → F4', async () => {
+    db.familiarityRows = [{ score: 0.05, lastCycle: null }];
     const r = await look();
-    expect(r.observer.attunement).toBe(0.45);
-    expect(r.fidelityLevel).toBe(2);
+    expect(r.observer.attunement).toBe(SCENE_ATTUNEMENT);
+    expect(r.fidelityLevel).toBe(4);
   });
 
-  it('takes the best-known scene aspect, faded to the campaign clock', async () => {
-    db.currentCycle = 50;
-    db.familiarityRows = [{ score: 0.3, lastCycle: null }, { score: 0.96, lastCycle: 0 }];
+  it('a sealed F5 familiarity does not lift the scene to F5 either', async () => {
+    db.familiarityRows = [{ score: 0.99, lastCycle: 0 }];
     const r = await look();
-    expect(r.observer.attunement).toBe(0.96); // sealed F5 does not fade
-    expect(r.fidelityLevel).toBe(5);
+    expect(r.observer.attunement).toBe(SCENE_ATTUNEMENT);
+    expect(r.fidelityLevel).toBe(4);
   });
 
-  it('a caller-given attunement skips the store; godlike never consults it', async () => {
+  it('the mirror does not read the familiarity store at all', async () => {
     db.familiarityRows = [{ score: 0.1, lastCycle: null }];
-    await perceive('violet', 'c1', 'x', 'perception', {}, { voice: false, observer: { attunement: 0.8 } });
-    expect(db.familiarityQueries).toBe(0);
+    await look();
     db.persona = JSON.stringify({ godlike: true });
     await look();
     expect(db.familiarityQueries).toBe(0);
-  });
-});
-
-describe('sceneAttunementFrom (pure)', () => {
-  it('no rows → the flat fallback; rows → the max faded score', () => {
-    expect(sceneAttunementFrom([], 0)).toBe(SCENE_ATTUNEMENT);
-    expect(sceneAttunementFrom([{ score: 0.2, lastCycle: null }, { score: 0.6, lastCycle: null }], 0)).toBe(0.6);
-    expect(sceneAttunementFrom([{ score: 0.6, lastCycle: 0 }], 100)).toBeLessThan(0.6);
   });
 });
