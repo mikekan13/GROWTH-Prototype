@@ -42,6 +42,7 @@ import { getCampaignEconomy } from '@/services/krma/wallet';
 import { bridgeContinuity, type BridgeResult } from '@/services/bridge';
 import { placeNewLocation, snapCharacterToLocation } from '@/services/canvas-placement';
 import type { ParsedProse } from '@/services/table-prose';
+import { clearVisibleFormCache } from '@/services/visible-form';
 import {
   IMPROV_TUNING,
   baseKrmaFor,
@@ -459,6 +460,8 @@ export async function correctCanon(
       rerendered++;
     } catch (err) { console.warn('[reconciliation] re-render failed for memory', m.id, err); }
   }
+  // Perception unit 8: every feed line resting on the corrected row re-renders from the new truth on its next read.
+  try { await clearVisibleFormCache(rows.map((m) => m.id)); } catch (err) { console.warn('[reconciliation] visible-form cache clear failed', err); }
   const reach = { memories: rows.length, rerendered, vines: load.vines, laterEvents: load.laterEvents, entities: load.entities };
   const rev = await prisma.canonRevision.create({
     data: { campaignId, canonEventId: event.id, previous: JSON.stringify({ narration: event.narration, detail: event.detail }), narration, reason: input.reason ?? '', reach: JSON.stringify(reach), authoredBy: actor.userId },

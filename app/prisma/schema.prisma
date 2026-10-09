@@ -1213,6 +1213,10 @@ model DayaMemoryEntry {
   // A thing that never reached the being has NO row at all.
   noticed        Boolean    @default(true)
   perceivedVia   String     @default("[]") // JSON string[] — senses that carried it (sight, hearing… a mind sense, 'self')
+  // Perception unit 8: cache of this row's VISIBLE FORM — the perceived feed line
+  // (services/visible-form). JSON {sig, form}; sig = hash of every input, so a
+  // changed input re-renders. A canon correction clears it. null = not rendered.
+  visibleForm    String?
 
   @@index([entityId, narrativeCycle])
   @@index([entityId, salience])
