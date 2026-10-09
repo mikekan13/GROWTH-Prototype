@@ -46,22 +46,21 @@ export async function POST(
     const body = await request.json();
     const input = WagerSchema.parse(body);
 
-    // Look up and remove the pending check
-    const pending = removePendingCheck(input.checkId);
-    if (!pending) {
+    // Look up the pending check (in this campaign) WITHOUT removing it, so a rejected wager leaves it intact
+    // (security 2026-10-09: the 403 path used to consume the check).
+    const found = getPendingCheck(input.checkId);
+    if (!found || found.campaignId !== campaignId) {
       return NextResponse.json({ error: 'Check not found or already resolved' }, { status: 404 });
     }
 
     // Verify the submitting user owns this check
-    if (session.user.id !== pending.targetUserId) {
-      // Re-store it since we removed it
+    if (session.user.id !== found.targetUserId) {
       return NextResponse.json({ error: 'Not your check to wager on' }, { status: 403 });
     }
 
-    // Validate wagers against available governors
-    const totalEffort = input.wagers.reduce((sum, w) => sum + w.amount, 0);
+    // Validate wagers against available governors (before claiming, so a bad wager can be retried)
     for (const wager of input.wagers) {
-      const gov = pending.availableGovernors.find(g => g.name === wager.governor);
+      const gov = found.availableGovernors.find(g => g.name === wager.governor);
       if (!gov) {
         return NextResponse.json({ error: `Invalid governor: ${wager.governor}` }, { status: 400 });
       }
@@ -71,6 +70,14 @@ export async function POST(
         }, { status: 400 });
       }
     }
+
+    // Claim it — only now is the check consumed (a concurrent resolve wins the race → 404)
+    const pending = removePendingCheck(input.checkId);
+    if (!pending) {
+      return NextResponse.json({ error: 'Check not found or already resolved' }, { status: 404 });
+    }
+
+    const totalEffort = input.wagers.reduce((sum, w) => sum + w.amount, 0);
 
     // Roll the Fate Die (SD was already rolled on initiate)
     const fdSides = parseDie(pending.fateDie);

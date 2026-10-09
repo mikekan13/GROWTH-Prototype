@@ -76,8 +76,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 |--------|------|---------|
 | Auth | `lib/auth.ts` | Password hashing, session management, cookie handling, typed auth/forbidden errors |
 | Database | `lib/db.ts` | Prisma client singleton with LibSQL adapter |
-| Permissions | `lib/permissions.ts` | Reusable role/ownership checks; `canViewCampaign` (GM / member / ADMIN read access, 2026-10-08), `canSeeCopilotRow` (JEWL history private per user) |
-| CampaignAccess | `services/campaign-access.ts` | `requireCampaignMember(campaignId, user)` — 404 unknown campaign, 403 non-member; gates GET events / changelog / sessions / copilot history (2026-10-08); `requireCampaignGM(campaignId, user)` — campaign GM or ADMIN/GODHEAD only (403 otherwise); gates POST sessions start/end |
+| Permissions | `lib/permissions.ts` | Reusable role/ownership checks; `canViewCampaign` (GM / member / ADMIN read access, 2026-10-08), `canPostAsCharacter` (GM/ADMIN any character; others only their own here, 2026-10-09), `canSeeCopilotRow` (JEWL history private per user) |
+| CampaignAccess | `services/campaign-access.ts` | `requireCampaignMember(campaignId, user)` — 404 unknown campaign, 403 non-member; gates GET events / changelog / sessions / copilot history (2026-10-08); `requireCampaignGM(campaignId, user)` — campaign GM or ADMIN/GODHEAD only (403 otherwise); gates POST sessions start/end and POST skill-check (2026-10-09); `requireEventPoster(campaignId, user, characterId?, characterName?)` — member gate for POST events: GM/ADMIN → actor 'gm', any character; others → actor 'player', own character only (name from the record), 403 otherwise |
 | Errors | `lib/errors.ts` | Typed error classes (AppError, ValidationError, etc.) |
 | API Utils | `lib/api.ts` | Error-to-HTTP-response conversion |
 | Defaults | `lib/defaults.ts` | Default GrowthCharacter factory |
@@ -344,10 +344,10 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/access-codes/redeem | POST | AccessCodeService |
 | /api/changelog | GET | ChangeLogService (query with filters: campaignId, characterId, actor, category, pagination); campaign members only (2026-10-08) |
 | /api/changelog/[id]/revert | POST | ChangeLogService (revert entry with conflict detection) |
-| /api/campaigns/[id]/events | GET, POST | CampaignEventService (create + query campaign events with type/session filters). POST now broadcasts via SSE. GET with PERCEPTION_FEED on + a non-Watcher member → `queryPerceivedFeed` (their character's perceived feed, server-filtered; unit 9); `?viewAs=<characterId>` = that character's view, Watcher/ADMIN only (unit 10) |
+| /api/campaigns/[id]/events | GET, POST | CampaignEventService (create + query campaign events with type/session filters). POST now broadcasts via SSE; POST is members-only — campaign GM/ADMIN post as 'gm' for any character, anyone else as 'player' for their own character only (`requireEventPoster`, 2026-10-09). GET with PERCEPTION_FEED on + a non-Watcher member → `queryPerceivedFeed` (their character's perceived feed, server-filtered; unit 9); `?viewAs=<characterId>` = that character's view, Watcher/ADMIN only (unit 10) |
 | /api/campaigns/[id]/stream | GET (SSE) | Campaign real-time stream. SSE endpoint for live events (dice, checks, state changes, chat, connections) |
-| /api/campaigns/[id]/skill-check | POST | Initiate multi-step skill check. Rolls SD, stores pending check, broadcasts wager prompt to player via SSE. Thin wrapper over `services/skill-check.initiateSkillCheck`; a GM's call also commits the planning board (inspect intents) |
-| /api/campaigns/[id]/skill-check/wager | POST | Submit effort wager for pending check. Rolls FD, computes result, deducts effort, broadcasts result; then `afterCheckResolved` (purpose, e.g. inspection) |
+| /api/campaigns/[id]/skill-check | POST | Campaign GM/ADMIN only (`requireCampaignGM`, 2026-10-09). Initiate multi-step skill check. Rolls SD, stores pending check, broadcasts wager prompt to player via SSE. Thin wrapper over `services/skill-check.initiateSkillCheck`; a GM's call also commits the planning board (inspect intents) |
+| /api/campaigns/[id]/skill-check/wager | POST | Submit effort wager for pending check. Owner + same campaign + valid governors checked BEFORE the check is claimed — a rejected wager (403/404/400) leaves it pending (2026-10-09). Rolls FD, computes result, deducts effort, broadcasts result; then `afterCheckResolved` (purpose, e.g. inspection) |
 | /api/campaigns/[id]/rest | POST | Rest system (short/long rest for selected characters, GM-only, creates changelog + game event) |
 | /api/campaigns/[id]/sessions | GET, POST | CampaignEventService (list sessions, start/end session) |
 | /api/campaigns/[id]/forge | GET, POST | ForgeService (list + create forge items, GM-only create, players see published only) |

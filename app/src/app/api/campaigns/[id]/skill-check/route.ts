@@ -19,6 +19,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { initiateSkillCheck, initiateSkillCheckSchema } from '@/services/skill-check';
 import { commitPlanningBoardOnGmMove } from '@/services/inspection';
+import { requireCampaignGM } from '@/services/campaign-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,10 @@ export async function POST(
   try {
     const session = await requireAuth();
     const { id: campaignId } = await params;
+    // Security (2026-10-09): calling a check is the GM's move — only this campaign's GM (or ADMIN). Every
+    // client caller is GM-side (canvas onSkillCheck isGM; terminal /skillcheck); a Trailblazer's own
+    // inspection reaches initiateSkillCheck through the GM's planning-board commit, not this route.
+    await requireCampaignGM(campaignId, session.user);
     const body = await request.json();
     const input = initiateSkillCheckSchema.parse(body);
     const result = await initiateSkillCheck(campaignId, { id: session.user.id, username: session.user.username }, input);

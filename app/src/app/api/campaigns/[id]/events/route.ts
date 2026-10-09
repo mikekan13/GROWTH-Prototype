@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
-import { requireCampaignMember } from '@/services/campaign-access';
+import { requireCampaignMember, requireEventPoster } from '@/services/campaign-access';
 import { feedViewerFor, queryPerceivedFeed, viewAsViewer } from '@/services/perceived-feed';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { postInspectFromChat } from '@/services/inspection';
@@ -61,7 +61,7 @@ export async function POST(
     const { id: campaignId } = await params;
     const body = await request.json();
 
-    const { type, characterId, characterName, payload } = body as {
+    const { type, characterId: askedCharacterId, characterName: askedCharacterName, payload } = body as {
       type: TerminalEventType;
       characterId?: string;
       characterName?: string;
@@ -72,7 +72,11 @@ export async function POST(
       return NextResponse.json({ error: 'type and payload are required' }, { status: 400 });
     }
 
-    const actor: TerminalActor = session.user.role === 'WATCHER' || session.user.role === 'GODHEAD' || session.user.role === 'ADMIN' ? 'gm' : 'player';
+    // Security (2026-10-09): members only; the campaign's GM/ADMIN posts for anyone, everyone else only for
+    // their own character (name from the record, not the request).
+    const poster = await requireEventPoster(campaignId, session.user, askedCharacterId, askedCharacterName);
+    const { characterId, characterName } = poster;
+    const actor: TerminalActor = poster.isGM ? 'gm' : 'player';
 
     const event = await createCampaignEvent({
       campaignId,

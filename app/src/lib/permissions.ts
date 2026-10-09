@@ -20,6 +20,21 @@ export function canManageCampaign(userId: string, userRole: string, campaign: { 
 }
 
 /**
+ * Posting a table line as/for a character (2026-10-09): the campaign's GM (or
+ * ADMIN/GODHEAD) may post for any character; anyone else only for their own
+ * character in this campaign.
+ */
+export function canPostAsCharacter(
+  userId: string,
+  userRole: string,
+  campaign: { id: string; gmUserId: string },
+  character: { userId: string | null; campaignId: string | null },
+): boolean {
+  if (canManageCampaign(userId, userRole, campaign)) return true;
+  return character.userId === userId && character.campaignId === campaign.id;
+}
+
+/**
  * Campaign read access (Mike 2026-10-08): the campaign's GM/Watcher, its
  * members (Trailblazers), and ADMIN. Nobody else reads a campaign's feed,
  * changelog or sessions. `isMember` = a CampaignMember row exists.

@@ -8,7 +8,33 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ForbiddenError } from '@/lib/errors';
-import { canViewCampaign, canManageCampaign } from '@/lib/permissions';
+import { canViewCampaign, canManageCampaign, canPostAsCharacter } from '@/lib/permissions';
+
+/**
+ * Table-line posting gate (2026-10-09, POST /events). Only a campaign member
+ * (GM, member, ADMIN) may post. The campaign's GM/ADMIN posts as 'gm' for any
+ * character (unchanged). Anyone else posts as 'player', and only for their OWN
+ * character in this campaign — the character name is taken from the record,
+ * never from the request.
+ */
+export async function requireEventPoster(
+  campaignId: string,
+  user: { id: string; role: string },
+  characterId: string | undefined,
+  characterName: string | undefined,
+): Promise<{ isGM: boolean; characterId: string | undefined; characterName: string | undefined }> {
+  const campaign = await requireCampaignMember(campaignId, user);
+  if (canManageCampaign(user.id, user.role, campaign)) return { isGM: true, characterId, characterName };
+  if (!characterId) return { isGM: false, characterId: undefined, characterName: undefined };
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { id: true, name: true, userId: true, campaignId: true },
+  });
+  if (!character || !canPostAsCharacter(user.id, user.role, campaign, character)) {
+    throw new ForbiddenError('You can only post for your own character');
+  }
+  return { isGM: false, characterId: character.id, characterName: character.name };
+}
 
 /**
  * Campaign GM gate (2026-10-08): only the campaign's own GM/Watcher and ADMIN
