@@ -26,6 +26,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { requireCampaignGM } from '@/services/campaign-access';
 import { RECALL_TUNING } from '@/daya/recall-tuning';
 import { currentCycleOf } from '@/services/history';
+import { listAspects } from '@/sim/perception/aspects';
 
 // ── Vocabulary ────────────────────────────────────────────────────────────
 
@@ -299,4 +300,46 @@ export async function recordExposureBatch(input: { campaignId: string; perceiver
     }
   });
   return writes.length;
+}
+
+/**
+ * Perception unit 12 — USE TEACHES: one round's item uses (sim/perception/use.usesFromRound), written
+ * once per being in ONE transaction, source 'use' (the small step), regardless of domain knowledge. Only
+ * aspects the item actually has are written; first contact is seeded first (an owned item starts known).
+ * `uses` carry characterIds; beings without a DAYA row are skipped. Returns the rows written.
+ */
+export async function recordUseBatch(input: { campaignId: string; cycle?: number; uses: Array<{ userId: string; itemId: string; aspects: string[] }> }): Promise<number> {
+  if (!input.uses.length) return 0;
+  const itemIds = [...new Set(input.uses.map((u) => u.itemId))];
+  const items = await prisma.campaignItem.findMany({ where: { id: { in: itemIds } }, select: { id: true, data: true } });
+  const has = new Map(items.map((i) => [i.id, new Set(listAspects(i.data))]));
+  const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
+  let written = 0;
+  for (const characterId of [...new Set(input.uses.map((u) => u.userId))]) {
+    const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true } });
+    if (!entity) continue;
+    const writes = input.uses.filter((u) => u.userId === characterId)
+      .flatMap((u) => u.aspects.filter((a) => has.get(u.itemId)?.has(a)).map((aspectKind) => ({ subjectId: u.itemId, aspectKind })))
+      .slice(0, EXPOSURE_BATCH_CAP);
+    if (!writes.length) continue;
+    await seedFirstContacts({
+      campaignId: input.campaignId, perceiverId: entity.id, perceiverCharacterId: characterId,
+      subjects: [...new Set(writes.map((w) => w.subjectId))].map((subjectId) => ({ subjectId, subjectKind: 'ITEM' as const })),
+      aspects: [...new Set(writes.map((w) => w.aspectKind))],
+    });
+    await prisma.$transaction(async (tx) => {
+      for (const w of writes) {
+        const key = { perceiverId: entity.id, subjectId: w.subjectId, aspectKind: w.aspectKind };
+        const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+        const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle) : 0, 'use');
+        await tx.familiarity.upsert({
+          where: { perceiverId_subjectId_aspectKind: key },
+          create: { ...key, campaignId: input.campaignId, subjectKind: 'ITEM', score, lastSource: 'use', lastCycle },
+          update: { score, lastSource: 'use', lastCycle },
+        });
+      }
+    });
+    written += writes.length;
+  }
+  return written;
 }

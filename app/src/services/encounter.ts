@@ -53,7 +53,8 @@ import { effortCap, eligibleEffortAttributes, skillUsableFromPillar } from '@/si
 import type { Governor, Intention, IntentionKind, Participant, Pillar, RoundResult } from '@/sim/round/types';
 import { aspectFacts, type AspectFact } from '@/sim/perception/aspect-values';
 import { BEING_ASPECTS } from '@/sim/perception/aspects';
-import { familiarityAt, scoreToFidelity } from '@/services/familiarity';
+import { familiarityAt, recordUseBatch, scoreToFidelity } from '@/services/familiarity';
+import { usesFromRound } from '@/sim/perception/use';
 import { currentCycleOf } from '@/services/history';
 import { buildSensoryField, senseFlagsFromSheet } from '@/sim/senses/field';
 import { planRound } from '@/sim/planning/branch-plan';
@@ -608,6 +609,10 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   const ordered = await orderSlots(slots, state.participants, state.intentions);
 
   // ── Stage 3: resolve with real dice, real Effort, real bodies + pools. ──
+  // Perception unit 12 (use teaches): what each being held as the round began, and worn items that took hits.
+  const heldAtStart: Record<string, string | null> = Object.fromEntries(state.participants.map(p => [p.id, p.heldItemId]));
+  const upAtStart = state.participants.filter(p => !p.downed).map(p => p.id);
+  const wornHits: Array<{ wearerId: string; itemId: string }> = [];
   const check: CheckFn = async ({ participant, skillName, effort, effortAttribute, dr }) => {
     const skill = skillName ? participant.skills.find(s => s.name === skillName) : undefined;
     let spent = 0;
@@ -627,6 +632,7 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     const body = await applyDamageToCharacter(actor.userId, actor.role, { characterId: targetId, damageType, amount, piercingTargetPath, note });
     const parts = body.events.map(e => `${e.partPath.at(-1)} ${e.conditionBefore}→${e.conditionAfter}`).join(', ');
     const worn = body.wornDamage.length ? ` (armor: ${body.wornDamage.map(w => w.name).join(', ')})` : '';
+    for (const wd of body.wornDamage) wornHits.push({ wearerId: targetId, itemId: wd.itemId });
     // Path 2 — Affinity Cycle attribute pool (natural target; overflow → Frequency).
     // Mike 09-20: a body part declares whether damage on it depletes attributes
     // (`depletesAttributes`; living tissue = true, horn/shell = false). What a
@@ -799,6 +805,10 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
   if (roundReach) await recordNoticedExposures(enc.campaignId, cycle, exposures);
+  // Perception unit 12: USE TEACHES — the round's item uses, once per being (source 'use', no domain gate).
+  try {
+    await recordUseBatch({ campaignId: enc.campaignId, cycle, uses: usesFromRound({ log: result.log, heldAtStart, upAtStart, wornHits }) });
+  } catch (err) { console.warn('[encounter] use familiarity failed', err); }
 
   // Provenance manifest for the round (2026-09-20): a COMPOSITE act — the
   // GM's declarations + every branch's plan + the sim's resolution. The
