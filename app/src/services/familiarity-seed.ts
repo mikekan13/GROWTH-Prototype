@@ -18,7 +18,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { listAspects } from '@/sim/perception/aspects';
-import { familiarityAt, F5_SEAL, type SubjectKind } from '@/services/familiarity';
+import { familiarityAt, F5_SEAL, writeFamiliarity, type FamiliarityWrite, type SubjectKind } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
 
 // ── Tuning ────────────────────────────────────────────────────────────────
@@ -166,11 +166,16 @@ export async function seedOnFirstContact(input: SeedOnFirstContactInput): Promis
   if (todo.length === 0) return { contact, seeded: [] };
 
   const lastCycle = await currentCycleOf(input.campaignId);
-  await prisma.$transaction(todo.map((p) => prisma.familiarity.upsert({
-    where: { perceiverId_subjectId_aspectKind: { perceiverId: input.perceiverId, subjectId: input.subjectId, aspectKind: p.aspectKind } },
-    create: { campaignId: input.campaignId, perceiverId: input.perceiverId, subjectId: input.subjectId, subjectKind: kind, aspectKind: p.aspectKind, score: p.score, lastSource: 'seed', lastCycle },
-    // A concurrent first contact may have created it: only a Godhead's row is raised; nobody else's is touched.
-    update: contact === 'godhead' ? { score: p.score, lastSource: 'seed', lastCycle } : {},
-  })));
-  return { contact, seeded: todo.map((p) => p.aspectKind) };
+  const seeded = await prisma.$transaction(async (tx) => {
+    const planned: FamiliarityWrite[] = [];
+    for (const p of todo) {
+      const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: { perceiverId: input.perceiverId, subjectId: input.subjectId, aspectKind: p.aspectKind } }, select: { score: true, lastCycle: true } });
+      // A concurrent first contact may have created it: only a Godhead's row is raised; nobody else's is touched.
+      if (prior && (contact !== 'godhead' || prior.score >= F5_SEAL)) continue;
+      planned.push({ campaignId: input.campaignId, perceiverId: input.perceiverId, subjectId: input.subjectId, subjectKind: kind, aspectKind: p.aspectKind, score: p.score, source: 'seed', cycle: lastCycle, prior, keepSubjectKind: true });
+    }
+    await writeFamiliarity(tx, planned);
+    return planned.map((w) => w.aspectKind);
+  });
+  return { contact, seeded };
 }

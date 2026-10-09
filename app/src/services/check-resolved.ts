@@ -15,12 +15,12 @@ export interface CheckOutcome {
   effortBy: Record<string, number>;
 }
 
-export async function afterCheckResolved(pending: Pick<PendingCheck, 'campaignId' | 'purpose' | 'isSkilled'>, outcome: CheckOutcome): Promise<void> {
+export async function afterCheckResolved(pending: Pick<PendingCheck, 'campaignId' | 'purpose' | 'isSkilled'> & { id?: string }, outcome: CheckOutcome): Promise<void> {
   if (!pending.purpose) return;
   try {
     if (pending.purpose.kind === 'inspect') {
       const { resolveInspection } = await import('@/services/inspection');
-      await resolveInspection(pending.campaignId, pending.purpose, { ...outcome, skilled: pending.isSkilled });
+      await resolveInspection(pending.campaignId, pending.purpose, { ...outcome, skilled: pending.isSkilled, checkId: pending.id });
     }
   } catch (err) {
     console.warn('[check-resolved] purpose failed', err);

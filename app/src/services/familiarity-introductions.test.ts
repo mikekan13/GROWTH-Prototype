@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   rows: new Map<string, { score: number; lastCycle: number | null; lastSource: string }>(),
-  cleared: [] as unknown[], pushed: [] as string[],
+  cleared: [] as unknown[], pushed: [] as string[], changes: [] as Array<Record<string, unknown>>,
   gm: true,
 }));
 
@@ -20,9 +20,10 @@ vi.mock('@/lib/db', () => {
     },
     findMany: async () => [...h.rows.keys()].map((key) => key.split('|')).map(([, subjectId, aspectKind]) => ({ subjectId, aspectKind })),
   };
+  const familiarityChange = { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { h.changes.push(...data); return { count: data.length }; } };
   return {
     prisma: {
-      $transaction: async (fn: (t: { familiarity: typeof familiarity }) => Promise<unknown>) => fn({ familiarity }),
+      $transaction: async (fn: (t: { familiarity: typeof familiarity; familiarityChange: typeof familiarityChange }) => Promise<unknown>) => fn({ familiarity, familiarityChange }),
       familiarity,
       dayaEntity: {
         findUnique: async () => ({ characterId: 'violet' }),
@@ -43,7 +44,7 @@ vi.mock('@/services/campaign-access', () => ({ requireCampaignGM: async () => { 
 
 import { recordIntroductions, setFamiliarityByWatcher, INTRODUCED_SCORE, INTRODUCED_SOURCE, scoreToFidelity } from './familiarity';
 
-beforeEach(() => { h.rows.clear(); h.cleared = []; h.pushed = []; h.gm = true; });
+beforeEach(() => { h.rows.clear(); h.cleared = []; h.pushed = []; h.gm = true; h.changes = []; });
 
 describe('recordIntroductions — raise identity to the naming level, never lower it', () => {
   it('a stranger is raised to INTRODUCED_SCORE (source introduced); the cached lines naming them are dropped and the feed nudged', async () => {
@@ -54,6 +55,7 @@ describe('recordIntroductions — raise identity to the naming level, never lowe
     expect(JSON.stringify(h.cleared[0])).toContain('ruth');
     expect(JSON.stringify(h.cleared[0])).toContain('"entityId":"e1"');
     expect(h.pushed).toEqual(['e1']);
+    expect(h.changes).toEqual([expect.objectContaining({ subjectId: 'ruth', aspectKind: 'identity', fromScore: 0.05, toScore: INTRODUCED_SCORE, source: INTRODUCED_SOURCE, cycle: 4 })]);
   });
 
   it('a name already known better is kept; nothing is invalidated', async () => {
@@ -61,6 +63,7 @@ describe('recordIntroductions — raise identity to the naming level, never lowe
     expect(await recordIntroductions({ campaignId: 'c', perceiverId: 'e1', perceiverCharacterId: 'violet', cycle: 4, subjects: [{ subjectId: 'ruth', subjectKind: 'NPC' }] })).toEqual([]);
     expect(h.rows.get('e1|ruth|identity')?.score).toBe(0.9);
     expect(h.cleared).toEqual([]);
+    expect(h.changes).toEqual([]); // no write, no change row
   });
 
   it('the perceiver is never introduced to itself', async () => {
@@ -74,6 +77,7 @@ describe('setFamiliarityByWatcher — the GM declares "they know each other"', (
     expect(r.aspectKind).toBe('identity');
     expect(scoreToFidelity(r.score)).toBe(3);
     expect(r.lastSource).toBe('watcher');
+    expect(h.changes).toEqual([expect.objectContaining({ perceiverId: 'e1', subjectId: 'ruth', fromScore: null, toScore: r.score, source: 'watcher', cycle: 4 })]);
     expect(h.pushed).toEqual(['e1']);
   });
 

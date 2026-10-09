@@ -534,6 +534,8 @@ export interface ViewerContext {
   /** The viewer's sense effectiveness now (organ condition) plus its mind senses. */
   clarity: Record<string, number>;
   rewrite: VagueRewriteModel | null;
+  /** The campaign clock the familiarity was faded to (kept on the first-render snapshot). */
+  nowCycle?: number;
 }
 
 /** Bound on the campaign items a context names (spans only; never a feed limit). */
@@ -572,7 +574,7 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
   const clarity: Record<string, number> = { ...senses.effectiveness };
   for (const m of senses.nonPhysical ?? []) clarity[m.name] = m.effectiveness;
   const rewrite = opts.rewrite !== undefined ? opts.rewrite : perceptionReachOn() ? vagueRewriteModelFor(campaignId) : null;
-  return { campaignId, viewerId: viewerCharacterId, viewerEntityId: entity.id, entities, familiarity, clarity, rewrite };
+  return { campaignId, viewerId: viewerCharacterId, viewerEntityId: entity.id, entities, familiarity, clarity, rewrite, nowCycle };
 }
 
 /** Bumped when the render rules change, so cached forms re-render (2: the viewer's own doings in full). */
@@ -610,10 +612,41 @@ export async function renderViewerFeed(campaignId: string, viewerCharacterId: st
     if (cached?.sig === sig && cached.form) { out.set(r.id, cached.form); continue; }
     const form: VisibleForm = { memoryId: r.id, ...(await renderVisibleForm(truth, perception, fam, { seed: r.id, rewrite: ctx.rewrite })) };
     out.set(r.id, form);
-    try { await prisma.dayaMemoryEntry.update({ where: { id: r.id }, data: { visibleForm: JSON.stringify({ sig, form }) } }); }
-    catch (err) { console.warn('[visible-form] cache write failed (render kept)', err); }
+    const visibleForm = JSON.stringify({ sig, form });
+    try {
+      if (r.firstVisibleForm === null) {
+        // First render ever: freeze it beside the live cache, in ONE write guarded on null (never overwritten).
+        const first = JSON.stringify(firstRenderSnapshot(form, sig, fam, perception, ctx.nowCycle ?? null));
+        const n = await prisma.dayaMemoryEntry.updateMany({ where: { id: r.id, firstVisibleForm: null }, data: { visibleForm, firstVisibleForm: first } });
+        if (n.count === 0) await prisma.dayaMemoryEntry.update({ where: { id: r.id }, data: { visibleForm } });
+      } else {
+        await prisma.dayaMemoryEntry.update({ where: { id: r.id }, data: { visibleForm } });
+      }
+    } catch (err) { console.warn('[visible-form] cache write failed (render kept)', err); }
   }
   return out;
+}
+
+/** What DayaMemoryEntry.firstVisibleForm holds: the first rendered form + the knowledge and senses it used. */
+export interface FirstVisibleFormSnapshot {
+  form: VisibleForm;
+  sig: string;
+  /** Per entity, per aspect F-level the render used (faded to `nowCycle`). */
+  familiarity: ViewerFamiliarity;
+  perception: ViewerPerception;
+  nowCycle: number | null;
+  renderedAt: string;
+}
+
+/** Pure: the immutable first-render record. */
+export function firstRenderSnapshot(form: VisibleForm, sig: string, familiarity: ViewerFamiliarity, perception: ViewerPerception, nowCycle: number | null, at = new Date()): FirstVisibleFormSnapshot {
+  return { form, sig, familiarity, perception, nowCycle, renderedAt: at.toISOString() };
+}
+
+/** The frozen first render of a memory row (null = never rendered, or unreadable). Read-only. */
+export async function getFirstVisibleForm(memoryId: string): Promise<FirstVisibleFormSnapshot | null> {
+  const row = await prisma.dayaMemoryEntry.findUnique({ where: { id: memoryId }, select: { firstVisibleForm: true } });
+  try { return row?.firstVisibleForm ? JSON.parse(row.firstVisibleForm) as FirstVisibleFormSnapshot : null; } catch { return null; }
 }
 
 /** What a heard line of speech gave this viewer: the caught pieces (gaps where words were missed), by speaker. */
@@ -646,7 +679,7 @@ export async function caughtSpeech(campaignId: string, viewerCharacterId: string
 async function prepareViewerRows(ctx: ViewerContext, memoryIds: string[]) {
   const rows = await prisma.dayaMemoryEntry.findMany({
     where: { id: { in: memoryIds }, entityId: ctx.viewerEntityId },
-    select: { id: true, truthRef: true, chain: true, noticed: true, perceivedVia: true, visibleForm: true },
+    select: { id: true, truthRef: true, chain: true, noticed: true, perceivedVia: true, visibleForm: true, firstVisibleForm: true },
   });
   const refsOf = (r: { truthRef: string | null; chain: string }) => {
     let refs: string[] = [];

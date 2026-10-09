@@ -27,7 +27,7 @@ import type { InspectPurpose } from '@/lib/pending-checks';
 import { requireCampaignMember } from '@/services/campaign-access';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { gatherTraitModifiers } from '@/services/trait-modifiers';
-import { familiarityAt, recordExposure } from '@/services/familiarity';
+import { familiarityAt, recordExposure, writeFamiliarity } from '@/services/familiarity';
 import { subjectAspects } from '@/services/familiarity-seed';
 import { currentCycleOf } from '@/services/history';
 import { getRelevance, normalizeSkillName, pickBestSkill, SKILL_RELEVANCE_TUNING, type SkillRelevance } from '@/services/skill-relevance';
@@ -290,13 +290,13 @@ async function engineInspectionRoll(
     skillName: choice.skilled ? choice.skillName : undefined, sdDie, sdResult, fdDie: fateDie, fdResult,
     effort: 0, traitFlat, traitSources: [], total, dr, success, margin,
   });
-  await resolveInspection(campaignId, purpose, { total, success, margin, effortBy: {}, skilled: choice.skilled });
+  await resolveInspection(campaignId, purpose, { total, success, margin, effortBy: {}, skilled: choice.skilled, checkId: `inspect-${purpose.intentId}` });
 }
 
 // ── Resolve ───────────────────────────────────────────────────────────────
 
 /** The check is in: raise (or mislead) the inspector's familiarity with the subject's aspects. */
-export async function resolveInspection(campaignId: string, purpose: InspectPurpose, outcome: CheckOutcome & { skilled: boolean }): Promise<InspectWrite[]> {
+export async function resolveInspection(campaignId: string, purpose: InspectPurpose, outcome: CheckOutcome & { skilled: boolean; checkId?: string }): Promise<InspectWrite[]> {
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId: purpose.characterId }, select: { id: true } });
   if (!entity) { console.warn('[inspection] no DAYA being for', purpose.characterId, '— nothing learned'); return []; }
   const [rows, nowCycle, itemData] = await Promise.all([
@@ -314,19 +314,19 @@ export async function resolveInspection(campaignId: string, purpose: InspectPurp
     { success: outcome.success, margin: outcome.margin, skilled: outcome.skilled, witEffort: outcome.effortBy.wit ?? 0 },
   );
   const base = { campaignId, perceiverId: entity.id, subjectId: purpose.subjectId, subjectKind: purpose.subjectKind };
+  const refs = outcome.checkId ? { checkId: outcome.checkId } : undefined;
   for (const w of writes) {
     const key = { perceiverId: entity.id, subjectId: purpose.subjectId, aspectKind: w.aspectKind };
     if (w.op === 'grow') {
-      await recordExposure({ ...base, aspectKind: w.aspectKind, source: 'inspect', times: w.times, cycle: nowCycle });
+      await recordExposure({ ...base, aspectKind: w.aspectKind, source: 'inspect', times: w.times, cycle: nowCycle, refs });
     } else {
       // A flag lifts an unknown aspect to F1 ("it's a relic"); a wrong impression stays F0, marked 'wrong'
       // (TUNING / minimal: nothing reads the mark yet — [QUESTION] how a wrong impression shows).
       const score = w.op === 'flag' ? Math.max(current[w.aspectKind] ?? 0, w.score) : (current[w.aspectKind] ?? 0);
-      const lastSource = w.op === 'flag' ? 'inspect' : 'wrong';
-      await prisma.familiarity.upsert({
-        where: { perceiverId_subjectId_aspectKind: key },
-        create: { ...key, campaignId, subjectKind: purpose.subjectKind, score, lastSource, lastCycle: nowCycle },
-        update: { score, lastSource, lastCycle: nowCycle },
+      const source = w.op === 'flag' ? 'inspect' : 'wrong';
+      await prisma.$transaction(async (tx) => {
+        const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+        await writeFamiliarity(tx, [{ ...key, campaignId, subjectKind: purpose.subjectKind, score, source, cycle: nowCycle, prior, keepSubjectKind: true, refs }]);
       });
     }
   }

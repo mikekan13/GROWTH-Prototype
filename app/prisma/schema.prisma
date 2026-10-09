@@ -1217,6 +1217,12 @@ model DayaMemoryEntry {
   // (services/visible-form). JSON {sig, form}; sig = hash of every input, so a
   // changed input re-renders. A canon correction clears it. null = not rendered.
   visibleForm    String?
+  // "All knowledge relabels past entries; the system keeps the record" (Mike
+  // 2026-10-09): the FIRST visible form ever rendered for this row, frozen —
+  // JSON {form, sig, familiarity, perception, nowCycle, renderedAt}. Written
+  // once (guarded on null), never overwritten or cleared; the live cache above
+  // keeps re-labelling with current knowledge. null = never rendered.
+  firstVisibleForm String?
 
   @@index([entityId, narrativeCycle])
   @@index([entityId, salience])
@@ -1246,6 +1252,33 @@ model Familiarity {
   @@index([campaignId])
   @@index([perceiverId, subjectKind])
   @@index([subjectId])
+}
+
+// APPEND-ONLY history of every Familiarity write (Mike 2026-10-09: "all
+// knowledge relabels past entries; the system keeps the record"). One row per
+// write, appended in the same transaction by services/familiarity
+// writeFamiliarity — the only write path. Nothing updates or deletes a row;
+// no API route reads it (Watcher/ADMIN service helper only). No FKs: the
+// record outlives the being or campaign it describes.
+model FamiliarityChange {
+  id           String   @id @default(cuid())
+  campaignId   String
+  perceiverId  String   // DayaEntity id
+  subjectId    String
+  subjectKind  String
+  aspectKind   String
+  fromScore    Float?   // stored (unfaded) score before the write; null = first contact
+  fromCycle    Float?   // the prior row's lastCycle (so the faded value can be rebuilt)
+  toScore      Float
+  source       String   // exposure | use | own | inspect | seed | introduced | watcher | wrong
+  cycle        Float?   // campaign clock (meta cycles) of the write
+  memoryId     String?
+  canonEventId String?
+  checkId      String?
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, perceiverId, createdAt])
+  @@index([perceiverId, subjectId, aspectKind])
 }
 
 // How relevant a freeform skill is to each of the ten head domains (perception

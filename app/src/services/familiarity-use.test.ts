@@ -1,7 +1,7 @@
 /** Perception unit 12 — USE TEACHES: the round's uses (pure) and their one-per-being write (source 'use'). */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const h = vi.hoisted(() => ({ rows: new Map<string, { score: number; lastCycle: number | null; lastSource: string; subjectKind?: string }>(), txCount: 0, seeded: [] as string[] }));
+const h = vi.hoisted(() => ({ rows: new Map<string, { score: number; lastCycle: number | null; lastSource: string; subjectKind?: string }>(), txCount: 0, seeded: [] as string[], changes: [] as Array<Record<string, unknown>> }));
 
 vi.mock('@/lib/db', () => {
   const k = (w: { perceiverId_subjectId_aspectKind: { perceiverId: string; subjectId: string; aspectKind: string } }) => {
@@ -14,8 +14,10 @@ vi.mock('@/lib/db', () => {
       upsert: async ({ where, create, update }: { where: Parameters<typeof k>[0]; create: { score: number; lastCycle: number; lastSource: string; subjectKind: string }; update: { score: number; lastCycle: number; lastSource: string } }) => {
         const key = k(where);
         h.rows.set(key, h.rows.has(key) ? { ...h.rows.get(key)!, ...update } : { score: create.score, lastCycle: create.lastCycle, lastSource: create.lastSource, subjectKind: create.subjectKind });
+        return { ...where.perceiverId_subjectId_aspectKind, updatedAt: new Date(0), subjectKind: 'ITEM', ...h.rows.get(key)! };
       },
     },
+    familiarityChange: { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { h.changes.push(...data); return { count: data.length }; } },
   };
   return {
     prisma: {
@@ -42,7 +44,7 @@ vi.mock('@/services/familiarity-seed', () => ({
 import { usesFromRound } from '@/sim/perception/use';
 import { recordUseBatch, growFamiliarity } from './familiarity';
 
-beforeEach(() => { h.rows.clear(); h.txCount = 0; h.seeded.length = 0; });
+beforeEach(() => { h.rows.clear(); h.txCount = 0; h.seeded.length = 0; h.changes.length = 0; });
 
 describe('usesFromRound (pure)', () => {
   it('wielding → weight; an attack that dealt damage → damage; a held item taking the hit → hardness + condition; worn armour hit → same', () => {
@@ -79,10 +81,13 @@ describe('recordUseBatch', () => {
     expect(h.rows.has('ent-ruth|blade|hardness')).toBe(false);
     expect(h.rows.get('ent-ruth|blade|ability:flame-tongue')?.lastSource).toBe('use');
     expect(h.seeded).toEqual(['violet:sword', 'ruth:blade']); // first contact seeded before counting
+    expect(h.changes).toHaveLength(4); // one append-only change row per write
+    expect(h.changes.every((c) => c.source === 'use' && c.fromScore === null && c.cycle === 5)).toBe(true);
   });
 
   it('repeated rounds grow slowly (diminishing returns)', async () => {
     for (let i = 0; i < 3; i++) await recordUseBatch({ campaignId: 'c1', cycle: 5, uses: [{ userId: 'violet', itemId: 'sword', aspects: ['damage'] }] });
     expect(h.rows.get('ent-violet|sword|damage')?.score).toBeCloseTo(growFamiliarity(0, 'use', 3));
+    expect(h.changes.map((c) => c.fromScore === null ? null : Number((c.fromScore as number).toFixed(6)))).toEqual([null, Number(growFamiliarity(0, 'use').toFixed(6)), Number(growFamiliarity(0, 'use', 2).toFixed(6))]);
   });
 });

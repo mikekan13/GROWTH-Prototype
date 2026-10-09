@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const h = vi.hoisted(() => ({ rows: new Map<string, { score: number; lastCycle: number | null; lastSource: string }>(), txCount: 0, seedCalls: [] as string[] }));
+const h = vi.hoisted(() => ({ rows: new Map<string, { score: number; lastCycle: number | null; lastSource: string }>(), txCount: 0, seedCalls: [] as string[], changes: [] as Array<Record<string, unknown>> }));
 
 vi.mock('@/lib/db', () => {
   const k = (w: { perceiverId_subjectId_aspectKind: { perceiverId: string; subjectId: string; aspectKind: string } }) => {
@@ -16,6 +16,7 @@ vi.mock('@/lib/db', () => {
         return { ...where.perceiverId_subjectId_aspectKind, subjectKind: 'ITEM', updatedAt: new Date(0), ...h.rows.get(key)! };
       },
     },
+    familiarityChange: { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { h.changes.push(...data); return { count: data.length }; } },
   };
   return {
     prisma: {
@@ -45,7 +46,7 @@ vi.mock('@/services/familiarity-seed', () => ({
 
 import { recordExposure, recordExposureBatch, growFamiliarity, EXPOSURE_BATCH_CAP, PASSIVE_ASPECTS } from './familiarity';
 
-beforeEach(() => { h.rows.clear(); h.txCount = 0; h.seedCalls.length = 0; });
+beforeEach(() => { h.rows.clear(); h.txCount = 0; h.seedCalls.length = 0; h.changes.length = 0; });
 
 describe('first contact is seeded BEFORE exposure is counted', () => {
   it('batch: a new owned item grows from its seed, not from zero; strangers still start at zero', async () => {
@@ -97,5 +98,25 @@ describe('recordExposureBatch — one transaction per being per pass', () => {
     expect(await recordExposureBatch({ campaignId: 'c', perceiverId: 'e1', subjects: many })).toBe(EXPOSURE_BATCH_CAP);
     expect(h.rows.size).toBe(EXPOSURE_BATCH_CAP);
     expect([...h.rows.values()][0].lastCycle).toBe(9); // the campaign clock when no cycle is passed
+  });
+});
+
+describe('the change record — every write appends one row (append-only)', () => {
+  it('batch: one change row per write, from the stored prior to the new score, in the same transaction', async () => {
+    h.rows.set('e1|ruth|identity', { score: 0.3, lastCycle: 2, lastSource: 'exposure' });
+    h.rows.set('e1|ruth|appearance', { score: 0.3, lastCycle: 2, lastSource: 'exposure' });
+    await recordExposureBatch({ campaignId: 'c', perceiverId: 'e1', perceiverCharacterId: 'violet', cycle: 9, subjects: [{ subjectId: 'ruth', subjectKind: 'NPC', source: 'exposure' }], refs: { canonEventId: 'ev1' } });
+    expect(h.txCount).toBe(1);
+    expect(h.changes).toHaveLength(PASSIVE_ASPECTS.length);
+    expect(h.changes[0]).toMatchObject({ campaignId: 'c', perceiverId: 'e1', subjectId: 'ruth', subjectKind: 'NPC', aspectKind: 'identity', fromScore: 0.3, fromCycle: 2, toScore: h.rows.get('e1|ruth|identity')!.score, source: 'exposure', cycle: 9, canonEventId: 'ev1', memoryId: null, checkId: null });
+  });
+
+  it('single write: first contact records fromScore null; a second write records the first as its from', async () => {
+    await recordExposure({ campaignId: 'c', perceiverId: 'e1', subjectId: 'cup', subjectKind: 'ITEM', aspectKind: 'identity', source: 'seed', score: 0.2, cycle: 9 });
+    await recordExposure({ campaignId: 'c', perceiverId: 'e1', subjectId: 'cup', subjectKind: 'ITEM', aspectKind: 'identity', source: 'inspect', cycle: 9, refs: { checkId: 'chk1' } });
+    expect(h.changes.map((c) => [c.source, c.fromScore, c.toScore, c.checkId])).toEqual([
+      ['seed', null, 0.2, null],
+      ['inspect', 0.2, growFamiliarity(0.2, 'inspect'), 'chk1'],
+    ]);
   });
 });

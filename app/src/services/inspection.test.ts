@@ -10,6 +10,7 @@ const w = vi.hoisted(() => ({
   exposures: [] as Array<Record<string, unknown>>,
   initiated: [] as Array<{ input: Record<string, unknown>; purpose: Record<string, unknown> }>,
   dice: [] as number[],
+  changes: [] as Array<Record<string, unknown>>,
 }));
 
 const SWORD = JSON.stringify({ damage: { slashing: 4 }, baseResist: 12, value: 40, properties: ['Sharp'], itemAbilities: [{ name: 'Flame Tongue', school: 'Force', description: 'burns' }] });
@@ -40,8 +41,16 @@ vi.mock('@/lib/db', () => {
         const k = where.perceiverId_subjectId_aspectKind;
         const row = w.fams.find((f) => f.perceiverId === k.perceiverId && f.subjectId === k.subjectId && f.aspectKind === k.aspectKind);
         if (row) Object.assign(row, update); else w.fams.push(create as never);
+        return { ...k, subjectKind: 'ITEM', updatedAt: new Date(0), ...(row ?? create) };
+      },
+      findUnique: async ({ where }: { where: { perceiverId_subjectId_aspectKind: { perceiverId: string; subjectId: string; aspectKind: string } } }) => {
+        const k = where.perceiverId_subjectId_aspectKind;
+        const row = w.fams.find((f) => f.perceiverId === k.perceiverId && f.subjectId === k.subjectId && f.aspectKind === k.aspectKind);
+        return row ? { score: row.score, lastCycle: row.lastCycle } : null;
       },
     },
+    familiarityChange: { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { w.changes.push(...data); return { count: data.length }; } },
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
   };
   return { prisma };
 });
@@ -76,7 +85,7 @@ const flush = () => new Promise((r) => setTimeout(r, 20));
 beforeEach(() => {
   clearBoard();
   w.fams = [{ perceiverId: 'ent-violet', subjectId: 'sword1', aspectKind: 'identity', score: 0.3, lastCycle: null }];
-  w.events = []; w.exposures = []; w.initiated = []; w.dice = [];
+  w.events = []; w.exposures = []; w.initiated = []; w.dice = []; w.changes = [];
 });
 
 describe('declare → board', () => {
@@ -126,7 +135,7 @@ describe('resolve', () => {
   const purpose = { kind: 'inspect' as const, intentId: 'i1', characterId: 'violet', subjectId: 'sword1', subjectKind: 'ITEM' as const, skillName: 'Swordsmanship', skillDomains: ['force', 'abjuration'] };
 
   it('skilled success raises damage / hardness / the fire enchantment with source inspect; strong result flags value at F1', async () => {
-    const writes = await svc.resolveInspection('c1', purpose, { total: 20, success: true, margin: 10, effortBy: {}, skilled: true });
+    const writes = await svc.resolveInspection('c1', purpose, { total: 20, success: true, margin: 10, effortBy: {}, skilled: true, checkId: 'chk9' });
     const grown = w.exposures.map((e) => e.aspectKind);
     expect(grown).toEqual(expect.arrayContaining(['damage', 'hardness', 'ability:flame-tongue']));
     expect(grown).not.toContain('property:sharp'); // alteration — not a swordsmanship domain (flagged instead)
@@ -134,14 +143,20 @@ describe('resolve', () => {
     expect(w.exposures.every((e) => e.source === 'inspect' && (e.times as number) > 1)).toBe(true);
     expect(writes.find((x) => x.aspectKind === 'value')).toMatchObject({ op: 'flag' });
     expect(w.fams.find((f) => f.aspectKind === 'value')).toMatchObject({ score: 0.2, lastSource: 'inspect' });
+    // the change record: the flag appended with its check; grows carry the check to recordExposure
+    expect(w.changes).toHaveLength(writes.filter((x) => x.op !== 'grow').length);
+    expect(w.changes.every((c) => c.source === 'inspect' && c.checkId === 'chk9')).toBe(true);
+    expect(w.changes.find((c) => c.aspectKind === 'value')).toMatchObject({ fromScore: null, toScore: 0.2 });
+    expect(w.exposures.every((e) => (e.refs as { checkId?: string })?.checkId === 'chk9')).toBe(true);
   });
 
   it('the hook: a resolved pending check with an inspect purpose resolves it; a bad failure marks one aspect wrong', async () => {
-    await afterCheckResolved({ campaignId: 'c1', isSkilled: true, purpose }, { total: 1, success: false, margin: -9, effortBy: {} });
+    await afterCheckResolved({ id: 'pc1', campaignId: 'c1', isSkilled: true, purpose }, { total: 1, success: false, margin: -9, effortBy: {} });
     expect(w.exposures).toEqual([]);
     const wrong = w.fams.filter((f) => f.lastSource === 'wrong');
     expect(wrong).toHaveLength(1);
     expect(wrong[0].score).toBe(0);
+    expect(w.changes).toEqual([expect.objectContaining({ aspectKind: wrong[0].aspectKind, toScore: 0, source: 'wrong', checkId: 'pc1' })]);
   });
 
   it('unskilled (raw Wisdom) never reaches a domain with zero exposure', async () => {

@@ -22,6 +22,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@/generated/prisma/client';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { requireCampaignGM } from '@/services/campaign-access';
 import { RECALL_TUNING } from '@/daya/recall-tuning';
@@ -114,6 +115,8 @@ export const recordExposureSchema = keySchema.extend({
   score: z.number().min(0).max(1).optional(),
   /** Campaign clock (meta cycles) of this exposure; defaults to the campaign's current cycle. */
   cycle: z.number().finite().optional(),
+  /** Pointers kept on the change record (memory row / canon event / check). */
+  refs: z.object({ memoryId: z.string().nullish(), canonEventId: z.string().nullish(), checkId: z.string().nullish() }).optional(),
 }).refine((v) => (v.source === 'seed') === (v.score !== undefined), {
   message: "score is required for source 'seed' and only for it",
   path: ['score'],
@@ -196,6 +199,101 @@ export async function listFamiliarityForWatcher(
   };
 }
 
+// ── The one write path (append-only change record) ───────────────────────
+
+/** What one familiarity write rests on — optional pointers kept on its change row. */
+export interface FamiliarityChangeRefs { memoryId?: string | null; canonEventId?: string | null; checkId?: string | null }
+
+/** The stored row before a write (null = first contact). */
+export type FamiliarityPrior = { score: number; lastCycle: number | null } | null;
+
+export interface FamiliarityWrite {
+  campaignId: string;
+  perceiverId: string;
+  subjectId: string;
+  subjectKind: string;
+  aspectKind: string;
+  /** The score to store. */
+  score: number;
+  /** lastSource on the row; `source` on the change row. */
+  source: string;
+  cycle: number | null;
+  /** The row as read inside this transaction before the write. */
+  prior: FamiliarityPrior;
+  /** Leave an existing row's subjectKind as stored (default: overwrite it). */
+  keepSubjectKind?: boolean;
+  refs?: FamiliarityChangeRefs;
+}
+
+type FamiliarityTx = Pick<Prisma.TransactionClient, 'familiarity' | 'familiarityChange'>;
+
+/**
+ * THE write path for Familiarity ("all knowledge relabels past entries; the
+ * system keeps the record" — Mike 2026-10-09). Upserts each row and appends
+ * one FamiliarityChange per write (one createMany per call), inside the
+ * caller's transaction so a batch stays one transaction. Change rows are
+ * never updated or deleted. Every writer (exposure, batch, seed, inspect,
+ * use, introductions, the Watcher's word) goes through here.
+ */
+export async function writeFamiliarity(tx: FamiliarityTx, writes: FamiliarityWrite[]): Promise<FamiliarityRecord[]> {
+  const out: FamiliarityRecord[] = [];
+  for (const w of writes) {
+    const key = { perceiverId: w.perceiverId, subjectId: w.subjectId, aspectKind: w.aspectKind };
+    const row = await tx.familiarity.upsert({
+      where: { perceiverId_subjectId_aspectKind: key },
+      create: { ...key, campaignId: w.campaignId, subjectKind: w.subjectKind, score: w.score, lastSource: w.source, lastCycle: w.cycle },
+      update: { score: w.score, lastSource: w.source, lastCycle: w.cycle, ...(w.keepSubjectKind ? {} : { subjectKind: w.subjectKind }) },
+      select: RECORD_SELECT,
+    });
+    out.push(toRecord(row));
+  }
+  if (writes.length) {
+    await tx.familiarityChange.createMany({
+      data: writes.map((w) => ({
+        campaignId: w.campaignId, perceiverId: w.perceiverId, subjectId: w.subjectId, subjectKind: w.subjectKind, aspectKind: w.aspectKind,
+        fromScore: w.prior?.score ?? null, fromCycle: w.prior?.lastCycle ?? null, toScore: w.score, source: w.source, cycle: w.cycle,
+        memoryId: w.refs?.memoryId ?? null, canonEventId: w.refs?.canonEventId ?? null, checkId: w.refs?.checkId ?? null,
+      })),
+    });
+  }
+  return out;
+}
+
+/** Read one row's prior inside a transaction (the change record's `from`). */
+async function priorOf(tx: FamiliarityTx, key: { perceiverId: string; subjectId: string; aspectKind: string }): Promise<FamiliarityPrior> {
+  return tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+}
+
+export interface FamiliarityChangeView {
+  subjectId: string; subjectKind: string; aspectKind: string;
+  fromScore: number | null; fromCycle: number | null; toScore: number;
+  source: string; cycle: number | null;
+  memoryId: string | null; canonEventId: string | null; checkId: string | null;
+  createdAt: Date;
+}
+
+/**
+ * The change record of one being, oldest first (internal: Watcher of the
+ * campaign or ADMIN; deliberately NO API route — players never see it).
+ * `perceiver` = DayaEntity id or characterId; optional subject/aspect filter.
+ */
+export async function listFamiliarityChanges(
+  campaignId: string,
+  user: { id: string; role: string },
+  perceiver: string,
+  opts: { subjectId?: string; aspectKind?: string; limit?: number } = {},
+): Promise<FamiliarityChangeView[]> {
+  await requireCampaignGM(campaignId, user);
+  const entity = await prisma.dayaEntity.findFirst({ where: { OR: [{ id: perceiver }, { characterId: perceiver }] }, select: { id: true } });
+  if (!entity) throw new NotFoundError('No DAYA being with that id');
+  return prisma.familiarityChange.findMany({
+    where: { campaignId, perceiverId: entity.id, ...(opts.subjectId ? { subjectId: opts.subjectId } : {}), ...(opts.aspectKind ? { aspectKind: opts.aspectKind } : {}) },
+    select: { subjectId: true, subjectKind: true, aspectKind: true, fromScore: true, fromCycle: true, toScore: true, source: true, cycle: true, memoryId: true, canonEventId: true, checkId: true, createdAt: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    take: Math.min(Math.max(1, opts.limit ?? 500), 5000),
+  });
+}
+
 /** The stored familiarity (unfaded), or null if this being has never met this aspect. */
 export async function getFamiliarity(perceiverId: string, subjectId: string, aspectKind: string): Promise<FamiliarityRecord | null> {
   const key = parse(keySchema, { perceiverId, subjectId, aspectKind });
@@ -245,19 +343,14 @@ export async function recordExposure(input: RecordExposureInput): Promise<Famili
     await seedFirstContacts({ campaignId: v.campaignId, perceiverId: v.perceiverId, subjects: [{ subjectId: v.subjectId, subjectKind: v.subjectKind }], aspects: [v.aspectKind] });
   }
   const lastCycle = v.cycle ?? await currentCycleOf(v.campaignId);
-  const row = await prisma.$transaction(async (tx) => {
-    const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+  return prisma.$transaction(async (tx) => {
+    const prior = await priorOf(tx, key);
     // Fade the prior up to this write before growing — re-stamping lastCycle must not erase the fade.
     const base = prior ? familiarityAt(prior, lastCycle) : 0;
     const score = v.source === 'seed' ? v.score! : growFamiliarity(base, v.source, v.times ?? 1);
-    return tx.familiarity.upsert({
-      where: { perceiverId_subjectId_aspectKind: key },
-      create: { ...key, campaignId: v.campaignId, subjectKind: v.subjectKind, score, lastSource: v.source, lastCycle },
-      update: { score, lastSource: v.source, subjectKind: v.subjectKind, lastCycle },
-      select: RECORD_SELECT,
-    });
+    const [row] = await writeFamiliarity(tx, [{ ...key, campaignId: v.campaignId, subjectKind: v.subjectKind, score, source: v.source, cycle: lastCycle, prior, refs: v.refs }]);
+    return row;
   });
-  return toRecord(row);
 }
 
 /** The aspects a passive exposure touches — what the senses take in of a thing, never its stats (Mike Q1). */
@@ -273,7 +366,7 @@ export interface ExposureSubject { subjectId: string; subjectKind: SubjectKind; 
  * once ('own' for its own items). Duplicates fold; the being itself is skipped
  * (self-perception is seeded, not exposed). Returns the rows written.
  */
-export async function recordExposureBatch(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: ExposureSubject[] }): Promise<number> {
+export async function recordExposureBatch(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: ExposureSubject[]; refs?: FamiliarityChangeRefs }): Promise<number> {
   const seen = new Map<string, ExposureSubject>();
   for (const s of input.subjects) {
     if (!s.subjectId || s.subjectId === input.perceiverCharacterId) continue;
@@ -288,16 +381,14 @@ export async function recordExposureBatch(input: { campaignId: string; perceiver
   });
   const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
   await prisma.$transaction(async (tx) => {
+    const planned: FamiliarityWrite[] = [];
     for (const w of writes) {
       const key = { perceiverId: input.perceiverId, subjectId: w.subjectId, aspectKind: w.aspectKind };
-      const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+      const prior = await priorOf(tx, key);
       const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle) : 0, w.source);
-      await tx.familiarity.upsert({
-        where: { perceiverId_subjectId_aspectKind: key },
-        create: { ...key, campaignId: input.campaignId, subjectKind: w.subjectKind, score, lastSource: w.source, lastCycle },
-        update: { score, lastSource: w.source, subjectKind: w.subjectKind, lastCycle },
-      });
+      planned.push({ ...key, campaignId: input.campaignId, subjectKind: w.subjectKind, score, source: w.source, cycle: lastCycle, prior, refs: input.refs });
     }
+    await writeFamiliarity(tx, planned);
   });
   return writes.length;
 }
@@ -336,25 +427,23 @@ export async function invalidateVisibleFormsNaming(perceiverId: string, subjectI
  * each subject to AT LEAST INTRODUCED_SCORE (a higher, earned score is kept),
  * one transaction; first contact seeded first. Returns the subjects raised.
  */
-export async function recordIntroductions(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: Array<{ subjectId: string; subjectKind: SubjectKind }> }): Promise<string[]> {
+export async function recordIntroductions(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: Array<{ subjectId: string; subjectKind: SubjectKind }>; refs?: FamiliarityChangeRefs }): Promise<string[]> {
   const subjects = [...new Map(input.subjects.filter((s) => s.subjectId && s.subjectId !== input.perceiverCharacterId).map((s) => [s.subjectId, s])).values()].slice(0, EXPOSURE_BATCH_CAP);
   if (!subjects.length) return [];
   await seedFirstContacts({ campaignId: input.campaignId, perceiverId: input.perceiverId, perceiverCharacterId: input.perceiverCharacterId, subjects, aspects: ['identity'] });
   const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
   const raised: string[] = [];
   await prisma.$transaction(async (tx) => {
+    const planned: FamiliarityWrite[] = [];
     for (const s of subjects) {
       const key = { perceiverId: input.perceiverId, subjectId: s.subjectId, aspectKind: 'identity' };
-      const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+      const prior = await priorOf(tx, key);
       const now = prior ? familiarityAt(prior, lastCycle) : 0;
       if (now >= INTRODUCED_SCORE) continue;
-      await tx.familiarity.upsert({
-        where: { perceiverId_subjectId_aspectKind: key },
-        create: { ...key, campaignId: input.campaignId, subjectKind: s.subjectKind, score: INTRODUCED_SCORE, lastSource: INTRODUCED_SOURCE, lastCycle },
-        update: { score: INTRODUCED_SCORE, lastSource: INTRODUCED_SOURCE, lastCycle },
-      });
+      planned.push({ ...key, campaignId: input.campaignId, subjectKind: s.subjectKind, score: INTRODUCED_SCORE, source: INTRODUCED_SOURCE, cycle: lastCycle, prior, keepSubjectKind: true, refs: input.refs });
       raised.push(s.subjectId);
     }
+    await writeFamiliarity(tx, planned);
   });
   if (raised.length) await invalidateVisibleFormsNaming(input.perceiverId, raised);
   return raised;
@@ -395,14 +484,13 @@ export async function setFamiliarityByWatcher(campaignId: string, user: { id: st
   const key = { perceiverId: entity.id, subjectId: v.subjectId, aspectKind: v.aspectKind };
   const score = scoreForLevel(v.level);
   const lastCycle = await currentCycleOf(campaignId);
-  const row = await prisma.familiarity.upsert({
-    where: { perceiverId_subjectId_aspectKind: key },
-    create: { ...key, campaignId, subjectKind, score, lastSource: WATCHER_SOURCE, lastCycle },
-    update: { score, lastSource: WATCHER_SOURCE, subjectKind, lastCycle },
-    select: RECORD_SELECT,
+  const row = await prisma.$transaction(async (tx) => {
+    const prior = await priorOf(tx, key);
+    const [r] = await writeFamiliarity(tx, [{ ...key, campaignId, subjectKind, score, source: WATCHER_SOURCE, cycle: lastCycle, prior }]);
+    return r;
   });
   await invalidateVisibleFormsNaming(entity.id, [v.subjectId]);
-  return toRecord(row);
+  return row;
 }
 
 /**
@@ -411,7 +499,7 @@ export async function setFamiliarityByWatcher(campaignId: string, user: { id: st
  * aspects the item actually has are written; first contact is seeded first (an owned item starts known).
  * `uses` carry characterIds; beings without a DAYA row are skipped. Returns the rows written.
  */
-export async function recordUseBatch(input: { campaignId: string; cycle?: number; uses: Array<{ userId: string; itemId: string; aspects: string[] }> }): Promise<number> {
+export async function recordUseBatch(input: { campaignId: string; cycle?: number; uses: Array<{ userId: string; itemId: string; aspects: string[] }>; refs?: FamiliarityChangeRefs }): Promise<number> {
   if (!input.uses.length) return 0;
   const itemIds = [...new Set(input.uses.map((u) => u.itemId))];
   const items = await prisma.campaignItem.findMany({ where: { id: { in: itemIds } }, select: { id: true, data: true } });
@@ -431,16 +519,14 @@ export async function recordUseBatch(input: { campaignId: string; cycle?: number
       aspects: [...new Set(writes.map((w) => w.aspectKind))],
     });
     await prisma.$transaction(async (tx) => {
+      const planned: FamiliarityWrite[] = [];
       for (const w of writes) {
         const key = { perceiverId: entity.id, subjectId: w.subjectId, aspectKind: w.aspectKind };
-        const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+        const prior = await priorOf(tx, key);
         const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle) : 0, 'use');
-        await tx.familiarity.upsert({
-          where: { perceiverId_subjectId_aspectKind: key },
-          create: { ...key, campaignId: input.campaignId, subjectKind: 'ITEM', score, lastSource: 'use', lastCycle },
-          update: { score, lastSource: 'use', lastCycle },
-        });
+        planned.push({ ...key, campaignId: input.campaignId, subjectKind: 'ITEM', score, source: 'use', cycle: lastCycle, prior, keepSubjectKind: true, refs: input.refs });
       }
+      await writeFamiliarity(tx, planned);
     });
     written += writes.length;
   }

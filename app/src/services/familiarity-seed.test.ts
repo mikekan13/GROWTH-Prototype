@@ -7,6 +7,7 @@ const db = vi.hoisted(() => ({
   items: {} as Record<string, { id: string; type: string; data: string; holderId: string | null; campaignId: string; status: string }>,
   godSeats: new Set<string>(),
   personas: {} as Record<string, string>,
+  changes: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@/lib/db', () => {
@@ -32,8 +33,14 @@ vi.mock('@/lib/db', () => {
         if (hit) Object.assign(hit, update); else db.rows.push({ ...create });
         return hit ?? create;
       },
+      findUnique: async ({ where }: { where: { perceiverId_subjectId_aspectKind: { perceiverId: string; subjectId: string; aspectKind: string } } }) => {
+        const k = where.perceiverId_subjectId_aspectKind;
+        const hit = db.rows.find((r) => r.perceiverId === k.perceiverId && r.subjectId === k.subjectId && r.aspectKind === k.aspectKind);
+        return hit ? { ...hit } : null; // a fresh object, as Prisma returns
+      },
     },
-    $transaction: async (ops: Promise<unknown>[]) => Promise.all(ops),
+    familiarityChange: { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { db.changes.push(...data); return { count: data.length }; } },
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
   };
   return { prisma };
 });
@@ -51,6 +58,7 @@ beforeEach(() => {
   db.items = {};
   db.godSeats = new Set();
   db.personas = {};
+  db.changes = [];
 });
 
 describe('seed tuning (labelled placeholders)', () => {
@@ -132,6 +140,7 @@ describe('seedOnFirstContact (store)', () => {
     const r = await seedOnFirstContact({ ...base, subjectId: 'violet', subjectKind: 'SELF' });
     expect(r.seeded).not.toContain('identity');
     expect(db.rows.find((x) => x.aspectKind === 'identity')!.score).toBe(0.2);
+    expect(db.changes.some((c) => c.aspectKind === 'identity')).toBe(false);
   });
 
   it('Godhead (seated, or godlike persona): every aspect F5, and an existing low row is raised', async () => {
@@ -143,6 +152,8 @@ describe('seedOnFirstContact (store)', () => {
     expect(r.contact).toBe('godhead');
     expect(r.seeded).toContain('damage');
     expect(db.rows.every((x) => x.score === 1)).toBe(true);
+    expect(db.changes.find((c) => c.aspectKind === 'damage')).toMatchObject({ fromScore: 0.1, fromCycle: 1, toScore: 1, source: 'seed', subjectKind: 'ITEM' });
+    expect(db.changes).toHaveLength(r.seeded.length); // one change row per seeded aspect
 
     db.godSeats.clear();
     db.personas.ruth = JSON.stringify({ godlike: true });
