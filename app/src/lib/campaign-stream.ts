@@ -21,6 +21,30 @@ interface SSEConnection {
   role: string;
   controller: ReadableStreamDefaultController<Uint8Array>;
   connectedAt: Date;
+  /**
+   * Perception unit 9 (PERCEPTION_FEED): this connection reads its character's perceived feed, not the
+   * truth record. Set at connect (services/perceived-feed feedViewerFor). `characterId` = its character (null = none yet).
+   */
+  perceived?: { characterId: string | null };
+}
+
+/**
+ * What a connection receives for an event (pure). The truth-record connections get everything unchanged.
+ * A perceived-feed connection never receives another being's line text: a terminal_event that is not its
+ * own (its character's line, or its own account's) becomes a text-free `perceived_feed_stale` nudge, and
+ * the growing line (being_speaking) is not sent — the line reaches it, if perceived, through its feed.
+ */
+export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, event: CampaignStreamEvent): CampaignStreamEvent | null {
+  if (!conn.perceived) return event;
+  const data = event.data;
+  if (data.kind === 'being_speaking') return null;
+  if (data.kind === 'terminal_event') {
+    const te = data.event;
+    const own = (!!conn.perceived.characterId && te.characterId === conn.perceived.characterId) || (te.actorUserId === conn.userId && te.actor === 'player');
+    if (own) return event;
+    return { id: event.id, timestamp: event.timestamp, campaignId: event.campaignId, data: { kind: 'perceived_feed_stale' } };
+  }
+  return event;
 }
 
 // ── Global Singleton (survives HMR) ───────────────────────────────────────
@@ -130,7 +154,9 @@ export function broadcast(campaignId: string, event: CampaignStreamEvent): void 
 
   for (const conn of pool.values()) {
     if (event.targetUserId && conn.userId !== event.targetUserId) continue;
-    sendToConnection(conn, payload);
+    if (!conn.perceived) { sendToConnection(conn, payload); continue; }
+    const out = deliveryFor(conn, event);
+    if (out) sendToConnection(conn, out === event ? payload : `data: ${JSON.stringify(out)}\n\n`);
   }
 }
 

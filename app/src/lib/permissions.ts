@@ -34,6 +34,16 @@ export function canViewCampaign(
 }
 
 /**
+ * The table feed's truth record (Mike 2026-10-08, ruling-feed-per-viewer): the campaign's own Watcher and
+ * ADMIN read every line as it happened. Everyone else — a Trailblazer, another Watcher, a GODHEAD not seated
+ * as this campaign's Watcher ("the truth view BY THE SEAT, not by its nature", 2026-10-09) — reads the feed
+ * as their character perceived it (when PERCEPTION_FEED is on).
+ */
+export function seesTruthRecord(userId: string, userRole: string, campaign: { gmUserId: string }): boolean {
+  return campaign.gmUserId === userId || userRole === 'ADMIN';
+}
+
+/**
  * JEWL history is private per user (Mike 2026-10-08): a viewer sees the rows
  * they wrote and JEWL's replies addressed to them (both carry their userId).
  * Rows with no userId cannot be attributed — only ADMIN sees those.

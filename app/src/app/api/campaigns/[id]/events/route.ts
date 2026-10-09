@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
 import { requireCampaignMember } from '@/services/campaign-access';
+import { feedViewerFor, queryPerceivedFeed } from '@/services/perceived-feed';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
 
@@ -23,6 +24,13 @@ export async function GET(
     const cursor = sp.get('cursor') || undefined;
     const limit = sp.get('limit') ? parseInt(sp.get('limit')!) : undefined;
     const sessionId = sp.has('sessionId') ? (sp.get('sessionId') || null) : undefined;
+
+    // Perception unit 9 (PERCEPTION_FEED): a Trailblazer reads their character's memory, filtered HERE —
+    // truth text of an unperceived line never leaves the server. Flag off / Watcher / ADMIN: unchanged.
+    const viewer = await feedViewerFor(campaignId, session.user);
+    if (viewer.mode === 'perceived') {
+      return NextResponse.json(await queryPerceivedFeed({ campaignId, viewer, types, sessionId, after, cursor, limit }));
+    }
 
     const result = await queryCampaignEvents({
       campaignId,

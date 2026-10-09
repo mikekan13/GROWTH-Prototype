@@ -21,6 +21,7 @@ import { buildFeedRows, type RosterName } from './feed-rows';
 import { buildFoldTree, openByDefaultKeys, filterTree, revealKeys, type FoldNode, type FoldItem, type FoldKeep } from './feed-tree';
 import { FeedRow, TableFeedProvider, type FeedEntity } from './TableFeedRows';
 import { TABLE_FEED_CSS } from './styles';
+import { perceivedFeedEntities } from './perceived-entities';
 
 type Folds = Record<string, boolean>; // key → open (the viewer's own choices)
 
@@ -178,8 +179,11 @@ export default function TableFeed({
   onOpenLog,
   reveal,
   emptyText = '[THE TABLE IS QUIET]',
+  perceived = false,
   children,
 }: {
+  /** Perception unit 9: the events are this viewer's perceived feed — spans/tooltips come only from the lines' own tokens. */
+  perceived?: boolean;
   campaignId: string;
   events: TerminalEvent[];
   entities: FeedEntity[];
@@ -230,7 +234,8 @@ export default function TableFeed({
     return () => { cancelled = true; };
   }, [campaignId]);
 
-  const roster = useMemo(() => entities.filter((e) => e.kind === 'npc').map((e) => ({ id: e.id, name: e.name })), [entities]);
+  const feedEntities = useMemo(() => (perceived ? perceivedFeedEntities(events, entities) : entities), [perceived, events, entities]);
+  const roster = useMemo(() => feedEntities.filter((e) => e.kind === 'npc').map((e) => ({ id: e.id, name: e.name })), [feedEntities]);
   const liveEncounter = encounter?.live ?? null;
   const tree = useMemo(
     () => (sessions ? buildFoldTree(events, sessions, { emptyFrom, liveEncounter, keep, dropBetween, prune }) : null),
@@ -269,7 +274,7 @@ export default function TableFeed({
   const empty = shown ? shown.length === 0 : flatRows.length === 0;
 
   return (
-    <TableFeedProvider entities={entities} timescale={timescale} onRevert={onRevert} reverting={reverting} onOpenLog={onOpenLog} highlight={reveal ?? undefined}>
+    <TableFeedProvider entities={feedEntities} perceived={perceived} timescale={timescale} onRevert={onRevert} reverting={reverting} onOpenLog={onOpenLog} highlight={reveal ?? undefined}>
       <style>{TABLE_FEED_CSS}</style>
       <div className={`tf${searching ? ' searching' : ''}`} data-table-feed data-hits={found ? found.hits : undefined}>
         {empty && <div className="empty">{loading ? 'Loading…' : searching ? '[NO LINE MATCHES]' : emptyText}</div>}

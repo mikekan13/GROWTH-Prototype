@@ -215,6 +215,17 @@ payload): fields prefilled as the editable preview; JEWL runs an edit-aware
 dialogue (`editLocationId` through `/api/copilot/create-dialog`). Commit
 merges into the existing data JSON, preserving canvas coords etc.
 
+## Per-Viewer Table Feed (perception unit 9, added 2026-10-09) — default OFF
+
+Ruling (Mike 2026-10-08/09, Q6): the feed is a view of an entity's memory. The campaign's Watcher and ADMIN read the truth record; a Trailblazer reads what their character perceived.
+
+- **Switch:** `NEXT_PUBLIC_PERCEPTION_FEED=on` (client + server, inlined at build — needs a dev-server restart) or `PERCEPTION_FEED=on` (server only). One helper: `lib/perception-feed.ts perceptionFeedOn()`. Off = identical behaviour (pinned by `events/route.test.ts`).
+- **Seat:** `lib/permissions.ts seesTruthRecord` (campaign GM or ADMIN; a GODHEAD gets the truth only BY THE SEAT). `services/perceived-feed.ts feedViewerFor` picks the viewer's PLAYER_CHARACTER in the campaign.
+- **GET /api/campaigns/[id]/events:** perceived viewers get `queryPerceivedFeed` — their own lines in full + session markers + their character's noticed memory rows rendered by `visible-form.renderViewerFeed`, laid out in the feed's existing payload shape (narration → declaration, character rows → chat) with `{gap}` and `{@id|label}` tokens (`lib/perceived-text.ts`) and `payload.perceived.entities` (label + known aspect names). Unperceived lines leave no trace; the server filters, the client never holds truth text.
+- **SSE (`lib/campaign-stream.ts deliveryFor`):** a perceived connection (set at connect by the stream route; fails closed) receives its own lines in full; anyone else's `terminal_event` becomes a text-free `perceived_feed_stale` nudge (CampaignCanvas → window `growth:perceived-feed-stale` → CampaignTerminal re-reads at 1.5/6/15 s); `being_speaking` is not sent.
+- **Client:** `TableFeed perceived` (from the response's `perceived: true`) → spans only from tokens, gap drawn as the rulebook gap/glitch dash, tooltips show `Seen as` + `Known` only (`table-feed/perceived-entities.ts`).
+- **D3:** sense clarity is stored on the memory row at perception time (`daya/perceived-via.ts`), so a moment perceived blind stays blurry after healing.
+
 ## Architecture Overview
 
 Next.js 16 App Router with layered architecture adapted for the framework:

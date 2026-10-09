@@ -1,0 +1,82 @@
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('@/lib/db', () => ({ prisma: {} }));
+vi.mock('@/services/history', () => ({ currentCycleOf: async () => 1 }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+
+import { formToFeedEvents, segmentsToMessage, entityRef } from './perceived-feed';
+import { buildFeedRows } from '@/components/terminal/table-feed/feed-rows';
+import { perceivedFeedEntities } from '@/components/terminal/table-feed/perceived-entities';
+import { splitPerceived, plainPerceived, entityToken } from '@/lib/perceived-text';
+import type { VisibleForm } from './visible-form';
+import type { TerminalEvent } from '@/types/terminal';
+
+const form: VisibleForm = {
+  memoryId: 'm1',
+  truthRefs: ['k1'],
+  rows: [
+    { type: 'narration', text: 'A figure opens the door.', pieces: [{ kind: 'entity', text: 'A figure', entityId: 'ruth' }, { kind: 'text', text: ' opens the door.' }] },
+    { type: 'character', speakerId: 'ruth', name: 'A figure', segments: [
+      { kind: 'speech', text: 'Sit {gap} now.', pieces: [{ kind: 'text', text: 'Sit ' }, { kind: 'gap' }, { kind: 'text', text: ' now.' }] },
+      { kind: 'action', text: 'someone moves', pieces: [{ kind: 'text', text: 'someone moves' }] },
+    ] },
+  ],
+  entities: [{ id: 'ruth', kind: 'NPC', label: 'a figure', known: [{ aspectKind: 'appearance', fidelity: 1 }] }],
+};
+
+const asTerminal = (rows: ReturnType<typeof formToFeedEvents>): TerminalEvent[] => rows.map((r) => ({
+  id: `ev-${r.id}`, type: r.type, timestamp: r.createdAt, campaignId: r.campaignId, actor: r.actor, actorUserId: r.actorUserId, actorName: r.actorName,
+  characterId: r.characterId ?? undefined, characterName: r.characterName ?? undefined, payload: r.payload,
+}));
+
+describe('perceived feed rows (unit 9)', () => {
+  it('a VisibleForm becomes rows the existing feed-rows reads unchanged: narration + a character line with gap/entity tokens', () => {
+    const rows = buildFeedRows(asTerminal(formToFeedEvents(form, { campaignId: 'c1', viewerId: 'violet', at: new Date('2026-10-09T12:00:00Z'), cycle: 3, sessionId: null })));
+    expect(rows.map((r) => r.type)).toEqual(['narration', 'character']);
+    const n = rows[0] as { text: string; cycle?: number };
+    expect(splitPerceived(n.text)).toEqual([{ kind: 'entity', id: 'ruth', label: 'A figure' }, { kind: 'text', text: ' opens the door.' }]);
+    expect(n.cycle).toBe(3);
+    const c = rows[1] as { name: string; characterId: string | null; segments: Array<{ kind: string; text: string }> };
+    expect(c.name).toBe('A figure');
+    expect(c.characterId).toBe('ruth');
+    expect(c.segments).toEqual([{ kind: 'speech', text: 'Sit {gap} now.' }, { kind: 'action', text: 'someone moves' }]);
+  });
+
+  it('never carries an account name, a level number or the word "distorted"', () => {
+    const raw = JSON.stringify(formToFeedEvents(form, { campaignId: 'c1', viewerId: 'violet', at: new Date(), sessionId: null }));
+    expect(raw).not.toMatch(/distort/i);
+    expect(raw).not.toContain('fidelity');
+    expect(formToFeedEvents(form, { campaignId: 'c1', viewerId: 'violet', at: new Date(), sessionId: null }).every((e) => e.actorName === '' && e.actorUserId === '')).toBe(true);
+  });
+
+  it('speech quotes inside a segment cannot break the markup', () => {
+    expect(segmentsToMessage({ type: 'character', speakerId: null, name: 'x', segments: [{ kind: 'speech', text: 'say "hi"', pieces: [{ kind: 'text', text: 'say "hi"' }] }] })).toBe('"say \'hi\'"');
+  });
+
+  it('entity refs carry aspect NAMES only; named only at the name level or for the viewer itself', () => {
+    expect(entityRef({ id: 'ruth', kind: 'NPC', label: 'a figure', known: [{ aspectKind: 'appearance', fidelity: 2 }] }, 'violet')).toEqual({ id: 'ruth', kind: 'NPC', label: 'a figure', known: ['appearance'], named: false });
+    expect(entityRef({ id: 'ruth', kind: 'NPC', label: 'Ruth', known: [{ aspectKind: 'identity', fidelity: 3 }] }, 'violet').named).toBe(true);
+    expect(entityRef({ id: 'violet', kind: 'CHARACTER', label: 'Violet', known: [] }, 'violet').named).toBe(true);
+  });
+
+  it('the client entity list: perceived refs (portrait only when named) + the speaker of the viewer\'s own lines', () => {
+    const events = asTerminal(formToFeedEvents(form, { campaignId: 'c1', viewerId: 'violet', at: new Date(), sessionId: null }));
+    events.push({ id: 'ev-own', type: 'chat', timestamp: '', campaignId: 'c1', actor: 'player', actorUserId: 'p1', actorName: 'p1', characterId: 'violet', payload: { kind: 'chat', message: 'hi' } });
+    const ents = perceivedFeedEntities(events, [
+      { id: 'ruth', name: 'Ruth', kind: 'npc', portrait: '/ruth.png', description: 'TRUTH-DESC' },
+      { id: 'violet', name: 'Violet', kind: 'character', portrait: '/v.png' },
+    ]);
+    expect(ents).toEqual([
+      { id: 'ruth', name: 'a figure', kind: 'npc', portrait: null, known: ['appearance'] },
+      { id: 'violet', name: 'Violet', kind: 'character', portrait: '/v.png' },
+    ]);
+    expect(JSON.stringify(ents)).not.toContain('TRUTH-DESC');
+  });
+
+  it('text tokens round-trip', () => {
+    const t = `${entityToken('ruth', 'a "tall" guard')} says {gap} today`;
+    expect(splitPerceived(t)).toEqual([{ kind: 'entity', id: 'ruth', label: 'a tall guard' }, { kind: 'text', text: ' says ' }, { kind: 'gap' }, { kind: 'text', text: ' today' }]);
+    expect(plainPerceived(t)).toBe('a tall guard says {gap} today');
+    expect(splitPerceived('plain')).toEqual([{ kind: 'text', text: 'plain' }]);
+  });
+});

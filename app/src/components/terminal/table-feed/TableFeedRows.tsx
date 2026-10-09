@@ -12,6 +12,7 @@ import React, { createContext, useContext, useMemo, useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { segmentMarks, splitEntities, presentCycle, realClock, type FeedSegment, type FeedTimescale, type EntityName } from '@/lib/feed-segments';
 import type { FeedRowModel, CharacterRowModel, NarrationRowModel, BarRowModel, WithdrawnRowModel, BeatRowModel, Via } from './feed-rows';
+import { splitPerceived } from '@/lib/perceived-text';
 
 /** A thing in the world the feed can name: a character, a place, an item. */
 export interface FeedEntity {
@@ -25,12 +26,16 @@ export interface FeedEntity {
   where?: string;
   description?: string;
   status?: string;
+  /** Perceived feed (unit 9): the aspects the viewer knows, by name. Present = the tooltip shows ONLY these. */
+  known?: string[];
 }
 
 interface FeedContextValue {
   entities: Map<string, FeedEntity>;
   names: EntityName[];
   timescale: FeedTimescale | null;
+  /** Perceived feed (unit 9): spans come only from the line's own tokens ({@id|label}, {gap}); no name matching. */
+  perceived?: boolean;
   /** Revert a character change (changelog entry id); absent = no revert control. */
   onRevert?: (entryId: string) => void;
   reverting?: string | null;
@@ -42,21 +47,23 @@ interface FeedContextValue {
 
 const FeedContext = createContext<FeedContextValue>({ entities: new Map(), names: [], timescale: null });
 
-export function TableFeedProvider({ entities, timescale, onRevert, reverting, onOpenLog, highlight, children }: {
+export function TableFeedProvider({ entities, timescale, onRevert, reverting, onOpenLog, highlight, perceived, children }: {
   entities: FeedEntity[]; timescale: FeedTimescale | null;
   onRevert?: (entryId: string) => void; reverting?: string | null;
   onOpenLog?: (ids: string[]) => void; highlight?: Set<string>;
+  perceived?: boolean;
   children: React.ReactNode;
 }) {
   const value = useMemo<FeedContextValue>(() => ({
     entities: new Map(entities.map((e) => [e.id, e])),
-    names: entities.map((e) => ({ id: e.id, name: e.name })),
+    names: perceived ? [] : entities.map((e) => ({ id: e.id, name: e.name })),
     timescale,
     onRevert,
     reverting,
     onOpenLog,
     highlight,
-  }), [entities, timescale, onRevert, reverting, onOpenLog, highlight]);
+    ...(perceived ? { perceived: true } : {}),
+  }), [entities, timescale, onRevert, reverting, onOpenLog, highlight, perceived]);
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;
 }
 
@@ -91,12 +98,23 @@ function RawToggle({ via, open, onToggle }: { via: Via; open: boolean; onToggle:
   );
 }
 
+/** What was missed: the rulebook's gap — a short black glitch dash, never a word (perceived feed, unit 9). */
+function Gap() {
+  return <span className="gap" role="img" aria-label="…" data-gap />;
+}
+
+/** A perceived line's raw text: labels inline, gaps drawn. */
+function PerceivedPlain({ text }: { text: string }) {
+  return <>{splitPerceived(text).map((p, i) => (p.kind === 'gap' ? <Gap key={i} /> : <React.Fragment key={i}>{p.kind === 'text' ? p.text : p.label}</React.Fragment>))}</>;
+}
+
 function RawBlock({ raw, via, cycle, timestamp }: { raw: string; via: Via; cycle?: number; timestamp: string }) {
   const inWorld = useInWorld(cycle);
+  const { perceived } = useContext(FeedContext);
   return (
     <div className="rawbox" data-raw>
       <div className="hd">RAW · {VIA_RAW[via]} · {inWorld} · <span className="real">{realClock(timestamp)}</span></div>
-      <div className="line"><span className="bar">{raw}</span></div>
+      <div className="line"><span className="bar">{perceived ? <PerceivedPlain text={raw} /> : raw}</span></div>
     </div>
   );
 }
@@ -122,7 +140,17 @@ function EntitySpan({ entity, text, source }: { entity: FeedEntity; text: string
       triggerStyle={{ display: 'inline' }}
       triggerProps={{ role: 'button', tabIndex: 0, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'data-entity': `${entity.kind}:${entity.id}`, 'data-no-hold': '' }}
       onOpenChange={setOpen}
-      content={(
+      content={entity.known ? (
+        <>
+          {/* Perceived (unit 9): only what the viewer knows of it — never a level, never the truth record. */}
+          <dl className="tft-f">
+            <dt>Seen as</dt><dd>{entity.name}</dd>
+            <dt>Type</dt><dd>{entityKindLine(entity)}</dd>
+            <dt>Known</dt><dd>{entity.known.length ? entity.known.join(' · ') : 'nothing yet'}</dd>
+          </dl>
+          <p className="tft-src">[{source}]</p>
+        </>
+      ) : (
         <>
           <dl className="tft-f">
             <dt>Name</dt><dd>{entity.name}</dd>
@@ -142,8 +170,23 @@ function EntitySpan({ entity, text, source }: { entity: FeedEntity; text: string
 
 /** Plain text with every named thing in the world turned into an entity span. */
 function EntityText({ text, exclude, source }: { text: string; exclude?: string[]; source: string }) {
-  const { entities, names } = useContext(FeedContext);
-  const pieces = useMemo(() => splitEntities(text, names, exclude ?? []), [text, names, exclude]);
+  const { entities, names, perceived } = useContext(FeedContext);
+  const pieces = useMemo(() => (perceived ? [] : splitEntities(text, names, exclude ?? [])), [perceived, text, names, exclude]);
+  if (perceived) {
+    // The line's own tokens only: {gap} → the gap dash; {@id|label} → a span with what the viewer knows.
+    return (
+      <>
+        {splitPerceived(text).map((p, i) => {
+          if (p.kind === 'gap') return <Gap key={i} />;
+          if (p.kind === 'text') return <React.Fragment key={i}>{p.text}</React.Fragment>;
+          const entity = entities.get(p.id);
+          return entity && !(exclude ?? []).includes(p.id)
+            ? <EntitySpan key={i} entity={{ ...entity, name: entity.known ? p.label : entity.name }} text={p.label} source={source} />
+            : <React.Fragment key={i}>{p.label}</React.Fragment>;
+        })}
+      </>
+    );
+  }
   return (
     <>
       {pieces.map((p, i) => {
@@ -178,9 +221,11 @@ function Segments({ segments, exclude, name, at, caret }: { segments: FeedSegmen
 
 /** The portrait chip with the p 10 `<Name>:` tag under it — a tooltip trigger. */
 function PortraitChip({ row }: { row: CharacterRowModel }) {
-  const { entities } = useContext(FeedContext);
+  const { entities, perceived } = useContext(FeedContext);
   const [open, setOpen] = useState(false);
   const entity = row.characterId ? entities.get(row.characterId) : undefined;
+  // Perceived feed: who voiced it at the real table is not something the character perceived.
+  const showVoice = !(perceived && entity?.known);
   const inWorld = useInWorld(row.cycle);
   const role = entity ? (entity.kind === 'npc' ? `NPC${entity.status ? ` · ${entity.status.toLowerCase()}` : ''}` : entity.kind === 'character' ? 'PC' : entityKindLine(entity)) : 'Not on the roster';
   const voiced = row.voice === 'Being' ? 'The being · DAYA' : `${row.voice}${row.voicedBy ? ` · ${row.voicedBy}` : ''}`;
@@ -198,8 +243,8 @@ function PortraitChip({ row }: { row: CharacterRowModel }) {
         <>
           <dl className="tft-f">
             <dt>Role</dt><dd>{role}</dd>
-            <dt>Voiced by</dt><dd>{voiced}</dd>
-            <dt>Received</dt><dd>{VIA_GLYPH[row.via]} {VIA_WORD[row.via]}</dd>
+            {showVoice && (<><dt>Voiced by</dt><dd>{voiced}</dd>
+            <dt>Received</dt><dd>{VIA_GLYPH[row.via]} {VIA_WORD[row.via]}</dd></>)}
             <dt>In-world</dt><dd>{inWorld}</dd>
             <dt>Real</dt><dd className="real">{realClock(row.timestamp)}</dd>
           </dl>

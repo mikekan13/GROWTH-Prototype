@@ -16,6 +16,7 @@ import TableSpeakBar from './TableSpeakBar';
 import BeingSpeakingLines from './BeingSpeakingLines';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
+import { perceptionFeedOn, PERCEIVED_FEED_STALE_EVENT } from '@/lib/perception-feed';
 import { pageCutoff, keepFrom, mergeEvents, withoutLoggedSessionLines } from './table-feed/feed-paging';
 import { matchEvent, type FoldKeep } from './table-feed/feed-tree';
 import { withNarration, feedKeep, isFeedLine } from './table-feed/feed-split';
@@ -112,6 +113,9 @@ export default function CampaignTerminal({
   }, []);
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  // Perception unit 9 (NEXT_PUBLIC_PERCEPTION_FEED): the server says whether this feed is the viewer's
+  // perceived one (a Trailblazer) — it filters; the client only renders the tokens and re-reads on a nudge.
+  const [perceivedFeed, setPerceivedFeed] = useState(false);
   // No filter chips (Mike 2026-10-08): the one feed is searched, not filtered.
   const activeFilter = 'all' as TerminalFilter;
   const [reverting, setReverting] = useState<string | null>(null);
@@ -217,6 +221,7 @@ export default function CampaignTerminal({
       }
       const evRes = wantEvents ? await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' }) : null;
       const evData = evRes?.ok ? await evRes.json() : { events: [], nextCursor: null };
+      if (perceptionFeedOn() && evRes?.ok) setPerceivedFeed(evData.perceived === true);
 
       // Wrap changelog entries as TerminalEvents
       const changelogEvents: TerminalEvent[] = (clData.entries || []).map((entry: ChangeLogEntry) => ({
@@ -353,6 +358,19 @@ export default function CampaignTerminal({
     }, 30_000);
     return () => clearInterval(interval);
   }, [visible, fetchEvents, fetchSessions]);
+
+  // Perceived feed: someone else's line happened (a text-free nudge, CampaignCanvas relays it). The
+  // character's memory of it lands after the reach pass / listening, so read the feed again a few times.
+  useEffect(() => {
+    if (!visible || !perceptionFeedOn()) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const onStale = () => {
+      timers.splice(0).forEach(clearTimeout);
+      for (const ms of [1500, 6000, 15000]) timers.push(setTimeout(() => { void fetchEvents(); }, ms));
+    };
+    window.addEventListener(PERCEIVED_FEED_STALE_EVENT, onStale);
+    return () => { window.removeEventListener(PERCEIVED_FEED_STALE_EVENT, onStale); timers.forEach(clearTimeout); };
+  }, [visible, fetchEvents]);
 
   // Newest at the bottom: new rows pin the view to the bottom — unless older
   // rows were just prepended (scrolling back), then the view holds its place.
@@ -1081,6 +1099,7 @@ export default function CampaignTerminal({
             sessions={sessions}
             emptyFrom={emptyFrom}
             foldKey={`growth:feed-folds:${campaignId}`}
+            perceived={perceivedFeed}
             query={query}
             encounter={encounter}
           />

@@ -64,6 +64,28 @@ export interface TableFeedFields {
   cycle?: number;
   /** The pre-processed text, exactly as typed or transcribed, when it differs from the cleaned text. */
   raw?: string;
+  /**
+   * Perception feed (unit 9, flag PERCEPTION_FEED): this line is the viewer's MEMORY of the moment, not the
+   * truth record. Its text carries `{gap}` (what was missed) and `{@id|label}` entity tokens (lib/perceived-text).
+   */
+  perceived?: PerceivedLineFields;
+}
+
+/** A named thing in a perceived line, as the viewer knows it — the tooltip shows only this. */
+export interface PerceivedEntityRef {
+  id: string;
+  kind: 'CHARACTER' | 'NPC' | 'ITEM' | 'LOCATION';
+  /** What the viewer calls it ("a figure", "a tall guard", "the Warden"). */
+  label: string;
+  /** Aspect kinds the viewer knows (names only — never a level). */
+  known: string[];
+  /** The label is its proper name (the viewer knows who it is). */
+  named: boolean;
+}
+
+export interface PerceivedLineFields {
+  memoryId: string;
+  entities: PerceivedEntityRef[];
 }
 
 export interface ChatPayload extends TableFeedFields {

@@ -52,6 +52,10 @@ export const TABLE_FEED_CSS = `
 .tf .seg .ent.open,.tf .seg .ent:focus-visible{background:linear-gradient(#ffcc78,#ffcc78) 0 19.5px/100% 3px no-repeat,linear-gradient(#000,#000) 0 .5px/100% 22px no-repeat;box-shadow:none}
 .tf .ent::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;height:40px;transform:translateY(-50%)}
 
+/* perceived feed (unit 9): what was missed = the rulebook gap/glitch — a short black dash with chromatic slivers, never a word */
+.tf .gap{display:inline-block;width:2.2em;height:5px;margin:0 .2em;vertical-align:middle;background:linear-gradient(90deg,#000 0 38%,transparent 38% 46%,#000 46% 100%);box-shadow:2px -2px 0 rgba(34,171,148,.7),-2px 2px 0 rgba(247,82,95,.6)}
+.tf .seg .gap{vertical-align:2px}
+
 /* right column: the typed/spoken badge IS the raw toggle (36px hit, 18px badge) */
 .tf .side{display:flex;flex-direction:column;align-items:flex-end}
 .tf .md{height:36px;width:44px;margin:0;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:flex-end;cursor:pointer}

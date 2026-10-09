@@ -267,6 +267,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         }
       }
 
+      // Perception unit 9: someone else's line happened — no text; the terminal re-reads its perceived feed.
+      if (data.kind === 'perceived_feed_stale') {
+        window.dispatchEvent(new CustomEvent('growth:perceived-feed-stale'));
+      }
+
       // Handle effort wager prompts — show modal to the player
       if (data.kind === 'effort_wager_prompt') {
         setPendingWager(data);

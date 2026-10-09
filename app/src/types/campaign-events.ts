@@ -245,6 +245,14 @@ export interface HeartbeatEvent {
   kind: 'heartbeat';
 }
 
+/**
+ * Perception unit 9 (PERCEPTION_FEED): sent to a perceived-feed connection INSTEAD of another person's
+ * terminal_event — no text at all. The client re-reads its own feed (its character's memory, built server-side).
+ */
+export interface PerceivedFeedStaleEvent {
+  kind: 'perceived_feed_stale';
+}
+
 // ── Union ─────────────────────────────────────────────────────────────────
 
 export type StreamEventData =
@@ -264,7 +272,8 @@ export type StreamEventData =
   | JewlFocusEvent
   | JewlHighlightEvent
   | BeingSpeakingStreamEvent
-  | HeartbeatEvent;
+  | HeartbeatEvent
+  | PerceivedFeedStaleEvent;
 
 /** The envelope sent over SSE */
 export interface CampaignStreamEvent {
