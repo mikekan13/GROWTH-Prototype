@@ -522,3 +522,10 @@ Tests: `src/sim/round/*.test.ts` (21). Deferred to Unit 2: mid-round reactive ch
 | `services/godhead-beings.ts` | ensureGodheadEntities (godlike DayaEntity per Godhead), seatGodhead (parentId/domainKey), godheadTree; GET/POST/PATCH /api/daya/godheads (ADMIN) |
 | `services/terminal-recall.ts` | askTerminal: classify → scope to campaign → score canon events (parties/goals/domains/words) + custodians' vine readings → phrase with a model, then enforceCitations drops any sentence without a resolving [c:ID]; recollectionCheck = the perfect-recollection harness (recall@k over sampled canon); POST /api/campaigns/[id]/terminal |
 | `ai/copilot/tools/ask-terminal.ts` | JEWL tool `ask_terminal` — JEWL as front man for the audience with the gods |
+
+## Perception — familiarity + aspects (2026-10-09, perception build units 1–2)
+Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Invisible: nothing in the mirror (`daya/perceive.ts`) reads these yet.
+
+| Module | Purpose |
+|--------|---------|
+| `services/familiarity.ts` | Familiarity store (per perceiver × subject × aspect). Pure: `scoreToFidelity` (the mirror's F0–F5 ladder), `growFamiliarity` (diminishing returns; per-source steps in `FAMILIARITY_TUNING.step` — placeholder tuning numbers: exposure < use < own < inspect), `fadeFamiliarity` (memory power-law curve with familiarity as salience; no fade at the F5 seal). DB: `getFamiliarity`, `recordExposure` (Zod-validated upsert; `seed` sets a score). Tests `familiarity.test.ts` |
