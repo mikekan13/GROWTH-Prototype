@@ -50,7 +50,10 @@ import { buildSlots, slotInputsFor } from '@/sim/round/slots';
 import { orderSlots } from '@/sim/round/ordering';
 import { resolveRound, type CheckFn, type DamageFn } from '@/sim/round/resolve';
 import { effortCap, eligibleEffortAttributes, skillUsableFromPillar } from '@/sim/round/action-economy';
-import type { Governor, Intention, IntentionKind, Participant, Pillar, RoundResult } from '@/sim/round/types';
+import { ATTR_KEYS, type Governor, type Intention, type IntentionKind, type Participant, type Pillar, type RoundResult } from '@/sim/round/types';
+import { aspectFacts, type AspectFact } from '@/sim/perception/aspect-values';
+import { familiarityAt, scoreToFidelity } from '@/services/familiarity';
+import { currentCycleOf } from '@/services/history';
 import { buildSensoryField, senseFlagsFromSheet } from '@/sim/senses/field';
 import { planRound } from '@/sim/planning/branch-plan';
 import { effectiveHeldResist, emptyState, parseState, participantFromCharacter, refreshParticipant, type EncounterState, type HeldItem } from '@/sim/encounter/state';
@@ -176,13 +179,62 @@ function summarizeRound(result: RoundResult, participants: Participant[]): strin
   return [`Round ${result.round}:`, ...lines, down.length ? `Down: ${down.join(', ')}` : ''].filter(Boolean).join('\n');
 }
 
+/**
+ * Another being in the encounter as a Trailblazer sees it (PERCEPTION_FEED): no raw pools, gauges, skills,
+ * attributes or held item — only what their character KNOWS of it, each known aspect's value at their
+ * fidelity (sim/perception/aspect-values). Unknown aspects are absent.
+ */
+export interface ParticipantSeen {
+  id: string;
+  name: string;
+  side: string;
+  control: Participant['control'];
+  downed: boolean;
+  perceived: true;
+  known: AspectFact[];
+}
+
 export interface EncounterView {
   id: string;
   campaignId: string;
   name: string;
   status: string;
   round: number;
-  state: EncounterState;
+  state: Omit<EncounterState, 'participants'> & { participants: Array<Participant | ParticipantSeen> };
+}
+
+/** The being aspects the encounter view can show, in display order. */
+export const PARTICIPANT_ASPECTS = ['pools', ...ATTR_KEYS.map((k) => `attribute:${k}`)];
+
+/** One other participant → what the viewer knows of it (`fidelity`: aspect key → F-level, absent = unknown). Pure. */
+export function perceivedParticipant(p: Participant, fidelity: Record<string, number>): ParticipantSeen {
+  const known = PARTICIPANT_ASPECTS.filter((k) => (fidelity[k] ?? 0) >= 1).map((k) => ({ aspectKind: k, fidelity: fidelity[k] }));
+  return {
+    id: p.id, name: p.name, side: p.side, control: p.control, downed: p.downed, perceived: true,
+    known: aspectFacts(known, { being: { attrs: p.attrs, pools: p.pools } }),
+  };
+}
+
+/** The viewer's characters' best familiarity with each other participant's being aspects (faded to now). */
+async function participantFidelity(campaignId: string, viewerCharacterIds: string[], subjectIds: string[]): Promise<Map<string, Record<string, number>>> {
+  const out = new Map<string, Record<string, number>>();
+  if (!viewerCharacterIds.length || !subjectIds.length) return out;
+  const beings = await prisma.dayaEntity.findMany({ where: { characterId: { in: viewerCharacterIds } }, select: { id: true } });
+  if (!beings.length) return out;
+  const [rows, nowCycle] = await Promise.all([
+    prisma.familiarity.findMany({
+      where: { campaignId, perceiverId: { in: beings.map((b) => b.id) }, subjectId: { in: subjectIds }, aspectKind: { in: PARTICIPANT_ASPECTS } },
+      select: { subjectId: true, aspectKind: true, score: true, lastCycle: true },
+    }),
+    currentCycleOf(campaignId),
+  ]);
+  for (const r of rows) {
+    const f = scoreToFidelity(familiarityAt(r, nowCycle));
+    const rec = out.get(r.subjectId) ?? {};
+    rec[r.aspectKind] = Math.max(rec[r.aspectKind] ?? 0, f);
+    out.set(r.subjectId, rec);
+  }
+  return out;
 }
 
 /**
@@ -193,8 +245,7 @@ export interface EncounterView {
 /**
  * A member's view of the round record under the perceived feed (pure): log lines whose actor is one of
  * their characters, slot entries of their characters, no scene narration. Participants stay (the roster
- * the declare form targets). [QUESTION for Mike] whether other participants' pools/attributes should be
- * withheld as well (today they ship, as before).
+ * the declare form targets); other participants' numbers are replaced in viewFor (perceivedParticipant).
  */
 export function perceivedEncounterState(state: EncounterState, mine: Set<string>): Pick<EncounterState, 'rounds' | 'sceneNarration'> {
   return {
@@ -218,7 +269,19 @@ async function viewFor(enc: { id: string; campaignId: string; name: string; stat
     // Perception (PERCEPTION_FEED): the round record is truth. A member keeps only their own characters'
     // log lines and slot entries (their own actions, in full); the rest reaches them, if perceived, through
     // their feed. The GM's scene narration is the same — it arrives as perceived narration, not here.
-    if (perceptionFeedOn()) Object.assign(state, perceivedEncounterState(state, mine));
+    if (perceptionFeedOn()) {
+      Object.assign(state, perceivedEncounterState(state, mine));
+      // Other beings' pools / attributes reach them only as their character's KNOWN aspect values.
+      let viewers = [...mine];
+      if (!viewers.length) {
+        const own = await prisma.character.findMany({ where: { campaignId: enc.campaignId, userId: actor.userId }, select: { id: true } });
+        viewers = own.map((c) => c.id);
+      }
+      const others = state.participants.filter((p) => !mine.has(p.id));
+      const fid = await participantFidelity(enc.campaignId, viewers, others.map((p) => p.id));
+      const participants = state.participants.map((p) => (mine.has(p.id) ? p : perceivedParticipant(p, fid.get(p.id) ?? {})));
+      return { id: enc.id, campaignId: enc.campaignId, name: enc.name, status: enc.status, round: enc.round, state: { ...state, participants } };
+    }
   }
   return { id: enc.id, campaignId: enc.campaignId, name: enc.name, status: enc.status, round: enc.round, state };
 }

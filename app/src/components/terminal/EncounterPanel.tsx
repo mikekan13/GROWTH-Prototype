@@ -15,14 +15,21 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 type Pillar = 'body' | 'spirit' | 'soul';
 type Kind = 'attack' | 'skill' | 'move' | 'negate' | 'block' | 'reserve' | 'hold';
 
-interface Participant {
+interface FullParticipant {
   id: string; name: string; side: string; control: 'player' | 'gm' | 'branch';
   pools: Record<Pillar, number>; gauges: { celerity: number; frequency: number; wisdom: number };
   skills: Array<{ name: string; level: number; governors: string[] }>;
   attrs?: Record<string, { current: number; max: number }>;
   fateDie?: string;
   heldItemName: string | null; heldResist: number; heldCondition?: number; downed: boolean;
+  perceived?: undefined;
 }
+/** Another being as a Trailblazer's character knows it (PERCEPTION_FEED): only known aspect values. */
+interface SeenParticipant {
+  id: string; name: string; side: string; control: 'player' | 'gm' | 'branch'; downed: boolean;
+  perceived: true; known: Array<{ aspect: string; label: string; value: string }>;
+}
+type Participant = FullParticipant | SeenParticipant;
 interface LogEntry { slot: number; kind: string; actorId: string | null; targetId: string | null; text: string }
 interface RoundResult { round: number; log: LogEntry[]; downed: string[] }
 interface Encounter {
@@ -178,7 +185,11 @@ export default function EncounterPanel({
     try { await fn(); onEvent?.(); } catch (e) { setError((e as Error).message); } finally { setBusy(null); }
   }, [onEvent]);
 
-  const selected = useMemo(() => enc?.state.participants.find(p => p.id === who) ?? null, [enc, who]);
+  // Only a being whose full sheet reached this viewer can be declared for (perceived ones are someone else's).
+  const selected = useMemo(() => {
+    const p = enc?.state.participants.find(q => q.id === who);
+    return p && !p.perceived ? p : null;
+  }, [enc, who]);
   const draftCounts = useMemo(() => {
     const c: Record<Pillar, number> = { body: 0, spirit: 0, soul: 0 };
     for (const d of drafts) c[d.pillar]++;
@@ -267,17 +278,25 @@ export default function EncounterPanel({
               {p.downed && <span className="ep-t t-down">Down</span>}
               <span className={`ep-t ${p.side === 'hostile' ? 't-hostile' : p.side === 'party' ? 't-party' : 't-other'}`}>{p.side}</span>
               <span className="ep-t t-ctl">{p.control}</span>
-              <span className="ep-t t-body" title="Body pool">B {p.pools.body}</span>
-              <span className="ep-t t-spirit" title="Spirit pool">S {p.pools.spirit}</span>
-              <span className="ep-t t-soul" title="Soul pool">So {p.pools.soul}</span>
-              {p.attrs?.frequency && <span className={p.attrs.frequency.current <= 0 ? 'ep-t t-freq zero' : 'ep-t t-freq'}>Frequency {p.attrs.frequency.current}/{p.attrs.frequency.max}</span>}
+              {!p.perceived && <>
+                <span className="ep-t t-body" title="Body pool">B {p.pools.body}</span>
+                <span className="ep-t t-spirit" title="Spirit pool">S {p.pools.spirit}</span>
+                <span className="ep-t t-soul" title="Soul pool">So {p.pools.soul}</span>
+                {p.attrs?.frequency && <span className={p.attrs.frequency.current <= 0 ? 'ep-t t-freq zero' : 'ep-t t-freq'}>Frequency {p.attrs.frequency.current}/{p.attrs.frequency.max}</span>}
+              </>}
             </div>
-            <div className="ep-sub">
-              cel {p.gauges.celerity} · frq {p.gauges.frequency} · wis {p.gauges.wisdom}
-              {p.heldItemName && <> · holds {p.heldItemName} (r{p.heldResist}{p.heldCondition !== undefined ? `, c${p.heldCondition}` : ''})</>}
-              {declaredFor(p.id) > 0 && <> · <b>declared {declaredFor(p.id)}</b></>}
-              {enc.state.lastPlan[p.id] && <> · last: {enc.state.lastPlan[p.id].source}{enc.state.lastPlan[p.id].note ? ` — ${enc.state.lastPlan[p.id].note}` : ''}</>}
-            </div>
+            {p.perceived ? (
+              <div className="ep-sub" data-perceived-participant>
+                {p.known.map((k, i) => <span key={k.aspect}>{i > 0 && ' · '}{k.label}: {k.value}</span>)}
+              </div>
+            ) : (
+              <div className="ep-sub">
+                cel {p.gauges.celerity} · frq {p.gauges.frequency} · wis {p.gauges.wisdom}
+                {p.heldItemName && <> · holds {p.heldItemName} (r{p.heldResist}{p.heldCondition !== undefined ? `, c${p.heldCondition}` : ''})</>}
+                {declaredFor(p.id) > 0 && <> · <b>declared {declaredFor(p.id)}</b></>}
+                {enc.state.lastPlan[p.id] && <> · last: {enc.state.lastPlan[p.id].source}{enc.state.lastPlan[p.id].note ? ` — ${enc.state.lastPlan[p.id].note}` : ''}</>}
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -462,6 +462,11 @@ export async function correctCanon(
   }
   // Perception unit 8: every feed line resting on the corrected row re-renders from the new truth on its next read.
   try { await clearVisibleFormCache(rows.map((m) => m.id)); } catch (err) { console.warn('[reconciliation] visible-form cache clear failed', err); }
+  // ...and each affected being's feed readers (owner + Watcher) get the same text-free re-read signal a new memory sends.
+  const affected = [...new Set(rows.map((m) => m.entityId))];
+  if (affected.length) {
+    void import('@/lib/perceived-feed-push').then((mod) => { for (const e of affected) mod.notifyMemoryWritten(e); }).catch(() => {});
+  }
   const reach = { memories: rows.length, rerendered, vines: load.vines, laterEvents: load.laterEvents, entities: load.entities };
   const rev = await prisma.canonRevision.create({
     data: { campaignId, canonEventId: event.id, previous: JSON.stringify({ narration: event.narration, detail: event.detail }), narration, reason: input.reason ?? '', reach: JSON.stringify(reach), authoredBy: actor.userId },

@@ -52,6 +52,8 @@ vi.mock('@/services/krma/ledger', () => ({ executeTransaction: vi.fn() }));
 vi.mock('@/services/krma/wallet', () => ({ getCampaignEconomy: vi.fn() }));
 vi.mock('@/services/canvas-placement', () => ({ placeNewLocation: vi.fn(), snapCharacterToLocation: vi.fn() }));
 vi.mock('@/lib/defaults', () => ({ createDefaultCharacter: vi.fn() }));
+const push = vi.hoisted(() => ({ notifyMemoryWritten: vi.fn() }));
+vi.mock('@/lib/perceived-feed-push', () => push);
 
 import { renderViewerFeed } from './visible-form';
 import { correctCanon } from './reconciliation';
@@ -92,6 +94,13 @@ describe('visible form cache', () => {
     const after = await renderViewerFeed('c1', 'violet', ['m1'], { rewrite: null });
     expect(text(after, 'm1')).toBe('Ruth slams the door.');
     expect(w.memories[0].visibleForm).toContain('slams');
+  });
+
+  it('a canon correction sends the text-free re-read signal once per affected being (owner + Watcher via feedReadersOf)', async () => {
+    push.notifyMemoryWritten.mockClear();
+    await correctCanon('c1', { userId: 'gm', role: 'WATCHER' }, { canonEventId: 'ev1', narration: 'Ruth slams the door.' });
+    await vi.waitFor(() => expect(push.notifyMemoryWritten).toHaveBeenCalledTimes(1));
+    expect(push.notifyMemoryWritten).toHaveBeenCalledWith('ent-v');
   });
 
   it('D3: reads sense clarity as stored at perception time, not the healed body now', async () => {

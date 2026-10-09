@@ -33,6 +33,11 @@ export interface AspectSubject {
   description?: string | null;
   /** CampaignItem.data when the subject is an item. */
   item?: Partial<GrowthWorldItem> | null;
+  /** A being's own numbers (encounter participant): attribute pools and action pools. */
+  being?: {
+    attrs?: Partial<Record<string, { current: number; max: number }>>;
+    pools?: { body: number; spirit: number; soul: number };
+  } | null;
 }
 
 const LABEL = new Map<string, string>(ASPECT_KINDS.map((k) => [k.key, k.label.replace(/\s*\(.*\)$/, '').replace(' / enchantment', '')]));
@@ -92,6 +97,26 @@ const DMG_HOW: Scale[] = [
   { max: 10, f2: 'hard', f1: '' },
   { max: Infinity, f2: 'terribly', f1: '' },
 ];
+
+/** An attribute pool's level (canon attribute scale; descriptive words = TUNING). */
+const ATTR: Scale[] = [
+  { max: 3, f2: 'weaker than most', f1: 'not much' },
+  { max: 8, f2: 'about what most have', f1: 'ordinary' },
+  { max: 15, f2: 'well beyond most', f1: 'strong' },
+  { max: Infinity, f2: 'far beyond anyone you know', f1: 'formidable' },
+];
+const ATTR_LABEL: Record<string, string> = {
+  clout: 'Clout', celerity: 'Celerity', constitution: 'Constitution', flow: 'Flow', frequency: 'Frequency',
+  focus: 'Focus', willpower: 'Willpower', wisdom: 'Wisdom', wit: 'Wit',
+};
+/** How spent a pool looks (current / max) — the loose rungs. */
+const spentWord = (cur: number, max: number, f: number) => {
+  const r = max > 0 ? cur / max : 0;
+  if (r <= 0) return f >= 2 ? 'spent' : 'flagging';
+  if (r < 0.4) return f >= 2 ? 'running low' : 'flagging';
+  if (r < 0.75) return f >= 2 ? 'holding up' : 'steady';
+  return f >= 2 ? 'fresh' : 'steady';
+};
 
 const firstSentence = (t: string) => (t.match(/^.*?[.!?](\s|$)/)?.[0] ?? t).trim();
 const firstWords = (t: string, n: number) => {
@@ -204,6 +229,23 @@ export function aspectFact(key: string, fidelity: number, subject: AspectSubject
       if (f === 4) return out(a.description ? `${a.name} — ${clip(a.description.trim(), 160)}` : a.name);
       if (f === 3) return out(a.name);
       return out(f === 2 ? 'there is more to it than it looks' : 'something about it');
+    }
+    case 'attribute': {
+      const a = instanceId ? subject.being?.attrs?.[instanceId] : undefined;
+      if (!a || typeof a.current !== 'number' || typeof a.max !== 'number') return null;
+      const name = ATTR_LABEL[instanceId!] ?? instanceId!;
+      const line = (value: string): AspectFact => ({ aspect: key, label: name, value });
+      if (f >= 5) return line(`${fmt(a.current)}/${fmt(a.max)}`);
+      if (f >= 3) return line(`${numericAt(a.current, f, '', ATTR)} of ${numericAt(a.max, f, '', ATTR)}`);
+      return line(`${pick(ATTR, a.max)[f === 2 ? 'f2' : 'f1']}, ${spentWord(a.current, a.max, f)}`);
+    }
+    case 'pools': {
+      const p = subject.being?.pools;
+      if (!p) return null;
+      const parts: Array<[string, number]> = [['Body', p.body], ['Spirit', p.spirit], ['Soul', p.soul]];
+      if (f >= 3) return out(parts.map(([n, v]) => `${n} ${f >= 5 ? fmt(v) : numericAt(v, f, '', ATTR)}`).join(' · '));
+      const total = p.body + p.spirit + p.soul;
+      return out(f === 2 ? (total >= 5 ? 'acts quickly and often' : total >= 3 ? 'acts about as often as most' : 'slow to act') : (total >= 5 ? 'quick' : 'hard to read'));
     }
     default:
       return null;

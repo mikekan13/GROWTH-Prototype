@@ -421,7 +421,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/campaigns/[id]/work-sessions | GET | DayaWorkSessionService (JEWL's open jobs for the copilot NOW strip; GM-only, others get []) |
 | /api/campaigns/[id]/godhead-messages | GET | GodHeadMessage list for campaign (GM-only) |
 | /api/campaigns/[id]/godhead-messages/[messageId]/resolve-bestowal | POST | NectarBestowService (GM confirms or declines Nectar proposal) |
-| /api/campaigns/[id]/history | GET | HistoryService (query per-object perspective history) |
+| /api/campaigns/[id]/history | GET | HistoryService (query per-object perspective history). Members only (`requireCampaignMember`; 403 otherwise, flag-independent). |
 | /api/campaigns/[id]/jewl-mistakes | POST | JewlMistakeService (GM flags a JEWL message as wrong) |
 | /api/campaigns/[id]/timescales | GET, POST | TimeService (list timescales, create custom calendar) |
 | /api/campaigns/[id]/timescales/[timescaleId] | GET, PATCH, DELETE | TimeService (get/update/delete timescale) |

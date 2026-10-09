@@ -82,6 +82,11 @@ export const ASPECT_KINDS = [
   // + the ability's own school (ItemAbility.school) — see aspectDomains.
   { key: 'ability', label: 'Ability / enchantment', domains: ['fortune'], perInstance: true },
   { key: 'thoughts', label: 'Thoughts', domains: ['enchantment'] },
+  // A being's own numbers (perception hardening 2026-10-09: the encounter view shows another being's pools /
+  // attributes only as what the viewer KNOWS of them). One aspect per attribute (`attribute:clout`), plus the
+  // action pools. Divination = "knowing a thing" — orchestrator pick, [QUESTION] for Mike.
+  { key: 'attribute', label: 'Attribute', domains: ['divination'], perInstance: true },
+  { key: 'pools', label: 'Action pools', domains: ['divination'] },
 ] as const satisfies readonly AspectKindDef[];
 
 export type AspectKindKey = (typeof ASPECT_KINDS)[number]['key'];

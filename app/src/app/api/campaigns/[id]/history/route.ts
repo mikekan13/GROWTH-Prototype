@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { prisma } from '@/lib/db';
-import { NotFoundError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
+import { requireCampaignMember } from '@/services/campaign-access';
 import { queryHistory, type HistorySubjectType } from '@/services/history';
 import { ownRecordScope } from '@/services/perceived-feed';
 
@@ -17,8 +16,8 @@ export async function GET(
   try {
     const session = await requireAuth();
     const { id } = await params;
-    const campaign = await prisma.campaign.findUnique({ where: { id } });
-    if (!campaign) throw new NotFoundError('Campaign not found');
+    // Members only (GM, CampaignMember, ADMIN) — independent of PERCEPTION_FEED; 404 if no campaign.
+    const campaign = await requireCampaignMember(id, session.user);
     const gmView = canManageCampaign(session.user.id, session.user.role, campaign);
 
     // Perception (PERCEPTION_FEED): a Trailblazer reads only their own characters' perspective entries —

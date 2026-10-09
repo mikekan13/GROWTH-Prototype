@@ -49,6 +49,13 @@ vi.mock('@/lib/db', () => {
       findMany: async ({ where }: { where: { subjectType?: string; subjectId?: In; visibility?: string } }) => w.history.filter((h) =>
         (!where.subjectType || h.subjectType === where.subjectType) && matches(h.subjectId, where.subjectId) && (!where.visibility || h.visibility === where.visibility)),
     },
+    dayaEntity: { findMany: async ({ where }: { where: { characterId: { in: string[] } } }) => where.characterId.in.map((c) => ({ id: `ent-${c}` })) },
+    familiarity: {
+      findMany: async ({ where }: { where: { perceiverId: { in: string[] }; subjectId: { in: string[] } } }) => [
+        { perceiverId: 'ent-violet', subjectId: 'ruth', aspectKind: 'attribute:clout', score: 0.99, lastCycle: null },
+        { perceiverId: 'ent-violet', subjectId: 'ruth', aspectKind: 'attribute:wit', score: 0.45, lastCycle: null },
+      ].filter((r) => where.perceiverId.in.includes(r.perceiverId) && where.subjectId.in.includes(r.subjectId)),
+    },
     encounter: {
       findUnique: async () => ({ id: 'enc1', campaignId: 'c1', name: 'Alley', status: 'ACTIVE', round: 1, state: w.encounterState, campaign: { id: 'c1', gmUserId: 'gm' } }),
     },
@@ -74,7 +81,11 @@ beforeEach(() => {
     { id: 'h3', campaignId: 'c1', subjectType: 'location', subjectId: 'vault', summary: 'SECRET-VAULT opened at night', visibility: 'public', timestampCycle: 1, realTime: T(3) },
   ];
   w.encounterState = JSON.stringify({
-    participants: [{ id: 'violet', name: 'Violet', side: 'party' }, { id: 'ruth', name: 'Ruth', side: 'hostile' }],
+    participants: [
+      { id: 'violet', name: 'Violet', side: 'party', control: 'player', pools: { body: 2, spirit: 1, soul: 1 }, gauges: { celerity: 5, frequency: 4, wisdom: 3 }, attrs: { clout: { current: 6, max: 6 } }, downed: false },
+      { id: 'ruth', name: 'Ruth', side: 'hostile', control: 'gm', pools: { body: 4, spirit: 3, soul: 2 }, gauges: { celerity: 777, frequency: 4, wisdom: 3 }, skills: [{ name: 'SECRET-SKILL', level: 9, governors: ['clout'] }],
+        attrs: { clout: { current: 17, max: 23 }, wit: { current: 4, max: 9 }, wisdom: { current: 31, max: 33 } }, heldItemName: 'SECRET-BLADE', heldResist: 5, downed: false },
+    ],
     intentions: [], lastPlan: {},
     sceneNarration: 'SECRET-SCENE the alley is trapped',
     rounds: [{
@@ -137,6 +148,21 @@ describe('PRIVACY beyond the feed (PERCEPTION_FEED on)', () => {
     expect(raw).not.toContain('SECRET');
   });
 
+  it('encounter: another participant\'s pools/attributes reach a Trailblazer only as their known aspect values', async () => {
+    as('p1', 'TRAILBLAZER');
+    const enc = JSON.parse((await encounter()).raw).encounter;
+    const [violet, ruth] = enc.state.participants;
+    expect(violet.attrs.clout.current).toBe(6); // own character in full
+    expect(ruth.perceived).toBe(true);
+    for (const k of ['pools', 'gauges', 'attrs', 'skills', 'heldItemName']) expect(ruth[k]).toBeUndefined();
+    expect(ruth.known).toEqual([
+      { aspect: 'attribute:clout', label: 'Clout', value: '17/23' }, // F5 → raw
+      { aspect: 'attribute:wit', label: 'Wit', value: 'well beyond most, holding up' }, // F2 → loose
+    ]);
+    expect(JSON.stringify(ruth)).not.toContain('777');
+    expect(JSON.stringify(ruth)).not.toContain('31'); // unknown Wisdom absent
+  });
+
   it('unit 10: changelog viewed as a character — Watcher gets that character\'s rows; a Trailblazer cannot ask for another\'s', async () => {
     as('gm', 'WATCHER');
     const v = await changelog('&viewAs=danny');
@@ -170,5 +196,15 @@ describe('flag OFF: every route exactly as before', () => {
     const e = await encounter();
     expect(e.raw).toContain('SECRET-RUTH');
     expect(e.raw).toContain('SECRET-SCENE');
+  });
+
+  it('history: a signed-in non-member gets 403 and no rows (membership check, independent of the flag)', async () => {
+    as('stranger', 'TRAILBLAZER');
+    const h = await history();
+    expect(h.status).toBe(403);
+    expect(h.raw).not.toContain('SECRET');
+    expect(h.raw).not.toContain('Violet arrived');
+    as('otherwatcher', 'WATCHER');
+    expect((await history()).status).toBe(403);
   });
 });
