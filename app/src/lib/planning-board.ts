@@ -56,10 +56,19 @@ export function listIntents(campaignId: string): IntentChip[] {
   return [...board.values()].filter((c) => c.campaignId === campaignId).sort((a, b) => a.createdAt - b.createdAt);
 }
 
-export function updateIntent(id: string, patch: Partial<Pick<IntentChip, 'skillName' | 'skillBy' | 'dr'>>): IntentChip | undefined {
+export function updateIntent(
+  id: string,
+  patch: Partial<Pick<IntentChip, 'skillName' | 'skillBy' | 'dr' | 'text' | 'subjectId' | 'subjectKind' | 'subjectName'>>,
+): IntentChip | undefined {
   const c = board.get(id);
   if (!c) return undefined;
   const next = { ...c, ...patch };
+  // Realigned onto a subject this character already has a chip for: the edited chip replaces that one.
+  if (patch.subjectId && patch.subjectId !== c.subjectId) {
+    for (const [oid, o] of board) {
+      if (oid !== id && o.campaignId === c.campaignId && o.characterId === c.characterId && o.subjectId === patch.subjectId) board.delete(oid);
+    }
+  }
   board.set(id, next);
   return next;
 }

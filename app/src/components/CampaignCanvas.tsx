@@ -9,6 +9,7 @@ import type { GrowthLocation } from '@/types/location';
 import type { GrowthWorldItem } from '@/types/item';
 import { calculateCharacterTKV, calculateItemKV, calculateLocationKV, type HeldItemForTKV } from '@/lib/kv-calculator';
 import { recomputeAugments } from '@/lib/character-actions';
+import { BOARD_CHANGED_EVENT } from '@/components/terminal/PlanningChips';
 import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
@@ -270,6 +271,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
       // Perception: a character's memory was written (no text) — the terminal re-reads that character's feed.
       if (data.kind === 'perceived_feed_stale') {
         window.dispatchEvent(new CustomEvent('growth:perceived-feed-stale', { detail: { characterId: data.characterId ?? null } }));
+      }
+
+      // Planning board moved (no text) — the chip strip re-reads GET /intents.
+      if (data.kind === 'board_changed') {
+        window.dispatchEvent(new CustomEvent(BOARD_CHANGED_EVENT));
       }
 
       // Handle effort wager prompts — show modal to the player

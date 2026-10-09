@@ -14,7 +14,10 @@ Last updated: 2026-10-09
 > seeds nothing (Mike: GM's story). Morning rulings A–E built: Wit = retention (fade scales with Wit),
 > sense grants from any source (mind sense from organs/items/abilities/traits), wrong impressions stored and
 > shown as received until fixed, inspection writes the inspector's feed line, known category by item tags.
-> Planning-board chip UI (U3 of TABLE-RHYTHM) ruled "yes" — not built yet. NEXT: Mike's [QUESTION]s
+> Planning-board chip UI BUILT for inspect chips (components/terminal/PlanningChips: strip above the speak
+> bar; owner rewrites words / names a sheet skill / withdraws; Watcher also sets DR; text-free targeted
+> `board_changed` SSE; chips leave on the GM's next move). Rest of U3 (a chip for every entity, NPC beings)
+> not built; board still in memory [QUESTION: persist?]. NEXT: Mike's [QUESTION]s
 > (memory/perception-build-progress-2026-10-09.md), a live run with both flags on.
 
 > 2026-10-06..08 (orchestrator + worker sessions, ~75 commits on merge/fork-portrait-pipeline):

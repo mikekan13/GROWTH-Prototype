@@ -255,6 +255,15 @@ export interface PerceivedFeedStaleEvent {
   characterId?: string;
 }
 
+/**
+ * Planning board (inspect chips): pushed to ONE viewer (targetUserId) — a chip's owner, the campaign's
+ * Watcher, and whoever acted — when a chip is posted, edited, withdrawn or committed. No text at all;
+ * the client re-reads GET /intents, which filters per viewer.
+ */
+export interface BoardChangedEvent {
+  kind: 'board_changed';
+}
+
 // ── Union ─────────────────────────────────────────────────────────────────
 
 export type StreamEventData =
@@ -275,7 +284,8 @@ export type StreamEventData =
   | JewlHighlightEvent
   | BeingSpeakingStreamEvent
   | HeartbeatEvent
-  | PerceivedFeedStaleEvent;
+  | PerceivedFeedStaleEvent
+  | BoardChangedEvent;
 
 /** The envelope sent over SSE */
 export interface CampaignStreamEvent {

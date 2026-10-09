@@ -117,6 +117,42 @@ describe('declare → board', () => {
   });
 });
 
+describe('planning-board chips (the strip\'s reads and edits)', () => {
+  it('the GM reads every chip with names + sheet skills; a player only their own, never the DR control', async () => {
+    await svc.postInspectIntent('c1', P1, { characterId: 'violet', target: 'sword' });
+    await svc.postInspectIntent('c1', GM, { characterId: 'ruth', target: 'sword' });
+    const gmView = await svc.listInspectIntents('c1', GM);
+    expect(gmView.map((c) => c.characterName)).toEqual(['Violet', 'Ruth']);
+    expect(gmView[0]).toMatchObject({ gm: true, skills: ['Swordsmanship'], subjectLabel: 'Old Sword' });
+    const p1View = await svc.listInspectIntents('c1', P1);
+    expect(p1View).toHaveLength(1);
+    expect(p1View[0]).toMatchObject({ characterId: 'violet', gm: false });
+  });
+
+  it('the owner rewrites the words: the chip realigns its subject and names the skill the words name', async () => {
+    const chip = await svc.postInspectIntent('c1', P1, { characterId: 'violet', target: 'sword' });
+    const next = await svc.editInspectIntent('c1', P1, chip.id, { text: 'I inspect Ruth with my swordsmanship' });
+    expect(next).toMatchObject({ subjectId: 'ruth', subjectKind: 'NPC', text: 'I inspect Ruth with my swordsmanship', skillName: 'swordsmanship', skillBy: 'player' });
+    await expect(svc.editInspectIntent('c1', P1, chip.id, { text: 'the moon' })).rejects.toThrow(/Nothing called/);
+  });
+
+  it('post / edit / withdraw / commit each send the text-free board_changed to the owner and the GM', async () => {
+    const { broadcastEvent } = await import('@/lib/campaign-stream');
+    const sent = vi.mocked(broadcastEvent);
+    sent.mockClear();
+    const chip = await svc.postInspectIntent('c1', P1, { characterId: 'violet', target: 'sword' });
+    await flush();
+    const boardSends = () => sent.mock.calls.filter((c) => (c[1] as { kind: string }).kind === 'board_changed');
+    expect(boardSends().map((c) => c[2]).sort()).toEqual(['gm', 'p1']);
+    expect(boardSends()[0][1]).toEqual({ kind: 'board_changed' });
+    sent.mockClear();
+    await svc.cancelInspectIntent('c1', P1, chip.id);
+    await flush();
+    expect(boardSends()).toHaveLength(2);
+    expect(listIntents('c1')).toHaveLength(0);
+  });
+});
+
 describe('commit on the GM\'s next move → the ordinary check', () => {
   it('a player\'s character: the EXISTING check flow, skilled, with the skill\'s domains on the purpose (system pick)', async () => {
     await svc.postInspectIntent('c1', P1, { characterId: 'violet', target: 'sword' });

@@ -26,6 +26,7 @@ import { getSkillDieType, parseDie } from '@/lib/dice-utils';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { postIntent, listIntents, getIntent, updateIntent, removeIntent, takeIntents, type InspectIntentChip } from '@/lib/planning-board';
 import type { InspectPurpose } from '@/lib/pending-checks';
+import { perceptionFeedOn } from '@/lib/perception-feed';
 import { requireCampaignMember } from '@/services/campaign-access';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { gatherTraitModifiers } from '@/services/trait-modifiers';
@@ -58,7 +59,36 @@ export const postInspectSchema = z.object({
 export const editInspectSchema = z.object({
   skillName: z.string().min(1).max(120).nullable().optional(),
   dr: z.number().int().min(1).max(100).nullable().optional(),
+  /** New words for the chip ("inspect the shield with my smithing"): realigns its subject (and names the skill if the words do). */
+  text: z.string().trim().min(1).max(500).optional(),
 });
+
+/** One chip as the viewer may read it (GET /intents). */
+export interface IntentChipView extends InspectIntentChip {
+  /** The inspecting character's name (the viewer's own character, or any for the GM). */
+  characterName: string;
+  /** The subject as this viewer knows it: the truth for the GM; flag on → the inspector's visible-form label. */
+  subjectLabel: string;
+  /** The inspecting character's sheet skills — the chip's skill choices. */
+  skills: string[];
+  /** The viewer is the GM (sets DR; edits any chip). */
+  gm: boolean;
+}
+
+/**
+ * Tell the readers of these characters' chips that the board moved: each character's owner, the campaign's
+ * GM, and whoever acted. No text — the client re-reads GET /intents (which filters per viewer). Best-effort.
+ */
+function notifyBoardChanged(campaignId: string, characterIds: string[], actorIds: string[] = []): void {
+  void (async () => {
+    const [campaign, chars] = await Promise.all([
+      prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } }),
+      characterIds.length ? prisma.character.findMany({ where: { id: { in: characterIds } }, select: { userId: true } }) : Promise.resolve([]),
+    ]);
+    const users = new Set([campaign?.gmUserId, ...chars.map((c) => c.userId), ...actorIds].filter((u): u is string => !!u));
+    for (const u of users) broadcastEvent(campaignId, { kind: 'board_changed' }, u);
+  })().catch((err) => console.warn('[inspection] board_changed not sent', err));
+}
 
 async function campaignOf(campaignId: string) {
   const c = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { id: true, gmUserId: true } });
@@ -114,12 +144,14 @@ export async function postInspectIntent(campaignId: string, user: User, input: z
   const { gm } = await requireDeclarer(campaignId, user, v.characterId);
   const subject = v.subjectId ? await subjectById(campaignId, v.subjectId) : await findInspectSubject(campaignId, v.target!);
   if (!subject) throw new NotFoundError(`Nothing called "${v.target ?? v.subjectId}" here`);
-  return postIntent({
+  const chip = postIntent({
     id: crypto.randomUUID(), campaignId, kind: 'inspect', characterId: v.characterId,
     subjectId: subject.id, subjectKind: subject.kind, subjectName: subject.name,
     skillName: v.skillName ?? null, skillBy: v.skillName ? (gm ? 'gm' : 'player') : null,
     dr: null, text: v.text ?? `inspect ${subject.name}`, postedBy: user.id, createdAt: Date.now(),
   });
+  notifyBoardChanged(campaignId, [chip.characterId], [user.id]);
+  return chip;
 }
 
 /** A player's chat line: if it declares an inspection, post it. Best-effort — never throws. */
@@ -134,17 +166,53 @@ export async function postInspectFromChat(campaignId: string, user: User, charac
   }
 }
 
-/** Open chips: the GM sees every chip; anyone else only their own characters'. */
-export async function listInspectIntents(campaignId: string, user: User): Promise<InspectIntentChip[]> {
-  const campaign = await requireCampaignMember(campaignId, user);
-  const chips = listIntents(campaignId);
-  if (canManageCampaign(user.id, user.role, campaign)) return chips;
-  const own = await prisma.character.findMany({ where: { campaignId, userId: user.id }, select: { id: true } });
-  const mine = new Set(own.map((c) => c.id));
-  return chips.filter((c) => mine.has(c.characterId));
+function sheetSkillNames(data: string | null | undefined): string[] {
+  try {
+    const sheet = data ? JSON.parse(data) as { skills?: unknown } : null;
+    const list = Array.isArray(sheet?.skills) ? sheet.skills as Array<{ name?: unknown } | string> : [];
+    return [...new Set(list.map((s) => (typeof s === 'string' ? s : typeof s?.name === 'string' ? s.name : '')).filter(Boolean))];
+  } catch { return []; }
 }
 
-/** The GM names the skill / sets DR; the owner may name (or clear) the skill. */
+/**
+ * Open chips as this viewer may read them: the GM sees every chip (truth); anyone else only their own
+ * characters'. With PERCEPTION_FEED on, a non-GM reads the subject as the INSPECTOR knows it (visible-form
+ * labelFor by its identity level) — never the truth name it has not learned.
+ */
+export async function listInspectIntents(campaignId: string, user: User): Promise<IntentChipView[]> {
+  const campaign = await requireCampaignMember(campaignId, user);
+  const gm = canManageCampaign(user.id, user.role, campaign);
+  let chips = listIntents(campaignId);
+  if (!chips.length) return [];
+  const ids = [...new Set(chips.map((c) => c.characterId))];
+  const chars = await prisma.character.findMany({ where: { campaignId, id: { in: ids } }, select: { id: true, name: true, userId: true, data: true } });
+  const byId = new Map(chars.map((c) => [c.id, c]));
+  if (!gm) chips = chips.filter((c) => byId.get(c.characterId)?.userId === user.id);
+  const perceived = !gm && perceptionFeedOn();
+  const vf = perceived ? await import('@/services/visible-form') : null;
+  const ctxs = new Map<string, Awaited<ReturnType<NonNullable<typeof vf>['loadViewerContext']>>>();
+  const out: IntentChipView[] = [];
+  for (const chip of chips) {
+    const ch = byId.get(chip.characterId);
+    let subjectLabel = chip.subjectName;
+    let text = chip.text;
+    if (vf) {
+      if (!ctxs.has(chip.characterId)) ctxs.set(chip.characterId, await vf.loadViewerContext(campaignId, chip.characterId, { rewrite: null }));
+      const ctx = ctxs.get(chip.characterId);
+      const e = ctx?.entities.find((x) => x.id === chip.subjectId) ?? { id: chip.subjectId, kind: chip.subjectKind, name: chip.subjectName };
+      subjectLabel = vf.labelFor(e, ctx?.familiarity[e.id]?.identity ?? 0, chip.characterId);
+      // Words someone else wrote (or the default wording) carry the truth name: show the viewer's own label instead.
+      if (chip.postedBy !== user.id || chip.text === `inspect ${chip.subjectName}`) text = `inspect ${subjectLabel}`;
+    }
+    out.push({
+      ...chip, text, subjectName: perceived ? subjectLabel : chip.subjectName,
+      characterName: ch?.name ?? '', subjectLabel, skills: sheetSkillNames(ch?.data), gm,
+    });
+  }
+  return out;
+}
+
+/** The GM names the skill / sets DR; the owner may name (or clear) the skill or rewrite the words (realigning the subject). */
 export async function editInspectIntent(campaignId: string, user: User, intentId: string, input: z.input<typeof editInspectSchema>): Promise<InspectIntentChip> {
   const r = editInspectSchema.safeParse(input);
   if (!r.success) throw new ValidationError(r.error.issues.map((i) => i.message).join('; '));
@@ -153,9 +221,21 @@ export async function editInspectIntent(campaignId: string, user: User, intentId
   const { gm } = await requireDeclarer(campaignId, user, chip.characterId);
   if (r.data.dr !== undefined && !gm) throw new ForbiddenError('Only the GM sets the DR');
   const patch: Parameters<typeof updateIntent>[1] = {};
+  if (r.data.text !== undefined) {
+    // The same reading as a chat line ("inspect X [with my Y]"); bare words name the subject themselves.
+    const said = detectInspectIntent(r.data.text);
+    const target = said?.target ?? r.data.text;
+    const subject = await findInspectSubject(campaignId, target);
+    if (!subject) throw new NotFoundError(`Nothing called "${target}" here`);
+    Object.assign(patch, { text: r.data.text, subjectId: subject.id, subjectKind: subject.kind, subjectName: subject.name });
+    if (said?.skill && r.data.skillName === undefined) { patch.skillName = said.skill; patch.skillBy = gm ? 'gm' : 'player'; }
+  }
   if (r.data.skillName !== undefined) { patch.skillName = r.data.skillName; patch.skillBy = r.data.skillName ? (gm ? 'gm' : 'player') : null; }
   if (r.data.dr !== undefined) patch.dr = r.data.dr;
-  return updateIntent(intentId, patch)!;
+  const next = updateIntent(intentId, patch);
+  if (!next) throw new NotFoundError('Intent not found (already committed?)');
+  notifyBoardChanged(campaignId, [chip.characterId], [user.id]);
+  return next;
 }
 
 export async function cancelInspectIntent(campaignId: string, user: User, intentId: string): Promise<void> {
@@ -163,6 +243,7 @@ export async function cancelInspectIntent(campaignId: string, user: User, intent
   if (!chip || chip.campaignId !== campaignId) throw new NotFoundError('Intent not found (already committed?)');
   await requireDeclarer(campaignId, user, chip.characterId);
   removeIntent(intentId);
+  notifyBoardChanged(campaignId, [chip.characterId], [user.id]);
 }
 
 // ── Commit (the GM's next move) ───────────────────────────────────────────
@@ -176,7 +257,9 @@ export function commitPlanningBoardOnGmMove(campaignId: string, user: User): voi
   void (async () => {
     const campaign = await campaignOf(campaignId);
     if (!canManageCampaign(user.id, user.role, campaign)) return;
-    for (const chip of takeIntents(campaignId)) {
+    const taken = takeIntents(campaignId);
+    notifyBoardChanged(campaignId, [...new Set(taken.map((c) => c.characterId))], [user.id]);
+    for (const chip of taken) {
       try { await startInspection(campaignId, { id: user.id, username: user.username ?? 'GM' }, chip); }
       catch (err) { console.warn('[inspection] could not start', chip.id, err); }
     }

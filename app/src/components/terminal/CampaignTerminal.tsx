@@ -13,6 +13,7 @@ import type { RollResult } from '@/types/dice';
 import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
 import TableSpeakBar from './TableSpeakBar';
+import PlanningChips from './PlanningChips';
 import BeingSpeakingLines from './BeingSpeakingLines';
 import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import TableFeed from './table-feed/TableFeed';
@@ -1152,6 +1153,8 @@ export default function CampaignTerminal({
         {/* Input only in play: the GM narrates through the speak bar; a
             Trailblazer speaks as their character. Out of play there is none
             (the /command path lives on in handleCommandSubmit + CommandInput). */}
+        {/* The planning board (inspect chips): who is about to do what, until the GM's next move commits it. */}
+        {activeSession && <PlanningChips campaignId={campaignId} entities={tableEntities} />}
         {activeSession && (isGM ? (
           <TableSpeakBar campaignId={campaignId} onEvent={refreshEvents} />
         ) : (
