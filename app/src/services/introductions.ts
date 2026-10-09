@@ -15,7 +15,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { caughtSpeech } from '@/services/visible-form';
-import { recordIntroductions } from '@/services/familiarity';
+import { recordIntroductions, type FamiliarityChangeRefs } from '@/services/familiarity';
 import { introducedBeings, type IntroCandidate } from '@/sim/perception/introductions';
 
 export interface PerceivedRows { characterId: string; memoryIds: string[] }
@@ -28,7 +28,7 @@ export function groupRows(rows: Array<{ characterId: string; memoryId: string | 
 }
 
 /** Learn names from the introductions each perceiver caught in its rows. Returns perceiver characterId → subjects raised. */
-export async function learnIntroductions(campaignId: string, perceived: PerceivedRows[], cycle?: number): Promise<Map<string, string[]>> {
+export async function learnIntroductions(campaignId: string, perceived: PerceivedRows[], cycle?: number, refs?: FamiliarityChangeRefs): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   for (const p of perceived) {
     try {
@@ -38,15 +38,17 @@ export async function learnIntroductions(campaignId: string, perceived: Perceive
       const beings = ctx.entities.filter((e) => e.kind === 'CHARACTER' || e.kind === 'NPC');
       const present = await presentBeings(p.characterId, beings);
       const byId = new Map(beings.map((b) => [b.id, b]));
-      const found = new Set<string>();
+      // subject → the memory row it was caught in (the change record's memoryId; first catch wins).
+      const found = new Map<string, string>();
       for (const s of speech) {
         const speaker = s.speakerId ? byId.get(s.speakerId) ?? null : null;
-        for (const id of introducedBeings(s.pieces, speaker ? { id: speaker.id, name: speaker.name } : null, present, p.characterId)) found.add(id);
+        for (const id of introducedBeings(s.pieces, speaker ? { id: speaker.id, name: speaker.name } : null, present, p.characterId)) if (!found.has(id)) found.set(id, s.memoryId);
       }
       if (!found.size) continue;
       const raised = await recordIntroductions({
         campaignId, perceiverId: ctx.viewerEntityId, perceiverCharacterId: p.characterId, cycle,
-        subjects: [...found].map((id) => ({ subjectId: id, subjectKind: byId.get(id)?.kind === 'NPC' ? 'NPC' as const : 'CHARACTER' as const })),
+        subjects: [...found].map(([id, memoryId]) => ({ subjectId: id, subjectKind: byId.get(id)?.kind === 'NPC' ? 'NPC' as const : 'CHARACTER' as const, memoryId })),
+        refs,
       });
       if (raised.length) out.set(p.characterId, raised);
     } catch (err) { console.warn(`[introductions] pass failed for ${p.characterId} (non-fatal)`, err); }

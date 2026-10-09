@@ -54,7 +54,7 @@ import { effortCap, eligibleEffortAttributes, skillUsableFromPillar } from '@/si
 import type { Governor, Intention, IntentionKind, Participant, Pillar, RoundResult } from '@/sim/round/types';
 import { aspectFacts, type AspectFact } from '@/sim/perception/aspect-values';
 import { BEING_ASPECTS } from '@/sim/perception/aspects';
-import { familiarityAt, recordUseBatch, scoreToFidelity } from '@/services/familiarity';
+import { familiarityAt, recordUseBatch, scoreToFidelity, witByPerceiver } from '@/services/familiarity';
 import { usesFromRound } from '@/sim/perception/use';
 import { currentCycleOf } from '@/services/history';
 import { buildSensoryField, senseFlagsFromSheet } from '@/sim/senses/field';
@@ -244,15 +244,16 @@ async function participantFidelity(campaignId: string, viewerCharacterIds: strin
   if (!viewerCharacterIds.length || !subjectIds.length) return out;
   const beings = await prisma.dayaEntity.findMany({ where: { characterId: { in: viewerCharacterIds } }, select: { id: true } });
   if (!beings.length) return out;
-  const [rows, nowCycle] = await Promise.all([
+  const [rows, nowCycle, wit] = await Promise.all([
     prisma.familiarity.findMany({
       where: { campaignId, perceiverId: { in: beings.map((b) => b.id) }, subjectId: { in: subjectIds }, aspectKind: { in: [...PARTICIPANT_ASPECTS, 'identity'] } },
-      select: { subjectId: true, aspectKind: true, score: true, lastCycle: true },
+      select: { perceiverId: true, subjectId: true, aspectKind: true, score: true, lastCycle: true },
     }),
     currentCycleOf(campaignId),
+    witByPerceiver(beings.map((b) => b.id)),
   ]);
   for (const r of rows) {
-    const f = scoreToFidelity(familiarityAt(r, nowCycle));
+    const f = scoreToFidelity(familiarityAt(r, nowCycle, wit.get(r.perceiverId)));
     const rec = out.get(r.subjectId) ?? {};
     rec[r.aspectKind] = Math.max(rec[r.aspectKind] ?? 0, f);
     out.set(r.subjectId, rec);
@@ -759,6 +760,8 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     ? await judgeRoundReach(enc.campaignId, enc.locationId ?? null, result.log, state.participants.filter(p => fields.has(p.id)).map(p => p.id), Object.fromEntries(Object.entries(state.lastPlan).map(([id, l]) => [id, l.note ?? null])))
     : null;
   const exposures = new Map<string, EventRefs>();
+  // Change-record pointers for this round's familiarity writes: each being's own round row + the round's canon event.
+  const roundRowOf: Record<string, { memoryId: string; canonEventId: string | null }> = {};
   for (const p of state.participants) {
     const field = fields.get(p.id);
     if (!field) continue; // was down before the round began
@@ -826,12 +829,15 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
         antecedentId: previous?.id ?? null,
       },
       ...(roundVia ? { noticed: true, perceivedVia: roundVia, perceivedClarity: roundClarity } : {}),
-    }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
+    }); memoryIds.push(written.id);
+    roundRowOf[p.id] = { memoryId: written.id, canonEventId: canon?.roundId ?? null };
+    if (exposures.has(p.id)) addRefs(exposures, p.id, roundRowOf[p.id]);
+    } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
   if (roundReach) await recordNoticedExposures(enc.campaignId, cycle, exposures);
   // Perception unit 12: USE TEACHES — the round's item uses, once per being (source 'use', no domain gate).
   try {
-    await recordUseBatch({ campaignId: enc.campaignId, cycle, uses: usesFromRound({ log: result.log, heldAtStart, upAtStart, wornHits }) });
+    await recordUseBatch({ campaignId: enc.campaignId, cycle, uses: usesFromRound({ log: result.log, heldAtStart, upAtStart, wornHits }), refs: { canonEventId: canon?.roundId ?? null }, refsByUser: roundRowOf });
   } catch (err) { console.warn('[encounter] use familiarity failed', err); }
 
   // Provenance manifest for the round (2026-09-20): a COMPOSITE act — the

@@ -352,12 +352,12 @@ export async function declareCanon(
         ...(reach && verdict ? memoryFieldsOf(verdict, reach.source) : {}),
       });
       memoryIds.push(m.id);
-      if (reach) { addRefs(exposures, w.characterId, { characterIds: parties, locationIds: [input.locationId] }); noticedRows.push({ characterId: w.characterId, memoryId: m.id }); }
+      if (reach) { addRefs(exposures, w.characterId, { characterIds: parties, locationIds: [input.locationId], memoryId: m.id, canonEventId: event.id }); noticedRows.push({ characterId: w.characterId, memoryId: m.id }); }
     } catch (err) { console.warn('[canon] witness memory failed', err); }
   }
   if (reach) await recordNoticedExposures(campaignId, cycle, exposures);
   // Introductions teach names: what each witness CAUGHT of any quoted introduction ("This is Ruth").
-  if (reach && noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle);
+  if (reach && noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle, { canonEventId: event.id });
   return { event, witnesses: witnesses.length, memoryIds };
 }
 

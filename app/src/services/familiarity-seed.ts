@@ -18,7 +18,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { listAspects } from '@/sim/perception/aspects';
-import { familiarityAt, F5_SEAL, writeFamiliarity, type FamiliarityWrite, type SubjectKind } from '@/services/familiarity';
+import { familiarityAt, F5_SEAL, witOfPerceiver, writeFamiliarity, type FamiliarityWrite, type SubjectKind } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
 
 // ── Tuning ────────────────────────────────────────────────────────────────
@@ -116,8 +116,8 @@ export async function knowsItemCategory(input: { campaignId: string; perceiverId
     select: { subjectId: true, score: true, lastCycle: true },
   });
   if (rows.length === 0) return false;
-  const now = await currentCycleOf(input.campaignId);
-  const known = rows.filter((r) => familiarityAt(r, now) >= FAMILIARITY_SEED.categoryKnownMin).map((r) => r.subjectId);
+  const [now, witMax] = await Promise.all([currentCycleOf(input.campaignId), witOfPerceiver(input.perceiverId)]);
+  const known = rows.filter((r) => familiarityAt(r, now, witMax) >= FAMILIARITY_SEED.categoryKnownMin).map((r) => r.subjectId);
   if (known.length === 0) return false;
   return (await prisma.campaignItem.count({ where: { id: { in: known }, type: input.itemType } })) > 0;
 }

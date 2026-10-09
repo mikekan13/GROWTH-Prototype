@@ -66,6 +66,11 @@ describe('recordIntroductions — raise identity to the naming level, never lowe
     expect(h.changes).toEqual([]); // no write, no change row
   });
 
+  it('the change row points at the memory row the name was caught in, plus the pass refs', async () => {
+    await recordIntroductions({ campaignId: 'c', perceiverId: 'e1', perceiverCharacterId: 'violet', cycle: 4, subjects: [{ subjectId: 'ruth', subjectKind: 'NPC', memoryId: 'mem-7' }], refs: { canonEventId: 'ev-3' } });
+    expect(h.changes).toEqual([expect.objectContaining({ subjectId: 'ruth', memoryId: 'mem-7', canonEventId: 'ev-3' })]);
+  });
+
   it('the perceiver is never introduced to itself', async () => {
     expect(await recordIntroductions({ campaignId: 'c', perceiverId: 'e1', perceiverCharacterId: 'violet', cycle: 4, subjects: [{ subjectId: 'violet', subjectKind: 'CHARACTER' }] })).toEqual([]);
   });

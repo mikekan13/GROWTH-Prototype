@@ -12,7 +12,8 @@
  * - FADE: the memory curve (daya/recall `computeRecency`, power law) with
  *   familiarity playing salience's role — the deeper it is the slower it
  *   fades; at the F5 seal it does not fade at all ("would easily remain solid
- *   through lifetimes").
+ *   through lifetimes"). WIT = RETENTION: the perceiver's Wit scales the fade
+ *   (witFadeFactor — higher Wit, slower fade; Mike 2026-10-09).
  *
  * Read by the mirror (daya/perceive: the place's stored familiarity sets the
  * scene attunement, unit 4); seeded on first contact by services/familiarity-seed —
@@ -58,6 +59,16 @@ export const FAMILIARITY_TUNING = {
   } satisfies Record<GrowthSource, number>,
   /** Power-law exponent — the memory curve's r (RECALL_TUNING.decayExp). */
   fadeExp: RECALL_TUNING.decayExp,
+  /**
+   * WIT = RETENTION (Mike 2026-10-09: "depends on the entity's wit. Higher wit
+   * means higher retention."). TUNING placeholders: the fade exponent is scaled
+   * by witFadeFactor — 1 at `referenceWit` (recall's default Wit when a sheet
+   * carries none, so the curve above is the reference being's), smaller (slower
+   * fade) above it, larger below. Wit normalised like recall's pools (poolNorm:
+   * max / 40, capped 1.2). Gain 1 → Wit 0 ×1.25, Wit 10 ×1, Wit 20 ×0.83, Wit 40 ×0.63.
+   */
+  witRetentionGain: 1,
+  referenceWit: 10,
 } as const;
 
 /** The F5 seal — same gate as the mirror's ladder (renderer-math). */
@@ -90,11 +101,59 @@ export function growFamiliarity(score: number, source: GrowthSource, times = 1):
  * exp = r * (1 - depth), depth = score / F5_SEAL — salience's role played by
  * familiarity, scaled so the F5 seal stops the fade entirely.
  */
-export function fadeFamiliarity(score: number, elapsed: number): number {
+export function fadeFamiliarity(score: number, elapsed: number, witMax: number = FAMILIARITY_TUNING.referenceWit): number {
   const s = clamp01(score);
   const depth = Math.min(1, s / F5_SEAL);
-  const effectiveExp = FAMILIARITY_TUNING.fadeExp * (1 - depth);
+  const effectiveExp = FAMILIARITY_TUNING.fadeExp * (1 - depth) * witFadeFactor(witMax);
   return s * Math.pow(1 + Math.max(0, elapsed), -effectiveExp);
+}
+
+/** Recall's pool normalisation (daya/recall poolNorm), kept local so this module stays a leaf. */
+function witNorm(witMax: number): number {
+  return Math.min(RECALL_TUNING.wisdomNormCap, Math.max(0, witMax / RECALL_TUNING.wisdomNormDivisor));
+}
+
+/**
+ * WIT = RETENTION: the multiplier on the fade exponent — 1 at the reference
+ * Wit, < 1 (slower fade) for higher Wit, > 1 for lower. The F5 seal still
+ * stops the fade entirely whatever the Wit (Godheads seed at 1 → never fade).
+ */
+export function witFadeFactor(witMax: number): number {
+  const g = FAMILIARITY_TUNING.witRetentionGain;
+  const w = Number.isFinite(witMax) ? witMax : FAMILIARITY_TUNING.referenceWit;
+  return (1 + g * witNorm(FAMILIARITY_TUNING.referenceWit)) / (1 + g * witNorm(w));
+}
+
+/**
+ * Wit pool max from a sheet, read the way recall's Wit gate reads it
+ * (daya/ensemble: level + augmentPositive − augmentNegative; no Wit on the
+ * sheet → recall's default 10 = the reference Wit). Pure.
+ */
+export function witMaxFromSheet(sheet: unknown): number {
+  const wit = (sheet as { attributes?: { wit?: { level?: number; augmentPositive?: number; augmentNegative?: number } } } | null)?.attributes?.wit;
+  if (!wit || typeof wit.level !== 'number') return FAMILIARITY_TUNING.referenceWit;
+  return wit.level + (wit.augmentPositive ?? 0) - (wit.augmentNegative ?? 0);
+}
+
+/** Each perceiver's (DayaEntity id) Wit, from its character sheet; unknown → the reference Wit. */
+export async function witByPerceiver(perceiverIds: string[]): Promise<Map<string, number>> {
+  const ids = [...new Set(perceiverIds)].filter(Boolean);
+  const out = new Map<string, number>();
+  if (!ids.length) return out;
+  let rows: Array<{ id: string; character: { data: string } | null }> = [];
+  try { rows = await prisma.dayaEntity.findMany({ where: { id: { in: ids } }, select: { id: true, character: { select: { data: true } } } }); }
+  catch (err) { console.warn('[familiarity] Wit read failed; reference Wit used', err); }
+  for (const r of rows) {
+    let sheet: unknown = null;
+    try { sheet = r.character?.data ? JSON.parse(r.character.data) : null; } catch { sheet = null; }
+    out.set(r.id, witMaxFromSheet(sheet));
+  }
+  return out;
+}
+
+/** One perceiver's Wit (see witByPerceiver). */
+export async function witOfPerceiver(perceiverId: string): Promise<number> {
+  return (await witByPerceiver([perceiverId])).get(perceiverId) ?? FAMILIARITY_TUNING.referenceWit;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────
@@ -144,8 +203,8 @@ const RECORD_SELECT = { perceiverId: true, subjectId: true, subjectKind: true, a
  * cycles since its last write (same unit memory decay uses). Rows without a
  * cycle stamp are returned unfaded.
  */
-export function familiarityAt(rec: Pick<FamiliarityRecord, 'score' | 'lastCycle'>, nowCycle: number): number {
-  return rec.lastCycle === null ? rec.score : fadeFamiliarity(rec.score, nowCycle - rec.lastCycle);
+export function familiarityAt(rec: Pick<FamiliarityRecord, 'score' | 'lastCycle'>, nowCycle: number, witMax?: number): number {
+  return rec.lastCycle === null ? rec.score : fadeFamiliarity(rec.score, nowCycle - rec.lastCycle, witMax);
 }
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -179,7 +238,7 @@ export async function listFamiliarityForWatcher(
   if (!perceiver) throw new ValidationError('perceiverId is required');
   const entity = await prisma.dayaEntity.findFirst({ where: { OR: [{ id: perceiver }, { characterId: perceiver }] }, select: { id: true, characterId: true } });
   if (!entity) throw new NotFoundError('No DAYA being with that id');
-  const nowCycle = await currentCycleOf(campaignId);
+  const [nowCycle, witMax] = await Promise.all([currentCycleOf(campaignId), witOfPerceiver(entity.id)]);
   const rows = await prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id }, select: RECORD_SELECT, orderBy: [{ subjectKind: 'asc' }, { subjectId: 'asc' }, { aspectKind: 'asc' }] });
   const ids = [...new Set(rows.map((r) => r.subjectId))];
   const [items, chars, locs] = ids.length ? await Promise.all([
@@ -193,7 +252,7 @@ export async function listFamiliarityForWatcher(
     characterId: entity.characterId ?? null,
     nowCycle,
     rows: rows.map((r) => {
-      const current = familiarityAt(r, nowCycle);
+      const current = familiarityAt(r, nowCycle, witMax);
       return { ...toRecord(r), subjectName: names.get(r.subjectId) ?? null, current, currentFidelity: scoreToFidelity(current) };
     }),
   };
@@ -343,10 +402,11 @@ export async function recordExposure(input: RecordExposureInput): Promise<Famili
     await seedFirstContacts({ campaignId: v.campaignId, perceiverId: v.perceiverId, subjects: [{ subjectId: v.subjectId, subjectKind: v.subjectKind }], aspects: [v.aspectKind] });
   }
   const lastCycle = v.cycle ?? await currentCycleOf(v.campaignId);
+  const witMax = await witOfPerceiver(v.perceiverId);
   return prisma.$transaction(async (tx) => {
     const prior = await priorOf(tx, key);
     // Fade the prior up to this write before growing — re-stamping lastCycle must not erase the fade.
-    const base = prior ? familiarityAt(prior, lastCycle) : 0;
+    const base = prior ? familiarityAt(prior, lastCycle, witMax) : 0;
     const score = v.source === 'seed' ? v.score! : growFamiliarity(base, v.source, v.times ?? 1);
     const [row] = await writeFamiliarity(tx, [{ ...key, campaignId: v.campaignId, subjectKind: v.subjectKind, score, source: v.source, cycle: lastCycle, prior, refs: v.refs }]);
     return row;
@@ -380,12 +440,13 @@ export async function recordExposureBatch(input: { campaignId: string; perceiver
     subjects: [...new Map(writes.map((w) => [w.subjectId, w])).values()], aspects: PASSIVE_ASPECTS,
   });
   const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
+  const witMax = await witOfPerceiver(input.perceiverId);
   await prisma.$transaction(async (tx) => {
     const planned: FamiliarityWrite[] = [];
     for (const w of writes) {
       const key = { perceiverId: input.perceiverId, subjectId: w.subjectId, aspectKind: w.aspectKind };
       const prior = await priorOf(tx, key);
-      const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle) : 0, w.source);
+      const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle, witMax) : 0, w.source);
       planned.push({ ...key, campaignId: input.campaignId, subjectKind: w.subjectKind, score, source: w.source, cycle: lastCycle, prior, refs: input.refs });
     }
     await writeFamiliarity(tx, planned);
@@ -427,20 +488,21 @@ export async function invalidateVisibleFormsNaming(perceiverId: string, subjectI
  * each subject to AT LEAST INTRODUCED_SCORE (a higher, earned score is kept),
  * one transaction; first contact seeded first. Returns the subjects raised.
  */
-export async function recordIntroductions(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: Array<{ subjectId: string; subjectKind: SubjectKind }>; refs?: FamiliarityChangeRefs }): Promise<string[]> {
+export async function recordIntroductions(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: Array<{ subjectId: string; subjectKind: SubjectKind; /** The memory row the introduction was caught in (overrides refs.memoryId). */ memoryId?: string | null }>; refs?: FamiliarityChangeRefs }): Promise<string[]> {
   const subjects = [...new Map(input.subjects.filter((s) => s.subjectId && s.subjectId !== input.perceiverCharacterId).map((s) => [s.subjectId, s])).values()].slice(0, EXPOSURE_BATCH_CAP);
   if (!subjects.length) return [];
   await seedFirstContacts({ campaignId: input.campaignId, perceiverId: input.perceiverId, perceiverCharacterId: input.perceiverCharacterId, subjects, aspects: ['identity'] });
   const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
+  const witMax = await witOfPerceiver(input.perceiverId);
   const raised: string[] = [];
   await prisma.$transaction(async (tx) => {
     const planned: FamiliarityWrite[] = [];
     for (const s of subjects) {
       const key = { perceiverId: input.perceiverId, subjectId: s.subjectId, aspectKind: 'identity' };
       const prior = await priorOf(tx, key);
-      const now = prior ? familiarityAt(prior, lastCycle) : 0;
+      const now = prior ? familiarityAt(prior, lastCycle, witMax) : 0;
       if (now >= INTRODUCED_SCORE) continue;
-      planned.push({ ...key, campaignId: input.campaignId, subjectKind: s.subjectKind, score: INTRODUCED_SCORE, source: INTRODUCED_SOURCE, cycle: lastCycle, prior, keepSubjectKind: true, refs: input.refs });
+      planned.push({ ...key, campaignId: input.campaignId, subjectKind: s.subjectKind, score: INTRODUCED_SCORE, source: INTRODUCED_SOURCE, cycle: lastCycle, prior, keepSubjectKind: true, refs: { ...input.refs, ...(s.memoryId ? { memoryId: s.memoryId } : {}) } });
       raised.push(s.subjectId);
     }
     await writeFamiliarity(tx, planned);
@@ -499,7 +561,7 @@ export async function setFamiliarityByWatcher(campaignId: string, user: { id: st
  * aspects the item actually has are written; first contact is seeded first (an owned item starts known).
  * `uses` carry characterIds; beings without a DAYA row are skipped. Returns the rows written.
  */
-export async function recordUseBatch(input: { campaignId: string; cycle?: number; uses: Array<{ userId: string; itemId: string; aspects: string[] }>; refs?: FamiliarityChangeRefs }): Promise<number> {
+export async function recordUseBatch(input: { campaignId: string; cycle?: number; uses: Array<{ userId: string; itemId: string; aspects: string[] }>; refs?: FamiliarityChangeRefs; /** Per user (characterId): its own row this round (merged over refs). */ refsByUser?: Record<string, FamiliarityChangeRefs> }): Promise<number> {
   if (!input.uses.length) return 0;
   const itemIds = [...new Set(input.uses.map((u) => u.itemId))];
   const items = await prisma.campaignItem.findMany({ where: { id: { in: itemIds } }, select: { id: true, data: true } });
@@ -509,6 +571,7 @@ export async function recordUseBatch(input: { campaignId: string; cycle?: number
   for (const characterId of [...new Set(input.uses.map((u) => u.userId))]) {
     const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true } });
     if (!entity) continue;
+    const witMax = await witOfPerceiver(entity.id);
     const writes = input.uses.filter((u) => u.userId === characterId)
       .flatMap((u) => u.aspects.filter((a) => has.get(u.itemId)?.has(a)).map((aspectKind) => ({ subjectId: u.itemId, aspectKind })))
       .slice(0, EXPOSURE_BATCH_CAP);
@@ -523,8 +586,8 @@ export async function recordUseBatch(input: { campaignId: string; cycle?: number
       for (const w of writes) {
         const key = { perceiverId: entity.id, subjectId: w.subjectId, aspectKind: w.aspectKind };
         const prior = await priorOf(tx, key);
-        const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle) : 0, 'use');
-        planned.push({ ...key, campaignId: input.campaignId, subjectKind: 'ITEM', score, source: 'use', cycle: lastCycle, prior, keepSubjectKind: true, refs: input.refs });
+        const score = growFamiliarity(prior ? familiarityAt(prior, lastCycle, witMax) : 0, 'use');
+        planned.push({ ...key, campaignId: input.campaignId, subjectKind: 'ITEM', score, source: 'use', cycle: lastCycle, prior, keepSubjectKind: true, refs: { ...input.refs, ...input.refsByUser?.[characterId] } });
       }
       await writeFamiliarity(tx, planned);
     });

@@ -195,7 +195,11 @@ export async function writeUnnoticed(args: { entityId: string; cycle: number; co
 
 // ── Familiarity exposure ──────────────────────────────────────────────────
 
-export interface EventRefs { characterIds?: Array<string | null | undefined>; itemIds?: string[]; locationIds?: Array<string | null | undefined> }
+export interface EventRefs {
+  characterIds?: Array<string | null | undefined>; itemIds?: string[]; locationIds?: Array<string | null | undefined>;
+  /** Change-record pointers (FamiliarityChange.memoryId / canonEventId): the being's row / the event this pass rests on (latest wins). */
+  memoryId?: string | null; canonEventId?: string | null;
+}
 
 /**
  * Exposure for every being that NOTICED something this pass: one transaction
@@ -225,7 +229,8 @@ export async function recordNoticedExposures(campaignId: string, cycle: number, 
         ...(r.itemIds ?? []).filter((i) => holderOf.has(i)).map((i) => ({ subjectId: i, subjectKind: 'ITEM' as const, source: holderOf.get(i) === e.characterId ? 'own' as const : 'exposure' as const })),
         ...(r.locationIds ?? []).filter((l): l is string => !!l).map((l) => ({ subjectId: l, subjectKind: 'LOCATION' as const, source: 'exposure' as const })),
       ];
-      try { await recordExposureBatch({ campaignId, perceiverId: e.id, perceiverCharacterId: e.characterId, cycle, subjects }); }
+      const refs = r.memoryId || r.canonEventId ? { memoryId: r.memoryId ?? null, canonEventId: r.canonEventId ?? null } : undefined;
+      try { await recordExposureBatch({ campaignId, perceiverId: e.id, perceiverCharacterId: e.characterId, cycle, subjects, refs }); }
       catch (err) { console.warn(`[perception-reach] exposure batch failed for ${e.characterId}`, err); }
     }
   } catch (err) { console.warn('[perception-reach] exposure pass failed', err); }
@@ -238,5 +243,7 @@ export function addRefs(map: Map<string, EventRefs>, beingId: string, refs: Even
     characterIds: [...(prior.characterIds ?? []), ...(refs.characterIds ?? [])],
     itemIds: [...(prior.itemIds ?? []), ...(refs.itemIds ?? [])],
     locationIds: [...(prior.locationIds ?? []), ...(refs.locationIds ?? [])],
+    memoryId: refs.memoryId ?? prior.memoryId ?? null,
+    canonEventId: refs.canonEventId ?? prior.canonEventId ?? null,
   });
 }

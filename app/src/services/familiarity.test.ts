@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreToFidelity, growFamiliarity, fadeFamiliarity, familiarityAt, FAMILIARITY_TUNING, F5_SEAL, recordExposureSchema } from './familiarity';
+import { scoreToFidelity, growFamiliarity, fadeFamiliarity, familiarityAt, FAMILIARITY_TUNING, F5_SEAL, recordExposureSchema, witFadeFactor, witMaxFromSheet } from './familiarity';
 import { computeFidelityLevel } from '@/daya/renderer-math';
 import { computeRecency } from '@/daya/recall';
 
@@ -104,5 +104,31 @@ describe('recordExposureSchema', () => {
   it('rejects unknown subject kinds and sources', () => {
     expect(recordExposureSchema.safeParse({ ...base, subjectKind: 'THING', source: 'use' }).success).toBe(false);
     expect(recordExposureSchema.safeParse({ ...base, source: 'smell' }).success).toBe(false);
+  });
+});
+
+describe('WIT = RETENTION (Mike 2026-10-09: higher Wit, higher retention)', () => {
+  it('the reference Wit leaves the curve as it was; higher Wit fades slower, lower faster', () => {
+    expect(witFadeFactor(FAMILIARITY_TUNING.referenceWit)).toBeCloseTo(1, 10);
+    expect(witFadeFactor(30)).toBeLessThan(witFadeFactor(20));
+    expect(witFadeFactor(20)).toBeLessThan(1);
+    expect(witFadeFactor(2)).toBeGreaterThan(1);
+    expect(fadeFamiliarity(0.7, 10)).toBe(fadeFamiliarity(0.7, 10, FAMILIARITY_TUNING.referenceWit));
+    const sharp = fadeFamiliarity(0.7, 10, 30), dull = fadeFamiliarity(0.7, 10, 3);
+    expect(sharp).toBeGreaterThan(fadeFamiliarity(0.7, 10));
+    expect(dull).toBeLessThan(fadeFamiliarity(0.7, 10));
+  });
+
+  it('applies through familiarityAt; the F5 seal (Godheads) never fades whatever the Wit', () => {
+    expect(familiarityAt({ score: 0.6, lastCycle: 0 }, 8, 40)).toBeGreaterThan(familiarityAt({ score: 0.6, lastCycle: 0 }, 8, 1));
+    expect(fadeFamiliarity(1, 1e6, 0)).toBe(1);
+    expect(fadeFamiliarity(F5_SEAL, 1e6, 0)).toBe(F5_SEAL);
+  });
+
+  it('reads Wit off the sheet the way recall does (level + aug+ - aug-; none -> 10)', () => {
+    expect(witMaxFromSheet({ attributes: { wit: { level: 12, augmentPositive: 3, augmentNegative: 1 } } })).toBe(14);
+    expect(witMaxFromSheet({ attributes: { wit: { level: 7 } } })).toBe(7);
+    expect(witMaxFromSheet(null)).toBe(10);
+    expect(witMaxFromSheet({ attributes: {} })).toBe(10);
   });
 });

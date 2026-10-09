@@ -38,7 +38,7 @@ import { parseSegments, splitEntities, type FeedSegment } from '@/lib/feed-segme
 import { parseTableProse } from '@/services/table-prose';
 import { SENSE_KINDS, senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
 import { perceptionReachOn } from '@/sim/senses/reach';
-import { familiarityAt, scoreToFidelity } from '@/services/familiarity';
+import { familiarityAt, scoreToFidelity, witMaxFromSheet } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
 import { decodePerceivedVia } from '@/daya/perceived-via';
 import { route, anthropicChatText, openAiCompatChat, recordAiCall } from '@/ai/network';
@@ -569,7 +569,8 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
     ...locs.map((l) => ({ id: l.id, kind: 'LOCATION' as const, name: l.name, description: parse<{ description?: string }>(l.data)?.description ?? null })),
   ];
   const familiarity: ViewerFamiliarity = {};
-  for (const f of fams) (familiarity[f.subjectId] ??= {})[f.aspectKind] = scoreToFidelity(familiarityAt(f, nowCycle));
+  const witMax = witMaxFromSheet(viewerSheet); // WIT = RETENTION: the viewer's own Wit fades what it knows
+  for (const f of fams) (familiarity[f.subjectId] ??= {})[f.aspectKind] = scoreToFidelity(familiarityAt(f, nowCycle, witMax));
   const senses = senseProfileFromSheet(viewerSheet);
   const clarity: Record<string, number> = { ...senses.effectiveness };
   for (const m of senses.nonPhysical ?? []) clarity[m.name] = m.effectiveness;

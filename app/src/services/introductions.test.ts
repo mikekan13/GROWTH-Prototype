@@ -74,7 +74,7 @@ describe('learnIntroductions (wiring)', () => {
     const out = await learnIntroductions('c', groupRows([{ characterId: 'violet', memoryId: 'm1' }, { characterId: 'violet', memoryId: null }]));
     expect(out.get('violet')?.sort()).toEqual(['kai', 'ruth']);
     expect(h.raised[0].perceiverId).toBe('e-violet');
-    expect(h.raised[0].subjects).toEqual(expect.arrayContaining([{ subjectId: 'ruth', subjectKind: 'NPC' }, { subjectId: 'kai', subjectKind: 'CHARACTER' }]));
+    expect(h.raised[0].subjects).toEqual(expect.arrayContaining([expect.objectContaining({ subjectId: 'ruth', subjectKind: 'NPC', memoryId: expect.any(String) }), expect.objectContaining({ subjectId: 'kai', subjectKind: 'CHARACTER', memoryId: expect.any(String) })]));
   });
 
   it('someone elsewhere is not "present": no gain from "this is Kai" when Kai is in another place', async () => {

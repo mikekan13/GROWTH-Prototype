@@ -27,7 +27,7 @@ import type { InspectPurpose } from '@/lib/pending-checks';
 import { requireCampaignMember } from '@/services/campaign-access';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { gatherTraitModifiers } from '@/services/trait-modifiers';
-import { familiarityAt, recordExposure, writeFamiliarity } from '@/services/familiarity';
+import { familiarityAt, recordExposure, witOfPerceiver, writeFamiliarity } from '@/services/familiarity';
 import { subjectAspects } from '@/services/familiarity-seed';
 import { currentCycleOf } from '@/services/history';
 import { getRelevance, normalizeSkillName, pickBestSkill, SKILL_RELEVANCE_TUNING, type SkillRelevance } from '@/services/skill-relevance';
@@ -299,12 +299,13 @@ async function engineInspectionRoll(
 export async function resolveInspection(campaignId: string, purpose: InspectPurpose, outcome: CheckOutcome & { skilled: boolean; checkId?: string }): Promise<InspectWrite[]> {
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId: purpose.characterId }, select: { id: true } });
   if (!entity) { console.warn('[inspection] no DAYA being for', purpose.characterId, '— nothing learned'); return []; }
-  const [rows, nowCycle, itemData] = await Promise.all([
+  const [rows, nowCycle, itemData, witMax] = await Promise.all([
     prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id }, select: { subjectId: true, aspectKind: true, score: true, lastCycle: true } }),
     currentCycleOf(campaignId),
     itemDataOf(purpose.subjectKind, purpose.subjectId),
+    witOfPerceiver(entity.id),
   ]);
-  const scored = rows.map((r) => ({ ...r, now: familiarityAt(r, nowCycle) }));
+  const scored = rows.map((r) => ({ ...r, now: familiarityAt(r, nowCycle, witMax) }));
   const exposure = exposureByDomain(scored.map((r) => ({ aspectKind: r.aspectKind, score: r.now })));
   const current: Record<string, number> = {};
   for (const r of scored) if (r.subjectId === purpose.subjectId) current[r.aspectKind] = r.now;

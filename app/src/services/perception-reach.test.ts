@@ -79,6 +79,7 @@ describe('declareCanon witnesses — PERCEPTION_REACH on', () => {
     expect(h.exposures).toHaveBeenCalledTimes(1);
     const refs = (h.exposures.mock.calls[0] as unknown as [string, number, Map<string, unknown>])[2];
     expect([...refs.keys()]).toEqual(['violet']); // only the being that noticed
+    expect(refs.get('violet')).toMatchObject({ memoryId: 'm1', canonEventId: 'ev1' }); // change-record pointers
   });
 
   it('stub verdicts keep the old fixed salience', async () => {

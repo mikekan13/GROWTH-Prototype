@@ -233,8 +233,8 @@ async function deliverToTable(
       responses.push({ characterId: listener.id, characterName: listener.name, status: 'ok', detail: 'unnoticed' });
       continue;
     }
-    if (reach) addRefs(exposures, listener.id, { characterIds: [excludeId], locationIds: [reach.beings.find((b) => b.id === listener.id)?.locationId] });
     const result = await converseWithEntity(listener.id, actor.role, stimulus, {}, source);
+    if (reach) addRefs(exposures, listener.id, { characterIds: [excludeId], locationIds: [reach.beings.find((b) => b.id === listener.id)?.locationId], memoryId: result.memoryEntryId ?? null, canonEventId: primaryTruth });
     if (reach && verdict && result.memoryEntryId) await stampPerception(result.memoryEntryId, verdict, reach.source);
     responses.push({
       characterId: listener.id,
@@ -258,7 +258,7 @@ async function deliverToTable(
     const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
     await recordNoticedExposures(campaignId, cycle, exposures);
     // Introductions teach names: what each listener CAUGHT of "I'm Ruth" / "this is Ruth".
-    if (noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle);
+    if (noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle, { canonEventId: primaryTruth });
   }
   return responses;
 }
@@ -440,7 +440,7 @@ async function runBeats(
         if (reached && outcome.listened?.memoryEntryId) {
           await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source);
           // Introductions teach names (this stretch's row, once it points at the truth and carries its senses).
-          await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }]);
+          await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }], undefined, { canonEventId: truth.primary });
         }
       })
       .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
@@ -476,7 +476,8 @@ async function runBeats(
         const v = j.verdicts.get(id) ?? null;
         const early = delivered.has(id);
         deliver(id, v, j.source);
-        if (!early && v?.reaches && v.noticed) addRefs(refs, id, { characterIds: utterances.map((u) => u.speaker?.id ?? null), locationIds: [j.beings.find((b) => b.id === id)?.locationId] });
+        // The stretch's memory row is written later by listening; the change record points at the truth event.
+        if (!early && v?.reaches && v.noticed) addRefs(refs, id, { characterIds: utterances.map((u) => u.speaker?.id ?? null), locationIds: [j.beings.find((b) => b.id === id)?.locationId], canonEventId: truth.primary });
       }
       if (refs.size) {
         const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
