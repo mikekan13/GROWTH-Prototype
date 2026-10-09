@@ -235,6 +235,7 @@ Ruling (Mike 2026-10-08/09, Q6): the feed is a view of an entity's memory. The c
 - **Sense grants (2026-10-09):** any active source may grant a sense (incl. `mind`, the only way a thought reaches another being): body parts, held items and their abilities, traits/blossoms (`grantsSenses`, `sim/senses/field.ts`). The reach pass, the mirror's sense profile and the visible-form thought rule all read the merged profile.
 - **Wrong impressions (2026-10-09):** an inspection fumble stores the WRONG value perceived on `Familiarity.impression` (small model when the world-sim is on, deterministic fallback); tooltips / roster show it as fact for that perceiver only, until a later correct perception reaches F3 on that aspect and fixes it (recorded on FamiliarityChange). Low-fidelity sight does not yet produce wrong impressions.
 - **Inspection feed line (2026-10-09):** a resolved inspection (success or not) writes the inspector a memory row (kind 'inspection', no canon ref); the perceived feed renders it as their own narration — "You study <the thing as known>: …" — at current knowledge, so it relabels as they learn. Tooltips deepen as before.
+- **Known category by tags (2026-10-09):** first-contact seeding treats an item as a known kind when it shares its non-misc `type` or any existing tag with an item the being holds or knows.
 
 ## Architecture Overview
 

@@ -10,6 +10,9 @@
  * - KNOWN CATEGORY: a thing of a kind it already knows starts at a mid
  *   relational level for what it is and what it looks like ("a normal human
  *   knows a butter knife even if it's a different type of butter knife").
+ *   Kind = the item's broad `type` OR any of its existing TAGS
+ *   (GrowthWorldItem.tags — Mike 2026-10-09: "items already have all sorts of
+ *   tags"; no archetype field).
  * - Otherwise: no seed — it starts at zero and grows by exposure.
  *
  * Seeding only ever CREATES rows that do not exist (first contact), except a
@@ -52,6 +55,22 @@ const NOT_A_CATEGORY = new Set(['misc', '']);
 // ── Pure ──────────────────────────────────────────────────────────────────
 
 export type FirstContact = 'godhead' | 'self' | 'owned' | 'known-category' | 'stranger';
+
+/** An item's category tags (CampaignItem.data.tags), normalised (trimmed, lower-case, de-duplicated). Pure. */
+export function itemTagsOf(data: string | { tags?: unknown } | null | undefined): string[] {
+  let d: unknown = data;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = null; } }
+  const tags = (d as { tags?: unknown } | null)?.tags;
+  if (!Array.isArray(tags)) return [];
+  return [...new Set(tags.filter((t): t is string => typeof t === 'string').map((t) => t.trim().toLowerCase()).filter(Boolean))];
+}
+
+/** Do two items share a knowable kind — the same non-misc `type`, or any tag? Pure. */
+export function sharesCategory(a: { type: string; tags: string[] }, b: { type: string; tags: string[] }): boolean {
+  if (!NOT_A_CATEGORY.has(a.type) && a.type === b.type) return true;
+  const bt = new Set(b.tags);
+  return a.tags.some((t) => bt.has(t));
+}
 
 /** Which first-contact case applies — Godhead > self > owned > known category > stranger. Pure. */
 export function contactKind(f: { godhead?: boolean; self?: boolean; owned?: boolean; categoryKnown?: boolean }): FirstContact {
@@ -101,16 +120,18 @@ export async function isGodheadBeing(characterId: string): Promise<boolean> {
 }
 
 /**
- * Does the being already know this item's CATEGORY? Category = CampaignItem.type
- * ('misc' is none). Known = it holds another ACTIVE item of that type, or its
- * faded identity familiarity with another item of that type is at least
- * FAMILIARITY_SEED.categoryKnownMin. [QUESTION for Mike: `type` is coarse —
- * weapon/tool/… — there is no item archetype field ("butter knife") yet.]
+ * Does the being already know this item's CATEGORY? A category is the broad
+ * CampaignItem.type ('misc' is none) or any of the item's existing TAGS
+ * (data.tags — Mike 2026-10-09: use existing item tags, no archetype field).
+ * Known = it holds another ACTIVE item sharing one, or its faded identity
+ * familiarity with another item sharing one is at least
+ * FAMILIARITY_SEED.categoryKnownMin.
  */
-export async function knowsItemCategory(input: { campaignId: string; perceiverId: string; perceiverCharacterId: string; itemId: string; itemType: string }): Promise<boolean> {
-  if (NOT_A_CATEGORY.has(input.itemType)) return false;
-  const held = await prisma.campaignItem.count({ where: { campaignId: input.campaignId, holderId: input.perceiverCharacterId, type: input.itemType, status: 'ACTIVE', id: { not: input.itemId } } });
-  if (held > 0) return true;
+export async function knowsItemCategory(input: { campaignId: string; perceiverId: string; perceiverCharacterId: string; itemId: string; itemType: string; itemTags?: string[] }): Promise<boolean> {
+  const me = { type: input.itemType, tags: input.itemTags ?? [] };
+  if (NOT_A_CATEGORY.has(me.type) && !me.tags.length) return false;
+  const held = await prisma.campaignItem.findMany({ where: { campaignId: input.campaignId, holderId: input.perceiverCharacterId, status: 'ACTIVE', id: { not: input.itemId } }, select: { type: true, data: true }, take: 200 });
+  if (held.some((h) => sharesCategory(me, { type: h.type, tags: itemTagsOf(h.data) }))) return true;
   const rows = await prisma.familiarity.findMany({
     where: { perceiverId: input.perceiverId, subjectKind: 'ITEM', aspectKind: 'identity', subjectId: { not: input.itemId } },
     select: { subjectId: true, score: true, lastCycle: true },
@@ -119,7 +140,8 @@ export async function knowsItemCategory(input: { campaignId: string; perceiverId
   const [now, witMax] = await Promise.all([currentCycleOf(input.campaignId), witOfPerceiver(input.perceiverId)]);
   const known = rows.filter((r) => familiarityAt(r, now, witMax) >= FAMILIARITY_SEED.categoryKnownMin).map((r) => r.subjectId);
   if (known.length === 0) return false;
-  return (await prisma.campaignItem.count({ where: { id: { in: known }, type: input.itemType } })) > 0;
+  const others = await prisma.campaignItem.findMany({ where: { id: { in: known } }, select: { type: true, data: true } });
+  return others.some((o) => sharesCategory(me, { type: o.type, tags: itemTagsOf(o.data) }));
 }
 
 export interface SeedOnFirstContactInput {
@@ -153,7 +175,7 @@ export async function seedOnFirstContact(input: SeedOnFirstContactInput): Promis
     if (!item || item.campaignId !== input.campaignId) return { contact: 'stranger', seeded: [] };
     itemData = item.data;
     owned = item.holderId === input.perceiverCharacterId;
-    if (!godhead && !owned) categoryKnown = await knowsItemCategory({ ...input, itemId: input.subjectId, itemType: item.type });
+    if (!godhead && !owned) categoryKnown = await knowsItemCategory({ ...input, itemId: input.subjectId, itemType: item.type, itemTags: itemTagsOf(item.data) });
   }
 
   const contact = contactKind({ godhead, self, owned, categoryKnown });

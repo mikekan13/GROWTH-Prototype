@@ -24,6 +24,7 @@ vi.mock('@/lib/db', () => {
     campaignItem: {
       findUnique: async ({ where }: { where: { id: string } }) => db.items[where.id] ?? null,
       count: async ({ where }: { where: Record<string, unknown> }) => Object.values(db.items).filter((i) => match(i as never, where)).length,
+      findMany: async ({ where }: { where: Record<string, unknown> }) => Object.values(db.items).filter((i) => match(i as never, where)),
     },
     familiarity: {
       findMany: async ({ where }: { where: Record<string, unknown> }) => db.rows.filter((r) => match(r, where)),
@@ -46,7 +47,7 @@ vi.mock('@/lib/db', () => {
 });
 
 import {
-  FAMILIARITY_SEED, contactKind, seedPlan, subjectAspects, seedOnFirstContact, isGodheadBeing,
+  FAMILIARITY_SEED, contactKind, seedPlan, subjectAspects, seedOnFirstContact, isGodheadBeing, itemTagsOf, sharesCategory,
 } from './familiarity-seed';
 import { scoreToFidelity, fadeFamiliarity, familiarityAt, growFamiliarity } from './familiarity';
 
@@ -126,6 +127,31 @@ describe('seedOnFirstContact (store)', () => {
     db.items.mine.holderId = null;
     db.rows.push({ ...base, perceiverId: 'ent-v', subjectId: 'mine', subjectKind: 'ITEM', aspectKind: 'identity', score: 0.6, lastSource: 'use', lastCycle: 7 } as Row);
     expect((await seedOnFirstContact({ ...base, subjectId: 'knife', subjectKind: 'ITEM' })).contact).toBe('known-category');
+  });
+
+  it('known category by a shared existing TAG (Mike 2026-10-09: "items already have all sorts of tags"), even across misc', async () => {
+    db.items.spreader = { id: 'spreader', type: 'misc', data: '{"tags":["Butter Knife","cutlery"]}', holderId: null, campaignId: 'c1', status: 'ACTIVE' };
+    db.items.mine = { id: 'mine', type: 'misc', data: '{"tags":["butter knife"]}', holderId: 'violet', campaignId: 'c1', status: 'ACTIVE' };
+    expect(await seedOnFirstContact({ ...base, subjectId: 'spreader', subjectKind: 'ITEM' })).toEqual({ contact: 'known-category', seeded: ['identity', 'appearance'] });
+    expect(db.rows.every((x) => x.score === FAMILIARITY_SEED.knownCategory)).toBe(true);
+
+    // known through familiarity (not held) with an item sharing a tag; a faded / unshared one does not count
+    db.rows = [];
+    db.items.mine.holderId = null;
+    db.rows.push({ ...base, perceiverId: 'ent-v', subjectId: 'mine', subjectKind: 'ITEM', aspectKind: 'identity', score: 0.6, lastSource: 'use', lastCycle: 7 } as Row);
+    expect((await seedOnFirstContact({ ...base, subjectId: 'spreader', subjectKind: 'ITEM' })).contact).toBe('known-category');
+    db.rows = [];
+    db.items.mine.data = '{"tags":["spoon"]}';
+    db.rows.push({ ...base, perceiverId: 'ent-v', subjectId: 'mine', subjectKind: 'ITEM', aspectKind: 'identity', score: 0.6, lastSource: 'use', lastCycle: 7 } as Row);
+    expect((await seedOnFirstContact({ ...base, subjectId: 'spreader', subjectKind: 'ITEM' })).contact).toBe('stranger');
+  });
+
+  it('itemTagsOf / sharesCategory (pure): normalised tags; misc type alone is no category', () => {
+    expect(itemTagsOf('{"tags":[" Butter Knife ","butter knife",3,""]}')).toEqual(['butter knife']);
+    expect(itemTagsOf('nope')).toEqual([]);
+    expect(sharesCategory({ type: 'misc', tags: [] }, { type: 'misc', tags: [] })).toBe(false);
+    expect(sharesCategory({ type: 'tool', tags: [] }, { type: 'tool', tags: [] })).toBe(true);
+    expect(sharesCategory({ type: 'misc', tags: ['cutlery'] }, { type: 'weapon', tags: ['cutlery'] })).toBe(true);
   });
 
   it("a stranger thing (unknown or 'misc' category) seeds nothing", async () => {
