@@ -34,7 +34,9 @@ import { broadcastEvent } from '@/lib/campaign-stream';
 import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus } from '@/daya/conversation';
 import { isDayaEnabled } from '@/daya/events';
 import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
-import { readTableTalk, type TableTalkState } from '@/services/table-talk';
+import { readTableTalk, type TableTalkState, type TableUtterance } from '@/services/table-talk';
+import { perceptionReachOn, judgeCanonReach, stampPerception, storeUnnoticedAtTable, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
+import type { ReachEvent, ReachJudgement, ReachVerdict } from '@/sim/senses/reach';
 import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
 import type { TerminalEvent, TerminalActor, TerminalPayload, TableFeedFields } from '@/types/terminal';
 import {
@@ -215,8 +217,23 @@ async function deliverToTable(
   const since = new Date();
   const listeners = await activeListeners(campaignId, excludeId);
   const responses: ListenerResponse[] = [];
+  // Perception units 6+7 (PERCEPTION_REACH=on): one world-sim call for every listener before anyone lives it.
+  const primaryTruth = truth.primary ?? truth.extra[0] ?? null;
+  const reach = perceptionReachOn() && listeners.length
+    ? await judgeCanonReach(campaignId, { id: primaryTruth, kind: source === 'dialogue' ? 'speech' : 'narration', text: stimulus, sourceId: excludeId ?? null }, listeners.map((l) => l.id))
+    : null;
+  const exposures = new Map<string, EventRefs>();
   for (const listener of listeners) {
+    const verdict = reach?.verdicts.get(listener.id);
+    if (reach && (!verdict || !verdict.reaches)) { responses.push({ characterId: listener.id, characterName: listener.name, status: 'ok', detail: 'out of reach' }); continue; }
+    if (reach && verdict && !verdict.noticed) {
+      await storeUnnoticedAtTable(campaignId, listener.id, { source, content: stimulus }, verdict, primaryTruth);
+      responses.push({ characterId: listener.id, characterName: listener.name, status: 'ok', detail: 'unnoticed' });
+      continue;
+    }
+    if (reach) addRefs(exposures, listener.id, { characterIds: [excludeId], locationIds: [reach.beings.find((b) => b.id === listener.id)?.locationId] });
     const result = await converseWithEntity(listener.id, actor.role, stimulus, {}, source);
+    if (reach && verdict && result.memoryEntryId) await stampPerception(result.memoryEntryId, verdict, reach.source);
     responses.push({
       characterId: listener.id,
       characterName: listener.name,
@@ -234,6 +251,7 @@ async function deliverToTable(
       }
     }
   }
+  if (reach) await recordNoticedExposures(campaignId, (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0, exposures);
   return responses;
 }
 
@@ -362,6 +380,23 @@ function reportTiming(timing: TableTiming): void {
   for (const watcher of timingWatchers) { try { watcher(timing); } catch { /* a watcher must not break the table */ } }
 }
 
+// Per campaign: the reach verdicts of successive beats are applied in the order the beats were said
+// (a slow judgement for an earlier beat holds a later one back, each capped by REACH_TUNING.timeoutMs).
+const reachChains = new Map<string, Promise<unknown>>();
+
+/** The world-sim's event for a run of table utterances: speech if every one is dialogue (from its one speaker), else narration. Pure. */
+export function reachEventOf(utterances: TableUtterance[], truthId: string | null): ReachEvent {
+  const speech = utterances.every((u) => u.kind === 'dialogue');
+  const speakers = [...new Set(utterances.map((u) => u.speaker?.id ?? null))];
+  return {
+    id: truthId,
+    kind: speech ? 'speech' : 'narration',
+    text: utterances.map((u) => (u.kind === 'dialogue' && u.speaker ? `${u.speaker.label}: ${u.text}` : u.text)).join(' '),
+    sourceId: speech && speakers.length === 1 ? speakers[0] : null,
+    sourceName: speech && speakers.length === 1 ? utterances[0].speaker?.label ?? null : null,
+  };
+}
+
 /**
  * Play a plan's beats to the awake beings: world content is handed over to be
  * listened to (never awaited — reflection is off the clock); a turn or a line
@@ -382,7 +417,7 @@ async function runBeats(
   const pointAtTruth = async (listenerId: string, memoryEntryId: string | undefined) => {
     if (truth.primary) await attachTruth(listenerId, memoryEntryId, truth.primary, truth.extra, since);
   };
-  const hear = (listenerId: string, stimulus: PlannedStimulus | null) => {
+  const hear = (listenerId: string, stimulus: PlannedStimulus | null, reached?: { verdict: ReachVerdict; source: ReachJudgement['source'] }) => {
     if (!stimulus) return;
     void listenToTable(listenerId, actor.role, stimulus)
       .then(async (outcome) => {
@@ -394,13 +429,60 @@ async function runBeats(
         reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings });
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
+        if (reached && outcome.listened?.memoryEntryId) await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source);
       })
       .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
   };
+
+  // Perception units 6+7 (PERCEPTION_REACH=on) — the reach/notice pass sits in the LISTEN beat: a stretch
+  // waits for the world-sim's verdict before it is handed to the being (not reached → nothing; unnoticed →
+  // stored noticed=false, no listening). Nothing on the answer clock waits for it: a being that is asked
+  // to answer before its verdict is in takes the waiting stretches as heard (flushed below), as before.
+  const reachOn = perceptionReachOn();
+  const waiting = new Map<string, Array<() => void>>();
+  const gatedHear = (utterances: TableUtterance[], ids: string[]) => {
+    if (!reachOn) { for (const id of ids) hear(id, stimulusFor(utterances, id)); return; }
+    const stims = new Map<string, PlannedStimulus>();
+    for (const id of ids) { const s = stimulusFor(utterances, id); if (s) stims.set(id, s); }
+    if (!stims.size) return;
+    const delivered = new Set<string>();
+    const deliver = (id: string, verdict: ReachVerdict | null, source: ReachJudgement['source']) => {
+      if (delivered.has(id)) return;
+      delivered.add(id);
+      const stim = stims.get(id)!;
+      if (!verdict) { hear(id, stim); return; }
+      if (!verdict.reaches) return;
+      if (!verdict.noticed) { void storeUnnoticedAtTable(campaignId, id, stim, verdict, truth.primary); return; }
+      hear(id, stim, { verdict, source });
+    };
+    for (const id of stims.keys()) waiting.set(id, [...(waiting.get(id) ?? []), () => deliver(id, null, 'stub')]);
+    const judged = judgeCanonReach(campaignId, reachEventOf(utterances, truth.primary), [...stims.keys()]);
+    const prior = reachChains.get(campaignId) ?? Promise.resolve();
+    const next = prior.then(() => judged).then(async (j) => {
+      const refs = new Map<string, EventRefs>();
+      for (const id of stims.keys()) {
+        const v = j.verdicts.get(id) ?? null;
+        const early = delivered.has(id);
+        deliver(id, v, j.source);
+        if (!early && v?.reaches && v.noticed) addRefs(refs, id, { characterIds: utterances.map((u) => u.speaker?.id ?? null), locationIds: [j.beings.find((b) => b.id === id)?.locationId] });
+      }
+      if (refs.size) {
+        const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+        await recordNoticedExposures(campaignId, cycle, refs);
+      }
+    }).catch((err) => {
+      console.error('[table-speak] reach pass failed; stretches heard as before (non-fatal):', err);
+      for (const id of stims.keys()) deliver(id, null, 'stub');
+    });
+    reachChains.set(campaignId, next);
+  };
+
   const answered = new Map<string, ListenerResponse>();
   const answer = async (listenerId: string, ask: TableAsk) => {
     const listener = listeners.find((l) => l.id === listenerId);
     if (!listener) return;
+    for (const flush of waiting.get(listenerId) ?? []) flush();
+    waiting.delete(listenerId);
     const outcome = await answerAtTable(listenerId, actor.role, ask, {
       onEvent: (event) => broadcastEvent(campaignId, { ...event, kind: 'being_speaking' }),
     });
@@ -421,10 +503,10 @@ async function runBeats(
 
   for (const beat of beats) {
     if (beat.type === 'hear') {
-      for (const l of listeners) hear(l.id, stimulusFor(beat.utterances, l.id));
+      gatedHear(beat.utterances, listeners.map((l) => l.id));
       continue;
     }
-    if (beat.type === 'spoken') for (const id of overhearers(beat, listeners)) hear(id, stimulusFor([beat.utterance], id));
+    if (beat.type === 'spoken') gatedHear([beat.utterance], overhearers(beat, listeners));
     await answerAll(answerers(beat, listeners), askOf(beat));
   }
   if (opts.answerAfterWorldOnly && beats.length > 0 && beats.every((b) => b.type === 'hear')) {

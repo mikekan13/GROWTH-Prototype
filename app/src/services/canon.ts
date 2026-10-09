@@ -22,6 +22,7 @@ import { goalsTouched, makeChain, parseChain } from '@/daya/chain';
 import { recordVineEntriesSafe } from '@/services/vine-memory';
 import { writeMemoryEntry } from '@/daya/memory';
 import { perceive } from '@/daya/perceive';
+import { perceptionReachOn, judgeCanonReach, writeUnnoticed, memoryFieldsOf, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import type { GameEventPayload, TerminalEvent, TerminalPayload } from '@/types/terminal';
@@ -312,7 +313,22 @@ export async function declareCanon(
       ? await prisma.dayaEntity.findMany({ where: { characterId: { in: input.witnessIds } }, select: { id: true, characterId: true } })
       : [];
   const memoryIds: string[] = [];
+  // Perception units 6+7 (PERCEPTION_REACH=on): one world-sim call judges every witness — not reached → no
+  // memory; reached but unnoticed → a noticed=false row; noticed → the row as before + its senses.
+  const reach = perceptionReachOn() && witnesses.length
+    ? await judgeCanonReach(campaignId, { id: event.id, kind: 'narration', text: input.narration, sourceId: input.actorId ?? null, targetId: input.targetId ?? null, locationId: input.locationId ?? null }, witnesses.map((w) => w.characterId))
+    : null;
+  const exposures = new Map<string, EventRefs>();
   for (const w of witnesses) {
+    const verdict = reach?.verdicts.get(w.characterId);
+    if (reach && (!verdict || !verdict.reaches)) continue;
+    if (reach && verdict && !verdict.noticed) {
+      let sensed = input.narration;
+      try { sensed = (await perceive(w.characterId, campaignId, input.narration, 'perception', {}, { standing: 'stimulus', voice: false })).prose; } catch { /* raw */ }
+      const m = await writeUnnoticed({ entityId: w.id, cycle, content: sensed, verdict, truthRef: event.id, entityRefs: parties.filter(p => p !== w.characterId), chain: { entities: parties.filter(p => p !== w.characterId), locationId: input.locationId ?? null }, classification: { kind: 'declaration', canonEventId: event.id } });
+      if (m) memoryIds.push(m.id);
+      continue;
+    }
     try {
       const own = await prisma.goal.findMany({ where: { characterId: w.characterId, status: 'ACTIVE' }, select: { id: true, description: true } });
       // The murky mirror (Mike 09-26): a witness lives the declaration as its
@@ -331,10 +347,13 @@ export async function declareCanon(
         classification: { kind: 'declaration', canonEventId: event.id, ...mirror },
         truthRef: event.id,
         chain: { truthRefs: [event.id], entities: parties.filter(p => p !== w.characterId), locationId: input.locationId ?? null, goalIds: goalsTouched(input.narration, own) },
+        ...(reach && verdict ? memoryFieldsOf(verdict, reach.source) : {}),
       });
       memoryIds.push(m.id);
+      if (reach) addRefs(exposures, w.characterId, { characterIds: parties, locationIds: [input.locationId] });
     } catch (err) { console.warn('[canon] witness memory failed', err); }
   }
+  if (reach) await recordNoticedExposures(campaignId, cycle, exposures);
   return { event, witnesses: witnesses.length, memoryIds };
 }
 

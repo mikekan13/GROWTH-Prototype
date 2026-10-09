@@ -361,9 +361,8 @@ export async function perceive(
   const { observer: current, godlike } = await observerFor(characterId);
   // Scene clarity = SCENE_ATTUNEMENT dimmed per line by the senses (composeSceneLines); familiarity of the
   // place does not set it (D1, unit 5) — familiarity will name entities/aspects (later units).
-  // TODO(perception unit 8): record exposure here — the place, the people present and the things lying
-  // around (source 'exposure'; 'own' for held items) with seedOnFirstContact (services/familiarity-seed) first.
-  // NOT wired: it is N writes per stimulus per being in the listening loop (SQLite contention); needs batching.
+  // Exposure is NOT recorded here (N writes per stimulus per being): units 6+7 record it batched, once per
+  // pass per being, from the reach/notice pass (services/perception-reach recordNoticedExposures, flag-gated).
   const observer: Observer = { ...current, ...(opts.observer?.mood ? { mood: opts.observer.mood } : {}), ...(opts.observer?.attunement != null ? { attunement: opts.observer.attunement } : {}) };
   const snapshot = { mood: observer.mood, attunement: observer.attunement };
   const subjectKey = `scene:${locationId ?? 'nowhere'}`;

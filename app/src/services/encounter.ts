@@ -40,6 +40,7 @@ import { ROUND_SECONDS } from '@/types/time';
 import { writeMemoryEntry } from '@/daya/memory';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { recordRoundCanon } from '@/services/canon';
+import { perceptionReachOn, judgeRoundReach, writeUnnoticed, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
 import { goalsTouched } from '@/daya/chain';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
@@ -634,6 +635,13 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
   } catch (err) { console.warn('[encounter] canon write failed', err); }
 
   const memoryIds: string[] = [];
+  // Perception units 6+7 (PERCEPTION_REACH=on): every narrated act is judged by the world-sim for every
+  // participant still up (one batched call per act, all acts in parallel). What did not reach a being is
+  // left out of its round; what reached it unnoticed goes in a separate noticed=false row.
+  const roundReach = perceptionReachOn()
+    ? await judgeRoundReach(enc.campaignId, enc.locationId ?? null, result.log, state.participants.filter(p => fields.has(p.id)).map(p => p.id), Object.fromEntries(Object.entries(state.lastPlan).map(([id, l]) => [id, l.note ?? null])))
+    : null;
+  const exposures = new Map<string, EventRefs>();
   for (const p of state.participants) {
     const field = fields.get(p.id);
     if (!field) continue; // was down before the round began
@@ -642,18 +650,38 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
     const downSlot = result.log.find(l => l.kind === 'downed' && l.targetId === p.id)?.slot;
     const flags = senseFlags(sheets.get(p.id) ?? null);
     const perceivable = (slot: number) => (flags.canSee || flags.canHear) && (downSlot === undefined || slot <= downSlot);
+    const verdictOf = (l: (typeof result.log)[number]) => roundReach?.get(l)?.verdicts.get(p.id);
+    const noticedAct = (l: (typeof result.log)[number]) => !roundReach || (!!verdictOf(l)?.reaches && !!verdictOf(l)?.noticed);
     const witnessed = result.log
-      .filter(l => l.narration && perceivable(l.slot))
+      .filter(l => l.narration && perceivable(l.slot) && noticedAct(l))
       .map(l => l.narration as string)
       .join('. ');
+    // Under the reach pass the per-slot pointers follow what was noticed (keys are slot indexes, as recordRoundCanon writes them).
+    const noticedSlots = roundReach ? new Set(result.log.filter(l => l.narration && perceivable(l.slot) && noticedAct(l)).map(l => l.slot - 1)) : null;
+    const inRound = (slot: number) => perceivable(slot) && (!noticedSlots || noticedSlots.has(slot));
     // The canon events this being actually witnessed — the fallible memory's
     // pointers into the infallible record, up to the slot it went down in.
     const truthRefs = canon
-      ? [...canon.childBySlotIndex.entries()].filter(([slot]) => perceivable(slot)).flatMap(([, ids]) => ids)
+      ? [...canon.childBySlotIndex.entries()].filter(([slot]) => inRound(slot)).flatMap(([, ids]) => ids)
       : [];
     // The being's chain (Mike 09-23): items it saw in play, the place, its own
     // goals the round touched, and its previous perception as antecedent.
-    const itemsSeen = canon ? [...canon.itemsBySlotIndex.entries()].filter(([slot]) => perceivable(slot)).flatMap(([, ids]) => ids) : [];
+    const itemsSeen = canon ? [...canon.itemsBySlotIndex.entries()].filter(([slot]) => inRound(slot)).flatMap(([, ids]) => ids) : [];
+    if (roundReach) {
+      const unnoticed = result.log.filter(l => l.narration && perceivable(l.slot) && verdictOf(l)?.reaches && !verdictOf(l)?.noticed);
+      if (unnoticed.length) {
+        const vs = unnoticed.map(l => verdictOf(l)!);
+        const m = await writeUnnoticed({
+          entityId: entity.id, cycle, content: unnoticed.map(l => l.narration as string).join('. ').slice(0, 4000),
+          verdict: { beingId: p.id, reaches: true, noticed: false, via: [...new Set(vs.flatMap(v => v.via))], salience: Math.max(...vs.map(v => v.salience)) },
+          truthRef: canon?.roundId ?? null, classification: { encounterId, round, kind: 'encounter_round' }, chain: { locationId: enc.locationId ?? null },
+        });
+        if (m) memoryIds.push(m.id);
+      }
+      const noticedActs = result.log.filter(l => l.narration && perceivable(l.slot) && noticedAct(l));
+      if (noticedActs.length) addRefs(exposures, p.id, { characterIds: noticedActs.flatMap(l => [l.actorId, l.targetId]), itemIds: itemsSeen, locationIds: [enc.locationId] });
+    }
+    const roundVia = roundReach ? [...new Set(result.log.filter(l => l.narration && perceivable(l.slot) && noticedAct(l)).flatMap(l => verdictOf(l)?.via ?? []))] : null;
     const goalIds = canon?.goalsByParticipant.get(p.id) ?? goalsTouched(witnessed, goalsByParticipant[p.id] ?? []);
     const previous = await prisma.dayaMemoryEntry.findFirst({ where: { entityId: entity.id, source: 'perception' }, orderBy: { realTime: 'desc' }, select: { id: true } });
     const hitMe = result.log.some(l => l.kind === 'damage' && l.targetId === p.id);
@@ -677,8 +705,10 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
         goalIds,
         antecedentId: previous?.id ?? null,
       },
+      ...(roundVia ? { noticed: true, perceivedVia: roundVia } : {}),
     }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
+  if (roundReach) await recordNoticedExposures(enc.campaignId, cycle, exposures);
 
   // Provenance manifest for the round (2026-09-20): a COMPOSITE act — the
   // GM's declarations + every branch's plan + the sim's resolution. The
