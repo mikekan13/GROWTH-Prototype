@@ -86,6 +86,12 @@ export interface ReachVerdict {
   via: string[];
   noticed: boolean;
   salience: number;
+  /**
+   * D3 (2026-10-09): per carried sense, how well it worked AT THIS MOMENT (organ effectiveness; a mind
+   * sense's own) — stored on the memory row so a moment perceived while blinded stays blurry after healing.
+   * Absent for 'self' and for a verdict that does not reach.
+   */
+  clarity?: Record<string, number>;
 }
 
 export interface ReachJudgement {
@@ -130,6 +136,18 @@ function mindSenses(b: ReachBeing): Array<{ name: string; effectiveness: number 
   return (b.senses.nonPhysical ?? []).filter((s) => s.reaches === 'thought' && s.effectiveness > 0);
 }
 
+/** Each carried sense's effectiveness for this being now (organs; mind senses by name). Pure. */
+export function clarityOf(b: ReachBeing, via: string[]): Record<string, number> {
+  const minds = new Map((b.senses.nonPhysical ?? []).map((m) => [m.name, m.effectiveness]));
+  const out: Record<string, number> = {};
+  for (const v of via) {
+    if (v === 'self') continue;
+    const e = minds.has(v) ? minds.get(v)! : b.senses.effectiveness[v as SenseKind];
+    if (typeof e === 'number') out[v] = clamp01(e);
+  }
+  return out;
+}
+
 function sameScene(event: ReachEvent, b: ReachBeing): boolean {
   // Unplaced on either side = theater of mind: everyone in the scene (the behaviour before units 6+7).
   return !event.locationId || !b.locationId || event.locationId === b.locationId;
@@ -169,7 +187,7 @@ export function stubVerdict(event: ReachEvent, b: ReachBeing): ReachVerdict {
   const noticed = aimed || !(volume === 'whisper' || hidden);
   const base = aimed || volume === 'loud' ? 0.8 : 0.5;
   const salience = clamp01((noticed ? base : base * 0.3) * best);
-  return { beingId: b.id, reaches: true, via, noticed, salience: Math.round(salience * 100) / 100 };
+  return { beingId: b.id, reaches: true, via, noticed, salience: Math.round(salience * 100) / 100, clarity: clarityOf(b, via) };
 }
 
 export function stubReach(event: ReachEvent, beings: ReachBeing[]): Map<string, ReachVerdict> {
@@ -261,7 +279,7 @@ export function lawfulVerdict(event: ReachEvent, b: ReachBeing, raw: z.infer<typ
     return (SENSE_KINDS as readonly string[]).includes(v) && (b.senses.effectiveness[v as SenseKind] ?? 0) > 0 ? [v] : [];
   });
   const reaches = raw.reach && via.length > 0;
-  return { beingId: b.id, reaches, via: reaches ? via : [], noticed: reaches && raw.noticed, salience: reaches ? Math.round(clamp01(raw.salience) * 100) / 100 : 0 };
+  return { beingId: b.id, reaches, via: reaches ? via : [], noticed: reaches && raw.noticed, salience: reaches ? Math.round(clamp01(raw.salience) * 100) / 100 : 0, ...(reaches ? { clarity: clarityOf(b, via) } : {}) };
 }
 
 // ── Judge ─────────────────────────────────────────────────────────────────

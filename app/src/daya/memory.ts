@@ -18,6 +18,7 @@ import { buildTaggerPrompt, type TaggerRosterEntry } from './prompts/roles/tagge
 import { RECALL_TUNING } from './recall-tuning';
 import { classifyDomains, pillarOfDomain } from './domains';
 import { makeChain, type MemoryChain } from './chain';
+import { encodePerceivedVia } from './perceived-via';
 
 export type { TaggerRosterEntry };
 
@@ -166,6 +167,8 @@ export interface WriteMemoryParams {
   noticed?: boolean;
   /** Senses that carried it (sim/senses/reach.ts). Omit = the column default ([]). */
   perceivedVia?: string[];
+  /** D3: per carried sense, its effectiveness when perceived (stored with perceivedVia — daya/perceived-via). */
+  perceivedClarity?: Record<string, number>;
 }
 
 /**
@@ -206,7 +209,7 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
       truthRef: params.truthRef ?? null,
       // Only when the reach pass set them — otherwise the row is written exactly as before (column defaults).
       ...(params.noticed !== undefined ? { noticed: params.noticed } : {}),
-      ...(params.perceivedVia !== undefined ? { perceivedVia: JSON.stringify(params.perceivedVia) } : {}),
+      ...(params.perceivedVia !== undefined ? { perceivedVia: encodePerceivedVia(params.perceivedVia, params.perceivedClarity) } : {}),
     },
   });
   // Event-driven dream trigger (2026-09-20): lived experience raises dream

@@ -21,6 +21,7 @@ import { recordExposureBatch, type ExposureSubject } from '@/services/familiarit
 import { writeMemoryEntry } from '@/daya/memory';
 import { perceive } from '@/daya/perceive';
 import type { MemoryChain } from '@/daya/chain';
+import { decodePerceivedVia, encodePerceivedVia, mergePerceivedVia } from '@/daya/perceived-via';
 
 export { perceptionReachOn };
 
@@ -160,19 +161,18 @@ export async function judgeRoundReach<L extends { slot: number; kind: string; ac
 }
 
 /** What a verdict adds to a memory write. The world-sim's salience only when it judged (the stub's is the old heuristic). */
-export function memoryFieldsOf(v: ReachVerdict, source: ReachJudgement['source']): { noticed: boolean; perceivedVia: string[]; salience?: number } {
-  return { noticed: v.noticed, perceivedVia: v.via, ...(source === 'model' ? { salience: v.salience } : {}) };
+export function memoryFieldsOf(v: ReachVerdict, source: ReachJudgement['source']): { noticed: boolean; perceivedVia: string[]; perceivedClarity?: Record<string, number>; salience?: number } {
+  return { noticed: v.noticed, perceivedVia: v.via, ...(v.clarity && Object.keys(v.clarity).length ? { perceivedClarity: v.clarity } : {}), ...(source === 'model' ? { salience: v.salience } : {}) };
 }
 
-/** Stamp a row the being loop wrote (the table's listening path) with the verdict; joined stretches union their senses. */
+/** Stamp a row the being loop wrote (the table's listening path) with the verdict; joined stretches union their senses (newer clarity wins per sense). */
 export async function stampPerception(memoryId: string, v: ReachVerdict, source: ReachJudgement['source']): Promise<void> {
   try {
     const row = await prisma.dayaMemoryEntry.findUnique({ where: { id: memoryId }, select: { perceivedVia: true } });
     if (!row) return;
-    let prior: string[] = [];
-    try { prior = JSON.parse(row.perceivedVia) as string[]; } catch { prior = []; }
     const f = memoryFieldsOf(v, source);
-    await prisma.dayaMemoryEntry.update({ where: { id: memoryId }, data: { noticed: true, perceivedVia: JSON.stringify([...new Set([...prior, ...f.perceivedVia])]), ...(f.salience !== undefined ? { salience: f.salience } : {}) } });
+    const merged = mergePerceivedVia(decodePerceivedVia(row.perceivedVia), { via: f.perceivedVia, clarity: f.perceivedClarity ?? {} });
+    await prisma.dayaMemoryEntry.update({ where: { id: memoryId }, data: { noticed: true, perceivedVia: encodePerceivedVia(merged.via, merged.clarity), ...(f.salience !== undefined ? { salience: f.salience } : {}) } });
   } catch (err) { console.warn('[perception-reach] stamp failed (record-keeping only)', err); }
 }
 
@@ -186,7 +186,7 @@ export async function writeUnnoticed(args: { entityId: string; cycle: number; co
       classification: { ...(args.classification ?? {}), unnoticed: true },
       truthRef: args.truthRef,
       chain: { ...(args.chain ?? {}), truthRefs: args.truthRef ? [args.truthRef] : [] },
-      noticed: false, perceivedVia: args.verdict.via,
+      noticed: false, perceivedVia: args.verdict.via, ...(args.verdict.clarity ? { perceivedClarity: args.verdict.clarity } : {}),
       // Unnoticed things do not press toward dreaming.
       skipDreamPressure: true,
     });

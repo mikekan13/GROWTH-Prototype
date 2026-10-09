@@ -673,7 +673,7 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
         const vs = unnoticed.map(l => verdictOf(l)!);
         const m = await writeUnnoticed({
           entityId: entity.id, cycle, content: unnoticed.map(l => l.narration as string).join('. ').slice(0, 4000),
-          verdict: { beingId: p.id, reaches: true, noticed: false, via: [...new Set(vs.flatMap(v => v.via))], salience: Math.max(...vs.map(v => v.salience)) },
+          verdict: { beingId: p.id, reaches: true, noticed: false, via: [...new Set(vs.flatMap(v => v.via))], salience: Math.max(...vs.map(v => v.salience)), clarity: Object.assign({}, ...vs.map(v => v.clarity ?? {})) },
           truthRef: canon?.roundId ?? null, classification: { encounterId, round, kind: 'encounter_round' }, chain: { locationId: enc.locationId ?? null },
         });
         if (m) memoryIds.push(m.id);
@@ -681,7 +681,10 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
       const noticedActs = result.log.filter(l => l.narration && perceivable(l.slot) && noticedAct(l));
       if (noticedActs.length) addRefs(exposures, p.id, { characterIds: noticedActs.flatMap(l => [l.actorId, l.targetId]), itemIds: itemsSeen, locationIds: [enc.locationId] });
     }
-    const roundVia = roundReach ? [...new Set(result.log.filter(l => l.narration && perceivable(l.slot) && noticedAct(l)).flatMap(l => verdictOf(l)?.via ?? []))] : null;
+    const roundNoticed = roundReach ? result.log.filter(l => l.narration && perceivable(l.slot) && noticedAct(l)) : [];
+    const roundVia = roundReach ? [...new Set(roundNoticed.flatMap(l => verdictOf(l)?.via ?? []))] : null;
+    // D3: the senses' clarity during the round, stored with the row (the being is read once per round).
+    const roundClarity: Record<string, number> = Object.assign({}, ...roundNoticed.map(l => verdictOf(l)?.clarity ?? {}));
     const goalIds = canon?.goalsByParticipant.get(p.id) ?? goalsTouched(witnessed, goalsByParticipant[p.id] ?? []);
     const previous = await prisma.dayaMemoryEntry.findFirst({ where: { entityId: entity.id, source: 'perception' }, orderBy: { realTime: 'desc' }, select: { id: true } });
     const hitMe = result.log.some(l => l.kind === 'damage' && l.targetId === p.id);
@@ -705,7 +708,7 @@ async function runRoundInner(encounterId: string, actor: EncounterActor) {
         goalIds,
         antecedentId: previous?.id ?? null,
       },
-      ...(roundVia ? { noticed: true, perceivedVia: roundVia } : {}),
+      ...(roundVia ? { noticed: true, perceivedVia: roundVia, perceivedClarity: roundClarity } : {}),
     }); memoryIds.push(written.id); } catch (err) { console.warn(`[encounter] memory write failed for ${p.name}`, err); }
   }
   if (roundReach) await recordNoticedExposures(enc.campaignId, cycle, exposures);

@@ -40,6 +40,7 @@ import { SENSE_KINDS, senseProfileFromSheet, type SenseKind } from '@/sim/senses
 import { perceptionReachOn } from '@/sim/senses/reach';
 import { familiarityAt, scoreToFidelity } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
+import { decodePerceivedVia } from '@/daya/perceived-via';
 import { route, anthropicChatText, openAiCompatChat, recordAiCall } from '@/ai/network';
 
 // ── Shapes ────────────────────────────────────────────────────────────────
@@ -606,11 +607,13 @@ export async function renderViewerFeed(campaignId: string, viewerCharacterId: st
     if (!r.noticed) continue;
     const evs = refsOf(r).map((id) => evById.get(id)).filter((e): e is NonNullable<typeof e> => !!e);
     if (!evs.length) continue;
-    let via: string[] = [];
-    try { via = (JSON.parse(r.perceivedVia) as unknown[]).filter((v): v is string => typeof v === 'string'); } catch { via = []; }
+    // D3: clarity AS STORED at perception time (a moment perceived while blinded stays blurry after healing);
+    // the viewer's body now only for senses the row carries no stored value for (rows from before D3).
+    const stored = decodePerceivedVia(r.perceivedVia);
+    const via = stored.via;
     const ents = entitiesIn(evs.map((e) => `${e.narration}\n${e.detail}`), ctx.entities, [...evs.map((e) => e.actorId), ctx.viewerId]);
     const truth = truthLineFromCanon(evs, ents);
-    const perception: ViewerPerception = { viewerId: ctx.viewerId, noticed: true, via, clarity: Object.fromEntries((via.length ? via : ['sight', 'hearing']).filter((v) => v !== 'self').map((v) => [v, ctx.clarity[v] ?? 1])) };
+    const perception: ViewerPerception = { viewerId: ctx.viewerId, noticed: true, via, clarity: Object.fromEntries((via.length ? via : ['sight', 'hearing']).filter((v) => v !== 'self').map((v) => [v, stored.clarity[v] ?? ctx.clarity[v] ?? 1])) };
     const fam: ViewerFamiliarity = Object.fromEntries(ents.filter((e) => ctx.familiarity[e.id]).map((e) => [e.id, ctx.familiarity[e.id]]));
     const sig = renderSignature(truth, perception, fam);
     const cached = (() => { try { return r.visibleForm ? JSON.parse(r.visibleForm) as { sig?: string; form?: VisibleForm } : null; } catch { return null; } })();

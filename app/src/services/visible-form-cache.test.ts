@@ -93,4 +93,15 @@ describe('visible form cache', () => {
     expect(text(after, 'm1')).toBe('Ruth slams the door.');
     expect(w.memories[0].visibleForm).toContain('slams');
   });
+
+  it('D3: reads sense clarity as stored at perception time, not the healed body now', async () => {
+    // Violet's sheet now is whole (full sight + hearing); the moment was perceived blind and deafened.
+    w.memories.push({ id: 'm3', entityId: 'ent-v', truthRef: 'ev1', chain: JSON.stringify({ truthRefs: ['ev1'] }), noticed: true, perceivedVia: JSON.stringify({ via: ['sight', 'hearing'], clarity: { sight: 0, hearing: 0 } }), visibleForm: null, source: 'perception', content: '', classification: '{}' });
+    w.memories.push({ id: 'm4', entityId: 'ent-v', truthRef: 'ev1', chain: JSON.stringify({ truthRefs: ['ev1'] }), noticed: true, perceivedVia: JSON.stringify({ via: ['sight', 'hearing'], clarity: { sight: 0.15, hearing: 0.15 } }), visibleForm: null, source: 'perception', content: '', classification: '{}' });
+    const f = await renderViewerFeed('c1', 'violet', ['m1', 'm3', 'm4'], { rewrite: null });
+    expect(text(f, 'm1')).toBe('Ruth opens the door.'); // legacy row → the body now (whole)
+    expect(f.get('m3')?.rows).toEqual([]); // took nothing in then → nothing now
+    expect(text(f, 'm4')).toContain('{gap}');
+    expect(text(f, 'm4')).not.toBe('Ruth opens the door.');
+  });
 });

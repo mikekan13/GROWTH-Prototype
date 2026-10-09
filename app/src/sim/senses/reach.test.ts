@@ -50,6 +50,13 @@ describe('reach stub (deterministic world-sim stand-in)', () => {
     expect(v).toMatchObject({ reaches: true, via: ['hearing'], noticed: true, salience: 0.25 });
   });
 
+  it('D3: the verdict carries each carried sense\'s clarity at this moment (stored on the memory row)', () => {
+    expect(stubVerdict(speech(), being('violet', {}, senseProfileFromSheet(anatomy([1, 1])))).clarity).toEqual({ hearing: 0.5 });
+    expect(stubVerdict({ kind: 'action', text: 'Ruth slams the door.', sourceId: 'ruth', locationId: 'room' }, being('violet')).clarity).toEqual({ sight: 1, hearing: 1 });
+    expect(stubVerdict(speech({ sourceId: 'violet' }), being('violet')).clarity).toBeUndefined();
+    expect(lawfulVerdict(speech(), being('violet', {}, senseProfileFromSheet(anatomy([1, 1]))), { id: 'violet', reach: true, via: ['hearing'], noticed: true, salience: 0.4 } as never).clarity).toEqual({ hearing: 0.5 });
+  });
+
   it('a whisper reaches but goes unnoticed — except by the one it is aimed at', () => {
     const e = speech({ text: 'Ruth whispers: the key is under the mat.', targetId: 'danny' });
     expect(stubVerdict(e, being('violet'))).toMatchObject({ reaches: true, noticed: false });
