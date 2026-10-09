@@ -183,7 +183,8 @@ export function labelFor(e: TruthEntity, identity: number, viewerId: string): st
   return GENERIC[e.kind];
 }
 
-function visibleEntity(e: TruthEntity, fam: ViewerFamiliarity, viewerId: string): VisibleEntity {
+/** One entity as this viewer knows it (label by identity level; known aspects + wrong impressions). Pure. */
+export function visibleEntity(e: TruthEntity, fam: ViewerFamiliarity, viewerId: string): VisibleEntity {
   const aspects = fam[e.id] ?? {};
   const imp = e.impressions ?? {};
   const keys = [...new Set([...Object.keys(aspects), ...Object.keys(imp)])];

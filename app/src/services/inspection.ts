@@ -374,6 +374,35 @@ export async function resolveInspection(campaignId: string, purpose: InspectPurp
       });
     }
   }
-  if (writes.length) void import('@/lib/perceived-feed-push').then((m) => m.notifyMemoryWritten(entity.id)).catch(() => {});
+  // The inspector's own feed line ("probably both" — Mike 2026-10-09): a memory row, rendered at its knowledge.
+  await writeInspectionLine(campaignId, entity.id, purpose, writes, nowCycle, outcome);
+  void import('@/lib/perceived-feed-push').then((m) => m.notifyMemoryWritten(entity.id)).catch(() => {});
   return writes;
+}
+
+/**
+ * INSPECTION WRITES A FEED LINE: one memory row for the inspector (classification kind 'inspection', no
+ * canon ref — the feed renders it at the viewer's CURRENT knowledge, services/perceived-feed
+ * inspectionForm). Its stored `content` is that line as rendered now ("You study the old sword: Weight:
+ * about as heavy as a war hammer; …"), the being's own memory of what it learned. Never throws.
+ */
+async function writeInspectionLine(campaignId: string, entityId: string, purpose: InspectPurpose, writes: InspectWrite[], nowCycle: number, outcome: CheckOutcome & { checkId?: string }): Promise<string | null> {
+  try {
+    const { writeMemoryEntry } = await import('@/daya/memory');
+    const { INSPECTION_MEMORY_KIND, renderInspectionForms } = await import('@/services/perceived-feed');
+    const cls = { kind: INSPECTION_MEMORY_KIND, subjectId: purpose.subjectId, subjectKind: purpose.subjectKind, aspects: [...new Set(writes.map((w) => w.aspectKind))], checkId: outcome.checkId ?? null, success: outcome.success };
+    const m = await writeMemoryEntry({
+      entityId, narrativeCycle: nowCycle, source: 'perception', content: 'You study it.',
+      valence: 0, arousal: 0.3, salience: 0.5, entityRefs: [purpose.subjectId],
+      classification: cls, truthRef: null, chain: { entities: [purpose.subjectId] }, noticed: true,
+    });
+    const { forms } = await renderInspectionForms(campaignId, purpose.characterId, [{ id: m.id, classification: JSON.stringify(cls) }]);
+    const row = forms.get(m.id)?.rows[0];
+    const text = row && row.type === 'narration' ? row.pieces.map((x) => (x.kind === 'gap' ? '' : x.text)).join('') : null;
+    if (text) await prisma.dayaMemoryEntry.update({ where: { id: m.id }, data: { content: text } });
+    return m.id;
+  } catch (err) {
+    console.warn('[inspection] feed line not written (non-fatal)', err);
+    return null;
+  }
 }

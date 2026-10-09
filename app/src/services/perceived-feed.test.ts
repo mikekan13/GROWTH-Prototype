@@ -4,7 +4,7 @@ vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/services/history', () => ({ currentCycleOf: async () => 1 }));
 vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
 
-import { formToFeedEvents, segmentsToMessage, entityRef } from './perceived-feed';
+import { formToFeedEvents, segmentsToMessage, entityRef, inspectionForm, inspectionClsOf } from './perceived-feed';
 import { buildFeedRows } from '@/components/terminal/table-feed/feed-rows';
 import { perceivedFeedEntities } from '@/components/terminal/table-feed/perceived-entities';
 import { splitPerceived, plainPerceived, entityToken } from '@/lib/perceived-text';
@@ -82,5 +82,30 @@ describe('perceived feed rows (unit 9)', () => {
     expect(splitPerceived(t)).toEqual([{ kind: 'entity', id: 'ruth', label: 'a tall guard' }, { kind: 'text', text: ' says ' }, { kind: 'gap' }, { kind: 'text', text: ' today' }]);
     expect(plainPerceived(t)).toBe('a tall guard says {gap} today');
     expect(splitPerceived('plain')).toEqual([{ kind: 'text', text: 'plain' }]);
+  });
+});
+
+describe('inspection line — the inspector\'s own line at its current knowledge', () => {
+  const sword = { id: 'sword1', kind: 'ITEM' as const, label: 'an old sword', known: [{ aspectKind: 'identity', fidelity: 2 }, { aspectKind: 'weight', fidelity: 2 }, { aspectKind: 'material', fidelity: 0, impression: 'gold' }] };
+  const data = { item: { weightLbs: 12, primaryMaterial: 'Silver' } };
+
+  it('lists the studied aspects as known (a wrong impression as plain fact), the subject as a span', () => {
+    const f = inspectionForm('m1', sword, ['weight', 'material'], data);
+    const row = f.rows[0];
+    expect(row.type).toBe('narration');
+    if (row.type !== 'narration') return;
+    expect(row.pieces[1]).toEqual({ kind: 'entity', text: 'an old sword', entityId: 'sword1' });
+    expect(row.text).toBe('You study an old sword: Weight: about as heavy as a war hammer; Material: gold.');
+    expect(f.entities).toEqual([sword]);
+    const ev = formToFeedEvents(f, { campaignId: 'c', viewerId: 'violet', at: new Date(0), sessionId: null });
+    expect(ev[0].payload).toMatchObject({ kind: 'game_event', eventType: 'declaration' });
+  });
+
+  it('nothing known of what it studied -> it made nothing of it; classification parsing is strict', () => {
+    const row = inspectionForm('m2', { ...sword, known: [] }, ['weight'], data).rows[0];
+    expect(row.type === 'narration' && row.text).toBe('You study an old sword, but make nothing of it.');
+    expect(inspectionClsOf('{"kind":"inspection","subjectId":"s","aspects":["weight",3]}')).toMatchObject({ subjectId: 's', aspects: ['weight'] });
+    expect(inspectionClsOf('{"kind":"declaration"}')).toBeNull();
+    expect(inspectionClsOf('nope')).toBeNull();
   });
 });

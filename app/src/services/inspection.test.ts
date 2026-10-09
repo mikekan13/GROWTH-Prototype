@@ -11,6 +11,8 @@ const w = vi.hoisted(() => ({
   initiated: [] as Array<{ input: Record<string, unknown>; purpose: Record<string, unknown> }>,
   dice: [] as number[],
   changes: [] as Array<Record<string, unknown>>,
+  mems: [] as Array<Record<string, unknown>>,
+  memUpdates: [] as Array<Record<string, unknown>>,
 }));
 
 const SWORD = JSON.stringify({ damage: { slashing: 4 }, baseResist: 12, value: 40, properties: ['Sharp'], itemAbilities: [{ name: 'Flame Tongue', school: 'Force', description: 'burns' }] });
@@ -49,11 +51,20 @@ vi.mock('@/lib/db', () => {
         return row ? { score: row.score, lastCycle: row.lastCycle } : null;
       },
     },
+    dayaMemoryEntry: { update: async (q: Record<string, unknown>) => { w.memUpdates.push(q); return {}; } },
     familiarityChange: { createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => { w.changes.push(...data); return { count: data.length }; } },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
   };
   return { prisma };
 });
+vi.mock('@/daya/memory', () => ({ writeMemoryEntry: vi.fn(async (p: Record<string, unknown>) => { w.mems.push(p); return { id: `mem${w.mems.length}` }; }) }));
+vi.mock('@/services/perceived-feed', () => ({
+  INSPECTION_MEMORY_KIND: 'inspection',
+  renderInspectionForms: async (_c: string, _v: string, rows: Array<{ id: string; classification: string }>) => ({
+    forms: new Map(rows.map((r) => [r.id, { rows: [{ type: 'narration', pieces: [{ kind: 'text', text: 'You study ' }, { kind: 'entity', text: 'an old sword', entityId: 'sword1' }, { kind: 'text', text: `: ${(JSON.parse(r.classification) as { aspects: string[] }).aspects.join(', ')}.` }] }] }])),
+    subjects: new Map(),
+  }),
+}));
 vi.mock('@/lib/dice', () => ({ rollDie: vi.fn(() => w.dice.shift() ?? 1) }));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));
 vi.mock('@/services/campaign-event', () => ({ createCampaignEvent: vi.fn(async (e: Record<string, unknown>) => { w.events.push(e); return { id: 'e' }; }) }));
@@ -85,7 +96,7 @@ const flush = () => new Promise((r) => setTimeout(r, 20));
 beforeEach(() => {
   clearBoard();
   w.fams = [{ perceiverId: 'ent-violet', subjectId: 'sword1', aspectKind: 'identity', score: 0.3, lastCycle: null }];
-  w.events = []; w.exposures = []; w.initiated = []; w.dice = []; w.changes = [];
+  w.events = []; w.exposures = []; w.initiated = []; w.dice = []; w.changes = []; w.mems = []; w.memUpdates = [];
 });
 
 describe('declare → board', () => {
@@ -177,5 +188,22 @@ describe('resolve', () => {
     const grown = w.exposures.map((e) => e.aspectKind);
     expect(grown).toEqual(expect.arrayContaining(['identity', 'appearance']));
     expect(grown.some((k) => k === 'damage' || String(k).startsWith('ability'))).toBe(false);
+  });
+});
+
+describe('inspection writes a feed line (Mike 2026-10-09: "probably both")', () => {
+  const purpose = { kind: 'inspect' as const, intentId: 'i1', characterId: 'violet', subjectId: 'sword1', subjectKind: 'ITEM' as const, skillName: 'Swordsmanship', skillDomains: ['force', 'abjuration'] };
+
+  it('a resolved inspection leaves the inspector a memory row naming what it studied, its content the rendered line', async () => {
+    const writes = await svc.resolveInspection('c1', purpose, { total: 20, success: true, margin: 10, effortBy: {}, skilled: true, checkId: 'chk1' });
+    expect(w.mems).toHaveLength(1);
+    expect(w.mems[0]).toMatchObject({ entityId: 'ent-violet', source: 'perception', truthRef: null, noticed: true, entityRefs: ['sword1'] });
+    expect(w.mems[0].classification).toMatchObject({ kind: 'inspection', subjectId: 'sword1', subjectKind: 'ITEM', checkId: 'chk1', success: true, aspects: [...new Set(writes.map((x) => x.aspectKind))] });
+    expect(w.memUpdates[0]).toMatchObject({ where: { id: 'mem1' }, data: { content: expect.stringMatching(/^You study an old sword: /) } });
+  });
+
+  it('a failed inspection still leaves its line (nothing studied)', async () => {
+    await svc.resolveInspection('c1', purpose, { total: 5, success: false, margin: -2, effortBy: {}, skilled: true, checkId: 'chk2' });
+    expect(w.mems[0].classification).toMatchObject({ kind: 'inspection', aspects: [], success: false });
   });
 });

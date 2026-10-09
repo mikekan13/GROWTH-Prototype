@@ -13,6 +13,11 @@
  *   - session markers (no diegetic text).
  * A line with no memory row does not appear — no trace row. The server builds the
  * whole response from the memory; truth text of an unperceived event never leaves.
+ *
+ * INSPECTION LINES (Mike 2026-10-09: "probably both" — a feed line AND deeper tooltips): a resolved
+ * inspection leaves a memory row (classification kind 'inspection', no canon ref) rendered here as the
+ * inspector's own narration — "You study <the thing as known>: <what is known of the aspects it
+ * studied>" — at its CURRENT knowledge (all knowledge relabels past entries), wrong impressions as fact.
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
@@ -20,7 +25,7 @@ import { seesTruthRecord } from '@/lib/permissions';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { perceptionFeedOn } from '@/lib/perception-feed';
 import { entityToken, GAP } from '@/lib/perceived-text';
-import { renderViewerFeed, characterDescription, VISIBLE_FORM_TUNING, type VisibleForm, type VisiblePiece, type VisibleRow, type VisibleEntity } from '@/services/visible-form';
+import { renderViewerFeed, characterDescription, loadViewerContext, visibleEntity, VISIBLE_FORM_TUNING, type VisibleForm, type VisiblePiece, type VisibleRow, type VisibleEntity } from '@/services/visible-form';
 import { aspectFacts, type AspectSubject } from '@/sim/perception/aspect-values';
 import type { GrowthWorldItem } from '@/types/item';
 import type { TerminalActor, TerminalEventType, TerminalPayload, PerceivedEntityRef } from '@/types/terminal';
@@ -153,6 +158,55 @@ export function formToFeedEvents(form: VisibleForm, meta: { campaignId: string; 
   });
 }
 
+// ── Inspection lines ──────────────────────────────────────────────────────
+
+/** classification.kind of the inspector's own memory row (services/inspection writes it). */
+export const INSPECTION_MEMORY_KIND = 'inspection';
+
+export interface InspectionMemoryCls { kind: typeof INSPECTION_MEMORY_KIND; subjectId: string; subjectKind?: string; aspects?: string[]; checkId?: string | null }
+
+/** Parse an inspection row's classification, or null. Pure. */
+export function inspectionClsOf(raw: string | null | undefined): InspectionMemoryCls | null {
+  try {
+    const c = JSON.parse(raw ?? '') as Partial<InspectionMemoryCls>;
+    return c && c.kind === INSPECTION_MEMORY_KIND && typeof c.subjectId === 'string' ? { ...c, aspects: Array.isArray(c.aspects) ? c.aspects.filter((a): a is string => typeof a === 'string') : [] } as InspectionMemoryCls : null;
+  } catch { return null; }
+}
+
+/**
+ * The inspector's own line for one inspection: "You study <subject as known>: <Label: value; …>." over the
+ * aspects it studied, each at the viewer's CURRENT fidelity (a wrong impression as fact); nothing known of
+ * them → "…but make nothing of it." Pure.
+ */
+export function inspectionForm(memoryId: string, subject: VisibleEntity, studied: string[], data: AspectSubject = {}): VisibleForm {
+  const want = new Set(studied);
+  const facts = aspectFacts(subject.known.filter((k) => want.has(k.aspectKind)), data);
+  const tail = facts.length ? `: ${facts.map((f) => `${f.label}: ${f.value}`).join('; ')}.` : ', but make nothing of it.';
+  const pieces: VisiblePiece[] = [{ kind: 'text', text: 'You study ' }, { kind: 'entity', text: subject.label, entityId: subject.id }, { kind: 'text', text: tail }];
+  return { memoryId, truthRefs: [], rows: [{ type: 'narration', text: pieces.map((p) => (p.kind === 'gap' ? GAP : p.text)).join(''), pieces }], entities: [subject] };
+}
+
+/** Render a viewer's inspection rows at its current knowledge (one context read). Rows whose subject is gone drop. */
+export async function renderInspectionForms(campaignId: string, viewerCharacterId: string, rows: Array<{ id: string; classification: string }>): Promise<{ forms: Map<string, VisibleForm>; subjects: Map<string, AspectSubject> }> {
+  const forms = new Map<string, VisibleForm>();
+  const parsed = rows.map((r) => ({ id: r.id, cls: inspectionClsOf(r.classification) })).filter((r): r is { id: string; cls: InspectionMemoryCls } => !!r.cls);
+  if (!parsed.length) return { forms, subjects: new Map() };
+  const ctx = await loadViewerContext(campaignId, viewerCharacterId, { rewrite: null });
+  if (!ctx) return { forms, subjects: new Map() };
+  const byId = new Map(ctx.entities.map((e) => [e.id, e]));
+  const ves = new Map<string, VisibleEntity>();
+  for (const r of parsed) {
+    const e = byId.get(r.cls.subjectId);
+    if (e && !ves.has(e.id)) ves.set(e.id, visibleEntity(e, ctx.familiarity, ctx.viewerId));
+  }
+  const subjects = await loadAspectSubjects(campaignId, [...ves.values()]);
+  for (const r of parsed) {
+    const ve = ves.get(r.cls.subjectId);
+    if (ve) forms.set(r.id, inspectionForm(r.id, ve, r.cls.aspects ?? [], subjects.get(ve.id)));
+  }
+  return { forms, subjects };
+}
+
 // ── The query ─────────────────────────────────────────────────────────────
 
 export interface PerceivedFeedQuery {
@@ -249,6 +303,22 @@ export async function queryPerceivedFeed(q: PerceivedFeedQuery): Promise<{ event
       const form = forms.get(p.id);
       if (!form || !form.rows.length) continue;
       memRows.push(...formToFeedEvents(form, { campaignId, viewerId: viewer.characterId, at: p.at, cycle: p.cycle, sessionId: sessionAt(p.at), subjects }));
+    }
+    // The inspector's own inspection lines (no canon ref), at its current knowledge.
+    const insp = await prisma.dayaMemoryEntry.findMany({
+      where: {
+        entityId: entity.id, noticed: true, truthRef: null, classification: { contains: `"kind":"${INSPECTION_MEMORY_KIND}"` },
+        ...(cursor || after ? { realTime: { ...(cursor ? { lt: cursor } : {}), ...(after ? { gt: after } : {}) } } : {}),
+      },
+      orderBy: { realTime: 'desc' },
+      take: limit + 1,
+      select: { id: true, classification: true, realTime: true, narrativeCycle: true },
+    });
+    if (insp.length > limit) memMore = true;
+    const ins = await renderInspectionForms(campaignId, viewer.characterId, insp.slice(0, limit));
+    for (const r of insp.slice(0, limit)) {
+      const form = ins.forms.get(r.id);
+      if (form) memRows.push(...formToFeedEvents(form, { campaignId, viewerId: viewer.characterId, at: r.realTime, cycle: r.narrativeCycle, sessionId: sessionAt(r.realTime), subjects: ins.subjects }));
     }
   }
 
