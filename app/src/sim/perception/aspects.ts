@@ -21,6 +21,7 @@
 import type { GrowthWorldItem, ItemAbility } from '@/types/item';
 import type { MagicSchool } from '@/types/growth';
 import { getMaterial } from '@/lib/materials';
+import { getPropertyDomains, propertySlug } from '@/lib/item-properties';
 
 // ── Head domains (the ten in daya/domains.ts) ─────────────────────────────
 
@@ -71,7 +72,8 @@ export const ASPECT_KINDS = [
   { key: 'hardness', label: 'Hardness (base resist)', domains: ['abjuration'] },
   // + each listed material's own tags (Material.domains) — see aspectDomains.
   { key: 'material', label: 'Material', domains: ['alteration'] },
-  { key: 'properties', label: 'Properties', domains: ['alteration'] },
+  // One aspect per property (Sharp, Brittle…), + that property's own tags (lib/item-properties) — see aspectDomains.
+  { key: 'property', label: 'Property', domains: ['alteration'], perInstance: true },
   { key: 'quality', label: 'Quality', domains: ['conjuration'] },
   { key: 'condition', label: 'Condition', domains: ['alteration'] },
   { key: 'rarity', label: 'Rarity', domains: ['fortune'] },
@@ -145,6 +147,35 @@ export function materialDomains(names: Iterable<string | null | undefined>): Hea
   return tagSet(tags);
 }
 
+/** Tags the named properties add on their own definitions (lib/item-properties). */
+export function propertyDomains(names: Iterable<string | null | undefined>): HeadDomainKey[] {
+  const tags: unknown[] = [];
+  for (const n of names) if (n) tags.push(...getPropertyDomains(n));
+  return tagSet(tags);
+}
+
+/**
+ * The item's properties as [instanceId, name] pairs: `properties` plus the
+ * deprecated aliases (`weaponProperties`, `materialModifiers`), one per slug
+ * (a property is a descriptor, so a repeat is the same property).
+ */
+export function itemProperties(subject: ItemSubject): Array<{ id: string; name: string }> {
+  return propertiesOf(readItem(subject));
+}
+
+function propertiesOf(d: Partial<GrowthWorldItem>): Array<{ id: string; name: string }> {
+  const out: Array<{ id: string; name: string }> = [];
+  for (const list of [d.properties, d.weaponProperties, d.materialModifiers]) {
+    if (!Array.isArray(list)) continue;
+    for (const name of list) {
+      if (typeof name !== 'string') continue;
+      const id = propertySlug(name);
+      if (id && !out.some((p) => p.id === id)) out.push({ id, name });
+    }
+  }
+  return out;
+}
+
 function itemMaterialNames(d: Partial<GrowthWorldItem>): string[] {
   const subs = Array.isArray(d.subordinateMaterials) ? d.subordinateMaterials : [];
   return [d.primaryMaterial, d.material, ...subs].filter((n): n is string => typeof n === 'string' && n !== '');
@@ -155,13 +186,15 @@ function itemMaterialNames(d: Partial<GrowthWorldItem>): string[] {
  * base tags always apply; with the subject's item data:
  * - `material` adds each of the item's materials' own tags;
  * - `ability:<id>` adds that ability's school (Fortune only if unknown).
- * Unknown kind → []. Pure.
+ * `property:<slug>` adds that property's own tags (no item data needed — the
+ * slug is the property). Unknown kind → []. Pure.
  */
 export function aspectDomains(key: string, subject?: ItemSubject): HeadDomainKey[] {
   const { kind, instanceId } = parseAspectKey(key);
   const def = aspectKind(kind);
   if (!def) return [];
   const tags: unknown[] = [...def.domains];
+  if (kind === 'property' && instanceId) tags.push(...propertyDomains([instanceId]));
   if (subject !== undefined && (kind === 'material' || kind === 'ability')) {
     const d = readItem(subject);
     if (kind === 'material') tags.push(...materialDomains(itemMaterialNames(d)));
@@ -192,11 +225,12 @@ export function listAspects(subject: ItemSubject): string[] {
   if (d.damage && typeof d.damage === 'object') out.push('damage');
   if (has(d.baseResist) || has(d.resistance)) out.push('hardness');
   if (has(d.primaryMaterial) || has(d.material) || nonEmpty(d.subordinateMaterials) || has(d.materialClass)) out.push('material');
-  if (nonEmpty(d.properties) || nonEmpty(d.weaponProperties) || nonEmpty(d.materialModifiers)) out.push('properties');
+  const props = propertiesOf(d);
   if (has(d.quality)) out.push('quality');
   if (has(d.condition)) out.push('condition');
   if (has(d.rarity)) out.push('rarity');
   out.push('value', 'history');
+  for (const p of props) out.push(aspectKey('property', p.id));
   for (const id of itemAbilityIds(Array.isArray(d.itemAbilities) ? d.itemAbilities : [])) out.push(aspectKey('ability', id));
   return out;
 }
