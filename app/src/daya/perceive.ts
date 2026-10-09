@@ -29,6 +29,8 @@ import { currentFacts, type WorldFactRecord } from './world-ledger';
 import { senseFlagsFromSheet } from '@/sim/senses/field';
 import type { DayaClientOverrides } from './model-client';
 import type { GrowthLocation } from '@/types/location';
+import { familiarityAt } from '@/services/familiarity';
+import { currentCycleOf } from '@/services/history';
 
 export interface PerceiveResult {
   /** What the being actually perceived — the stimulus content to ingest. */
@@ -63,8 +65,32 @@ export interface PerceiveOptions {
   voice?: boolean;
 }
 
-/** Perceptual attunement to one's own surroundings. Flat for now — [QUESTION for Mike]: which attribute governs it (Focus? Wisdom?). */
+/** Perceptual attunement to one's own surroundings. Flat for now — [QUESTION for Mike]: which attribute governs it (Focus? Wisdom?). The FALLBACK when the being has no stored familiarity of the place (perception unit 4). */
 export const SCENE_ATTUNEMENT = 0.8;
+
+/** The place's aspects (sim/perception/aspects) whose familiarity sets how clearly a being takes the scene in. */
+export const SCENE_ASPECTS = ['appearance', 'identity'] as const;
+
+/**
+ * The scene attunement from a being's stored familiarity of the place: the
+ * best-known scene aspect, faded to `nowCycle`; no rows → SCENE_ATTUNEMENT
+ * (unchanged behaviour for unseeded pairs). Pure.
+ */
+export function sceneAttunementFrom(rows: Array<{ score: number; lastCycle: number | null }>, nowCycle: number): number {
+  if (rows.length === 0) return SCENE_ATTUNEMENT;
+  return Math.max(...rows.map((r) => familiarityAt(r, nowCycle)));
+}
+
+/** Stored familiarity of the place → attunement; null when there is none (or the store cannot be read — the mirror never fails on it). */
+async function storedSceneAttunement(entityId: string, locationId: string, campaignId: string): Promise<number | null> {
+  try {
+    const rows = await prisma.familiarity.findMany({ where: { perceiverId: entityId, subjectId: locationId, aspectKind: { in: [...SCENE_ASPECTS] } }, select: { score: true, lastCycle: true } });
+    if (rows.length === 0) return null;
+    return sceneAttunementFrom(rows, await currentCycleOf(campaignId));
+  } catch {
+    return null;
+  }
+}
 
 const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'on', 'at', 'to', 'fourth', 'floor', 'walkup', 'room', 'street', 'branch']);
 
@@ -283,12 +309,13 @@ export function sceneRoll(input: { placed: boolean; present: string[]; items: st
   };
 }
 
-async function observerFor(characterId: string): Promise<{ observer: Observer; godlike: boolean }> {
+async function observerFor(characterId: string): Promise<{ observer: Observer; godlike: boolean; entityId: string | null }> {
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true, personaProfile: true, affect: { select: { morale: true, stress: true, grief: true } } } });
   let persona: { bias?: BiasProfile; voice?: VoiceParams; godlike?: boolean; omniscient?: boolean } = {};
   try { persona = entity ? JSON.parse(entity.personaProfile) : {}; } catch { persona = {}; }
   const mood = entity?.affect ? { morale: entity.affect.morale, stress: entity.affect.stress, grief: entity.affect.grief } : { morale: 0, stress: 0, grief: 0 };
   return {
+    entityId: entity?.id ?? null,
     godlike: persona.godlike === true || persona.omniscient === true,
     observer: { entityId: characterId, attunement: SCENE_ATTUNEMENT, biasProfile: persona.bias ?? {}, mood, voice: persona.voice ?? {} },
   };
@@ -317,7 +344,18 @@ export async function perceive(
   const narrowed = opts.standing === 'once' ? narrowToNew(whole, takenIn.get(characterId), locationId, Date.now(), roll) : null;
   const truth = narrowed?.truth ?? (opts.standing === 'stimulus' ? stimulusOnly(whole) : whole);
   const standing = narrowed?.standing ?? (opts.standing === 'stimulus' ? 'new' : 'full');
-  const { observer: current, godlike } = await observerFor(characterId);
+  const { observer: current, godlike, entityId } = await observerFor(characterId);
+  // Unit 4: the being's stored familiarity of the place replaces the flat SCENE_ATTUNEMENT when it has any.
+  // Godlike beings bypass the mirror below (Terminal tier = F5); a caller-given attunement (canon re-render) wins.
+  if (!godlike && opts.observer?.attunement == null && entityId && locationId) {
+    const stored = await storedSceneAttunement(entityId, locationId, campaignId);
+    if (stored != null) current.attunement = stored;
+  }
+  // TODO(perception unit 4/8): record exposure here — the place, the people present and the things lying
+  // around (source 'exposure'; 'own' for held items) with seedOnFirstContact (services/familiarity-seed) first.
+  // NOT wired: it is N writes per stimulus per being in the listening loop (SQLite contention), and a fresh
+  // exposure row for the PLACE (0.01 → F0) would replace the 0.8 fallback and blank the scene. Needs a seed
+  // policy for places [QUESTION] and batching before it goes in.
   const observer: Observer = { ...current, ...(opts.observer?.mood ? { mood: opts.observer.mood } : {}), ...(opts.observer?.attunement != null ? { attunement: opts.observer.attunement } : {}) };
   const snapshot = { mood: observer.mood, attunement: observer.attunement };
   const subjectKey = `scene:${locationId ?? 'nowhere'}`;

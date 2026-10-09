@@ -14,12 +14,15 @@
  *   fades; at the F5 seal it does not fade at all ("would easily remain solid
  *   through lifetimes").
  *
- * Invisible for now: nothing in perception reads this store yet (unit 4).
+ * Read by the mirror (daya/perceive: the place's stored familiarity sets the
+ * scene attunement, unit 4); seeded on first contact by services/familiarity-seed;
+ * Watcher view via listFamiliarityForWatcher (GET /api/campaigns/[id]/familiarity).
  */
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { ValidationError } from '@/lib/errors';
+import { NotFoundError, ValidationError } from '@/lib/errors';
+import { requireCampaignGM } from '@/services/campaign-access';
 import { RECALL_TUNING } from '@/daya/recall-tuning';
 import { currentCycleOf } from '@/services/history';
 
@@ -148,6 +151,47 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 
 function toRecord(row: Omit<FamiliarityRecord, 'fidelity'>): FamiliarityRecord {
   return { ...row, fidelity: scoreToFidelity(row.score) };
+}
+
+export interface FamiliarityView extends FamiliarityRecord {
+  /** The subject's display name (item / character / location), null if it is gone. */
+  subjectName: string | null;
+  /** Score faded to the campaign clock (what the being knows NOW); `score` is the stored value. */
+  current: number;
+  currentFidelity: number;
+}
+
+/**
+ * Everything one being knows, for the Watcher (read-only debug view). GM of
+ * the campaign or ADMIN. `perceiver` = the DayaEntity id or its characterId.
+ */
+export async function listFamiliarityForWatcher(
+  campaignId: string,
+  user: { id: string; role: string },
+  perceiver: string,
+): Promise<{ perceiverId: string; characterId: string | null; nowCycle: number; rows: FamiliarityView[] }> {
+  await requireCampaignGM(campaignId, user);
+  if (!perceiver) throw new ValidationError('perceiverId is required');
+  const entity = await prisma.dayaEntity.findFirst({ where: { OR: [{ id: perceiver }, { characterId: perceiver }] }, select: { id: true, characterId: true } });
+  if (!entity) throw new NotFoundError('No DAYA being with that id');
+  const nowCycle = await currentCycleOf(campaignId);
+  const rows = await prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id }, select: RECORD_SELECT, orderBy: [{ subjectKind: 'asc' }, { subjectId: 'asc' }, { aspectKind: 'asc' }] });
+  const ids = [...new Set(rows.map((r) => r.subjectId))];
+  const [items, chars, locs] = ids.length ? await Promise.all([
+    prisma.campaignItem.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+    prisma.character.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+    prisma.location.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+  ]) : [[], [], []];
+  const names = new Map<string, string>([...items, ...chars, ...locs].map((r) => [r.id, r.name]));
+  return {
+    perceiverId: entity.id,
+    characterId: entity.characterId ?? null,
+    nowCycle,
+    rows: rows.map((r) => {
+      const current = familiarityAt(r, nowCycle);
+      return { ...toRecord(r), subjectName: names.get(r.subjectId) ?? null, current, currentFidelity: scoreToFidelity(current) };
+    }),
+  };
 }
 
 /** The stored familiarity (unfaded), or null if this being has never met this aspect. */
