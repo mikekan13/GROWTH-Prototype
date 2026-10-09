@@ -292,6 +292,7 @@ model Campaign {
   timescales          Timescale[]
   historyEntries      HistoryEntry[]
   familiarities       Familiarity[]
+  skillDomainRelevances SkillDomainRelevance[]
   createdAt           DateTime             @default(now())
 }
 
@@ -1235,6 +1236,28 @@ model Familiarity {
   @@index([campaignId])
   @@index([perceiverId, subjectKind])
   @@index([subjectId])
+}
+
+// How relevant a freeform skill is to each of the ten head domains (perception
+// unit 3, Mike 2026-10-09: "the engine scores skill→domain relevance once (small
+// model), caches it, GM can override"). Skills are freeform names inside
+// Character.data, so the model's scores are GLOBAL (scope '*'); a GM override
+// is scoped to that GM's campaign (scope = campaignId) and always wins there.
+// The model never overwrites any row. See services/skill-relevance.ts.
+model SkillDomainRelevance {
+  id         String    @id @default(cuid())
+  scope      String    // '*' = global, else the campaignId (a campaign GM's overrides)
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String?   // set iff scope is a campaign
+  skillName  String    // normalized: trimmed, lower-case, single spaces
+  domain     String    // head-domain key (daya/domains.ts)
+  relevance  Float     // 0..1
+  source     String    // model | gm
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([scope, skillName, domain])
+  @@index([campaignId])
 }
 
 // Mood vector — event-driven internal state for AI-controlled characters.
