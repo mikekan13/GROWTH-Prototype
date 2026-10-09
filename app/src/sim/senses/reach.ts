@@ -12,7 +12,8 @@
  * Wisdom (wider passive noticing) and the context (threat, surprise, volume);
  * output = noticed | unnoticed + salience 0..1.
  * Mike (Q7): thoughts are just another event; they reach a being only through a
- * sense that reaches minds (SenseProfile.nonPhysical, default none).
+ * sense that reaches minds — a 'mind' SENSE GRANT from anything active on the
+ * being (organ, item, ability, trait/blossom; field.mindSensesOf), default none.
  *
  * This module is pure apart from the model call, which is injected (tests) or
  * routed on the 'classify' lane (Haiku today; the local small model when that
@@ -25,7 +26,7 @@
  * event that does not reach is not noticed.
  */
 import { z } from 'zod';
-import { SENSE_KINDS, type SenseKind, type SenseProfile } from './field';
+import { SENSE_KINDS, mindSensesOf, type SenseKind, type SenseProfile } from './field';
 
 // ── Flag ──────────────────────────────────────────────────────────────────
 
@@ -133,12 +134,12 @@ export function cuesFromText(text: string): { kind: ReachEventKind | null; volum
 }
 
 function mindSenses(b: ReachBeing): Array<{ name: string; effectiveness: number }> {
-  return (b.senses.nonPhysical ?? []).filter((s) => s.reaches === 'thought' && s.effectiveness > 0);
+  return mindSensesOf(b.senses);
 }
 
 /** Each carried sense's effectiveness for this being now (organs; mind senses by name). Pure. */
 export function clarityOf(b: ReachBeing, via: string[]): Record<string, number> {
-  const minds = new Map((b.senses.nonPhysical ?? []).map((m) => [m.name, m.effectiveness]));
+  const minds = new Map(mindSenses(b).map((m) => [m.name, m.effectiveness]));
   const out: Record<string, number> = {};
   for (const v of via) {
     if (v === 'self') continue;
@@ -200,7 +201,9 @@ function senseLine(b: ReachBeing): string {
   const parts = SENSE_KINDS.map((s) => {
     const e = b.senses.effectiveness[s];
     const hurt = b.senses.organs.filter((o) => o.sense === s && !o.assumed && o.effectiveness < 1).map((o) => `${o.partName} ${o.conditionLabel}`);
-    return `${s} ${e}${hurt.length ? ` (${hurt.join(', ')})` : ''}`;
+    const granted = (b.senses.grants ?? []).filter((g) => g.sense === s && g.effectiveness > 0).map((g) => `via ${g.source.label}`);
+    const notes = [...hurt, ...granted];
+    return `${s} ${e}${notes.length ? ` (${notes.join(', ')})` : ''}`;
   });
   const minds = mindSenses(b);
   return `${parts.join(', ')}. Mind sense: ${minds.length ? minds.map((m) => `${m.name} ${m.effectiveness}`).join(', ') : 'none'}.`;

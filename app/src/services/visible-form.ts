@@ -36,7 +36,7 @@ import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
 import { parseSegments, splitEntities, type FeedSegment } from '@/lib/feed-segments';
 import { parseTableProse } from '@/services/table-prose';
-import { SENSE_KINDS, senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
+import { SENSE_KINDS, mindSensesOf, senseProfileFromSheet, type SenseKind } from '@/sim/senses/field';
 import { perceptionReachOn } from '@/sim/senses/reach';
 import { familiarityAt, scoreToFidelity, witMaxFromSheet } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
@@ -552,7 +552,7 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
   if (!entity) return null;
   const [chars, items, locs, fams, nowCycle] = await Promise.all([
     prisma.character.findMany({ where: { campaignId }, select: { id: true, name: true, data: true, entityType: true } }),
-    prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, type: true, data: true }, take: CONTEXT_ITEM_CAP }),
+    prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, type: true, data: true, holderId: true }, take: CONTEXT_ITEM_CAP }),
     prisma.location.findMany({ where: { campaignId }, select: { id: true, name: true, data: true } }),
     prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id }, select: { subjectId: true, aspectKind: true, score: true, lastCycle: true } }),
     currentCycleOf(campaignId),
@@ -571,9 +571,10 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
   const familiarity: ViewerFamiliarity = {};
   const witMax = witMaxFromSheet(viewerSheet); // WIT = RETENTION: the viewer's own Wit fades what it knows
   for (const f of fams) (familiarity[f.subjectId] ??= {})[f.aspectKind] = scoreToFidelity(familiarityAt(f, nowCycle, witMax));
-  const senses = senseProfileFromSheet(viewerSheet);
+  // Sense grants from anything active on the viewer: organs, traits/blossoms (sheet) and the items it holds.
+  const senses = senseProfileFromSheet(viewerSheet, { items: items.filter((i) => i.holderId === viewerCharacterId), nowCycle });
   const clarity: Record<string, number> = { ...senses.effectiveness };
-  for (const m of senses.nonPhysical ?? []) clarity[m.name] = m.effectiveness;
+  for (const m of mindSensesOf(senses)) clarity[m.name] = m.effectiveness;
   const rewrite = opts.rewrite !== undefined ? opts.rewrite : perceptionReachOn() ? vagueRewriteModelFor(campaignId) : null;
   return { campaignId, viewerId: viewerCharacterId, viewerEntityId: entity.id, entities, familiarity, clarity, rewrite, nowCycle };
 }

@@ -102,22 +102,69 @@ export interface SenseProfile {
   /** Per sense: the BEST organ's effectiveness (0 = the sense is gone). */
   effectiveness: Record<SenseKind, number>;
   /**
-   * Senses that are not organs (perception units 6+7, Mike Q7 2026-10-09: "mind reading spell") — e.g. a
-   * spell or blossom that lets a being perceive THOUGHTS. Absent / empty = none (the default: no being reads
-   * minds by nature). Nothing on the sheet grants one yet; the caller adds it.
+   * SENSE GRANTS (Mike 2026-10-09 morning: mind-reading "could come from anything. It would be like any
+   * other sense. could be an organ an item a spell... just about anything") — every sense granted by
+   * something active on the being: a body part's or held item's `grantsSenses`, their item abilities',
+   * its traits' (nectars, thorns, unexpired blossoms — spells act through blossoms). Organ-kind grants
+   * also raise `effectiveness`; 'mind' grants are the senses that reach thoughts (mindSensesOf).
+   * Empty = none (the default: no being reads minds by nature).
    */
-  nonPhysical?: NonPhysicalSense[];
+  grants: SenseGrant[];
 }
 
-/** A non-organ sense. `reaches` names what it can carry that no organ can ('thought' = another being's thoughts). */
-export interface NonPhysicalSense {
-  /** Free name shown to the world-sim, e.g. 'mind reading'. */
+/** One granted sense, resolved from its source. JSON-safe. */
+export interface SenseGrant {
+  /** 'sight' | 'hearing' | 'smell' | 'taste' | 'touch' | 'mind' | another name (kept, not yet modelled). */
+  sense: string;
+  /** Shown to the world-sim and used as the `via` name for a mind sense ('mind reading', or the source's label). */
   name: string;
-  reaches: 'thought';
-  /** 0..1, like an organ's. */
+  /** 0..1 — the grant's own, scaled by its source's condition (Broken halves, Destroyed 0). */
   effectiveness: number;
-  /** Where it comes from (spell / blossom / ability id or label). */
-  source: string | null;
+  source: { kind: 'organ' | 'item' | 'ability' | 'trait'; id: string | null; label: string };
+}
+
+/** The 'mind' grants that work (effectiveness > 0), one per name (best wins). Pure. */
+export function mindSensesOf(profile: Pick<SenseProfile, 'grants'> | null | undefined): Array<{ name: string; effectiveness: number }> {
+  const best = new Map<string, number>();
+  for (const g of profile?.grants ?? []) {
+    if (g.sense !== 'mind' || !(g.effectiveness > 0)) continue;
+    best.set(g.name, Math.max(best.get(g.name) ?? 0, g.effectiveness));
+  }
+  return [...best].map(([name, effectiveness]) => ({ name, effectiveness }));
+}
+
+/** A source's declared grants (types/growth SenseGrantSpec), validated loosely. */
+type GrantSpec = { sense?: unknown; effectiveness?: unknown; name?: unknown };
+function specsOf(v: unknown): Array<{ sense: string; effectiveness: number; name: string | null }> {
+  if (!Array.isArray(v)) return [];
+  return (v as GrantSpec[]).flatMap((g) => {
+    if (!g || typeof g !== 'object' || typeof g.sense !== 'string' || !g.sense.trim()) return [];
+    const e = typeof g.effectiveness === 'number' && Number.isFinite(g.effectiveness) ? Math.min(1, Math.max(0, g.effectiveness)) : 1;
+    return [{ sense: g.sense.trim().toLowerCase(), effectiveness: e, name: typeof g.name === 'string' && g.name.trim() ? g.name.trim() : null }];
+  });
+}
+
+/** Grants on one item-shaped source (a body part / a held item) and its item abilities, scaled by its condition. */
+function grantsOnItem(node: { grantsSenses?: unknown; itemAbilities?: unknown; condition?: unknown }, kind: 'organ' | 'item', id: string | null, label: string): SenseGrant[] {
+  const scale = conditionEffectiveness(typeof node.condition === 'number' ? node.condition : 3);
+  const out: SenseGrant[] = specsOf(node.grantsSenses).map((g) => ({ sense: g.sense, name: g.name ?? (g.sense === 'mind' ? label : g.sense), effectiveness: g.effectiveness * scale, source: { kind, id, label } }));
+  if (Array.isArray(node.itemAbilities)) {
+    for (const a of node.itemAbilities as Array<{ name?: unknown; grantsSenses?: unknown }>) {
+      const aLabel = typeof a?.name === 'string' && a.name ? a.name : label;
+      for (const g of specsOf(a?.grantsSenses)) out.push({ sense: g.sense, name: g.name ?? (g.sense === 'mind' ? aLabel : g.sense), effectiveness: g.effectiveness * scale, source: { kind: 'ability', id, label: `${label}: ${aLabel}` } });
+    }
+  }
+  return out;
+}
+
+/** A held item as the sense pass reads it (CampaignItem row; `data` = GrowthWorldItem JSON or parsed). */
+export interface SenseItemSource { id: string; name: string; data: unknown }
+
+export interface SenseProfileOptions {
+  /** ACTIVE items the being holds (equipped or carried) — their grants and their abilities' grants. */
+  items?: SenseItemSource[];
+  /** Campaign clock: blossoms with expiresAtCycle <= nowCycle grant nothing. Omitted = every trait on the sheet counts. */
+  nowCycle?: number;
 }
 
 function assumedOrgan(sense: SenseKind): SenseOrgan {
@@ -131,10 +178,11 @@ function assumedOrgan(sense: SenseKind): SenseOrgan {
  * a head with no eye parts still sees). Several organs for one sense → the best
  * one counts (one good eye sees). Pure.
  */
-export function senseProfileFromSheet(sheet: { bodyAnatomy?: unknown } | null | undefined): SenseProfile {
-  type Part = { partName?: string; condition?: number; properties?: unknown; primaryMaterial?: string; contains?: Part[] };
+export function senseProfileFromSheet(sheet: { bodyAnatomy?: unknown; traits?: unknown } | null | undefined, opts: SenseProfileOptions = {}): SenseProfile {
+  type Part = { partName?: string; condition?: number; properties?: unknown; primaryMaterial?: string; contains?: Part[]; grantsSenses?: unknown; itemAbilities?: unknown; id?: string };
   const root = sheet?.bodyAnatomy as Part | undefined;
   const organs: SenseOrgan[] = [];
+  const grants: SenseGrant[] = [];
   if (root && typeof root === 'object') {
     const walk = (n: Part, parentPath: string[]) => {
       const partName = n.partName ?? '';
@@ -152,20 +200,37 @@ export function senseProfileFromSheet(sheet: { bodyAnatomy?: unknown } | null | 
           assumed: false,
         });
       }
+      grants.push(...grantsOnItem(n, 'organ', typeof n.id === 'string' ? n.id : null, partName || 'body'));
       for (const c of n.contains ?? []) walk(c, path);
     };
     walk(root, []);
   }
   for (const sense of SENSE_KINDS) if (!organs.some((o) => o.sense === sense)) organs.push(assumedOrgan(sense));
+  for (const it of opts.items ?? []) {
+    let d: unknown = it.data;
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch { d = null; } }
+    // A loose body part (a severed eye) grants nothing to its holder.
+    if (!d || typeof d !== 'object' || (d as { isBodyPart?: boolean }).isBodyPart) continue;
+    grants.push(...grantsOnItem(d as Part, 'item', it.id, it.name));
+  }
+  if (Array.isArray(sheet?.traits)) {
+    for (const t of sheet.traits as Array<{ name?: unknown; type?: unknown; grantsSenses?: unknown; expiresAtCycle?: unknown }>) {
+      if (!t || typeof t !== 'object') continue;
+      if (t.type === 'blossom' && typeof t.expiresAtCycle === 'number' && typeof opts.nowCycle === 'number' && t.expiresAtCycle <= opts.nowCycle) continue;
+      const label = typeof t.name === 'string' && t.name ? t.name : 'trait';
+      for (const g of specsOf(t.grantsSenses)) grants.push({ sense: g.sense, name: g.name ?? (g.sense === 'mind' ? label : g.sense), effectiveness: g.effectiveness, source: { kind: 'trait', id: null, label } });
+    }
+  }
+  // An organ-kind grant (goggles that see, a blossom of keen hearing) counts like an organ: the best source wins.
   const effectiveness = Object.fromEntries(
-    SENSE_KINDS.map((s) => [s, Math.max(...organs.filter((o) => o.sense === s).map((o) => o.effectiveness))]),
+    SENSE_KINDS.map((s) => [s, Math.max(...organs.filter((o) => o.sense === s).map((o) => o.effectiveness), ...grants.filter((g) => g.sense === s).map((g) => g.effectiveness))]),
   ) as Record<SenseKind, number>;
-  return { anatomyModelled: !!root && typeof root === 'object', organs, effectiveness };
+  return { anatomyModelled: !!root && typeof root === 'object', organs, effectiveness, grants };
 }
 
 /** v0 sense flags, now derived from organ effectiveness (> 0 = the sense works); no anatomy = human default.
  *  Shared by the round engine and the perception composer (daya/perceive.ts). */
-export function senseFlagsFromSheet(sheet: { bodyAnatomy?: unknown } | null | undefined): { canSee: boolean; canHear: boolean } {
+export function senseFlagsFromSheet(sheet: { bodyAnatomy?: unknown; traits?: unknown } | null | undefined): { canSee: boolean; canHear: boolean } {
   const { effectiveness } = senseProfileFromSheet(sheet);
   return { canSee: effectiveness.sight > 0, canHear: effectiveness.hearing > 0 };
 }

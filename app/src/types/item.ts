@@ -4,6 +4,8 @@
  * They appear on the Relations Canvas and can be assigned to characters or locations.
  */
 
+import type { SenseGrantSpec } from './growth';
+
 export type WorldItemType = 'weapon' | 'armor' | 'accessory' | 'consumable' | 'tool' | 'artifact' | 'prima_materia' | 'misc';
 
 /**
@@ -22,10 +24,14 @@ export interface ItemAbility {
    * domain; without a school it is tagged Fortune only.
    */
   school?: string;
+  /** Senses this ability grants the holder (types/growth SenseGrantSpec). */
+  grantsSenses?: SenseGrantSpec[];
 }
 
 export interface GrowthWorldItem {
   description: string;
+  /** Senses this item / body part grants its holder or body (types/growth SenseGrantSpec), scaled by its condition. */
+  grantsSenses?: SenseGrantSpec[];
 
   // ── Materials (canon: Material_System.md) ──
   primaryMaterial?: string;        // Primary material; e.g. "Iron", "Leather"

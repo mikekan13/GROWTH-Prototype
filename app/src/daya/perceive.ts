@@ -256,9 +256,11 @@ export async function composeSceneTruth(
   source: 'perception' | 'dialogue',
 ): Promise<{ truth: SceneTruth; locationId: string | null; roll: SceneRoll }> {
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
-  let sheet: { bodyAnatomy?: unknown } | null = null;
-  try { sheet = character ? (JSON.parse(character.data) as { bodyAnatomy?: unknown }) : null; } catch { sheet = null; }
-  const profile = senseProfileFromSheet(sheet);
+  let sheet: { bodyAnatomy?: unknown; traits?: unknown } | null = null;
+  try { sheet = character ? (JSON.parse(character.data) as { bodyAnatomy?: unknown; traits?: unknown }) : null; } catch { sheet = null; }
+  // Sense grants: organs + traits on the sheet, plus the items the being holds (a read failure grants nothing).
+  const held = await Promise.resolve().then(() => prisma.campaignItem.findMany({ where: { holderId: characterId, status: 'ACTIVE' }, select: { id: true, name: true, data: true }, take: 100 })).catch(() => []);
+  const profile = senseProfileFromSheet(sheet, { items: held });
   const senses = { canSee: profile.effectiveness.sight > 0, canHear: profile.effectiveness.hearing > 0, effectiveness: profile.effectiveness };
 
   const locationId = await locationOf(characterId);

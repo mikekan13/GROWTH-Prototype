@@ -85,11 +85,19 @@ const forgePrimaMateriaSchema = z.object({
   charges: z.number().int().min(0).optional(),
 }).optional();
 
+/** types/growth SenseGrantSpec — a sense granted by an item / ability / trait (Mike 2026-10-09). */
+export const senseGrantSpecSchema = z.object({
+  sense: z.string().min(1).max(40),
+  effectiveness: z.number().min(0).max(1).optional(),
+  name: z.string().max(100).optional(),
+});
+
 const itemAbilitySchema = z.object({
   name: z.string().max(100),
   description: z.string().max(500),
   mechanicalEffect: z.string().max(300).optional(),
   kv: z.number().optional(),
+  grantsSenses: z.array(senseGrantSpecSchema).max(6).optional(),
 });
 
 const forgeItemDataSchema = z.object({
@@ -125,6 +133,7 @@ const forgeItemDataSchema = z.object({
   weightLbs: z.number().min(0).optional(),
   quality: z.number().int().min(1).max(10).optional(),
   itemAbilities: z.array(itemAbilitySchema).max(20).optional(),
+  grantsSenses: z.array(senseGrantSpecSchema).max(6).optional(),
   shots: z.number().int().min(0).optional(),
   reload: z.string().max(100).optional(),
   damageScaling: z.union([z.boolean(), z.string().max(100)]).optional(),
@@ -255,6 +264,7 @@ const forgeTraitDataSchema = z.object({
   // cross-referencing depend on this being stable.
   category: z.enum(TRAIT_CATEGORIES as unknown as [string, ...string[]]).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
+  grantsSenses: z.array(senseGrantSpecSchema).max(6).optional(),
   /** Structured effects (rulings 2026-08-24 #5/#9): preferred over prose
    *  mechanicalEffect + loose rollModifiers for NEW authoring. */
   effects: z.array(traitEffectSchema).max(6).optional(),

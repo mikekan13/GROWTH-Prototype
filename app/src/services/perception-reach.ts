@@ -15,7 +15,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { route, anthropicChatText, openAiCompatChat, recordAiCall } from '@/ai/network';
-import { senseProfileFromSheet } from '@/sim/senses/field';
+import { senseProfileFromSheet, type SenseItemSource } from '@/sim/senses/field';
 import { judgeReach, perceptionReachOn, type ReachBeing, type ReachEvent, type ReachJudgement, type ReachModel, type ReachVerdict } from '@/sim/senses/reach';
 import { recordExposureBatch, type ExposureSubject } from '@/services/familiarity';
 import { writeMemoryEntry } from '@/daya/memory';
@@ -57,6 +57,20 @@ export function wisdomOf(sheet: SheetBits | null): number | null {
 }
 
 /**
+ * SENSE GRANTS from held things (Mike 2026-10-09: a sense "could be an organ an item a spell"): every
+ * ACTIVE item each being holds (equipped or carried), grouped by holder. A read failure grants nothing.
+ */
+export async function heldItemsBy(characterIds: string[]): Promise<Map<string, SenseItemSource[]>> {
+  const out = new Map<string, SenseItemSource[]>();
+  if (!characterIds.length) return out;
+  try {
+    const rows = await prisma.campaignItem.findMany({ where: { holderId: { in: characterIds }, status: 'ACTIVE' }, select: { id: true, name: true, data: true, holderId: true }, take: 400 });
+    for (const r of rows) if (r.holderId) out.set(r.holderId, [...(out.get(r.holderId) ?? []), { id: r.id, name: r.name, data: r.data }]);
+  } catch (err) { console.warn('[perception-reach] held items unread; no item sense grants', err); }
+  return out;
+}
+
+/**
  * The beings the pass judges, with what the world-sim needs: organs, place,
  * focus (the caller's intent if it has one — an encounter plan — else the
  * being's ACTIVE goals), Wisdom. Five reads, whatever the number of beings.
@@ -64,10 +78,11 @@ export function wisdomOf(sheet: SheetBits | null): number | null {
 export async function loadReachBeings(campaignId: string, characterIds: string[], opts: { focusById?: Record<string, string | null | undefined> } = {}): Promise<ReachBeing[]> {
   const ids = [...new Set(characterIds)];
   if (!ids.length) return [];
-  const [chars, rels, goals] = await Promise.all([
+  const [chars, rels, goals, held] = await Promise.all([
     prisma.character.findMany({ where: { id: { in: ids }, campaignId }, select: { id: true, name: true, data: true } }),
     prisma.entityRelationship.findMany({ where: { sourceId: { in: ids }, relationshipType: 'located_at' }, select: { sourceId: true, targetId: true } }),
     prisma.goal.findMany({ where: { characterId: { in: ids }, status: 'ACTIVE' }, select: { characterId: true, description: true } }),
+    heldItemsBy(ids),
   ]);
   const locOf = new Map(rels.map((r) => [r.sourceId, r.targetId]));
   const locIds = [...new Set(rels.map((r) => r.targetId))];
@@ -80,7 +95,7 @@ export async function loadReachBeings(campaignId: string, characterIds: string[]
     try { sheet = JSON.parse(c.data) as SheetBits; } catch { sheet = null; }
     const locationId = locOf.get(c.id) ?? null;
     const focus = opts.focusById?.[c.id] ?? (goalsOf.get(c.id)?.slice(0, 2).join('; ') || null);
-    return { id: c.id, name: c.name, locationId, locationName: locationId ? locName.get(locationId) ?? null : null, senses: senseProfileFromSheet(sheet), focus, wisdom: wisdomOf(sheet) };
+    return { id: c.id, name: c.name, locationId, locationName: locationId ? locName.get(locationId) ?? null : null, senses: senseProfileFromSheet(sheet, { items: held.get(c.id) ?? [] }), focus, wisdom: wisdomOf(sheet) };
   });
 }
 

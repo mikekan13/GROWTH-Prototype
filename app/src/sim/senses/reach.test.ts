@@ -68,7 +68,7 @@ describe('reach stub (deterministic world-sim stand-in)', () => {
   it('a thought reaches nobody without a mind sense; a mind-reader in the room hears it', () => {
     const thought: ReachEvent = { kind: 'thought', text: '((She is lying to me.))', sourceId: 'ruth', locationId: 'room' };
     expect(stubVerdict(thought, being('violet')).reaches).toBe(false);
-    const reader = being('seer', {}, { ...senseProfileFromSheet(null), nonPhysical: [{ name: 'mind reading', reaches: 'thought', effectiveness: 1, source: 'spell' }] });
+    const reader = being('seer', {}, senseProfileFromSheet({ traits: [{ name: 'mind reading', type: 'blossom', grantsSenses: [{ sense: 'mind' }] }] }));
     expect(stubVerdict(thought, reader)).toMatchObject({ reaches: true, via: ['mind reading'], noticed: true });
     // ((…)) text alone marks a thought even when the writer said 'narration'.
     expect(stubVerdict({ ...thought, kind: 'narration' }, being('violet')).reaches).toBe(false);
@@ -146,7 +146,7 @@ describe('judgeReach — flag, model, fallback', () => {
   it('a thought can only reach through a mind sense, whatever the model says', () => {
     const thought: ReachEvent = { kind: 'thought', text: '((run))', sourceId: 'ruth', locationId: 'room' };
     expect(lawfulVerdict(thought, being('violet'), { id: 'b1', reach: true, via: ['hearing'], noticed: true, salience: 0.9 }).reaches).toBe(false);
-    const reader = being('seer', {}, { ...senseProfileFromSheet(null), nonPhysical: [{ name: 'Mind Reading', reaches: 'thought', effectiveness: 0.5, source: null }] });
+    const reader = being('seer', {}, senseProfileFromSheet(null, { items: [{ id: 'i1', name: 'Circlet', data: { itemAbilities: [{ name: 'Mind Reading', grantsSenses: [{ sense: 'mind', effectiveness: 0.5 }] }] } }] }));
     expect(lawfulVerdict(thought, reader, { id: 'b1', reach: true, via: ['mind reading'], noticed: true, salience: 0.9 })).toMatchObject({ reaches: true, via: ['Mind Reading'] });
   });
 });
