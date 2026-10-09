@@ -302,6 +302,109 @@ export async function recordExposureBatch(input: { campaignId: string; perceiver
   return writes.length;
 }
 
+// ── Introductions + the Watcher's word ────────────────────────────────────
+
+/**
+ * TUNING (placeholder): the identity score an introduction sets — mid-F3, the
+ * naming level (services/visible-form VISIBLE_FORM_TUNING.nameAt = 3 → 0.6),
+ * with headroom so a name is not lost at the first fade (≈2 cycles at r 0.5).
+ */
+export const INTRODUCED_SCORE = 0.7;
+/** lastSource of a name learned by introduction (a raise-to-at-least, not a growth step). */
+export const INTRODUCED_SOURCE = 'introduced';
+/** lastSource of a level the Watcher set by declaration. */
+export const WATCHER_SOURCE = 'watcher';
+
+/**
+ * Drop the cached visible form of the perceiver's rows that name any of
+ * `subjectIds` (the cache holds the entity ids it labelled), so old lines
+ * re-label at the new familiarity, and nudge its feed. The render signature
+ * already misses on a familiarity change; this makes it explicit + pushes.
+ */
+export async function invalidateVisibleFormsNaming(perceiverId: string, subjectIds: string[]): Promise<number> {
+  if (!subjectIds.length) return 0;
+  const r = await prisma.dayaMemoryEntry.updateMany({
+    where: { entityId: perceiverId, visibleForm: { not: null }, OR: subjectIds.map((id) => ({ visibleForm: { contains: id } })) },
+    data: { visibleForm: null },
+  });
+  try { (await import('@/lib/perceived-feed-push')).notifyMemoryWritten(perceiverId); } catch { /* push is a nudge only */ }
+  return r.count;
+}
+
+/**
+ * INTRODUCTIONS TEACH NAMES: raise the perceiver's identity familiarity with
+ * each subject to AT LEAST INTRODUCED_SCORE (a higher, earned score is kept),
+ * one transaction; first contact seeded first. Returns the subjects raised.
+ */
+export async function recordIntroductions(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; cycle?: number; subjects: Array<{ subjectId: string; subjectKind: SubjectKind }> }): Promise<string[]> {
+  const subjects = [...new Map(input.subjects.filter((s) => s.subjectId && s.subjectId !== input.perceiverCharacterId).map((s) => [s.subjectId, s])).values()].slice(0, EXPOSURE_BATCH_CAP);
+  if (!subjects.length) return [];
+  await seedFirstContacts({ campaignId: input.campaignId, perceiverId: input.perceiverId, perceiverCharacterId: input.perceiverCharacterId, subjects, aspects: ['identity'] });
+  const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
+  const raised: string[] = [];
+  await prisma.$transaction(async (tx) => {
+    for (const s of subjects) {
+      const key = { perceiverId: input.perceiverId, subjectId: s.subjectId, aspectKind: 'identity' };
+      const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+      const now = prior ? familiarityAt(prior, lastCycle) : 0;
+      if (now >= INTRODUCED_SCORE) continue;
+      await tx.familiarity.upsert({
+        where: { perceiverId_subjectId_aspectKind: key },
+        create: { ...key, campaignId: input.campaignId, subjectKind: s.subjectKind, score: INTRODUCED_SCORE, lastSource: INTRODUCED_SOURCE, lastCycle },
+        update: { score: INTRODUCED_SCORE, lastSource: INTRODUCED_SOURCE, lastCycle },
+      });
+      raised.push(s.subjectId);
+    }
+  });
+  if (raised.length) await invalidateVisibleFormsNaming(input.perceiverId, raised);
+  return raised;
+}
+
+/** F-level → the stored score the Watcher's word sets (mid-band; F5 = sealed). Pure. */
+export function scoreForLevel(level: number): number {
+  const l = Math.max(0, Math.min(5, Math.floor(level)));
+  return l === 0 ? 0 : l === 5 ? 0.97 : (l + 0.5) / 5;
+}
+
+export const watcherSetFamiliaritySchema = z.object({
+  perceiverId: z.string().min(1),
+  subjectId: z.string().min(1),
+  aspectKind: z.string().min(1).max(200).default('identity'),
+  level: z.number().int().min(0).max(5),
+});
+
+/**
+ * The Watcher declares what a being knows ("they know each other" — Mike
+ * 2026-10-09: party members' names are up to the GM's story, never seeded).
+ * Sets one aspect to an F-level outright. GM of the campaign or ADMIN.
+ * `perceiverId` = DayaEntity id or characterId; the subject = a character,
+ * item or location of the campaign.
+ */
+export async function setFamiliarityByWatcher(campaignId: string, user: { id: string; role: string }, input: unknown): Promise<FamiliarityRecord> {
+  await requireCampaignGM(campaignId, user);
+  const v = parse(watcherSetFamiliaritySchema, input);
+  const entity = await prisma.dayaEntity.findFirst({ where: { OR: [{ id: v.perceiverId }, { characterId: v.perceiverId }] }, select: { id: true, characterId: true, character: { select: { campaignId: true } } } });
+  if (!entity || entity.character?.campaignId !== campaignId) throw new NotFoundError('No DAYA being with that id in this campaign');
+  const [ch, item, loc] = await Promise.all([
+    prisma.character.findFirst({ where: { id: v.subjectId, campaignId }, select: { entityType: true } }),
+    prisma.campaignItem.findFirst({ where: { id: v.subjectId, campaignId }, select: { id: true } }),
+    prisma.location.findFirst({ where: { id: v.subjectId, campaignId }, select: { id: true } }),
+  ]);
+  const subjectKind: SubjectKind | null = ch ? (v.subjectId === entity.characterId ? 'SELF' : ch.entityType === 'NPC' ? 'NPC' : 'CHARACTER') : item ? 'ITEM' : loc ? 'LOCATION' : null;
+  if (!subjectKind) throw new NotFoundError('No character, item or location with that id in this campaign');
+  const key = { perceiverId: entity.id, subjectId: v.subjectId, aspectKind: v.aspectKind };
+  const score = scoreForLevel(v.level);
+  const lastCycle = await currentCycleOf(campaignId);
+  const row = await prisma.familiarity.upsert({
+    where: { perceiverId_subjectId_aspectKind: key },
+    create: { ...key, campaignId, subjectKind, score, lastSource: WATCHER_SOURCE, lastCycle },
+    update: { score, lastSource: WATCHER_SOURCE, subjectKind, lastCycle },
+    select: RECORD_SELECT,
+  });
+  await invalidateVisibleFormsNaming(entity.id, [v.subjectId]);
+  return toRecord(row);
+}
+
 /**
  * Perception unit 12 — USE TEACHES: one round's item uses (sim/perception/use.usesFromRound), written
  * once per being in ONE transaction, source 'use' (the small step), regardless of domain knowledge. Only

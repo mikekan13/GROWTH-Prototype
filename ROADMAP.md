@@ -9,7 +9,9 @@ Last updated: 2026-10-09
 > fidelity; push on memory write), unit 10 Watcher "view as character", then fixes (history membership,
 > correction push, encounter participants as known aspects), unit 11 active inspection (inspect intents →
 > minimal planning board → ordinary skilled/unskilled check → familiarity), unit 12 use teaches. All 12
-> perception units built. NEXT: Mike's [QUESTION]s
+> perception units built. Then: introductions teach names (caught "I'm Ruth" / "this is Ruth" → identity
+> F3; a gapped name teaches nothing) + Watcher PUT familiarity ("they know each other"); party membership
+> seeds nothing (Mike: GM's story). NEXT: Mike's [QUESTION]s
 > (memory/perception-build-progress-2026-10-09.md), a live run with both flags on.
 
 > 2026-10-06..08 (orchestrator + worker sessions, ~75 commits on merge/fork-portrait-pipeline):

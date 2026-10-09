@@ -35,6 +35,7 @@ import { converseWithEntity, listenToTable, answerAtTable, type ConverseStatus }
 import { isDayaEnabled } from '@/daya/events';
 import type { TableAsk, ListenTimings, AnswerTimings } from '@/daya/ensemble';
 import { readTableTalk, type TableTalkState, type TableUtterance } from '@/services/table-talk';
+import { learnIntroductions, groupRows } from '@/services/introductions';
 import { perceptionReachOn, judgeCanonReach, stampPerception, storeUnnoticedAtTable, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
 import type { ReachEvent, ReachJudgement, ReachVerdict } from '@/sim/senses/reach';
 import { planTableTalk, stimulusFor, answerers, overhearers, canonNarration, narrationSentences, type PlannedStimulus, type TableBeat, type TablePlan } from '@/services/table-plan';
@@ -223,6 +224,7 @@ async function deliverToTable(
     ? await judgeCanonReach(campaignId, { id: primaryTruth, kind: source === 'dialogue' ? 'speech' : 'narration', text: stimulus, sourceId: excludeId ?? null }, listeners.map((l) => l.id))
     : null;
   const exposures = new Map<string, EventRefs>();
+  const noticedRows: Array<{ characterId: string; memoryId: string }> = [];
   for (const listener of listeners) {
     const verdict = reach?.verdicts.get(listener.id);
     if (reach && (!verdict || !verdict.reaches)) { responses.push({ characterId: listener.id, characterName: listener.name, status: 'ok', detail: 'out of reach' }); continue; }
@@ -243,6 +245,7 @@ async function deliverToTable(
     });
     const primary = truth.primary ?? truth.extra[0];
     if (primary) await attachTruth(listener.id, result.memoryEntryId, primary, truth.extra.filter((id) => id !== primary), since);
+    if (reach && verdict && result.memoryEntryId) noticedRows.push({ characterId: listener.id, memoryId: result.memoryEntryId });
 
     if (result.status === 'ok' && result.action) {
       const line = actionToTableLine(listener.name, result.action);
@@ -251,7 +254,12 @@ async function deliverToTable(
       }
     }
   }
-  if (reach) await recordNoticedExposures(campaignId, (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0, exposures);
+  if (reach) {
+    const cycle = (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentCycle: true } }))?.currentCycle ?? 0;
+    await recordNoticedExposures(campaignId, cycle, exposures);
+    // Introductions teach names: what each listener CAUGHT of "I'm Ruth" / "this is Ruth".
+    if (noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle);
+  }
   return responses;
 }
 
@@ -429,7 +437,11 @@ async function runBeats(
         reportTiming({ kind: 'listen', characterId: listenerId, outcome: outcome.listened ? outcome.listened.status : 'taken_over', timings: outcome.listened?.timings });
         // null = an answer took this stretch over; that answer stores it and points it at the truth.
         if (outcome.listened?.memoryEntryId) await pointAtTruth(listenerId, outcome.listened.memoryEntryId);
-        if (reached && outcome.listened?.memoryEntryId) await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source);
+        if (reached && outcome.listened?.memoryEntryId) {
+          await stampPerception(outcome.listened.memoryEntryId, reached.verdict, reached.source);
+          // Introductions teach names (this stretch's row, once it points at the truth and carries its senses).
+          await learnIntroductions(campaignId, [{ characterId: listenerId, memoryIds: [outcome.listened.memoryEntryId] }]);
+        }
       })
       .catch((err) => console.error('[table-speak] listening failed (non-fatal):', err));
   };

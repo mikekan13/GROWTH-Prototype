@@ -22,6 +22,7 @@ import { goalsTouched, makeChain, parseChain } from '@/daya/chain';
 import { recordVineEntriesSafe } from '@/services/vine-memory';
 import { writeMemoryEntry } from '@/daya/memory';
 import { perceive } from '@/daya/perceive';
+import { learnIntroductions, groupRows } from '@/services/introductions';
 import { perceptionReachOn, judgeCanonReach, writeUnnoticed, memoryFieldsOf, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
@@ -319,6 +320,7 @@ export async function declareCanon(
     ? await judgeCanonReach(campaignId, { id: event.id, kind: 'narration', text: input.narration, sourceId: input.actorId ?? null, targetId: input.targetId ?? null, locationId: input.locationId ?? null }, witnesses.map((w) => w.characterId))
     : null;
   const exposures = new Map<string, EventRefs>();
+  const noticedRows: Array<{ characterId: string; memoryId: string }> = [];
   for (const w of witnesses) {
     const verdict = reach?.verdicts.get(w.characterId);
     if (reach && (!verdict || !verdict.reaches)) continue;
@@ -350,10 +352,12 @@ export async function declareCanon(
         ...(reach && verdict ? memoryFieldsOf(verdict, reach.source) : {}),
       });
       memoryIds.push(m.id);
-      if (reach) addRefs(exposures, w.characterId, { characterIds: parties, locationIds: [input.locationId] });
+      if (reach) { addRefs(exposures, w.characterId, { characterIds: parties, locationIds: [input.locationId] }); noticedRows.push({ characterId: w.characterId, memoryId: m.id }); }
     } catch (err) { console.warn('[canon] witness memory failed', err); }
   }
   if (reach) await recordNoticedExposures(campaignId, cycle, exposures);
+  // Introductions teach names: what each witness CAUGHT of any quoted introduction ("This is Ruth").
+  if (reach && noticedRows.length) await learnIntroductions(campaignId, groupRows(noticedRows), cycle);
   return { event, witnesses: witnesses.length, memoryIds };
 }
 

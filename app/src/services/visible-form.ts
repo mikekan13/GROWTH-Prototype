@@ -604,6 +604,46 @@ export async function renderViewerFeed(campaignId: string, viewerCharacterId: st
   if (!memoryIds.length) return out;
   const ctx = await loadViewerContext(campaignId, viewerCharacterId, opts);
   if (!ctx) return out;
+  for (const { r, truth, perception, fam } of await prepareViewerRows(ctx, memoryIds)) {
+    const sig = renderSignature(truth, perception, fam);
+    const cached = (() => { try { return r.visibleForm ? JSON.parse(r.visibleForm) as { sig?: string; form?: VisibleForm } : null; } catch { return null; } })();
+    if (cached?.sig === sig && cached.form) { out.set(r.id, cached.form); continue; }
+    const form: VisibleForm = { memoryId: r.id, ...(await renderVisibleForm(truth, perception, fam, { seed: r.id, rewrite: ctx.rewrite })) };
+    out.set(r.id, form);
+    try { await prisma.dayaMemoryEntry.update({ where: { id: r.id }, data: { visibleForm: JSON.stringify({ sig, form }) } }); }
+    catch (err) { console.warn('[visible-form] cache write failed (render kept)', err); }
+  }
+  return out;
+}
+
+/** What a heard line of speech gave this viewer: the caught pieces (gaps where words were missed), by speaker. */
+export interface CaughtSpeech { memoryId: string; speakerId: string | null; pieces: VisiblePiece[] }
+
+/**
+ * The speech this viewer CAUGHT in these memory rows — the same seeded
+ * fragmenting the feed renders (same seed = the memory row id, same stored
+ * clarity), so a name lost in a `{gap}` in the feed is lost here too. Speech
+ * is literal (no model rewrite), so this never calls a model and writes no
+ * cache. The viewer's own speech is left out. Introductions read it
+ * (services/introductions).
+ */
+export async function caughtSpeech(campaignId: string, viewerCharacterId: string, memoryIds: string[]): Promise<{ ctx: ViewerContext; speech: CaughtSpeech[] } | null> {
+  if (!memoryIds.length) return null;
+  const ctx = await loadViewerContext(campaignId, viewerCharacterId, { rewrite: null });
+  if (!ctx) return null;
+  const speech: CaughtSpeech[] = [];
+  for (const { r, truth, perception, fam } of await prepareViewerRows(ctx, memoryIds)) {
+    const form = await renderVisibleForm(truth, perception, fam, { seed: r.id, rewrite: null });
+    for (const row of form.rows) {
+      if (row.type !== 'character' || row.speakerId === ctx.viewerId) continue;
+      for (const seg of row.segments) if (seg.kind === 'speech') speech.push({ memoryId: r.id, speakerId: row.speakerId, pieces: seg.pieces });
+    }
+  }
+  return { ctx, speech };
+}
+
+/** The viewer's noticed rows with their truth line, perception (stored clarity) and familiarity — shared by the feed render and caughtSpeech. */
+async function prepareViewerRows(ctx: ViewerContext, memoryIds: string[]) {
   const rows = await prisma.dayaMemoryEntry.findMany({
     where: { id: { in: memoryIds }, entityId: ctx.viewerEntityId },
     select: { id: true, truthRef: true, chain: true, noticed: true, perceivedVia: true, visibleForm: true },
@@ -614,8 +654,9 @@ export async function renderViewerFeed(campaignId: string, viewerCharacterId: st
     return [...new Set(refs.length ? refs : r.truthRef ? [r.truthRef] : [])];
   };
   const allRefs = [...new Set(rows.flatMap(refsOf))];
-  const events = allRefs.length ? await prisma.canonEvent.findMany({ where: { id: { in: allRefs }, campaignId }, select: { id: true, kind: true, narration: true, detail: true, actorId: true, sourceType: true } }) : [];
+  const events = allRefs.length ? await prisma.canonEvent.findMany({ where: { id: { in: allRefs }, campaignId: ctx.campaignId }, select: { id: true, kind: true, narration: true, detail: true, actorId: true, sourceType: true } }) : [];
   const evById = new Map(events.map((e) => [e.id, e]));
+  const prepared: Array<{ r: (typeof rows)[number]; truth: TruthLine; perception: ViewerPerception; fam: ViewerFamiliarity }> = [];
   for (const r of rows) {
     if (!r.noticed) continue;
     const evs = refsOf(r).map((id) => evById.get(id)).filter((e): e is NonNullable<typeof e> => !!e);
@@ -628,15 +669,9 @@ export async function renderViewerFeed(campaignId: string, viewerCharacterId: st
     const truth = truthLineFromCanon(evs, ents);
     const perception: ViewerPerception = { viewerId: ctx.viewerId, noticed: true, via, clarity: Object.fromEntries((via.length ? via : ['sight', 'hearing']).filter((v) => v !== 'self').map((v) => [v, stored.clarity[v] ?? ctx.clarity[v] ?? 1])) };
     const fam: ViewerFamiliarity = Object.fromEntries(ents.filter((e) => ctx.familiarity[e.id]).map((e) => [e.id, ctx.familiarity[e.id]]));
-    const sig = renderSignature(truth, perception, fam);
-    const cached = (() => { try { return r.visibleForm ? JSON.parse(r.visibleForm) as { sig?: string; form?: VisibleForm } : null; } catch { return null; } })();
-    if (cached?.sig === sig && cached.form) { out.set(r.id, cached.form); continue; }
-    const form: VisibleForm = { memoryId: r.id, ...(await renderVisibleForm(truth, perception, fam, { seed: r.id, rewrite: ctx.rewrite })) };
-    out.set(r.id, form);
-    try { await prisma.dayaMemoryEntry.update({ where: { id: r.id }, data: { visibleForm: JSON.stringify({ sig, form }) } }); }
-    catch (err) { console.warn('[visible-form] cache write failed (render kept)', err); }
+    prepared.push({ r, truth, perception, fam });
   }
-  return out;
+  return prepared;
 }
 
 /** One row (convenience over renderViewerFeed): the memory's own being is the viewer. */
