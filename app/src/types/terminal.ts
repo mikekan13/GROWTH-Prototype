@@ -71,14 +71,21 @@ export interface TableFeedFields {
   perceived?: PerceivedLineFields;
 }
 
+/** One known aspect of a perceived thing: "Weight" / "about as heavy as a sword" (sim/perception/aspect-values). */
+export interface PerceivedFact {
+  aspect: string;
+  label: string;
+  value: string;
+}
+
 /** A named thing in a perceived line, as the viewer knows it — the tooltip shows only this. */
 export interface PerceivedEntityRef {
   id: string;
   kind: 'CHARACTER' | 'NPC' | 'ITEM' | 'LOCATION';
   /** What the viewer calls it ("a figure", "a tall guard", "the Warden"). */
   label: string;
-  /** Aspect kinds the viewer knows (names only — never a level). */
-  known: string[];
+  /** What the viewer knows of each known aspect, phrased at their fidelity (never a level; unknown aspects absent). */
+  known: PerceivedFact[];
   /** The label is its proper name (the viewer knows who it is). */
   named: boolean;
 }

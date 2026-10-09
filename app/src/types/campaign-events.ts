@@ -246,11 +246,13 @@ export interface HeartbeatEvent {
 }
 
 /**
- * Perception unit 9 (PERCEPTION_FEED): sent to a perceived-feed connection INSTEAD of another person's
- * terminal_event — no text at all. The client re-reads its own feed (its character's memory, built server-side).
+ * Perception (PERCEPTION_FEED): pushed to ONE viewer (targetUserId) when a memory row of a character whose
+ * feed they read was written — the character's owner, and the campaign's Watcher (for "view as"). No text
+ * at all: only which character's memory moved. The client re-reads that feed (built server-side).
  */
 export interface PerceivedFeedStaleEvent {
   kind: 'perceived_feed_stale';
+  characterId?: string;
 }
 
 // ── Union ─────────────────────────────────────────────────────────────────

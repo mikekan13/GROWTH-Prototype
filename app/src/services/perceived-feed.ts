@@ -19,7 +19,9 @@ import { prisma } from '@/lib/db';
 import { seesTruthRecord } from '@/lib/permissions';
 import { perceptionFeedOn } from '@/lib/perception-feed';
 import { entityToken, GAP } from '@/lib/perceived-text';
-import { renderViewerFeed, VISIBLE_FORM_TUNING, type VisibleForm, type VisiblePiece, type VisibleRow, type VisibleEntity } from '@/services/visible-form';
+import { renderViewerFeed, characterDescription, VISIBLE_FORM_TUNING, type VisibleForm, type VisiblePiece, type VisibleRow, type VisibleEntity } from '@/services/visible-form';
+import { aspectFacts, type AspectSubject } from '@/sim/perception/aspect-values';
+import type { GrowthWorldItem } from '@/types/item';
 import type { TerminalActor, TerminalEventType, TerminalPayload, PerceivedEntityRef } from '@/types/terminal';
 
 export type FeedViewer =
@@ -37,6 +39,17 @@ export async function feedViewerFor(campaignId: string, user: { id: string; role
     select: { id: true },
   });
   return { mode: 'perceived', userId: user.id, characterId: ch?.id ?? null };
+}
+
+/**
+ * Records other than the feed (changelog, history): what a perceived reader may see is only what concerns
+ * their own characters. null = the truth record (flag off, the campaign's Watcher, ADMIN) — unrestricted.
+ */
+export async function ownRecordScope(campaignId: string, user: { id: string; role: string }): Promise<string[] | null> {
+  const viewer = await feedViewerFor(campaignId, user);
+  if (viewer.mode === 'truth') return null;
+  const own = await prisma.character.findMany({ where: { campaignId, userId: user.id }, select: { id: true } });
+  return own.map((c) => c.id);
 }
 
 /** One feed row in the shape queryCampaignEvents returns (the client wraps it the same way). */
@@ -71,10 +84,30 @@ export function segmentsToMessage(row: Extract<VisibleRow, { type: 'character' }
   }).join(' ');
 }
 
-/** The tooltip's view of an entity: label + known aspect NAMES (never a level). Pure. */
-export function entityRef(e: VisibleEntity, viewerId: string): PerceivedEntityRef {
+/**
+ * The tooltip's view of an entity: label + what the viewer knows of each KNOWN aspect, phrased at their
+ * fidelity (sim/perception/aspect-values — F5 raw, lower relational). Never a level; unknown aspects absent;
+ * a thing with no subject data shows only the aspects that need none. Pure.
+ */
+export function entityRef(e: VisibleEntity, viewerId: string, subject: AspectSubject = {}): PerceivedEntityRef {
   const identity = e.known.find((k) => k.aspectKind === 'identity')?.fidelity ?? 0;
-  return { id: e.id, kind: e.kind, label: e.label, known: e.known.map((k) => k.aspectKind), named: e.id === viewerId || identity >= VISIBLE_FORM_TUNING.nameAt };
+  return { id: e.id, kind: e.kind, label: e.label, known: aspectFacts(e.known, subject), named: e.id === viewerId || identity >= VISIBLE_FORM_TUNING.nameAt };
+}
+
+/** What the tooltip values read from: each entity's description / item data, read once per page. */
+export async function loadAspectSubjects(campaignId: string, entities: VisibleEntity[]): Promise<Map<string, AspectSubject>> {
+  const ids = (k: VisibleEntity['kind'][]) => [...new Set(entities.filter((e) => k.includes(e.kind) && e.known.length).map((e) => e.id))];
+  const [chars, items, locs] = await Promise.all([
+    ids(['CHARACTER', 'NPC']).length ? prisma.character.findMany({ where: { campaignId, id: { in: ids(['CHARACTER', 'NPC']) } }, select: { id: true, data: true } }) : [],
+    ids(['ITEM']).length ? prisma.campaignItem.findMany({ where: { campaignId, id: { in: ids(['ITEM']) } }, select: { id: true, data: true } }) : [],
+    ids(['LOCATION']).length ? prisma.location.findMany({ where: { campaignId, id: { in: ids(['LOCATION']) } }, select: { id: true, data: true } }) : [],
+  ]);
+  const parse = <T,>(s: string | null | undefined): T | null => { try { return s ? JSON.parse(s) as T : null; } catch { return null; } };
+  const out = new Map<string, AspectSubject>();
+  for (const c of chars) out.set(c.id, { description: characterDescription(parse<NonNullable<Parameters<typeof characterDescription>[0]>>(c.data)) });
+  for (const i of items) { const d = parse<Partial<GrowthWorldItem>>(i.data); out.set(i.id, { description: d?.description ?? null, item: d }); }
+  for (const l of locs) out.set(l.id, { description: parse<{ description?: string }>(l.data)?.description ?? null });
+  return out;
 }
 
 /**
@@ -83,8 +116,8 @@ export function entityRef(e: VisibleEntity, viewerId: string): PerceivedEntityRe
  * narration row; a character row → a chat row with the viewer's label as the
  * name. No account names ride along (actorName '' — voicedBy stays empty). Pure.
  */
-export function formToFeedEvents(form: VisibleForm, meta: { campaignId: string; viewerId: string; at: Date; cycle?: number; sessionId: string | null }): FeedApiEvent[] {
-  const perceived = { memoryId: form.memoryId, entities: form.entities.map((e) => entityRef(e, meta.viewerId)) };
+export function formToFeedEvents(form: VisibleForm, meta: { campaignId: string; viewerId: string; at: Date; cycle?: number; sessionId: string | null; subjects?: Map<string, AspectSubject> }): FeedApiEvent[] {
+  const perceived = { memoryId: form.memoryId, entities: form.entities.map((e) => entityRef(e, meta.viewerId, meta.subjects?.get(e.id))) };
   const cycle = typeof meta.cycle === 'number' ? { cycle: meta.cycle } : {};
   return form.rows.map((row, i): FeedApiEvent => {
     const base = { id: `pm-${form.memoryId}-${i}`, campaignId: meta.campaignId, sessionId: meta.sessionId, actorUserId: '', actorName: '', createdAt: new Date(meta.at.getTime() + i).toISOString() };
@@ -187,10 +220,11 @@ export async function queryPerceivedFeed(q: PerceivedFeedQuery): Promise<{ event
     const forms = await renderViewerFeed(campaignId, viewer.characterId, picked.map((p) => p.id));
     const sessions = await prisma.gameSession.findMany({ where: { campaignId }, select: { id: true, startedAt: true, endedAt: true }, orderBy: { startedAt: 'asc' } });
     const sessionAt = (d: Date) => sessions.find((s) => s.startedAt <= d && (!s.endedAt || d <= s.endedAt))?.id ?? null;
+    const subjects = await loadAspectSubjects(campaignId, [...forms.values()].flatMap((f) => f?.entities ?? []));
     for (const p of picked) {
       const form = forms.get(p.id);
       if (!form || !form.rows.length) continue;
-      memRows.push(...formToFeedEvents(form, { campaignId, viewerId: viewer.characterId, at: p.at, cycle: p.cycle, sessionId: sessionAt(p.at) }));
+      memRows.push(...formToFeedEvents(form, { campaignId, viewerId: viewer.characterId, at: p.at, cycle: p.cycle, sessionId: sessionAt(p.at), subjects }));
     }
   }
 

@@ -13,6 +13,7 @@ import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { segmentMarks, splitEntities, presentCycle, realClock, type FeedSegment, type FeedTimescale, type EntityName } from '@/lib/feed-segments';
 import type { FeedRowModel, CharacterRowModel, NarrationRowModel, BarRowModel, WithdrawnRowModel, BeatRowModel, Via } from './feed-rows';
 import { splitPerceived } from '@/lib/perceived-text';
+import type { PerceivedFact } from '@/types/terminal';
 
 /** A thing in the world the feed can name: a character, a place, an item. */
 export interface FeedEntity {
@@ -26,8 +27,8 @@ export interface FeedEntity {
   where?: string;
   description?: string;
   status?: string;
-  /** Perceived feed (unit 9): the aspects the viewer knows, by name. Present = the tooltip shows ONLY these. */
-  known?: string[];
+  /** Perceived feed: what the viewer knows of each known aspect, at their fidelity. Present = the tooltip shows ONLY these. */
+  known?: PerceivedFact[];
 }
 
 interface FeedContextValue {
@@ -142,11 +143,13 @@ function EntitySpan({ entity, text, source }: { entity: FeedEntity; text: string
       onOpenChange={setOpen}
       content={entity.known ? (
         <>
-          {/* Perceived (unit 9): only what the viewer knows of it — never a level, never the truth record. */}
+          {/* Perceived: only what the viewer knows of it, phrased at their fidelity — never a level, never an unknown aspect. */}
           <dl className="tft-f">
             <dt>Seen as</dt><dd>{entity.name}</dd>
             <dt>Type</dt><dd>{entityKindLine(entity)}</dd>
-            <dt>Known</dt><dd>{entity.known.length ? entity.known.join(' · ') : 'nothing yet'}</dd>
+            {entity.known.length
+              ? entity.known.map((k) => (<React.Fragment key={k.aspect}><dt>{k.label}</dt><dd className={k.value.length > 40 ? 'long' : undefined}>{k.value}</dd></React.Fragment>))
+              : (<><dt>Known</dt><dd>nothing yet</dd></>)}
           </dl>
           <p className="tft-src">[{source}]</p>
         </>

@@ -53,21 +53,25 @@ describe('perceived feed rows (unit 9)', () => {
     expect(segmentsToMessage({ type: 'character', speakerId: null, name: 'x', segments: [{ kind: 'speech', text: 'say "hi"', pieces: [{ kind: 'text', text: 'say "hi"' }] }] })).toBe('"say \'hi\'"');
   });
 
-  it('entity refs carry aspect NAMES only; named only at the name level or for the viewer itself', () => {
-    expect(entityRef({ id: 'ruth', kind: 'NPC', label: 'a figure', known: [{ aspectKind: 'appearance', fidelity: 2 }] }, 'violet')).toEqual({ id: 'ruth', kind: 'NPC', label: 'a figure', known: ['appearance'], named: false });
+  it('entity refs carry known aspects\' values at the viewer\'s fidelity (never a level); named only at the name level or for the viewer itself', () => {
+    expect(entityRef({ id: 'ruth', kind: 'NPC', label: 'a figure', known: [{ aspectKind: 'appearance', fidelity: 2 }] }, 'violet', { description: 'A tall woman in a grey coat with silver buttons.' }))
+      .toEqual({ id: 'ruth', kind: 'NPC', label: 'a figure', known: [{ aspect: 'appearance', label: 'Appearance', value: 'A tall woman in a grey…' }], named: false });
+    // No subject data → no value line (never the truth record, never a level).
+    expect(entityRef({ id: 'ruth', kind: 'NPC', label: 'a figure', known: [{ aspectKind: 'appearance', fidelity: 2 }] }, 'violet').known).toEqual([]);
     expect(entityRef({ id: 'ruth', kind: 'NPC', label: 'Ruth', known: [{ aspectKind: 'identity', fidelity: 3 }] }, 'violet').named).toBe(true);
     expect(entityRef({ id: 'violet', kind: 'CHARACTER', label: 'Violet', known: [] }, 'violet').named).toBe(true);
   });
 
   it('the client entity list: perceived refs (portrait only when named) + the speaker of the viewer\'s own lines', () => {
-    const events = asTerminal(formToFeedEvents(form, { campaignId: 'c1', viewerId: 'violet', at: new Date(), sessionId: null }));
+    const subjects = new Map([['ruth', { description: 'Grey coat, silver buttons.' }]]);
+    const events = asTerminal(formToFeedEvents(form, { campaignId: 'c1', viewerId: 'violet', at: new Date(), sessionId: null, subjects }));
     events.push({ id: 'ev-own', type: 'chat', timestamp: '', campaignId: 'c1', actor: 'player', actorUserId: 'p1', actorName: 'p1', characterId: 'violet', payload: { kind: 'chat', message: 'hi' } });
     const ents = perceivedFeedEntities(events, [
       { id: 'ruth', name: 'Ruth', kind: 'npc', portrait: '/ruth.png', description: 'TRUTH-DESC' },
       { id: 'violet', name: 'Violet', kind: 'character', portrait: '/v.png' },
     ]);
     expect(ents).toEqual([
-      { id: 'ruth', name: 'a figure', kind: 'npc', portrait: null, known: ['appearance'] },
+      { id: 'ruth', name: 'a figure', kind: 'npc', portrait: null, known: [{ aspect: 'appearance', label: 'Appearance', value: 'a vague picture of it' }] },
       { id: 'violet', name: 'Violet', kind: 'character', portrait: '/v.png' },
     ]);
     expect(JSON.stringify(ents)).not.toContain('TRUTH-DESC');

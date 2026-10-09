@@ -3,7 +3,7 @@
  * may open, built from the lines themselves. Pure, client-safe.
  *
  *   - every perceived line carries its entities as the viewer knows them
- *     (payload.perceived.entities): label + known aspect names — the tooltip
+ *     (payload.perceived.entities): label + known aspects' values at the viewer's fidelity — the tooltip
  *     shows only that; a portrait only when the viewer knows who it is;
  *   - the viewer's own lines (no `perceived` field; the server sends only those
  *     in full) keep their speaker's roster entry — a character knows itself.

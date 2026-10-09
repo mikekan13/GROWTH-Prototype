@@ -38,6 +38,7 @@ import { applyAttributeDamage } from '@/services/character-attribute';
 import { advanceClockBySim, flushSimClock, getClock } from '@/services/time';
 import { ROUND_SECONDS } from '@/types/time';
 import { writeMemoryEntry } from '@/daya/memory';
+import { perceptionFeedOn } from '@/lib/perception-feed';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { recordRoundCanon } from '@/services/canon';
 import { perceptionReachOn, judgeRoundReach, writeUnnoticed, recordNoticedExposures, addRefs, type EventRefs } from '@/services/perception-reach';
@@ -189,6 +190,24 @@ export interface EncounterView {
  * everything; a member sees the shared record (participants, rounds) plus
  * only the intentions and plan notes of characters they own.
  */
+/**
+ * A member's view of the round record under the perceived feed (pure): log lines whose actor is one of
+ * their characters, slot entries of their characters, no scene narration. Participants stay (the roster
+ * the declare form targets). [QUESTION for Mike] whether other participants' pools/attributes should be
+ * withheld as well (today they ship, as before).
+ */
+export function perceivedEncounterState(state: EncounterState, mine: Set<string>): Pick<EncounterState, 'rounds' | 'sceneNarration'> {
+  return {
+    sceneNarration: null,
+    rounds: state.rounds.map((r) => ({
+      ...r,
+      log: r.log.filter((l) => !!l.actorId && mine.has(l.actorId)),
+      slots: r.slots.map((s) => ({ ...s, entries: s.entries.filter((e) => mine.has(e.participantId)) })),
+      downed: r.downed.filter((id) => mine.has(id)),
+    })),
+  };
+}
+
 async function viewFor(enc: { id: string; campaignId: string; name: string; status: string; round: number; state: string }, actor: EncounterActor, isGm: boolean): Promise<EncounterView> {
   const state = parseState(enc.state);
   if (!isGm) {
@@ -196,6 +215,10 @@ async function viewFor(enc: { id: string; campaignId: string; name: string; stat
     const mine = new Set(owned.map(c => c.id));
     state.intentions = state.intentions.filter(i => mine.has(i.participantId));
     state.lastPlan = Object.fromEntries(Object.entries(state.lastPlan).filter(([id]) => mine.has(id)));
+    // Perception (PERCEPTION_FEED): the round record is truth. A member keeps only their own characters'
+    // log lines and slot entries (their own actions, in full); the rest reaches them, if perceived, through
+    // their feed. The GM's scene narration is the same — it arrives as perceived narration, not here.
+    if (perceptionFeedOn()) Object.assign(state, perceivedEncounterState(state, mine));
   }
   return { id: enc.id, campaignId: enc.campaignId, name: enc.name, status: enc.status, round: enc.round, state };
 }

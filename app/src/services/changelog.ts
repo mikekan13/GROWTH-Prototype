@@ -128,7 +128,10 @@ export async function queryChangeLog(params: ChangeLogQueryParams) {
     campaignId: params.campaignId,
   };
 
-  if (params.characterId) where.characterId = params.characterId;
+  if (params.characterIds) {
+    const ids = params.characterId ? params.characterIds.filter((id) => id === params.characterId) : params.characterIds;
+    where.characterId = { in: ids };
+  } else if (params.characterId) where.characterId = params.characterId;
   if (params.category?.length) where.category = { in: params.category };
   if (params.actor?.length) where.actor = { in: params.actor };
 

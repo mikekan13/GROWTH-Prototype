@@ -359,18 +359,19 @@ export default function CampaignTerminal({
     return () => clearInterval(interval);
   }, [visible, fetchEvents, fetchSessions]);
 
-  // Perceived feed: someone else's line happened (a text-free nudge, CampaignCanvas relays it). The
-  // character's memory of it lands after the reach pass / listening, so read the feed again a few times.
+  // Perceived feed: the server pushes a text-free nudge to this viewer alone when their character's memory
+  // row is written (lib/perceived-feed-push; CampaignCanvas relays it) — read the feed once. The 30 s
+  // fallback poll above is the only timer.
   useEffect(() => {
-    if (!visible || !perceptionFeedOn()) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (!visible || !perceptionFeedOn() || !perceivedFeed) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
     const onStale = () => {
-      timers.splice(0).forEach(clearTimeout);
-      for (const ms of [1500, 6000, 15000]) timers.push(setTimeout(() => { void fetchEvents(); }, ms));
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { void fetchEvents(); }, 150);
     };
     window.addEventListener(PERCEIVED_FEED_STALE_EVENT, onStale);
-    return () => { window.removeEventListener(PERCEIVED_FEED_STALE_EVENT, onStale); timers.forEach(clearTimeout); };
-  }, [visible, fetchEvents]);
+    return () => { window.removeEventListener(PERCEIVED_FEED_STALE_EVENT, onStale); if (t) clearTimeout(t); };
+  }, [visible, perceivedFeed, fetchEvents]);
 
   // Newest at the bottom: new rows pin the view to the bottom — unless older
   // rows were just prepended (scrolling back), then the view holds its place.
@@ -1024,6 +1025,7 @@ export default function CampaignTerminal({
           entities={tableEntities ?? []}
           emptyFrom={emptyFrom}
           isGM={isGM}
+          perceived={perceivedFeed}
           onRevert={handleRevert}
           reverting={reverting}
           reveal={logReveal}

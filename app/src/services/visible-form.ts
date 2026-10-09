@@ -364,9 +364,12 @@ export async function renderVisibleForm(truth: TruthLine, perception: ViewerPerc
     return whole(line ?? fallbackVague(text, truth.entities, actorId, sentence));
   };
 
-  /** An action (a ::segment:: or a sim act): full sight = as it happened; less = vaguer; heard only = vaguer still; neither = gone. */
+  /** The viewer's own doing (ruling: the viewer's own lines in full) — never dimmed by its senses. */
+  const ownBy = (id: string | null | undefined) => !!viewerId && id === viewerId;
+
+  /** An action (a ::segment:: or a sim act): own or full sight = as it happened; less = vaguer; heard only = vaguer still; neither = gone. */
   const action = async (text: string, actorId: string | null | undefined, sentence: boolean) => {
-    if (cl.self || cl.sight >= 1) return whole(text);
+    if (cl.self || ownBy(actorId) || cl.sight >= 1) return whole(text);
     if (cl.sight > 0) return vague(text, actorId, sentence, 'poorly');
     if (cl.hearing > 0) return vague(text, actorId, sentence, 'heard only');
     return null;
@@ -389,8 +392,15 @@ export async function renderVisibleForm(truth: TruthLine, perception: ViewerPerc
     }
     const segments: VisibleSegment[] = [];
     let s = 0;
+    const own = ownBy(row.speakerId);
     for (const seg of row.segments) {
       const skey = `${key}.${s++}`;
+      if (own && seg.kind !== 'action') {
+        // Their own words and thoughts, as they said / thought them.
+        const r = catchWords(toWords(entityToks(seg.text, truth.entities, null)), 1, () => 0);
+        segments.push({ kind: seg.kind, text: r.text, pieces: r.pieces });
+        continue;
+      }
       if (seg.kind === 'speech') {
         // Heard: the caught words, literally. Not heard but seen said: a lone gap. Neither: gone.
         if (cl.hearing > 0) {
@@ -565,12 +575,15 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
   return { campaignId, viewerId: viewerCharacterId, viewerEntityId: entity.id, entities, familiarity, clarity, rewrite };
 }
 
+/** Bumped when the render rules change, so cached forms re-render (2: the viewer's own doings in full). */
+const RENDER_VERSION = 2;
+
 /** A stable signature of everything a render depends on — the cache key. Pure. */
 export function renderSignature(truth: TruthLine, perception: ViewerPerception, familiarity: ViewerFamiliarity): string {
   const ids = new Set(truth.entities.map((e) => e.id));
   const fam = Object.keys(familiarity).filter((id) => ids.has(id)).sort().map((id) => [id, Object.entries(familiarity[id]).sort()]);
   const ents = truth.entities.map((e) => [e.id, e.name, e.description ?? '']).sort();
-  return createHash('sha1').update(JSON.stringify([truth.refs, truth.rows, ents, perception, fam])).digest('hex');
+  return createHash('sha1').update(JSON.stringify([RENDER_VERSION, truth.refs, truth.rows, ents, perception, fam])).digest('hex');
 }
 
 /** Only the entities a line can name: those whose name occurs in its text (keeps the signature and the span search small). Pure. */

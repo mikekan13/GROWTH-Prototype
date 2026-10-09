@@ -217,6 +217,10 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
   if (params.source !== 'dream' && !params.skipDreamPressure) {
     void import('./dream-pressure').then(m => m.accumulateDreamPressure(params.entityId, params.salience ?? 0)).catch(() => {});
   }
+  // Perceived feed (PERCEPTION_FEED): a row a feed line can rest on → its readers re-read (no text pushed).
+  if (params.noticed !== false && chain.truthRefs.length) {
+    void import('@/lib/perceived-feed-push').then(m => m.notifyMemoryWritten(params.entityId)).catch(() => {});
+  }
   return { id: row.id };
 }
 

@@ -29,6 +29,7 @@ export default function MechanicalLog({
   entities,
   emptyFrom,
   isGM,
+  perceived = false,
   onRevert,
   reverting,
   reveal,
@@ -42,6 +43,8 @@ export default function MechanicalLog({
   entities: FeedEntity[];
   emptyFrom: string | null;
   isGM: boolean;
+  /** Perceived feed: the events are the viewer's character's view — spans/tooltips only from the lines' own tokens. */
+  perceived?: boolean;
   onRevert?: (entryId: string) => void;
   reverting?: string | null;
   reveal: Set<string> | null;
@@ -135,6 +138,7 @@ export default function MechanicalLog({
           campaignId={campaignId}
           events={events}
           entities={entities}
+          perceived={perceived}
           onRevert={onRevert}
           reverting={reverting}
           sessions={sessions}

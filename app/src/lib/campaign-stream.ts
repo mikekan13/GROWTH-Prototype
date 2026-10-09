@@ -30,21 +30,49 @@ interface SSEConnection {
 
 /**
  * What a connection receives for an event (pure). The truth-record connections get everything unchanged.
- * A perceived-feed connection never receives another being's line text: a terminal_event that is not its
- * own (its character's line, or its own account's) becomes a text-free `perceived_feed_stale` nudge, and
- * the growing line (being_speaking) is not sent — the line reaches it, if perceived, through its feed.
+ * A perceived-feed connection never receives another being's text or results:
+ *   - terminal_event: its own (its character's line, or its own account's) and session markers in full;
+ *     anything else is NOT sent — the line reaches it, if perceived, through its feed, read when the
+ *     character's memory row is written (the targeted `perceived_feed_stale` push, lib/perceived-feed-push);
+ *   - being_speaking (the growing line): never;
+ *   - check / cast / death-save / wager / check-request results: only its own character's;
+ *   - character_update of another: the refresh signal without the name;
+ *   - jewl_working: the phase/tool only (its label names what was built); DAYA work sessions: never.
+ * Everything else (connection presence, heartbeats, its own targeted nudges, portrait / focus ids) passes.
  */
 export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, event: CampaignStreamEvent): CampaignStreamEvent | null {
   if (!conn.perceived) return event;
   const data = event.data;
-  if (data.kind === 'being_speaking') return null;
-  if (data.kind === 'terminal_event') {
-    const te = data.event;
-    const own = (!!conn.perceived.characterId && te.characterId === conn.perceived.characterId) || (te.actorUserId === conn.userId && te.actor === 'player');
-    if (own) return event;
-    return { id: event.id, timestamp: event.timestamp, campaignId: event.campaignId, data: { kind: 'perceived_feed_stale' } };
+  const mine = (characterId: string | null | undefined) => !!conn.perceived?.characterId && characterId === conn.perceived.characterId;
+  const withData = (d: CampaignStreamEvent['data']): CampaignStreamEvent => ({ ...event, data: d });
+  switch (data.kind) {
+    case 'being_speaking':
+    case 'daya_work_session':
+      return null;
+    case 'terminal_event': {
+      const te = data.event;
+      const own = mine(te.characterId) || (te.actorUserId === conn.userId && te.actor === 'player');
+      const p = te.payload as { kind?: string; eventType?: string };
+      const sessionMarker = p.kind === 'game_event' && typeof p.eventType === 'string' && p.eventType.startsWith('session_');
+      return own || sessionMarker ? event : null;
+    }
+    case 'check_result':
+    case 'cast_result':
+    case 'death_save':
+    case 'effort_wager_submit':
+      return mine(data.characterId) ? event : null;
+    case 'skill_check_request':
+      return mine(data.targetCharacterId) ? event : null;
+    case 'effort_wager_prompt':
+      // Only ever sent to the one player being asked (targetUserId); untargeted → not this viewer's to read.
+      return event.targetUserId === conn.userId ? event : null;
+    case 'character_update':
+      return mine(data.characterId) ? event : withData({ ...data, characterName: '' });
+    case 'jewl_working':
+      return withData({ kind: 'jewl_working', phase: data.phase, ...(data.tool ? { tool: data.tool } : {}) });
+    default:
+      return event;
   }
-  return event;
 }
 
 // ── Global Singleton (survives HMR) ───────────────────────────────────────
