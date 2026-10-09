@@ -15,7 +15,8 @@
  *   through lifetimes").
  *
  * Read by the mirror (daya/perceive: the place's stored familiarity sets the
- * scene attunement, unit 4); seeded on first contact by services/familiarity-seed;
+ * scene attunement, unit 4); seeded on first contact by services/familiarity-seed —
+ * recordExposure / recordExposureBatch run the seeder before counting a new row;
  * Watcher view via listFamiliarityForWatcher (GET /api/campaigns/[id]/familiarity).
  */
 import 'server-only';
@@ -205,6 +206,32 @@ export async function getFamiliarity(perceiverId: string, subjectId: string, asp
 }
 
 /**
+ * First contact BEFORE exposure is counted (Mike's seeding ruling: self /
+ * owned / known category / Godhead start above zero). For every subject with
+ * any of `aspects` not yet stored for this perceiver, run the unit-4 seeder
+ * (services/familiarity-seed), which creates only missing rows; the exposure
+ * then grows from the seeded score. A perceiver with no character (no DAYA
+ * row / no characterId) cannot be classified and is left unseeded.
+ */
+async function seedFirstContacts(input: { campaignId: string; perceiverId: string; perceiverCharacterId?: string | null; subjects: Array<{ subjectId: string; subjectKind: SubjectKind }>; aspects: readonly string[] }): Promise<void> {
+  if (!input.subjects.length || !input.aspects.length) return;
+  const ids = input.subjects.map((s) => s.subjectId);
+  const have = await prisma.familiarity.findMany({ where: { perceiverId: input.perceiverId, subjectId: { in: ids }, aspectKind: { in: [...input.aspects] } }, select: { subjectId: true, aspectKind: true } });
+  const known = new Set(have.map((r) => `${r.subjectId}|${r.aspectKind}`));
+  const fresh = input.subjects.filter((s) => input.aspects.some((a) => !known.has(`${s.subjectId}|${a}`)));
+  if (!fresh.length) return;
+  const characterId = input.perceiverCharacterId
+    ?? (await prisma.dayaEntity.findUnique({ where: { id: input.perceiverId }, select: { characterId: true } }))?.characterId
+    ?? null;
+  if (!characterId) return;
+  const { seedOnFirstContact, isGodheadBeing } = await import('@/services/familiarity-seed');
+  const godhead = await isGodheadBeing(characterId);
+  for (const s of fresh) {
+    await seedOnFirstContact({ campaignId: input.campaignId, perceiverId: input.perceiverId, perceiverCharacterId: characterId, subjectId: s.subjectId, subjectKind: s.subjectKind, godhead });
+  }
+}
+
+/**
  * Record exposure of a being to one aspect of a subject. Growth sources raise
  * the stored score along the diminishing-returns curve; 'seed' sets it.
  * Stamps lastCycle (`cycle`, else the campaign clock) as the fade anchor.
@@ -213,6 +240,9 @@ export async function getFamiliarity(perceiverId: string, subjectId: string, asp
 export async function recordExposure(input: RecordExposureInput): Promise<FamiliarityRecord> {
   const v = parse(recordExposureSchema, input);
   const key = { perceiverId: v.perceiverId, subjectId: v.subjectId, aspectKind: v.aspectKind };
+  if (v.source !== 'seed') {
+    await seedFirstContacts({ campaignId: v.campaignId, perceiverId: v.perceiverId, subjects: [{ subjectId: v.subjectId, subjectKind: v.subjectKind }], aspects: [v.aspectKind] });
+  }
   const lastCycle = v.cycle ?? await currentCycleOf(v.campaignId);
   const row = await prisma.$transaction(async (tx) => {
     const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
@@ -251,6 +281,10 @@ export async function recordExposureBatch(input: { campaignId: string; perceiver
   }
   const writes = [...seen.values()].flatMap((s) => PASSIVE_ASPECTS.map((aspectKind) => ({ ...s, aspectKind }))).slice(0, EXPOSURE_BATCH_CAP);
   if (!writes.length) return 0;
+  await seedFirstContacts({
+    campaignId: input.campaignId, perceiverId: input.perceiverId, perceiverCharacterId: input.perceiverCharacterId,
+    subjects: [...new Map(writes.map((w) => [w.subjectId, w])).values()], aspects: PASSIVE_ASPECTS,
+  });
   const lastCycle = input.cycle ?? await currentCycleOf(input.campaignId);
   await prisma.$transaction(async (tx) => {
     for (const w of writes) {
