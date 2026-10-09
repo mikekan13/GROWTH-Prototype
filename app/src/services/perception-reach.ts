@@ -28,9 +28,9 @@ export { perceptionReachOn };
 // ── The model transport ───────────────────────────────────────────────────
 
 /** The world-sim call on the classify lane (Haiku today, the local small model when that lane points at it). */
-export function reachModelFor(campaignId?: string | null): ReachModel {
+export function reachModelFor(campaignId?: string | null, caller = 'perception-reach'): ReachModel {
   return async ({ system, user, maxTokens }) => {
-    const lane = route({ caller: 'perception-reach', lane: 'classify', campaignId: campaignId ?? undefined, privacy: 'trusted-dev' });
+    const lane = route({ caller, lane: 'classify', campaignId: campaignId ?? undefined, privacy: 'trusted-dev' });
     const opts = { maxTokens, temperature: 0 };
     let res: { text: string; model: string; usage: Parameters<typeof recordAiCall>[0]['usage'] };
     if (lane.provider === 'anthropic') {
@@ -40,7 +40,7 @@ export function reachModelFor(campaignId?: string | null): ReachModel {
     } else {
       throw new Error(`perception-reach: unsupported provider ${lane.provider}`);
     }
-    recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller: 'perception-reach', campaignId: campaignId ?? undefined, usage: res.usage });
+    recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller, campaignId: campaignId ?? undefined, usage: res.usage });
     return res.text;
   };
 }

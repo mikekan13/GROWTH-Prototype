@@ -57,6 +57,11 @@ export interface TruthEntity {
   name: string;
   /** What can be seen of it, free text (sheet description / appearance). F1–F2 name it by this. */
   description?: string | null;
+  /**
+   * This viewer's WRONG impressions of it, aspect key → the value it believes (Familiarity.impression).
+   * Shown as fact in its tooltips; a wrong 'appearance' also replaces `description` for this viewer.
+   */
+  impressions?: Record<string, string>;
 }
 
 export type TruthRow =
@@ -91,8 +96,8 @@ export interface VisibleEntity {
   kind: EntityKind;
   /** What the viewer calls it — a generic, a short description, or the name. */
   label: string;
-  /** Aspects the viewer knows (level ≥ 1); the tooltip shows only these. Level 5 = the raw stats. Data for the tooltip, never printed. */
-  known: Array<{ aspectKind: string; fidelity: number }>;
+  /** Aspects the viewer knows (level ≥ 1, or any level with a wrong `impression`); the tooltip shows only these. Level 5 = the raw stats. Data for the tooltip, never printed. */
+  known: Array<{ aspectKind: string; fidelity: number; impression?: string }>;
 }
 
 export type VisiblePiece =
@@ -180,7 +185,12 @@ export function labelFor(e: TruthEntity, identity: number, viewerId: string): st
 
 function visibleEntity(e: TruthEntity, fam: ViewerFamiliarity, viewerId: string): VisibleEntity {
   const aspects = fam[e.id] ?? {};
-  const known = Object.entries(aspects).filter(([, f]) => f >= 1).map(([aspectKind, fidelity]) => ({ aspectKind, fidelity })).sort((a, b) => a.aspectKind.localeCompare(b.aspectKind));
+  const imp = e.impressions ?? {};
+  const keys = [...new Set([...Object.keys(aspects), ...Object.keys(imp)])];
+  const known = keys
+    .filter((k) => imp[k] || (aspects[k] ?? 0) >= 1)
+    .map((aspectKind) => ({ aspectKind, fidelity: aspects[aspectKind] ?? 0, ...(imp[aspectKind] ? { impression: imp[aspectKind] } : {}) }))
+    .sort((a, b) => a.aspectKind.localeCompare(b.aspectKind));
   return { id: e.id, kind: e.kind, label: labelFor(e, aspects.identity ?? 0, viewerId), known };
 }
 
@@ -554,7 +564,7 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
     prisma.character.findMany({ where: { campaignId }, select: { id: true, name: true, data: true, entityType: true } }),
     prisma.campaignItem.findMany({ where: { campaignId, status: 'ACTIVE' }, select: { id: true, name: true, type: true, data: true, holderId: true }, take: CONTEXT_ITEM_CAP }),
     prisma.location.findMany({ where: { campaignId }, select: { id: true, name: true, data: true } }),
-    prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id }, select: { subjectId: true, aspectKind: true, score: true, lastCycle: true } }),
+    prisma.familiarity.findMany({ where: { campaignId, perceiverId: entity.id }, select: { subjectId: true, aspectKind: true, score: true, lastCycle: true, impression: true } }),
     currentCycleOf(campaignId),
   ]);
   const parse = <T,>(s: string | null | undefined): T | null => { try { return s ? JSON.parse(s) as T : null; } catch { return null; } };
@@ -571,6 +581,13 @@ export async function loadViewerContext(campaignId: string, viewerCharacterId: s
   const familiarity: ViewerFamiliarity = {};
   const witMax = witMaxFromSheet(viewerSheet); // WIT = RETENTION: the viewer's own Wit fades what it knows
   for (const f of fams) (familiarity[f.subjectId] ??= {})[f.aspectKind] = scoreToFidelity(familiarityAt(f, nowCycle, witMax));
+  // Wrong impressions show as received: this viewer's believed values ride on its entities (a wrong look replaces the description).
+  const impressions = new Map<string, Record<string, string>>();
+  for (const f of fams) if (f.impression) (impressions.get(f.subjectId) ?? impressions.set(f.subjectId, {}).get(f.subjectId)!)[f.aspectKind] = f.impression;
+  for (let i = 0; i < entities.length; i++) {
+    const imp = impressions.get(entities[i].id);
+    if (imp) entities[i] = { ...entities[i], impressions: imp, ...(imp.appearance ? { description: imp.appearance } : {}) };
+  }
   // Sense grants from anything active on the viewer: organs, traits/blossoms (sheet) and the items it holds.
   const senses = senseProfileFromSheet(viewerSheet, { items: items.filter((i) => i.holderId === viewerCharacterId), nowCycle });
   const clarity: Record<string, number> = { ...senses.effectiveness };
@@ -586,7 +603,7 @@ const RENDER_VERSION = 2;
 export function renderSignature(truth: TruthLine, perception: ViewerPerception, familiarity: ViewerFamiliarity): string {
   const ids = new Set(truth.entities.map((e) => e.id));
   const fam = Object.keys(familiarity).filter((id) => ids.has(id)).sort().map((id) => [id, Object.entries(familiarity[id]).sort()]);
-  const ents = truth.entities.map((e) => [e.id, e.name, e.description ?? '']).sort();
+  const ents = truth.entities.map((e) => [e.id, e.name, e.description ?? '', e.impressions ? Object.entries(e.impressions).sort() : []]).sort();
   return createHash('sha1').update(JSON.stringify([RENDER_VERSION, truth.refs, truth.rows, ents, perception, fam])).digest('hex');
 }
 

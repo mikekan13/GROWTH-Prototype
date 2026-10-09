@@ -217,10 +217,12 @@ export const PARTICIPANT_ASPECTS = [...BEING_ASPECTS];
 export function perceivedParticipant(
   p: Participant,
   fidelity: Record<string, number>,
-  seen: { kind?: EntityKind; description?: string | null } = {},
+  seen: { kind?: EntityKind; description?: string | null; impressions?: Record<string, string> } = {},
 ): ParticipantSeen {
-  const known = PARTICIPANT_ASPECTS.filter((k) => (fidelity[k] ?? 0) >= 1).map((k) => ({ aspectKind: k, fidelity: fidelity[k] }));
-  const name = labelFor({ id: p.id, kind: seen.kind ?? 'CHARACTER', name: p.name, description: seen.description ?? null }, fidelity.identity ?? 0, '');
+  // Wrong impressions show as received (as fact, any fidelity); a wrong look renames it for this viewer.
+  const imp = seen.impressions ?? {};
+  const known = PARTICIPANT_ASPECTS.filter((k) => imp[k] || (fidelity[k] ?? 0) >= 1).map((k) => ({ aspectKind: k, fidelity: fidelity[k] ?? 0, impression: imp[k] }));
+  const name = labelFor({ id: p.id, kind: seen.kind ?? 'CHARACTER', name: p.name, description: imp.appearance ?? seen.description ?? null }, fidelity.identity ?? 0, '');
   return {
     id: p.id, name, side: p.side, control: p.control, downed: p.downed, perceived: true,
     known: aspectFacts(known, { being: { attrs: p.attrs, pools: p.pools } }),
@@ -238,16 +240,19 @@ async function participantLooks(ids: string[]): Promise<Map<string, { kind: Enti
   return out;
 }
 
-/** The viewer's characters' best familiarity with each other participant's being aspects (faded to now). */
-async function participantFidelity(campaignId: string, viewerCharacterIds: string[], subjectIds: string[]): Promise<Map<string, Record<string, number>>> {
+/**
+ * The viewer's characters' best familiarity with each other participant's being aspects (faded to now).
+ * Wrong impressions they hold land in `impressions` (subject → aspect → believed value).
+ */
+async function participantFidelity(campaignId: string, viewerCharacterIds: string[], subjectIds: string[], impressions?: Map<string, Record<string, string>>): Promise<Map<string, Record<string, number>>> {
   const out = new Map<string, Record<string, number>>();
   if (!viewerCharacterIds.length || !subjectIds.length) return out;
   const beings = await prisma.dayaEntity.findMany({ where: { characterId: { in: viewerCharacterIds } }, select: { id: true } });
   if (!beings.length) return out;
   const [rows, nowCycle, wit] = await Promise.all([
     prisma.familiarity.findMany({
-      where: { campaignId, perceiverId: { in: beings.map((b) => b.id) }, subjectId: { in: subjectIds }, aspectKind: { in: [...PARTICIPANT_ASPECTS, 'identity'] } },
-      select: { perceiverId: true, subjectId: true, aspectKind: true, score: true, lastCycle: true },
+      where: { campaignId, perceiverId: { in: beings.map((b) => b.id) }, subjectId: { in: subjectIds }, aspectKind: { in: [...PARTICIPANT_ASPECTS, 'identity', 'appearance'] } },
+      select: { perceiverId: true, subjectId: true, aspectKind: true, score: true, lastCycle: true, impression: true },
     }),
     currentCycleOf(campaignId),
     witByPerceiver(beings.map((b) => b.id)),
@@ -257,6 +262,7 @@ async function participantFidelity(campaignId: string, viewerCharacterIds: strin
     const rec = out.get(r.subjectId) ?? {};
     rec[r.aspectKind] = Math.max(rec[r.aspectKind] ?? 0, f);
     out.set(r.subjectId, rec);
+    if (r.impression && impressions) impressions.set(r.subjectId, { ...(impressions.get(r.subjectId) ?? {}), [r.aspectKind]: r.impression });
   }
   return out;
 }
@@ -302,11 +308,12 @@ async function viewFor(enc: { id: string; campaignId: string; name: string; stat
         viewers = own.map((c) => c.id);
       }
       const others = state.participants.filter((p) => !mine.has(p.id));
+      const impressions = new Map<string, Record<string, string>>();
       const [fid, looks] = await Promise.all([
-        participantFidelity(enc.campaignId, viewers, others.map((p) => p.id)),
+        participantFidelity(enc.campaignId, viewers, others.map((p) => p.id), impressions),
         participantLooks(others.map((p) => p.id)),
       ]);
-      const participants = state.participants.map((p) => (mine.has(p.id) ? p : perceivedParticipant(p, fid.get(p.id) ?? {}, looks.get(p.id))));
+      const participants = state.participants.map((p) => (mine.has(p.id) ? p : perceivedParticipant(p, fid.get(p.id) ?? {}, { ...looks.get(p.id), impressions: impressions.get(p.id) })));
       return { id: enc.id, campaignId: enc.campaignId, name: enc.name, status: enc.status, round: enc.round, state: { ...state, participants } };
     }
   }

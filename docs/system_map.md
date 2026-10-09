@@ -233,6 +233,7 @@ Ruling (Mike 2026-10-08/09, Q6): the feed is a view of an entity's memory. The c
 - **D3:** sense clarity is stored on the memory row at perception time (`daya/perceived-via.ts`), so a moment perceived blind stays blurry after healing.
 - **Wit = retention (2026-10-09):** every familiarity fade scales with the PERCEIVER's Wit (`familiarity.witFadeFactor`, Wit read off the sheet like recall's Wit gate: level + aug+ − aug−, none → 10 = reference, factor 1). Higher Wit, slower fade; the F5 seal (Godheads) never fades. The reach/encounter/introduction/use passes now pass change-record refs (memory row + canon event) into `writeFamiliarity`.
 - **Sense grants (2026-10-09):** any active source may grant a sense (incl. `mind`, the only way a thought reaches another being): body parts, held items and their abilities, traits/blossoms (`grantsSenses`, `sim/senses/field.ts`). The reach pass, the mirror's sense profile and the visible-form thought rule all read the merged profile.
+- **Wrong impressions (2026-10-09):** an inspection fumble stores the WRONG value perceived on `Familiarity.impression` (small model when the world-sim is on, deterministic fallback); tooltips / roster show it as fact for that perceiver only, until a later correct perception reaches F3 on that aspect and fixes it (recorded on FamiliarityChange). Low-fidelity sight does not yet produce wrong impressions.
 
 ## Architecture Overview
 

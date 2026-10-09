@@ -157,6 +157,19 @@ describe('resolve', () => {
     expect(wrong).toHaveLength(1);
     expect(wrong[0].score).toBe(0);
     expect(w.changes).toEqual([expect.objectContaining({ aspectKind: wrong[0].aspectKind, toScore: 0, source: 'wrong', checkId: 'pc1' })]);
+    // Wrong impressions show as received: the WRONG value is stored (world-sim off → deterministic fallback) and recorded.
+    expect(wrong[0]).toMatchObject({ aspectKind: 'damage', impression: 'slashing roughly 5–9' }); // truth: slashing 4 (F3 'roughly 3–5')
+    expect(w.changes[0]).toMatchObject({ fromImpression: null, toImpression: 'slashing roughly 5–9' });
+  });
+
+  it('a wrong impression takes the small model value when there is one (the truth itself is refused)', async () => {
+    await svc.resolveInspection('c1', purpose, { total: 1, success: false, margin: -9, effortBy: {}, skilled: true, checkId: 'k1' }, { model: async () => '{"value":"cuts deep, a butcher edge"}' });
+    expect(w.fams.find((f) => f.lastSource === 'wrong')).toMatchObject({ impression: 'cuts deep, a butcher edge' });
+    w.fams.length = 0; w.changes.length = 0;
+    await svc.resolveInspection('c1', purpose, { total: 1, success: false, margin: -9, effortBy: {}, skilled: true, checkId: 'k2' }, { model: async () => '{"value":"slashing 4"}' });
+    const fell = w.fams.find((f) => f.lastSource === 'wrong') as { impression?: string } | undefined;
+    expect(fell?.impression).toMatch(/^slashing roughly/); // fell back to the deterministic wrong value
+    expect(fell?.impression).not.toBe('slashing 4');
   });
 
   it('unskilled (raw Wisdom) never reaches a domain with zero exposure', async () => {

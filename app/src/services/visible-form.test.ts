@@ -172,3 +172,13 @@ describe('visible form — actions seen poorly', () => {
     expect((await renderVisibleForm(line, see({ noticed: false }), knowsAll, { seed: 's' })).rows).toEqual([]);
   });
 });
+
+describe('wrong impressions show as received (Mike 2026-10-09: "shows as gold for that entity until it is fixed")', () => {
+  it('the entity carries the believed value as a known aspect (even at F0); a wrong look relabels it', async () => {
+    const believed: TruthEntity = { ...warden, description: 'Short guard in gilded mail', impressions: { appearance: 'Short guard in gilded mail', material: 'gold' } };
+    const form = await renderVisibleForm({ ...line, entities: [ruth, violet, believed, door] }, see(), { ...knowsAll, warden: { identity: 2 } }, { seed: 'm1' });
+    const w = form.entities.find((e) => e.id === 'warden')!;
+    expect(w.label).toBe('a short guard in gilded mail');
+    expect(w.known).toEqual(expect.arrayContaining([{ aspectKind: 'material', fidelity: 0, impression: 'gold' }]));
+  });
+});

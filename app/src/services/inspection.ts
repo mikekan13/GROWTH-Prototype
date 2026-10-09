@@ -12,7 +12,9 @@
  *            hint, wager, FD — rolled visibly by the player); a being nobody plays → the engine rolls
  *            the same dice (no effort) and posts the roll.
  *   resolve  services/check-resolved → resolveInspection → planInspection (sim/perception/inspect)
- *            → familiarity writes, source 'inspect' (a WRONG impression is lastSource 'wrong').
+ *            → familiarity writes, source 'inspect'. A WRONG impression (bad fumble) is lastSource 'wrong'
+ *            and stores the WRONG VALUE perceived (sim/perception/wrong-impression; small model, deterministic
+ *            fallback) — shown as fact to that inspector until a correct perception fixes it.
  */
 import 'server-only';
 import { z } from 'zod';
@@ -27,7 +29,9 @@ import type { InspectPurpose } from '@/lib/pending-checks';
 import { requireCampaignMember } from '@/services/campaign-access';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { gatherTraitModifiers } from '@/services/trait-modifiers';
-import { familiarityAt, recordExposure, witOfPerceiver, writeFamiliarity } from '@/services/familiarity';
+import { familiarityAt, priorOf, recordExposure, witOfPerceiver, writeFamiliarity, WRONG_SOURCE } from '@/services/familiarity';
+import { wrongImpressionFor, type WrongImpressionModel } from '@/sim/perception/wrong-impression';
+import type { AspectSubject } from '@/sim/perception/aspect-values';
 import { subjectAspects } from '@/services/familiarity-seed';
 import { currentCycleOf } from '@/services/history';
 import { getRelevance, normalizeSkillName, pickBestSkill, SKILL_RELEVANCE_TUNING, type SkillRelevance } from '@/services/skill-relevance';
@@ -295,8 +299,40 @@ async function engineInspectionRoll(
 
 // ── Resolve ───────────────────────────────────────────────────────────────
 
+/** What the inspector looked at, for its wrong impression: an item's data + look, a being's look + attributes. */
+async function impressionSubjectOf(kind: SubjectKind, subjectId: string, itemData: string | null): Promise<{ subject: AspectSubject; name: string }> {
+  try {
+    if (kind === 'ITEM') {
+      const row = await prisma.campaignItem.findUnique({ where: { id: subjectId }, select: { name: true } });
+      const item = parseJson<NonNullable<AspectSubject['item']>>(itemData);
+      return { subject: { item, description: (item as { description?: string } | null)?.description ?? null }, name: row?.name ?? 'the thing' };
+    }
+    if (kind === 'CHARACTER' || kind === 'NPC') {
+      const ch = await prisma.character.findUnique({ where: { id: subjectId }, select: { data: true } });
+      const sheet = parseJson<GrowthCharacter>(ch?.data);
+      const { characterDescription } = await import('@/services/visible-form');
+      const attrs: Record<string, { current: number; max: number }> = {};
+      for (const [k, a] of Object.entries((sheet?.attributes ?? {}) as unknown as Record<string, { level?: number; current?: number; augmentPositive?: number; augmentNegative?: number }>)) {
+        if (a && typeof a.level === 'number') attrs[k] = { current: typeof a.current === 'number' ? a.current : a.level, max: a.level + (a.augmentPositive ?? 0) - (a.augmentNegative ?? 0) };
+      }
+      return { subject: { description: characterDescription(sheet as Parameters<typeof characterDescription>[0]), being: { attrs } }, name: 'the figure' };
+    }
+    if (kind === 'LOCATION') {
+      const loc = await prisma.location.findUnique({ where: { id: subjectId }, select: { name: true, data: true } });
+      return { subject: { description: parseJson<{ description?: string }>(loc?.data)?.description ?? null }, name: loc?.name ?? 'the place' };
+    }
+  } catch (err) { console.warn('[inspection] could not read the subject for its wrong impression', err); }
+  return { subject: {}, name: 'the thing' };
+}
+
+/** The world-sim's small model on the classify lane — only when the world-sim is on (PERCEPTION_REACH). */
+async function defaultImpressionModel(campaignId: string): Promise<WrongImpressionModel | null> {
+  const { perceptionReachOn, reachModelFor } = await import('@/services/perception-reach');
+  return perceptionReachOn() ? reachModelFor(campaignId, 'wrong-impression') : null;
+}
+
 /** The check is in: raise (or mislead) the inspector's familiarity with the subject's aspects. */
-export async function resolveInspection(campaignId: string, purpose: InspectPurpose, outcome: CheckOutcome & { skilled: boolean; checkId?: string }): Promise<InspectWrite[]> {
+export async function resolveInspection(campaignId: string, purpose: InspectPurpose, outcome: CheckOutcome & { skilled: boolean; checkId?: string }, opts: { model?: WrongImpressionModel | null } = {}): Promise<InspectWrite[]> {
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId: purpose.characterId }, select: { id: true } });
   if (!entity) { console.warn('[inspection] no DAYA being for', purpose.characterId, '— nothing learned'); return []; }
   const [rows, nowCycle, itemData, witMax] = await Promise.all([
@@ -321,13 +357,20 @@ export async function resolveInspection(campaignId: string, purpose: InspectPurp
     if (w.op === 'grow') {
       await recordExposure({ ...base, aspectKind: w.aspectKind, source: 'inspect', times: w.times, cycle: nowCycle, refs });
     } else {
-      // A flag lifts an unknown aspect to F1 ("it's a relic"); a wrong impression stays F0, marked 'wrong'
-      // (TUNING / minimal: nothing reads the mark yet — [QUESTION] how a wrong impression shows).
+      // A flag lifts an unknown aspect to F1 ("it's a relic"). A wrong impression keeps its score, is marked
+      // 'wrong', and stores the WRONG VALUE perceived (Mike 2026-10-09: "shows as gold for that entity until
+      // it is 'fixed'") — the model first when the world-sim is on, else the deterministic fallback.
       const score = w.op === 'flag' ? Math.max(current[w.aspectKind] ?? 0, w.score) : (current[w.aspectKind] ?? 0);
-      const source = w.op === 'flag' ? 'inspect' : 'wrong';
+      const source = w.op === 'flag' ? 'inspect' : WRONG_SOURCE;
+      let impression: string | undefined;
+      if (w.op === 'wrong') {
+        const subj = await impressionSubjectOf(purpose.subjectKind, purpose.subjectId, itemData);
+        const model = opts.model !== undefined ? opts.model : await defaultImpressionModel(campaignId);
+        impression = (await wrongImpressionFor(w.aspectKind, subj.subject, { seed: `${entity.id}:${purpose.subjectId}:${outcome.checkId ?? nowCycle}`, subjectName: subj.name, model })).value ?? undefined;
+      }
       await prisma.$transaction(async (tx) => {
-        const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
-        await writeFamiliarity(tx, [{ ...key, campaignId, subjectKind: purpose.subjectKind, score, source, cycle: nowCycle, prior, keepSubjectKind: true, refs }]);
+        const prior = await priorOf(tx, key);
+        await writeFamiliarity(tx, [{ ...key, campaignId, subjectKind: purpose.subjectKind, score, source, cycle: nowCycle, prior, keepSubjectKind: true, refs, ...(impression !== undefined ? { impression } : {}) }]);
       });
     }
   }

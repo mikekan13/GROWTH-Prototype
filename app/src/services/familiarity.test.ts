@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreToFidelity, growFamiliarity, fadeFamiliarity, familiarityAt, FAMILIARITY_TUNING, F5_SEAL, recordExposureSchema, witFadeFactor, witMaxFromSheet } from './familiarity';
+import { scoreToFidelity, growFamiliarity, fadeFamiliarity, familiarityAt, FAMILIARITY_TUNING, F5_SEAL, recordExposureSchema, witFadeFactor, witMaxFromSheet, impressionAfter, writeFamiliarity } from './familiarity';
 import { computeFidelityLevel } from '@/daya/renderer-math';
 import { computeRecency } from '@/daya/recall';
 
@@ -130,5 +130,29 @@ describe('WIT = RETENTION (Mike 2026-10-09: higher Wit, higher retention)', () =
     expect(witMaxFromSheet({ attributes: { wit: { level: 7 } } })).toBe(7);
     expect(witMaxFromSheet(null)).toBe(10);
     expect(witMaxFromSheet({ attributes: {} })).toBe(10);
+  });
+});
+
+describe('wrong impressions: set, kept, FIXED by a correct perception at sufficient fidelity', () => {
+  it('impressionAfter: explicit wins; a non-wrong write to >= F3 fixes; below F3 or another wrong keeps it; an unread prior leaves it alone', () => {
+    const prior = { score: 0.1, lastCycle: 1, impression: 'gold' };
+    expect(impressionAfter({ prior, score: 0.1, source: 'wrong', impression: 'brass' })).toBe('brass');
+    expect(impressionAfter({ prior, score: 0.65, source: 'inspect' })).toBeNull(); // F3 → fixed
+    expect(impressionAfter({ prior, score: 0.45, source: 'use' })).toBe('gold'); // F2 → still believed
+    expect(impressionAfter({ prior, score: 0.9, source: 'wrong' })).toBe('gold');
+    expect(impressionAfter({ prior: { score: 0.1, lastCycle: 1 }, score: 0.9, source: 'inspect' })).toBeUndefined();
+    expect(impressionAfter({ prior: null, score: 0.9, source: 'inspect' })).toBeNull();
+  });
+
+  it('writeFamiliarity records the fix on the change row (gold → null) and clears the row', async () => {
+    const rows: Record<string, unknown>[] = []; const changes: Record<string, unknown>[] = [];
+    const tx = {
+      familiarity: { upsert: async (q: { create: Record<string, unknown>; update: Record<string, unknown> }) => { rows.push(q.update); return { perceiverId: 'e', subjectId: 's', subjectKind: 'ITEM', aspectKind: 'material', score: 0.7, lastSource: 'inspect', lastCycle: 2, impression: (q.update.impression as string | null) ?? null, updatedAt: new Date(0) }; } },
+      familiarityChange: { createMany: async (q: { data: Record<string, unknown>[] }) => { changes.push(...q.data); return { count: q.data.length }; } },
+    } as unknown as Parameters<typeof writeFamiliarity>[0];
+    const [rec] = await writeFamiliarity(tx, [{ campaignId: 'c', perceiverId: 'e', subjectId: 's', subjectKind: 'ITEM', aspectKind: 'material', score: 0.7, source: 'inspect', cycle: 2, prior: { score: 0.1, lastCycle: 1, impression: 'gold' } }]);
+    expect(rec.impression).toBeNull();
+    expect(rows[0]).toMatchObject({ impression: null });
+    expect(changes[0]).toMatchObject({ fromImpression: 'gold', toImpression: null, source: 'inspect' });
   });
 });

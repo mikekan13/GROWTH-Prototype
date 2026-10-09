@@ -252,7 +252,18 @@ export function aspectFact(key: string, fidelity: number, subject: AspectSubject
   }
 }
 
-/** Every known aspect's line, in the order given; unknown / empty ones dropped. Pure. */
-export function aspectFacts(known: Array<{ aspectKind: string; fidelity: number }>, subject: AspectSubject): AspectFact[] {
-  return known.map((k) => aspectFact(k.aspectKind, k.fidelity, subject)).filter((x): x is AspectFact => !!x);
+/**
+ * Every known aspect's line, in the order given; unknown / empty ones dropped. An aspect carrying a WRONG
+ * `impression` (Mike 2026-10-09: "shows as gold for that entity until it is 'fixed'") shows that value as
+ * plain fact — no marker, whatever its fidelity. Pure.
+ */
+export function aspectFacts(known: Array<{ aspectKind: string; fidelity: number; impression?: string | null }>, subject: AspectSubject): AspectFact[] {
+  return known.map((k) => (k.impression ? impressionFact(k.aspectKind, k.impression) : aspectFact(k.aspectKind, k.fidelity, subject))).filter((x): x is AspectFact => !!x);
+}
+
+/** A wrong impression's tooltip line, labelled like the true one would be. Pure. */
+export function impressionFact(key: string, value: string): AspectFact {
+  const { kind, instanceId } = parseAspectKey(key);
+  const label = kind === 'attribute' && instanceId ? ATTR_LABEL[instanceId] ?? instanceId : LABEL.get(kind) ?? kind;
+  return { aspect: key, label, value };
 }

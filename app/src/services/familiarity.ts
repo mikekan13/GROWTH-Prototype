@@ -29,6 +29,7 @@ import { requireCampaignGM } from '@/services/campaign-access';
 import { RECALL_TUNING } from '@/daya/recall-tuning';
 import { currentCycleOf } from '@/services/history';
 import { listAspects } from '@/sim/perception/aspects';
+import { WRONG_IMPRESSION_TUNING } from '@/sim/perception/wrong-impression';
 
 // ── Vocabulary ────────────────────────────────────────────────────────────
 
@@ -193,10 +194,12 @@ export interface FamiliarityRecord {
   lastSource: string;
   /** Campaign clock (meta cycles) at the last write — the fade anchor; null on pre-2026-10-09 rows. */
   lastCycle: number | null;
+  /** The WRONG value this perceiver believes of the aspect (shown as fact to it), null = none / fixed. */
+  impression: string | null;
   updatedAt: Date;
 }
 
-const RECORD_SELECT = { perceiverId: true, subjectId: true, subjectKind: true, aspectKind: true, score: true, lastSource: true, lastCycle: true, updatedAt: true } as const;
+const RECORD_SELECT = { perceiverId: true, subjectId: true, subjectKind: true, aspectKind: true, score: true, lastSource: true, lastCycle: true, impression: true, updatedAt: true } as const;
 
 /**
  * A stored row's familiarity as of `nowCycle` — fadeFamiliarity over the
@@ -263,8 +266,11 @@ export async function listFamiliarityForWatcher(
 /** What one familiarity write rests on — optional pointers kept on its change row. */
 export interface FamiliarityChangeRefs { memoryId?: string | null; canonEventId?: string | null; checkId?: string | null }
 
-/** The stored row before a write (null = first contact). */
-export type FamiliarityPrior = { score: number; lastCycle: number | null } | null;
+/**
+ * The stored row before a write (null = first contact). `impression` read = the wrong value held then;
+ * a prior read WITHOUT the key leaves the stored impression untouched (it cannot be judged fixed).
+ */
+export type FamiliarityPrior = { score: number; lastCycle: number | null; impression?: string | null } | null;
 
 export interface FamiliarityWrite {
   campaignId: string;
@@ -282,7 +288,26 @@ export interface FamiliarityWrite {
   /** Leave an existing row's subjectKind as stored (default: overwrite it). */
   keepSubjectKind?: boolean;
   refs?: FamiliarityChangeRefs;
+  /** Set a WRONG impression (string) or clear one (null) outright; omitted = keep, or FIX (see impressionAfter). */
+  impression?: string | null;
 }
+
+/**
+ * The impression a write leaves (pure): an explicit `impression` wins; otherwise a held impression is FIXED
+ * (cleared) by any non-'wrong' write that brings the aspect to WRONG_IMPRESSION_TUNING.fixFidelity or above
+ * — a correct perception / inspection at sufficient fidelity (Mike 2026-10-09: "until it is 'fixed'").
+ * `undefined` = the prior was read without its impression → leave the stored value alone.
+ */
+export function impressionAfter(w: Pick<FamiliarityWrite, 'impression' | 'prior' | 'score' | 'source'>): string | null | undefined {
+  if (w.impression !== undefined) return w.impression;
+  if (!w.prior || !('impression' in w.prior)) return w.prior ? undefined : null;
+  const held = w.prior.impression ?? null;
+  if (held && w.source !== WRONG_SOURCE && scoreToFidelity(w.score) >= WRONG_IMPRESSION_TUNING.fixFidelity) return null;
+  return held;
+}
+
+/** lastSource of a wrong impression (inspection fumble). */
+export const WRONG_SOURCE = 'wrong';
 
 type FamiliarityTx = Pick<Prisma.TransactionClient, 'familiarity' | 'familiarityChange'>;
 
@@ -296,22 +321,27 @@ type FamiliarityTx = Pick<Prisma.TransactionClient, 'familiarity' | 'familiarity
  */
 export async function writeFamiliarity(tx: FamiliarityTx, writes: FamiliarityWrite[]): Promise<FamiliarityRecord[]> {
   const out: FamiliarityRecord[] = [];
+  const imps: Array<string | null | undefined> = [];
   for (const w of writes) {
     const key = { perceiverId: w.perceiverId, subjectId: w.subjectId, aspectKind: w.aspectKind };
+    const imp = impressionAfter(w);
+    imps.push(imp);
     const row = await tx.familiarity.upsert({
       where: { perceiverId_subjectId_aspectKind: key },
-      create: { ...key, campaignId: w.campaignId, subjectKind: w.subjectKind, score: w.score, lastSource: w.source, lastCycle: w.cycle },
-      update: { score: w.score, lastSource: w.source, lastCycle: w.cycle, ...(w.keepSubjectKind ? {} : { subjectKind: w.subjectKind }) },
+      create: { ...key, campaignId: w.campaignId, subjectKind: w.subjectKind, score: w.score, lastSource: w.source, lastCycle: w.cycle, impression: imp ?? null },
+      update: { score: w.score, lastSource: w.source, lastCycle: w.cycle, ...(w.keepSubjectKind ? {} : { subjectKind: w.subjectKind }), ...(imp !== undefined ? { impression: imp } : {}) },
       select: RECORD_SELECT,
     });
     out.push(toRecord(row));
   }
   if (writes.length) {
     await tx.familiarityChange.createMany({
-      data: writes.map((w) => ({
+      data: writes.map((w, i) => ({
         campaignId: w.campaignId, perceiverId: w.perceiverId, subjectId: w.subjectId, subjectKind: w.subjectKind, aspectKind: w.aspectKind,
         fromScore: w.prior?.score ?? null, fromCycle: w.prior?.lastCycle ?? null, toScore: w.score, source: w.source, cycle: w.cycle,
         memoryId: w.refs?.memoryId ?? null, canonEventId: w.refs?.canonEventId ?? null, checkId: w.refs?.checkId ?? null,
+        // The impression record: a set, a FIX (from → null) or unchanged; unknown (prior read without it) = the prior's.
+        fromImpression: w.prior?.impression ?? null, toImpression: imps[i] === undefined ? (w.prior?.impression ?? null) : imps[i],
       })),
     });
   }
@@ -319,8 +349,9 @@ export async function writeFamiliarity(tx: FamiliarityTx, writes: FamiliarityWri
 }
 
 /** Read one row's prior inside a transaction (the change record's `from`). */
-async function priorOf(tx: FamiliarityTx, key: { perceiverId: string; subjectId: string; aspectKind: string }): Promise<FamiliarityPrior> {
-  return tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+export async function priorOf(tx: FamiliarityTx, key: { perceiverId: string; subjectId: string; aspectKind: string }): Promise<FamiliarityPrior> {
+  const row = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true, impression: true } });
+  return row ? { score: row.score, lastCycle: row.lastCycle, impression: row.impression ?? null } : null;
 }
 
 export interface FamiliarityChangeView {
@@ -328,6 +359,7 @@ export interface FamiliarityChangeView {
   fromScore: number | null; fromCycle: number | null; toScore: number;
   source: string; cycle: number | null;
   memoryId: string | null; canonEventId: string | null; checkId: string | null;
+  fromImpression: string | null; toImpression: string | null;
   createdAt: Date;
 }
 
@@ -347,7 +379,7 @@ export async function listFamiliarityChanges(
   if (!entity) throw new NotFoundError('No DAYA being with that id');
   return prisma.familiarityChange.findMany({
     where: { campaignId, perceiverId: entity.id, ...(opts.subjectId ? { subjectId: opts.subjectId } : {}), ...(opts.aspectKind ? { aspectKind: opts.aspectKind } : {}) },
-    select: { subjectId: true, subjectKind: true, aspectKind: true, fromScore: true, fromCycle: true, toScore: true, source: true, cycle: true, memoryId: true, canonEventId: true, checkId: true, createdAt: true },
+    select: { subjectId: true, subjectKind: true, aspectKind: true, fromScore: true, fromCycle: true, toScore: true, source: true, cycle: true, memoryId: true, canonEventId: true, checkId: true, fromImpression: true, toImpression: true, createdAt: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     take: Math.min(Math.max(1, opts.limit ?? 500), 5000),
   });
