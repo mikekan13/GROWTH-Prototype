@@ -5,6 +5,7 @@ import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-ev
 import { requireCampaignMember } from '@/services/campaign-access';
 import { feedViewerFor, queryPerceivedFeed, viewAsViewer } from '@/services/perceived-feed';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { postInspectFromChat } from '@/services/inspection';
 import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
 
 export const dynamic = 'force-dynamic';
@@ -99,6 +100,12 @@ export async function POST(
       payload,
     };
     broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
+
+    // Perception unit 11: a player's "I inspect the sword (with my swordsmanship)" posts an inspect intent
+    // to the planning board (best-effort; the chat line itself is unchanged).
+    if (type === 'chat' && actor === 'player' && characterId && payload.kind === 'chat') {
+      void postInspectFromChat(campaignId, session.user, characterId, payload.message);
+    }
 
     return NextResponse.json({ event }, { status: 201 });
   } catch (error) {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { speakProse, speakThroughNpc, narrateAtTable, getTableRoster } from '@/services/table-speak';
+import { commitPlanningBoardOnGmMove } from '@/services/inspection';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,8 @@ export async function POST(
     const body = await request.json();
     const input = bodySchema.parse(body);
     const actor = { userId: session.user.id, username: session.user.username, role: session.user.role };
+    // Narrating is one of the GM's "next moves": the planning board's intents commit (perception unit 11).
+    commitPlanningBoardOnGmMove(campaignId, session.user);
     const result = 'narrate' in input
       ? await narrateAtTable(campaignId, actor, input)
       : 'npcCharacterId' in input

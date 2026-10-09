@@ -23,6 +23,7 @@ import { broadcastEvent } from '@/lib/campaign-stream';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { gatherTraitModifiers, type TraitModifierContribution } from '@/services/trait-modifiers';
 import { markAttributeTrainable, markSkillTrainable } from '@/services/advancement';
+import { afterCheckResolved } from '@/services/check-resolved';
 import type { GrowthCharacter } from '@/types/growth';
 
 export const dynamic = 'force-dynamic';
@@ -162,6 +163,11 @@ export async function POST(
       success,
       margin,
     });
+
+    // Perception unit 11: a check started for a purpose (an inspection) resolves that purpose too.
+    const effortBy: Record<string, number> = {};
+    for (const w of input.wagers) if (w.amount > 0) effortBy[w.governor.toLowerCase()] = (effortBy[w.governor.toLowerCase()] ?? 0) + w.amount;
+    await afterCheckResolved(pending, { total, success, margin, effortBy });
 
     // Build effort description for the terminal
     const effortDesc = input.wagers

@@ -50,8 +50,9 @@ import { buildSlots, slotInputsFor } from '@/sim/round/slots';
 import { orderSlots } from '@/sim/round/ordering';
 import { resolveRound, type CheckFn, type DamageFn } from '@/sim/round/resolve';
 import { effortCap, eligibleEffortAttributes, skillUsableFromPillar } from '@/sim/round/action-economy';
-import { ATTR_KEYS, type Governor, type Intention, type IntentionKind, type Participant, type Pillar, type RoundResult } from '@/sim/round/types';
+import type { Governor, Intention, IntentionKind, Participant, Pillar, RoundResult } from '@/sim/round/types';
 import { aspectFacts, type AspectFact } from '@/sim/perception/aspect-values';
+import { BEING_ASPECTS } from '@/sim/perception/aspects';
 import { familiarityAt, scoreToFidelity } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
 import { buildSensoryField, senseFlagsFromSheet } from '@/sim/senses/field';
@@ -204,7 +205,7 @@ export interface EncounterView {
 }
 
 /** The being aspects the encounter view can show, in display order. */
-export const PARTICIPANT_ASPECTS = ['pools', ...ATTR_KEYS.map((k) => `attribute:${k}`)];
+export const PARTICIPANT_ASPECTS = [...BEING_ASPECTS];
 
 /** One other participant → what the viewer knows of it (`fidelity`: aspect key → F-level, absent = unknown). Pure. */
 export function perceivedParticipant(p: Participant, fidelity: Record<string, number>): ParticipantSeen {

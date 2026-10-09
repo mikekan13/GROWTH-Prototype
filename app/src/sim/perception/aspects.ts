@@ -91,6 +91,11 @@ export const ASPECT_KINDS = [
 
 export type AspectKindKey = (typeof ASPECT_KINDS)[number]['key'];
 
+/** The attribute keys a being's `attribute:<key>` aspects use (sim/round ATTR_KEYS order). */
+export const BEING_ATTRIBUTE_KEYS = ['clout', 'celerity', 'constitution', 'flow', 'frequency', 'focus', 'willpower', 'wisdom', 'wit'] as const;
+/** A being's own-number aspects, in display order: the action pools, then each attribute. */
+export const BEING_ASPECTS: readonly string[] = ['pools', ...BEING_ATTRIBUTE_KEYS.map((k) => `attribute:${k}`)];
+
 const kindByKey = new Map<string, AspectKindDef>(ASPECT_KINDS.map((k) => [k.key, k]));
 
 export function aspectKind(key: string): AspectKindDef | undefined {
