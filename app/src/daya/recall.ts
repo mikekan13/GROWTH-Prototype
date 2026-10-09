@@ -487,6 +487,21 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
         .catch(() => undefined);
     }),
   );
+  // Thinking about it refreshes it (Mike 2026-10-09): what the surfaced memories are about, if the being already
+  // knows it, has its familiarity refreshed (services/familiarity-thought — never teaches, never throws outward).
+  if (!godlike && surfacedList.length > 0) {
+    try {
+      const { refreshFamiliarityByThought } = await import('@/services/familiarity-thought');
+      await refreshFamiliarityByThought({
+        perceiverId: req.entityId,
+        subjectIds: [...new Set(surfacedList.flatMap((c) => c.memory.entityRefs))],
+        texts: surfacedList.filter((c) => c.thornMatch?.mode !== 'distort').map((c) => c.memory.content),
+        refs: { memoryId: surfacedList[0].memory.id },
+      });
+    } catch (err) {
+      console.warn('[daya/recall] familiarity refresh by thought failed (non-fatal):', err);
+    }
+  }
 
   // Prose: normal content, or a vague distort line for Thorn-distorted memories.
   const proseLines = surfacedList.map((c) =>

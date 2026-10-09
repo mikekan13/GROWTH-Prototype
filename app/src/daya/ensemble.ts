@@ -17,6 +17,8 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentCycleOf } from '@/services/history';
+import { refreshFamiliarityByThought } from '@/services/familiarity-thought';
+import { parseSegments } from '@/lib/feed-segments';
 import type { GrowthCharacter } from '@/types/growth';
 
 import { resolveDayaEntityId } from './entity';
@@ -888,6 +890,11 @@ export async function listenStimulus(
   } catch (err) {
     console.error('[daya/ensemble] listening monologue failed; earlier inner state stands (non-fatal):', err);
   }
+  // Thinking about it refreshes it: what the monologue dwells on, if already known, does not fade (familiarity-thought).
+  if (innerUpdated && !omniscient && !ctx.soulState.godlike) {
+    await refreshFamiliarityByThought({ perceiverId: ctx.entityDaId, texts: [innerState], refs: { memoryId: ingest.memoryEntryId ?? null } })
+      .catch((err) => console.warn('[daya/ensemble] familiarity refresh by thought failed (non-fatal):', err));
+  }
   const tDone = Date.now();
 
   // Fold into the LATEST state: an answer may have been given while this stretch was being worked.
@@ -1173,6 +1180,11 @@ export async function answerAsk(
         out.spokenMemoryId = memory.id;
       } else if (line.kind === 'act') {
         await actOnIntent(ctx, line.content, overrides);
+      }
+      // ((thought)) segments in its own line are thought: known subjects in them are refreshed (familiarity-thought).
+      const thoughts = line.kind === 'rest' ? [] : parseSegments(line.content).filter((s) => s.kind === 'thought').map((s) => s.text);
+      if (thoughts.length && !ctx.persona.omniscient && !ctx.soulState.godlike) {
+        await refreshFamiliarityByThought({ perceiverId: ctx.entityDaId, texts: thoughts, refs: { memoryId: out.spokenMemoryId ?? null } });
       }
     } catch (err) {
       console.error('[daya/ensemble] bookkeeping after an answer failed (non-fatal):', err);
