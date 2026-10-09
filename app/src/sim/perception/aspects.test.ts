@@ -1,32 +1,83 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DOMAINS } from '@/daya/domains';
+import { MAGIC_SCHOOLS } from '@/types/growth';
 import {
-  ASPECT_KINDS, KNOWLEDGE_DOMAINS, aspectKey, parseAspectKey, domainOfAspect, itemAbilityIds, listAspects, knowledgeDomain,
+  ASPECT_KINDS, HEAD_DOMAIN_KEYS, aspectKey, parseAspectKey, aspectDomains, abilityDomains, materialDomains,
+  schoolToDomain, itemAbilityIds, listAspects,
 } from './aspects';
 import type { GrowthWorldItem } from '@/types/item';
 
-describe('domain tree', () => {
-  it('hangs every knowledge sub-domain under one of the ten head domains', () => {
-    const heads = new Set(DOMAINS.map((d) => d.key));
-    for (const sub of KNOWLEDGE_DOMAINS) expect(heads.has(sub.parent)).toBe(true);
+// Materials carry no domain tags in the starter catalog yet — give two a few for the tests.
+vi.mock('@/lib/materials', () => ({
+  getMaterial: (n: string) => ({
+    Moonsilver: { name: 'Moonsilver', domains: ['divination', 'restoration'] },
+    Bloodiron: { name: 'Bloodiron', domains: ['dissolution', 'force', 'nonsense'] },
+    Steel: { name: 'Steel' },
+  } as Record<string, { name: string; domains?: string[] }>)[n],
+}));
+
+describe('head-domain tags', () => {
+  it('HEAD_DOMAIN_KEYS are exactly the ten in daya/domains.ts and the ten schools', () => {
+    expect([...HEAD_DOMAIN_KEYS].sort()).toEqual(DOMAINS.map((d) => d.key).sort());
+    expect([...HEAD_DOMAIN_KEYS].sort()).toEqual(Object.keys(MAGIC_SCHOOLS).map((s) => s.toLowerCase()).sort());
   });
 
-  it('never repeats a head domain as a sub-domain (no parallel top-level list)', () => {
-    const heads = new Set(DOMAINS.map((d) => d.key));
-    for (const sub of KNOWLEDGE_DOMAINS) expect(heads.has(sub.key)).toBe(false);
-    expect(new Set(KNOWLEDGE_DOMAINS.map((d) => d.key)).size).toBe(KNOWLEDGE_DOMAINS.length);
-  });
-
-  it('tags every aspect kind with a known sub-domain', () => {
-    for (const k of ASPECT_KINDS) expect(knowledgeDomain(k.domain)).toBeDefined();
+  it('tags every aspect kind with a non-empty set of head domains, no repeats', () => {
+    for (const k of ASPECT_KINDS) {
+      expect(k.domains.length).toBeGreaterThan(0);
+      expect(new Set(k.domains).size).toBe(k.domains.length);
+      for (const d of k.domains) expect(HEAD_DOMAIN_KEYS).toContain(d);
+    }
     expect(new Set(ASPECT_KINDS.map((k) => k.key)).size).toBe(ASPECT_KINDS.length);
   });
 
-  it('resolves an aspect key to its sub-domain and head domain', () => {
-    expect(domainOfAspect('damage')).toMatchObject({ sub: { key: 'weapons' }, head: { key: 'force' } });
-    expect(domainOfAspect('ability:flame-tongue')).toMatchObject({ sub: { key: 'arcana' } });
-    expect(domainOfAspect('value')?.head.key).toBe('fortune');
-    expect(domainOfAspect('nope')).toBeNull();
+  it("follows Mike's 2026-10-09 picks", () => {
+    expect(aspectDomains('history')).toEqual(['divination']);
+    expect(aspectDomains('thoughts')).toEqual(['enchantment']);
+    expect(aspectDomains('material')).toEqual(['alteration']);
+    expect(aspectDomains('hardness')).toEqual(['abjuration']);
+    expect(aspectDomains('damage')).toEqual(['force']);
+    expect(aspectDomains('value')).toEqual(['fortune']);
+    expect(aspectDomains('nope')).toEqual([]);
+  });
+
+  it('maps school names to head domains', () => {
+    expect(schoolToDomain('Force')).toBe('force');
+    expect(schoolToDomain(' RESTORATION ')).toBe('restoration');
+    expect(schoolToDomain('Pyromancy')).toBeNull();
+    expect(schoolToDomain(undefined)).toBeNull();
+  });
+});
+
+describe('ability tags: Fortune + its school', () => {
+  it('a fire (Force) enchantment = Force + Fortune', () => {
+    expect(abilityDomains({ name: 'Ember Bite', description: '', school: 'Force' })).toEqual({ domains: ['fortune', 'force'], schoolKnown: true });
+  });
+  it('no readable school → Fortune only, flagged', () => {
+    expect(abilityDomains({ name: 'Oathbound', description: '' })).toEqual({ domains: ['fortune'], schoolKnown: false });
+    expect(abilityDomains({ name: 'X', description: '', school: 'Pyromancy' })).toEqual({ domains: ['fortune'], schoolKnown: false });
+    expect(abilityDomains({ name: 'Y', description: '', school: 'Fortune' }).domains).toEqual(['fortune']);
+  });
+  it('resolves an ability aspect key against the item', () => {
+    const item: GrowthWorldItem = {
+      description: '',
+      itemAbilities: [{ name: 'Ember Bite', description: '', school: 'Force' }, { name: 'Oathbound', description: '' }],
+    };
+    expect(aspectDomains('ability:ember-bite', item)).toEqual(['fortune', 'force']);
+    expect(aspectDomains('ability:oathbound', JSON.stringify(item))).toEqual(['fortune']);
+    expect(aspectDomains('ability:missing', item)).toEqual(['fortune']);
+    expect(aspectDomains('ability:ember-bite')).toEqual(['fortune']);
+  });
+});
+
+describe('material tags', () => {
+  it("adds each material's own tags to Alteration, ignoring junk tags", () => {
+    expect(materialDomains(['Moonsilver', 'Bloodiron', 'Steel', 'Unknown', null])).toEqual(['divination', 'restoration', 'dissolution', 'force']);
+    const item: GrowthWorldItem = { description: '', primaryMaterial: 'Steel', subordinateMaterials: ['Moonsilver'] };
+    expect(aspectDomains('material', item)).toEqual(['alteration', 'divination', 'restoration']);
+    expect(aspectDomains('material', { description: '', primaryMaterial: 'Steel' })).toEqual(['alteration']);
+    // other aspects never pick up material tags
+    expect(aspectDomains('hardness', item)).toEqual(['abjuration']);
   });
 });
 

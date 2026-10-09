@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreToFidelity, growFamiliarity, fadeFamiliarity, FAMILIARITY_TUNING, F5_SEAL, recordExposureSchema } from './familiarity';
+import { scoreToFidelity, growFamiliarity, fadeFamiliarity, familiarityAt, FAMILIARITY_TUNING, F5_SEAL, recordExposureSchema } from './familiarity';
 import { computeFidelityLevel } from '@/daya/renderer-math';
 import { computeRecency } from '@/daya/recall';
 
@@ -79,6 +79,17 @@ describe('fadeFamiliarity', () => {
       expect(v).toBeLessThanOrEqual(last);
       last = v;
     }
+  });
+});
+
+describe('familiarityAt (per-row fade from lastCycle)', () => {
+  it('fades by the cycles since the stamp, in the memory cycle unit', () => {
+    expect(familiarityAt({ score: 0.5, lastCycle: 10 }, 10)).toBe(0.5);
+    expect(familiarityAt({ score: 0.5, lastCycle: 10 }, 60)).toBeCloseTo(fadeFamiliarity(0.5, 50), 12);
+  });
+  it('leaves unstamped rows unfaded and sealed rows whole', () => {
+    expect(familiarityAt({ score: 0.5, lastCycle: null }, 1e6)).toBe(0.5);
+    expect(familiarityAt({ score: 1, lastCycle: 0 }, 1e6)).toBe(1);
   });
 });
 

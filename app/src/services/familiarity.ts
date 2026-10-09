@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ValidationError } from '@/lib/errors';
 import { RECALL_TUNING } from '@/daya/recall-tuning';
+import { currentCycleOf } from '@/services/history';
 
 // ── Vocabulary ────────────────────────────────────────────────────────────
 
@@ -106,6 +107,8 @@ export const recordExposureSchema = keySchema.extend({
   times: z.number().int().min(1).max(10_000).optional(),
   /** The score to set — required for 'seed', refused otherwise. */
   score: z.number().min(0).max(1).optional(),
+  /** Campaign clock (meta cycles) of this exposure; defaults to the campaign's current cycle. */
+  cycle: z.number().finite().optional(),
 }).refine((v) => (v.source === 'seed') === (v.score !== undefined), {
   message: "score is required for source 'seed' and only for it",
   path: ['score'],
@@ -121,7 +124,20 @@ export interface FamiliarityRecord {
   score: number;
   fidelity: number;
   lastSource: string;
+  /** Campaign clock (meta cycles) at the last write — the fade anchor; null on pre-2026-10-09 rows. */
+  lastCycle: number | null;
   updatedAt: Date;
+}
+
+const RECORD_SELECT = { perceiverId: true, subjectId: true, subjectKind: true, aspectKind: true, score: true, lastSource: true, lastCycle: true, updatedAt: true } as const;
+
+/**
+ * A stored row's familiarity as of `nowCycle` — fadeFamiliarity over the
+ * cycles since its last write (same unit memory decay uses). Rows without a
+ * cycle stamp are returned unfaded.
+ */
+export function familiarityAt(rec: Pick<FamiliarityRecord, 'score' | 'lastCycle'>, nowCycle: number): number {
+  return rec.lastCycle === null ? rec.score : fadeFamiliarity(rec.score, nowCycle - rec.lastCycle);
 }
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -130,7 +146,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   return r.data;
 }
 
-function toRecord(row: { perceiverId: string; subjectId: string; subjectKind: string; aspectKind: string; score: number; lastSource: string; updatedAt: Date }): FamiliarityRecord {
+function toRecord(row: Omit<FamiliarityRecord, 'fidelity'>): FamiliarityRecord {
   return { ...row, fidelity: scoreToFidelity(row.score) };
 }
 
@@ -139,7 +155,7 @@ export async function getFamiliarity(perceiverId: string, subjectId: string, asp
   const key = parse(keySchema, { perceiverId, subjectId, aspectKind });
   const row = await prisma.familiarity.findUnique({
     where: { perceiverId_subjectId_aspectKind: key },
-    select: { perceiverId: true, subjectId: true, subjectKind: true, aspectKind: true, score: true, lastSource: true, updatedAt: true },
+    select: RECORD_SELECT,
   });
   return row ? toRecord(row) : null;
 }
@@ -147,19 +163,23 @@ export async function getFamiliarity(perceiverId: string, subjectId: string, asp
 /**
  * Record exposure of a being to one aspect of a subject. Growth sources raise
  * the stored score along the diminishing-returns curve; 'seed' sets it.
- * Fade is not applied here — it is a read-time view (fadeFamiliarity).
+ * Stamps lastCycle (`cycle`, else the campaign clock) as the fade anchor.
+ * Fade is not applied here — it is a read-time view (familiarityAt).
  */
 export async function recordExposure(input: RecordExposureInput): Promise<FamiliarityRecord> {
   const v = parse(recordExposureSchema, input);
   const key = { perceiverId: v.perceiverId, subjectId: v.subjectId, aspectKind: v.aspectKind };
+  const lastCycle = v.cycle ?? await currentCycleOf(v.campaignId);
   const row = await prisma.$transaction(async (tx) => {
-    const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true } });
-    const score = v.source === 'seed' ? v.score! : growFamiliarity(prior?.score ?? 0, v.source, v.times ?? 1);
+    const prior = await tx.familiarity.findUnique({ where: { perceiverId_subjectId_aspectKind: key }, select: { score: true, lastCycle: true } });
+    // Fade the prior up to this write before growing — re-stamping lastCycle must not erase the fade.
+    const base = prior ? familiarityAt(prior, lastCycle) : 0;
+    const score = v.source === 'seed' ? v.score! : growFamiliarity(base, v.source, v.times ?? 1);
     return tx.familiarity.upsert({
       where: { perceiverId_subjectId_aspectKind: key },
-      create: { ...key, campaignId: v.campaignId, subjectKind: v.subjectKind, score, lastSource: v.source },
-      update: { score, lastSource: v.source, subjectKind: v.subjectKind },
-      select: { perceiverId: true, subjectId: true, subjectKind: true, aspectKind: true, score: true, lastSource: true, updatedAt: true },
+      create: { ...key, campaignId: v.campaignId, subjectKind: v.subjectKind, score, lastSource: v.source, lastCycle },
+      update: { score, lastSource: v.source, subjectKind: v.subjectKind, lastCycle },
+      select: RECORD_SELECT,
     });
   });
   return toRecord(row);

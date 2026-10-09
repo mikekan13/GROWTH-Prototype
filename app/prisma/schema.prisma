@@ -1227,6 +1227,7 @@ model Familiarity {
   aspectKind  String     // aspect key (sim/perception/aspects.ts), e.g. 'damage', 'ability:<id>'
   score       Float      @default(0) // 0..1
   lastSource  String     // exposure | use | own | inspect | seed
+  lastCycle   Float?     // campaign clock (meta cycles, as DayaMemoryEntry.narrativeCycle) at the last write — the fade anchor; null on rows written before 2026-10-09
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 

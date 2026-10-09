@@ -16,6 +16,12 @@ export interface ItemAbility {
   description: string;
   mechanicalEffect?: string;
   kv?: number;            // Hidden from UI; contributes to item's total KV in the background
+  /**
+   * Magic school of the enchantment (one of the ten MagicSchool names). Optional
+   * hook (perception, Mike 2026-10-09): an ability is tagged Fortune + its school's
+   * domain; without a school it is tagged Fortune only.
+   */
+  school?: string;
 }
 
 export interface GrowthWorldItem {
