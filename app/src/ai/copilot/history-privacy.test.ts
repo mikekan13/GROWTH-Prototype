@@ -62,6 +62,18 @@ describe('getCopilotHistory — private per user', () => {
     expect(h.map(m => m.content)).toEqual(['gm asks', 'jewl answers gm', 'legacy unattributed reply']);
   });
 
+  it('actions is always an array — metadata JSON, null and junk rows become []', async () => {
+    table.length = 0; t = 0;
+    const meta = row('assistant', 'gm', 'metadata row'); meta.actions = '{"source":"GM_TEXT","canvasAction":null}';
+    const none = row('assistant', 'gm', 'null row');
+    const junk = row('assistant', 'gm', 'junk row'); junk.actions = 'not json';
+    const list = row('assistant', 'gm', 'action list'); list.actions = '[{"id":"a1","type":"create_npc","status":"pending"}]';
+    table.push(meta, none, junk, list);
+    const h = await getCopilotHistory(C, { id: 'gm', role: 'ADMIN' });
+    for (const m of h) expect(Array.isArray(m.actions)).toBe(true);
+    expect(h.map(m => m.actions.length)).toEqual([0, 0, 0, 1]);
+  });
+
   it('GODHEAD role is not ADMIN for unattributed rows', async () => {
     const h = await getCopilotHistory(C, { id: 'x', role: 'GODHEAD' });
     expect(h).toEqual([]);

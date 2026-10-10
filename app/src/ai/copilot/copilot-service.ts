@@ -37,6 +37,21 @@ export async function getCopilotHistory(
 
   return messages.map(m => ({
     ...m,
-    actions: m.actions ?? null,
+    actions: parseCopilotActions(m.actions),
   }));
+}
+
+/**
+ * The column is a JSON string, and most rows hold prompt metadata
+ * (`{"source":"GM_TEXT","canvasAction":null}`), not an action list. The chat
+ * renders `actions` as an array — anything else becomes [].
+ */
+export function parseCopilotActions(raw: string | null | undefined): unknown[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

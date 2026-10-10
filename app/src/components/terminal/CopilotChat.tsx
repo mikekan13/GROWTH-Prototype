@@ -43,7 +43,8 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
         const res = await fetch(`/api/campaigns/${campaignId}/copilot/history`);
         if (res.ok) {
           const data = await res.json();
-          setMessages(data.messages || []);
+          // `actions` must be an array for the render below — never trust the wire shape.
+          setMessages(((data.messages || []) as CopilotMessage[]).map(m => ({ ...m, actions: Array.isArray(m.actions) ? m.actions : [] })));
         }
       } catch { /* silent */ }
       finally { setLoadingHistory(false); }
@@ -94,7 +95,7 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
           id: `resp-${Date.now()}`,
           role: 'assistant',
           content: data.message,
-          actions: data.actions || [],
+          actions: Array.isArray(data.actions) ? data.actions : [],
           createdAt: new Date().toISOString(),
         }]);
       } else {
