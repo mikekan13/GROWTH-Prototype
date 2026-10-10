@@ -2,6 +2,9 @@
 
 Last updated: 2026-10-09
 
+> 2026-10-09: canvas card controller pill (AI / GM / Trailblazer) REMOVED per table-rhythm ruling 3; `npc_speak`/`npc_act`
+> no longer gate on GodHead.aiActionMode. The being loop never read it (gate = DayaEntity.status ACTIVE). Schema untouched.
+
 > 2026-10-09 (overnight, Mike asleep): PERCEPTION units 1–10 built behind PERCEPTION_FEED / PERCEPTION_REACH
 > (default OFF) — familiarity store + aspects + skill→domain relevance, organ condition, LLM reach/notice,
 > visible form, per-viewer feed (a Trailblazer reads their character's memory), hardening (no truth text on

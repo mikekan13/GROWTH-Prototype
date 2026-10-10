@@ -414,7 +414,7 @@ JEWL is the campaign copilot — always-listening when the GM is on a campaign p
 - **Files**: `ai/copilot/`, `services/jewl-mistake.ts`, `services/stt-vocabulary.ts`, `components/copilot/JewlChip.tsx`, `components/terminal/CopilotChat.tsx`
 
 ### GodHead Agent Runtime
-AI personas linked to Character records. When `aiActionMode=true` the persona is autonomous; when false a human controls the character but memory is still captured.
+AI personas linked to Character records. **Controller toggle removed 2026-10-09** (table-rhythm ruling 3: every entity runs the loop, owned or not; GM voicing = override the NPC remembers). The canvas card's AI/GM/Trailblazer controller pill is gone, and `npc_speak` / `npc_act` no longer gate on `GodHead.aiActionMode` or require a GodHead row. The `aiActionMode` column stays in the schema; its remaining readers are the character page (shows GodheadPersonaPanel only when true) and `read_actors_state` (reports it). The being loop never read it: it runs every character whose `DayaEntity.status='ACTIVE'`.
 
 - **Dispatcher** (`services/godhead-dispatcher.ts`): Event bus. Services emit named events (goal.completed, blueprint.published, blueprint.unused_for_90d, contract.violated, character.crystallized). Dispatcher consults routing table → triggers the right godhead's agent. Kill switch: `GODHEAD_DISPATCHER=false` (audit rows still written).
 - **Agent loop** (`godhead/agent.ts`): Loads persona systemPrompt, runs Claude API with the godhead's tool registry, logs every tool call to GodHeadActionLog, closes invocation row on completion.

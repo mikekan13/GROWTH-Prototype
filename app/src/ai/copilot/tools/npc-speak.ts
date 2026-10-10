@@ -9,9 +9,8 @@
  * and characterId=<NPC>, so the existing terminal/event UI broadcasts it
  * to players without any new surface.
  *
- * Future lifts: action verbs (`npc_act`), reactive NPC autonomous ticks,
- * AI-mode toggle integration so JEWL only puppets NPCs whose
- * `aiActionMode=true`.
+ * No AI/GM controller gate: every entity runs the loop and a GM voicing
+ * an NPC is an override (table-rhythm ruling 3, 2026-10-01).
  */
 
 import 'server-only';
@@ -76,25 +75,9 @@ export const npcSpeakTool: JewlTool = {
       throw new ValidationError(`NPC is not ACTIVE (status=${npc.status})`);
     }
 
-    // aiActionMode gate per [[ai-two-layers-and-universal-character-log]] —
-    // an NPC must have AI mode flipped on by the GM for JEWL to puppet it.
-    // Memory is captured either way (background log); ACTION requires opt-in.
-    // The flag lives on the linked GodHead row if any; NPCs without a
-    // GodHead row are NEVER auto-AI (GM must promote them first).
-    const godhead = await prisma.godHead.findFirst({
-      where: { characterId: npc.id },
-      select: { aiActionMode: true, name: true },
-    });
-    if (!godhead) {
-      throw new ValidationError(
-        `NPC "${npc.name}" has no GodHead persona; flip AI mode on the canvas card before puppeting`,
-      );
-    }
-    if (!godhead.aiActionMode) {
-      throw new ValidationError(
-        `NPC "${npc.name}" has AI mode OFF; the GM is currently driving them`,
-      );
-    }
+    // No AI/GM controller gate (removed 2026-10-09). Per the table-rhythm
+    // ruling every entity runs the loop, owned or not; the GM voicing an NPC
+    // through JEWL is an override the NPC remembers, not a mode switch.
 
     // JEWL's GodHead row supplies the actorUserId so the event stream knows
     // it was the universal copilot doing the puppeting, not an anonymous AI.

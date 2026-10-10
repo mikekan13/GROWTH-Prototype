@@ -10,7 +10,7 @@
  *
  * `npc_act` is the verb-action sibling of `npc_speak`: it posts a
  * narrative beat ("Tara raises her scythe") as a game_event-type
- * CampaignEvent attributed to the NPC. Same aiActionMode gate.
+ * CampaignEvent attributed to the NPC. Same gates as npc_speak.
  */
 
 import 'server-only';
@@ -214,7 +214,7 @@ export const npcActTool: JewlTool = {
     'environmental interaction. Speech goes through `npc_speak`. The action ' +
     'lands in the campaign event stream as a game_event attributed to the ' +
     'NPC. Same gates as npc_speak: entityType=NPC, ACTIVE, in this ' +
-    'campaign, with a linked GodHead row whose aiActionMode is true.',
+    'campaign.',
   inputSchema: npcActSchema,
   handler: async (input, ctx: JewlToolContext): Promise<JewlToolHandlerResult> => {
     const parsed = npcActSchema.parse(input);
@@ -240,21 +240,7 @@ export const npcActTool: JewlTool = {
     if (npc.status !== 'ACTIVE') {
       throw new ValidationError(`NPC is not ACTIVE (status=${npc.status})`);
     }
-    const godhead = await prisma.godHead.findFirst({
-      where: { characterId: npc.id },
-      select: { aiActionMode: true },
-    });
-    if (!godhead) {
-      throw new ValidationError(
-        `NPC "${npc.name}" has no GodHead persona; flip AI mode on the canvas card before puppeting`,
-      );
-    }
-    if (!godhead.aiActionMode) {
-      throw new ValidationError(
-        `NPC "${npc.name}" has AI mode OFF; the GM is currently driving them`,
-      );
-    }
-
+    // No AI/GM controller gate (removed 2026-10-09) — see npc-speak.ts.
     const jewl = await getJewlGodHead();
     const event = await createCampaignEvent({
       campaignId: ctx.campaignId,
