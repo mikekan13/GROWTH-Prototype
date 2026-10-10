@@ -45,6 +45,12 @@ next-env.d.ts
 # database
 *.db
 *.db-journal
+*.db.pre-*
+*.db.bak*
+*.db.backup*
+# campaign-reset keep exports + inventories (contain story text; local only)
+/incubator-keep-*.json
+/incubator-reset-inventory-*/
 
 # generated portraits (local, not committed) — except angle-refs (app assets)
 /public/portraits/*
