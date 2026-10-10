@@ -21,7 +21,11 @@ export async function getCopilotHistory(
   limit: number = 50,
 ) {
   const recent = await prisma.copilotMessage.findMany({
-    where: copilotHistoryWhere(campaignId, viewer),
+    where: {
+      ...copilotHistoryWhere(campaignId, viewer),
+      // Hide legacy persisted STT markers ("[empty transcript]") — filter, not delete.
+      NOT: { AND: [{ username: '[ambient]' }, { content: { startsWith: '[' } }, { content: { endsWith: ']' } }] },
+    },
     orderBy: { createdAt: 'desc' },
     take: limit,
     select: {

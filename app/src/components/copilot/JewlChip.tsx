@@ -838,6 +838,8 @@ export function JewlChip() {
   // dot briefly so the GM can see audio IS flowing even when JEWL stays
   // silent (his default for ambient).
   const [chunkPulse, setChunkPulse] = useState(0);
+  // Server says the last several chunks transcribed to nothing: quiet flag, no feed lines.
+  const [noAudio, setNoAudio] = useState(false);
 
   // Send a single audio chunk to the audio-chunk endpoint. Empty / muted /
   // unauthed chunks short-circuit. This is intentionally separate from the
@@ -875,6 +877,7 @@ export function JewlChip() {
           // U2c-4: present only when the mic fed the table (switch on, GM, live session).
           const t = data?.table as { fed?: boolean; heard?: number; asked?: number; holding?: boolean } | undefined;
           if (t?.fed) announceTableFeedRef.current({ heard: t.heard ?? 0, asked: t.asked ?? 0, holding: !!t.holding });
+          setNoAudio(data?.capture === 'no-audio');
           const v = data?.classifierVerdict as string | undefined;
           if (v && v !== 'silent') {
             setThinking(true);
@@ -1081,19 +1084,21 @@ export function JewlChip() {
 
   const visibleMessages = messages.filter(m => m.username !== '[system]' && m.username !== '[ui]');
   const feeding = audioStatus === 'listening' ? tableFeed : null;
+  const noAudioFlag = audioStatus === 'listening' && !audioMuted && noAudio;
   // The mic state in the drawer header's grammar: a coloured ◆/● glyph + navy Bebas words.
-  const audioGlyph = feeding ? '◆'
+  const audioGlyph = noAudioFlag ? '◌' : feeding ? '◆'
     : audioStatus === 'listening' ? '●'
     : audioStatus === 'muted' ? '◌'
     : audioStatus === 'denied' || audioStatus === 'unsupported' ? '✕'
     : audioStatus === 'requesting' ? '…'
     : '○';
-  const audioGlyphColour = feeding ? (feeding.holding ? '#b07a00' : '#2f6fb0')
+  const audioGlyphColour = noAudioFlag ? '#b07a00' : feeding ? (feeding.holding ? '#b07a00' : '#2f6fb0')
     : audioStatus === 'listening' ? '#0f6e5e'
     : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#b0303b'
     : audioStatus === 'requesting' ? '#b07a00'
     : '#6b7380';
-  const audioWords = feeding ? `Table · ${feeding.heard}${feeding.holding ? ' …' : ''}`
+  const audioWords = noAudioFlag ? 'No audio · check mic'
+    : feeding ? `Table · ${feeding.heard}${feeding.holding ? ' …' : ''}`
     : audioStatus === 'listening' ? 'Live'
     : audioStatus === 'muted' ? 'Muted'
     : audioStatus === 'denied' ? 'Mic blocked'
@@ -1199,7 +1204,7 @@ export function JewlChip() {
             {/* Audio status + mute toggle. Always rendered so the GM knows the
                 mic state at a glance. Per [[jewl-always-on-audio-when-active]]:
                 audio runs whenever the chip is mounted; mute is the privacy lever. */}
-            <span className="jo-audio" data-jewl-audio={audioStatus}>
+            <span className="jo-audio" data-jewl-audio={audioStatus} data-jewl-no-audio={noAudioFlag || undefined} title={noAudioFlag ? 'Nothing captured from the mic recently — check it is unmuted and the right input' : undefined}>
               <i style={{ color: audioGlyphColour }}>{audioGlyph}</i>{audioWords}
             </span>
             {(audioStatus === 'listening' || audioStatus === 'muted') && (

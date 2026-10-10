@@ -16,6 +16,7 @@
  * context piles up in the log between triggers.
  */
 
+import { recordCapture, isMarkerTranscript } from '@/ai/copilot/capture-status';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
@@ -119,37 +120,18 @@ export async function POST(
     const stt = await transcribeAudio(dataUrl, { initialPrompt });
     const transcript = stt.transcript.trim();
 
-    if (!transcript) {
-      return NextResponse.json({ accepted: true, transcribed: false });
+    // Empty / bracketed-marker transcripts ("[empty transcript]", "no provider")
+    // are never chat lines: they only feed the per-user capture status so the
+    // client can show a quiet "no audio — check mic" flag.
+    if (!transcript || isMarkerTranscript(transcript)) {
+      const capture = recordCapture(campaignId, session.user.id, false);
+      return NextResponse.json({ accepted: true, transcribed: false, capture });
     }
 
-    // Markers like "[empty transcript]" still need to flow through the
-    // marker-dedup path below; only raw hallucinations get dropped here.
-    const isMarker = transcript.startsWith('[') && transcript.endsWith(']');
-    if (!isMarker && isWhisperHallucination(transcript)) {
+    if (isWhisperHallucination(transcript)) {
       return NextResponse.json({ accepted: true, transcribed: false, hallucination: true });
     }
-
-    // If the provider is 'none' or unimplemented, the transcript is a
-    // bracketed marker, not real speech. Log it ONCE per campaign so we
-    // don't spam the chat log with the same warning every 10 seconds.
-    const looksLikeMarker = transcript.startsWith('[') && transcript.endsWith(']');
-    if (looksLikeMarker) {
-      const sinceCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1h
-      const existingWarning = await prisma.copilotMessage.findFirst({
-        where: {
-          campaignId,
-          role: 'user',
-          username: '[ambient]',
-          content: transcript,
-          createdAt: { gte: sinceCutoff },
-        },
-        select: { id: true },
-      });
-      if (existingWarning) {
-        return NextResponse.json({ accepted: true, transcribed: false, deduped: true });
-      }
-    }
+    const capture = recordCapture(campaignId, session.user.id, true);
 
     await prisma.copilotMessage.create({
       data: {
@@ -170,7 +152,7 @@ export async function POST(
     // table-speak.ts (off = this returns at once and nothing else changes),
     // and never allowed to break the ambient path above.
     let table: SpokenTableResult | undefined;
-    if (!looksLikeMarker) {
+    {
       try {
         table = await hearSpoken(
           campaignId,
@@ -190,7 +172,7 @@ export async function POST(
     // Sonnet dispatch (the slow part) is still fire-and-forget inside
     // maybeFireClassifier — the chip picks the reply up via the 5s poll.
     let classifierVerdict: string | undefined;
-    if (!looksLikeMarker) {
+    {
       try {
         const result = await maybeFireClassifier({
           campaignId,
@@ -208,6 +190,7 @@ export async function POST(
     return NextResponse.json({
       accepted: true,
       transcribed: true,
+      capture,
       provider: stt.provider,
       length: transcript.length,
       classifierVerdict,
