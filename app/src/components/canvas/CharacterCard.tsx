@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { CtxMenuPanel, CtxMenuStreamLabel } from '@/components/ui/ContextMenu';
@@ -90,7 +89,7 @@ interface CharacterCardProps {
   onContestedDefenderSelect?: (characterId: string, characterName: string, skillName: string, governors: string[]) => void;
   /** Whether the current viewer is a GM */
   isGM?: boolean;
-  /** Campaign roster for the controller dropdown. GM-only feature. */
+  /** Campaign roster (unused by the card since the controller pill was removed 2026-10-09). */
   trailblazers?: TrailblazerOption[];
   /** Campaign id — required for firing JEWL observation events after direct mutations.
    *  Optional only because some legacy callsites haven't been wired yet. */
@@ -225,11 +224,11 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
     const onUp = () => {
       setIsDragging(false);
       onDragStateChange?.(false);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, [editable, attrName, max, onAttributeChange, onDragStateChange]);
 
   const inner = (
@@ -275,7 +274,7 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
               zIndex: 3,
               padding: '0 8px',
             }}
-            onMouseDown={handleLeverMouseDown}
+            onPointerDown={handleLeverMouseDown}
           >
             <div style={{
               width: '4px',
@@ -302,7 +301,7 @@ const HBar: React.FC<HBarProps> = ({ label, attrName, current, max, isFrequency,
             if (e.key === 'Enter') { e.preventDefault(); commitMaxEdit(); }
             else if (e.key === 'Escape') { e.preventDefault(); setMaxEditing(false); }
           }}
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           className="text-xl font-bold text-white bg-black/60 border border-white/30 rounded px-1"
           style={{ fontFamily: 'Consolas, monospace', minWidth: '60px', textAlign: 'right' }}
         />
@@ -357,10 +356,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   contestedAttackerId,
   onContestedDefenderSelect,
   isGM,
-  trailblazers,
   campaignId,
 }) => {
-  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [isBarDragging, setIsBarDragging] = useState(false);
   // Owned-entity possessions fetched live from the relationship API.
@@ -368,10 +365,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   // free-text data.possessions string falls back when nothing's wired.
   const [ownedPossessions, setOwnedPossessions] = useState<PossessionRow[]>([]);
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const [controllerSaving, setControllerSaving] = useState(false);
-  const [controllerMenuOpen, setControllerMenuOpen] = useState(false);
-  const [controllerMenuPos, setControllerMenuPos] = useState({ x: 0, y: 0 });
-  const controllerMenuRef = useRef<HTMLDivElement | null>(null);
   const [showSkillCheckMenu, setShowSkillCheckMenu] = useState(false);
   const [showContestedMenu, setShowContestedMenu] = useState(false);
   const [showDefenderMenu, setShowDefenderMenu] = useState(false);
@@ -503,51 +496,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     }
   }, [onCharacterUpdate, node, damageAmount, damageType, campaignId, damageNote]);
 
-  // Open the terminal-styled controller menu anchored near the pill click.
-  const handleControllerClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (controllerSaving) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setControllerMenuPos({ x: rect.left, y: rect.bottom + 4 });
-    setControllerMenuOpen(true);
-  }, [controllerSaving]);
-
-  // Apply a controller selection (AI / GM / specific trailblazer). PATCHes
-  // the controller endpoint, refreshes the canvas data on success.
-  const applyController = useCallback(async (
-    payload: { controller: 'AI' } | { controller: 'GM' } | { controller: 'PLAYER'; userId: string },
-  ) => {
-    setControllerSaving(true);
-    try {
-      const res = await fetch(`/api/characters/${node.id}/controller`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        // eslint-disable-next-line no-console
-        console.error('Controller change failed', await res.text());
-        return;
-      }
-      router.refresh();
-    } finally {
-      setControllerSaving(false);
-      setControllerMenuOpen(false);
-    }
-  }, [node.id, router]);
-
-  // Outside-click closes the controller menu.
-  useEffect(() => {
-    if (!controllerMenuOpen) return;
-    const onClick = (e: MouseEvent) => {
-      if (controllerMenuRef.current && !controllerMenuRef.current.contains(e.target as Node)) {
-        setControllerMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [controllerMenuOpen]);
-
   if (!node?.id || !node?.name) return null;
 
   const data = node.characterData;
@@ -621,8 +569,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handleMouseMove);
+      document.removeEventListener('pointerup', handleMouseUp);
       if (!dragStartPosRef.current) return;
       const final = screenToSVG(upEvent.clientX, upEvent.clientY);
       onDragOffsetChange(node.id, 0, 0);
@@ -631,8 +579,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
       dragStartPosRef.current = null;
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handleMouseUp);
   };
 
   // ── Context Menu Portal ───────────────────────────────────────────────────
@@ -1006,114 +954,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     document.body
   );
 
-  // ── Controller pill + dropdown ────────────────────────────────────────────
-  // Terminal-styled tiny indicator on the canvas card showing WHO is currently
-  // choosing this character's actions. GM-only: click opens a dropdown that
-  // lists AI, GM, and every active campaign trailblazer. Selecting one
-  // reassigns control (and ownership, for human picks) via the controller
-  // endpoint. Memory continues capturing regardless of selection — this only
-  // controls the action layer.
-  const aiActionOn = node.aiActionMode === true;
-  const assignedTrailblazer = trailblazers?.find(t => t.userId === node.controllerUserId) ?? null;
-  // Long usernames are truncated to keep the pill from sprawling across the
-  // header. Hover tooltip shows the full name.
-  const truncateName = (s: string, max: number) =>
-    s.length > max ? `${s.slice(0, max - 1)}…` : s;
-  const controllerLabelRaw = aiActionOn
-    ? 'AI'
-    : assignedTrailblazer
-      ? truncateName(assignedTrailblazer.username.toUpperCase(), 10)
-      : 'GM';
-  const controllerLabel = `[${controllerLabelRaw}]`;
-
-  const aiTogglePill = isGM ? (
-    <button
-      onClick={handleControllerClick}
-      onMouseDown={(e) => e.stopPropagation()}
-      disabled={controllerSaving}
-      title={
-        aiActionOn
-          ? 'AI is choosing actions. Click to reassign.'
-          : assignedTrailblazer
-            ? `${assignedTrailblazer.username} controls this character. Click to reassign.`
-            : 'GM is scripting actions. Click to reassign.'
-      }
-      style={{
-        fontFamily: 'Consolas, monospace',
-        fontSize: '30px',
-        fontWeight: 'bold',
-        lineHeight: 1,
-        letterSpacing: '0.08em',
-        padding: '8px 18px',
-        borderRadius: '3px',
-        border: '2px solid #22ab9499',
-        background: aiActionOn ? '#22ab9433' : '#000',
-        color: 'var(--terminal-prime)',
-        cursor: controllerSaving ? 'wait' : 'pointer',
-        whiteSpace: 'nowrap',
-        textShadow: '0 0 10px rgba(34,171,148,0.7)',
-        boxShadow: '0 0 16px rgba(34,171,148,0.25), inset 0 0 8px rgba(34,171,148,0.15)',
-        opacity: controllerSaving ? 0.5 : 1,
-      }}
-    >
-      {controllerLabel}
-    </button>
-  ) : null;
-
-  const controllerMenu = controllerMenuOpen && typeof window !== 'undefined' && createPortal(
-    <div
-      ref={controllerMenuRef}
-      style={{
-        position: 'fixed',
-        left: controllerMenuPos.x,
-        top: controllerMenuPos.y,
-        zIndex: 1000,
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <CtxMenuPanel title="Controller">
-        <CtxMenuStreamLabel />
-        <ControllerMenuItem
-          label="AI"
-          hint="Let the AI persona choose actions"
-          selected={aiActionOn}
-          disabled={controllerSaving}
-          onClick={() => applyController({ controller: 'AI' })}
-        />
-        <ControllerMenuItem
-          label="GM"
-          hint="You (the GM) script the actions"
-          selected={!aiActionOn && !assignedTrailblazer}
-          disabled={controllerSaving}
-          onClick={() => applyController({ controller: 'GM' })}
-        />
-        {trailblazers && trailblazers.length > 0 && (
-          <div style={{
-            fontFamily: 'Consolas, monospace',
-            fontSize: '8px',
-            color: 'rgba(255,255,255,0.35)',
-            letterSpacing: '0.1em',
-            padding: '6px 8px 2px',
-            textTransform: 'uppercase',
-          }}>
-            Trailblazers
-          </div>
-        )}
-        {trailblazers?.map(tb => (
-          <ControllerMenuItem
-            key={tb.userId}
-            label={tb.username}
-            hint={`Assign to ${tb.username}`}
-            selected={!aiActionOn && assignedTrailblazer?.userId === tb.userId}
-            disabled={controllerSaving}
-            onClick={() => applyController({ controller: 'PLAYER', userId: tb.userId })}
-          />
-        ))}
-      </CtxMenuPanel>
-    </div>,
-    document.body,
-  );
-
   // ── Compact View (500x220) ────────────────────────────────────────────────
 
   if (!isExpanded) {
@@ -1138,7 +978,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   ? 'drop-shadow(0 0 4px rgba(255, 204, 120, 0.35)) drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5))'
                   : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
           }}
-          onMouseDown={handleMouseDown}
+          onPointerDown={handleMouseDown}
           onContextMenu={handleContextMenu}
         >
           {/* Portrait - 160px */}
@@ -1159,7 +999,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               <div className="font-bold truncate" style={{ fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif', fontSize: '14px', color: 'var(--krma-gold)' }}>
                 {node.name}
               </div>
-              {aiTogglePill}
             </div>
             {/* TKV — top-right corner */}
             <div className="absolute flex flex-col overflow-hidden" style={{
@@ -1248,7 +1087,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {onToggleExpand && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               className="absolute bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center text-white cursor-pointer transition-all shadow-lg hover:shadow-xl"
               style={{ width: '36px', height: '36px', bottom: '-16px', right: '-18px', fontSize: '24px', lineHeight: '1', zIndex: 10 }}
               title="Expand character sheet"
@@ -1256,7 +1095,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           )}
         </div>
         {contextMenu}
-        {controllerMenu}
       </div>
     );
   }
@@ -1309,7 +1147,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 ? 'drop-shadow(0 0 5px rgba(255, 204, 120, 0.4)) drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5))'
                 : 'drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.5)) drop-shadow(2px 3px 6px rgba(0, 0, 0, 0.3))',
         }}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         onContextMenu={handleContextMenu}
       >
         {/* ── Top Header Bar ── */}
@@ -1317,9 +1155,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           {/* Teal + purple band — extends the vertical buffer-stripe pattern
               (14px teal on top, 15px purple on bottom) horizontally across
               the header. Runs from the left edge to where the attributes
-              header begins (444px reserved on the right). The controller
-              pill sits fully above this band so both stripes pass through
-              uninterrupted, forming a menu-options bar. */}
+              header begins (444px reserved on the right). Both stripes
+              pass through uninterrupted, forming a menu-options bar. */}
           <div className="absolute top-0 left-0" style={{ width: 'calc(100% - 444px)', height: '14px', backgroundColor: 'var(--terminal-prime)', zIndex: 0 }} />
           <div className="absolute bottom-0 left-0" style={{ width: 'calc(100% - 444px)', height: '15px', backgroundColor: 'var(--pillar-spirit)', zIndex: 0 }} />
           <div style={{ width: '128px' }} />
@@ -1361,16 +1198,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             <div style={{ height: '14px', backgroundColor: 'var(--terminal-prime)' }} />
             <div style={{ height: '15px', backgroundColor: 'var(--pillar-spirit)' }} />
           </div>
-
-          {/* Controller pill — first item in the menu-options bar. Lifted
-              enough that its bottom clears the 29px teal+purple band (pill
-              is ~50px tall, so marginTop -55 puts its bottom at -5px,
-              giving a 5px gap above the band). */}
-          {aiTogglePill && (
-            <div className="flex items-center" style={{ marginTop: '-55px', position: 'relative', zIndex: 1 }}>
-              {aiTogglePill}
-            </div>
-          )}
 
           <div style={{ width: '13px' }} />
         </div>
@@ -1764,7 +1591,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           const Btn = ({ icon, label, isOpen, onClick }: { icon: string; label: string; isOpen: boolean; onClick: () => void }) => (
             <button
               onClick={(e) => { e.stopPropagation(); onClick(); }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               className="flex items-center gap-1 hover:brightness-110 transition-all cursor-pointer shadow-lg"
               style={btnStyle(isOpen)}
             >
@@ -1807,7 +1634,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         {onToggleExpand && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             className="absolute bg-purple-600 hover:bg-purple-500 rounded-full flex items-center justify-center text-white cursor-pointer transition-all shadow-lg hover:shadow-xl"
             style={{ width: '36px', height: '36px', top: '574px', right: '-15px', fontSize: '24px', lineHeight: '1', zIndex: 10 }}
             title="Compact character sheet"
@@ -1815,61 +1642,11 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
         )}
       </div>
       {contextMenu}
-      {controllerMenu}
     </div>
   );
 };
 
 CharacterCard.displayName = 'CharacterCard';
-
-/** Single row in the controller dropdown menu. Terminal-styled — Consolas
- *  mono, teal accents, selected state inverted to filled teal. */
-function ControllerMenuItem({
-  label,
-  hint,
-  selected,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  hint?: string;
-  selected: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      onMouseDown={(e) => e.stopPropagation()}
-      disabled={disabled}
-      title={hint}
-      style={{
-        display: 'block',
-        width: '100%',
-        textAlign: 'left',
-        fontFamily: 'Consolas, monospace',
-        fontSize: '20px',
-        lineHeight: 1.4,
-        padding: '10px 20px',
-        border: 'none',
-        background: selected ? '#22ab9444' : 'transparent',
-        color: selected ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.85)',
-        letterSpacing: '0.05em',
-        cursor: disabled ? 'wait' : 'pointer',
-        position: 'relative',
-        textShadow: selected ? '0 0 4px rgba(34,171,148,0.6)' : 'none',
-      }}
-      onMouseEnter={(e) => {
-        if (!selected) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(34,171,148,0.15)';
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-      }}
-    >
-      <span style={{ color: 'var(--terminal-prime)' }}>&gt;&nbsp;</span>{label}
-    </button>
-  );
-}
 
 export default React.memo(CharacterCard, (prev, next) => (
   prev.node.id === next.node.id &&

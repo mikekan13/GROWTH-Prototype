@@ -2,8 +2,9 @@
  * Ambient audio chunk ingestion.
  *
  * Per [[jewl-always-on-audio-when-active]] JEWL listens continuously while
- * the GM is on a campaign page. The chip pushes a 10-second audio chunk
- * here every tick. We transcribe via the STT pipe, and — if the transcript
+ * the GM is on a campaign page. The chip pushes an audio chunk here every
+ * tick (5 s; 3 s while a session is live and the table's split loop is on).
+ * We transcribe via the STT pipe, and — if the transcript
  * is non-empty — append it to the campaign's copilot history as a user
  * message tagged `[ambient]`. JEWL sees it the next time he reasons (via
  * an autonomous tick, an explicit prompt, or an observation event). We do
@@ -15,6 +16,7 @@
  * context piles up in the log between triggers.
  */
 
+import { recordCapture, isMarkerTranscript } from '@/ai/copilot/capture-status';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
@@ -22,6 +24,7 @@ import { prisma } from '@/lib/db';
 import { transcribeAudio } from '@/ai/providers/stt';
 import { maybeFireClassifier } from '@/ai/copilot/classifier';
 import { buildSttVocabulary } from '@/services/stt-vocabulary';
+import { hearSpoken, type SpokenTableResult } from '@/services/table-speak';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,37 +120,18 @@ export async function POST(
     const stt = await transcribeAudio(dataUrl, { initialPrompt });
     const transcript = stt.transcript.trim();
 
-    if (!transcript) {
-      return NextResponse.json({ accepted: true, transcribed: false });
+    // Empty / bracketed-marker transcripts ("[empty transcript]", "no provider")
+    // are never chat lines: they only feed the per-user capture status so the
+    // client can show a quiet "no audio — check mic" flag.
+    if (!transcript || isMarkerTranscript(transcript)) {
+      const capture = recordCapture(campaignId, session.user.id, false);
+      return NextResponse.json({ accepted: true, transcribed: false, capture });
     }
 
-    // Markers like "[empty transcript]" still need to flow through the
-    // marker-dedup path below; only raw hallucinations get dropped here.
-    const isMarker = transcript.startsWith('[') && transcript.endsWith(']');
-    if (!isMarker && isWhisperHallucination(transcript)) {
+    if (isWhisperHallucination(transcript)) {
       return NextResponse.json({ accepted: true, transcribed: false, hallucination: true });
     }
-
-    // If the provider is 'none' or unimplemented, the transcript is a
-    // bracketed marker, not real speech. Log it ONCE per campaign so we
-    // don't spam the chat log with the same warning every 10 seconds.
-    const looksLikeMarker = transcript.startsWith('[') && transcript.endsWith(']');
-    if (looksLikeMarker) {
-      const sinceCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1h
-      const existingWarning = await prisma.copilotMessage.findFirst({
-        where: {
-          campaignId,
-          role: 'user',
-          username: '[ambient]',
-          content: transcript,
-          createdAt: { gte: sinceCutoff },
-        },
-        select: { id: true },
-      });
-      if (existingWarning) {
-        return NextResponse.json({ accepted: true, transcribed: false, deduped: true });
-      }
-    }
+    const capture = recordCapture(campaignId, session.user.id, true);
 
     await prisma.copilotMessage.create({
       data: {
@@ -163,6 +147,23 @@ export async function POST(
       },
     });
 
+    // U2c-4: while a session is live, what the GM says is table talk too —
+    // the beings listen and answer at the ask. Behind the rollout switch in
+    // table-speak.ts (off = this returns at once and nothing else changes),
+    // and never allowed to break the ambient path above.
+    let table: SpokenTableResult | undefined;
+    {
+      try {
+        table = await hearSpoken(
+          campaignId,
+          { userId: session.user.id, username: session.user.username, role: session.user.role, runsCampaign: isGM || session.user.role === 'ADMIN' },
+          transcript,
+        );
+      } catch (err) {
+        console.error('[audio-chunk] table feed failed:', err);
+      }
+    }
+
     // Per [[jewl-always-on-audio-when-active]] there is no wake word — JEWL
     // is supposed to decide moment-by-moment whether to react. We delegate
     // that decision to a cheap Haiku classifier (see classifier.ts). The
@@ -171,7 +172,7 @@ export async function POST(
     // Sonnet dispatch (the slow part) is still fire-and-forget inside
     // maybeFireClassifier — the chip picks the reply up via the 5s poll.
     let classifierVerdict: string | undefined;
-    if (!looksLikeMarker) {
+    {
       try {
         const result = await maybeFireClassifier({
           campaignId,
@@ -189,9 +190,12 @@ export async function POST(
     return NextResponse.json({
       accepted: true,
       transcribed: true,
+      capture,
       provider: stt.provider,
       length: transcript.length,
       classifierVerdict,
+      // Present only when the mic fed the table: what was heard, asked and left out.
+      ...(table?.fed ? { table } : {}),
     });
   } catch (error) {
     return errorResponse(error);

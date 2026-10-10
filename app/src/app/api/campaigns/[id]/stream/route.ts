@@ -18,6 +18,8 @@ import {
   broadcastEvent,
 } from '@/lib/campaign-stream';
 import { kickWorkLoop } from '@/ai/copilot/work-loop';
+import { feedViewerFor, type FeedViewer } from '@/services/perceived-feed';
+import { perceptionFeedOn } from '@/lib/perception-feed';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,6 +37,12 @@ export async function GET(
   const connectionId = crypto.randomUUID();
   const { user } = session;
 
+  // Perception unit 9: a perceived-feed reader's connection never carries other lines' text (lib/campaign-stream
+  // deliveryFor). Fails CLOSED: with the flag on, an error reading the seat reads as perceived.
+  let viewer: FeedViewer;
+  try { viewer = await feedViewerFor(campaignId, user); }
+  catch { viewer = perceptionFeedOn() ? { mode: 'perceived', userId: user.id, characterId: null } : { mode: 'truth' }; }
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       // Register this connection
@@ -46,6 +54,7 @@ export async function GET(
         role: user.role,
         controller,
         connectedAt: new Date(),
+        ...(viewer.mode === 'perceived' ? { perceived: { characterId: viewer.characterId } } : {}),
       });
 
       // Send state sync to the new connection (just this client)

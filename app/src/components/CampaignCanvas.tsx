@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { GrowthCharacter } from '@/types/growth';
@@ -10,15 +9,14 @@ import type { GrowthLocation } from '@/types/location';
 import type { GrowthWorldItem } from '@/types/item';
 import { calculateCharacterTKV, calculateItemKV, calculateLocationKV, type HeldItemForTKV } from '@/lib/kv-calculator';
 import { recomputeAugments } from '@/lib/character-actions';
+import { BOARD_CHANGED_EVENT } from '@/components/terminal/PlanningChips';
 import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
-import CampaignClock from '@/components/time/CampaignClock';
+import CampaignHeader from '@/components/canvas/CampaignHeader';
+import { TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
+import type { FeedEntity } from '@/components/terminal/table-feed/TableFeedRows';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
 import type { TerminalEvent } from '@/types/terminal';
-
-function formatKrma(value: string): string {
-  return Number(value).toLocaleString();
-}
 
 const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanvas'), { ssr: false });
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
@@ -35,6 +33,7 @@ interface CanvasNode {
   name: string;
   x: number;
   y: number;
+  placedAt?: number;
   status?: string;
   color?: string;
   portrait?: string | null;
@@ -73,6 +72,8 @@ interface CampaignCanvasProps {
     name: string;
     inviteCode: string | null;
     genre: string | null;
+    /** Server-side whole-canvas re-lay counter (JEWL organizing the canvas). */
+    canvasLayoutEpoch?: number;
   };
   nodes: CanvasNode[];
   connections: Connection[];
@@ -107,7 +108,32 @@ interface CampaignEconomyData {
   total: string;
 }
 
+/**
+ * Layout epoch gate (2026-09-28, Mike: "please reset it for me"): when the
+ * server has re-laid the whole canvas since this browser last looked, drop
+ * everything this browser remembers about the campaign's canvas (positions,
+ * folders, collapse states, drill-in focus, camera, zoom) and reload once, so
+ * the server layout is what renders. Runs before any canvas state initializer
+ * reads storage. Never loops: the new epoch is stored before the reload.
+ */
+function applyLayoutEpochGate(campaignId: string, serverEpoch: number | undefined): boolean {
+  if (typeof window === 'undefined' || typeof serverEpoch !== 'number') return false;
+  const key = `canvas-${campaignId}-layoutEpoch`;
+  let seen = 0;
+  try { seen = Number(localStorage.getItem(key) ?? '0') || 0; } catch { return false; }
+  if (serverEpoch <= seen) return false;
+  try {
+    const prefix = `canvas-${campaignId}-`;
+    for (const k of Object.keys(localStorage)) if (k.startsWith(prefix) && k !== key) localStorage.removeItem(k);
+    localStorage.setItem(key, String(serverEpoch));
+  } catch { return false; }
+  window.location.reload();
+  return true;
+}
+
 export default function CampaignCanvas({ campaign, nodes: initialNodes, connections, userId, username, userRole, userCharacter, trailblazers, autoFolders, locatedAtEdges = [], entityNames = {} }: CampaignCanvasProps) {
+  const [epochReloading] = useState(() => applyLayoutEpochGate(campaign.id, campaign.canvasLayoutEpoch));
+  void epochReloading;
   const [activeTab, setActiveTab] = useState<Tab>('canvas');
   // In-canvas character selection: when set, the Character tab loads THIS character
   // instead of the user's own PC. Cleared when navigating to a non-character tab so
@@ -124,6 +150,30 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   }, [activeTab]);
   const [nodes, setNodes] = useState(initialNodes);
   const [showTerminal, setShowTerminal] = useState(false);
+  // P1 mirror: the JEWL header shows "◆ table" while the mic feeds the table;
+  // the TERMINAL toggle tab shows the same glyph so the GM sees it with JEWL
+  // closed. Blue = feeding, gold = holding an unfinished sentence.
+  const [tableFeed, setTableFeed] = useState<{ holding: boolean } | null>(null);
+  useEffect(() => {
+    const onFeed = (e: Event) => {
+      const d = (e as CustomEvent<{ fed?: boolean; holding?: boolean }>).detail;
+      setTableFeed(d?.fed ? { holding: !!d.holding } : null);
+    };
+    window.addEventListener(TABLE_FEED_EVENT, onFeed);
+    return () => window.removeEventListener(TABLE_FEED_EVENT, onFeed);
+  }, []);
+  // The TABLE feed's world: portraits for the chips, names for the entity spans.
+  const tableEntities = useMemo<FeedEntity[]>(() => nodes.flatMap((n): FeedEntity[] => {
+    if (n.type === 'character' || n.type === 'npc') return [{ id: n.id, name: n.name, kind: n.type, portrait: n.portrait ?? null, status: n.status }];
+    if (n.type === 'location') return [{ id: n.id, name: n.name, kind: 'location', subtype: n.locationType, description: n.locationData?.description }];
+    if (n.type === 'item') return [{ id: n.id, name: n.name, kind: 'item', subtype: n.itemType, where: n.holderName ?? n.locationName, description: n.itemData?.description }];
+    return [];
+  }), [nodes]);
+  // Tell floating chrome (the phone JEWL summon button in JewlChip) whether the
+  // terminal drawer is open, so nothing floats over the table log during play.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('growth:terminal-drawer', { detail: { open: showTerminal } }));
+  }, [showTerminal]);
   const [pendingWager, setPendingWager] = useState<EffortWagerPromptEvent | null>(null);
   // Stores check result data until the die settles, then posts to terminal
   const pendingCheckResultRef = useRef<Record<string, unknown> | null>(null);
@@ -216,6 +266,16 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           streamEventsRef.current = [...streamEventsRef.current, te];
           setStreamEventsTick(n => n + 1);
         }
+      }
+
+      // Perception: a character's memory was written (no text) — the terminal re-reads that character's feed.
+      if (data.kind === 'perceived_feed_stale') {
+        window.dispatchEvent(new CustomEvent('growth:perceived-feed-stale', { detail: { characterId: data.characterId ?? null } }));
+      }
+
+      // Planning board moved (no text) — the chip strip re-reads GET /intents.
+      if (data.kind === 'board_changed') {
+        window.dispatchEvent(new CustomEvent(BOARD_CHANGED_EVENT));
       }
 
       // Handle effort wager prompts — show modal to the player
@@ -461,8 +521,19 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   });
 
   const handleFoldersChange = useCallback((newFolders: CanvasFolder[]) => {
-    setFolders(newFolders);
-    try { localStorage.setItem(folderStorageKey, JSON.stringify(newFolders)); } catch { /* ignore */ }
+    // Stamp movedAt on folders whose position/size changed, so a later
+    // server placement (JEWL) can be compared against the GM's last drag.
+    setFolders((prev) => {
+      const prevById = new Map(prev.map((f) => [f.id, f]));
+      const now = Date.now();
+      const stamped = newFolders.map((f) => {
+        const p = prevById.get(f.id);
+        const moved = !p || p.posX !== f.posX || p.posY !== f.posY || p.userWidth !== f.userWidth || p.userHeight !== f.userHeight;
+        return moved ? { ...f, movedAt: now } : f;
+      });
+      try { localStorage.setItem(folderStorageKey, JSON.stringify(stamped)); } catch { /* ignore */ }
+      return stamped;
+    });
   }, [folderStorageKey]);
 
   // Keep folder nodeIds in sync — remove deleted nodes
@@ -491,12 +562,17 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     const merged = folders.filter(f => !autoIds.has(f.id));
     for (const af of autoFolders ?? []) {
       const stored = storedById.get(af.id);
+      // Position: the GM's stored drag wins UNLESS the server placed this
+      // location more recently (JEWL organizing the canvas, the sim moving
+      // things) — Mike 2026-09-26: "I do not see a change on the canvas".
+      const serverStamp = af.placedAt ?? 0;
+      const localStamp = stored?.movedAt ?? 0;
+      const localPosWins = stored?.posX != null && stored?.posY != null && localStamp >= serverStamp;
       merged.push({
         // Server-fresh: nodeIds, locationInfo, name, type.
         ...af,
         // GM-authored overrides that should persist:
-        ...(stored?.posX != null ? { posX: stored.posX } : {}),
-        ...(stored?.posY != null ? { posY: stored.posY } : {}),
+        ...(localPosWins ? { posX: stored!.posX, posY: stored!.posY } : {}),
         ...(stored?.userWidth != null ? { userWidth: stored.userWidth } : {}),
         ...(stored?.userHeight != null ? { userHeight: stored.userHeight } : {}),
         // Every Location renders as a container per the world-recursive
@@ -766,11 +842,28 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     if (typeof window === 'undefined') return 350;
     try {
       const stored = localStorage.getItem(storageKey);
-      return stored ? parseInt(stored) : 350;
+      const n = stored ? parseInt(stored, 10) : NaN;
+      return Number.isFinite(n) && n >= 150 ? n : 350;
     } catch { return 350; }
   });
   const isResizing = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
+  // <main>'s live height — the drawer can never exceed a fraction of it
+  // (rotation / mobile URL-bar changes re-clamp via the observer).
+  const [mainHeight, setMainHeight] = useState(0);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    setMainHeight(el.clientHeight);
+    const ro = new ResizeObserver(() => setMainHeight(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const clampTerminalHeight = useCallback((h: number, mainH: number) => {
+    if (!mainH) return h;
+    return Math.max(Math.min(MIN_TERMINAL_HEIGHT, mainH * MAX_TERMINAL_FRACTION), Math.min(mainH * MAX_TERMINAL_FRACTION, h));
+  }, []);
+  const effectiveTerminalHeight = clampTerminalHeight(terminalHeight, mainHeight);
 
   // Persist terminal height
   useEffect(() => {
@@ -1289,15 +1382,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     isResizing.current = true;
 
     const startY = e.clientY;
-    const startHeight = terminalHeight;
+    const startHeight = effectiveTerminalHeight;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isResizing.current) return;
       const dy = startY - moveEvent.clientY;
       const mainEl = mainRef.current;
-      const maxHeight = mainEl ? mainEl.clientHeight * MAX_TERMINAL_FRACTION : 600;
-      const newHeight = Math.max(MIN_TERMINAL_HEIGHT, Math.min(maxHeight, startHeight + dy));
-      setTerminalHeight(newHeight);
+      setTerminalHeight(clampTerminalHeight(startHeight + dy, mainEl ? mainEl.clientHeight : 0));
     };
 
     const handleMouseUp = () => {
@@ -1312,7 +1403,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [terminalHeight]);
+  }, [effectiveTerminalHeight, clampTerminalHeight]);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'forge', label: 'Forge' },
@@ -1322,7 +1413,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
   ];
 
   return (
-    <div className="h-screen bg-[var(--surface-dark)] flex flex-col overflow-hidden">
+    <div className="h-dvh bg-[var(--surface-dark)] flex flex-col overflow-hidden">
       {/* ── JEWL construction site — visible while he lays work down (F-2).
           The ⚒ badge names the last committed piece; page data refreshes
           progressively underneath so his builds materialize live. */}
@@ -1352,124 +1443,15 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
           </div>
         </div>
       )}
-      {/* Compact header bar */}
-      <header className="bg-[var(--surface-dark)] border-b border-[var(--accent-teal)]/30 flex-shrink-0 relative z-[60]">
-        {/* Micro bar — window controls */}
-        <div className="flex items-center justify-between px-3 py-0.5 bg-black/20 border-b border-[var(--accent-teal)]/20">
-          <div className="flex items-center gap-1.5">
-            <div className="w-[6px] h-[6px] bg-[var(--pillar-body)]" />
-            <div className="w-[6px] h-[6px] bg-[var(--pillar-soul)]" />
-            <div className="w-[6px] h-[6px] bg-[var(--pillar-soul)]" />
-          </div>
-          <span className="text-[var(--accent-teal)]/40 text-[8px] tracking-[0.3em] font-[family-name:var(--font-terminal)]">
-            CANVAS://session.layer.0
-          </span>
-          <span className="text-[var(--accent-teal)]/30 text-[8px]">&#x2298; &#x2295;</span>
-        </div>
-
-        {/* Main header content */}
-        <div className="px-4 py-2 flex items-center justify-between">
-          {/* Left: back + campaign name */}
-          <div className="flex items-center gap-4">
-            <Link
-              href="/terminal"
-              className="text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] text-sm font-[family-name:var(--font-terminal)] transition-colors"
-            >
-              &larr;
-            </Link>
-            <div>
-              <h1 className="text-white text-sm font-[family-name:var(--font-header)] uppercase tracking-[0.15em]">
-                {campaign.name}
-              </h1>
-              {campaign.genre && (
-                <span className="text-white/30 text-[9px] font-[family-name:var(--font-terminal)]">
-                  {campaign.genre}
-                </span>
-              )}
-              {campaign.inviteCode && (
-                <div className="text-[9px] text-white/30 font-[family-name:var(--font-terminal)]">
-                  Invite: <span className="text-[var(--accent-gold)]/60">{campaign.inviteCode}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Center: tab navigation */}
-          <div className="flex">
-            {tabs.map((tab, i) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`py-1.5 px-4 text-xs uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] border border-[var(--accent-teal)]/40 transition-colors ${
-                  i > 0 ? 'border-l-0' : ''
-                } ${
-                  activeTab === tab.key
-                    ? 'bg-[var(--accent-teal)] text-black'
-                    : 'bg-transparent text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Right: clock + KRMA readout + invite code */}
-          <div className="text-right flex items-center gap-4">
-            <CampaignClock campaignId={campaign.id} isGM={isGM} />
-            {isGM && economy && (
-              <div className="flex items-center gap-0">
-                {/* Gold KRMA bar — purple text */}
-                <div
-                  className="px-5 py-2 flex items-center gap-3"
-                  style={{ background: 'linear-gradient(90deg, #D4A830, #E8C848, #D4A830)' }}
-                >
-                  <span
-                    className="uppercase leading-none"
-                    style={{ fontFamily: '"Bebas Neue", Impact, sans-serif', fontSize: '32px', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '-0.01em' }}
-                  >
-                    {formatKrma(economy.total)}
-                  </span>
-                  <span className="leading-none" style={{ fontSize: '28px', color: '#8e7cc3', fontWeight: 'bold', letterSpacing: '0.02em' }}>
-                    <span style={{ fontFamily: 'var(--font-inknut-antiqua), "Inknut Antiqua", serif', fontSize: '22px', fontWeight: 900 }}>Ҝ</span>
-                    <span style={{ fontFamily: '"Bebas Neue", Impact, sans-serif' }}>RMA</span>
-                  </span>
-                </div>
-                {/* Purple box — fluid */}
-                <div
-                  className="h-16 min-w-16 px-3 flex flex-col items-center justify-center"
-                  style={{ background: 'var(--pillar-spirit)' }}
-                >
-                  <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.fluid)}</span>
-                  <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">FLD</span>
-                </div>
-                {/* Red box with ] */}
-                <div
-                  className="h-16 flex items-center"
-                  style={{ background: '#E8585A' }}
-                >
-                  <div className="flex flex-col items-center justify-center px-3">
-                    <span className="text-white text-[18px] font-bold font-[family-name:var(--font-terminal)] leading-none whitespace-nowrap">{formatKrma(economy.crystallized)}</span>
-                    <span className="text-white/50 text-[10px] tracking-[0.1em] font-[family-name:var(--font-terminal)] leading-none mt-1">CRY</span>
-                  </div>
-                  <span className="text-white font-bold font-[family-name:var(--font-terminal)] text-[32px] leading-none pr-1.5">]</span>
-                </div>
-              </div>
-            )}
-            {isGM && (
-              <Link
-                href={`/watcher/campaign/${campaign.id}/settings`}
-                className="w-8 h-8 flex items-center justify-center rounded-full border border-[var(--accent-teal)]/30 text-[var(--accent-teal)]/50 hover:text-[var(--accent-teal)] hover:border-[var(--accent-teal)]/60 transition-colors"
-                title="Campaign Settings"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* Campaign header — rulebook order voice, Option 2 (Mike 2026-10-07). */}
+      <CampaignHeader
+        campaign={campaign}
+        isGM={isGM}
+        economy={economy}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTab={setActiveTab}
+      />
 
       {/* Canvas content area — fills remaining space */}
       <main ref={mainRef} className="flex-1 relative overflow-hidden">
@@ -1832,28 +1814,46 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
         <div
           className="absolute bottom-0 left-0 right-0"
           style={{
-            height: showTerminal ? `${terminalHeight}px` : '0',
+            height: showTerminal ? `${effectiveTerminalHeight}px` : '0',
             zIndex: 50,
             pointerEvents: showTerminal ? 'auto' : 'none',
             transition: showTerminal ? 'none' : 'height 0.3s ease-in-out',
           }}
         >
           {/* Toggle tab */}
+          {/* Pull tab \u2014 the drawer's header voice (Bebas gold on navy, 2026-10-08) */}
           <button
             onClick={() => setShowTerminal(prev => !prev)}
-            className="absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1 text-[9px] uppercase tracking-[0.2em] transition-colors"
+            aria-expanded={showTerminal}
+            data-no-hold
+            className="absolute left-1/2 -translate-x-1/2"
             style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: showTerminal ? '#0a0a1a' : 'var(--terminal-prime)',
-              backgroundColor: showTerminal ? 'var(--terminal-prime)' : 'rgba(10, 10, 26, 0.9)',
-              border: '1px solid rgba(34, 171, 148, 0.4)',
-              borderBottom: showTerminal ? 'none' : undefined,
-              borderRadius: '3px 3px 0 0',
+              top: -36,
+              height: 36,
+              padding: '4px 16px 0',
+              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
+              fontSize: 17,
+              letterSpacing: '0.08em',
+              whiteSpace: 'nowrap',
+              color: '#ffcc78',
+              backgroundColor: '#002f6c',
+              border: 0,
+              boxShadow: '0 -2px 8px rgba(0,0,0,.3)',
               pointerEvents: 'auto',
               zIndex: 51,
+              cursor: 'pointer',
             }}
           >
-            {showTerminal ? '\u25BC TERMINAL' : '\u25B2 TERMINAL'}
+            {tableFeed && (
+              <span
+                aria-label={tableFeed.holding ? 'The table is holding an unfinished sentence' : 'The mic is feeding the table'}
+                title={tableFeed.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table \u2014 what you say becomes the world. Mute JEWL to stop.'}
+                style={{ color: tableFeed.holding ? 'var(--krma-gold, #ffcc78)' : '#6fa8dc', marginRight: 6, fontSize: 12, fontFamily: 'var(--font-terminal), Consolas, monospace' }}
+              >
+                {'\u25C6'}
+              </span>
+            )}
+            {showTerminal ? '\u25BE Terminal' : '\u25B4 Terminal'}
           </button>
 
           {/* Resize handle */}
@@ -1866,18 +1866,18 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 backgroundColor: 'transparent',
               }}
             >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[3px] rounded-full" style={{
-                backgroundColor: 'rgba(34, 171, 148, 0.4)',
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[3px]" style={{
+                backgroundColor: 'rgba(255, 204, 120, 0.7)',
                 marginTop: '1px',
               }} />
             </div>
           )}
 
           {/* Panel content — always mounted so event listeners stay active */}
-          <div className="h-full border-t" style={{
-            borderColor: 'rgba(34, 171, 148, 0.4)',
-            backgroundColor: 'rgba(10, 10, 26, 0.95)',
-            backdropFilter: 'blur(8px)',
+          <div className="h-full" style={{
+            borderTop: '3px solid #002f6c',
+            backgroundColor: '#cfe2f2',
+            boxShadow: '0 -6px 18px rgba(0,0,0,.3)',
             display: showTerminal ? 'block' : 'none',
           }}>
             <CampaignTerminal
@@ -1895,6 +1895,8 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
               connected={connected}
               connectedUsers={connectedUsers}
               campaignCharacters={nodes.filter(n => n.type === 'character' || n.type === 'npc').map(n => ({ id: n.id, name: n.name }))}
+              tableEntities={tableEntities}
+              onClose={() => setShowTerminal(false)}
             />
           </div>
         </div>

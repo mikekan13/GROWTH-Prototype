@@ -260,6 +260,23 @@ export type TraitCategory = typeof TRAIT_CATEGORIES[number];
 export type TraitPillar = 'body' | 'spirit' | 'soul';
 
 /**
+ * A sense granted by a source (Mike 2026-10-09: a mind sense "could come from
+ * anything. It would be like any other sense. could be an organ an item a
+ * spell... just about anything"). Optional `grantsSenses` on a body part / item
+ * (GrowthWorldItem), an item ability, a trait (nectar / thorn / blossom — spells
+ * act through blossoms). Read by sim/senses/field.senseProfileFromSheet.
+ * `sense`: 'sight' | 'hearing' | 'smell' | 'taste' | 'touch' | 'mind' (reaches
+ * thoughts) — other names are kept but not modelled yet. `effectiveness` 0..1,
+ * default 1 (scaled by the source's condition). `name`: how it is known
+ * ('mind reading'); default = the source's name. No content ships with one.
+ */
+export interface SenseGrantSpec {
+  sense: string;
+  effectiveness?: number;
+  name?: string;
+}
+
+/**
  * Structured roll modifier carried by a trait. Optional — when present,
  * the skill-check pipeline (services/trait-modifiers.ts) sums matching
  * modifiers into the roll total automatically.
@@ -298,6 +315,8 @@ export interface GrowthTrait {
   pillar?: TraitPillar;
   source?: string;          // Where it came from (GRO.vine name, Godhead, etc.)
   mechanicalEffect?: string; // E.g. "+1 GRO.vine capacity", "+2 Restoration"
+  /** Senses this trait grants while on the sheet (a nectar, an unexpired blossom). See SenseGrantSpec. */
+  grantsSenses?: SenseGrantSpec[];
   // nectar = permanent positive (from completing GRO.vines)
   // blossom = temporary buff (bestowed by Godheads during play)
   // thorn = permanent negative (from failed GRO.vines, death)

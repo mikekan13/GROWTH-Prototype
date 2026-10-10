@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { prisma } from '@/lib/db';
-import { NotFoundError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
+import { requireCampaignMember } from '@/services/campaign-access';
 import { queryHistory, type HistorySubjectType } from '@/services/history';
+import { ownRecordScope } from '@/services/perceived-feed';
 
 /** Per-object perspective history (ruling r-2026-06-09-07).
  *  ?subjectType=location&subjectId=...&limit=50&beforeCycle=12.5
@@ -16,15 +16,20 @@ export async function GET(
   try {
     const session = await requireAuth();
     const { id } = await params;
-    const campaign = await prisma.campaign.findUnique({ where: { id } });
-    if (!campaign) throw new NotFoundError('Campaign not found');
+    // Members only (GM, CampaignMember, ADMIN) — independent of PERCEPTION_FEED; 404 if no campaign.
+    const campaign = await requireCampaignMember(id, session.user);
     const gmView = canManageCampaign(session.user.id, session.user.role, campaign);
+
+    // Perception (PERCEPTION_FEED): a Trailblazer reads only their own characters' perspective entries —
+    // a place's or another being's history is truth their character did not perceive. Watcher / ADMIN / flag off: unchanged.
+    const scope = gmView ? null : await ownRecordScope(id, session.user);
 
     const sp = request.nextUrl.searchParams;
     const subjectType = sp.get('subjectType') as HistorySubjectType | null;
     const entries = await queryHistory(id, {
       subjectType: subjectType ?? undefined,
       subjectId: sp.get('subjectId') ?? undefined,
+      ...(scope ? { ownCharacterIds: scope } : {}),
       gmView,
       limit: sp.get('limit') ? Number(sp.get('limit')) : undefined,
       beforeCycle: sp.get('beforeCycle') ? Number(sp.get('beforeCycle')) : undefined,

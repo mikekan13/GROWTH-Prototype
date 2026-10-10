@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canEditCharacter } from '@/lib/permissions';
+import { snapCharacterToLocation } from '@/services/canvas-placement';
 
 export const moveCharacterToLocationSchema = z.object({
   characterId: z.string().min(1),
@@ -21,6 +22,8 @@ export const moveCharacterToLocationSchema = z.object({
    *  (character becomes unanchored / off-canvas). */
   locationId: z.string().min(1).nullable(),
   note: z.string().max(500).optional(),
+  /** Also move the character's CARD beside the target location's card, so a narrated move is visible (Mike 09-26). */
+  snapCanvas: z.boolean().optional(),
 });
 
 export interface MoveCharacterResult {
@@ -86,5 +89,10 @@ export async function moveCharacterToLocation(
       fromLocationIds,
       toLocationId: input.locationId,
     };
+  }).then(async (result) => {
+    if (input.snapCanvas && input.locationId) {
+      try { await snapCharacterToLocation(character.campaignId!, input.characterId, input.locationId); } catch (err) { console.warn('[character-location] canvas snap failed', err); }
+    }
+    return result;
   });
 }

@@ -19,9 +19,14 @@ import 'server-only';
 import { createHash } from 'crypto';
 import { appendFile, mkdir, writeFile, access } from 'fs/promises';
 import path from 'path';
+import { resolveTrainingConsent, type TrainingConsent } from '@/services/consent';
 
 const TRACES_DIR = path.join(process.cwd(), 'traces');
 const SYSTEMS_DIR = path.join(TRACES_DIR, 'systems');
+// Consent gate (2026-09-20): a trace whose campaign has not fully consented to
+// AI training never enters the corpus dir. It goes to quarantine — kept for
+// debugging, excluded from any fine-tune export by location AND by flag.
+const QUARANTINE_DIR = path.join(TRACES_DIR, 'quarantine');
 
 export interface TraceRecord {
   ts: string;
@@ -41,10 +46,13 @@ export interface TraceRecord {
     usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   };
   flags: { maturityFlags?: string[]; privacy?: string };
+  /** AI-training consent resolved at write-time (GM + every ACTIVE member). */
+  consent: TrainingConsent;
 }
 
 async function ensureDirs(): Promise<void> {
   await mkdir(SYSTEMS_DIR, { recursive: true });
+  await mkdir(QUARANTINE_DIR, { recursive: true });
 }
 
 async function persistSystemPrompt(systemPrompt: string): Promise<string> {
@@ -75,8 +83,10 @@ export interface RecordTraceInput {
 export function recordTrace(input: RecordTraceInput): void {
   void (async () => {
     await ensureDirs();
+    const consent = await resolveTrainingConsent(input.campaignId);
     const systemRef = await persistSystemPrompt(input.systemPrompt);
     const record: TraceRecord = {
+      consent,
       ts: new Date().toISOString(),
       caller: input.caller,
       source: input.source,
@@ -91,12 +101,11 @@ export function recordTrace(input: RecordTraceInput): void {
     };
     const day = record.ts.slice(0, 10);
     await appendFile(
-      path.join(TRACES_DIR, `${day}.jsonl`),
+      path.join(consent.training ? TRACES_DIR : QUARANTINE_DIR, `${day}.jsonl`),
       JSON.stringify(record) + '\n',
       'utf8',
     );
   })().catch((err: unknown) => {
-    // eslint-disable-next-line no-console
     console.error('[ai/network] trace write failed:', err);
   });
 }

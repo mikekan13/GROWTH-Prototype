@@ -45,6 +45,13 @@ export interface Material {
   valueRating: number;      // 1-10: Rarity/desirability
   mods: MaterialMod[];      // Special properties inherited by items made from this material
   description?: string;     // Flavor text
+  /**
+   * Extra head-domain tags (daya/domains.ts keys) this material adds to the
+   * 'material' aspect of anything made of it (perception, Mike 2026-10-09: "A
+   * material might have several different category tags on it"). Optional;
+   * none set in the starter catalog yet.
+   */
+  domains?: string[];
 }
 
 /**

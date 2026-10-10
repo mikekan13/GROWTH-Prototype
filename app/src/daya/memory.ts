@@ -16,6 +16,9 @@ import { prisma } from '@/lib/db';
 import { chat, type DayaChatMessage, type DayaClientOverrides, type DayaTier } from './model-client';
 import { buildTaggerPrompt, type TaggerRosterEntry } from './prompts/roles/tagger';
 import { RECALL_TUNING } from './recall-tuning';
+import { classifyDomains, pillarOfDomain } from './domains';
+import { makeChain, type MemoryChain } from './chain';
+import { encodePerceivedVia } from './perceived-via';
 
 export type { TaggerRosterEntry };
 
@@ -150,6 +153,22 @@ export interface WriteMemoryParams {
   classification?: TaggerClassification | Record<string, unknown>;
   clusterId?: string | null;
   parentMemoryId?: string | null;
+  /** Bookkeeping rows (tick markers, tests) that must not raise dream pressure. */
+  skipDreamPressure?: boolean;
+  /** The CanonEvent this lived memory perceived (Mike 09-20: fallible memory over infallible truth). */
+  truthRef?: string | null;
+  /** Domain classification (Mike 09-23). Omit to classify from content at write-time. */
+  domain?: string | null;
+  domains?: string[];
+  pillar?: string | null;
+  /** The chain that backs the memory (Mike 09-23). Omit for an empty chain. */
+  chain?: Partial<MemoryChain>;
+  /** Perception units 6+7: false = sensed-but-unnoticed (kept out of normal recall). Omit = the column default (true). */
+  noticed?: boolean;
+  /** Senses that carried it (sim/senses/reach.ts). Omit = the column default ([]). */
+  perceivedVia?: string[];
+  /** D3: per carried sense, its effectiveness when perceived (stored with perceivedVia — daya/perceived-via). */
+  perceivedClarity?: Record<string, number>;
 }
 
 /**
@@ -158,8 +177,24 @@ export interface WriteMemoryParams {
  * experience (Ruling 5: the attempt itself is a memory).
  */
 export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id: string }> {
+  // Classification at write-time (Mike 09-23): every memory is tagged into the
+  // ten domains; callers may pass an explicit classification, otherwise the
+  // keyword classifier runs on the content. Overlap is the rule.
+  const cls = params.domain !== undefined || params.domains ? null : classifyDomains(params.content);
+  const domains = params.domains ?? cls?.all ?? [];
+  const domain = params.domain !== undefined ? params.domain : cls?.primary ?? null;
+  const pillar = params.pillar !== undefined ? params.pillar : pillarOfDomain(domain);
+  const chain = makeChain({
+    ...(params.chain ?? {}),
+    truthRefs: [...(params.chain?.truthRefs ?? []), ...(params.truthRef ? [params.truthRef] : [])],
+    entities: params.chain?.entities ?? params.entityRefs ?? [],
+  });
   const row = await prisma.dayaMemoryEntry.create({
     data: {
+      pillar,
+      domain,
+      domains: JSON.stringify(domains),
+      chain: JSON.stringify(chain),
       entityId: params.entityId,
       narrativeCycle: params.narrativeCycle,
       source: params.source,
@@ -171,8 +206,21 @@ export async function writeMemoryEntry(params: WriteMemoryParams): Promise<{ id:
       classification: JSON.stringify(params.classification ?? {}),
       clusterId: params.clusterId ?? null,
       parentMemoryId: params.parentMemoryId ?? null,
+      truthRef: params.truthRef ?? null,
+      // Only when the reach pass set them — otherwise the row is written exactly as before (column defaults).
+      ...(params.noticed !== undefined ? { noticed: params.noticed } : {}),
+      ...(params.perceivedVia !== undefined ? { perceivedVia: encodePerceivedVia(params.perceivedVia, params.perceivedClarity) } : {}),
     },
   });
+  // Event-driven dream trigger (2026-09-20): lived experience raises dream
+  // pressure; dream-authored rows don't (no self-triggering). Fire-and-forget.
+  if (params.source !== 'dream' && !params.skipDreamPressure) {
+    void import('./dream-pressure').then(m => m.accumulateDreamPressure(params.entityId, params.salience ?? 0)).catch(() => {});
+  }
+  // Perceived feed (PERCEPTION_FEED): a row a feed line can rest on → its readers re-read (no text pushed).
+  if (params.noticed !== false && chain.truthRefs.length) {
+    void import('@/lib/perceived-feed-push').then(m => m.notifyMemoryWritten(params.entityId)).catch(() => {});
+  }
   return { id: row.id };
 }
 
@@ -185,6 +233,8 @@ export interface IngestParams {
   content: string;
   roster?: TaggerRosterEntry[];
   parentMemoryId?: string | null;
+  /** Audit fields merged into the row's classification (e.g. the mirror's fidelity/distortions) — JEWL-visible, never prompt content. */
+  extraClassification?: Record<string, unknown>;
 }
 
 export interface IngestResult {
@@ -213,6 +263,13 @@ export async function ingestStimulus(
 
   const salienceStored = clamp(tags.salience * (1 + RECALL_TUNING.encodeArousalSalienceMul * tags.arousal), 0, 1);
 
+  // Chain (Mike 09-23): the being's previous memory is the antecedent.
+  const previous = await prisma.dayaMemoryEntry.findFirst({
+    where: { entityId: params.entityId, NOT: { source: 'dream' } },
+    orderBy: { realTime: 'desc' },
+    select: { id: true },
+  });
+
   const row = await writeMemoryEntry({
     entityId: params.entityId,
     narrativeCycle: params.cycle,
@@ -222,8 +279,9 @@ export async function ingestStimulus(
     arousal: tags.arousal,
     salience: salienceStored,
     entityRefs: tags.entityRefs,
-    classification: tags.classification,
+    classification: params.extraClassification ? { ...tags.classification, ...params.extraClassification } : tags.classification,
     parentMemoryId: params.parentMemoryId ?? null,
+    chain: { entities: tags.entityRefs, antecedentId: previous?.id ?? null },
   });
 
   return { persisted: true, memoryEntryId: row.id, tags };

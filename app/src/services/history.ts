@@ -69,14 +69,21 @@ export interface HistoryQuery {
   gmView: boolean;
   limit?: number;
   beforeCycle?: number;
+  /** Perceived reader (PERCEPTION_FEED): only these characters' own perspective entries. Empty → none. */
+  ownCharacterIds?: string[];
 }
 
 export async function queryHistory(campaignId: string, q: HistoryQuery) {
+  const own = q.ownCharacterIds;
   return prisma.historyEntry.findMany({
     where: {
       campaignId,
-      ...(q.subjectType ? { subjectType: q.subjectType } : {}),
-      ...(q.subjectId ? { subjectId: q.subjectId } : {}),
+      ...(own
+        ? { subjectType: 'character', subjectId: { in: q.subjectType && q.subjectType !== 'character' ? [] : q.subjectId ? own.filter((id) => id === q.subjectId) : own } }
+        : {
+          ...(q.subjectType ? { subjectType: q.subjectType } : {}),
+          ...(q.subjectId ? { subjectId: q.subjectId } : {}),
+        }),
       ...(q.gmView ? {} : { visibility: 'public' }),
       ...(q.beforeCycle !== undefined ? { timestampCycle: { lt: q.beforeCycle } } : {}),
     },

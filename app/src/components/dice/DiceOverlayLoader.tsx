@@ -73,6 +73,24 @@ export function DiceOverlayLoader() {
 
   useEffect(() => () => clearTimeout(fadeTimerRef.current), []);
 
+  // Safety net (2026-09-05): the engine only reports ready once it finds the
+  // Relations Canvas container in the DOM. On a campaign page whose current
+  // tab has no canvas mounted (Terminal-first landings, headless runs) that
+  // never happens — and a full-screen z-10000 loading screen blocked every
+  // click forever. Dice still initialize lazily later; the screen must not
+  // hold the page hostage.
+  useEffect(() => {
+    if (!onCanvas || engineReady) return;
+    const t = setTimeout(() => {
+      if (!engineReady) {
+        console.warn('[DiceOverlayLoader] engine not ready after 6s — dismissing loading screen; dice will attach when the canvas mounts');
+        setFadingOut(true);
+        fadeTimerRef.current = setTimeout(() => setEngineReady(true), 400);
+      }
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [onCanvas, engineReady]);
+
   // Show loading screen: only on canvas pages, while chunk or engine is loading
   const showLoading = onCanvas && !engineReady;
 

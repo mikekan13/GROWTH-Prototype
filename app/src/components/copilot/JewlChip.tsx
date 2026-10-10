@@ -16,9 +16,9 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { CtxMenuBorder, CtxMenuScanlines, ctxMenuStyle } from '@/components/ui/ContextMenu';
+import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 
 /**
@@ -27,7 +27,7 @@ import { useCampaignStream } from '@/hooks/useCampaignStream';
  * flag set show "JEWL". The hotkey hint stays identity-neutral either way.
  */
 const REVEAL_JEWL = process.env.NEXT_PUBLIC_REVEAL_JEWL === 'true';
-const COPILOT_LABEL = REVEAL_JEWL ? 'JEWL' : 'Copilot';
+const JEWL_TAG = REVEAL_JEWL ? 'jEWL' : 'Copilot';
 
 /**
  * Collapse a mistake row's (status, resolution) into the single string the
@@ -117,6 +117,65 @@ function extractCampaignId(pathname: string): string | null {
   return null;
 }
 
+/** Phone layout threshold: below this the JEWL window becomes a bottom sheet. */
+/** Always-on audio chunk length. Each chunk is a standalone recording (stop +
+ *  restart), transcribed on its own. DEFAULT = today's behaviour. LIVE is the
+ *  value to use while a GameSession is live AND the engine's split loop is on
+ *  (U2c): shorter chunks = beings hear the table sooner. Set at runtime via the
+ *  window event growth:recorder-chunk { ms } — the recorder restarts cleanly. */
+export const RECORDER_CHUNK_MS_DEFAULT = 5_000;
+export const RECORDER_CHUNK_MS_LIVE = 3_000;
+export const RECORDER_CHUNK_EVENT = 'growth:recorder-chunk';
+/** Fired after every mic chunk the TABLE heard (U2c-4): { fed, heard, asked, holding }.
+ *  fed:false is sent when the feed stops (mute, or no fed chunk for TABLE_FEED_TTL_MS)
+ *  so mirrors (the TERMINAL tab) can clear their glyph. */
+export const TABLE_FEED_EVENT = 'growth:table-feed';
+/** How long the ◆ indicator stays lit after the last fed chunk (2–3 chunk lengths). */
+export const TABLE_FEED_TTL_MS = 12_000;
+
+const SHEET_QUERY = '(max-width: 599px)';
+const sheetMq = () => (typeof window !== 'undefined' ? window.matchMedia(SHEET_QUERY) : null);
+function useSheetMode(): boolean {
+  return useSyncExternalStore(
+    cb => { const q = sheetMq(); q?.addEventListener('change', cb); return () => q?.removeEventListener('change', cb); },
+    () => sheetMq()?.matches ?? false,
+    () => false,
+  );
+}
+
+/** Finger device: the only way to summon JEWL without a right-click is the
+ *  long-press on empty canvas, which is undiscoverable — so coarse pointers get
+ *  a floating ◈ summon button. */
+const coarseMq = () => (typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null);
+function useCoarsePointer(): boolean {
+  return useSyncExternalStore(
+    cb => { const q = coarseMq(); q?.addEventListener('change', cb); return () => q?.removeEventListener('change', cb); },
+    () => coarseMq()?.matches ?? false,
+    () => false,
+  );
+}
+
+/** Soft-keyboard tracking via visualViewport: how far the visible bottom sits
+ *  above the layout bottom (inset) and how tall the visible area is. */
+function useKeyboardInset(active: boolean): { inset: number; viewportHeight: number } {
+  const [state, setState] = useState({ inset: 0, viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 800 });
+  useEffect(() => {
+    if (!active || typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    const update = () => {
+      if (!vv) { setState({ inset: 0, viewportHeight: window.innerHeight }); return; }
+      const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setState({ inset, viewportHeight: Math.round(vv.height) });
+    };
+    update();
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => { vv?.removeEventListener('resize', update); vv?.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+  }, [active]);
+  return state;
+}
+
 export function JewlChip() {
   const pathname = usePathname();
   const router = useRouter();
@@ -138,7 +197,7 @@ export function JewlChip() {
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   // Always-on audio per [[jewl-always-on-audio-when-active]]. The chip mounts
   // on every campaign page; the moment it mounts, we try to start the mic
-  // and run a continuous MediaRecorder. Chunks emit every 10s, hit /copilot
+  // and run a continuous MediaRecorder. Chunks emit every RECORDER_CHUNK_MS_DEFAULT ms (5 s), hit /copilot
   // with source=TABLE_AMBIENT. Mute toggles whether chunks actually fire.
   const [audioStatus, setAudioStatus] = useState<
     'idle' | 'requesting' | 'listening' | 'muted' | 'denied' | 'unsupported'
@@ -176,19 +235,73 @@ export function JewlChip() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Phones (2026-10-06, with the mobile session): below 600 px the fixed
+  // 380×500 window is wider than the screen, so JEWL becomes a BOTTOM SHEET —
+  // full width, ~70vh, drag handle + ⊗ to dismiss, a backdrop that swallows
+  // the tap-away so closing him never drops a carried card. The anchor is
+  // kept only for the seed text. useSyncExternalStore so SSR (false) matches.
+  const sheetMode = useSheetMode();
+  // The soft keyboard shrinks the visual viewport, not the layout viewport:
+  // track it so the input row stays pinned ABOVE the keyboard.
+  const kb = useKeyboardInset(open && sheetMode);
+  const sheetDragRef = useRef<{ y0: number } | null>(null);
+  // Recorder chunk length (see RECORDER_CHUNK_MS_*). Read per cycle from a ref
+  // so a change never restarts the mic; it only shortens the cycle in flight.
+  const chunkMsRef = useRef<number>(RECORDER_CHUNK_MS_DEFAULT);
+  // P1 — "the mic is feeding the table": set from the audio-chunk response
+  // (table.fed), cleared by mute or by silence longer than TABLE_FEED_TTL_MS.
+  // The GM must see at a glance that what he says is becoming the world.
+  const [tableFeed, setTableFeed] = useState<{ heard: number; asked: number; holding: boolean } | null>(null);
+  const tableFeedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const announceTableFeed = useCallback((feed: { heard: number; asked: number; holding: boolean } | null) => {
+    setTableFeed(feed);
+    window.dispatchEvent(new CustomEvent(TABLE_FEED_EVENT, { detail: feed ? { fed: true, ...feed } : { fed: false } }));
+    if (tableFeedTimerRef.current) clearTimeout(tableFeedTimerRef.current);
+    tableFeedTimerRef.current = feed ? setTimeout(() => announceTableFeedRef.current(null), TABLE_FEED_TTL_MS) : null;
+  }, []);
+  const announceTableFeedRef = useRef(announceTableFeed);
+  useEffect(() => { announceTableFeedRef.current = announceTableFeed; }, [announceTableFeed]);
+  useEffect(() => {
+    const onChunk = (e: Event) => {
+      const ms = Number((e as CustomEvent<{ ms?: number }>).detail?.ms);
+      if (!Number.isFinite(ms) || ms < 1000 || ms > 60_000 || ms === chunkMsRef.current) return;
+      chunkMsRef.current = ms;
+      // Cut the cycle in flight short: stop() sends what was said so far and
+      // onstop chains the next cycle at the new length — same stream, same
+      // permission, never two recorders.
+      const rec = mediaRecorderRef.current;
+      try { if (rec && rec.state === 'recording') rec.stop(); } catch { /* ignore */ }
+    };
+    window.addEventListener(RECORDER_CHUNK_EVENT, onChunk);
+    return () => window.removeEventListener(RECORDER_CHUNK_EVENT, onChunk);
+  }, []);
+  // Floating ◈ summon button for fingers (2026-10-06). Hidden while JEWL is
+  // open and while the campaign terminal drawer is open (CampaignCanvas
+  // broadcasts growth:terminal-drawer {open}) so it never sits on the table log.
+  const coarsePointer = useCoarsePointer();
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  useEffect(() => {
+    const onDrawer = (e: Event) => setTerminalOpen(!!(e as CustomEvent<{ open?: boolean }>).detail?.open);
+    window.addEventListener('growth:terminal-drawer', onDrawer);
+    return () => window.removeEventListener('growth:terminal-drawer', onDrawer);
+  }, []);
+
   // Summoned, not resident: clicking anywhere OUTSIDE the panel dismisses
   // it (a right-click outside dismisses-then-resummons at the new spot via
   // the contextmenu listener). Esc already closes via the hotkey handler.
+  // Sheet mode uses a backdrop instead, so the outside tap never reaches the canvas.
   useEffect(() => {
-    if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
+    if (!open || sheetMode) return;
+    // pointerdown in the capture phase: the canvas cancels the compatibility
+    // mousedown, so a click on empty canvas never reached a mousedown listener.
+    function onDocPointerDown(e: PointerEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
-  }, [open]);
+    document.addEventListener('pointerdown', onDocPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onDocPointerDown, true);
+  }, [open, sheetMode]);
 
   // Hotkeys
   useEffect(() => {
@@ -725,6 +838,8 @@ export function JewlChip() {
   // dot briefly so the GM can see audio IS flowing even when JEWL stays
   // silent (his default for ambient).
   const [chunkPulse, setChunkPulse] = useState(0);
+  // Server says the last several chunks transcribed to nothing: quiet flag, no feed lines.
+  const [noAudio, setNoAudio] = useState(false);
 
   // Send a single audio chunk to the audio-chunk endpoint. Empty / muted /
   // unauthed chunks short-circuit. This is intentionally separate from the
@@ -759,6 +874,10 @@ export function JewlChip() {
         // a silently-failed dispatch can't lock the indicator on forever.
         try {
           const data = await res.json();
+          // U2c-4: present only when the mic fed the table (switch on, GM, live session).
+          const t = data?.table as { fed?: boolean; heard?: number; asked?: number; holding?: boolean } | undefined;
+          if (t?.fed) announceTableFeedRef.current({ heard: t.heard ?? 0, asked: t.asked ?? 0, holding: !!t.holding });
+          setNoAudio(data?.capture === 'no-audio');
           const v = data?.classifierVerdict as string | undefined;
           if (v && v !== 'silent') {
             setThinking(true);
@@ -771,7 +890,7 @@ export function JewlChip() {
     }
   }, [campaignId]);
 
-  // Always-on audio: every CHUNK_MS we stop and restart the MediaRecorder
+  // Always-on audio: every chunkMsRef.current ms we stop and restart the MediaRecorder
   // so each emitted blob is a complete, standalone container (valid webm
   // header etc.) that the server can decode in isolation. Using
   // `MediaRecorder.start(timeslice)` produces header-less fragment chunks
@@ -788,9 +907,6 @@ export function JewlChip() {
       return;
     }
 
-    // 5s chunks — halves worst-case latency from end-of-speech to JEWL
-    // reply. Doubles chunk count but each is cheap.
-    const CHUNK_MS = 5_000;
     let cancelled = false;
     let stream: MediaStream | null = null;
     let currentRecorder: MediaRecorder | null = null;
@@ -831,7 +947,7 @@ export function JewlChip() {
         try {
           if (recorder.state === 'recording') recorder.stop();
         } catch { /* ignore */ }
-      }, CHUNK_MS);
+      }, chunkMsRef.current);
     };
 
     (async () => {
@@ -862,8 +978,10 @@ export function JewlChip() {
       if (cycleTimer) clearTimeout(cycleTimer);
       try {
         if (currentRecorder && currentRecorder.state !== 'inactive') {
-          // Detach onstop so it doesn't restart a new cycle after cleanup.
-          currentRecorder.onstop = null;
+          // Keep onstop attached: it SENDS the chunk in flight (the words said
+          // in the last few seconds are not thrown away on a chunk-length change
+          // or on leaving the page). It will not chain a new cycle, because
+          // startCycle checks the `cancelled` flag, which is already true here.
           currentRecorder.stop();
         }
       } catch { /* ignore */ }
@@ -949,458 +1067,317 @@ export function JewlChip() {
       }
     : { bottom: 84, right: 20 };
 
+  // Sheet geometry: sits on the visual viewport's bottom (above the soft
+  // keyboard), 70% of the visible height, never taller than what is visible.
+  const sheetStyle: React.CSSProperties = {
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: kb.inset,
+    width: '100%',
+    height: `min(70vh, ${Math.max(240, kb.viewportHeight - 24)}px)`,
+    maxHeight: `${Math.max(240, kb.viewportHeight - 24)}px`,
+    borderRadius: '12px 12px 0 0',
+    // safe-area inset lives on the input row (JEWL_OVERLAY_CSS) so the white
+    // bar runs to the bottom edge; same total height as before.
+  };
+
+  const visibleMessages = messages.filter(m => m.username !== '[system]' && m.username !== '[ui]');
+  const feeding = audioStatus === 'listening' ? tableFeed : null;
+  const noAudioFlag = audioStatus === 'listening' && !audioMuted && noAudio;
+  // The mic state in the drawer header's grammar: a coloured ◆/● glyph + navy Bebas words.
+  const audioGlyph = noAudioFlag ? '◌' : feeding ? '◆'
+    : audioStatus === 'listening' ? '●'
+    : audioStatus === 'muted' ? '◌'
+    : audioStatus === 'denied' || audioStatus === 'unsupported' ? '✕'
+    : audioStatus === 'requesting' ? '…'
+    : '○';
+  const audioGlyphColour = noAudioFlag ? '#b07a00' : feeding ? (feeding.holding ? '#b07a00' : '#2f6fb0')
+    : audioStatus === 'listening' ? '#0f6e5e'
+    : audioStatus === 'denied' || audioStatus === 'unsupported' ? '#b0303b'
+    : audioStatus === 'requesting' ? '#b07a00'
+    : '#6b7380';
+  const audioWords = noAudioFlag ? 'No audio · check mic'
+    : feeding ? `Table · ${feeding.heard}${feeding.holding ? ' …' : ''}`
+    : audioStatus === 'listening' ? 'Live'
+    : audioStatus === 'muted' ? 'Muted'
+    : audioStatus === 'denied' ? 'Mic blocked'
+    : audioStatus === 'unsupported' ? 'No mic'
+    : audioStatus === 'requesting' ? 'Mic'
+    : 'Off';
+  const sendDisabled = loading || (!input.trim() && pendingImages.length === 0);
+
   return (
     <>
-      {/* No corner chip — JEWL is summoned by right-click (anywhere in the
-          campaign) or "/" / Ctrl-K. He appears where you call him. */}
+      {/* No corner chip on desktop — JEWL is summoned by right-click (anywhere
+          in the campaign) or "/" / Ctrl-K. He appears where you call him.
+          Fingers get a floating ◈ (above the carry tray, clear of the terminal
+          toggle); tap = click, per the canvas touch tracker's contract. */}
+      {!open && coarsePointer && !terminalOpen && (
+        <button
+          type="button"
+          onClick={() => { setAnchor(null); setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
+          aria-label="Summon JEWL"
+          title="Summon JEWL"
+          data-no-hold
+          style={{
+            position: 'fixed',
+            right: 14,
+            bottom: 'calc(160px + env(safe-area-inset-bottom))',
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: '#002f6c',
+            border: '2px solid #ffcc78',
+            boxShadow: '0 4px 14px rgba(0,47,108,0.45), 0 1px 3px rgba(0,0,0,0.3)',
+            color: '#ffcc78',
+            fontSize: 'calc(22px * var(--jewl-fs, 1))',
+            lineHeight: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9996,
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+          }}
+        >
+          ◈
+        </button>
+      )}
+      {open && sheetMode && (
+        // Backdrop: dims the canvas and SWALLOWS the tap-away, so dismissing
+        // JEWL on a phone never lands as a tap on the canvas (which would
+        // drop a carried card or move the camera).
+        <div
+          aria-hidden
+          onClick={() => setOpen(false)}
+          onPointerDown={e => e.stopPropagation()}
+          data-no-hold
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9997 }}
+        />
+      )}
       {open && (
+        // Look (2026-10-08): the drawer's jEWL Conversation, floating — same
+        // shared CSS (terminal/jewlChatCss). Powder-blue page under a navy
+        // frame; the header is the drawer's tab row (navy/gold title, ◆ mic
+        // state in navy Bebas); NOW and the mistake flags speak the same calm
+        // row language. Behaviour unchanged.
         <div
           ref={panelRef}
           role="dialog"
           aria-label="Co-pilot"
+          data-no-hold
+          data-jewl-sheet={sheetMode ? '1' : undefined}
+          data-jewl-overlay
+          className={`jc jo ${sheetMode ? 'jo-sheet' : 'jo-win'}`}
           style={{
+            // Readability knob: every type size in the panel is
+            // calc(Npx * var(--jewl-fs)). The shared look is already sized for
+            // a phone (≥ 12 px everywhere), so both modes sit at 1; turn it up
+            // here if the sheet needs to read bigger.
+            ...({ '--jewl-fs': 1 } as React.CSSProperties),
             position: 'fixed',
-            ...anchoredPos,
-            width: PANEL_W,
-            height: PANEL_H,
-            maxHeight: 'calc(100vh - 120px)',
-            background: '#000',
-            border: 'none',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
+            ...(sheetMode ? sheetStyle : { ...anchoredPos, width: PANEL_W, height: PANEL_H, maxHeight: 'calc(100vh - 120px)' }),
             zIndex: 9998,
-            display: 'flex',
-            flexDirection: 'column',
-            fontFamily: 'Consolas, monospace',
-            padding: '6px',
           }}
         >
-          {/* The ^v^v undulating chrome — same skin as every context menu.
-              JEWL is the OS runner; his overlay IS a Terminal surface.
-              count sized up so the strip wraps the full 380x500 panel. */}
-          <CtxMenuBorder count={90} />
-          <CtxMenuScanlines />
-          {/* Header */}
-          <div
-            style={{
-              padding: '10px 14px',
-              borderBottom: '1px solid #333',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexShrink: 0,
-            }}
-          >
+          <style>{JEWL_CHAT_CSS}</style>
+          <style>{JEWL_OVERLAY_CSS}</style>
+          {sheetMode && (
+            // Drag handle: swipe down ~80 px to dismiss. Pointer events, not
+            // touch events, so the canvas's touch tracker contract holds.
             <div
-              style={{
-                color: '#fff',
-                fontSize: 12,
-                fontFamily: "'Inknut Antiqua', serif",
-              }}
+              className="jo-grip"
+              onPointerDown={e => { sheetDragRef.current = { y0: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
+              onPointerMove={e => { const d = sheetDragRef.current; if (d && e.clientY - d.y0 > 80) { sheetDragRef.current = null; setOpen(false); } }}
+              onPointerUp={() => { sheetDragRef.current = null; }}
+              onPointerCancel={() => { sheetDragRef.current = null; }}
+              aria-label="Drag down to close"
             >
-              {ctxMenuStyle(COPILOT_LABEL)}
+              <i />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Audio status label + mute toggle. Always rendered so the
-                  GM knows the mic state at a glance. Per
-                  [[jewl-always-on-audio-when-active]]: audio runs
-                  whenever the chip is mounted; mute is the privacy lever. */}
-              <span
-                style={{
-                  fontSize: 8,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color:
-                    audioStatus === 'listening' ? 'rgba(34, 171, 148, 0.8)'
-                    : audioStatus === 'muted' ? 'rgba(255,255,255,0.4)'
-                    : audioStatus === 'denied' ? 'rgba(231, 76, 60, 0.8)'
-                    : audioStatus === 'unsupported' ? 'rgba(231, 76, 60, 0.6)'
-                    : audioStatus === 'requesting' ? 'rgba(208, 160, 48, 0.6)'
-                    : 'rgba(255,255,255,0.3)',
-                }}
-              >
-                {audioStatus === 'listening' ? '● live'
-                  : audioStatus === 'muted' ? '◌ muted'
-                  : audioStatus === 'denied' ? '✕ mic blocked'
-                  : audioStatus === 'unsupported' ? '✕ no mic'
-                  : audioStatus === 'requesting' ? '... mic'
-                  : '○ off'}
-              </span>
-              {(audioStatus === 'listening' || audioStatus === 'muted') && (
-                <button
-                  onClick={() => setAudioMuted(m => !m)}
-                  aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
-                  title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    color: audioMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
-                    cursor: 'pointer',
-                    fontSize: 11,
-                    padding: '2px 6px',
-                    fontFamily: 'Consolas, monospace',
-                    lineHeight: 1,
-                  }}
-                >
-                  {audioMuted ? '🎤̸' : '🎤'}
-                </button>
-              )}
+          )}
+          {/* Header — the drawer's tab row */}
+          <div className="jo-head">
+            <h2 className="jo-title">{JEWL_TAG}</h2>
+            <span className="jo-spacer" />
+            {/* Audio status + mute toggle. Always rendered so the GM knows the
+                mic state at a glance. Per [[jewl-always-on-audio-when-active]]:
+                audio runs whenever the chip is mounted; mute is the privacy lever. */}
+            <span className="jo-audio" data-jewl-audio={audioStatus} data-jewl-no-audio={noAudioFlag || undefined} title={noAudioFlag ? 'Nothing captured from the mic recently — check it is unmuted and the right input' : undefined}>
+              <i style={{ color: audioGlyphColour }}>{audioGlyph}</i>{audioWords}
+            </span>
+            {(audioStatus === 'listening' || audioStatus === 'muted') && (
               <button
                 onClick={() => {
-                  setVoiceMuted(v => !v);
-                  // If muting, stop any currently-speaking utterance.
-                  if (!voiceMuted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                  }
+                  setAudioMuted(m => !m);
+                  // Mute is the STOP for the table feed: nothing said while muted is heard.
+                  if (!audioMuted) announceTableFeedRef.current(null);
                 }}
-                aria-label={voiceMuted ? 'Unmute voice output' : 'Mute voice output'}
-                title={voiceMuted ? 'Voice output OFF — JEWL will not speak aloud' : 'Voice output ON — click to silence'}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  color: voiceMuted ? 'rgba(231, 76, 60, 0.85)' : 'rgba(255,255,255,0.55)',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  padding: '2px 6px',
-                  fontFamily: 'Consolas, monospace',
-                  lineHeight: 1,
-                }}
+                aria-label={audioMuted ? 'Unmute mic' : 'Mute mic'}
+                aria-pressed={audioMuted}
+                title={audioMuted ? 'Unmute mic' : 'Mute mic (audio keeps recording but is dropped)'}
+                className={`jo-tool${audioMuted ? ' jo-off' : ''}`}
               >
-                {voiceMuted ? '🔇' : '🔊'}
+                Mic
               </button>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'rgba(255,255,255,0.4)',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  padding: '0 4px',
-                  fontFamily: 'Consolas, monospace',
-                  lineHeight: 1,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = '#fff';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
-                }}
-              >
-                ⊗
-              </button>
-            </div>
+            )}
+            <button
+              onClick={() => {
+                setVoiceMuted(v => !v);
+                // If muting, stop any currently-speaking utterance.
+                if (!voiceMuted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                }
+              }}
+              aria-label={voiceMuted ? 'Unmute voice output' : 'Mute voice output'}
+              aria-pressed={voiceMuted}
+              title={voiceMuted ? 'Voice output OFF — JEWL will not speak aloud' : 'Voice output ON — click to silence'}
+              className={`jo-tool${voiceMuted ? ' jo-off' : ''}`}
+            >
+              Voice
+            </button>
+            <button onClick={() => setOpen(false)} aria-label="Close" className="jo-x">⊗</button>
           </div>
 
           {/* NOW — live view of what JEWL is doing right now: in-flight
               dispatch ticks + his open jobs. Always rendered so the GM can
-              right-click any time and see where his hands are. */}
-          <div
-            style={{
-              padding: '6px 14px 7px',
-              borderBottom: '1px solid #222',
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 3,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 8,
-                letterSpacing: '0.25em',
-                textTransform: 'uppercase',
-                color: 'rgba(34, 171, 148, 0.65)',
-              }}
-            >
-              now
+              summon him any time and see where his hands are. */}
+          <div className="jo-now" data-jewl-now>
+            <div className="jo-now-head">
+              <span className="jc-kind">Now</span>
+              {!nowTick && workSessions.length === 0 && <span className="jo-idle">idle — watching</span>}
             </div>
             {nowTick && (
-              <div style={{ fontSize: 9, color: '#ffcc78', lineHeight: 1.5 }}>
-                ⟳ {nowTick.label}
-              </div>
+              <p className="jc-note"><span className="jc-bar">[⟳ {nowTick.label}]</span></p>
             )}
-            {workSessions.map(s => (
-              <div key={s.id} style={{ lineHeight: 1.5 }}>
-                <div
-                  style={{
-                    fontSize: 9,
-                    color: s.status === 'blocked' ? 'rgba(231, 76, 60, 0.85)' : 'rgba(34, 171, 148, 0.85)',
-                  }}
-                >
-                  {s.status === 'blocked' ? '◼' : '⟳'} {formatGoal(s.goal)}
-                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · cycle {s.cycleCount}</span>
-                </div>
-                {(s.status === 'blocked' ? s.blockedReason : s.lastNote) && (
-                  <div
-                    style={{
-                      fontSize: 8.5,
-                      color: 'rgba(255,255,255,0.45)',
-                      paddingLeft: 12,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {s.status === 'blocked' ? `waiting on you — ${s.blockedReason}` : s.lastNote}
+            {workSessions.map(s => {
+              const blocked = s.status === 'blocked';
+              const note = blocked ? s.blockedReason : s.lastNote;
+              return (
+                <div key={s.id} className={`jo-job${blocked ? ' jo-blocked' : ''}`} data-work-session={s.status}>
+                  <div className="jc-who">
+                    <span className="jo-goal">{formatGoal(s.goal)}</span>
+                    <span className="jc-time">cycle {s.cycleCount}</span>
                   </div>
-                )}
-              </div>
-            ))}
-            {!nowTick && workSessions.length === 0 && (
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>
-                ◦ idle — watching
-              </div>
-            )}
+                  {note && (
+                    <p className="jo-jobnote">{blocked ? <><b>waiting on you —</b> {note}</> : note}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Messages */}
-          <div
-            ref={scrollRef}
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '10px 12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            {messages.filter(m => m.username !== '[system]' && m.username !== '[ui]').length === 0 && !loading ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  marginTop: 40,
-                  color: 'rgba(255,255,255,0.3)',
-                  fontSize: 10,
-                  padding: '0 20px',
-                  lineHeight: 1.7,
-                }}
-              >
-                <div
-                  style={{
-                    color: 'rgba(208, 160, 48, 0.5)',
-                    fontSize: 9,
-                    letterSpacing: '0.25em',
-                    textTransform: 'uppercase',
-                    marginBottom: 10,
-                  }}
-                >
-                  ✦ {COPILOT_LABEL}
-                </div>
-                Ask. I&apos;ve been watching.
+          <div ref={scrollRef} className="jc-scroll">
+            {visibleMessages.length === 0 && !loading ? (
+              <div className="jc-turn jc-jewl">
+                <p className="jc-msg"><span className="jc-aside"><b>[{JEWL_TAG}]:</b> Ask. I&apos;ve been watching.</span></p>
               </div>
             ) : (
-              messages.filter(m => m.username !== '[system]' && m.username !== '[ui]').map(m => {
+              visibleMessages.map(m => {
                 const toolCalls = m.role === 'assistant' ? parseAssistantActions(m.actions) : null;
                 const userAction = m.role === 'user' ? parseUserAction(m.actions) : null;
+                const persisted = !m.id.startsWith('temp-') && !m.id.startsWith('resp-') && !m.id.startsWith('err-');
+                if (m.role === 'user') {
+                  return (
+                    <div key={m.id} className="jc-turn jc-user">
+                      <div className="jc-who">
+                        <span className="jc-tag">
+                          {m.username || 'You'}:
+                          {userAction?.source === 'GM_CANVAS_ACTION' && userAction.canvasAction?.kind ? (
+                            <span className="jo-via"> · {userAction.canvasAction.kind}</span>
+                          ) : null}
+                        </span>
+                        <span className="jc-time">{fmtTime(m.createdAt)}</span>
+                      </div>
+                      <p className="jc-said">{m.content}</p>
+                    </div>
+                  );
+                }
+                const failed = toolCalls ? toolCalls.filter(tc => tc.error).length : 0;
                 return (
-                  <div
-                    key={m.id}
-                    style={{
-                      alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                      maxWidth: '88%',
-                      padding: '6px 10px',
-                      fontSize: 11,
-                      lineHeight: 1.5,
-                      background:
-                        m.role === 'user'
-                          ? 'rgba(34, 171, 148, 0.12)'
-                          : 'rgba(255,255,255,0.05)',
-                      border:
-                        m.role === 'user'
-                          ? '1px solid rgba(34, 171, 148, 0.25)'
-                          : '1px solid rgba(255,255,255,0.1)',
-                      color:
-                        m.role === 'user' ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.88)',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {m.role === 'assistant' && (
-                      <div
-                        style={{
-                          fontSize: 8,
-                          color: 'rgba(208, 160, 48, 0.65)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.18em',
-                          marginBottom: 2,
-                        }}
-                      >
-                        {COPILOT_LABEL}
-                      </div>
-                    )}
-                    {m.role === 'user' && m.username && (
-                      <div
-                        style={{
-                          fontSize: 8,
-                          color: 'rgba(34, 171, 148, 0.65)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.18em',
-                          marginBottom: 2,
-                        }}
-                      >
-                        {m.username}
-                        {userAction?.source === 'GM_CANVAS_ACTION' && userAction.canvasAction?.kind ? (
-                          <span style={{ marginLeft: 6, color: 'rgba(208, 160, 48, 0.7)' }}>
-                            · {userAction.canvasAction.kind}
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
-                    {m.content}
+                  <div key={m.id} className="jc-turn jc-jewl" data-jewl-msg={m.id}>
+                    <p className="jc-msg"><span className="jc-aside"><b>[{JEWL_TAG}]:</b> {m.content}</span></p>
                     {/* Collapsed by default (Mike 2026-08-21): the action log
                         is a click away, never a wall in the chat. Errors are
                         flagged in the summary so failures stay visible. */}
                     {toolCalls && toolCalls.length > 0 && (
-                      <details
-                        style={{
-                          marginTop: 6,
-                          paddingTop: 6,
-                          borderTop: '1px dashed rgba(208, 160, 48, 0.2)',
-                        }}
-                      >
-                        <summary
-                          style={{
-                            cursor: 'pointer',
-                            fontSize: 9,
-                            fontFamily: 'Consolas, monospace',
-                            color: toolCalls.some(tc => tc.error)
-                              ? 'rgba(231, 76, 60, 0.85)'
-                              : 'rgba(208, 160, 48, 0.55)',
-                            listStyle: 'none',
-                          }}
-                        >
-                          ⚙ {toolCalls.length} action{toolCalls.length === 1 ? '' : 's'}
-                          {toolCalls.some(tc => tc.error)
-                            ? ` · ${toolCalls.filter(tc => tc.error).length} failed`
-                            : ''}
+                      <details className="jo-tools">
+                        <summary>
+                          <span className="jc-bar">[⚙ {toolCalls.length} action{toolCalls.length === 1 ? '' : 's'}]</span>
+                          {failed > 0 && <span className="jo-fail">[{failed} failed]</span>}
                         </summary>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
-                          {toolCalls.map((tc, i) => (
-                            <div
-                              key={i}
-                              style={{
-                                fontSize: 9,
-                                color: tc.error
-                                  ? 'rgba(231, 76, 60, 0.85)'
-                                  : 'rgba(208, 160, 48, 0.75)',
-                                fontFamily: 'Consolas, monospace',
-                              }}
-                            >
-                              {tc.error ? '✗' : '→'} {tc.name}
-                              {tc.input ? `(${Object.entries(tc.input)
-                                .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-                                .join(', ')})` : '()'}
-                              {tc.error ? ` — ${tc.error}` : ''}
-                            </div>
-                          ))}
-                        </div>
+                        {toolCalls.map((tc, i) => (
+                          <p key={i} className={`jo-toolrow${tc.error ? ' jo-err' : ''}`}>
+                            {tc.error ? '✗' : '→'} {tc.name}
+                            {tc.input ? `(${Object.entries(tc.input)
+                              .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+                              .join(', ')})` : '()'}
+                            {tc.error ? ` — ${tc.error}` : ''}
+                          </p>
+                        ))}
                       </details>
                     )}
                     {/* Mistake-bounty: flag affordance on persisted assistant
                         messages. Temp ids (temp-/resp-/err-) get skipped — they
                         aren't in the DB yet so a flag would 404. */}
-                    {m.role === 'assistant' &&
-                      !m.id.startsWith('temp-') &&
-                      !m.id.startsWith('resp-') &&
-                      !m.id.startsWith('err-') && (
-                        <div
-                          style={{
-                            marginTop: 6,
-                            paddingTop: 4,
-                            borderTop: '1px dashed rgba(255,255,255,0.06)',
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          {flagStatusById.has(m.id) ? (
-                            (() => {
-                              const [status, resolution] = flagStatusById.get(m.id)!.split(':');
-                              const label =
-                                status === 'acknowledged' ? '✓ owned'
-                                : status === 'disputed' ? '⚡ disputed'
-                                : status === 'resolved'
-                                  ? (resolution === 'upheld' ? '⚖ upheld'
-                                    : resolution === 'overturned' ? '⚖ overturned'
-                                    : '⚖ resolved')
-                                : '⚐ flagged';
-                              const color =
-                                status === 'acknowledged' ? 'rgba(34, 171, 148, 0.85)'
-                                : status === 'disputed' ? 'rgba(208, 160, 48, 0.85)'
-                                : status === 'resolved'
-                                  ? (resolution === 'upheld' ? 'rgba(34, 171, 148, 0.85)'
-                                    : 'rgba(255,255,255,0.4)')
-                                : 'rgba(231, 76, 60, 0.75)';
-                              return (
-                                <span
-                                  style={{
-                                    fontSize: 8,
-                                    color,
-                                    letterSpacing: '0.15em',
-                                    textTransform: 'uppercase',
-                                  }}
-                                  title={
-                                    status === 'acknowledged' ? 'JEWL acknowledged the mistake — bounty paid'
-                                    : status === 'disputed' ? 'JEWL disputes the flag — Et\'erling adjudicating'
-                                    : status === 'resolved'
-                                      ? (resolution === 'upheld' ? 'Et\'erling upheld the flag — bounty paid'
-                                        : resolution === 'overturned' ? 'Et\'erling overturned the flag — no bounty'
-                                        : 'Adjudicated by Et\'erling')
-                                    : 'Flagged — bounty pending JEWL\'s response'
-                                  }
-                                >
-                                  {label}
-                                </span>
-                              );
-                            })()
-                          ) : flagTarget === m.id ? null : (
-                            <button
-                              onClick={() => openFlagPicker(m.id)}
-                              title="Flag a copilot mistake — KRMA bounty"
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'rgba(255,255,255,0.3)',
-                                fontSize: 9,
-                                cursor: 'pointer',
-                                letterSpacing: '0.1em',
-                                padding: '0 2px',
-                                fontFamily: 'Consolas, monospace',
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.color = 'rgba(231, 76, 60, 0.85)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
-                              }}
-                            >
-                              ⚐ flag
-                            </button>
-                          )}
-                        </div>
-                      )}
+                    {persisted && flagTarget !== m.id && (
+                      <div className="jo-flagrow">
+                        {flagStatusById.has(m.id) ? (
+                          (() => {
+                            const [status, resolution] = flagStatusById.get(m.id)!.split(':');
+                            const label =
+                              status === 'acknowledged' ? '✓ owned'
+                              : status === 'disputed' ? '⚡ disputed'
+                              : status === 'resolved'
+                                ? (resolution === 'upheld' ? '⚖ upheld'
+                                  : resolution === 'overturned' ? '⚖ overturned'
+                                  : '⚖ resolved')
+                              : '⚐ flagged';
+                            const tone =
+                              status === 'acknowledged' ? 'good'
+                              : status === 'disputed' ? 'gold'
+                              : status === 'resolved' ? (resolution === 'upheld' ? 'good' : 'plain')
+                              : 'red';
+                            return (
+                              <span
+                                className={`jo-badge jo-b-${tone}`}
+                                data-jewl-flag={status}
+                                title={
+                                  status === 'acknowledged' ? 'JEWL acknowledged the mistake — bounty paid'
+                                  : status === 'disputed' ? 'JEWL disputes the flag — Et\'erling adjudicating'
+                                  : status === 'resolved'
+                                    ? (resolution === 'upheld' ? 'Et\'erling upheld the flag — bounty paid'
+                                      : resolution === 'overturned' ? 'Et\'erling overturned the flag — no bounty'
+                                      : 'Adjudicated by Et\'erling')
+                                  : 'Flagged — bounty pending JEWL\'s response'
+                                }
+                              >
+                                [{label}]
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <button
+                            onClick={() => openFlagPicker(m.id)}
+                            title="Flag a copilot mistake — KRMA bounty"
+                            className="jo-flag"
+                          >
+                            ⚐ Flag
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {/* The flag picker is a held question (p 64): navy/gold kind
+                        tag + the grey aside bar, answers in navy/gold Bebas. */}
                     {flagTarget === m.id && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          padding: 6,
-                          background: 'rgba(231, 76, 60, 0.06)',
-                          border: '1px solid rgba(231, 76, 60, 0.25)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 5,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: 4,
-                            justifyContent: 'space-between',
-                          }}
-                        >
+                      <div className="jc-ask jo-picker" data-jewl-flag-picker>
+                        <p className="jc-msg">
+                          <span className="jc-kind">Flag a mistake</span>
+                          <span className="jc-aside">How bad was it? The bounty pays if the flag stands.</span>
+                        </p>
+                        <div className="jc-answers" role="group" aria-label="Severity">
                           {(['minor', 'major', 'critical'] as const).map(sev => {
                             const selected = flagSeverity === sev;
                             const bounty = { minor: 10, major: 100, critical: 1000 }[sev];
@@ -1408,29 +1385,10 @@ export function JewlChip() {
                               <button
                                 key={sev}
                                 onClick={() => setFlagSeverity(sev)}
-                                style={{
-                                  flex: 1,
-                                  background: selected
-                                    ? 'rgba(231, 76, 60, 0.2)'
-                                    : 'rgba(255,255,255,0.04)',
-                                  border: selected
-                                    ? '1px solid rgba(231, 76, 60, 0.6)'
-                                    : '1px solid rgba(255,255,255,0.1)',
-                                  color: selected
-                                    ? 'rgba(231, 76, 60, 0.95)'
-                                    : 'rgba(255,255,255,0.55)',
-                                  fontSize: 9,
-                                  letterSpacing: '0.1em',
-                                  textTransform: 'uppercase',
-                                  padding: '4px 4px',
-                                  cursor: 'pointer',
-                                  fontFamily: 'Consolas, monospace',
-                                }}
+                                aria-pressed={selected}
+                                className={selected ? 'jc-yes' : 'jc-no'}
                               >
-                                {sev}
-                                <div style={{ fontSize: 7, opacity: 0.7, marginTop: 1 }}>
-                                  {bounty} K
-                                </div>
+                                {sev} · {bounty} K
                               </button>
                             );
                           })}
@@ -1439,53 +1397,18 @@ export function JewlChip() {
                           value={flagNote}
                           onChange={e => setFlagNote(e.target.value.slice(0, 1000))}
                           placeholder="Why? (optional — helps the copilot learn)"
+                          aria-label="Why it was a mistake"
                           rows={2}
-                          style={{
-                            background: 'rgba(0,0,0,0.5)',
-                            border: '1px solid rgba(231, 76, 60, 0.2)',
-                            color: 'rgba(255,255,255,0.85)',
-                            fontSize: 10,
-                            padding: 4,
-                            fontFamily: 'Consolas, monospace',
-                            resize: 'none',
-                            outline: 'none',
-                          }}
+                          className="jo-note"
+                          // 16px on phones: below that iOS zooms the page when the note box is tapped.
+                          style={{ fontSize: sheetMode ? 16 : 14 }}
                         />
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                          <button
-                            onClick={cancelFlag}
-                            disabled={flagSubmitting}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid rgba(255,255,255,0.15)',
-                              color: 'rgba(255,255,255,0.55)',
-                              fontSize: 9,
-                              letterSpacing: '0.1em',
-                              textTransform: 'uppercase',
-                              padding: '3px 8px',
-                              cursor: 'pointer',
-                              fontFamily: 'Consolas, monospace',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={submitFlag}
-                            disabled={flagSubmitting}
-                            style={{
-                              background: 'rgba(231, 76, 60, 0.2)',
-                              border: '1px solid rgba(231, 76, 60, 0.5)',
-                              color: 'rgba(231, 76, 60, 0.95)',
-                              fontSize: 9,
-                              letterSpacing: '0.1em',
-                              textTransform: 'uppercase',
-                              padding: '3px 8px',
-                              cursor: flagSubmitting ? 'wait' : 'pointer',
-                              fontFamily: 'Consolas, monospace',
-                              opacity: flagSubmitting ? 0.5 : 1,
-                            }}
-                          >
+                        <div className="jc-answers">
+                          <button onClick={submitFlag} disabled={flagSubmitting} className="jc-yes" style={{ cursor: flagSubmitting ? 'wait' : undefined }}>
                             {flagSubmitting ? 'Submitting…' : 'Submit flag'}
+                          </button>
+                          <button onClick={cancelFlag} disabled={flagSubmitting} className="jc-no">
+                            Cancel
                           </button>
                         </div>
                       </div>
@@ -1495,77 +1418,29 @@ export function JewlChip() {
               })
             )}
             {(loading || thinking) && (
-              <div
-                style={{
-                  alignSelf: 'flex-start',
-                  maxWidth: '88%',
-                  padding: '6px 10px',
-                  fontSize: 11,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(34, 171, 148, 0.3)',
-                  color: 'rgba(34, 171, 148, 0.85)',
-                }}
-              >
-                <span
-                  style={{ animation: 'jewlchip-pulse 1.4s ease-in-out infinite' }}
-                >
-                  {/* Snappy ack (Mike 2026-08-21): instant "On it", then the
-                      live jewl_working tick narrates what he's actually doing
-                      tool-by-tool until the real reply replaces this bubble. */}
-                  {loading
-                    ? (nowTick?.label ? `On it — ${nowTick.label}` : 'On it.')
-                    : 'Reasoning on what you said...'}
+              // Snappy ack (Mike 2026-08-21): instant "On it", then the live
+              // jewl_working tick narrates what he's doing tool-by-tool until
+              // the real reply replaces this bar.
+              <p className="jc-note" data-jewl-thinking>
+                <span className="jc-bar">
+                  [{loading
+                    ? (nowTick?.label ? `ON IT — ${nowTick.label}` : 'ON IT')
+                    : `${JEWL_TAG} IS THINKING`}<span className="jc-caret">_</span>]
                 </span>
-              </div>
+              </p>
             )}
           </div>
 
           {/* Pending image thumbnails */}
           {pendingImages.length > 0 && (
-            <div
-              style={{
-                flexShrink: 0,
-                padding: '6px 12px',
-                borderTop: '1px solid rgba(208, 160, 48, 0.15)',
-                display: 'flex',
-                gap: 6,
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className="jo-thumbs">
               {pendingImages.map((url, idx) => (
-                <div key={idx} style={{ position: 'relative' }}>
+                <div key={idx} className="jo-thumb">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`attachment ${idx + 1}`}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      objectFit: 'cover',
-                      border: '1px solid rgba(208, 160, 48, 0.4)',
-                    }}
-                  />
+                  <img src={url} alt={`attachment ${idx + 1}`} />
                   <button
-                    onClick={() =>
-                      setPendingImages(prev => prev.filter((_, i) => i !== idx))
-                    }
+                    onClick={() => setPendingImages(prev => prev.filter((_, i) => i !== idx))}
                     aria-label="Remove attachment"
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      background: 'rgba(0,0,0,0.85)',
-                      border: '1px solid rgba(208, 160, 48, 0.6)',
-                      color: '#D0A030',
-                      cursor: 'pointer',
-                      fontSize: 9,
-                      lineHeight: 1,
-                      padding: 0,
-                      fontFamily: 'Consolas, monospace',
-                    }}
                   >
                     ×
                   </button>
@@ -1574,17 +1449,8 @@ export function JewlChip() {
             </div>
           )}
 
-          {/* Input */}
-          <div
-            style={{
-              flexShrink: 0,
-              padding: '10px 12px',
-              borderTop: '1px solid rgba(208, 160, 48, 0.2)',
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-            }}
-          >
+          {/* Input — the speak bar's shape: ⊕ attach, white field under a navy rule, navy/gold Send */}
+          <div className="jc-input">
             <input
               ref={fileInputRef}
               type="file"
@@ -1603,18 +1469,7 @@ export function JewlChip() {
               disabled={loading}
               aria-label="Attach image"
               title="Attach image (or paste one)"
-              style={{
-                background: 'transparent',
-                border: '1px solid rgba(208, 160, 48, 0.25)',
-                color: 'rgba(208, 160, 48, 0.8)',
-                fontSize: 13,
-                width: 28,
-                height: 28,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'Consolas, monospace',
-                lineHeight: 1,
-                padding: 0,
-              }}
+              className="jo-attach"
             >
               ⊕
             </button>
@@ -1630,58 +1485,77 @@ export function JewlChip() {
                   handleSend();
                 }
               }}
-              placeholder="Ask the co-pilot..."
+              placeholder={`Ask ${JEWL_TAG}…`}
+              aria-label={`Ask ${JEWL_TAG}`}
               disabled={loading}
-              style={{
-                flex: 1,
-                background: 'rgba(0,0,0,0.5)',
-                border: '1px solid rgba(208, 160, 48, 0.25)',
-                color: '#fff',
-                fontSize: 11,
-                padding: '6px 8px',
-                fontFamily: 'Consolas, monospace',
-                outline: 'none',
-                transition: 'border-color 0.15s ease',
-              }}
-              onFocus={e => {
-                e.currentTarget.style.borderColor = 'rgba(208, 160, 48, 0.6)';
-              }}
-              onBlur={e => {
-                e.currentTarget.style.borderColor = 'rgba(208, 160, 48, 0.25)';
-              }}
+              // 16px on phones: anything smaller makes iOS zoom the page on focus.
+              style={{ fontSize: sheetMode ? 16 : 14 }}
             />
-            <button
-              onClick={handleSend}
-              disabled={loading || (!input.trim() && pendingImages.length === 0)}
-              style={{
-                background: 'rgba(34, 171, 148, 0.2)',
-                color: 'var(--terminal-prime)',
-                border: '1px solid rgba(34, 171, 148, 0.4)',
-                fontSize: 9,
-                letterSpacing: '0.15em',
-                textTransform: 'uppercase',
-                padding: '0 12px',
-                fontFamily: 'Consolas, monospace',
-                cursor:
-                  loading || (!input.trim() && pendingImages.length === 0)
-                    ? 'not-allowed'
-                    : 'pointer',
-                opacity:
-                  loading || (!input.trim() && pendingImages.length === 0) ? 0.4 : 1,
-              }}
-            >
-              Send
+            <button onClick={handleSend} disabled={sendDisabled}>
+              {loading ? '…' : 'Send'}
             </button>
           </div>
-
-          <style>{`
-            @keyframes jewlchip-pulse {
-              0%, 100% { opacity: 0.45; }
-              50% { opacity: 1; }
-            }
-          `}</style>
         </div>
       )}
     </>
   );
 }
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Overlay-only rules on top of the shared jEWL conversation CSS. */
+const JEWL_OVERLAY_CSS = `
+.jo{overflow:hidden}
+.jo-win{border:3px solid #002f6c;box-shadow:0 12px 32px rgba(0,47,108,.35),0 2px 6px rgba(0,0,0,.25)}
+.jo-sheet{border-top:3px solid #002f6c;box-shadow:0 -8px 28px rgba(0,0,0,.35)}
+.jo-sheet .jc-input{padding-bottom:calc(10px + max(6px, env(safe-area-inset-bottom)))}
+.jo button{min-height:36px;min-width:36px}
+.jo button:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.jo-grip{flex:none;display:flex;justify-content:center;padding:8px 0 4px;cursor:grab;touch-action:none;background:#CBD9E8}
+.jo-grip i{display:block;width:44px;height:4px;border-radius:2px;background:#002f6c;opacity:.45}
+.jo-head{flex:none;display:flex;align-items:stretch;gap:4px;height:44px;background:#CBD9E8;border-bottom:3px solid #002f6c;padding:0 4px 0 0}
+.jo-title{display:flex;align-items:center;margin:0;padding:3px 14px 0;background:#002f6c;color:#ffcc78;font:400 ${fs(22)}/1 ${BEBAS};letter-spacing:.05em}
+.jo-spacer{flex:1;min-width:4px}
+.jo-audio{align-self:center;white-space:nowrap;padding-top:3px;color:#002f6c;font:400 ${fs(17)}/1 ${BEBAS};letter-spacing:.05em}
+.jo-audio i{font:400 ${fs(13)}/1 ${MONO};font-style:normal;margin-right:3px;vertical-align:1px}
+.jo-tool{align-self:center;height:36px;padding:3px 8px 0;border:0;cursor:pointer;background:none;white-space:nowrap;color:#002f6c;box-shadow:inset 0 0 0 2px #002f6c;font:400 ${fs(16)}/1 ${BEBAS};letter-spacing:.06em}
+.jo-tool.jo-off{color:#b0303b;box-shadow:inset 0 0 0 2px #b0303b;text-decoration:line-through;text-decoration-thickness:2px}
+.jo-x{align-self:center;width:40px;height:36px;border:0;background:none;cursor:pointer;color:#002f6c;font:400 ${fs(20)}/1 ${MONO}}
+.jo-tool:hover,.jo-x:hover{background:rgba(0,47,108,.08)}
+.jo-now{flex:none;max-height:34%;overflow-y:auto;overflow-x:hidden;padding:8px 12px 10px 14px;background:#CBD9E8;border-bottom:1px solid rgba(0,47,108,.35)}
+.jo-now-head{display:flex;align-items:baseline;gap:4px}
+.jo-idle{font:400 ${fs(13)}/1.5 ${MONO};color:#393937}
+.jo-now .jc-note{margin:6px 0 0}
+.jo-job{margin:8px 0 0;border-left:4px solid #22ab94;padding:0 0 0 10px}
+.jo-job.jo-blocked{border-left-color:#b0303b}
+.jo-goal{min-width:0;overflow-wrap:anywhere;font:400 ${fs(14)}/1.5 ${READ}}
+.jo-jobnote{margin:2px 0 0;font:400 ${fs(13)}/1.5 ${MONO};color:#393937;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.jo-blocked .jo-jobnote{color:#000}
+.jo-blocked .jo-jobnote b{color:#b0303b}
+.jo-tools{margin:6px 0 0}
+.jo-tools summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:36px;font:700 ${fs(13)}/1.62 ${MONO}}
+.jo-tools summary::-webkit-details-marker{display:none}
+.jo-tools summary:focus-visible{outline:3px solid #ffcc78;outline-offset:2px}
+.jo-fail{background:#f7525f;color:#000;padding:1px 5px}
+.jo-toolrow{margin:4px 0 0;padding:0 0 0 8px;border-left:2px solid #393937;color:#222;overflow-wrap:anywhere;font:400 ${fs(12)}/1.5 ${MONO}}
+.jo-toolrow.jo-err{border-left-color:#b0303b;color:#8a1c26}
+.jo-flagrow{display:flex;justify-content:flex-end;align-items:center;min-height:36px;margin:2px 0 0}
+.jo-flag{padding:3px 8px 0;border:0;background:none;cursor:pointer;color:#393937;font:400 ${fs(16)}/1 ${BEBAS};letter-spacing:.06em}
+.jo-flag:hover{color:#b0303b}
+.jo-badge{padding:1px 5px;text-transform:uppercase;font:700 ${fs(12)}/1.62 ${MONO}}
+.jo-b-good{background:#22ab94;color:#222}
+.jo-b-gold{background:#ffcc78;color:#000}
+.jo-b-red{background:#f7525f;color:#000}
+.jo-b-plain{background:#000;color:#f5f4ef}
+.jo-note{display:block;width:100%;min-height:64px;margin:8px 0 0;padding:8px;border:0;border-left:4px solid #002f6c;background:#fff;color:#000;font-family:${READ};resize:none;outline:0}
+.jo-note:focus-visible{outline:2px solid #002f6c}
+.jo-via{color:#393937;font-weight:400}
+.jo-thumbs{flex:none;display:flex;flex-wrap:wrap;gap:8px;padding:8px 10px;background:#fafaf8;border-top:1px solid rgba(0,47,108,.35)}
+.jo-thumb{position:relative;width:64px;height:64px}
+.jo-thumb img{display:block;width:64px;height:64px;object-fit:cover;border:2px solid #002f6c}
+.jo-thumb button{position:absolute;top:0;right:0;width:36px;height:36px;padding:0;border:0;cursor:pointer;background:#002f6c;color:#ffcc78;font:400 ${fs(20)}/1 ${MONO}}
+.jc-input .jo-attach{width:44px;background:none;color:#002f6c;box-shadow:inset 0 0 0 2px #002f6c;font:400 ${fs(20)}/1 ${MONO}}
+`;

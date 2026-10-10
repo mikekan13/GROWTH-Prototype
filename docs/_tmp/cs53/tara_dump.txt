@@ -1,0 +1,399 @@
+SHEETS: ['Main', 'Inventory', 'EXPLOITDATA', 'Combat', 'Utility', 'Learning', 'Social', 'Magic', 'Supernatural', 'Negative', 'Racial']
+
+=== Main === rows=112
+R2:  | Name | Tara Almswood |  | Sex | Female | Weight | 100.0 | KV
+R3:  | Race | Altered Human |  | Home | Tiberoak | Height | 5'1" | 377.0 |  |  |  | Undamaged |  |  |  | Elemental Resistances |  |  |  |  |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Hard |  |  | Destroyed
+R4:  | Value |  |  |  |  | Hair | Black |  | = | Auto Count KV |  |  |  |  |  | False
+R5:  | Value |  |  |  |  | Eyes | Teal/Gold | Karma | = | True |  | 9 |  |  |  | False |  |  |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R6:  | Value |  |  |  |  | Birth Month |  |  |  |  |  |  |  |  |  | False
+R7:  | Age | 25.0 | Life Span | Normal |  | Beauty | 10.0
+R8:  |  |  |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  | Undamaged |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0
+R9:  | Attributes |  |  | Save Mod | Save DR | Focus Mod | Resist Mod | Regen Mod |  | 4 |  |  |  |  |  | 4 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R10:  | STR | 5.0 | 0 |  | 0 | 40.0 | 5.0 | 2.0 |  |  |  | 4 |  |  |  |  |  |   |  |  |  |  | False | False | False |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R11:  | DEX | 7.0 | 2 | 2.0 | 4 | Focus |  |  |  | Undamaged |  |  |  |  |  | Undamaged |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0
+R12:  | CON | 4.0 | -1 |  | -1 | 60 |  | Distressed |  | 4 |  |  |  |  |  | 4 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R13:  | INT | 16.0 | 11 | 1.0 | 12 | 60.0 |  | Wounded |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0
+R14:  | WIS | 14.0 | 9 | 1.0 | 10 |  |  | Unconscious |  |  |  |  |  |  |  | Wounds Treated
+R15:  | CHA | 10.0 | 5 | 1.0 | 6 | 0.0 |  | Dead |  |  |  | 9 |  | 9 |  | False |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0
+R16:  |  |  |  |  |  | Strain
+R17:  | Reflexes | Level 1 | Focus Regen | 6 |  | Notes |  |  |  |  |  |  |  |  |  | Block Stacks
+R18:  | APT Mod | 1.0 | APT | 5 |  | COMBAT |  |  |  |  |  | Undamaged |  | Undamaged |  | 0.0 |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0
+R19:  | Speed Mod | 0.0 | Speed | 40ft (8) |  | MAGIC |  |  |  |  |  | 4 |  | 4 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0
+R20:  | Unarmed Mod | 0.0 | Unarmed DMG | 0/5/0 : 0/0/0 |  | ITEMS
+R21:  |  |  |  |  |  | MISC |  |  |  | Weapons & Tools |  |  | Condition |  |  |  |  | Resists |  |  |  |  |  | P | B | S |  | F | E | A
+R22:  | Tech Level |  |  |  |  |  |  |  |  | Left Hand |  |  | Destroyed |  |  | Hard |  | False | False | False
+R23:  | 5 - Transcendent |  |  |  |  |  |  |  |  | Right Hand |  |  | Destroyed |  |  | Hard |  | False | False | False
+R24: Skills
+R26:  | Skills | Skill Level | Governing Attributes |  |  |  | Expertise | Mods |  | Skill Check |  | Total Mods |  | Failed
+R27:  | Athletics
+R28:  | Balance | 1.0 | DEX / CON | 2 | -1 |  | None |  |  | -2 Coin |  | 0 |  | NO
+R29:  | Swim | 1.0 | STR / CON | 0 | -1 |  | None |  |  | -2 Coin |  | 0 |  | NO
+R30:  | Jump | 1.0 | STR / DEX | 0 | 2 |  | None |  |  | +1 Coin |  | 0 |  | NO
+R31:  | Sneak | 6.0 | DEX / WIS | 2 | 9 |  | None |  |  | +3d6 |  | 0 |  | NO
+R32:  | Sleight of Hand | 8.0 | DEX / WIS | 2 | 9 |  | None |  |  | +3d8 |  | 0 |  | NO
+R33:  | Climb | 2.0 | STR DEX / CON | 0 | 2 | -1 | None |  |  | -2 Coin |  | 0 |  | NO
+R34:  | Acrobatics | 0.0 | STR  DEX / WIS | 0 | 2 | -1 | None |  |  | No Skill |  | 0 |  | NO
+R35:  | .
+R36:  | Seduction | 13.0 | CHA / WIS | 5 | 9 |  | None |  |  | +6d12 |  | 3 |  | NO
+R37:  | Intimidation | 8.0 | STR / CHA | 0 | 5 |  | None |  |  | +1d8 |  | -3 |  | NO
+R38:  | Negotiation | 12.0 | CHA / INT | 5 | 11 |  | None |  |  | +6d12 |  | 3 |  | NO
+R39:  | Deception | 8.0 | CHA / INT | 5 | 11 |  | None |  |  | +6d8 |  | 0 |  | NO
+R40:  | Martial Arts
+R41:  | Knives | 6.0 | DEX / WIS | 2 | 9 |  | None |  |  | +3d6 |  | 0 |  | NO
+R42:  | Polearms | 0.0 | STR / DEX | 0 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R43:  | Swordsmanship | 0.0 | STR / DEX | 0 | 2 |  | None |  |  | No Skill |  | 0 |  | NO
+R44:  | Firearms | 1.0 | DEX / WIS | 2 | 9 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R45:  | Exotic Weapons | 0.0 | DEX INT / WIS | 2 | 11 | 9 | None |  |  | No Skill |  | 0 |  | NO
+R46:  | Great Weapons | 0.0 | STR DEX / CON | 0 | 2 | -1 | None |  |  | No Skill |  | 0 |  | NO
+R47:  | Throwing | 1.0 | STR DEX / WIS | 0 | 2 | 9 | None |  |  | +1 Coin |  | 0 |  | NO
+R48:  | Archery | 0.0 | STR  DEX / WIS | 0 | 2 | 9 | None |  |  | No Skill |  | 0 |  | NO
+R49:  | Unarmed | 3.0 | STR  DEX / CON | 0 | 2 | -1 | None |  |  | -2 Coin |  | 0 |  | NO
+R50:  | Performing Arts
+R51:  | Sing | 6.0 | CHA / WIS | 5 | 9 |  | None |  |  | +6d6 |  | 3 |  | NO
+R52:  | Music | 0.0 | CHA / INT | 5 | 11 |  | None |  |  | No Skill |  | 3 |  | NO
+R53:  | Drama | 0.0 | DEX CHA / WIS | 2 | 5 | 9 | None |  |  | No Skill |  | 3 |  | NO
+R54:  | Dance | 0.0 | STR  DEX / CHA  | 0 | 2 | 5 | None |  |  | No Skill |  | 3 |  | NO
+R55:  | Visual Arts
+R56:  | Sculpt | 0.0 | DEX CHA / WIS | 2 | 5 | 9 | None |  |  | No Skill |  | 0 |  | NO
+R57:  | Paint | 0.0 | DEX CHA / WIS | 2 | 5 | 9 | None |  |  | No Skill |  | 0 |  | NO
+R58:  | Draw | 0.0 | DEX CHA / WIS | 2 | 5 | 9 | None |  |  | No Skill |  | 0 |  | NO
+R59:  | Literature | 10.0 | INT CHA / WIS | 5 | 11 | 9 | None |  |  | +6d10 |  | 0 |  | NO
+R60:  | Photography/ Videography | 0.0 | DEX  CHA / INT | 2 | 5 | 11 | None |  |  | No Skill |  | 0 |  | NO
+R61:  | Social Sciences
+R62:  | History | 20.0 | INT / WIS | 11 | 9 |  | Master |  |  | +12d20 |  | 1 |  | NO
+R63:  | Linguistics | 15.0 | CHA / INT | 5 | 11 |  | None |  |  | +6d12 |  | 0 |  | NO
+R64:  | Economics | 4.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d4 |  | 0 |  | NO
+R65:  | Geography | 20.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d20 |  | 0 |  | NO
+R66:  | Education | 10.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d10 |  | 0 |  | NO
+R67:  | Psychology | 12.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d12 |  | 0 |  | NO
+R68:  | Politics | 8.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d8 |  | 3 |  | NO
+R69:  | Law | 8.0 |  CHA / INT  WIS | 5 | 11 | 9 | None |  |  | +6d8 |  | 0 |  | NO
+R70:  | Natural Sciences
+R71:  | Biology | 12.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d12 |  | 0 |  | NO
+R72:  | Geoscience | 6.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d6 |  | 0 |  | NO
+R73:  | Chemistry | 12.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d12 |  | 0 |  | NO
+R74:  | Physics | 8.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d8 |  | 0 |  | NO
+R75:  | Astronomy | 10.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d10 |  | 0 |  | NO
+R76:  | Applied Sciences
+R77:  | Civil Engineering | 3.0 | INT / WIS | 11 | 9 |  | None |  |  | +10 Coin |  | 0 |  | NO
+R78:  | Animal Husbandry | 3.0 | INT / WIS | 11 | 9 |  | None |  |  | +10 Coin |  | 0 |  | NO
+R79:  | Agriculture | 3.0 | INT / WIS | 11 | 9 |  | None |  |  | +10 Coin |  | 0 |  | NO
+R80:  | Electrical Engineering | 8.0 | INT / WIS | 11 | 9 |  | None |  |  | +10d8 |  | 0 |  | NO
+R81:  | Software Engineering | 3.0 | INT / WIS | 11 | 9 |  | None |  |  | +10 Coin |  | 0 |  | NO
+R82:  | Mechanical Engineering | 6.0 | DEX INT / WIS | 2 | 11 | 9 | None |  |  | +3d6 |  | 0 |  | NO
+R83:  | Chemical Engineering | 10.0 | CON INT / WIS | -1 | 11 | 9 | None |  |  | -2d10 |  | 0 |  | NO
+R84:  | Medicine | 12.0 | DEX / INT  WIS | 2 | 11 | 9 | None |  |  | +3d12 |  | 0 |  | NO
+R85:  | Use Vehicle
+R86:  | Sail | 0.0 | DEX / WIS | 2 | 9 |  | None |  |  | No Skill |  | 0 |  | NO
+R87:  | Drive | 0.0 | DEX / WIS | 2 | 9 |  | None |  |  | No Skill |  | 0 |  | NO
+R88:  | Pilot | 0.0 | DEX INT / WIS | 2 | 11 | 9 | None |  |  | No Skill |  | 0 |  | NO
+R89:  | Handle Animal | 4.0 | DEX CON / CHA | 2 | -1 | 5 | None |  |  | -2d4 |  | 0 |  | NO
+R90:  | Perception Skills
+R91:  | Social Perception | 6.0 | CHA / WIS | 5 | 9 |  | None |  |  | +6d6 |  | 0 |  | NO
+R92:  | Environmental Perception | 3.0 | INT / WIS | 11 | 9 |  | None |  |  | +10 Coin |  | 0 |  | NO
+R93:  | Paranormal Perception | 15.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d12 |  | 0 |  | NO
+R94:  | Life Skills
+R95:  | Cooking | 10.0 | CHA / WIS | 5 | 9 |  | None |  |  | +6d10 |  | 0 |  | NO
+R96:  | Textiles | 3.0 | DEX / INT | 2 | 11 |  | None |  |  | +3 Coin |  | 0 |  | NO
+R97:  | Leadership | 5.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d4 |  | 0 |  | NO
+R98:  | Survival | 3.0 | DEX CON / WIS | 2 | -1 | 9 | None |  |  | -2 Coin |  | 0 |  | NO
+R99:  | Theory Knowledge
+R100:  | Philosophy | 10.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d10 |  | 0 |  | NO
+R101:  | Arcane Knowledge | 17.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d12 |  | 0 |  | NO
+R102:  | Theology | 9.0 | CHA INT / WIS | 5 | 11 | 9 | None |  |  | +6d8 |  | 0 |  | NO
+R104:  | Attunement | Negative |  | Catalyst |  |  |  | Counter DR |  | Cast Check |  |  |  | Can Train
+R105:  | Domains of Magic
+R106:  | Alteration | 8.0 | + /  | None | -1 |  |  | +2d8 |  | -2d8 |  |  |  | NO
+R107:  | Fortune | 4.0 | + /  | None | -1 |  |  | +2d4 |  | -2d4 |  |  |  | NO |  | Available Mana
+R108:  | Enchantment | 9.0 | + /  | None | -1 |  |  | +2d8 |  | -2d8 |  |  |  | NO |  | Container | Mana
+R109:  | Divination | 8.0 | N /  | None | 0 |  |  | Can't Counter |  | +1d8 |  |  |  | NO |  | Body | 15/15
+R110:  | Dissolution | 16.0 | N /  | None | 0 |  |  | Can't Counter |  | +1 d12 |  |  |  | NO
+R111:  | Restoration | 2.0 | N /  | None | 0 |  |  | Can't Counter |  | +1 Coin |  |  |  | NO
+R112:  | Illusion | 7.0 | N /  | None | 0 |  |  | Can't Counter |  | +1d6 |  |  |  | NO
+R113:  | Abjuration | 4.0 | - /  | None | 1 |  |  | Can't Counter |  | +2d4 |  |  |  | NO
+R114:  | Force | 7.0 | - /  | None | 1 |  |  | Can't Counter |  | +2d6 |  |  |  | NO
+R115:  | Conjuration | 10.0 | - /  | None | 1 |  |  | Can't Counter |  | +2d10 |  |  |  | NO
+
+=== Inventory === rows=83
+R3:  |  | Inventory |  |  |  |  |  |  |  |  |  |  |  | Exploits
+R5:  | Sort | Name | Grade | Range | P/B/S : F/E/A | Resists | Material | Description & Mods | Value | Quantity/ Uses | Weight | In Bag |  | Type | Name | Level | Description | X
+R6:  | 1.0 |  |  |  |  |  |  |  |  |  |  | False |  | Supernatural | Eidetic Memory | Level I
+R7:  | 2.0 |  |  |  |  |  |  |  |  |  |  | False
+R8:  | 3.0 |  |  |  |  |  |  |  |  |  |  | False |  | Supernatural | Machine Interfacing | Level I | #N/A
+R9:  | 4.0 |  |  |  |  |  |  |  |  |  |  | False
+R10:  | 5.0 |  |  |  |  |  |  |  |  |  |  | False |  | Supernatural | Precognition | Level I
+R11:  | 6.0 |  |  |  |  |  |  |  |  |  |  | False
+R12:  | 7.0 |  |  |  |  |  |  |  |  |  |  | False |  | Combat | Combat Prowess | Level II
+R13:  | 8.0 |  |  |  |  |  |  |  |  |  |  | False
+R14:  | 9.0 |  |  |  |  |  |  |  |  |  |  | False |  | Combat | Advanced Reflexes | Level I | #N/A
+R15:  | 10.0 |  |  |  |  |  |  |  |  |  |  | False
+R16:  | 11.0 |  |  |  |  |  |  |  |  |  |  | False |  | Learning | Gifted | Level I
+R17:  | 12.0 |  |  |  |  |  |  |  |  |  |  | False
+R18:  | 13.0 |  |  |  |  |  |  |  |  |  |  | False |  | Learning | Hive Mind | Level I
+R19:  | 14.0 |  |  |  |  |  |  |  |  |  |  | False
+R20:  | 15.0 |  |  |  |  |  |  |  |  |  |  | False |  | Learning | Expertise at (X) | Level III | #N/A | History
+R21:  | 16.0 |  |  |  |  |  |  |  |  |  |  | False
+R22:  | 17.0 |  |  |  |  |  |  |  |  |  |  | False |  | Negative | Heart is Taken by (X) | Level I |  | Valmir Calius
+R23:  | 18.0 |  |  |  |  |  |  |  |  |  |  | False
+R24:  | 19.0 |  |  |  |  |  |  |  |  |  |  | False |  | Negative | Bane (X) | Level I |  | JEWL
+R25:  | 20.0 |  |  |  |  |  |  |  |  |  |  | False
+R26:  | 21.0 |  |  |  |  |  |  |  |  |  |  | False |  | Magic | Esther Conduit | Level III
+R27:  | 22.0 |  |  |  |  |  |  |  |  |  |  | False
+R28:  | 23.0 |  |  |  |  |  |  |  |  |  |  | False |  | Magic | Attunement (X) | Level I |  | Negative
+R29:  | 24.0 |  |  |  |  |  |  |  |  |  |  | False
+R30:  | 25.0 |  |  |  |  |  |  |  |  |  |  | False |  | Magic | Battery Body | Level III
+R31:  | 26.0 |  |  |  |  |  |  |  |  |  |  | False
+R32:  | 27.0 |  |  |  |  |  |  |  |  |  |  | False |  |  |  |  | False
+R33:  | 28.0 |  |  |  |  |  |  |  |  |  |  | False
+R34:  | 29.0 |  |  |  |  |  |  |  |  |  |  | False |  |  |  |  | False
+R35:  | 30.0 |  |  |  |  |  |  |  |  |  |  | False
+R36:  | 31.0 |  |  |  |  |  |  |  |  |  |  | False |  |  |  |  | False
+R37:  | 32.0 |  |  |  |  |  |  |  |  |  |  | False
+R38:  | 33.0 |  |  |  |  |  |  |  |  |  |  | False |  |  |  |  | False
+R39:  | 34.0 |  |  |  |  |  |  |  |  |  |  | False
+R40:  |  |  |  |  |  |  |  |  |  | Total Weight | 0 |  |  |  |  |  | False
+R41:  |  |  |  |  |  |  |  |  |  | Total Value | 0
+R42:  |  |  |  |  |  |  |  |  |  | Bag Weight | 0 |  |  |  |  |  | False
+R43:  |  | Woven Spells
+R44:  | Sort | Name | Domains | DR | Casting Speed | Targets | Range | Description | Spell Strength | Duration | C/D |  |  |  |  |  | False
+R45:  | 1.0
+R46:  | 2.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R47:  | 3.0
+R48:  | 4.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R49:  | 5.0
+R50:  | 6.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R51:  | 7.0
+R52:  | 8.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R53:  | 9.0
+R54:  | 10.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R55:  | 11.0
+R56:  | 12.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R57:  | 13.0
+R58:  | 14.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R59:  | 15.0
+R60:  | 16.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R61:  | 17.0
+R62:  | 18.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R63:  | 19.0
+R64:  | 20.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R65:  | 21.0
+R66:  | 22.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R67:  | 23.0
+R68:  | 24.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R69:  | 25.0
+R70:  | 26.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R71:  | 27.0
+R72:  | 28.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R73:  | 29.0
+R74:  |  | Passive Tasks |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R75:  |  | Type | Time | Notes
+R76:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R78:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R79:  |  | Root, Branches, Thorns & Blossoms
+R80:  |  | Branches |  | Thorns |  |  |  | Blossoms |  |  |  |  |  |  |  |  | False
+R81:  | Root
+R82:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R84:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R86:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R88:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R90:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+R92:  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False
+
+=== EXPLOITDATA === rows=44
+R1: Ancient Soul | Born Evolved | Death's Hand | Eidetic Memory | Enthralling Aura | Flight | Healing Factor | Magic Negator (X) | Precognition | Proof (X) | Shapeshifter | The Hunger | The Need for Speed | They're All Going to Laugh at You! | Undead | Unnatural Existence | Voice of the Esther | Leyline of Ascalia | Iron Mind | Impossible Luck | Esther Locked
+R3: Ancient Soul | Born Evolved | Death's Hand | Eidetic Memory | Enthralling Aura | Flight | Healing Factor | Magic Negator (X) | Precognition | Proof (X) | Shapeshifter | The Hunger | The Need for Speed | They're All Going to Laugh at You! | Undead | Unnatural Existence | Voice of the Esther | Leyline of Ascalia | Iron Mind | Impossible Luck | Esther Locked
+R5: Ancient Soul | Born Evolved | Death's Hand | Eidetic Memory | Enthralling Aura | Flight | Healing Factor | Magic Negator (X) | Precognition | Proof (X) | Shapeshifter | The Hunger | The Need for Speed | They're All Going to Laugh at You! | Undead | Unnatural Existence | Voice of the Esther | Leyline of Ascalia | Iron Mind | Impossible Luck | Esther Locked
+R7: Combat Improvision | Way of the Fists | Battle Momentum | Battle Proficiency | Brawler | Combat Endurance | Combat Prowess | Combat Tactics | Counter Combatives | Destroy Guard | Die Hard | Dirty Fighter | Disarm | Double Tap... No, Triple Tap... Just Keep Shooting! | Dual Wield | Envigorating Rally | Fighting Flow | I Am Your Shield! | I Only Make Headshots | Lay It All On The Line | Lend Me ...
+R9: Combat Improvision | Way of the Fists | Battle Momentum | Battle Proficiency | Brawler | Combat Endurance | Combat Prowess | Combat Tactics | Counter Combatives | Destroy Guard | Die Hard | Dirty Fighter | Disarm | Double Tap... No, Triple Tap... Just Keep Shooting! | Dual Wield | Envigorating Rally | Fighting Flow | I Am Your Shield! | I Only Make Headshots | Lay It All On The Line | Lend Me ...
+R11: Fast Learner | Gifted | Hive Mind | Jack of All Trades | Knowledge is Power | Muscle Memory | Scatterbrained | Self Teacher
+R13: Fast Learner | Gifted | Hive Mind | Jack of All Trades | Knowledge is Power | Muscle Memory | Scatterbrained | Self Teacher
+R15: Fast Learner | Gifted | Hive Mind | Jack of All Trades | Knowledge is Power | Muscle Memory | Scatterbrained | Self Teacher
+R17: Allergic to (X) | Bad Blood with (X) | Bane (X) | Broken Heart | Emotional Baggage | Emotional Scars | Emotional Torment | Heart is Taken by (X) | I'm Awkward | Impaired Taste | Karma is a Bitch | Over-Thinker | Silver Spoon | Stagnant Vitality | Static | Strange Vibrations | Strange Vibrations (Partial Supression) | Teetotaler | That's Mine! | Weak Weave Connection
+R19: Allergic to (X) | Bad Blood with (X) | Bane (X) | Broken Heart | Emotional Baggage | Emotional Scars | Emotional Torment | Heart is Taken by (X) | I'm Awkward | Impaired Taste | Karma is a Bitch | Over-Thinker | Silver Spoon | Stagnant Vitality | Static | Strange Vibrations | Strange Vibrations (Partial Supression) | Teetotaler | That's Mine! | Weak Weave Connection
+R21: Chaotic Spark | Enchanted Performer | Ritualist | Altruistic Spark | Attunement (X) | Battery Body | Blessed Arcana | Demonic Arts | Esther Conduit | Feel the Esther | Parsley, Sage, Rosemary, and Thyme | Sacred Exchange | Selfish Spark | Karmic Power | Don't Break My Concentration | Attunement Unlocked
+R23: Chaotic Spark | Enchanted Performer | Ritualist | Altruistic Spark | Attunement (X) | Battery Body | Blessed Arcana | Demonic Arts | Esther Conduit | Feel the Esther | Parsley, Sage, Rosemary, and Thyme | Sacred Exchange | Selfish Spark | Karmic Power | Don't Break My Concentration | Attunement Unlocked
+R25: Chaotic Spark | Enchanted Performer | Ritualist | Altruistic Spark | Attunement (X) | Battery Body | Blessed Arcana | Demonic Arts | Esther Conduit | Feel the Esther | Parsley, Sage, Rosemary, and Thyme | Sacred Exchange | Selfish Spark | Karmic Power | Don't Break My Concentration | Attunement Unlocked
+R27: #REF!
+R29: #REF!
+R31: #REF!
+R33: #REF!
+R35: #REF!
+R37: #REF!
+R39: #REF!
+R41: #REF!
+R43: #REF!
+R45: #REF!
+R47: #REF!
+R49: #REF!
+R51: #REF!
+R53: #REF!
+R55: #REF!
+R57: #REF!
+R59: #REF!
+R61: #REF!
+R63: #REF!
+R65: #REF!
+R67: #REF!
+R69: #REF!
+R71: #REF!
+R73: #REF!
+R75: #REF!
+R77: #REF!
+R79: #REF!
+R81: #REF!
+R83: #REF!
+R85: #REF!
+R87: #REF!
+
+=== Combat === rows=44
+R1: Combat Improvision | [Deception 5 ] / Once per combat round, at any time, you may turn a Defense token into a Basic or Magic token. | #N/A | [Deception 10] / Once per combat round, at any time, you may turn a Defense token into a Basic or Magic token, or you may turn a Basic or Magic token into a Defense token. | #N/A | [Deception 14] / Once per combat round, at any time, you may change up to ...
+R2: Way of the Fists | [Unarmed 10] / You may take an additional reaction action per combat round. The reaction action must be an unarmed attack. |  | [Unarmed 15] / You may take up to two additional reaction actions per combat round. The reaction actions must be unarmed attacks.  |  | [Unarmed 20] / You may take up to two additional reaction actions per combat round. The reaction actions must be ...
+R3: Battle Momentum | [Any Melee Martial Arts Skill 6] / Successful melee attacks give you a free spontaneous 5 foot step. /  |  | [Any Melee Martial Arts Skill 10] / Successful melee attacks give you a free spontaneous 10 foot step in one direction. /  |  | [Any Melee Martial Arts Skill 14] / Successful melee attacks give you a free spontaneous 10 foot step in one direction. You may take a Free S...
+R4: Battle Proficiency | [Any Martial Arts Skill 6] / +1 Mod to all Martial Arts Skills |  | [Any Martial Arts Skill 10 or STR 5] / +1 Mod to all Martial Arts Skills. Successful attacks will allow you to move the attacked creature 5 feet any any direction. |  | [Any Martial Arts Skill 17 or DEX 6] / +1 Mod to all Martial Arts Skills. Successful attacks will allow you to move the attacked creature ...
+R5: Brawler | [Unarmed 4] / Unarmed Mod +2 /  |  | [Unarmed 9] / Unarmed Mod +4 /  |  | [Unarmed 14] / Unarmed Mod +4. You can add an additional +5 Bashing damage to your unarmed attacks for one round but you must remove an active defensive action. (You can only do this once per round.) /
+R6: Combat Endurance | [Combined Athletics 10] / +2 to Virility Mod. /  |  | [CON 4] / +2 to Virility Mod; +5 to Base Endurance /  |  | [Survival 12] / +3 to Virility Mod; +5 to Base Endurance; +1 to Base Resist.
+R7: Combat Prowess | [Fought in a battle; Any Martial Arts Skill 4] / +1 APT /  |  | [Any Martial Arts Skill 8] / +1 APT; +2 to Nimbleness Mod. /  |  | [Any Martial Arts Skill 14] / +1 APT; +2 Nimbleness Mod. You may reroll attack rolls but you have to keep the second roll.
+R8: Combat Tactics | [Leadership 3; Any 3 Martial Arts Skills 4] / At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone you choose who can understand you gains +2 APT during the first round of combat.  /  |  | [Leadership 10; WIS 3] / At the start of any battle, if unsurprised, you may skip your first round of combat. If you do, then anyone yo...
+R9: Counter Combatives | [Any Martial Arts Skill 6] / Requires a defensive action: / If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Action against them). /  |  | [Unarmed 8 or STR 5] / Requires a defensive action: / If someone uses an Basic Action against you and they fail, you may counter attack (take a Free Spontaneous Basic Actio...
+R10: Destroy Guard | [Unarmed 10] / A successful unarmed attack removes a Defensive action from the creature attacked. /  |  | -[] |  | -[]
+R11: Die Hard | [Must have fallen unconcious during a battle; CON 4] / +2 Conviction Mod |  | [CHA 4] / +2 Conviction Mod; +2 Virility Mod.  |  | [Defied Death] / +2 Conviction Mod; +2 Virility Mod.; +1 mod to fate roll for defying death.
+R12: Dirty Fighter | [Unarmed 5] / During any attack you make that is blocked you may pay 5 Fortitude to trip the blocker and knock them prone. |  | [Nimbleness 8] / During any attack you make that is blocked you may pay 5 Fortitude to trip the blocker and knock them prone. Or, During any attack you make that is blocked you may pay 8 Fortitude to kick dust into the blocker's eyes and blind them fo...
+R13: Disarm | [Manual Dexterity 3] / You can make a creature drop an object when you hit the object or the lower arm carrying it. /  |  | [STR 3; Manual Dexterity 7] / You can make a creature drop an object when you hit the object or the lower arm carrying it. If able, you may pick up that object with a successful Free No Effort Spontaneous Manual Dexterity Skill Check. /  |  | [DEX 5; Manual Dext...
+R14: Double Tap... No, Triple Tap... Just Keep Shooting! | [Firearms 5] / Using only one basic action, you may attack a target with a firearm until the weapon needs reloading or you miss an attack. The DR to hit is increased by one for every shot after the first. /  |  | [Firearms 11] / Using only one basic action, you may attack up to 2 targets with a firearm until the weapon needs reloading or y...
+R15: Dual Wield | [None] / You may dual wield one-handed weapons that are Trivial weight or less; You may use one Basic Action to attack with both weapons using one skill check. The DR for the target is increased by 3. /  |  | [STR 4] / You may dual wield one-handed weapons that are Light weight or less; You may use one Basic Action to attack with both weapons using one skill check. You may attack...
+R16: Envigorating Rally | [Virility 5] / Once per day you may summon inner determination to keep going. During combat you may take a Basic Action to increase your Fortitude by your heal rate.  |  | [Virility 9] / Once per day you may summon inner determination to keep going. Take a Basic Action to increase your Fortitude by your heal rate. |  | [Virility 11; Conviction 5] / Once per day you may su...
+R17: Fighting Flow | [DEX 5] / Once per day during combat you may increase your ATP by 2. |  | [Nimbleness 12] / Once per day during combat you may increase your ATP by 3. |  | [Combined Athletics 50] / Once per combat you may increase your ATP by 3.
+R18: I Am Your Shield! | [Combat Prowess Level 1] / Requires a Defensive action: / You may intercept damage for a willing creature within 5 feet. You must change places with them before the attacker rolls to hit. Remove one of your defensive actions after the attack. /  |  | [STR 5 CON 4] / Requires a Defensive action: / You may intercept damage for a willing creature within 5 feet. You must chang...
+R19: I Only Make Headshots | [Firearms or Archery 10; Manual Dexterity 8] / Ranged attacks do not impose a +2 DR when calling a shot. |  | -[] |  | -[] /
+R20: Lay It All On The Line | [CHA 4] / Once, at the beginging of a combat round, you may pay 20 Fortitude for +1 APT that round. |  | [CHA 5] / Once, at the beginging of a combat round, you may pay 15 Fortitude for +1 APT that round. |  | [CHA 6; DEX 5] / As many times as you like, you may pay 15 Fortitude for +1 APT that round.
+R21: Lend Me A Hand | [Leadership 3] / At the begining of a combat round, a willing creature within 5 feet may reduce their APT by 1 and you gain +1 APT this round. /  |  | [Leadership 6] / Any time during combat, a willing creature within 20 feet may remove 1 action and you gain 1 free action. /  |  | [Leadership 12; Negotiation 7] / Any time during or before combat, a willing creature within 20 ...
+R22: Look, No Hands! | [Unarmed 8] / Defensive tokens still prevent death from critical attacks when you are grappling a creature. |  | [Unarmed 10; Environmental Perception 5; Combat Prowess Level 2] / Defensive tokens still prevent death from critical attacks when you are grappling a creature. You may still block while grappling. |  | [Unarmed 13] / Defensive tokens still prevent death from crit...
+R23: Master Grappler | [Successfuly Grappled 5 Creatues] / You can grapple creatures 2 sizes larger than you instead of 1. /  |  | [Unarmed 13] / You can grapple creatures 2 sizes larger than you instead of 1. When grappled or grappling you may add +3 Bashing to your unarmed attacks. /  |  | [Unarmed 16] / You can grapple creatures 2 sizes larger than you instead of 1. When grappled or grappling y...
+R24: Missile Command | [Manual Dexterity 8] / Requires a defensive action: / Instead of blocking or dodging a ranged attack you may instead make a free Manual Dexterity skill check against the attack roll. If successful you can grab the missile out of the air. If you fail then remove a defensive token. |  | [Manual Dexterity 13] / Requires a defensive action: / Instead of blocking or dodging a ran...
+R25: Move Like a Butterfly | [Acrobatics 6] / Requires a Defensive action: / As a reaction to a successful melee attack you may make a free acrobatics 0 effort skill check to directly contest the attack. If you are successful then the damage from the attack is negated. Remove one of your defensive actions. |  | [Acrobatics 13] / Requires a Defensive action: / As a reaction to a successful melee at...
+R26: Murder-Stroke | [Blades 3] / Damage is equal to the weapon's slashing attack damage -12 but as bashing. /  |  | [Blades 6] / Damage is equal to the weapon's slashing attack damage - 8 but as bashing. /  |  | [Blades 12] / Damage is equal to the weapon's slashing attack damage -6 but as bashing. If you do damage to a creatures body with this attack and they are the same size or smaller than yo...
+R27: Parry | [None] / When you block you may directly contest an incoming melee attack with a free 0 effort melee Martial Arts Action. Remove 1 defensive action if their attack is still succesful after the parry attempt.  |  | -[] |  | -[]
+R28: Patience, Grasshopper! | [None] / You may defer 1 action in combat to the next round; You will get the deferred action plus your normal APT. You must choose to defer before the round begins and actions are placed. /  |  | [Environmental Perception 10] / You may defer up to 2 actions in combat to the next round; You will get the deferred actions plus your normal APT. /  |  | [DEX 6; Environmen...
+R29: Put A Tourniquet On That! | [Survival 6 or Medicine 2] / A successful medicine or survival check in battle can heal a wounded body part of yours or another to undamaged. You must have something to act as a bandage and they must be within 5 feet. /  |  | [Survival 12 or Medicine 6; Combat Prowess level 1] / A successful medicine or survival check in battle can heal all wounded body parts of yo...
+R30: Quick Loading | [Manual Dexterity 7] / You may reload a weapon using 1 less action than it normally takes. |  | [Manual Dexterity 14] / You may reload a weapon using 2 less actions than it normally takes. |  | -[]
+R31: Rapid Fists | [Unarmed 6; Manual Dexterity 7] / You may strike one target up to 5 times with a single Basic action using an unarmed attack.  You must declare how many strikes and pay 1 Fortitude for every strike after the first. If the attack is unsucessful you must still pay the Fortitude for each additional strike. /  |  | [Unarmed 8; Manual Dexterity 10] / You may strike up to 2 targets up...
+R32: Rhythmic Cadence | [Music 6] / A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR) (May only be used once per combat) |  | [Music 8] / A successful music check that your allies can hear gives them a free APT this round. (DR 1 + situational DR). If the free APT is used on a Defensive action then they regain 10 Fortitude. (May only be use...
+R33: Riposte | [Level 1 Parry] / After a successful Parry you get a free Spontaneous Basic action. |  | -[] |  | -[]
+R34: Running Start | [Nothing] / You can move 5 feet as a free joint spontanious action before an Basic action.  /  |  | [DEX 5] / You can move 10 feet as a free joint spontanious action before an Basic action.  Movement must be in one direction. /  |  | [Acrobatics 8 or DEX 6] / You can move 10 feet as a free joint spontanious action before an Basic action.  Movement must be in one direction. You...
+R35: Shank Blitz | [Knives 7] / Can't Dual Wield:  / You can strike one target up to 3 times with a single Basic Action using a knife. If your attack is unsuccesful and you chose to strike multiple times: remove 1 defensive action and then the creature you attacked may choose to automaticaly put you into an uncontested grapple. |  | [Knives 12] / Can't Dual Wield:  / You can strike one target up t...
+R36: Shield Bash | [STR 5] / If you block against a melee attack with a shield then you may remove a defensive token from the attacker. /  |  | -[] |  | -[]
+R37: Shield Proficiency | [DEX 4] / The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing. |  | [DEX 5; CON 4; Manual Dexterity 8] / The damage of attacks you block are reduced by your choice of 5 Bashing, Piercing or Slashing. You may block unblockable Attacks targeting you. |  | [CON 5; Manual Dexterity 10] / The damage of attacks you block are reduced by ...
+R38: Shield Up! | [Shield Proficiency Level 3] / You may block attacks that pass or happen within 5 feet of you. /  |  | -[] |  | -[]
+R39: Sniper | [Manual Dexterity 15] / Effective range for all ranged weapons is doubled. |  | -[] |  | -[] /
+R40: Split the Arrow | [Archery 5] / While you have a defensive action, you may contest an incoming thrown or archery attack directly with a free archery skill check of your own. If you win, the attack is considered a miss; if you lose, your defensive action is removed. /  |  | [Archery 10] / While you have a defensive action, you may contest an incoming thrown or archery attack directly with a fr...
+R41: Sting Like a Bee | [Brawler Level 1] / You may apply your DEX to your unarmed mod. /  |  | -[] |  | -[]
+R42: Weaver's Bane | [Arcane Knowledge 8] / Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you. |  | [Arcane Knowledge 13] / Recieve a Free Spontaneous Basic Action if someone casts a spell within 5 feet of you. You may apply your Conviction to the DR of any spell being cast within 5 feet of you. |  | [Arcane Knowledge 20] / Recieve a Free Spontaneous Basic Actio...
+R43: Taunt | [None] / When you attack a creature you may spend 5 Fortitude to taunt the creature. For the remainder of the combat round if that creature attacks anyone except you they must take a +5 DR to their Attack Skill Roll. |  | [Intimidation 10] / When you attack a creature you may spend 3 Fortitude to taunt the creature. For the remainder of the combat round if that creature attacks anyone...
+R44: Tactical Footing | [Nimbleness 5] / You may take a free 5 foot step before using a Basic Action. |  | [Ingenuity 7] / You may take a free 5 foot step before using a Basic Action. At any time you may remove a Defensive token to take a free spontaneous 5 foot step. |  | [Nimbleness 10] / You may take a free 5 foot step before and after using a Basic Action. At any time you may remove a Defensiv...
+
+=== Utility === rows=22
+R1: Field Repair | [Mechanical Engineering 8] / You may use a basic action to increase the condition of a non-resource item by 1 tier. The object gains the brittle trait. | #N/A | [Mechanical Engineering 12] / You may use a basic action to increase the condition of a non-resource item by 1 tier. Make a 0 Effort Mechanical Engineering check DR 10. On a failure the item gains the brittle trait. | #N...
+R2: *Hello Darkness, My Old Friend | -[Any Performing Arts Skill 4] |  | -[] |  | -[]
+R3: *Inspirational Performer | -[Any Performing Arts Skill 4] / A successful Performing Arts skill check during combat will increase your allies’ (able to witness the performance) movement 5 feet for a round and you may take a 5 foot step during the performance. |  | -[Any Performing Arts Skill 8; CHA +2] / Successful performing art skill checks with a level 8 or higher allow anyone witnessing to ...
+R4: *Marked for Death | -[Sneak 6] /  |  | -[Any Martial Arts Skill 8; Sneak 10] / If you surprise attack a creature, and you succeed a Sneak check, gain a free round of combat on the target with a +1 mod to attacks against the target during that round. Marked for Death can't be used again during the free round. |  | -[Any Martial Art 12; Sneak 17] / The killing blow is so masterful that it takes ...
+R5: Death Becomes Me | [Defied Death twice] / Whenever you Defy Death gain 7 Karma. |  | [Defied Death thrice] / You are immune to Monkey Paws from Defying Death. Whenever you Defy Death gain 7 Karma. |  | [Rolled a 10 Defying Death] / Choose one Supernatural Exploit. You are immune to Monkey Paws from Defying Death. Whenever you Defy Death gain 7 Karma.
+R6: Fleet Footed | [Combined Athletics 30; Dex 6] / Speed Mod +2 |  | -[] |  | -[] /
+R7: Fortify Your Mind! | [WIS 3] / You know when someone is reading your mind. |  | [INT 3; CHA 3] / You know when someone is reading your mind. You can't be put to sleep magically. +1 to Wit, Ingenuity, and Conviction |  | [WIS 4; INT 4; CHA 4] / Your mind can't be read and you can't be put to sleep magically. +2 to Wit, Ingenuity, and Conviction
+R8: Head on a Swivel | [Environmental Awareness 12] / You are considered to have an active Defensive Action outside of combat. |  | -[] |  | -[] /
+R9: Hey! Listen! | [Leadership 6] / You can let another creature do skill checks using your skill level. They must have at least 1 in the skill to use it. If they fail they may not mark the skill trainable. |  | -[] |  | -[]
+R10: Know Thy Mark | [Any Perception Skill 3; WIS 2] / You know just by looking at someone their Wealth Level. If they are trying to disguise themselves then this estimate could be wrong.  |  | [Environmental Perception 6; Social Perception 10]  / You know just by looking at someone their Wealth Level even if they are trying to hide it. /  |  | [Social Perception 14] / You know just by looking at ...
+R11: Pinnacle of Health | [CON 6; Life Span < Epic] / Increase your lifespan one tier |  | -[] |  | -[]
+R12: Recon Expert | [Social Insight 8] / if you spend at least 1 minute observing another creature outside combat, you can learn if any skill or attribute of your choice is equal, superior, or inferior to your own. |  | [Social Insight 13] / if you spend at least 1 minute observing another creature outside combat, you can learn if two skills or attribute of your choice is equal, superior, or infer...
+R13: Resolute | [None] / +1 Mod to all Saves. |  | -[] |  | -[] /
+R14: Sharp Memory | [INT 5] / You always know what direction you are traveling. |  | [INT 7] / You always know what direction you are traveling. You can remember in great detail everything you have seen or heard within the past month. |  | [INT 9] / You always know what direction you are traveling. You can remember in great detail everything you have seen or heard within the past month. You can me...
+R15: There's No Such Thing as Luck | [None] / You may not spend Karma to change you or anyone else's luck. (can't bargain with GM)  Whenever you gain Karma for upholding your goals or values double the amount you recieve. |  | -[] |  | -[]
+R16: With Imagination, Anything is possible | [WIS 3] / On completion of an invention you recieve a normal version of the item instead of a prototype. |  | [WIS 5] / On completion of an invention you recieve a normal version of the item instead of a prototype. Invention minimum time is reduced from 1 month to 1 week. |  | [INT 5] / On completion of an invention you recieve a normal version of the ...
+R17: Resolute Mind | [Environmental Awareness 10] / Conviction +2  |  | [WIS 5] / Conviction +4 |  | [One Magic Pillar 20] / Conviction +4. Your Toughness is applied in addition to your Conviction when resisting a spell concentration break.
+R18: Master of Disguise | [Deception 12; Social Insight 12] / Once per session, while not in combat, you may remove your chartacter from play. At anytime after this, you may return to play revealing yourself as a GM's NPC that was just in disguise. /  |  | -[] /  |  | -[] /
+R19: Meditation | [] / Double recovery for all short rest Frequency spent |  | -[] /  |  | -[] /
+R20: Easy to Find Work | [] / You have no issues integrating into the local populace and making connections via oddjobs. |  | -[] /  |  | -[] /
+R21: Natural Sportsman | [] / Any attribute points spent during the course of a sport is doubled. |  | -[] /  |  | -[] /
+R22: University Contacts | [] / As an alumni, you have have easy access to the University reasearch resources and have contacts within the establishment. |  | -[] /  |  | -[] /
+
+=== Learning === rows=8
+R1: Fast Learner | [None] / When rolling to train a skill, a 5 and above is a success instead of 6 and above. | #N/A | [INT 3; CHA 4] / When rolling to train a skill, a 5 and above is a success instead of 6 and above. +1 to Learning Mod | #N/A | [WIS 6] / When rolling to train a skill, a 5 and above is a success instead of 6 and above. If you roll successfuly to train a skill, gain 2 levels in tha...
+R2: Gifted | [CHA 4] / When a skill is increased from level 0 to 1, gain 2 extra levels. |  | -[] |  | -[]
+R3: Hive Mind | [Social Perception 6; CHA 4] / Before after actions for a session you may pick one of your party members. Every time they gain a level in a skill you may make a fate roll. If the fate roll is a success you also gain a level in that skill. |  | [Social Perception 10; WIS 4] / Before after actions for a session you may pick one of your party members. Every level they gain in skills y...
+R4: Jack of All Trades | [At least one trained skill in every skill category except magic] / If you roll successfuly to train a basic skill, if that skill level is less than 6 then gain 2 extra levels in that skill. |  | -[] |  | -[]
+R5: Knowledge is Power | [INT 3] / If you roll a 10 on a skill training check then you gain an extra level on that skill. |  | [INT 5] / When rolling to train a skill, if you roll a 10, gain an extra level in that skill, and keep the skill marked as trainable for next session. |  | [INT 8] / When rolling to train a skill, if you roll a 10, gain an extra level in that skill, keep the skill marked a...
+R6: Muscle Memory | [STR 4, DEX 5] / Any Skills with STR or DEX governing them can be trained when they are trainable at the end of a session, regardless of your max skills trainable. |  | -[] |  | -[]
+R7: Scatterbrained | [INT 4] / At the end of a session you may change one trainable skill to another of the same skill class. |  | -[] |  | -[]
+R8: Self Teacher | [WIS 5] / Instead of training any skills at the end of a session you may instead gain a level in any non magic skill that is currently 0 with a successful fate roll. |  | -[] |  | -[]
+
+=== Social === rows=5
+R1: Alluring Spark | [Seduction 6; Beauty 7] / Anyone that finds you sexually attractive will do one minor favor without expecting compensation. /  | #N/A | [Beauty 8] / Anyone that finds you sexually attractive will do one minor favor without expecting compensation. Your Social Skill Checks aren't effected by Deficiency Status Effects.  | #N/A | [Beauty 10] / Anyone that finds you sexually attrac...
+R2: Diplomatic Immunity in (X) | [Law 8] / Government officials can’t persecute based on their laws if murder isn’t involved; the most they can do is detain and extradite you. (X is equal to a region the size of a large city.) |  | [Law 14] /   Even if murder is involved the law can only detain and extradite you. |  | [Law 16] / The law can't touch you.
+R3: Heavenly Beauty | [Beauty 10, All Social Skills 5] / Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies. |  | [Seduction 13] / Lies about you being a deity are extremely believable and only a creature's intelligence can be used to resist these lies. Seduction checks can’t be denied because of a character’s sexual preference...
+R4: Letting Off Steam | [None] / Successful intimidation skill checks reduce your strain by the score of the skill check -2. |  | [Survival 8, Fortitude 4] / Successful intimidation skill checks reduce your strain by the score of the skill check -2 and you get +2 Strain reduction from alcohol. |  | [CHA 7] / Successful intimidation skill checks reduce your strain by the score of the skill check -2...
+R5: You Have No Power Over Me! | [WIS 4] / Others may not apply their beauty modifier to checks against you. |  | [WIS 5; INT 6] / Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or seduced unless you allow it. |  | [WIS 6; INT 6; CHA 5] / Others may not apply their beauty modifier to checks against you. You can't be intimidated, persuaded, or...
+
+=== Magic === rows=16
+R1: Chaotic Spark | [None] / Add 3 levels to every school of magic. You can no longer spellweave and all woven spells you have are gone. When raw casting you can not choose what school to cast from, instead roll a 1d10 to determine what school of magic you will cast from. | #N/A | -[] | #N/A | -[] | #N/A
+R2: Enchanted Performer | [None] / You may use a performing arts skill to augment casting magic. Add half your skill level in the performing art rounded down to the magic skill check. The time required for casting is doubled. |  | -[] |  | -[]
+R3: Ritualist | [Supernatural Perception 10; Arcane Knowledge 10] / You may destroy items in exchange for mana during spellcasting. This mana may not be stored. The mana recieved is detemined by the GM based on the items value grade and condition. The GM may also determine an item isn't worth any mana.  |  | -[] |  | -[]
+R4: Altruistic Spark | [Positive or Neutral Attunement] / Monkey Paws from raw casting can only be directed at you.  |  | -[] |  | -[]
+R5: Attunement (X) | [Replaces Feel the Esther Level 1; Must be gained through Root, Branch, Blossom, or GM awarded] / You gain the ability to use magic and spellweave. Mercy, Severity or Balance attunement |  | -[] |  | -[]
+R6: Battery Body | [Any Domains of Magic Skill 4; Arcane Knowledge 5] / You can store 5 mana within your body. |  | [Any Domains of Magic Skill 6; Arcane Knowledge 10] / You can store 10 mana within your body. |  | [Any Domains of Magic Skill 8; Arcane Knowledge 15] / You can store 15 mana within your body.
+R7: Blessed Arcana | [Must be gained through Root, Branch, Blossom, or GM awarded] / You have a strong foundation in the arcane arts. You will take no negatives from the Understand the Esther blossom. |  | [Arcane Knowledge 6; Feel the Esther Level 1] / You are unable to cast unless you have Attunement, but gain +3 to one Pillar of Mercy Magic Skill |  | [Arcane Knowledge 10] / You have a strong f...
+R8: Demonic Arts | [Must be gained through Root, Branch, Blossom, or GM awarded] / You can peform an ancient dark ritual to unlock a connection to the Esther. Remove 1 attribute point from a fellow party member as you perform the ritual to unlock the knowledge you seek. Instantly gain the Feel the Esther Exploit. |  | [Arcane Knowledge 6; Feel the Esther Level 1] / You are unable to cast unless yo...
+R9: Esther Conduit | [Used 20 Mana] / Whenever you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored and must be applied to the current casted spell or it burns up. |  | [Used 40 Mana] / When you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. If someone else uses mana to cast a spell within 500 feet o...
+R10: Feel the Esther | [Must be gained through Root, Branch, Blossom, or GM awarded] / You can increase levels in the Domains of Magic Skills. (This doesn't give you the ability to cast or spellweave.) |  | -[] |  | -[]
+R11: Parsley, Sage, Rosemary, and Thyme | [Chemical Engineering 6; Arcane Knowledge 8] / You may raw cast by sacrificing items. Using a magic action, you may destroy one undamaged item to cast from any school of magic. The value of the item is equal to the skill during casting. No mana from any source may be added to this raw cast. |  | [Chemical Engineering 10; Arcane Knowledge 12] / You may raw ...
+R12: Sacred Exchange | [The Hunger or Arcane Knowledge 8] / You may freely consume 1 available Mana to instantly regain 1 Fortitude. |  | -[] |  | -[]
+R13: Selfish Spark | [Negative or Neutral Attunement] / Monkey Paws from raw casting can only be directed at others or the environment. |  | -[] |  | -[]
+R14: Karmic Power | [None] / You may use Karma as if it was Mana stored in your body. |  | -[] |  | -[]
+R15: Don't Break My Concentration | [Arcane Knowledge 12] / If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from your body. |  | [Supernatural Perception 12] / If your concentration is broken when casting or channelling a spell then a 20 foot radius blast that does 3d10 of bashing damage is expelled from y...
+R16: Attunement Unlocked | [1 School of magic in your attunement pillar 20] / You may roll an additional 1d10 when casting any spell in your pillar of attunement |  | [2 Schools of magic in your attunement pillar 20] / You may roll an additional 1d12 when casting any spell in your pillar of attunement |  | [3 Schools of magic in your attunement pillar 20] / You may roll an additional 1d20 when cas...
+
+=== Supernatural === rows=21
+R1: Ancient Soul | [None] / This body may be new but your soul is very old. +1 Karma at the end of every session no matter what. | #N/A | -[] | #N/A | -[] | #N/A
+R2: Born Evolved | [None] / All attributes +1 |  | -[] |  | -[]
+R3: Death's Hand | [Lifespan < 4 - Long] / Increase Lifespan 2 ranks. If someone in your party must roll to defy death then you must also roll to defy death. You don't recieve a monkey paw but if you roll a 5 or lower then your character is doomed. |  | -[] |  | -[]
+R4: Eidetic Memory | [None] / You remember everything you read, hear, or see in great detail with nearly perfect recollection. This should provide substantial bonuses in numerous occasions at GM's discretion. Also you no longer have to roll or spend karma to level up skills at the end of a session. (You can still only gain a max amount of skill points per session based on your learning amount.) | ...
+R5: Enthralling Aura | [None] / Enthrall one being of DR of 11 or lower at a time. You have complete control over them. GM makes them a character sheet and plays them but you command them. |  | [Subsequent Earning] / Enthrall one being of DR of 18 or lower at a time. You have complete control over them. GM makes them a character sheet and plays them but you command them. |  | [Subsequent Earning] ...
+R6: Flight | [None] / You have the natural ability of flight. You can fly in any direction at your movement speed. |  | -[] |  | -[]
+R7: Healing Factor | [None] / Worn body parts automaticaly heal in 6 seconds or one combat round. |  | [CON +4] / Worn and broken body parts heal one condition in 6 seconds or one combat round. |  | [CON +6] / Worn and broken body parts heal one condition in 6 seconds or one combat round. Destroyed body parts heal in 1 day.
+R8: Magic Negator (X) | [None] / If (X) school of magic is used within 300 feet of you the spell is instantly countered and you have access to the mana used for that spell. You can store the mana in a catalyst or it must be used within 6 seconds or by the end of the next combat round. (YOU CAN NOT CAST FROM THAT SCHOOL EITHER) |  | -[] |  | -[]
+R9: Precognition | [None] / You may at anytime ask the GM to have the last 10 minutes of game time be replayed. The events never happened; you just saw the future. You can't replay the same span of time twice.  (Can only be used once per session) |  | -[] |  | -[]
+R10: Proof (X) | [None] / Your body is naturally immune to cold, fire, electricity, or acid |  | -[] |  | -[]
+R11: Shapeshifter | [None] / You may change your apperance at will. You can't grow or shrink in size but everything else is free game. Changing is exhausting and every transformation reduces your Fortitude by 5. This can allow the user to change their Beauty stat. |  | -[] |  | -[]
+R12: The Hunger | Consume the Body: [None] / Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action you may gorge on a fresh corpse to replenish 10 Fortitude. |  | Drink the Spirit: [Subsequent Earning] / Tearing, bitting, ripping whatever way you do it you recive sustanence from the blood or flesh of your enemies. As an action ...
+R13: The Need for Speed | 1.209 Gigawatts: [None] / +2 to APT; + 6 Speed Mod |  | Give Me Fuel, Give Me Fire: [Subsequent Earning] / +2 to APT; +6 Speed Mod; +8 Healing Mod; |  | Touch the Speed Force: [Subsequent Earning] / +2 to APT; +7 Speed Mod; +8 Healing Mod; Once a day you can move 99.99% the speed of light for a minute.
+R14: They're All Going to Laugh at You! | [None] / You can create a medium size fire at will within 30 feet of you. In combat this can only be done once per round as an offesnive action. Damage from this fire is 15 Fire. |  | -[] |  | -[]
+R15: Undead | [None] / CON levels are reduced to 0 and you can't gain CON. You can't die from having a 0 CON. Regen Mod is reduced to 0 and you can't raise it higher. +300 Stamina Mod. |  | -[] |  | -[]
+R16: Unnatural Existence | [None] / You do not need to eat, drink, or sleep. You don't lose Fortitude from a lack of any of these things. |  | [CON +5] / You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't lose Fortitude from a lack of any of these things. |  | [Immortal Life Span] / You do not need to eat, drink, breathe, or sleep and...
+R17: Voice of the Esther | [None] / You are connected to everything around you, the elements speak to you, and let know you what is happening around you at all times.  You cannot be caught unaware.  Any trap/hidden object, creature, or person is known to you. |  | -[] |  | -[]
+R18: Leyline of Ascalia | [Special] / There is a surplus of Mana to draw from this realm. Whenever anyone draws upon this leyline it gives 1d20 worth of mana to be used immedietly. The Mana given then goes down one tier of dice. It goes back up one tier everyday. |  | -[] |  | -[]
+R19: Iron Mind | [None] / Your memory cannot be changed or altered by any outside force. You can vividly relive moments from your past and remember details you may not have conciously remembered.  |  | -[] |  | -[]
+R20: Impossible Luck | [None] / +1 Mod to all Basic Skills |  | -[] |  | -[]
+R21: Esther Locked | [None] / Magic that targets you automatically fails |  | -[] |  | -[]
+
+=== Negative === rows=20
+R1: Allergic to (X) | [None] / When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds). | #N/A | [Subsequent Earning] / When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds) and +2 DR to every roll. | #N/A | [Subsequent Earning] / When you are within 30 feet of X you take 5 Stamina damage every turn (6 Seconds) and +2 DR to every roll. If X tou...
+R2: Bad Blood with (X) | [None] / The person or group doesn't trust you. +2 DR to all checks involved with influencing that person or group. |  | [Subsequent Earning] / The person or group hates you. +4 DR to all checks involved with influencing that person or group, and they will be strongly urged to attack you and your party if they notice you. |  | [Subsequent Earning] / You can't use social sk...
+R3: Bane (X) | [None] / When you are within 100 feet of X all your skill rolls get a -5 mod and you lose 5 Fortitude every turn (6 Seconds). |  | -[] |  | -[]
+R4: Broken Heart | [Heart is Taken by (X) X Dies] / Add +2 DR to all Skill Checks you perform. If the GM allows, you may replace this Exploit with a Level in Emotional Scars Exploit after some time has passed. |  | -[] |  | -[]
+R5: Emotional Baggage | [None] / The horrors of your past are hard to let go. Strain reduction from sleep is halved rounded down. |  | -[] |  | -[]
+R6: Emotional Scars | [Replaces Emotional Baggage] / Whatever happend to you left so much damage that when vulnerable you can't help but dwelling on your past wounds.  Strain reduction from sleep is halved rounded down and when Distressed double all Strain acquired. |  | -[] |  | -[]
+R7: Emotional Torment | [Replaces Emotional Scars] / The pain is so bad that death is probably welcomed. Strain isn't reduced from sleep. When Distressed, double all Strain acquired.You may not attempt to defy death. |  | -[] |  | -[]
+R8: Heart is Taken by (X) | [None] / Strain does not reduce from intimate enounters unless it is with the person who has taken your heart. If you are away from this person for more than a month then you'll receive 4 Strain at the end of every session until you see them again. If they die, replace this exploit with the Broken Heart exploit. |  | -[] |  | -[]
+R9: I'm Awkward | [None] / Social ineptness is often a sign of a genius but it also means social situations are extremely taxing and hard to understand. / Social Perception, and Social Skills cannot be purchased with karma; if you attempt to increase them with a training roll then you must roll a 10 instead of a 6 or higher. |  | -[] |  | -[]
+R10: Impaired Taste | [None] / Eating doesn't restore Fortitude |  | -[] |  | -[]
+R11: Karma is a Bitch | [None] / Remove 1 Karma at the end of each session. This removal does not increase your KV. (This can take you into negative Karma) |  | -[] |  | -[]
+R12: Over-Thinker | [None] / Exerting INT governed skill checks results in double the Strain. |  | -[] |  | -[]
+R13: Silver Spoon | [None] / You are not used to getting your hands dirty or being uncomfortable. You lose double Fortitude whenever you Exert a Skill Check. |  | -[] |  | -[]
+R14: Stagnant Vitality | [None] / Your Heal Rate is always effectively 0. You don't recover Fortitude from Sleeping. |  | -[] |  | -[]
+R15: Static | [None] / All attributes are set to 2 and can't be changed by Roots, Branches, Blossoms, or Thorns |  | -[] |  | -[]
+R16: Strange Vibrations | [None] / You can't use, resist, or gain any positive benefits from magic. |  | -[] |  | -[]
+R17: Strange Vibrations (Partial Supression) | [None] / It is easier to cast negative spell targeting you and harder for possitive. -5 DR to negative spells targeting you. +5 DR to possitive spells targeting you. |  | -[] |  | -[]
+R18: Teetotaler | [None] / You won't drink alcohol willingly. Drinking Alcohol doesn't restore Fortitude. |  | -[] |  | -[]
+R19: That's Mine! | [None] / If you give something away you take strain equal to the value of the object/100.  |  | -[] |  | -[]
+R20: Weak Weave Connection | [None] / You may only Raw Cast Empowered Spells and lower (<30 DR). Woven Spells are unaffected. |  | -[] |  | -[]
+
+=== Racial === rows=1
+R1: #REF! | #REF! | #REF! | #REF! | #REF! | #REF! | #REF!

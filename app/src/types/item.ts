@@ -4,6 +4,8 @@
  * They appear on the Relations Canvas and can be assigned to characters or locations.
  */
 
+import type { SenseGrantSpec } from './growth';
+
 export type WorldItemType = 'weapon' | 'armor' | 'accessory' | 'consumable' | 'tool' | 'artifact' | 'prima_materia' | 'misc';
 
 /**
@@ -16,10 +18,20 @@ export interface ItemAbility {
   description: string;
   mechanicalEffect?: string;
   kv?: number;            // Hidden from UI; contributes to item's total KV in the background
+  /**
+   * Magic school of the enchantment (one of the ten MagicSchool names). Optional
+   * hook (perception, Mike 2026-10-09): an ability is tagged Fortune + its school's
+   * domain; without a school it is tagged Fortune only.
+   */
+  school?: string;
+  /** Senses this ability grants the holder (types/growth SenseGrantSpec). */
+  grantsSenses?: SenseGrantSpec[];
 }
 
 export interface GrowthWorldItem {
   description: string;
+  /** Senses this item / body part grants its holder or body (types/growth SenseGrantSpec), scaled by its condition. */
+  grantsSenses?: SenseGrantSpec[];
 
   // ── Materials (canon: Material_System.md) ──
   primaryMaterial?: string;        // Primary material; e.g. "Iron", "Leather"
@@ -103,6 +115,10 @@ export interface GrowthWorldItem {
    *  (r-2026-06-11-05). Seeds mark their own vitals; Human baseline marks
    *  Brain and Heart. */
   isVital?: boolean;
+  /** Mike 2026-09-20: whether damage landing on this part depletes the
+   *  bearer's attribute pool (Affinity Cycle path). Living tissue = true
+   *  (default when absent); a horn, shell, carapace, hoof = false. */
+  depletesAttributes?: boolean;
 }
 
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary' | 'artifact';

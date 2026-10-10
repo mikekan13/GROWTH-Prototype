@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
+import { recordProvenanceSafe } from '@/services/provenance';
 
 // --- Schemas ---
 
@@ -69,7 +70,7 @@ export async function createCampaignItem(
 
   const data = input.data ?? createDefaultItem();
 
-  return prisma.campaignItem.create({
+  const item = await prisma.campaignItem.create({
     data: {
       name: input.name,
       type: input.type ?? 'misc',
@@ -80,6 +81,9 @@ export async function createCampaignItem(
       createdBy: userId,
     },
   });
+  // Provenance manifest at write-time (2026-09-20).
+  recordProvenanceSafe({ assetType: 'campaign_item', assetId: item.id, campaignId, creatorUserId: userId, creatorKind: 'human', content: data });
+  return item;
 }
 
 export async function updateCampaignItem(

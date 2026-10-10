@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
+import { requireCampaignMember, requireEventPoster } from '@/services/campaign-access';
+import { feedViewerFor, queryPerceivedFeed, viewAsViewer } from '@/services/perceived-feed';
 import { broadcastEvent } from '@/lib/campaign-stream';
+import { postInspectFromChat } from '@/services/inspection';
 import type { TerminalEventType, TerminalActor, TerminalPayload, TerminalEvent } from '@/types/terminal';
 
 export const dynamic = 'force-dynamic';
@@ -12,8 +15,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const { id: campaignId } = await params;
+    await requireCampaignMember(campaignId, session.user);
     const sp = request.nextUrl.searchParams;
 
     const types = sp.get('types')?.split(',').filter(Boolean) as TerminalEventType[] | undefined;
@@ -21,6 +25,17 @@ export async function GET(
     const cursor = sp.get('cursor') || undefined;
     const limit = sp.get('limit') ? parseInt(sp.get('limit')!) : undefined;
     const sessionId = sp.has('sessionId') ? (sp.get('sessionId') || null) : undefined;
+
+    // Perception unit 9 (PERCEPTION_FEED): a Trailblazer reads their character's memory, filtered HERE —
+    // truth text of an unperceived line never leaves the server. Flag off / Watcher / ADMIN: unchanged.
+    // Unit 10: `viewAs=<characterId>` — the Watcher (or ADMIN) reads the feed exactly as that character's
+    // memory, through the same path; anyone else asking for another character's view → 403.
+    const viewAs = sp.get('viewAs') || undefined;
+    const viewer = viewAs ? await viewAsViewer(campaignId, session.user, viewAs) : await feedViewerFor(campaignId, session.user);
+    if (viewer.mode === 'perceived') {
+      const page = await queryPerceivedFeed({ campaignId, viewer, types, sessionId, after, cursor, limit });
+      return NextResponse.json(viewAs ? { ...page, viewAs: viewer.characterId } : page);
+    }
 
     const result = await queryCampaignEvents({
       campaignId,
@@ -46,7 +61,7 @@ export async function POST(
     const { id: campaignId } = await params;
     const body = await request.json();
 
-    const { type, characterId, characterName, payload } = body as {
+    const { type, characterId: askedCharacterId, characterName: askedCharacterName, payload } = body as {
       type: TerminalEventType;
       characterId?: string;
       characterName?: string;
@@ -57,7 +72,11 @@ export async function POST(
       return NextResponse.json({ error: 'type and payload are required' }, { status: 400 });
     }
 
-    const actor: TerminalActor = session.user.role === 'WATCHER' || session.user.role === 'GODHEAD' || session.user.role === 'ADMIN' ? 'gm' : 'player';
+    // Security (2026-10-09): members only; the campaign's GM/ADMIN posts for anyone, everyone else only for
+    // their own character (name from the record, not the request).
+    const poster = await requireEventPoster(campaignId, session.user, askedCharacterId, askedCharacterName);
+    const { characterId, characterName } = poster;
+    const actor: TerminalActor = poster.isGM ? 'gm' : 'player';
 
     const event = await createCampaignEvent({
       campaignId,
@@ -85,6 +104,12 @@ export async function POST(
       payload,
     };
     broadcastEvent(campaignId, { kind: 'terminal_event', event: terminalEvent });
+
+    // Perception unit 11: a player's "I inspect the sword (with my swordsmanship)" posts an inspect intent
+    // to the planning board (best-effort; the chat line itself is unchanged).
+    if (type === 'chat' && actor === 'player' && characterId && payload.kind === 'chat') {
+      void postInspectFromChat(campaignId, session.user, characterId, payload.message);
+    }
 
     return NextResponse.json({ event }, { status: 201 });
   } catch (error) {

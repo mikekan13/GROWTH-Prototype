@@ -1,7 +1,7 @@
 # 00 — CANON CORE
 
 **Status:** #validated · condensed canonical core · **RUNTIME COMPONENT**
-**Last synced:** 2026-06-26 (incorporates all rulings through r-2026-06-11-08)
+**Last synced:** 2026-08-26 (incorporates all rulings through r-2026-08-26-01)
 **Security:** PUBLIC (rules) — the Founder-Only 10-year arc is NOT in this file by design.
 
 > **What this is.** The single condensed source of truth every AI internalizes —
@@ -22,7 +22,7 @@
 
 A digital-first TTRPG platform. The app **is** the game, not an accessory. Name
 stylized **GRO<n>WTH**: `G/R/O` = Body (red), `<n>` = bridge (gold, near-invisible),
-`W/T/H` = Spirit (blue), the whole governed by Soul (purple). The dot in GRO.WTH is
+`W/T/H` = Spirit (purple), the whole governed by Soul (blue). The dot in GRO.WTH is
 the threshold between what changes *within* a story (GRO) and what persists *across*
 stories (WTH).
 
@@ -115,6 +115,10 @@ to the GM** (r-2026-06-09-04).
 - **Roots** (upbringing): GM-authored from backstory. Cost Frequency. **Max start age
   25** (r-2026-04-22-11); past that → Branches.
 - **Branches** (life events): GM-authored. Cost Frequency.
+- **Age is ADDITIVE** (r-2026-08-19-01): `ageAdded` = the DURATION a block covers;
+  starting age = Σ ageAdded over roots + branches; seeds add no years. Kai density
+  gauge = KV ÷ ageAdded, 3–15/yr. Species maturation (two-clocks) is PARKED — do not
+  build; experience is calendar-universal per Mike's correction.
 - **Crystallization** (Q5.14): tutorial → structured backstory prompts (NEVER a single
   open field) → GM assigns Seed/Roots/Branches → system generates sheet → player+GM
   discussion → **GM "crystallizes"** = locks active in campaign + debits KRMA.
@@ -198,12 +202,27 @@ mercy** (r-2026-07-11-02): after a failed roll she may still decline to reap
    **Third fail after fated age = death.**
 3. **Death = transformation, not destruction** (r-2026-05-19-02). Character becomes a
    **GHOST**, persists on canvas. Split:
-   - Body attrs/skills/Nectars/Thorns/baseResist → 0; KRMA → GM.
-   - Soul attrs + soul-only skills → halved; lost half → Lady Death.
-   - Frequency `level` → 0; its KRMA value → Lady Death.
+   - Body attrs, body-governed skill shares, body Nectars/Thorns, baseResist → 0; KRMA → GM.
+   - Soul attrs + soul-governed skill shares → halved: **floor(½) KRMA → GM; the MAJORITY (ceil ½) stays on the ghost** (corrected 2026-07-13 — was "→ Lady Death").
+   - Multi-governor skills split their levels evenly per governor, each share by its pillar; uneven division favors the Spirit package.
+   - Frequency `level` → 0; its KRMA value → Lady Death. **Frequency is the ONLY thing Lady Death takes.**
+   - Blossoms vanish on death; their KRMA returns to the **bestowing Godhead**.
    - Spirit attrs (Flow, Focus), pure-Spirit skills, all 10 magic schools, Spirit-
      pillared traits → **kept unchanged**.
    - Lady Death **is** Tara Almswood (one Godhead, two names).
+   - **Thorn LIENS route by pillar** (r-2026-08-19-02): body thorn → removed, holder
+     paid the FULL lien (death payout first, GM wallet backstops); soul thorn →
+     removed, holder paid HALF, a less-severe residue thorn (same owner) rides the
+     ghost; spirit thorn (essence-fracturing only) → rides whole, no payment.
+     Positive traits mirror it — **the GM harvests** body + half-soul nectar KRMA,
+     which is what usually funds the lien payouts.
+   - **Tara pays no one's liens** (r-2026-08-19-03): her own thorns are fated-age
+     claim markers she removes at collection — a CUSTOM (souls kept + recycled),
+     not a Terminal contract.
+   - **Lien sizing** (r-2026-08-21-01): imposed lien = min(Kai's grade of the wound,
+     the winner's LEDGERED stake in that opposition). Zero-stake winners impose
+     scars with no creditor. Godheads observe effects, never each other's wallets;
+     disclosure only when a lien is cashed. Shadow proxy wars = wanted play.
 
 ### Damage targeting — the Affinity Cycle (r-2026-06-10-02, AUTHORITATIVE spec:
 `05_COMBAT_STRUCTURE/Damage_Targeting_KV_Spec.md`)
@@ -223,7 +242,12 @@ mercy** (r-2026-07-11-02): after a failed roll she may still decline to reap
 
 ### Body composition (r-2026-05-19-04)
 Body parts are `GrowthWorldItem`s (`isBodyPart`, `partName`) nesting via `contains`;
-armor+body+organs = one container chain. Cascade: outer absorbs to resist, excess
+armor+body+organs = one container chain. **The universal pattern** (r-2026-08-18-01):
+at every layer (material → item → body part → character) ONE scalar for magnitude,
+TRAITS for behavior — the broadsword logic: the ITEM's own traits/resist say what it
+IS, the material says what it's made of. Materials = substance archetypes only (no
+per-species variants); resists are physics-derived (1–50 mundane band, 50+ Kai-graded
+supernatural); seed `baseResist` eventually retires into graded body deviations. Cascade: outer absorbs to resist, excess
 passes through; **piercing** designates ONE internal, all other types even-split. **No
 "Body" damage type** — each part has a material (Hard/Soft). Each Seed declares its own
 anatomy. Parts have **condition tracks** the death system reads. **Creature size** is
@@ -290,7 +314,65 @@ content but routes through the Forge chain — never bypasses.
 **Three pillars of magic:** Mercy (Flow: Fortune/Restoration/Enchantment), Severity
 (Focus: Force/Alteration/Conjuration), Balance (Flow+Focus: Divination/Dissolution/
 Abjuration/Illusion). 10 schools total. Magic comes down from the Godheads via the
-Terminal; per-table GM defines its in-fiction nature.
+Terminal; per-table GM defines its in-fiction nature. **Godhead casts carry an innate
+SIGNATURE** (r-2026-08-21-03): peers always read who cast; disguise is possible but
+very difficult; PROXY CASTING (demons especially) is the real anonymity tool. The
+reading ability is likely built as a Nectar. "Unique signatures" (meta-uniques) PARKED.
+
+**Character genesis** (r-2026-08-08-01): a backstory is a GENOME — JEWL gestates the
+whole person (chronology, episodic memory ledger, psychology, voice, relationships)
+BEFORE catalog-first mechanical translation; the memory ledger IS the person.
+**Memory authority law:** AI-controlled characters never confabulate memories —
+recall is read-only, a miss is an honest "doesn't remember"; new memories enter only
+by lived experience or the gated channel. Two ledgers (r-2026-08-19-04): memory
+belongs to the PERSON, history belongs to the OBJECT.
+
+### Forge authoring law (rulings r-2026-08-24-01…19, r-2026-08-25-01/-02, r-2026-08-26-01)
+
+- **Catalog blocks are AGNOSTIC ARCHETYPES — the STRANGER TEST** (r-2026-08-24-02): a GM
+  who never met the character must know what the block is and when to pick it. Personal
+  story attaches to the block-INSTANCE on the character, with MORE description there.
+  **Names must paint a predictive mental picture** (r-2026-08-25-02) — poetic is legal
+  only if a stranger can predict the stat skew from the name; since a block's numbers
+  commit to ONE developmental outcome, the name names that outcome.
+- **One effect = one discrete entry** (r-2026-08-24-09): structured `effects[]` —
+  persistent (condition-gated modifiers, lazy) vs triggered (adjudicated trigger →
+  spawns a blossom and/or applies a condition). No mechanic may exist only in prose.
+- **Durations must be TABLE-TRACKABLE** (r-2026-08-24-07, r-2026-08-26-01): units are
+  rounds (6 s, encounter mode only) | hours | days | cycles. No "scene" primitive, no
+  minutes. Outside encounters, short-lived states are phrased as conditions.
+- **Blocks BALANCE INTERNALLY** (r-2026-08-24-14): the 3–15 KV/yr density band applies
+  to the NET price; thorn debt is serviced by the block's other levers. Extreme designs
+  legal. **Negative frequency is a 1:1 KV lever** (r-2026-08-24-01, r-2026-08-25-01):
+  frequency −N credits exactly N KV — never attribute rate.
+- **Blossoms are THE temporary-effects surface** (r-2026-08-21-02): positive AND
+  negative (blessings, colds, intoxication); expiry mandatory (time or trigger, never
+  forever); spells route many effects through blossoms; blossoms NEVER count against
+  the Fate-Die trait cap. **Pricing is INTERNAL** (r-2026-08-24-17) — the spawner
+  (trait-trigger, spell-cast, or persistent emitter/aura) carries the cost; a
+  blossom's KV is measurement only.
+- **Block grants** (r-2026-08-24-13/-15/-16): possessions = crystallization stubs
+  (big things unpack on observation); kits = KV-budget draw-down (plausibility-gated,
+  consciously fun-chosen); allocatable skills = player-choice levels under governor/
+  domain constraints.
+- **Skill names stay deliberately LOOSE** (r-2026-08-24-11): no canonical registry;
+  specificity skews DR in the bearer's favor (cloud-lane simulation). Emotions are not
+  skills; practices of managing them are (r-2026-08-24-19).
+- **Randomness law** (r-2026-08-24-18): random parameters never establish severity
+  without a counterbalance (fixed count, or KV scales with the roll).
+- **Dual proposal notes** (r-2026-08-24-04): gmNote = narrative rationale (genre, hooks,
+  table dynamics — no KRMA math); chainNote = anchors/KV/balance for Kai.
+- **ADMIN stock is public + KRMA-free** (r-2026-08-06-01): pulling stock never debits;
+  stock = the grading anchors. **JEWL suggests, godheads decide** (r-2026-08-17-01):
+  draft numbers are a pitch until Kai grades + the GM ratifies; Forge approval is a
+  GM-CONSENT action — JEWL holds no approve/deny power (2026-08-26).
+- **maturityFlags on all content** (r-2026-08-19-05): mental-health / violence /
+  substance / trauma / illness-detail (extend by ruling only); unflagged mature
+  content is a defect. Flags double as the model-router signal (mature → local lane).
+- **Root age is unconstrained** (r-2026-08-24-05); attribute skew should eventually come
+  from a Godhead developmental consult (r-2026-08-24-03, queued build).
+- **Modifier breadth anchors** (compliance pass 2026-08-26): flat-point anchor 5 KV ×
+  breadth — single attribute/skill ×1, pillar ×2, all-checks ×3. Kai re-grades.
 
 ---
 

@@ -73,47 +73,42 @@ const CommandInput = forwardRef<CommandInputHandle, CommandInputProps>(function 
     }
   }, [handleSubmit, history, historyIndex]);
 
+  // Same slot and look as the TABLE speak bar (drawer v7, 2026-10-08).
+  const empty = !value.trim();
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-t" style={{
-      borderColor: 'rgba(34, 171, 148, 0.3)',
-      backgroundColor: '#0d0d1a',
-    }}>
-      <span className="text-[13px] flex-shrink-0" style={{
-        fontFamily: 'var(--font-terminal), Consolas, monospace',
-        color: 'var(--terminal-prime)',
-      }}>{'>'}</span>
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={e => { setValue(e.target.value); setHistoryIndex(-1); }}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder={placeholder || 'Type a message or /command...'}
-        className="flex-1 bg-transparent outline-none text-[13px]"
-        style={{
-          fontFamily: 'var(--font-terminal), Consolas, monospace',
-          color: '#ccc',
-          caretColor: 'var(--terminal-prime)',
-        }}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <button
-        onClick={handleSubmit}
-        disabled={disabled || !value.trim()}
-        className="text-[13px] px-2 py-1 uppercase tracking-wider transition-colors"
-        style={{
-          fontFamily: 'var(--font-terminal), Consolas, monospace',
-          color: value.trim() ? 'var(--terminal-prime)' : 'rgba(34,171,148,0.3)',
-          border: `1px solid ${value.trim() ? 'rgba(34,171,148,0.4)' : 'rgba(34,171,148,0.15)'}`,
-          backgroundColor: 'transparent',
-          borderRadius: '2px',
-          cursor: value.trim() ? 'pointer' : 'default',
-        }}
-      >
-        {'\u23CE'}
-      </button>
+    <div style={{ flex: 'none', backgroundColor: '#fafaf8', borderTop: '3px solid #000', padding: '8px 10px 10px' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={e => { setValue(e.target.value); setHistoryIndex(-1); }}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder={placeholder || 'Type a message or /command...'}
+          // 16px below md: anything smaller makes iOS zoom the page on focus.
+          className="text-[16px] md:text-[14px]"
+          style={{
+            flex: 1, minWidth: 0, height: 48, outline: 0,
+            fontFamily: 'var(--font-comfortaa), Comfortaa, sans-serif',
+            color: '#000', backgroundColor: '#fff', border: 0, borderLeft: '4px solid #002f6c', padding: '6px 8px',
+            caretColor: '#002f6c',
+          }}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={disabled || empty}
+          style={{
+            width: 68, minHeight: 36, border: 0, cursor: empty ? 'default' : 'pointer',
+            fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: 22, letterSpacing: '0.06em',
+            backgroundColor: '#002f6c', color: '#ffcc78', opacity: disabled || empty ? 0.55 : 1,
+          }}
+        >
+          Send
+        </button>
+      </div>
     </div>
   );
 });

@@ -127,6 +127,14 @@ export function useCampaignStream({
         }
       }
 
+      // A being speaking at the table (U2c, 2026-10-06): start / partial /
+      // retract / final for one utterance. Re-broadcast as a window event so
+      // the terminal's growing line can listen without the whole campaign
+      // tree re-rendering on every partial (partials arrive per token burst).
+      if (data.kind === 'being_speaking') {
+        window.dispatchEvent(new CustomEvent('growth:being-speaking', { detail: data }));
+      }
+
       // ── Dispatch to subscribers ───────────────────────────────────────
 
       onEventRef.current?.(event);

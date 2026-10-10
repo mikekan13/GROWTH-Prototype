@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { requireCampaignMember, requireCampaignGM } from '@/services/campaign-access';
 import { startSession, endSession, listSessions, getActiveSession } from '@/services/campaign-event';
 
 export async function GET(
@@ -8,8 +9,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const { id: campaignId } = await params;
+    await requireCampaignMember(campaignId, session.user);
     const sessions = await listSessions(campaignId);
     const active = await getActiveSession(campaignId);
     return NextResponse.json({ sessions, active });
@@ -23,8 +25,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuth();
+    const auth = await requireAuth();
     const { id: campaignId } = await params;
+    // Starting/ending a session runs the table — the campaign's GM or ADMIN only.
+    await requireCampaignGM(campaignId, auth.user);
     const body = await request.json();
     const { action, name } = body as { action: 'start' | 'end'; name?: string };
 

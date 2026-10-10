@@ -78,6 +78,7 @@ Each seed authors its tree once in its [[Seeds_Roots_Branches_System|seed data]]
 - Each part tracks its own condition. If Left Eye drops to 0 but Right Eye is fine, the character is blind in one eye, not blind entirely.
 - A part at condition 0 (Destroyed) is mechanically inert. The narrative effect is up to the GM (severed limb, missing eye, etc.).
 - Abilities on a part **function fully unless the ability text declares otherwise**. There is no universal "abilities degrade with condition" rule. If a Nectar attached to a body part says "loses effect at condition 1 or lower," that's authored on the trait. Otherwise the ability persists until the part hits 0.
+- **A part declares whether damage on it depletes the bearer's attributes** (Mike 2026-09-20, `depletesAttributes`). Living tissue does (default); a horn, shell, carapace or hoof does not — what such a part absorbs never reaches the Affinity-Cycle attribute pool. Seeds mark this on their anatomy.
 
 ## Body modifications
 

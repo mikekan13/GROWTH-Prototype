@@ -164,10 +164,24 @@ days, hours/day, epoch, holidays; ruling r-2026-06-09-06 requires GM control
 of presentation at release).
 
 - Math + types: `types/time.ts` (cycleToLocalDate, localUnitsToCycles incl.
-  6 s combat rounds, dualAge, STANDARD_CALENDAR, SECONDS_PER_META_CYCLE)
+  6 s combat rounds, secondsToCycles — the one seconds→cycles conversion,
+  through the campaign calendar; 'round' = secondsToCycles(ROUND_SECONDS),
+  dualAge, STANDARD_CALENDAR)
 - Service: `services/time.ts` (timescale CRUD, getClock/advanceClock/setClock,
   ensureDefaultTimescale, resolveTimescaleForLocation — inheritance walks
   located_at upward, characterDualAge)
+- **The simulation keeps time (ruling 2026-10-07, step 1 built 2026-10-08):**
+  `advanceClockBySim(campaignId, seconds, cause)` — no role check (the sim is
+  not a user). `Campaign.currentCycle` moves on every call; the clock_advance
+  HistoryEntry + blossom-expiry + mana-residue sweeps are BATCHED and flush
+  when pending ≥ `SIM_CLOCK_FLUSH_SECONDS` (60 s = ten rounds) or on
+  `flushSimClock(campaignId)` — called at encounter pause/resolve, after a
+  continuity bridge, and before any GM advanceClock/setClock (so history reads
+  in order). Pending map is in-process (globalThis); a restart loses at most
+  the un-flushed history line and <60 s of residue fade, never the clock.
+  Callers: encounter round (6 s, whoever resolved it), bridge (travel span).
+  `advanceClock`/`setClock` stay GM-only = the manual OVERRIDE. Not built yet:
+  per-action durations, narrated jumps ("seven weeks pass").
 - Routes: `/api/campaigns/[id]/timescales` (+ `[timescaleId]`),
   `/api/campaigns/[id]/clock`, `/api/campaigns/[id]/history`
 - UI: `components/time/CampaignClock.tsx` — clock chip in the canvas header
@@ -187,7 +201,7 @@ eventGroupId), timestamped in meta cycles.
 - Service: `services/history.ts` (writeHistory, queryHistory, currentCycleOf)
 - Wired into: location create / re-parent (3 perspectives) / field edits /
   status flips (crystallize/dissolve), clock changes
-- Route: `/api/campaigns/[id]/history` — players see only `public` entries
+- Route: `/api/campaigns/[id]/history` — campaign members only (`requireCampaignMember`, 2026-10-09); players see only `public` entries
 - Future writers: JEWL session engine (r-2026-06-09-08), combat, harvests
 
 ## Location Edit Mode (added 2026-06-10)
@@ -200,6 +214,28 @@ Edit reuses the ONE JEWL dialog (`CanvasCreateDialog` with `existing`
 payload): fields prefilled as the editable preview; JEWL runs an edit-aware
 dialogue (`editLocationId` through `/api/copilot/create-dialog`). Commit
 merges into the existing data JSON, preserving canvas coords etc.
+
+## Per-Viewer Table Feed (perception unit 9, added 2026-10-09) — default OFF
+
+Ruling (Mike 2026-10-08/09, Q6): the feed is a view of an entity's memory. The campaign's Watcher and ADMIN read the truth record; a Trailblazer reads what their character perceived.
+
+- **Switch:** `NEXT_PUBLIC_PERCEPTION_FEED=on` (client + server, inlined at build — needs a dev-server restart) or `PERCEPTION_FEED=on` (server only). One helper: `lib/perception-feed.ts perceptionFeedOn()`. Off = identical behaviour (pinned by `events/route.test.ts`).
+- **Seat:** `lib/permissions.ts seesTruthRecord` (campaign GM or ADMIN; a GODHEAD gets the truth only BY THE SEAT). `services/perceived-feed.ts feedViewerFor` picks the viewer's PLAYER_CHARACTER in the campaign.
+- **GET /api/campaigns/[id]/events:** perceived viewers get `queryPerceivedFeed` — their own lines in full + session markers + their character's noticed memory rows rendered by `visible-form.renderViewerFeed`, laid out in the feed's existing payload shape (narration → declaration, character rows → chat) with `{gap}` and `{@id|label}` tokens (`lib/perceived-text.ts`) and `payload.perceived.entities` (label + each KNOWN aspect's value at the viewer's fidelity — `sim/perception/aspect-values.ts`: F5 raw, F4 "-ish", F3 a rough band, F2 relational, F1 vague; never a level, never an unknown aspect). Unperceived lines leave no trace; the server filters, the client never holds truth text. The viewer's own doings (incl. their own encounter acts / words / thoughts in a memory row) render in full (`visible-form` `ownBy`; cache RENDER_VERSION 2).
+- **Other member routes (hardening 2026-10-09), flag on, non-Watcher:** `GET /api/changelog` → own characters' rows only (`ownRecordScope`); `GET /api/campaigns/[id]/history` → own characters' perspective entries only; `GET …/encounters/[id]` (+ intentions/round responses) → own log lines + slot entries, no scene narration (`perceivedEncounterState`); every OTHER participant arrives as `ParticipantSeen {id,name,side,control,downed,perceived:true,known}` — no pools/gauges/skills/attrs/held item, only the viewer's characters' best KNOWN being aspects (`pools`, `attribute:<key>`) at fidelity (`encounter.perceivedParticipant` + aspect-values), and each other participant's NAME follows visible-form `labelFor` by the identity aspect — "a figure" / short description from its sheet appearance / the real name only once known (2026-10-09); EncounterPanel shows those and cannot declare for them. Canon / reconcile / godhead-messages / context / table / lane are Watcher-only already; sessions carry names + times only; copilot history is per-user. Pinned by `app/api/perception-privacy.test.ts`.
+- **SSE (`lib/campaign-stream.ts deliveryFor`):** a perceived connection (set at connect by the stream route; fails closed) receives its own lines + session markers in full; anyone else's `terminal_event` is NOT sent; no `being_speaking`, no DAYA work sessions; check/cast/death-save/wager/check-request only for its own character; another's `character_update` without the name; `jewl_working` without its label.
+- **Push on memory write:** `daya/memory.writeMemoryEntry` (noticed row with a canon ref) → `lib/perceived-feed-push.notifyMemoryWritten` (coalesced 400 ms per being) → `perceived_feed_stale {characterId}` to the character's owner and the campaign's Watcher only (targetUserId; no text) → CampaignCanvas → window `growth:perceived-feed-stale` → CampaignTerminal reads the feed once. The 30 s fallback poll is the only timer. A canon correction (`reconciliation.correctCanon`) sends the same signal for every being whose memory rested on the corrected row.
+- **Client:** `TableFeed perceived` (from the response's `perceived: true`; the Log tab's `MechanicalLog` too) → spans only from tokens, gap drawn as the rulebook gap/glitch dash, tooltips show `Seen as` + the known aspects' values only (`table-feed/perceived-entities.ts`).
+- **Unit 10 — Watcher "view as character":** `table-feed/ViewAsPicker.tsx` (Watcher/GODHEAD/ADMIN role + flag on; beside the feed search; rulebook ORDER styling — Bebas gold-on-blue `SEEN BY` bar + select; default `Truth record`, then Characters / NPCs from the canvas roster). Choice kept per viewer in localStorage (`growth:feed-view-as:<campaign>:<user>`). The client sends `?viewAs=` to GET /events and GET /api/changelog; `services/perceived-feed.viewAsViewer` lets only the campaign's Watcher or ADMIN read another character's view (a Trailblazer may name only their own; else 403, unknown character 404; flag off → ignored) and returns the same perceived viewer a Trailblazer gets (an NPC has no player lines). While viewing as, the Watcher's truth stream is not merged and the growing line is hidden; the view re-reads on the memory push for that character. A 403/404 falls back to the truth record.
+- **Unit 11 — active inspection (ordinary checks):** a player's chat "I inspect the sword (with my swordsmanship)" (`sim/perception/inspect.detectInspectIntent`, hooked in POST /events) or POST `/intents` → an inspect chip on the minimal planning board (`lib/planning-board`, in memory; the full U3 board is not built). GM / owner edit the chip (PATCH; GM sets DR, default `INSPECT_TUNING.defaultDr`). The GM's next move (POST /skill-check or POST /table) commits every chip (`services/inspection.commitPlanningBoardOnGmMove`): skill named & on the sheet → skilled; else system pick by domain relevance; else unskilled Wisdom. A played character → the EXISTING check flow (`services/skill-check.initiateSkillCheck`, wager prompt, visible FD) carrying an inspect `purpose`; an unplayed being → engine roll. On resolution (`services/check-resolved`) → `resolveInspection` → `planInspection` → familiarity writes (`inspect` steps scaled by margin; F1 relic flag; Wit; raw Wisdom only in exposed domains; bad failure → `lastSource: 'wrong'`).
+- **Unit 12 — use teaches:** each encounter round, `sim/perception/use.usesFromRound` (wielded → weight; damaging attack while holding → damage; held item / worn armour hit → hardness + condition; fired item ability → its aspect, no engine source yet) → `familiarity.recordUseBatch` once per being (source `use`, small step, no domain gate — the enchantment is learned by using the blade).
+- **Introductions teach names (2026-10-09):** after the reach pass writes a perceiver's noticed rows (declareCanon, deliverToTable, runBeats LISTEN), `services/introductions.learnIntroductions` reads what it CAUGHT of the speech (`visible-form.caughtSpeech`, same fragmenting as the feed — a name in a `{gap}` teaches nothing), detects "I'm X" / "this is X" deterministically (`sim/perception/introductions`), and raises identity to the naming level (F3, `familiarity.recordIntroductions`, source `introduced`); cached visible forms naming the being are dropped so old lines re-label. Party membership seeds nothing; the Watcher can declare it (`PUT /api/campaigns/[id]/familiarity`).
+- **D3:** sense clarity is stored on the memory row at perception time (`daya/perceived-via.ts`), so a moment perceived blind stays blurry after healing.
+- **Wit = retention (2026-10-09):** every familiarity fade scales with the PERCEIVER's Wit (`familiarity.witFadeFactor`, Wit read off the sheet like recall's Wit gate: level + aug+ − aug−, none → 10 = reference, factor 1). Higher Wit, slower fade; the F5 seal (Godheads) never fades. The reach/encounter/introduction/use passes now pass change-record refs (memory row + canon event) into `writeFamiliarity`.
+- **Sense grants (2026-10-09):** any active source may grant a sense (incl. `mind`, the only way a thought reaches another being): body parts, held items and their abilities, traits/blossoms (`grantsSenses`, `sim/senses/field.ts`). The reach pass, the mirror's sense profile and the visible-form thought rule all read the merged profile.
+- **Wrong impressions (2026-10-09):** an inspection fumble stores the WRONG value perceived on `Familiarity.impression` (small model when the world-sim is on, deterministic fallback); tooltips / roster show it as fact for that perceiver only, until a later correct perception reaches F3 on that aspect and fixes it (recorded on FamiliarityChange). Low-fidelity sight does not yet produce wrong impressions.
+- **Inspection feed line (2026-10-09):** a resolved inspection (success or not) writes the inspector a memory row (kind 'inspection', no canon ref); the perceived feed renders it as their own narration — "You study <the thing as known>: …" — at current knowledge, so it relabels as they learn. Tooltips deepen as before.
+- **Known category by tags (2026-10-09):** first-contact seeding treats an item as a known kind when it shares its non-misc `type` or any existing tag with an item the being holds or knows.
 
 ## Architecture Overview
 
@@ -378,7 +414,7 @@ JEWL is the campaign copilot — always-listening when the GM is on a campaign p
 - **Files**: `ai/copilot/`, `services/jewl-mistake.ts`, `services/stt-vocabulary.ts`, `components/copilot/JewlChip.tsx`, `components/terminal/CopilotChat.tsx`
 
 ### GodHead Agent Runtime
-AI personas linked to Character records. When `aiActionMode=true` the persona is autonomous; when false a human controls the character but memory is still captured.
+AI personas linked to Character records. **Controller toggle removed 2026-10-09** (table-rhythm ruling 3: every entity runs the loop, owned or not; GM voicing = override the NPC remembers). The canvas card's AI/GM/Trailblazer controller pill is gone, and `npc_speak` / `npc_act` no longer gate on `GodHead.aiActionMode` or require a GodHead row. The `aiActionMode` column stays in the schema; its remaining readers are the character page (shows GodheadPersonaPanel only when true) and `read_actors_state` (reports it). The being loop never read it: it runs every character whose `DayaEntity.status='ACTIVE'`.
 
 - **Dispatcher** (`services/godhead-dispatcher.ts`): Event bus. Services emit named events (goal.completed, blueprint.published, blueprint.unused_for_90d, contract.violated, character.crystallized). Dispatcher consults routing table → triggers the right godhead's agent. Kill switch: `GODHEAD_DISPATCHER=false` (audit rows still written).
 - **Agent loop** (`godhead/agent.ts`): Loads persona systemPrompt, runs Claude API with the godhead's tool registry, logs every tool call to GodHeadActionLog, closes invocation row on completion.
@@ -428,4 +464,5 @@ Tracks paying GMs and runs the monthly KRMA injection schedule.
 
 - **Zero external services** during alpha/beta
 - SQLite for data (file-based, no server needed)
+- Dev SQLite runs in **WAL** mode with a **5 s busy timeout**, primed on every fresh libsql connection by `lib/db.ts` (2026-10-06; two processes writing dev.db used to fail instantly with "Operation has timed out"). `dev.db` therefore has `-wal`/`-shm` sidecars: a file-copy backup must copy all three, or run `PRAGMA wal_checkpoint(TRUNCATE)` first.
 - ComfyUI for portraits (local, optional — system works without it)

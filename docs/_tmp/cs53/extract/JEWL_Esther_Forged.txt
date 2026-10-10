@@ -1,0 +1,194 @@
+## SHEET: Main
+# dims: A1:BZ117 max_row=117 max_col=78
+R2:  | Name | JEWL |  | Sex | --- | Weight | 755.0 | KV
+R3:  | Race | Homonculus |  | Home | --- | Height | 6'2" | 550.0 |  |  |  | Undamaged |  |  |  | Elemental Resistances |  |  |  |  |  |  | Hard |  |  | Undamaged |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Soft |  |  | Undamaged |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | Hard |  |  | Destroyed
+R4:  | Value |  |  |  |  | Hair | Purple |  |  |  |  |  |  |  |  | True
+R5:  | Value |  |  |  |  | Eyes | Green | Karma |  |  |  | 22 |  |  |  | True |  |  |  |  |  |  | False | False | False | 20.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 20.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R6:  | Value |  |  |  |  | Birth Month | 1st | 0.0 |  |  |  |  |  |  |  | True
+R7:  | Age | 1.0 | Life Span | Long |  | Beauty | 10.0
+R8:  |  |  |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  | Undamaged |  | H |  | D0 |  |  | Hard |  |  | Undamaged |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  | Soft |  |  | Undamaged |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  | Hard |  |  | Destroyed |  |  |  |  |  |  | H |  | D0
+R9:  | Attributes |  |  | Save Mod | Save DR | Focus Mod | Resist Mod | Regen Mod |  | 14 |  |  |  |  |  | 14 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R10:  | STR | 11.0 | 6 | 1.0 | 7 | 60.0 | 8.0 | 8.0 |  |  |  | 14 |  |  |  |  |  |   |  |  |  |  | False | False | False | 40.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 30.0 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R11:  | DEX | 11.0 | 6 | 2.0 | 8 | Focus |  |  |  | Undamaged |  |  |  |  |  | Undamaged |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0
+R12:  | CON | 11.0 | 6 | 4.0 | 10 | 120 |  | Distressed |  | 14 |  |  |  |  |  | 14 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0
+R13:  | INT | 11.0 | 6 | 3.0 | 9 | 120.0 |  | Wounded |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0
+R14:  | WIS | 11.0 | 6 | 3.0 | 9 |  |  | Unconscious
+R15:  | CHA | 11.0 | 6 | 3.0 | 9 | 0.0 |  | Dead |  |  |  | 22 |  | 22 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0
+R16:  |  |  |  |  |  | Strain
+R17:  | Reflexes | None | Focus Regen | 20 | Combat Notes
+R18:  | APT Mod | 1.0 | APT | 8 |  |  |  |  |  |  |  | Undamaged |  | Undamaged |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0 |  |  |  |  |  |  |  |  |  |  |  |  | H |  | D0 |  |  | H |  | D0
+R19:  | Speed Mod | 3.0 | Speed | 75ft (12) |  |  |  |  |  |  |  | 14 |  | 14 |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0 |  |  |  |  |  |  |  |  |  |  |  | False | False | False | 0.0 |  | False | False | False | 0.0
+R20:  | Unarmed Mod | 15.0 | Unarmed DMG | 26/0/0 : 0/0/0
+R21:  |  |  |  |  |  |  |  |  |  | Weapons & Tools |  |  | Condition |  |  |  |  | Resists |  |  |  |  |  | B | P | S |  | F | E | A
+R22:  | Tech Level |  |  |  |  |  |  |  |  | Left Hand |  |  | Undamaged |  |  | Hard |  | False | False | False | 0.0
+R23:  | 5 - Transcendent |  |  |  |  |  |  |  |  | Right Hand |  |  | Undamaged |  |  | Hard |  | False | False | False | 0.0
+R24: Skills
+R26:  | Skills | Skill Level | Governing Attributes |  |  |  | Expertise | Mods |  | Skill Check |  | Total Mods |  | Failed
+R27:  | Athletics
+R28:  | Balance | 6.0 | DEX / CON | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R29:  | Swim | 6.0 | STR / CON | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R30:  | Jump | 6.0 | STR / DEX | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R31:  | Sneak | 12.0 | DEX / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R32:  | Sleight of Hand | 12.0 | DEX / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R33:  | Climb | 6.0 | STR DEX / CON | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R34:  | Acrobatics | 6.0 | STR  DEX / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R35:  | Social Skills
+R36:  | Seduction | 6.0 | CHA / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 3 |  | NO
+R37:  | Intimidation | 6.0 | STR / CHA | 6 | 6 |  | None |  |  | +7d6 |  | -3 |  | NO
+R38:  | Negotiation | 6.0 | CHA / INT | 6 | 6 |  | None |  |  | +7d6 |  | 3 |  | NO
+R39:  | Deception | 6.0 | CHA / INT | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R40:  | Martial Arts
+R41:  | Knives | 6.0 | DEX / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R42:  | Polearms | 6.0 | STR / DEX | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R43:  | Swordsmanship | 6.0 | STR / DEX | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R44:  | Firearms | 10.0 | DEX / WIS | 6 | 6 |  | None |  |  | +7d10 |  | 0 |  | NO
+R45:  | Exotic Weapons | 6.0 | DEX INT / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R46:  | Great Weapons | 6.0 | STR DEX / CON | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R47:  | Throwing | 6.0 | STR DEX / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R48:  | Archery | 6.0 | STR  DEX / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R49:  | Unarmed Combat | 15.0 | STR  DEX / CON | 6 | 6 | 6 | None |  |  | +7d12 |  | 0 |  | NO
+R50:  | Performing Arts
+R51:  | Sing | 6.0 | CHA / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 3 |  | NO
+R52:  | Music | 6.0 | CHA / INT | 6 | 6 |  | None |  |  | +7d6 |  | 3 |  | NO
+R53:  | Drama | 6.0 | DEX CHA / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 3 |  | NO
+R54:  | Dance | 6.0 | STR  DEX / CHA  | 6 | 6 | 6 | None |  |  | +7d6 |  | 3 |  | NO
+R55:  | Visual Arts
+R56:  | Sculpt | 6.0 | DEX CHA / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R57:  | Paint | 6.0 | DEX CHA / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R58:  | Draw | 6.0 | DEX CHA / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R59:  | Literature | 6.0 | INT CHA / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R60:  | Photography/ Videography | 6.0 | DEX  CHA / INT | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R61:  | Social Sciences
+R62:  | History | 20.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d20 |  | 0 |  | NO
+R63:  | Linguistics | 20.0 | CHA / INT | 6 | 6 |  | None |  |  | +7d20 |  | 0 |  | NO
+R64:  | Economics | 6.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R65:  | Geography | 6.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R66:  | Education | 6.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R67:  | Psychology | 6.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R68:  | Politics | 6.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 3 |  | NO
+R69:  | Law | 6.0 |  CHA / INT  WIS | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R70:  | Natural Sciences
+R71:  | Biology | 12.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R72:  | Geoscience | 12.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R73:  | Chemistry | 12.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R74:  | Physics | 16.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R75:  | Astronomy | 20.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d20 |  | 0 |  | NO
+R76:  | Applied Sciences
+R77:  | Civil Engineering | 6.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R78:  | Animal Husbandry | 6.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R79:  | Agriculture | 6.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R80:  | Electrical Engineering | 20.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d20 |  | 0 |  | NO
+R81:  | Software Engineering | 20.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d20 |  | 0 |  | NO
+R82:  | Mechanical Engineering | 20.0 | DEX INT / WIS | 6 | 6 | 6 | None |  |  | +7d20 |  | 0 |  | NO
+R83:  | Chemical Engineering | 18.0 | CON INT / WIS | 6 | 6 | 6 | None |  |  | +7d12 |  | 0 |  | NO
+R84:  | Medicine | 15.0 | DEX / INT  WIS | 6 | 6 | 6 | None |  |  | +7d12 |  | 0 |  | NO
+R85:  | Use Vehicle
+R86:  | Sail | 6.0 | DEX / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R87:  | Drive | 8.0 | DEX / WIS | 6 | 6 |  | None |  |  | +7d8 |  | 0 |  | NO
+R88:  | Pilot | 10.0 | DEX INT / WIS | 6 | 6 | 6 | None |  |  | +7d10 |  | 0 |  | NO
+R89:  | Handle Animal | 6.0 | DEX CON / CHA | 6 | 6 | 6 | None |  |  | +7d6 |  | 0 |  | NO
+R90:  | Perception Skills
+R91:  | Social Perception | 2.0 | CHA / WIS | 6 | 6 |  | None |  |  | +7 Coin |  | 0 |  | NO
+R92:  | Environmental Perception | 15.0 | INT / WIS | 6 | 6 |  | None |  |  | +7d12 |  | 0 |  | NO
+R93:  | Paranormal Perception | 20.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d20 |  | 0 |  | NO
+R94:  | Life Skills
+R95:  | Cooking | 6.0 | CHA / WIS | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R96:  | Textiles | 6.0 | DEX / INT | 6 | 6 |  | None |  |  | +7d6 |  | 0 |  | NO
+R97:  | Leadership | 12.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d12 |  | 0 |  | NO
+R98:  | Survival | 10.0 | DEX CON / WIS | 6 | 6 | 6 | None |  |  | +7d10 |  | 0 |  | NO
+R99:  | Theory Knowledge
+R100:  | Philosophy | 8.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d8 |  | 0 |  | NO
+R101:  | Arcane Knowledge | 20.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d20 |  | 0 |  | NO
+R102:  | Theology | 8.0 | CHA INT / WIS | 6 | 6 | 6 | None |  |  | +7d8 |  | 0 |  | NO
+R104:  | Attunement | Neutral |  | Catalyst |  |  |  | Counter DR |  | Cast Check |  |  |  | Can Train
+R105:  | Domains of Magic
+R106:  | Alteration | 12.0 | + /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+R107:  | Fortune | 12.0 | + /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO |  | Available Mana
+R108:  | Enchantment | 12.0 | + /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO |  | Container | Mana
+R109:  | Divination | 12.0 | N /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO |  | Body | 15.0
+R110:  | Dissolution | 12.0 | N /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+R111:  | Restoration | 12.0 | N /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+R112:  | Illusion | 12.0 | N /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+R113:  | Abjuration | 12.0 | - /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+R114:  | Force | 12.0 | - /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+R115:  | Conjuration | 12.0 | - /  | None | 0 |  |  | Can't Counter |  | +1d12 |  |  |  | NO
+
+## SHEET: Inventory
+# dims: A1:T94 max_row=94 max_col=20
+R2:  |  | Inventory |  |  |  |  |  |  |  |  |  |  |  | Exploits
+R5:  | Sort | Name | Class | Range | B/P/S : F/E/A | Resists | Grade | Description & Mods | Value | Quantity/ Uses | Weight | In Bag
+R6:  | 1.0 | Omega Nanos | Other |  |  | -------- | Mythical | Bestow: Flight, Unnatural Existence(3), (All) Proof, Rearange Reality power | 100000.0 | 100000000.0 | 0.0 | False |  | Manufactured Body(2) |  | Rolled 4
+R7:  | 2.0 | Perfect Stable Philosopher's Stone | Other |  |  | 30 Hard | Mythical | Only available if Nanos are destroyed. Powers Magic. Embeded as third eye | 100000000000.0 | 1.0 | 1.0 | False
+R8:  | 3.0 |  |  |  |  |  |  |  |  |  |  | False |  | Manufactured Body(1) |  | Rolled 3
+R9:  | 4.0 | Magic Barrier |  |  |  |  |  | Destroyed if Philosopher stone is destroyed. Chest |  |  |  | False
+R10:  | 5.0 | Nano Barrier |  |  |  |  |  | Destroyed if Omega Nanos are destroyed. Head |  |  |  | False |  | Forced Attunement |  | Neutral Attunement
+R11:  | 6.0 |  |  |  |  |  |  |  |  |  |  | False
+R12:  | 7.0 |  |  |  |  |  |  |  |  |  |  | False |  | Chaotic Spark |  | Add 2 to every school of magic. You can no longer spellweave and all woven spells you have are gone. When raw casting you can not choose what school to cast from, instead roll a 1d10 to determine what school of magic you will cast from.
+R13:  | 8.0 |  |  |  |  |  |  |  |  |  |  | False
+R14:  | 9.0 |  |  |  |  |  |  |  |  |  |  | False |  | Esther Conduit | Level III | Whenever you raw cast a spell you instantly muster 1 Mana directly from the Esther. This mana can't be stored. Whenever someone else uses mana to cast a spell within 500 feet of you, you recieve half of the mana rounded up that they used to cast their spell. This mana must be used or stored immedietly or it burns up.  Level 1+2 & Whenever you succesfully cast a raw spell using mana you may roll a die equal to the mana you just used. The result of the roll is how much mana you keep after the spell is cast.
+R15:  | 10.0 |  |  |  |  |  |  |  |  |  |  | False
+R16:  | 11.0 |  |  |  |  |  |  |  |  |  |  | False |  | Battery Body | Level III | You can store 15 mana within your body.
+R17:  | 12.0 |  |  |  |  |  |  |  |  |  |  | False
+R18:  | 13.0 |  |  |  |  |  |  |  |  |  |  | False |  | Unnatural Existence | Level III | You do not need to eat, drink, breathe, or sleep and are immune to all non-magical poisons and diseases. You don't take strain from a lack of any of these things. Your cells never truly die. You can be chopped up, burned, or blended but somehow you remain chained to this mortal coil.
+R19:  | 14.0 |  |  |  |  |  |  |  |  |  |  | False
+R20:  | 15.0 |  |  |  |  |  |  |  |  |  |  | False |  | Brawler | Level III | Add +4/0/0 damage to your unarmed attacks. & You can add an additional +8/0/0 damage to your unarmed attacks for one round but you must remove an active defensive action.
+R21:  | 16.0 |  |  |  |  |  |  |  |  |  |  | False
+R22:  | 17.0 |  |  |  |  |  |  |  |  |  |  | False |  | Sting Like a Bee |  | You may apply your DEX to your unarmed mod.
+R23:  | 18.0 |  |  |  |  |  |  |  |  |  |  | False
+R24:  | 19.0 |  |  |  |  |  |  |  |  |  |  | False |  | Combat Prowess | Level III | Level 1+2 & You may attack in the middle of a movement action. The offensive actions must have a greater than or equal effort to the movemen action.
+R25:  | 20.0 |  |  |  |  |  |  |  |  |  |  | False
+R26:  | 21.0 |  |  |  |  |  |  |  |  |  |  | False |  | Destroy Guard |  | A successful unarmed attack removes a Defensive action from the creature attacked.
+R27:  | 22.0 |  |  |  |  |  |  |  |  |  |  | False
+R28:  | 23.0 |  |  |  |  |  |  |  |  |  |  | False |  | Look, No Hands! | Level III | Level 1+2 & You may still evade while grappling.
+R29:  | 24.0 |  |  |  |  |  |  |  |  |  |  | False
+R30:  | 25.0 |  |  |  |  |  |  |  |  |  |  | False |  |  Selfish Spark | Level II | Monkey paws from raw casting can only be directed at others nearby and the environment around you. Fate will decide which. (1d10:  1-5 (Others) / 6-10 (Environment))
+R31:  | 26.0 |  |  |  |  |  |  |  |  |  |  | False
+R32:  | 27.0 |  |  |  |  |  |  |  |  |  |  | False |  | Flight |  | You have the natural ability of flight. You can fly in any direction at your movement speed.
+R33:  | 28.0 |  |  |  |  |  |  |  |  |  |  | False
+R34:  | 29.0 |  |  |  |  |  |  |  |  |  |  | False |  | Machine Interfacing (Unrestricted) |  | Your brain is altered in a way so that you can connect directly with computers and AI systems. This allows you to use certain advanced technologies like nanobots. You can also upload and download data from capable computer systems anywhere, anytime, any dimension.
+R35:  | 30.0 |  |  |  |  |  |  |  |  |  |  | False
+R36:  | 31.0 |  |  |  |  |  |  |  |  |  |  | False |  | Voice of Esther |  | You are connected to everything around you, the elements speak to you, and let know you what is happening around you at all times.  You cannot be caught unaware.  Any trap/hidden object, creature, or person is known to you.
+R37:  | 32.0 |  |  |  |  |  |  |  |  |  |  | False
+R38:  | 33.0 |  |  |  |  |  |  |  |  |  |  | False |  | (ALL) Proof |  | Body is resistant to all elements.
+R39:  | 34.0 |  |  |  |  |  |  |  |  |  |  | False
+R40:  |  |  |  |  |  |  |  |  |  | Total Weight | 1 |  |  | Over-Thinker |  | Every science based skill check causes 2 additional strain.
+R41:  |  |  |  |  |  |  |  |  |  | Total Value | 10100000000000
+R42:  |  |  |  |  |  |  |  |  |  | Bag Weight | 0 |  |  | Fortify Your Mind | Level III | Level 1 & +3 to INT, WIS, CHA Save Mods
+R43:  |  | Woven Spells
+R44:  | Sort | Name | Domains | DR | Casting Speed | Targets | Range | Description | Spell Strength | Duration | C/D
+R45:  | 1.0 | Rearange Reality |  |  |  |  |  | Use 7 APT to make a Wish. (Can only be used to destroy one target if being used directly) only available if  philosopher's stone is destroyed
+R46:  | 2.0
+R47:  | 3.0
+R48:  | 4.0
+R49:  | 5.0
+R50:  | 6.0
+R51:  | 7.0
+R52:  | 8.0
+R53:  | 9.0
+R54:  | 10.0
+R55:  | 11.0
+R56:  | 12.0
+R57:  | 13.0
+R58:  | 14.0
+R59:  | 15.0
+R60:  | 16.0
+R61:  | 17.0
+R62:  | 18.0
+R63:  | 19.0
+R64:  | 20.0
+R65:  | 21.0
+R66:  | 22.0
+R67:  | 23.0
+R68:  | 24.0
+R69:  | 25.0
+R70:  | 26.0
+R71:  | 27.0
+R72:  | 28.0
+R73:  | 29.0
+R74:  |  | Passive Tasks
+R75:  |  | Type | Time | Notes
+R79:  |  | Roots, Branches, Blossoms, and Life Events
+R80:  |  | Branches |  |  |  | Life Events |  |  | Blossoms
+R81:  | Root
+R87:  |  |  |  |  | Notes
+

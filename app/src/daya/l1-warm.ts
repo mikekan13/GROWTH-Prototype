@@ -63,7 +63,10 @@ async function probeL1(overrides: L1WarmOverrides): Promise<L1Status> {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const apiKey = process.env.DAYA_L1_API_KEY;
+  // Same fallback chain as model-client (2026-08-29 fix): the serverless
+  // gateway 401s without a bearer, and a 401 reads as "warming" forever —
+  // which silently pushed every branch plan onto the heuristic (found 09-20).
+  const apiKey = process.env.DAYA_L1_API_KEY ?? process.env.AI_LOCAL_API_KEY ?? process.env.RUNPOD_API_KEY;
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   try {

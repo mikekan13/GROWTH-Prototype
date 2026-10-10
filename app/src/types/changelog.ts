@@ -66,6 +66,8 @@ export interface ChangeLogGroup {
 export interface ChangeLogQueryParams {
   campaignId: string;
   characterId?: string;
+  /** Restrict to these characters (perceived feed: the viewer's own). An empty list → no rows. */
+  characterIds?: string[];
   category?: ChangeCategory[];
   actor?: ChangeActor[];
   after?: string;

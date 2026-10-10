@@ -42,12 +42,25 @@ export interface DayaChatParams {
    * without mutating process.env, which would race under concurrent calls
    * resolving to different models at once. */
   model?: string;
+  /** Stop sequences (L1/L2 only — the Claude API refuses whitespace-only ones, so a Claude-backed tier ignores this). */
+  stop?: string[];
+  /** Streaming (U2b, TABLE-RHYTHM-DESIGN §6): called with each piece of text as it
+   * is generated. Return `false` to stop the generation there (the seal gate does
+   * this on a hit). L1/L2 stream over SSE; a Claude-backed tier calls it once
+   * with the whole text. The metering row is written the same either way. */
+  onToken?: (delta: string) => boolean | void;
 }
 
 export interface DayaChatResult {
   text: string;
   tokensIn: number;
   tokensOut: number;
+  /** Request sent → answer complete, as this process saw it. */
+  totalMs: number;
+  /** Request sent → first piece of text. Streamed calls only. */
+  ttftMs?: number;
+  /** The consumer stopped the stream early (onToken returned false). */
+  stopped?: boolean;
 }
 
 export class DayaTierUnavailableError extends AppError {
@@ -87,6 +100,8 @@ export interface DayaFetchResponse {
   status: number;
   json: () => Promise<unknown>;
   text: () => Promise<string>;
+  /** The raw body, for streamed calls. Absent (a test fake, an odd runtime) = the call falls back to `json()`. */
+  body?: ReadableStream<Uint8Array> | null;
 }
 export type DayaFetch = (
   url: string,
@@ -191,6 +206,89 @@ function resolveOpenAiTierConfig(tier: 'L1' | 'L2'): { url: string; model: strin
   return { url, model };
 }
 
+// ── Streaming (OpenAI-compatible SSE) ───────────────────────────────────────
+
+export interface SseEvent {
+  delta?: string;
+  usage?: { tokensIn: number; tokensOut: number };
+  error?: string;
+  done?: boolean;
+}
+
+/**
+ * Parse the complete lines of an OpenAI-compatible SSE buffer; whatever follows
+ * the last newline is handed back as `rest` for the next chunk. Pure.
+ * Only `delta.content` counts as text — a reasoning trace never does.
+ */
+export function parseSseLines(buffer: string): { events: SseEvent[]; rest: string } {
+  const lines = buffer.split('\n');
+  const rest = lines.pop() ?? '';
+  const events: SseEvent[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line.startsWith('data:')) continue;
+    const data = line.slice(5).trim();
+    if (data === '[DONE]') { events.push({ done: true }); continue; }
+    let chunk: {
+      choices?: Array<{ delta?: { content?: string | null } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+      error?: unknown;
+    };
+    try { chunk = JSON.parse(data); } catch { continue; }
+    if (chunk.error) { events.push({ error: typeof chunk.error === 'string' ? chunk.error : JSON.stringify(chunk.error) }); continue; }
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (delta) events.push({ delta });
+    if (chunk.usage) events.push({ usage: { tokensIn: chunk.usage.prompt_tokens ?? 0, tokensOut: chunk.usage.completion_tokens ?? 0 } });
+  }
+  return { events, rest };
+}
+
+async function readSseBody(
+  body: ReadableStream<Uint8Array>,
+  onToken: NonNullable<DayaChatParams['onToken']>,
+  startedAt: number,
+): Promise<{ text: string; tokensIn: number; tokensOut: number; ttftMs?: number; stopped: boolean }> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  let pieces = 0;
+  let usage: SseEvent['usage'];
+  let ttftMs: number | undefined;
+  let stopped = false;
+  let finished = false;
+
+  const take = (events: SseEvent[]) => {
+    for (const event of events) {
+      if (event.error) throw new AppError(`DAYA stream failed mid-answer: ${event.error}`, 502);
+      if (event.usage) usage = event.usage;
+      if (event.done) finished = true;
+      if (event.delta) {
+        if (ttftMs === undefined) ttftMs = Date.now() - startedAt;
+        text += event.delta;
+        pieces += 1;
+        if (onToken(event.delta) === false) { stopped = true; return; }
+      }
+    }
+  };
+
+  try {
+    while (!stopped && !finished) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parsed = parseSseLines(buffer);
+      buffer = parsed.rest;
+      take(parsed.events);
+    }
+    if (!stopped && buffer.trim()) take(parseSseLines(`${buffer}\n`).events);
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  // A stream stopped early never reaches its usage chunk: count the pieces received (one per token on vLLM) so the call is still metered.
+  return { text, tokensIn: usage?.tokensIn ?? 0, tokensOut: usage?.tokensOut ?? pieces, ttftMs, stopped };
+}
+
 /**
  * Exported (WP14) so its auth-header + timeout behavior can be unit-tested
  * directly against an injected fetchImpl, without going through chat()'s
@@ -203,16 +301,35 @@ export async function callOpenAiCompatible(
   tier: 'L1' | 'L2',
   params: DayaChatParams,
   fetchImpl: DayaFetch,
-): Promise<{ text: string; tokensIn: number; tokensOut: number; model: string }> {
+): Promise<{ text: string; tokensIn: number; tokensOut: number; model: string; ttftMs?: number; stopped?: boolean }> {
   const { url, model: tierModel } = resolveOpenAiTierConfig(tier);
   const model = params.model || tierModel;
 
+  // vLLM/Qwen chat templates cannot render a conversation with no
+  // user/assistant turn — a system-only message list 500s opaquely through
+  // the RunPod proxy (found 2026-08-30, A/B verified). The harness composes
+  // single system-blob prompts; normalize by demoting to a user turn
+  // (single) or folding the tail into one (multiple). No text is added —
+  // instruction-following is equivalent from the user role here.
+  let messages = params.messages;
+  if (!messages.some(m => m.role !== 'system')) {
+    messages = messages.length === 1
+      ? [{ ...messages[0], role: 'user' as const }]
+      : [messages[0], { role: 'user' as const, content: messages.slice(1).map(m => m.content).join('\n\n') }];
+  }
+
   const requestBody: Record<string, unknown> = {
     model,
-    messages: params.messages,
+    messages,
     max_tokens: params.maxTokens ?? 1024,
     temperature: params.temperature ?? 0.7,
   };
+  if (params.stop?.length) requestBody.stop = params.stop;
+  // SSE passes through the RunPod proxy untouched (bench-l1-lane.mjs, 10-01); the usage arrives in a final chunk.
+  if (params.onToken) {
+    requestBody.stream = true;
+    requestBody.stream_options = { include_usage: true };
+  }
 
   // The self-hosted persona core (Qwen3.6-class) ships with an interleaved
   // reasoning mode that emits chain-of-thought ("Here's a thinking process:")
@@ -228,7 +345,12 @@ export async function callOpenAiCompatible(
   // OpenAI-compatible endpoint behind a bearer token; the current
   // always-on pod has none configured, so absent = unchanged (no header).
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const apiKey = process.env[`DAYA_${tier}_API_KEY`];
+  // Fallback chain matches ai/network/config localLane(): tier-specific
+  // key first, then the shared local-lane / RunPod keys (2026-08-29 — the
+  // serverless endpoint 401'd because only DAYA_L1_API_KEY was consulted).
+  const apiKey = process.env[`DAYA_${tier}_API_KEY`]
+    ?? process.env.AI_LOCAL_API_KEY
+    ?? process.env.RUNPOD_API_KEY;
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   // WP14 — generous, env-configurable timeout so a cold start (worker
@@ -240,6 +362,7 @@ export async function callOpenAiCompatible(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  const startedAt = Date.now();
   let res: DayaFetchResponse;
   try {
     res = await fetchImpl(`${url.replace(/\/+$/, '')}/chat/completions`, {
@@ -249,17 +372,40 @@ export async function callOpenAiCompatible(
       signal: controller.signal,
     });
   } catch (err) {
+    clearTimeout(timer);
     if (isAbortError(err)) {
       throw new DayaWarmingTimeoutError(tier, timeoutMs);
     }
     throw err;
-  } finally {
-    clearTimeout(timer);
   }
+  // A streamed answer is still arriving after the headers: the timeout keeps running until the body is read.
+  const streaming = res.ok && !!params.onToken && !!res.body;
+  if (!streaming) clearTimeout(timer);
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
+    // Diagnostic breadcrumb (2026-08-30): the RunPod proxy masks vLLM
+    // errors as opaque 500s — log what we actually sent so shape bugs
+    // (overlong prompts, bad model names, odd roles) are visible.
+    const chars = JSON.stringify(requestBody).length;
+    // eslint-disable-next-line no-console
+    console.error(
+      `[daya/model-client] ${tier} ${res.status} — model=${model} messages=${params.messages.length} bodyChars=${chars} maxTokens=${requestBody.max_tokens} roles=${params.messages.map(m => m.role).join(',').slice(0, 120)}`,
+    );
     throw new AppError(`DAYA ${tier} endpoint returned ${res.status}: ${detail}`, 502);
+  }
+
+  if (params.onToken && res.body) {
+    try {
+      const streamed = await readSseBody(res.body, params.onToken, startedAt);
+      if (streamed.stopped) controller.abort();
+      return { ...streamed, model };
+    } catch (err) {
+      if (isAbortError(err)) throw new DayaWarmingTimeoutError(tier, timeoutMs);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   const body = (await res.json()) as {
@@ -267,8 +413,11 @@ export async function callOpenAiCompatible(
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
+  const text = body.choices?.[0]?.message?.content ?? '';
+  // Streaming was asked for but the transport gave no body to read: the consumer still gets its text, in one piece.
+  if (params.onToken && text) params.onToken(text);
   return {
-    text: body.choices?.[0]?.message?.content ?? '',
+    text,
     tokensIn: body.usage?.prompt_tokens ?? 0,
     tokensOut: body.usage?.completion_tokens ?? 0,
     model,
@@ -316,6 +465,14 @@ async function callAnthropic(
   };
 }
 
+/** Marks a deliberately stopped stream on its metering row, so its token counts (input unknown, output = pieces received) are never read as a normal call's. */
+export const STREAM_STOPPED_NOTE = 'stream stopped by consumer: tokensIn unknown, tokensOut = pieces received';
+
+export function meteredRationale(rationale: string | undefined, stopped: boolean): string | undefined {
+  if (!stopped) return rationale;
+  return rationale ? `${rationale} | ${STREAM_STOPPED_NOTE}` : STREAM_STOPPED_NOTE;
+}
+
 // ── Entry point ─────────────────────────────────────────────────────────────
 
 /**
@@ -330,11 +487,20 @@ export async function chat(
   const fetchImpl: DayaFetch = overrides.fetchImpl ?? ((url, init) => fetch(url, init) as unknown as Promise<DayaFetchResponse>);
 
   const viaAnthropic = params.tier === 'C' || tierProvider(params.tier) === 'anthropic';
-  const { text, tokensIn, tokensOut, model, ...cacheStats } = viaAnthropic
-    ? await callAnthropic(params, overrides.anthropicClient)
-    : { ...(await callOpenAiCompatible(params.tier as 'L1' | 'L2', params, fetchImpl)), cacheRead: 0, cacheWrite: 0 };
-  const cacheRead = cacheStats.cacheRead ?? 0;
-  const cacheWrite = cacheStats.cacheWrite ?? 0;
+  const startedAt = Date.now();
+  let ttftMs: number | undefined;
+  let stopped: boolean | undefined;
+  let cacheRead = 0;
+  let cacheWrite = 0;
+  let text: string, tokensIn: number, tokensOut: number, model: string;
+  if (viaAnthropic) {
+    ({ text, tokensIn, tokensOut, model, cacheRead, cacheWrite } = await callAnthropic(params, overrides.anthropicClient));
+    // No token stream on this transport: the consumer gets the whole answer as one piece.
+    if (params.onToken && text) params.onToken(text);
+  } else {
+    ({ text, tokensIn, tokensOut, model, ttftMs, stopped } = await callOpenAiCompatible(params.tier as 'L1' | 'L2', params, fetchImpl));
+  }
+  const totalMs = Date.now() - startedAt;
 
   const usd = estimateUsd(model, tokensIn, tokensOut);
 
@@ -360,9 +526,9 @@ export async function chat(
       usd,
       krma: 0,
       sanitized: params.sanitized ?? false,
-      rationale: params.rationale,
+      rationale: meteredRationale(params.rationale, stopped === true),
     },
   });
 
-  return { text, tokensIn, tokensOut };
+  return { text, tokensIn, tokensOut, totalMs, ...(ttftMs !== undefined ? { ttftMs } : {}), ...(stopped ? { stopped } : {}) };
 }

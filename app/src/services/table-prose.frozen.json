@@ -1,0 +1,238 @@
+[
+ {
+  "text": "You sit at the bar. The scent of flame licked meat and spicy mead linger over the lively inn atmosphere. A bright eyed lass behind the bar gives you a wink. \"Hey scruffy, you gonna order something?\"",
+  "withRoster": true,
+  "parsed": {
+   "full": "You sit at the bar. The scent of flame licked meat and spicy mead linger over the lively inn atmosphere. A bright eyed lass behind the bar gives you a wink. \"Hey scruffy, you gonna order something?\"",
+   "narration": "You sit at the bar. The scent of flame licked meat and spicy mead linger over the lively inn atmosphere. A bright eyed lass behind the bar gives you a wink.",
+   "quotes": [
+    {
+     "text": "Hey scruffy, you gonna order something?",
+     "speakerId": null,
+     "speakerLabel": "a bright eyed lass behind the bar",
+     "context": "A bright eyed lass behind the bar gives you a wink."
+    }
+   ]
+  }
+ },
+ {
+  "text": "Mr. Carrasco pounds on the door from the landing. \"Open this door, Danny. You owe me rent.\"",
+  "withRoster": true,
+  "parsed": {
+   "full": "Mr. Carrasco pounds on the door from the landing. \"Open this door, Danny. You owe me rent.\"",
+   "narration": "Mr. Carrasco pounds on the door from the landing.",
+   "quotes": [
+    {
+     "text": "Open this door, Danny. You owe me rent.",
+     "speakerId": "carr",
+     "speakerLabel": "Mr. Carrasco",
+     "context": "Carrasco pounds on the door from the landing."
+    }
+   ]
+  }
+ },
+ {
+  "text": "\"Get out of my kitchen,\" Ruth says without turning around.",
+  "withRoster": true,
+  "parsed": {
+   "full": "\"Get out of my kitchen,\" Ruth says without turning around.",
+   "narration": "Ruth says without turning around.",
+   "quotes": [
+    {
+     "text": "Get out of my kitchen,",
+     "speakerId": "ruth",
+     "speakerLabel": "Ruth",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "Ruth: \"Sit down.\"",
+  "withRoster": true,
+  "parsed": {
+   "full": "Ruth: \"Sit down.\"",
+   "narration": null,
+   "quotes": [
+    {
+     "text": "Sit down.",
+     "speakerId": "ruth",
+     "speakerLabel": "Ruth",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "Danny: I never touched it.",
+  "withRoster": true,
+  "parsed": {
+   "full": "Danny: I never touched it.",
+   "narration": null,
+   "quotes": [
+    {
+     "text": "I never touched it.",
+     "speakerId": "danny",
+     "speakerLabel": "Danny",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "Barkeep: \"We're closing.\"",
+  "withRoster": true,
+  "parsed": {
+   "full": "Barkeep: \"We're closing.\"",
+   "narration": null,
+   "quotes": [
+    {
+     "text": "We're closing.",
+     "speakerId": null,
+     "speakerLabel": "Barkeep",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "\"Who goes there?\"",
+  "withRoster": true,
+  "parsed": {
+   "full": "\"Who goes there?\"",
+   "narration": null,
+   "quotes": [
+    {
+     "text": "Who goes there?",
+     "speakerId": null,
+     "speakerLabel": "someone present",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "Ruth sets down the tray. “Eat.” Danny pushes it away. “Not hungry.”",
+  "withRoster": true,
+  "parsed": {
+   "full": "Ruth sets down the tray. “Eat.” Danny pushes it away. “Not hungry.”",
+   "narration": "Ruth sets down the tray. Danny pushes it away.",
+   "quotes": [
+    {
+     "text": "Eat.",
+     "speakerId": "ruth",
+     "speakerLabel": "Ruth",
+     "context": "Ruth sets down the tray."
+    },
+    {
+     "text": "Not hungry.",
+     "speakerId": "danny",
+     "speakerLabel": "Danny",
+     "context": "Danny pushes it away."
+    }
+   ]
+  }
+ },
+ {
+  "text": "The light over the door flickers once.",
+  "withRoster": true,
+  "parsed": {
+   "full": "The light over the door flickers once.",
+   "narration": "The light over the door flickers once.",
+   "quotes": []
+  }
+ },
+ {
+  "text": "Danny says he never touched it.",
+  "withRoster": true,
+  "parsed": {
+   "full": "Danny says he never touched it.",
+   "narration": "Danny says he never touched it.",
+   "quotes": []
+  }
+ },
+ {
+  "text": "Ruth says nothing and goes back to the dishes.",
+  "withRoster": true,
+  "parsed": {
+   "full": "Ruth says nothing and goes back to the dishes.",
+   "narration": "Ruth says nothing and goes back to the dishes.",
+   "quotes": []
+  }
+ },
+ {
+  "text": "Ruth says, \"Sit down.\"",
+  "withRoster": true,
+  "parsed": {
+   "full": "Ruth says, \"Sit down.\"",
+   "narration": "Ruth says,",
+   "quotes": [
+    {
+     "text": "Sit down.",
+     "speakerId": "ruth",
+     "speakerLabel": "Ruth",
+     "context": "Ruth says,"
+    }
+   ]
+  }
+ },
+ {
+  "text": "The stranger says, sit down.",
+  "withRoster": true,
+  "parsed": {
+   "full": "The stranger says, sit down.",
+   "narration": "The stranger says, sit down.",
+   "quotes": []
+  }
+ },
+ {
+  "text": "You wonder what Ruth says about you.",
+  "withRoster": true,
+  "parsed": {
+   "full": "You wonder what Ruth says about you.",
+   "narration": "You wonder what Ruth says about you.",
+   "quotes": []
+  }
+ },
+ {
+  "text": "The kettle starts to scream.\nRuth: Sit.",
+  "withRoster": true,
+  "parsed": {
+   "full": "The kettle starts to scream.\nRuth: Sit.",
+   "narration": "The kettle starts to scream.",
+   "quotes": [
+    {
+     "text": "Sit.",
+     "speakerId": "ruth",
+     "speakerLabel": "Ruth",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "Then: the door opens.",
+  "withRoster": true,
+  "parsed": {
+   "full": "Then: the door opens.",
+   "narration": null,
+   "quotes": [
+    {
+     "text": "the door opens.",
+     "speakerId": null,
+     "speakerLabel": "Then",
+     "context": null
+    }
+   ]
+  }
+ },
+ {
+  "text": "Ruth says, sit down.",
+  "withRoster": false,
+  "parsed": {
+   "full": "Ruth says, sit down.",
+   "narration": "Ruth says, sit down.",
+   "quotes": []
+  }
+ }
+]

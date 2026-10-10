@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import CharacterCard from "./CharacterCard";
 import type { CharacterNodeData } from "./CharacterCard";
 import InventoryCard from "./InventoryCard";
@@ -30,6 +30,9 @@ import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
 import { CtxMenuPanel, CtxMenuStreamLabel, ctxMenuStyle } from "@/components/ui/ContextMenu";
 import { FolderGroupRect, calcContentBounds, getDisplayBounds, getNodeDimensions, FOLDER_PADDING, locationHeaderHeight } from "./FolderGroup";
+import { settle, packFolder, pickRoomAt, type SettleNode, type SettleFolder, type SettlePriority } from "./canvas-settle";
+import { lodForZoom, folderLabelSize } from "./canvas-lod";
+import { clampCameraToContent, contentBoxOf, maxZoomForContent, type Rect as WorldRect } from "./camera-bounds";
 import FolderGroup from "./FolderGroup";
 
 // â”€â”€ Interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -40,6 +43,8 @@ interface CanvasNode {
   name: string;
   x: number;
   y: number;
+  /** Server: when a placement (JEWL / the sim) last wrote this position (ms). Newer than the GM's last drag → the server position wins over the browser-stored one (2026-09-26). */
+  placedAt?: number;
   status?: string;
   color?: string;
   portrait?: string | null;
@@ -208,19 +213,24 @@ export default function RelationsCanvas({
   // â”€â”€ Zoom constants â”€â”€
   // zoom < 1 = zoomed IN (smaller viewBox), zoom > 1 = zoomed OUT (larger viewBox)
   const BASE_HEIGHT = 924;
-  const MIN_ZOOM = 1.0;   // max zoom IN â€” 1x base magnification
   const MAX_ZOOM = 6.0;   // max zoom OUT
   const ZOOM_IN_FACTOR = 0.9;
   const ZOOM_OUT_FACTOR = 1.1;
 
   // Track container size so viewBox matches actual aspect ratio (prevents SVG letterboxing)
   const [containerSize, setContainerSize] = useState({ width: 1386, height: 924 });
+  // True once the ResizeObserver has reported the real container (phone
+  // floor + phone opening view depend on it — scout 2026-10-08).
+  const [measured, setMeasured] = useState(false);
+  // Max zoom IN. 1x on a laptop; a phone may go closer so one 520-wide card
+  // fits its 412 px (2026-10-06: at 1x the floor was 474 world units across).
+  const MIN_ZOOM = containerSize.width < 768 ? 0.45 : 1.0;
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
-      if (width > 0 && height > 0) setContainerSize({ width, height });
+      if (width > 0 && height > 0) { setContainerSize({ width, height }); setMeasured(true); }
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -229,13 +239,21 @@ export default function RelationsCanvas({
   const BASE_WIDTH = Math.round(BASE_HEIGHT * (containerSize.width / containerSize.height));
 
   // Round zoom to 4 decimal places to prevent floating-point drift
-  const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) * 1e4) / 1e4;
+  // Zoom-out ceiling from the content (Mike 2026-10-08): never further out than
+  // the whole world + margin. Set by the camera-bounds effect below.
+  const zoomCeilRef = useRef(MAX_ZOOM);
+  const clampZoom = (z: number) => Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomCeilRef.current, z)) * 1e4) / 1e4;
 
   // â”€â”€ localStorage helpers â”€â”€
   const storageKey = (key: string) => `canvas-${campaignId}-${key}`;
 
+  // `#reset-view` on the URL drops the remembered camera + zoom once (a phone
+  // lost in the void has no other way back — 2026-10-08).
+  const resetView = typeof window !== 'undefined' && window.location.hash === '#reset-view';
+
   function loadJSON<T>(key: string, fallback: T): T {
     if (typeof window === 'undefined') return fallback;
+    if (resetView && (key === 'camera' || key === 'zoom' || key === 'viewBox')) return fallback;
     try {
       const raw = localStorage.getItem(storageKey(key));
       if (raw) return JSON.parse(raw) as T;
@@ -252,19 +270,40 @@ export default function RelationsCanvas({
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
+  // The remembered zoom before any clamp — re-clamped once the container is
+  // measured, so a phone's 0.45 floor (not the desktop 1.0) applies.
+  const rawStoredZoomRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(() => {
-    const stored = loadJSON('zoom', 1);
+    // Phone default: one 520-wide card fits with margin (2026-10-06); laptop stays 1x.
+    const stored = loadJSON('zoom', typeof window !== 'undefined' && window.innerWidth < 768 ? 1.4 : 1);
+    rawStoredZoomRef.current = typeof stored === 'number' && Number.isFinite(stored) ? stored : null;
     return clampZoom(stored);
   });
+  // Whether the opening camera came from storage (else the phone opening view
+  // is recomputed after measurement with the real width).
+  const cameraWasStoredRef = useRef(false);
+  // Semantic zoom (Mike 2026-09-28): what a card renders as depends on how far out the Watcher is.
+  const lod = lodForZoom(zoom);
   const [camera, setCamera] = useState(() => {
     // Migrate from old viewBox storage or load camera position
     const oldVB = loadJSON<{ x: number; y: number; width?: number; height?: number } | null>('viewBox', null);
     const cam = loadJSON<{ x: number; y: number } | null>('camera', null);
-    if (cam) return cam;
+    if (cam) { cameraWasStoredRef.current = true; return cam; }
     if (oldVB) {
+      cameraWasStoredRef.current = true;
       // Clean up old key after migration
       try { localStorage.removeItem(storageKey('viewBox')); } catch { /* ignore */ }
       return { x: oldVB.x, y: oldVB.y };
+    }
+    // Phone, nothing remembered: open on the people (the scene), not the
+    // world's origin (2026-10-06, Mike: it opened at the block).
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const people = nodes.filter(n => n.type === 'character');
+      if (people.length) {
+        const cx = people.reduce((a, n) => a + n.x, 0) / people.length;
+        const cy = people.reduce((a, n) => a + n.y, 0) / people.length;
+        return { x: cx - (BASE_WIDTH * zoom) / 2, y: cy - (BASE_HEIGHT * zoom) / 2 };
+      }
     }
     return { x: -BASE_WIDTH / 2, y: -BASE_HEIGHT / 2 };
   });
@@ -297,8 +336,9 @@ export default function RelationsCanvas({
   } | null>(null);
 
   // â”€â”€ Node position & layering state â”€â”€
-  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(() => {
-    const stored = loadJSON<[string, { x: number; y: number }][]>('positions', []);
+  // Stored positions carry movedAt (the GM's last drag) so a server placement newer than it can win.
+  const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number; movedAt?: number }>>(() => {
+    const stored = loadJSON<[string, { x: number; y: number; movedAt?: number }][]>('positions', []);
     return new Map(stored);
   });
   const [dragOffsets, setDragOffsets] = useState<Map<string, { x: number; y: number }>>(new Map());
@@ -392,6 +432,16 @@ export default function RelationsCanvas({
   // cards). Compute every auto-folder's footprint bottom-up — three
   // passes covers three nesting levels; deeper levels converge on
   // later renders.
+  // Display names for everything a folder can hold (items + sub-locations
+  // arrive as ids) — the UI session's folder tooltips list them (10-06 ask).
+  const nodeNamesById = useMemo(() => {
+    const m = new Map<string, string>(nodes.map(n => [n.id, n.name]));
+    for (const f of folders) if (f.locationInfo?.locationId) m.set(f.locationInfo.locationId, f.name);
+    return m;
+  }, [nodes, folders]);
+  // Folder titles live INSIDE the header bar since ed776ba (UI session,
+  // 2026-10-06), so no headroom is reserved above a child folder any more.
+  const CHILD_LABEL_ALLOWANCE = 0;
   const folderRectById = useMemo(() => {
     const rects = new Map<string, { x: number; y: number; width: number; height: number }>();
     const nodeTypesMap = new Map(nodes.map(n => [n.id, n.type]));
@@ -399,14 +449,14 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
-        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects);
+        const content = calcContentBounds(f, nodePositions, dragOffsets, nodeTypesMap, expandedNodes, rects, CHILD_LABEL_ALLOWANCE);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
           rect = {
             x: f.posX ?? -360,
             y: f.posY ?? 100,
-            width: Math.max(720, f.userWidth || 0),
-            height: Math.max(200, f.userHeight || 0),
+            width: Math.max(560, f.userWidth || 0),
+            height: Math.max(150, f.userHeight || 0),
           };
         } else {
           const display = getDisplayBounds(content, f);
@@ -416,7 +466,7 @@ export default function RelationsCanvas({
       }
     }
     return rects;
-  }, [folders, nodes, nodePositions, dragOffsets, expandedNodes]);
+  }, [folders, nodes, nodePositions, dragOffsets, expandedNodes, zoom]);
 
   // Committed-geometry variant (no live drag offsets) — the live physics
   // (reflow/bumping) MUST measure against committed state or the
@@ -429,14 +479,14 @@ export default function RelationsCanvas({
       for (const f of folders) {
         if (!f.id.startsWith('auto-')) continue;
         const locId = f.id.slice('auto-'.length);
-        const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects);
+        const content = calcContentBounds(f, nodePositions, emptyOffsets, nodeTypesMap, expandedNodes, rects, CHILD_LABEL_ALLOWANCE);
         let rect: { x: number; y: number; width: number; height: number };
         if (!content) {
           rect = {
             x: f.posX ?? -360,
             y: f.posY ?? 100,
-            width: Math.max(280, f.userWidth || 0),
-            height: Math.max(120, f.userHeight || 0),
+            width: Math.max(560, f.userWidth || 0),
+            height: Math.max(150, f.userHeight || 0),
           };
         } else {
           const display = getDisplayBounds(content, f);
@@ -446,7 +496,7 @@ export default function RelationsCanvas({
       }
     }
     return rects;
-  }, [folders, nodes, nodePositions, expandedNodes]);
+  }, [folders, nodes, nodePositions, expandedNodes, zoom]);
 
   // â”€â”€ Inventory sub-panel state â”€â”€
   // Highlights the drop-target character when an inventory ROW is being dragged
@@ -503,6 +553,15 @@ export default function RelationsCanvas({
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced save â€” batches rapid state changes into one write
+  // Consume `#reset-view` so a later reload keeps the new camera.
+  useEffect(() => {
+    if (!resetView) return;
+    saveJSON('camera', camera);
+    saveJSON('zoom', zoom);
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const persistState = useCallback(() => {
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
@@ -522,6 +581,80 @@ export default function RelationsCanvas({
   useEffect(() => {
     persistState();
   }, [persistState]);
+
+  // ── Camera bounded by content (Mike 2026-10-08) ──
+  // "you can only scroll so far away from stuff if it doesn't exist … the
+  // canvas can keep getting larger if stuff exists to fill it." The world box
+  // = every card + every place's drawn rect. The viewport may stray past it by
+  // min(half a viewport, CAMERA_PAD); zoom-out stops where box + pad fits.
+  // One layout effect clamps every camera write (load, pan, pinch, wheel,
+  // focus, #reset-view) and re-clamps when the content grows or shrinks.
+  const CAMERA_PAD = BASE_HEIGHT / 2;
+  const contentRects = useMemo(() => {
+    const rects: WorldRect[] = [];
+    for (const n of nodes) {
+      if (n.type === 'location') continue; // places draw as folders
+      const p = nodePositions.get(n.id) ?? { x: n.x, y: n.y };
+      const d = getNodeDimensions(n.type, expandedNodes.has(n.id));
+      rects.push({ x: p.x - d.width / 2, y: p.y - d.topH, width: d.width, height: d.topH + d.bottomH });
+    }
+    for (const r of folderRectById.values()) rects.push(r);
+    return rects;
+  }, [nodes, nodePositions, expandedNodes, folderRectById]);
+  const contentBox = useMemo(() => contentBoxOf(contentRects), [contentRects]);
+  useLayoutEffect(() => {
+    const ceil = maxZoomForContent(contentBox, BASE_WIDTH, BASE_HEIGHT, CAMERA_PAD);
+    zoomCeilRef.current = Math.max(MIN_ZOOM, ceil);
+    const z = clampZoom(zoom);
+    if (z !== zoom) { setZoom(z); return; } // re-runs with the new zoom
+    const c = clampCameraToContent(camera, z, { baseW: BASE_WIDTH, baseH: BASE_HEIGHT }, contentRects, CAMERA_PAD);
+    if (Math.abs(c.x - camera.x) > 0.01 || Math.abs(c.y - camera.y) > 0.01) setCamera(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera, zoom, contentBox, contentRects, BASE_WIDTH, MIN_ZOOM]);
+
+  // First real container measurement (scout 2026-10-08): before it, BASE_WIDTH
+  // and the zoom floor are the desktop defaults. Once measured: re-clamp the
+  // remembered zoom with the real floor, recompute the phone's opening view on
+  // the people with the real width, clamp to content, and as a backstop centre
+  // on the people if no card is in view. Declared AFTER the bounds effect so
+  // its writes win this commit; the bounds effect re-validates next render.
+  const firstMeasureDoneRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!measured || firstMeasureDoneRef.current) return;
+    firstMeasureDoneRef.current = true;
+    const vp = { baseW: BASE_WIDTH, baseH: BASE_HEIGHT };
+    zoomCeilRef.current = Math.max(MIN_ZOOM, maxZoomForContent(contentBox, BASE_WIDTH, BASE_HEIGHT, CAMERA_PAD));
+    const z = clampZoom(rawStoredZoomRef.current ?? zoom);
+    const drawn = nodes.filter(n => n.type !== 'location');
+    const people = drawn.filter(n => n.type === 'character');
+    const posOf = (n: CanvasNode) => nodePositions.get(n.id) ?? { x: n.x, y: n.y };
+    const centreOn = (): { x: number; y: number } | null => {
+      const set = people.length ? people : drawn;
+      if (set.length) {
+        const cx = set.reduce((a, n) => a + posOf(n).x, 0) / set.length;
+        const cy = set.reduce((a, n) => a + posOf(n).y, 0) / set.length;
+        return { x: cx - (BASE_WIDTH * z) / 2, y: cy - (BASE_HEIGHT * z) / 2 };
+      }
+      if (contentBox) {
+        return { x: (contentBox.minX + contentBox.maxX) / 2 - (BASE_WIDTH * z) / 2, y: (contentBox.minY + contentBox.maxY) / 2 - (BASE_HEIGHT * z) / 2 };
+      }
+      return null;
+    };
+    let c = camera;
+    if (!cameraWasStoredRef.current && containerSize.width < 768) c = centreOn() ?? c;
+    c = clampCameraToContent(c, z, vp, contentRects, CAMERA_PAD);
+    if (drawn.length) {
+      const vw = BASE_WIDTH * z, vh = BASE_HEIGHT * z;
+      const anyInView = drawn.some(n => {
+        const p = posOf(n);
+        return p.x >= c.x && p.x <= c.x + vw && p.y >= c.y && p.y <= c.y + vh;
+      });
+      if (!anyInView) c = clampCameraToContent(centreOn() ?? c, z, vp, contentRects, CAMERA_PAD);
+    }
+    if (z !== zoom) setZoom(z);
+    if (c.x !== camera.x || c.y !== camera.y) setCamera(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measured]);
 
   // ── Measure possession-row positions ──────────────────────────────────────
   // Walks `[data-possession-row]` elements each animation frame while a
@@ -804,8 +937,8 @@ export default function RelationsCanvas({
         cy: Math.round(viewBox.y + fy * viewBox.height),
       });
     };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox is derived from camera+zoom; using those deps directly avoids infinite loops
   }, [showDebug, camera.x, camera.y, zoom]);
 
@@ -838,7 +971,10 @@ export default function RelationsCanvas({
   // triggers compaction — contents reflow into the new bounds, cascading
   // down the tree), and sibling location folders never overlap (the
   // moved/resized one yields, nudged to the nearest free spot).
-  const [pendingLayoutPass, setPendingLayoutPass] = useState<{ locId: string; compact: boolean } | null>(null);
+  // Settle-once (Mike 2026-10-01): queued on release, runs one render later
+  // against fresh committed geometry. `repack` = the location whose contents
+  // must first be shelf-packed into its new user width (resize end).
+  const [pendingLayoutPass, setPendingLayoutPass] = useState<{ priority: SettlePriority; repack?: string } | null>(null);
 
   /** All descendant node ids (cards) under a location, walking nested
    *  location folders. */
@@ -891,16 +1027,11 @@ export default function RelationsCanvas({
     });
   }, [walkDescendantNodeIds, onNodePositionChange, committedFolderRectById]);
 
-  /** Shelf-pack a location folder's direct members (cards + child
-   *  folders) into its user-set width — the cascade-shrink reflow. */
-  // ── LIVE physics (Mike 2026-08-03: "Think of all these things having
-  // physicality... They bump into and resize each other dynamically
-  // based on the hierarchy in real time.") Everything below emits
-  // TRANSIENT drag offsets — the render layer already applies offsets
-  // per frame — and commitPhysicsOffsets() lands the final state once
-  // on release. All measurement runs against COMMITTED geometry
-  // (committedFolderRectById), never offset-following rects, or the
-  // per-frame math compounds into runaway motion.
+  // ── Gesture offsets + glide (what remains of the 08-03 live physics) ──
+  // The held thing tracks the cursor through gesture offsets; after a
+  // settle, moved things glide from their old place to rest through the
+  // same rAF loop. Nothing is computed per frame any more (Mike
+  // 2026-10-01: measured oscillation + whole-tree relocation).
 
   /** Accumulate an offset onto a whole folder subtree (descendant cards
    *  + descendant folder pseudo-keys). */
@@ -921,141 +1052,154 @@ export default function RelationsCanvas({
     }
   }, [walkDescendantNodeIds]);
 
-  /** Live reflow: shelf-pack a folder's members against a target width,
-   *  emitted as offsets from committed positions. Runs every resize
-   *  frame — contents move organically WITH the handle. */
-  /** Resize-gesture baseline: geometry frozen at gesture start so
-   *  per-frame math is stable (idempotent deltas, no compounding) and
-   *  shrunk children RECOVER when the handle moves back out. `dirty`
-   *  latches once a reflow has run so recovery keeps recomputing. */
-  const resizeBaselineRef = useRef<{
-    parentW: number;
-    rects: Map<string, { x: number; y: number; width: number; height: number }>;
-    dirty: boolean;
-  } | null>(null);
+  const ensurePhysicsLoopRef = useRef<(() => void) | null>(null);
+  const pickAutoDropTargetRef = useRef<((px: number, py: number) => string | null) | null>(null);
+  // ── Settle-once (Mike 2026-10-01, replaces the per-frame reflow/push) ──
+  // The pure engine lives in canvas-settle.ts. Here: build its model from
+  // COMMITTED state (refs are synced every render), apply its moves in one
+  // batch, and let the moved things glide from where they were.
 
-  const computeReflowOffsetsInto = useCallback((
-    next: Map<string, { x: number; y: number }>,
-    locId: string,
-    targetW: number,
-    targetH?: number,
-    folderSizes?: Map<string, { w: number; h: number }>,
-    depth: number = 0,
-  ): { width: number; height: number } | null => {
-    if (depth > 3) return null;
+  /** Committed geometry → settle model. Only location (auto-) folders and
+   *  the cards inside them / loose on the canvas take part; party and
+   *  manual-group folders keep their own rules. */
+  const buildSettleModel = useCallback((): { sNodes: SettleNode[]; sFolders: SettleFolder[] } => {
     const foldersList = foldersRef.current;
-    const folder = foldersList.find(f => f.id === `auto-${locId}`);
-    if (!folder || folder.collapsed || folder.nodeIds.length === 0) return null;
-    const baseline = resizeBaselineRef.current;
-    const baseRect = (id: string) => baseline?.rects.get(id) ?? committedFolderRectById.get(id);
-    const selfRect = baseRect(locId);
-    const anchorX = folder.posX ?? selfRect?.x ?? 0;
-    const anchorY = folder.posY ?? selfRect?.y ?? 0;
-    // Cascade-shrink ratio (Mike 2026-08-03: "when I resize a parent it
-    // should also resize children as it shrinks"): children scale with
-    // the parent, floored at the minimum folder size, capped at their
-    // gesture-start size (growing past baseline never inflates them).
-    const wRatio = targetW / Math.max(1, selfRect?.width ?? targetW);
-    const hRatio = targetH != null ? targetH / Math.max(1, selfRect?.height ?? targetH) : 1;
-    const ratio = Math.max(0.35, Math.min(1, Math.min(wRatio, hRatio)));
-
-    type Member = { id: string; w: number; h: number; kind: 'node' | 'folder'; oldX: number; oldY: number; topH: number };
-    const members: Member[] = [];
-    for (const id of folder.nodeIds) {
-      if (foldersList.some(ff => ff.id === `auto-${id}`)) {
-        const r = baseRect(id);
-        if (!r) continue;
-        const childF = foldersList.find(ff => ff.id === `auto-${id}`);
-        if (childF?.collapsed) {
-          members.push({ id, w: r.width, h: r.height, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
-          continue;
-        }
-        const childTargetW = Math.max(280, Math.min(r.width, Math.round(r.width * ratio)));
-        const packed = computeReflowOffsetsInto(next, id, childTargetW, undefined, folderSizes, depth + 1);
-        const childW = childTargetW;
-        const childH = packed?.height ?? r.height;
-        folderSizes?.set(id, { w: childW, h: childH });
-        members.push({ id, w: childW, h: childH, kind: 'folder', oldX: r.x, oldY: r.y, topH: 0 });
-        continue;
+    const positions = nodePositionsRef.current;
+    const expanded = expandedNodesRef.current;
+    const autoFolders = foldersList.filter(f => f.id.startsWith('auto-'));
+    const locIds = new Set(autoFolders.map(f => f.id.slice('auto-'.length)));
+    const parentOf = new Map<string, string>();
+    const folderOfNode = new Map<string, string>();
+    for (const f of autoFolders) {
+      const locId = f.id.slice('auto-'.length);
+      for (const nid of f.nodeIds) {
+        if (locIds.has(nid)) parentOf.set(nid, locId);
+        else folderOfNode.set(nid, locId);
       }
-      const pos = nodePositionsRef.current.get(id);
-      if (!pos) continue;
-      const n = nodes.find(nn => nn.id === id);
-      const dims = getNodeDimensions(n?.type || 'character', expandedNodesRef.current.has(id));
-      members.push({
-        id, kind: 'node', w: dims.width, h: dims.topH + dims.bottomH,
-        oldX: pos.x - dims.width / 2, oldY: pos.y - dims.topH, topH: dims.topH,
+    }
+    const inManualFolder = new Set<string>();
+    for (const f of foldersList) if (!f.id.startsWith('auto-')) for (const nid of f.nodeIds) inManualFolder.add(nid);
+    const sNodes: SettleNode[] = [];
+    for (const n of nodes) {
+      if (n.type === 'location' || inManualFolder.has(n.id)) continue;
+      const pos = positions.get(n.id) ?? { x: n.x, y: n.y };
+      const dims = getNodeDimensions(n.type, expanded.has(n.id));
+      sNodes.push({ id: n.id, x: pos.x, y: pos.y, w: dims.width, topH: dims.topH, bottomH: dims.bottomH, folderId: folderOfNode.get(n.id) ?? null });
+    }
+    const sFolders: SettleFolder[] = autoFolders.map(f => {
+      const locId = f.id.slice('auto-'.length);
+      return {
+        id: locId,
+        parentId: parentOf.get(locId) ?? null,
+        userWidth: f.userWidth,
+        userHeight: f.userHeight,
+        posX: f.posX,
+        posY: f.posY,
+        collapsed: f.collapsed,
+        drafting: !!f.locationInfo && f.locationInfo.status !== 'ACTIVE',
+        headerH: locationHeaderHeight(f),
+      };
+    });
+    return { sNodes, sFolders };
+  }, [nodes]);
+
+  /** Run one settle pass (optionally repacking a resized folder first) and
+   *  land the result: positions + folder anchors committed in one batch,
+   *  moved things glide in from where they were. */
+  const applySettle = useCallback((priority: SettlePriority, repackLocId?: string) => {
+    const { sNodes, sFolders } = buildSettleModel();
+    const labelAllowance = CHILD_LABEL_ALLOWANCE;
+    // A dropped card joins the smallest room under it (the same rule the
+    // server applies via onDropIntoLocation, whose refresh lands later) —
+    // settle against the membership it is ABOUT to have, not the stale one.
+    if (priority?.kind === 'node') {
+      const n = sNodes.find(sn => sn.id === priority.id);
+      const hit = n ? pickAutoDropTargetRef.current?.(n.x, n.y) ?? null : null;
+      if (n && hit && hit !== n.folderId && sFolders.some(sf => sf.id === hit)) n.folderId = hit;
+    }
+    const moves = new Map<string, { x: number; y: number }>();
+    const shifts = new Map<string, { dx: number; dy: number }>();
+    const sizes = new Map<string, { width: number; height: number }>();
+    let workingNodes = sNodes;
+    let workingFolders = sFolders;
+    if (repackLocId) {
+      const f = foldersRef.current.find(ff => ff.id === `auto-${repackLocId}`);
+      if (f?.userWidth) {
+        const packed = packFolder(repackLocId, f.userWidth, sNodes, sFolders, { labelAllowance });
+        if (packed) {
+          for (const [id, m] of packed.nodeMoves) moves.set(id, m);
+          for (const [id, sh] of packed.folderShifts) shifts.set(id, sh);
+          for (const [id, sz] of packed.folderSizes) sizes.set(id, sz);
+          workingNodes = sNodes.map(n => { const m = packed.nodeMoves.get(n.id); return m ? { ...n, x: m.x, y: m.y } : n; });
+          workingFolders = sFolders.map(sf => {
+            const sh = packed.folderShifts.get(sf.id);
+            const sz = packed.folderSizes.get(sf.id);
+            if (!sh && !sz) return sf;
+            return {
+              ...sf,
+              posX: sh && sf.posX != null ? sf.posX + sh.dx : sf.posX,
+              posY: sh && sf.posY != null ? sf.posY + sh.dy : sf.posY,
+              ...(sz ? { userWidth: sz.width, userHeight: sz.height } : {}),
+            };
+          });
+        }
+      }
+    }
+    const result = settle(workingNodes, workingFolders, priority, { labelAllowance });
+    for (const [id, m] of result.nodeMoves) moves.set(id, m);
+    for (const [id, sh] of result.folderShifts) {
+      const prev = shifts.get(id) ?? { dx: 0, dy: 0 };
+      shifts.set(id, { dx: prev.dx + sh.dx, dy: prev.dy + sh.dy });
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      const tree = workingFolders.map(f => `${f.id.slice(-6)}<${f.parentId ? f.parentId.slice(-6) : 'root'}`).join(' ');
+      const prioNode = priority?.kind === 'node' ? workingNodes.find(n => n.id === priority.id) : undefined;
+      const prioFolderRect = priority?.kind === 'folder' ? result.folderRects.get(priority.id) : undefined;
+      const prioRectInfo = prioFolderRect ? ` prioRect=${Math.round(prioFolderRect.x)},${Math.round(prioFolderRect.y)}+${Math.round(prioFolderRect.width)}x${Math.round(prioFolderRect.height)}` : '';
+      const prioInfo = prioNode ? ` prioFolder=${prioNode.folderId ? prioNode.folderId.slice(-6) : 'loose'} stillOver=${workingNodes.filter(n => n.id !== prioNode.id && (() => { const a = moves.get(n.id) ?? { x: n.x, y: n.y }; const b = moves.get(prioNode.id) ?? { x: prioNode.x, y: prioNode.y }; return Math.abs(a.x - b.x) < (n.w + prioNode.w) / 2 && Math.abs((a.y - n.topH + (n.topH + n.bottomH) / 2) - (b.y - prioNode.topH + (prioNode.topH + prioNode.bottomH) / 2)) < (n.topH + n.bottomH + prioNode.topH + prioNode.bottomH) / 2; })()).map(n => `${n.id.slice(-6)}@${n.folderId ? n.folderId.slice(-6) : 'loose'}`).join(',') || '-'}` : '';
+      console.log(`[settle] ${priority ? `${priority.kind}:${priority.id.slice(-6)}` : 'none'}${prioInfo}${prioRectInfo}${repackLocId ? ` repack:${repackLocId.slice(-6)}` : ''} nodes=${workingNodes.length} folders=${workingFolders.length} rounds=${result.rounds} perRound=${result.roundMoves.join('/')} moves=${moves.size} shifts=${[...shifts].map(([id, sh]) => `${id.slice(-6)}(${Math.round(sh.dx)},${Math.round(sh.dy)})`).join(',') || '-'} tree=${tree}`);
+    }
+    if (moves.size === 0 && shifts.size === 0 && sizes.size === 0) return;
+    // Glide: every moved thing starts at its OLD place and eases to rest.
+    const currents = new Map<string, { x: number; y: number }>();
+    for (const [id, m] of moves) {
+      const base = nodePositionsRef.current.get(id);
+      if (base) currents.set(id, { x: base.x - m.x, y: base.y - m.y });
+    }
+    for (const [id, sh] of shifts) currents.set(`__folder__auto-${id}`, { x: -sh.dx, y: -sh.dy });
+    gestureOffsetsRef.current = new Map();
+    reactionTargetsRef.current = new Map();
+    reactionCurrentsRef.current = currents;
+    ensurePhysicsLoopRef.current?.();
+    // Commit.
+    const movedAt = Date.now();
+    if (moves.size) {
+      setNodePositions(prev => {
+        const next = new Map(prev);
+        for (const [id, m] of moves) {
+          next.set(id, { x: m.x, y: m.y, movedAt });
+          onNodePositionChange?.(id, m.x, m.y);
+        }
+        return next;
       });
     }
-    if (!members.length) return null;
-    // Reflow only when contents overflow the live width (starburst
-    // guard) — but once a reflow has run this gesture, keep recomputing
-    // so growing back RECOVERS the layout toward baseline.
-    const hh = locationHeaderHeight(folder);
-    if (!(baseline?.dirty)) {
-      const fitLeft = anchorX + 4;
-      const fitRight = anchorX + targetW - 24;
-      const fitTop = anchorY + hh - 8;
-      const fitBottom = targetH != null ? anchorY + targetH - 8 : Infinity;
-      const overflows = members.some(m =>
-        m.oldX < fitLeft || m.oldX + m.w > fitRight ||
-        m.oldY < fitTop || m.oldY + m.h > fitBottom);
-      if (!overflows) return null;
-      if (baseline) baseline.dirty = true;
+    if (shifts.size || sizes.size) {
+      const updated = foldersRef.current.map(f => {
+        const locId = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
+        const sh = locId ? shifts.get(locId) : undefined;
+        const sz = locId ? sizes.get(locId) : undefined;
+        if (!sh && !sz) return f;
+        return {
+          ...f,
+          ...(sh && f.posX != null ? { posX: f.posX + sh.dx } : {}),
+          ...(sh && f.posY != null ? { posY: f.posY + sh.dy } : {}),
+          ...(sz ? { userWidth: sz.width, userHeight: sz.height } : {}),
+          movedAt,
+        };
+      });
+      onFoldersChange?.(updated);
     }
-    members.sort((a, b) => (a.oldY - b.oldY) || (a.oldX - b.oldX));
-    const PAD = FOLDER_PADDING, GAP = 20;
-    let cx = anchorX + PAD, cy = anchorY + hh + PAD, rowH = 0;
-    for (const m of members) {
-      if (cx + m.w > anchorX + targetW - PAD && cx > anchorX + PAD) {
-        cx = anchorX + PAD; cy += rowH + GAP; rowH = 0;
-      }
-      const dx = cx - m.oldX;
-      const dy = cy - m.oldY;
-      if (dx !== 0 || dy !== 0) {
-        if (m.kind === 'node') next.set(m.id, { x: dx, y: dy });
-        else addSubtreeOffsetInto(next, m.id, dx, dy);
-      }
-      cx += m.w + GAP; rowH = Math.max(rowH, m.h);
-    }
-    return { width: targetW, height: (cy + rowH + PAD) - anchorY };
-  }, [nodes, committedFolderRectById, addSubtreeOffsetInto]);
-
-  /** Live bumping: the actor's live rect pushes overlapping sibling
-   *  folders (and their subtrees) away along the minimal axis. */
-  const computeSiblingPushesInto = useCallback((next: Map<string, { x: number; y: number }>, locId: string, liveRect: { x: number; y: number; width: number; height: number }) => {
-    const foldersList = foldersRef.current;
-    const parentOf = (id: string): string | null =>
-      foldersList.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(id))?.id.slice('auto-'.length) ?? null;
-    const myParent = parentOf(locId);
-    const GAP = 24;
-    for (const f of foldersList) {
-      if (!f.id.startsWith('auto-') || f.id === `auto-${locId}`) continue;
-      const sib = f.id.slice('auto-'.length);
-      if (parentOf(sib) !== myParent) continue;
-      const rs0 = committedFolderRectById.get(sib);
-      if (!rs0) continue;
-      const cur = next.get(`__folder__auto-${sib}`) ?? { x: 0, y: 0 };
-      const rs = { x: rs0.x + cur.x, y: rs0.y + cur.y, width: rs0.width, height: rs0.height };
-      const overlapX = Math.min(liveRect.x + liveRect.width, rs.x + rs.width) - Math.max(liveRect.x, rs.x);
-      const overlapY = Math.min(liveRect.y + liveRect.height, rs.y + rs.height) - Math.max(liveRect.y, rs.y);
-      if (overlapX <= 0 || overlapY <= 0) continue;
-      let dx = 0, dy = 0;
-      if (overlapX < overlapY) dx = rs.x + rs.width / 2 < liveRect.x + liveRect.width / 2 ? -(overlapX + GAP) : overlapX + GAP;
-      else dy = rs.y + rs.height / 2 < liveRect.y + liveRect.height / 2 ? -(overlapY + GAP) : overlapY + GAP;
-      // A physics push must NEVER shove a drafting folder across the
-      // crystallization line — crossing is the OWNER's gesture (with its
-      // KRMA consequence), not collateral of someone else's drag (bug
-      // 2026-08-03: pushed items stranded above the line after a
-      // declined crystallize prompt). Deflect horizontally instead.
-      const sibDrafting = f.locationInfo && f.locationInfo.status !== 'ACTIVE';
-      if (sibDrafting && dy < 0 && rs.y + dy < 0) {
-        dy = 0;
-        dx = rs.x + rs.width / 2 < liveRect.x + liveRect.width / 2 ? -(overlapX + GAP) : overlapX + GAP;
-      }
-      addSubtreeOffsetInto(next, sib, dx, dy);
-    }
-  }, [committedFolderRectById, addSubtreeOffsetInto]);
+  }, [buildSettleModel, zoom, onNodePositionChange, onFoldersChange]);
 
   // ── Fluid reaction layer (Mike 2026-08-03: "still too snappy, more
   // fluid") ── The DRAGGED thing tracks the cursor 1:1 (gesture
@@ -1105,6 +1249,7 @@ export default function RelationsCanvas({
       physicsRafRef.current = requestAnimationFrame(physicsTick);
     }
   }, [physicsTick]);
+  ensurePhysicsLoopRef.current = ensurePhysicsLoop;
 
   /** Land every transient physics offset as committed state, batched.
    *  Commits the TARGETS (final resting places), not the mid-animation
@@ -1135,13 +1280,19 @@ export default function RelationsCanvas({
       if (key.startsWith('__folder__auto-')) folderMoves.set(key.slice('__folder__auto-'.length), o);
       else if (!key.startsWith('__folder__')) nodeMoves.set(key, o);
     }
+    // movedAt marks these as the GM's own drag: without it the stored-position
+    // rule (`placedAt > (movedAt ?? 0)`) handed the members straight back to
+    // the server's placement on the next refresh — a dragged room snapped
+    // home after its settle had already pushed the neighbours (measured
+    // 2026-10-06: Kitchen −300 → kitchen back, Main Room −176).
+    const movedAt = Date.now();
     if (nodeMoves.size) {
       setNodePositions(prev => {
         const next = new Map(prev);
         for (const [id, o] of nodeMoves) {
           const base = prev.get(id);
           if (!base) continue;
-          next.set(id, { x: base.x + o.x, y: base.y + o.y });
+          next.set(id, { x: base.x + o.x, y: base.y + o.y, movedAt });
           onNodePositionChange?.(id, base.x + o.x, base.y + o.y);
         }
         return next;
@@ -1153,51 +1304,12 @@ export default function RelationsCanvas({
         const o = locId ? folderMoves.get(locId) : undefined;
         if (!o) return f;
         const rect = committedFolderRectById.get(locId!);
-        return { ...f, posX: (f.posX ?? rect?.x ?? 0) + o.x, posY: (f.posY ?? rect?.y ?? 0) + o.y };
+        return { ...f, posX: (f.posX ?? rect?.x ?? 0) + o.x, posY: (f.posY ?? rect?.y ?? 0) + o.y, movedAt };
       });
       onFoldersChange?.(updated);
     }
     setDragOffsets(new Map());
   }, [committedFolderRectById, onNodePositionChange, onFoldersChange]);
-
-  /** Nudge a moved/resized location folder out of its siblings — the
-   *  disturbed folder yields. */
-  const resolveSiblingOverlaps = useCallback((locId: string) => {
-    const foldersList = foldersRef.current;
-    const parentOf = (id: string): string | null =>
-      foldersList.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(id))?.id.slice('auto-'.length) ?? null;
-    const myParent = parentOf(locId);
-    const siblings = foldersList
-      .filter(f => f.id.startsWith('auto-') && f.id !== `auto-${locId}`)
-      .map(f => f.id.slice('auto-'.length))
-      .filter(id => parentOf(id) === myParent);
-    let rect = committedFolderRectById.get(locId);
-    if (!rect) return;
-    let totalDx = 0, totalDy = 0;
-    for (let iter = 0; iter < 8; iter++) {
-      let pushed = false;
-      for (const sib of siblings) {
-        const rs = committedFolderRectById.get(sib);
-        if (!rs) continue;
-        const cur = { x: rect.x + totalDx, y: rect.y + totalDy, width: rect.width, height: rect.height };
-        const overlapX = Math.min(cur.x + cur.width, rs.x + rs.width) - Math.max(cur.x, rs.x);
-        const overlapY = Math.min(cur.y + cur.height, rs.y + rs.height) - Math.max(cur.y, rs.y);
-        if (overlapX <= 0 || overlapY <= 0) continue;
-        const GAP = 24;
-        if (overlapX < overlapY) {
-          totalDx += (cur.x + cur.width / 2 < rs.x + rs.width / 2 ? -(overlapX + GAP) : overlapX + GAP);
-        } else {
-          totalDy += (cur.y + cur.height / 2 < rs.y + rs.height / 2 ? -(overlapY + GAP) : overlapY + GAP);
-        }
-        pushed = true;
-      }
-      if (!pushed) break;
-    }
-    if (totalDx !== 0 || totalDy !== 0) {
-      const updated = shiftFolderTree(locId, totalDx, totalDy, foldersList);
-      onFoldersChange?.(updated);
-    }
-  }, [committedFolderRectById, shiftFolderTree, onFoldersChange]);
 
   // ── JEWL stage direction (C2/C3): camera focus + transient highlights ──
   const [jewlHighlights, setJewlHighlights] = useState<Map<string, number>>(new Map());
@@ -1254,28 +1366,26 @@ export default function RelationsCanvas({
     return () => clearInterval(t);
   }, [jewlHighlights.size]);
 
-  /** Smallest AUTO (location) folder whose interior contains the point —
-   *  dropping into a room inside an apartment targets the ROOM. Interior
-   *  excludes the header band so hovering the title doesn't capture.
+  /** Smallest AUTO (location) folder whose drawn box contains the card
+   *  centre — dropping into a room inside an apartment targets the ROOM.
+   *  The whole box counts, header band and edges included (2026-10-06:
+   *  the old 12 px inset + header exclusion filed edge-hugging cards with
+   *  the parent while they visibly sat in the room). Rule: pickRoomAt.
    *  Membership is NOT excluded here — callers compare against the
    *  node's current parent and no-op on a same-room move (excluding it
    *  made every within-room drag fall through to the enclosing
    *  apartment and silently re-parent, 2026-08-03). */
   const pickAutoDropTarget = useCallback((px: number, py: number): string | null => {
-    let best: { locId: string; area: number } | null = null;
+    const rooms: Array<{ id: string; rect: { x: number; y: number; width: number; height: number }; collapsed?: boolean }> = [];
     for (const f of foldersRef.current) {
-      if (!f.id.startsWith('auto-') || f.collapsed) continue;
+      if (!f.id.startsWith('auto-')) continue;
       const locId = f.id.slice('auto-'.length);
       const r = folderRectById.get(locId);
-      if (!r) continue;
-      const inset = 12;
-      if (px >= r.x + inset && px <= r.x + r.width - inset && py >= r.y + 96 && py <= r.y + r.height - inset) {
-        const area = r.width * r.height;
-        if (!best || area < best.area) best = { locId, area };
-      }
+      if (r) rooms.push({ id: locId, rect: r, collapsed: f.collapsed });
     }
-    return best?.locId ?? null;
+    return pickRoomAt(px, py, rooms);
   }, [folderRectById]);
+  pickAutoDropTargetRef.current = pickAutoDropTarget;
 
   /** The location the node currently lives in (its auto-folder parent). */
   const currentAutoParentOf = useCallback((nodeId: string): string | null => {
@@ -1285,6 +1395,39 @@ export default function RelationsCanvas({
         ?.id.slice('auto-'.length) ?? null
     );
   }, []);
+
+  /** Every canvas room change goes through here (drop, carry, group drop,
+   *  take-out, undo/redo). The server write (onDropIntoLocation → the
+   *  location route) is async and the folder membership only follows on the
+   *  refresh, so the canvas remembers what it ASKED for until the folders
+   *  agree: undo snapshots and undo/redo comparisons read that intent. Before
+   *  this (10-06, Ruth): a drop changed her located_at, the undo fired before
+   *  the refresh, saw "same room" and never restored the edge. Writes for one
+   *  card are chained so an undo can't overtake the drop it reverses. */
+  const intendedParentRef = useRef(new Map<string, { loc: string | null; at: number }>());
+  const dropChainRef = useRef(new Map<string, Promise<unknown>>());
+  const onDropIntoLocationRef = useRef(onDropIntoLocation);
+  onDropIntoLocationRef.current = onDropIntoLocation;
+  const dropIntoLocation = useCallback((nodeId: string, nodeType: 'character' | 'item', locationId: string | null) => {
+    intendedParentRef.current.set(nodeId, { loc: locationId, at: Date.now() });
+    const prev = dropChainRef.current.get(nodeId) ?? Promise.resolve();
+    const next = prev.then(() => onDropIntoLocationRef.current?.(nodeId, nodeType, locationId)).catch(() => {});
+    dropChainRef.current.set(nodeId, next);
+  }, []);
+  /** The room a card belongs to as far as this canvas knows: a pending
+   *  request wins over the not-yet-refreshed folders (expires after 15 s so
+   *  a failed write falls back to server truth). */
+  const membershipOf = useCallback((nodeId: string): string | null => {
+    const want = intendedParentRef.current.get(nodeId);
+    if (want && Date.now() - want.at < 15000) return want.loc;
+    return currentAutoParentOf(nodeId);
+  }, [currentAutoParentOf]);
+  useEffect(() => {
+    const now = Date.now();
+    for (const [id, want] of intendedParentRef.current) {
+      if (now - want.at >= 15000 || currentAutoParentOf(id) === want.loc) intendedParentRef.current.delete(id);
+    }
+  }, [folders, currentAutoParentOf]);
 
   // "Take out" (Mike 2026-08-03): a right-click context action that
   // moves a card ONE level up the hierarchy — room → apartment,
@@ -1296,14 +1439,14 @@ export default function RelationsCanvas({
       const n = nodes.find(nn => nn.id === nodeId);
       if (!n) return;
       const nodeType = n.type === 'item' ? ('item' as const) : ('character' as const);
-      const curParent = currentAutoParentOf(nodeId);
+      const curParent = membershipOf(nodeId);
       if (!curParent) return; // already loose
       const grandParent = currentAutoParentOf(curParent);
-      onDropIntoLocation?.(nodeId, nodeType, grandParent);
+      dropIntoLocation(nodeId, nodeType, grandParent);
     };
     window.addEventListener('growth:take-out', handler);
     return () => window.removeEventListener('growth:take-out', handler);
-  }, [nodes, currentAutoParentOf, onDropIntoLocation]);
+  }, [nodes, currentAutoParentOf, membershipOf, dropIntoLocation]);
 
   /** Commit a group drag: move every OTHER selected member by the same
    *  delta AND persist their room membership by final position — the
@@ -1324,8 +1467,9 @@ export default function RelationsCanvas({
     }
     setNodePositions((prev) => {
       const next = new Map(prev);
+      const movedAt = Date.now();
       for (const m of finals) {
-        next.set(m.id, { x: m.fx, y: m.fy });
+        next.set(m.id, { x: m.fx, y: m.fy, movedAt });
         onNodePositionChange?.(m.id, m.fx, m.fy);
       }
       return next;
@@ -1336,21 +1480,178 @@ export default function RelationsCanvas({
       const n = nodes.find(nn => nn.id === m.id);
       if (!n || n.type === 'location') continue;
       const hit = pickAutoDropTarget(m.fx, m.fy);
-      const cur = currentAutoParentOf(m.id);
+      const cur = membershipOf(m.id);
       if (hit && hit !== cur) {
-        onDropIntoLocation?.(m.id, n.type === 'item' ? 'item' : 'character', hit);
+        dropIntoLocation(m.id, n.type === 'item' ? 'item' : 'character', hit);
       }
     }
-  }, [nodes, pickAutoDropTarget, currentAutoParentOf, onDropIntoLocation, onNodePositionChange]);
+  }, [nodes, pickAutoDropTarget, membershipOf, dropIntoLocation, onNodePositionChange]);
 
 
-  // Layout pass runs one render AFTER a commit so folderRectById is fresh.
+  // ── Undo / redo for the planning layer (Mike 2026-10-06: "We need an undo
+  // feature on the canvas (obviously for just planning (aka below the line)").
+  // One transaction = one gesture AND its consequences (the settle pushes, a
+  // repack, a room-membership change). A snapshot is taken when a gesture
+  // begins (beginTx) and again a beat after the settle lands (closeTx); the
+  // pair goes on the stack. Undo restores the BEFORE snapshot against the
+  // current state — positions, folder geometry, and membership (through the
+  // same onDropIntoLocation path, so the server follows). Crystallized places
+  // (status ACTIVE) and anything above the line are left alone: not planning.
+  type CanvasSnapshot = {
+    positions: Map<string, { x: number; y: number }>;
+    folders: Map<string, { posX?: number; posY?: number; userWidth?: number; userHeight?: number; collapsed?: boolean }>;
+    membership: Map<string, string | null>;
+  };
+  type CanvasTx = { label: string; before: CanvasSnapshot; after: CanvasSnapshot };
+  const HISTORY_LIMIT = 50;
+  const historyRef = useRef<{ undo: CanvasTx[]; redo: CanvasTx[] }>({ undo: [], redo: [] });
+  const openTxRef = useRef<{ label: string; before: CanvasSnapshot } | null>(null);
+  const txCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const takeSnapshot = useCallback((): CanvasSnapshot => {
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const n of nodes) {
+      const p = nodePositionsRef.current.get(n.id) ?? { x: n.x, y: n.y };
+      positions.set(n.id, { x: p.x, y: p.y });
+    }
+    const folders = new Map<string, { posX?: number; posY?: number; userWidth?: number; userHeight?: number; collapsed?: boolean }>();
+    for (const f of foldersRef.current) folders.set(f.id, { posX: f.posX, posY: f.posY, userWidth: f.userWidth, userHeight: f.userHeight, collapsed: f.collapsed });
+    const membership = new Map<string, string | null>();
+    for (const n of nodes) if (n.type !== 'location') membership.set(n.id, membershipOf(n.id));
+    return { positions, folders, membership };
+  }, [nodes, membershipOf]);
+  const broadcastHistory = useCallback(() => {
+    const h = historyRef.current;
+    window.dispatchEvent(new CustomEvent('growth:canvas-history', {
+      detail: { canUndo: h.undo.length > 0, canRedo: h.redo.length > 0, undoLabel: h.undo[h.undo.length - 1]?.label ?? null, redoLabel: h.redo[h.redo.length - 1]?.label ?? null },
+    }));
+  }, []);
+  /** Call at the START of any gesture that will change the canvas. Idempotent while a tx is open. */
+  const closeTxRef = useRef<() => void>(() => {});
+  const beginTx = useCallback((label: string) => {
+    // A gesture that changed nothing (a click on a card, a zero-length drag)
+    // never schedules a settle, so its transaction would stay open and the
+    // NEXT gesture would be recorded under its label (orchestrator report
+    // 10-06: a carry showed up as "move"). Close any stale one first — the
+    // close is a no-op when nothing changed — and arm a fallback close.
+    if (openTxRef.current) closeTxRef.current();
+    if (txCloseTimerRef.current) clearTimeout(txCloseTimerRef.current);
+    openTxRef.current = { label, before: takeSnapshot() };
+    txCloseTimerRef.current = setTimeout(() => closeTxRef.current(), 1500);
+  }, [takeSnapshot]);
+  const closeTx = useCallback(() => {
+    const open = openTxRef.current;
+    openTxRef.current = null;
+    txCloseTimerRef.current = null;
+    if (!open) return;
+    const after = takeSnapshot();
+    let changed = false;
+    for (const [id, a] of after.positions) { const b = open.before.positions.get(id); if (!b || b.x !== a.x || b.y !== a.y) { changed = true; break; } }
+    if (!changed) for (const [id, a] of after.folders) { const b = open.before.folders.get(id); if (!b || b.posX !== a.posX || b.posY !== a.posY || b.userWidth !== a.userWidth || b.userHeight !== a.userHeight || b.collapsed !== a.collapsed) { changed = true; break; } }
+    if (!changed) for (const [id, a] of after.membership) { if (open.before.membership.get(id) !== a) { changed = true; break; } }
+    if (!changed) return;
+    const h = historyRef.current;
+    h.undo.push({ label: open.label, before: open.before, after });
+    if (h.undo.length > HISTORY_LIMIT) h.undo.shift();
+    h.redo = [];
+    broadcastHistory();
+  }, [takeSnapshot, broadcastHistory]);
+  /** Schedule the close a beat after the settle's commits have rendered. */
+  closeTxRef.current = closeTx;
+  const scheduleTxClose = useCallback(() => {
+    if (!openTxRef.current) return;
+    if (txCloseTimerRef.current) clearTimeout(txCloseTimerRef.current);
+    txCloseTimerRef.current = setTimeout(closeTx, 350);
+  }, [closeTx]);
+  /** Restore a snapshot against the current state — planning layer only. */
+  const applySnapshot = useCallback((target: CanvasSnapshot) => {
+    const activeLocIds = new Set(foldersRef.current.filter(f => f.locationInfo?.status === 'ACTIVE').map(f => f.id.slice('auto-'.length)));
+    const movedAt = Date.now();
+    // Positions (skip anything above the line, before or after).
+    const posMoves: Array<[string, { x: number; y: number }]> = [];
+    for (const [id, t] of target.positions) {
+      const cur = nodePositionsRef.current.get(id);
+      if (!cur || (cur.x === t.x && cur.y === t.y)) continue;
+      if (cur.y < 0 || t.y < 0) continue;
+      posMoves.push([id, t]);
+    }
+    if (posMoves.length) {
+      setNodePositions(prev => {
+        const next = new Map(prev);
+        for (const [id, t] of posMoves) { next.set(id, { x: t.x, y: t.y, movedAt }); onNodePositionChange?.(id, t.x, t.y); }
+        return next;
+      });
+    }
+    // Folder geometry (skip crystallized places).
+    let foldersChanged = false;
+    const updated = foldersRef.current.map(f => {
+      const t = target.folders.get(f.id);
+      if (!t) return f;
+      const locId = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
+      if (locId && activeLocIds.has(locId)) return f;
+      if (f.posX === t.posX && f.posY === t.posY && f.userWidth === t.userWidth && f.userHeight === t.userHeight && f.collapsed === t.collapsed) return f;
+      foldersChanged = true;
+      return { ...f, posX: t.posX, posY: t.posY, userWidth: t.userWidth, userHeight: t.userHeight, collapsed: t.collapsed, movedAt };
+    });
+    if (foldersChanged) onFoldersChange?.(updated);
+    // Membership (through the server path; a crystallized target room is left alone).
+    for (const [id, loc] of target.membership) {
+      const cur = membershipOf(id);
+      if (cur === loc) continue;
+      if (loc && activeLocIds.has(loc)) continue;
+      const n = nodes.find(nn => nn.id === id);
+      if (!n || n.type === 'location') continue;
+      dropIntoLocation(id, n.type === 'item' ? 'item' : 'character', loc);
+    }
+    setDragOffsets(new Map());
+    gestureOffsetsRef.current = new Map();
+  }, [nodes, membershipOf, onNodePositionChange, onFoldersChange, dropIntoLocation]);
+  const undoCanvas = useCallback(() => {
+    if (openTxRef.current) closeTx();
+    const h = historyRef.current;
+    const tx = h.undo.pop();
+    if (!tx) return;
+    applySnapshot(tx.before);
+    h.redo.push(tx);
+    broadcastHistory();
+  }, [closeTx, applySnapshot, broadcastHistory]);
+  const redoCanvas = useCallback(() => {
+    const h = historyRef.current;
+    const tx = h.redo.pop();
+    if (!tx) return;
+    applySnapshot(tx.after);
+    h.undo.push(tx);
+    broadcastHistory();
+  }, [applySnapshot, broadcastHistory]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoCanvas(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoCanvas(); }
+    };
+    const onUndo = () => undoCanvas();
+    const onRedo = () => redoCanvas();
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('growth:canvas-undo', onUndo);
+    window.addEventListener('growth:canvas-redo', onRedo);
+    broadcastHistory();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('growth:canvas-undo', onUndo);
+      window.removeEventListener('growth:canvas-redo', onRedo);
+    };
+  }, [undoCanvas, redoCanvas, broadcastHistory]);
+
+  // Settle runs one render AFTER a commit so the refs hold fresh geometry.
   useEffect(() => {
     if (!pendingLayoutPass) return;
-    const { locId } = pendingLayoutPass;
+    const { priority, repack } = pendingLayoutPass;
     setPendingLayoutPass(null);
-    resolveSiblingOverlaps(locId);
-  }, [pendingLayoutPass, resolveSiblingOverlaps]);
+    applySettle(priority, repack);
+    scheduleTxClose();
+  }, [pendingLayoutPass, applySettle, scheduleTxClose]);
 
 
   // Refs for RAF throttling
@@ -1375,7 +1676,12 @@ export default function RelationsCanvas({
     setNodePositions((prev) => {
       const next = new Map(prev);
       nodes.forEach((node) => {
-        if (!next.has(node.id)) {
+        const stored = next.get(node.id);
+        // Server wins when it placed this node more recently than the GM last
+        // dragged it (JEWL organizing the canvas, the sim moving a being) —
+        // Mike 2026-09-26: "I do not see a change on the canvas".
+        const serverNewer = typeof node.placedAt === 'number' && node.placedAt > (stored?.movedAt ?? 0);
+        if (!stored || serverNewer) {
           next.set(node.id, { x: node.x, y: node.y });
         }
       });
@@ -1527,7 +1833,7 @@ export default function RelationsCanvas({
     // (same room). The old first-match loop lit up the enclosing
     // apartment while you hovered a room.
     const autoHit = pickAutoDropTarget(dropX, dropY);
-    const curParent = currentAutoParentOf(nodeId);
+    const curParent = membershipOf(nodeId);
     if (autoHit && autoHit !== curParent) {
       const id = `auto-${autoHit}`;
       setDropTargetFolderId(id);
@@ -1552,7 +1858,7 @@ export default function RelationsCanvas({
     }
     setDropTargetFolderId(hitFolder);
     dropTargetRef.current = hitFolder;
-  }, [nodes, pickAutoDropTarget, currentAutoParentOf]);
+  }, [nodes, pickAutoDropTarget, membershipOf]);
 
   // Clamp a panel Y so it stays on the same side of the KRMA line as its parent card.
   // For crystallized panels (above line), the BOTTOM edge (panelY + panelHeight) must not cross below the line.
@@ -1860,7 +2166,7 @@ export default function RelationsCanvas({
   // â”€â”€ Pan handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent) => {
       const target = e.target as Element;
       const isBackground =
         target === svgRef.current ||
@@ -1871,7 +2177,10 @@ export default function RelationsCanvas({
       if (isBackground) {
         // OS-grade gesture map (S-5): middle-drag or Space+drag = pan;
         // plain left-drag = marquee select (the desktop convention).
-        if (e.button === 1 || spaceHeldRef.current) {
+        // Touch (2026-10-06, Mike on his phone: "the canvas I cant even
+        // navigate"): one finger on the background pans; two fingers pinch
+        // (see the pinch tracker below). There is no middle button to pan with.
+        if (e.button === 1 || spaceHeldRef.current || e.pointerType === 'touch') {
           setIsPanning(true);
           setIsDragging(true);
           setPanStart({ x: e.clientX, y: e.clientY, viewBoxX: camera.x, viewBoxY: camera.y });
@@ -1901,6 +2210,7 @@ export default function RelationsCanvas({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       stampGesture();
+      if (pinchRef.current) return; // two fingers own the gesture
       // Marquee select (S-5): live-track the band.
       if (marquee) {
         const cur = clientToSvg(e.clientX, e.clientY);
@@ -2012,17 +2322,9 @@ export default function RelationsCanvas({
             }
             gesture.set(`__folder__${folder.id}`, { x: dx, y: dy });
             gestureOffsetsRef.current = gesture;
-            // REACTIONS ease: bumped siblings glide out of the way.
-            const reactions = new Map<string, { x: number; y: number }>();
-            if (dragLocId) {
-              const rect = committedFolderRectById.get(dragLocId);
-              if (rect) {
-                computeSiblingPushesInto(reactions, dragLocId, {
-                  x: rect.x + dx, y: rect.y + dy, width: rect.width, height: rect.height,
-                });
-              }
-            }
-            reactionTargetsRef.current = reactions;
+            // Settle-once (2026-10-01): nothing reacts while the folder is in
+            // hand — siblings are pushed clear ONCE on release.
+            reactionTargetsRef.current = new Map();
             mergePhysicsFrame();
             ensurePhysicsLoop();
           }
@@ -2069,12 +2371,11 @@ export default function RelationsCanvas({
               // Match the visual bounds computation from FolderGroupRect
               const anchorX = f.posX != null ? Math.min(f.posX, content.x) : content.x;
               const anchorY = f.posY != null ? Math.min(f.posY, content.y) : content.y;
-              const basePosX = f.posX ?? content.x;
-              const basePosY = f.posY ?? content.y;
               const contentRight = content.x + content.minWidth;
               const contentBottom = content.y + content.minHeight;
-              const rightEdge = Math.max(basePosX + MIN_FOLDER_W, basePosX + (f.userWidth || 0), contentRight);
-              const bottomEdge = Math.max(basePosY + MIN_FOLDER_H, basePosY + (f.userHeight || 0), contentBottom);
+              // Same anchor-based rect as FolderGroupRect (2026-10-01).
+              const rightEdge = Math.max(anchorX + MIN_FOLDER_W, anchorX + (f.userWidth || 0), contentRight);
+              const bottomEdge = Math.max(anchorY + MIN_FOLDER_H, anchorY + (f.userHeight || 0), contentBottom);
               let w = rightEdge - anchorX;
               let h = bottomEdge - anchorY;
               if (f.type === 'party') {
@@ -2125,7 +2426,7 @@ export default function RelationsCanvas({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewBox derived from camera+zoom
-    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee, addSubtreeOffsetInto, computeSiblingPushesInto, committedFolderRectById, mergePhysicsFrame, ensurePhysicsLoop]
+    [isPanning, isDragging, panStart, camera, zoom, dragNodeId, dragStartSvg, dragFolderId, folderDragStartSvg, folders, clientToSvg, marquee, addSubtreeOffsetInto, committedFolderRectById, mergePhysicsFrame, ensurePhysicsLoop]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -2155,6 +2456,7 @@ export default function RelationsCanvas({
     }
     // â”€â”€ Finish folder drag (moves all member nodes) â”€â”€
     if (dragFolderId) {
+      beginTx('move place'); // undo (2026-10-06)
       const folder = foldersRef.current.find(f => f.id === dragFolderId);
       if (folder) {
         if (folder.nodeIds.length > 0) {
@@ -2177,7 +2479,7 @@ export default function RelationsCanvas({
                   if (folder.type === 'party' && newY > -130) {
                     newY = Math.min(newY, -130);
                   }
-                  next.set(nodeId, { x: basePos.x + offset.x, y: newY });
+                  next.set(nodeId, { x: basePos.x + offset.x, y: newY, movedAt: Date.now() });
                   onNodePositionChange?.(nodeId, basePos.x + offset.x, newY);
                 }
               }
@@ -2247,7 +2549,24 @@ export default function RelationsCanvas({
           const baseY = folder.posY ?? 0;
           const checkX = baseX + (lastNodeOffset?.x ?? 0) + 200; // ~middle of a typical header
           const checkY = baseY + (lastNodeOffset?.y ?? 0) + 40;  // ~middle of the chrome strip
-          const newParentId = findContainingLocationFolder(checkX, checkY, folder.id);
+          // Re-parent only when THIS drag changed containment (2026-10-01):
+          // nested boxes stacked at one corner already "contain" each
+          // other's header point, so a click or a sub-threshold drag used
+          // to file rooms into their siblings. The point must have moved,
+          // and must land somewhere it was not before.
+          const dragDist = Math.hypot(lastNodeOffset?.x ?? 0, lastNodeOffset?.y ?? 0);
+          const startParentId = findContainingLocationFolder(baseX + 200, baseY + 40, folder.id);
+          const newParentIdRaw = findContainingLocationFolder(checkX, checkY, folder.id);
+          // 2026-10-01 (Mike: "the canvas is a mess… sub folders overlapping
+          // parent folders"): dragging a ROOM never re-files it. Nested boxes
+          // overlap by design, so geometry cannot express intent here —
+          // re-parenting a location is an explicit act (JEWL / the location
+          // editor), never a drag side-effect. The gesture still MOVES it.
+          const FOLDER_DRAG_REPARENT = false;
+          const newParentId = FOLDER_DRAG_REPARENT && dragDist >= 8 && newParentIdRaw !== startParentId ? newParentIdRaw : null;
+          if (process.env.NODE_ENV !== 'production' && newParentIdRaw !== startParentId) {
+            console.log(`[reparent] ${myLocId.slice(-6)} drag=${Math.round(dragDist)} from=${startParentId ? startParentId.slice(-6) : 'root'} to=${newParentIdRaw ? newParentIdRaw.slice(-6) : 'root'} → ${newParentId ? 'APPLY' : 'skip'}`);
+          }
           // With real nesting, overlap is NORMAL: children sit inside
           // their parent, and a dragged parent often covers its own
           // children. Only re-parent on a REAL change, and never into a
@@ -2311,7 +2630,7 @@ export default function RelationsCanvas({
       {
         const movedFolder = foldersRef.current.find(f => f.id === dragFolderId);
         const movedLocId = movedFolder?.locationInfo?.locationId;
-        if (movedLocId) setPendingLayoutPass({ locId: movedLocId, compact: false });
+        if (movedLocId) setPendingLayoutPass({ priority: { kind: 'folder', id: movedLocId } });
       }
       setDragFolderId(null);
       setFolderDragStartSvg(null);
@@ -2320,6 +2639,7 @@ export default function RelationsCanvas({
 
     // â”€â”€ Finish node drag â”€â”€
     if (dragNodeId) {
+      beginTx('move'); // undo (2026-10-06)
       // Group drag (S-5): commit the whole selection when the dragged
       // card is part of it.
       const sel = selectedNodeIdsRef.current;
@@ -2353,6 +2673,11 @@ export default function RelationsCanvas({
         setDropTargetFolderId(null);
         dropTargetRef.current = null;
       }
+      // Settle-once (2026-10-01): the dropped card never yields; whatever it
+      // landed on is pushed clear one render later, against committed state.
+      if (offset && (offset.x !== 0 || offset.y !== 0)) {
+        setPendingLayoutPass({ priority: { kind: 'node', id: dragNodeId } });
+      }
       setDragOffsets((prev) => {
         const next = new Map(prev);
         for (const id of groupIds) next.delete(id);
@@ -2373,11 +2698,11 @@ export default function RelationsCanvas({
   useEffect(() => {
     const needListeners = (isPanning && isDragging) || dragNodeId !== null || dragFolderId !== null || marquee !== null;
     if (needListeners) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener("pointermove", handleMouseMove);
+      document.addEventListener("pointerup", handleMouseUp);
       return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
+        document.removeEventListener("pointermove", handleMouseMove);
+        document.removeEventListener("pointerup", handleMouseUp);
       };
     }
   }, [isPanning, isDragging, dragNodeId, dragFolderId, marquee, handleMouseMove, handleMouseUp]);
@@ -2432,6 +2757,232 @@ export default function RelationsCanvas({
     svg.addEventListener('wheel', onWheel, { passive: false });
     return () => svg.removeEventListener('wheel', onWheel);
   }, []);
+
+  // ── Touch: two-finger pinch zoom + pan (2026-10-06) ──
+  // Pointer ids are tracked document-wide; the moment a second finger lands,
+  // whatever gesture the first finger started (pan, marquee, a card or folder
+  // drag) is abandoned and the pair becomes a pinch. Zoom math mirrors the
+  // wheel handler: the world point under the fingers' midpoint stays put, so
+  // moving both fingers together pans.
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ dist: number; worldMidX: number; worldMidY: number; zoom: number } | null>(null);
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  // ── Carry mode (touch) — Mike 2026-10-06: "a grab being a long press… then
+  // something else to drop but having all the movement functionality intact
+  // while holding something." A long press picks a card or a room up into a
+  // tray; pan and pinch work exactly as if nothing were held; a tap on empty
+  // canvas (or DROP HERE for the screen centre) puts it down there, with the
+  // same room-membership and settle rules as a desktop drop.
+  const [carried, setCarried] = useState<{ kind: 'node' | 'folder'; id: string; label: string } | null>(null);
+  const carriedRef = useRef(carried);
+  carriedRef.current = carried;
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const clientToSvgRef = useRef(clientToSvg);
+  clientToSvgRef.current = clientToSvg;
+  const dropCarriedAt = useCallback((wx: number, wy: number) => {
+    const c = carriedRef.current;
+    if (!c) return;
+    setCarried(null);
+    beginTx('carry');
+    if (c.kind === 'node') {
+      const n = nodesRef.current.find(nn => nn.id === c.id);
+      if (!n) return;
+      const movedAt = Date.now();
+      setNodePositions(prev => { const next = new Map(prev); next.set(c.id, { x: wx, y: wy, movedAt }); return next; });
+      onNodePositionChange?.(c.id, wx, wy);
+      bringNodeToFront(c.id);
+      if (n.type !== 'location') {
+        const hit = pickAutoDropTarget(wx, wy);
+        const cur = membershipOf(c.id);
+        if (hit && hit !== cur) dropIntoLocation(c.id, n.type === 'item' ? 'item' : 'character', hit);
+      }
+      setPendingLayoutPass({ priority: { kind: 'node', id: c.id } });
+      return;
+    }
+    const rect = committedFolderRectById.get(c.id);
+    const f = foldersRef.current.find(ff => ff.id === `auto-${c.id}`);
+    if (!rect || !f) return;
+    const dx = wx - (rect.x + rect.width / 2);
+    let dy = wy - (rect.y + rect.height / 2);
+    // A drafting place never crosses the crystallization line by being carried.
+    if (f.locationInfo && f.locationInfo.status !== 'ACTIVE' && rect.y + dy < 0) dy = -rect.y;
+    const updated = shiftFolderTree(c.id, dx, dy, foldersRef.current);
+    onFoldersChange?.(updated.map(ff => (ff.id === f.id ? { ...ff, movedAt: Date.now() } : ff)));
+    setPendingLayoutPass({ priority: { kind: 'folder', id: c.id } });
+  }, [onNodePositionChange, bringNodeToFront, pickAutoDropTarget, membershipOf, dropIntoLocation, committedFolderRectById, shiftFolderTree, onFoldersChange]);
+  const dropCarriedRef = useRef(dropCarriedAt);
+  dropCarriedRef.current = dropCarriedAt;
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const pointers = activePointersRef.current;
+    const midAndDist = () => {
+      const pts = [...pointers.values()];
+      const mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+      return { mx, my, dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) };
+    };
+    // Hold-to-pick-up (2026-10-06, Mike: "easy to accidentally grab a card").
+    // On touch, a finger landing on a card or folder is NOT a drag yet: React
+    // never sees the pointerdown. Move within the hold time → the canvas pans.
+    // Hold still → the original pointerdown is replayed to the target and the
+    // card's own drag takes over, fed by the real pointermoves that follow.
+    const HOLD_MS = 280, SLOP_PX = 10;
+    let hold: { id: number; x: number; y: number; target: Element; timer: ReturnType<typeof setTimeout>; done: boolean } | null = null;
+    let bgTap: { id: number; x: number; y: number } | null = null; // a tap on empty canvas while carrying = drop here
+    let swallowClickUntil = 0; // after a completed hold, the finger lifting must not also count as a tap/click
+    let swallowMenuUntil = 0; // after a completed hold, a late touch contextmenu must not open a menu either
+    const isBackgroundTarget = (t: Element) => t === svg || t.tagName === 'svg' || (t.tagName === 'rect' && t.hasAttribute('data-bg'));
+    const isControl = (t: Element) => !!t.closest('button, input, textarea, select, a, [role="button"], [data-no-hold]');
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      if (!e.isTrusted) return; // our own replayed pointerdown — let React have it
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const t = e.target as Element;
+      if (pointers.size === 1 && carriedRef.current && svg.contains(t) && isBackgroundTarget(t)) {
+        bgTap = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      }
+      if (pointers.size === 1 && svg.contains(t) && !isBackgroundTarget(t) && !isControl(t)) {
+        e.stopPropagation();
+        const target = t;
+        const timer = setTimeout(() => {
+          if (!hold || hold.id !== e.pointerId || hold.done) return;
+          hold.done = true;
+          if (carriedRef.current) return; // already carrying something
+          const wrap = target.closest('[data-card-wrapper]');
+          const nid = wrap?.getAttribute('data-node-id');
+          if (nid) {
+            const n = nodesRef.current.find(nn => nn.id === nid);
+            setCarried({ kind: 'node', id: nid, label: n?.name ?? 'card' });
+          } else {
+            const fl = target.closest('[data-folder-location-id]');
+            const locId = fl?.getAttribute('data-folder-location-id');
+            if (!locId) return;
+            const f = foldersRef.current.find(ff => ff.id === `auto-${locId}`);
+            setCarried({ kind: 'folder', id: locId, label: f?.name ?? 'place' });
+          }
+          try { navigator.vibrate?.(30); } catch { /* no haptics */ }
+        }, HOLD_MS);
+        hold = { id: e.pointerId, x: e.clientX, y: e.clientY, target, timer, done: false };
+      }
+      if (pointers.size === 2) {
+        if (hold) { clearTimeout(hold.timer); hold = null; }
+        const rect = svg.getBoundingClientRect();
+        const { mx, my, dist } = midAndDist();
+        const z = zoomRef.current, cam = cameraRef.current;
+        const fx = (mx - rect.left) / rect.width, fy = (my - rect.top) / rect.height;
+        pinchRef.current = { dist: Math.max(1, dist), worldMidX: cam.x + fx * BASE_WIDTH * z, worldMidY: cam.y + fy * BASE_HEIGHT * z, zoom: z };
+        // Abandon whatever the first finger started.
+        setIsPanning(false); setIsDragging(false); setMarquee(null);
+        setDragNodeId(null); setDragStartSvg(null);
+        setDragFolderId(null); setFolderDragStartSvg(null);
+        setDragOffsets(new Map());
+        gestureOffsetsRef.current = new Map();
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (bgTap && bgTap.id === e.pointerId && Math.hypot(e.clientX - bgTap.x, e.clientY - bgTap.y) > SLOP_PX) bgTap = null; // it became a pan
+      if (hold && hold.id === e.pointerId && !hold.done) {
+        if (Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > SLOP_PX) {
+          // Moved before the hold completed: this finger is panning the canvas.
+          clearTimeout(hold.timer);
+          const cam = cameraRef.current;
+          setPanStart({ x: hold.x, y: hold.y, viewBoxX: cam.x, viewBoxY: cam.y });
+          setIsPanning(true); setIsDragging(true);
+          hold = null;
+        }
+        return;
+      }
+      const p = pinchRef.current;
+      if (!p || pointers.size < 2) return;
+      const rect = svg.getBoundingClientRect();
+      const { mx, my, dist } = midAndDist();
+      const newZoom = clampZoom(p.zoom * (p.dist / Math.max(1, dist)));
+      const fx = (mx - rect.left) / rect.width, fy = (my - rect.top) / rect.height;
+      setZoom(newZoom);
+      setCamera({ x: p.worldMidX - fx * BASE_WIDTH * newZoom, y: p.worldMidY - fy * BASE_HEIGHT * newZoom });
+    };
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      pointers.delete(e.pointerId);
+      if (hold && hold.id === e.pointerId) {
+        clearTimeout(hold.timer);
+        if (hold.done) { swallowClickUntil = Date.now() + 700; swallowMenuUntil = Date.now() + 700; } // the hold was a pick-up, not a tap
+        hold = null;
+      }
+      if (bgTap && bgTap.id === e.pointerId) {
+        const p = clientToSvgRef.current(e.clientX, e.clientY);
+        bgTap = null;
+        dropCarriedRef.current(p.x, p.y);
+      }
+      if (pointers.size < 2 && pinchRef.current) {
+        pinchRef.current = null;
+        // The remaining finger does not inherit a gesture — lift and start again.
+        setIsPanning(false); setIsDragging(false);
+      }
+    };
+    // JEWL is summoned by the browser's contextmenu event, which Android also
+    // fires on a long press. Empty canvas: let it through — long-press on the
+    // background IS "talk to JEWL here" on a phone. A card or a room: the hold
+    // means CARRY, so the menu event is swallowed (2026-10-06).
+    const onClickCapture = (e: MouseEvent) => {
+      if (Date.now() < swallowClickUntil) { e.preventDefault(); e.stopPropagation(); swallowClickUntil = 0; }
+    };
+    // The finger lifting after a completed hold also makes the browser fire
+    // its compatibility mousedown/mouseup (measured 2026-10-06: pointerup at
+    // 501 ms, mousedown 505, mouseup 520, then a [settle] at 538). A card's
+    // mouse-driven drag start saw that pair as a zero-length drag, committed
+    // it and scheduled a settle at PICK-UP — before anything was dropped, and
+    // outside the carry transaction so undo could not reach it. Swallow the
+    // pair in the same window as the click; the click itself clears it.
+    const onCompatMouse = (e: MouseEvent) => {
+      if (Date.now() < swallowClickUntil) { e.preventDefault(); e.stopPropagation(); }
+    };
+    // Registered on WINDOW capture (2026-10-07, Mike on his phone: "when I long
+    // press to pick something up the old dice menu appears"). DiceOverlay owns
+    // a document-capture contextmenu listener that opens the spawn-dice menu
+    // for anything in the canvas that is not inside [data-card-wrapper] (room
+    // boxes, card frames outside the wrapper). A document-capture swallow here
+    // could not stop it — stopPropagation does not stop another listener on the
+    // same node, and DiceOverlay mounted first so it ran first. Window capture
+    // runs before every document listener, so stopping here reaches nothing.
+    // Touch only: `pointers` and `hold` only ever hold touch pointers, and the
+    // post-hold window covers a phone that fires the menu event at lift.
+    const onContextMenu = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (!t || !svg.contains(t)) return;
+      if (isBackgroundTarget(t)) return; // empty canvas: long-press = JEWL here
+      const touchHold = (hold && hold.target === t) || (hold && t.contains(hold.target)) || pointers.size > 0
+        || Date.now() < swallowMenuUntil;
+      if (touchHold) { e.preventDefault(); e.stopImmediatePropagation(); }
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('pointermove', onMove, true);
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('pointercancel', onUp, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
+    document.addEventListener('mousedown', onCompatMouse, true);
+    document.addEventListener('mouseup', onCompatMouse, true);
+    document.addEventListener('click', onClickCapture, true);
+    return () => {
+      document.removeEventListener('click', onClickCapture, true);
+      document.removeEventListener('mousedown', onCompatMouse, true);
+      document.removeEventListener('mouseup', onCompatMouse, true);
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('pointermove', onMove, true);
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('pointercancel', onUp, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- BASE_WIDTH/clampZoom are stable per container size
+  }, [BASE_WIDTH]);
 
   // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -2819,6 +3370,22 @@ export default function RelationsCanvas({
     const showGlow = hasCrossed || isShimmering;
     const glowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
+    // Zoomed out: a person is a portrait chip with a name — legible at any distance.
+    if (lod !== 'near') {
+      const r = lod === 'far' ? 110 : 90;
+      const fs = lod === 'far' ? 44 : 30;
+      return (
+        <g key={`card-group-${node.id}`} style={{ pointerEvents: 'none' }}>
+          <circle cx={visualX} cy={visualY} r={r} fill="#0d0d1a" stroke="var(--krma-gold)" strokeWidth={6} />
+          {node.portrait ? (
+            <image href={node.portrait} x={visualX - r + 6} y={visualY - r + 6} width={2 * r - 12} height={2 * r - 12} preserveAspectRatio="xMidYMid slice" style={{ clipPath: `circle(${r - 6}px at 50% 50%)` }} />
+          ) : (
+            <text x={visualX} y={visualY + r * 0.38} textAnchor="middle" fontSize={r * 1.05} fontWeight={700} fill="var(--krma-gold)" fontFamily="var(--font-bebas-neue), Bebas Neue, sans-serif">{node.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}</text>
+          )}
+          <text x={visualX} y={visualY + r + fs} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace" letterSpacing="0.08em">{node.name.toUpperCase()}</text>
+        </g>
+      );
+    }
     return (
       <g key={`card-group-${node.id}`}>
         {/* Soft pulsing backlight glow when card has crossed the KRMA line */}
@@ -2877,6 +3444,7 @@ export default function RelationsCanvas({
 
         <foreignObject
           key={`card-${node.id}`}
+          opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
           x={visualX - cardWidth / 2 - viewBox.width}
           y={visualY - cardHeight / 2 - viewBox.height}
           width={cardWidth + viewBox.width * 2}
@@ -2904,6 +3472,7 @@ export default function RelationsCanvas({
             onInventoryToggle={toggleInventory}
             onPanelToggle={togglePanel}
             onPositionChange={(nodeId, x, y) => {
+              beginTx('move'); // undo (2026-10-06)
               commitGroupDrag(nodeId);
               // Clamp party folder nodes above KRMA line
               let clampedY = y;
@@ -2914,10 +3483,11 @@ export default function RelationsCanvas({
               }
               setNodePositions((prev) => {
                 const next = new Map(prev);
-                next.set(nodeId, { x, y: clampedY });
+                next.set(nodeId, { x, y: clampedY, movedAt: Date.now() });
                 return next;
               });
               onNodePositionChange?.(nodeId, x, clampedY);
+              setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
               bringNodeToFront(nodeId);
 
               // NOTE: Do NOT update folder posX/posY here. posX/posY are only set by
@@ -2930,9 +3500,9 @@ export default function RelationsCanvas({
               // Drop-in adds; taking OUT is the right-click "take out"
               // action, never a drag side-effect (Mike 2026-08-03).
               const autoHit = pickAutoDropTarget(x, clampedY);
-              const curParent = currentAutoParentOf(nodeId);
+              const curParent = membershipOf(nodeId);
               if (autoHit && autoHit !== curParent) {
-                onDropIntoLocation?.(nodeId, 'character', autoHit);
+                dropIntoLocation(nodeId, 'character', autoHit);
               } else if (!autoHit) {
                 // Party/manual folders keep client-side membership.
                 const curFolders = foldersRef.current;
@@ -3035,7 +3605,7 @@ export default function RelationsCanvas({
                 <div
                   ref={measurePanelRef(invHeightKey)}
                   style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     if (e.button !== 0) return;
                     e.preventDefault();
                     e.stopPropagation();
@@ -3080,12 +3650,12 @@ export default function RelationsCanvas({
                     };
 
                     const onUp = () => {
-                      document.removeEventListener('mousemove', onMove);
-                      document.removeEventListener('mouseup', onUp);
+                      document.removeEventListener('pointermove', onMove);
+                      document.removeEventListener('pointerup', onUp);
                     };
 
-                    document.addEventListener('mousemove', onMove);
-                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
                   }}
                 >
                   <InventoryCard
@@ -3330,7 +3900,7 @@ export default function RelationsCanvas({
                 <div
                   ref={measurePanelRef(offsetKey)}
                   style={{ cursor: 'grab', userSelect: 'none', pointerEvents: 'auto', display: 'inline-block' }}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     if (e.button !== 0) return;
                     e.preventDefault();
                     e.stopPropagation();
@@ -3375,12 +3945,12 @@ export default function RelationsCanvas({
                     };
 
                     const onUp = () => {
-                      document.removeEventListener('mousemove', onMove);
-                      document.removeEventListener('mouseup', onUp);
+                      document.removeEventListener('pointermove', onMove);
+                      document.removeEventListener('pointerup', onUp);
                     };
 
-                    document.addEventListener('mousemove', onMove);
-                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
                   }}
                 >
                   {panelContent}
@@ -3408,7 +3978,7 @@ export default function RelationsCanvas({
         ref={svgRef}
         className="w-full h-full"
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         onContextMenu={(e) => {
           // Only fire for clicks on the empty canvas or a folder background
           // — let cards keep their own right-click menus.
@@ -3452,7 +4022,7 @@ export default function RelationsCanvas({
             setCanvasMenu(null);
           }
         }}
-        style={{ cursor: isPanning ? "grabbing" : spaceHeld ? "grab" : "default" }}
+        style={{ cursor: isPanning ? "grabbing" : spaceHeld ? "grab" : "default", touchAction: "none" }}
       >
         {/* â”€â”€ Definitions â”€â”€ */}
         <defs>
@@ -3702,11 +4272,13 @@ export default function RelationsCanvas({
               id: n.id,
               name: n.name,
               data: n.characterData as unknown as GrowthCharacter,
+              portrait: n.portrait ?? null,
             }));
           return (
             <FolderGroupRect
               key={`folder-bg-${folder.id}`}
               folder={folder}
+              nodeNames={nodeNamesById}
               nodePositions={nodePositions}
               dragOffsets={dragOffsets}
               nodeTypes={nodeTypes}
@@ -3715,60 +4287,43 @@ export default function RelationsCanvas({
               characters={folderChars}
               svgRef={svgRef}
               viewBox={viewBox}
+              zoom={zoom}
               showActionsMenu={false}
               onDrillIn={onDrillIn}
               onFolderResize={(folderId, width, height, posX, posY) => {
-                // LIVE physics: every resize frame, contents reflow into
-                // the live width, children scale down with the parent,
-                // and overlapped siblings get bumped — all organically
-                // WITH the handle, not on release.
-                if (!resizeActiveRef.current) {
-                  // Freeze gesture-start geometry: stable per-frame math
-                  // + shrunk children recover when the handle backs out.
-                  const locId0 = folderId.startsWith('auto-') ? folderId.slice('auto-'.length) : null;
-                  resizeBaselineRef.current = {
-                    parentW: (locId0 ? committedFolderRectById.get(locId0)?.width : undefined) ?? width,
-                    rects: new Map(committedFolderRectById),
-                    dirty: false,
-                  };
-                }
+                // Settle-once (2026-10-01): while the handle is held only THIS
+                // folder's rect changes. Contents repack and siblings move
+                // once, on release.
                 resizeActiveRef.current = true;
                 stampGesture();
-                const childSizes = new Map<string, { w: number; h: number }>();
+                // A sub-folder is never larger than its parent (Mike 2026-10-01):
+                // clamp the handle to the parent's interior.
                 if (folderId.startsWith('auto-')) {
                   const locId = folderId.slice('auto-'.length);
-                  const rect = resizeBaselineRef.current?.rects.get(locId) ?? committedFolderRectById.get(locId);
-                  const next = new Map<string, { x: number; y: number }>();
-                  computeReflowOffsetsInto(next, locId, width, height, childSizes);
-                  computeSiblingPushesInto(next, locId, {
-                    x: posX ?? rect?.x ?? 0,
-                    y: posY ?? rect?.y ?? 0,
-                    width,
-                    height,
-                  });
-                  // Fluid: reactions ease toward their slots instead of
-                  // teleporting.
-                  reactionTargetsRef.current = next;
-                  ensurePhysicsLoop();
-                }
-                const updated = foldersRef.current.map(f => {
-                  if (f.id === folderId) {
-                    return { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}), ...(posY != null ? { posY } : {}) };
+                  const parentEntry = foldersRef.current.find(ff => ff.id.startsWith('auto-') && ff.nodeIds.includes(locId));
+                  const parentRect = parentEntry ? committedFolderRectById.get(parentEntry.id.slice('auto-'.length)) : undefined;
+                  if (parentEntry && parentRect) {
+                    const innerW = parentRect.width - FOLDER_PADDING * 2;
+                    const innerH = parentRect.height - locationHeaderHeight(parentEntry) - FOLDER_PADDING;
+                    width = Math.min(width, innerW);
+                    height = Math.min(height, innerH);
+                    if (posX != null) posX = Math.max(parentRect.x + FOLDER_PADDING, Math.min(posX, parentRect.x + parentRect.width - FOLDER_PADDING - width));
+                    if (posY != null) posY = Math.max(parentRect.y + locationHeaderHeight(parentEntry), Math.min(posY, parentRect.y + parentRect.height - FOLDER_PADDING - height));
                   }
-                  const l = f.id.startsWith('auto-') ? f.id.slice('auto-'.length) : null;
-                  const s = l ? childSizes.get(l) : undefined;
-                  return s ? { ...f, userWidth: s.w, userHeight: s.h } : f;
-                });
+                }
+                const updated = foldersRef.current.map(f =>
+                  f.id === folderId
+                    ? { ...f, userWidth: width, userHeight: height, ...(posX != null ? { posX } : {}), ...(posY != null ? { posY } : {}) }
+                    : f,
+                );
                 onFoldersChange?.(updated);
               }}
+              onFolderResizeStart={() => { resizeActiveRef.current = true; beginTx('resize'); }}
               onFolderResizeEnd={(folderId) => {
-                // Land the live-physics offsets; a safety overlap pass
-                // runs one render later against fresh geometry.
-                commitPhysicsOffsets();
                 resizeActiveRef.current = false;
-                resizeBaselineRef.current = null;
                 if (folderId.startsWith('auto-')) {
-                  setPendingLayoutPass({ locId: folderId.slice('auto-'.length), compact: false });
+                  const locId = folderId.slice('auto-'.length);
+                  setPendingLayoutPass({ priority: { kind: 'folder', id: locId }, repack: locId });
                 }
               }}
               onToggleDetails={(folderId) => {
@@ -3934,7 +4489,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <LocationCard
                     node={{
                       id: node.id,
@@ -3949,6 +4504,7 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteLocation}
                     onPositionChange={(nodeId, x, y) => {
+                      beginTx('move'); // undo (2026-10-06)
                       commitGroupDrag(nodeId);
                       setNodePositions((prev) => {
                         const next = new Map(prev);
@@ -3956,6 +4512,7 @@ export default function RelationsCanvas({
                         return next;
                       });
                       onNodePositionChange?.(nodeId, x, y);
+                      setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
                       bringNodeToFront(nodeId);
                     }}
                     onDragOffsetChange={(nodeId, offsetX, offsetY) => {
@@ -4005,6 +4562,19 @@ export default function RelationsCanvas({
             const itemShowGlow = itemHasCrossed || isShimmering;
             const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
+            // Zoomed out: an item is a gold dot (far) or a name chip (mid) — the room keeps its texture without the noise.
+            if (lod === 'far') {
+              return <circle key={`item-dot-${node.id}`} cx={visualX} cy={visualY} r={14} fill="var(--krma-gold)" opacity={0.55} style={{ pointerEvents: 'none' }} />;
+            }
+            if (lod === 'mid') {
+              const label = node.name.length > 14 ? node.name.slice(0, 13) + '…' : node.name;
+              return (
+                <g key={`item-chip-${node.id}`} style={{ pointerEvents: 'none' }}>
+                  <rect x={visualX - 110} y={visualY - 26} width={220} height={52} rx={10} fill="#0d0d1a" stroke="rgba(255,204,120,0.55)" strokeWidth={3} />
+                  <text x={visualX} y={visualY + 9} textAnchor="middle" fontSize={26} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace">{label}</text>
+                </g>
+              );
+            }
             return (
               <g key={`item-group-${node.id}`}>
               {itemShowGlow && (
@@ -4022,6 +4592,7 @@ export default function RelationsCanvas({
               )}
               <foreignObject
                 key={`item-${node.id}`}
+                opacity={carried?.kind === 'node' && carried.id === node.id ? 0.35 : undefined}
                 x={visualX - cardWidth / 2 - viewBox.width}
                 y={visualY - cardHeight / 2 - viewBox.height}
                 width={cardWidth + viewBox.width * 2}
@@ -4029,7 +4600,7 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
                   <WorldItemCard
                     node={{
                       id: node.id,
@@ -4046,6 +4617,7 @@ export default function RelationsCanvas({
                     onToggleExpand={toggleExpand}
                     onDelete={onDeleteItem}
                     onPositionChange={(nodeId, x, y) => {
+                      beginTx('move'); // undo (2026-10-06)
                       commitGroupDrag(nodeId);
                       // ANY overlap between the dragged item and a target = droppable (Mike 2026-05-14)
                       const itemHalf = getCardHalfWidth(nodeId);
@@ -4087,15 +4659,16 @@ export default function RelationsCanvas({
                           return next;
                         });
                         onNodePositionChange?.(nodeId, x, y);
+                        setPendingLayoutPass({ priority: { kind: 'node', id: nodeId } }); // settle-once (2026-10-01)
                         bringNodeToFront(nodeId);
                         // Drop-into-room for items (server-side: locationId +
                         // located_at edge stay in sync via the service).
                         // Drop-in adds; taking OUT is the right-click "take
                         // out" action, never a drag side-effect (Mike 2026-08-03).
                         const itemAutoHit = pickAutoDropTarget(x, y);
-                        const itemCurParent = currentAutoParentOf(nodeId);
+                        const itemCurParent = membershipOf(nodeId);
                         if (itemAutoHit && itemAutoHit !== itemCurParent) {
-                          onDropIntoLocation?.(nodeId, 'item', itemAutoHit);
+                          dropIntoLocation(nodeId, 'item', itemAutoHit);
                         }
                       }
                       setDraggingItemId(null);
@@ -4153,7 +4726,7 @@ export default function RelationsCanvas({
                   onClick={() => { setSelectedNode(node.id); onNodeClick?.(node); bringNodeToFront(node.id); }}
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     const svgCoords = clientToSvg(e.clientX, e.clientY);
                     setDragNodeId(node.id);
@@ -4267,6 +4840,33 @@ export default function RelationsCanvas({
         )}
       </svg>
 
+      {/* Carry mode (touch): what you hold rides along; the world moves under it. */}
+      {carried && (
+        <div className="absolute pointer-events-none z-[96]" style={{ left: '50%', top: '50%', width: 28, height: 28, marginLeft: -14, marginTop: -14, border: '2px solid #ffcc78', borderRadius: '50%', boxShadow: '0 0 12px rgba(255,204,120,0.6)' }} />
+      )}
+      {carried && (
+        <div data-no-hold className="absolute left-0 right-0 z-[97] flex items-center gap-3 px-4 py-3" style={{ bottom: 0, background: 'rgba(0,0,0,0.92)', borderTop: '1px solid #ffcc78', touchAction: 'manipulation' }}>
+          <div className="flex-1 min-w-0" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255,204,120,0.9)', fontSize: 13 }}>
+            <div className="uppercase tracking-widest" style={{ fontSize: 11, opacity: 0.7 }}>Carrying</div>
+            <div className="truncate">{carried.label}</div>
+            <div style={{ fontSize: 11, opacity: 0.7 }}>Move the canvas, then tap where it goes.</div>
+          </div>
+          <button
+            onClick={() => { const r = svgRef.current?.getBoundingClientRect(); if (!r) return; const p = clientToSvg(r.left + r.width / 2, r.top + r.height / 2); dropCarriedAt(p.x, p.y); }}
+            className="px-3 py-2 text-[13px] uppercase tracking-wider"
+            style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#0a0a1a', backgroundColor: '#ffcc78', borderRadius: 2 }}
+          >
+            Drop here
+          </button>
+          <button
+            onClick={() => setCarried(null)}
+            className="px-3 py-2 text-[13px] uppercase tracking-wider"
+            style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', color: '#CBD9E8', border: '1px solid rgba(203,217,232,0.35)', borderRadius: 2 }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       {/* One-time teaching toast — the single retrained habit (S-5). */}
       {showPanToast && (
         <div
@@ -4295,7 +4895,7 @@ export default function RelationsCanvas({
           <div
             className="fixed z-[100]"
             style={{ left: canvasMenu.screenX, top: canvasMenu.screenY, width: 220 }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             <CtxMenuPanel title={f?.name ?? 'Location'}>
               <button
@@ -4477,6 +5077,7 @@ export default function RelationsCanvas({
             zoom={zoom}
             onDrillIn={onDrillIn}
             onFolderDragStart={(folderId, startSvg) => {
+              if (resizeActiveRef.current) return; // resize is resize, never a drag
               setDragFolderId(folderId);
               setFolderDragStartSvg(startSvg);
             }}
@@ -5267,7 +5868,7 @@ function CanvasCreateDialog({
   return (
     <div
       ref={ref}
-      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       data-jewl-subject={existing ? `Location edit dialog — ${existing.name}` : 'Location create dialog'}
       className="fixed z-[100]"
       style={{ left, top, width: FORM_W }}

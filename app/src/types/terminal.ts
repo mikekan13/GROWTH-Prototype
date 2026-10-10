@@ -52,7 +52,50 @@ export interface DiceRollPayload {
   physicalDice?: Array<{ dieType: string; value: number }>;
 }
 
-export interface ChatPayload {
+/**
+ * What the TABLE feed needs to draw a line the way the ruling says
+ * (ruling-feed-segment-colours-pillars, 2026-10-07). All optional: rows written
+ * before 2026-10-07 have none of it and the feed falls back.
+ */
+export interface TableFeedFields {
+  /** How the line reached the table: typed by a person, spoken into the mic, or answered by a being (DAYA). */
+  via?: 'typed' | 'spoken' | 'being';
+  /** The campaign clock (meta cycles) when the line was recorded — the in-world time shown before the real one. */
+  cycle?: number;
+  /** The pre-processed text, exactly as typed or transcribed, when it differs from the cleaned text. */
+  raw?: string;
+  /**
+   * Perception feed (unit 9, flag PERCEPTION_FEED): this line is the viewer's MEMORY of the moment, not the
+   * truth record. Its text carries `{gap}` (what was missed) and `{@id|label}` entity tokens (lib/perceived-text).
+   */
+  perceived?: PerceivedLineFields;
+}
+
+/** One known aspect of a perceived thing: "Weight" / "about as heavy as a sword" (sim/perception/aspect-values). */
+export interface PerceivedFact {
+  aspect: string;
+  label: string;
+  value: string;
+}
+
+/** A named thing in a perceived line, as the viewer knows it — the tooltip shows only this. */
+export interface PerceivedEntityRef {
+  id: string;
+  kind: 'CHARACTER' | 'NPC' | 'ITEM' | 'LOCATION';
+  /** What the viewer calls it ("a figure", "a tall guard", "the Warden"). */
+  label: string;
+  /** What the viewer knows of each known aspect, phrased at their fidelity (never a level; unknown aspects absent). */
+  known: PerceivedFact[];
+  /** The label is its proper name (the viewer knows who it is). */
+  named: boolean;
+}
+
+export interface PerceivedLineFields {
+  memoryId: string;
+  entities: PerceivedEntityRef[];
+}
+
+export interface ChatPayload extends TableFeedFields {
   kind: 'chat';
   message: string;
 }
@@ -72,10 +115,19 @@ export interface AIMessagePayload {
   requiresConfirmation?: boolean;
 }
 
-export interface GameEventPayload {
+export interface GameEventPayload extends TableFeedFields {
   kind: 'game_event';
   eventType: string;             // "session_start", "session_end", "combat_begin", etc.
   description: string;
+  /** Spoken narration is recorded sentence by sentence (U2c, Mike 2026-10-06); rows of one beat share this id so the feed can read them as one. */
+  beatId?: string;
+  /** A table declaration's split, as the preprocessor (table-prose) made it: the pure narration (null = the message was speech alone)… */
+  narration?: string | null;
+  /** …and each line of speech it pulled out, with who the record says spoke it. The feed draws these as that character's own rows. */
+  speech?: Array<{ speakerId: string | null; speakerLabel: string; text: string }>;
+  /** Encounter lines (encounter_begin/round/down/up/end, since 2026-10-08): which encounter, so the feed folds begin → end. */
+  encounterId?: string;
+  encounterName?: string;
 }
 
 export type TerminalPayload =

@@ -10,6 +10,20 @@
 
 import 'server-only';
 
+/** An active inspection riding on a check (perception unit 11). */
+export interface InspectPurpose {
+  kind: 'inspect';
+  intentId: string;
+  /** The inspector's character + its DAYA being (the familiarity perceiver). */
+  characterId: string;
+  subjectId: string;
+  subjectKind: 'ITEM' | 'CHARACTER' | 'NPC' | 'LOCATION';
+  /** The skill used ('' = unskilled raw Wisdom) and the head domains it reaches (relevance ≥ cut-off). */
+  skillName: string;
+  skillDomains: string[];
+}
+export type CheckPurpose = InspectPurpose;
+
 export interface PendingCheck {
   id: string;
   campaignId: string;
@@ -51,6 +65,8 @@ export interface PendingCheck {
     defenderGovernors: string[];
     defenderFateDie: string;
   };
+  /** What the check is FOR beyond its result (perception unit 11: an inspection). Resolved by services/check-resolved. */
+  purpose?: CheckPurpose;
   /** Metadata */
   requestedBy: string;
   createdAt: number;

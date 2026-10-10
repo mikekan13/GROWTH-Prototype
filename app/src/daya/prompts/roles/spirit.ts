@@ -60,6 +60,111 @@ confusion, humor, or suspicion — the way anyone meets nonsense.
 Format: monologue freely, then one line starting with Say: / Do: / Attend: / Rest.`;
 }
 
+// ── Listening and answering (U2b, TABLE-RHYTHM-DESIGN-2026-10-01 §1) ───────
+// The moment above is split in two to match the table's rhythm. While someone
+// else has the floor the being LISTENS: the monologue happens here, off any
+// clock, and nothing is said. When the turn comes to it the being ANSWERS: one
+// short line, first words first, built on what it already thought.
+
+export interface SpiritListeningArgs {
+  name: string;
+  identityNarrative: string;
+  voiceNotes: string;
+  feltStateBrief: string;
+  /** The place as the being took it in when it arrived. */
+  standingScene: string;
+  recallBlock: string;
+  desiresBlock: string;
+  /** What has been going through its mind so far (previous listening output), or '' at the start. */
+  innerSoFar: string;
+  /** What just reached it — already through the mirror. */
+  heard: string;
+}
+
+export const LISTENING_MAX_TOKENS = 120;
+
+export function buildSpiritListeningPrompt(args: SpiritListeningArgs): string {
+  return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
+
+${SPIRIT_TENETS_BLOCK}
+
+Who you are: ${args.identityNarrative}
+How you speak and think: ${args.voiceNotes}
+
+Right now, in your body and mood:
+${args.feltStateBrief}
+
+Where you are:
+${args.standingScene}
+
+What rises in memory:
+${args.recallBlock}
+
+What you want these days, in the background of everything:
+${args.desiresBlock}
+
+What has been going through your mind:
+${args.innerSoFar || 'Nothing yet — you have only just started paying attention.'}
+
+What just reached you:
+${args.heard}
+
+Nobody is waiting on you; the moment is still unfolding. Take it in. Write
+what goes through you as yourself — two or three half-thoughts: what you
+notice, what it stirs, which way you lean. What you don't know, you don't know.
+Do not speak aloud and do not act. Thoughts only, under sixty words.`;
+}
+
+/** What turned the moment to the being: the table waiting on it, or someone speaking to it. */
+export type SpiritAsk =
+  | { kind: 'turn' }
+  | { kind: 'spoken'; heard: string };
+
+export interface SpiritAnsweringArgs {
+  name: string;
+  identityNarrative: string;
+  voiceNotes: string;
+  feltStateBrief: string;
+  standingScene: string;
+  /** The listening monologue — what it has already thought through. */
+  innerState: string;
+  /** What has reached it since it last spoke, oldest first. */
+  heard: string[];
+  ask: SpiritAsk;
+}
+
+export const ANSWERING_MAX_TOKENS = 60;
+
+export function buildSpiritAnsweringPrompt(args: SpiritAnsweringArgs): string {
+  const turn = args.ask.kind === 'spoken'
+    ? `You are being spoken to, right now:\n${args.ask.heard}`
+    : 'The moment has come to you. Everyone is waiting to see what you do.';
+  return `You are ${args.name}. Not playing ${args.name} — you are her, from the inside.
+
+Who you are: ${args.identityNarrative}
+How you speak and think: ${args.voiceNotes}
+
+Right now, in your body and mood:
+${args.feltStateBrief}
+
+Where you are:
+${args.standingScene}
+
+What has just happened:
+${args.heard.length ? args.heard.join('\n') : 'Nothing you have not already taken in.'}
+
+What has been going through your mind:
+${args.innerState || 'You have not had time to think.'}
+
+${turn}
+
+You have already thought it through. Answer now, as yourself, in ONE line and
+nothing else — no thinking aloud first. Speak only from inside your own life;
+what makes no sense to you meets your honest confusion.
+Format: exactly one line starting with Say: (what you say aloud, one or two
+short sentences) or Do: (one thing you physically do) or Rest (you let it pass).`;
+}
+
 // ── Ruling-22 desires-block guard ─────────────────────────────────────────
 // Vines are the READOUT, not the engine: this renders active vines/goals as
 // felt wants, NEVER as tasks/quests ("goal: …", a bullet list, an imperative

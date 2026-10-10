@@ -7,14 +7,25 @@
  *
  * Only the read helper survives — used by `/api/campaigns/[id]/copilot/history`
  * to render past messages (including legacy ones with action blocks).
+ *
+ * PRIVATE PER USER (Mike 2026-10-08) — see `history-privacy.ts`.
  */
 
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { copilotHistoryWhere, type CopilotHistoryViewer } from './history-privacy';
 
-export async function getCopilotHistory(campaignId: string, limit: number = 50) {
+export async function getCopilotHistory(
+  campaignId: string,
+  viewer: CopilotHistoryViewer,
+  limit: number = 50,
+) {
   const recent = await prisma.copilotMessage.findMany({
-    where: { campaignId },
+    where: {
+      ...copilotHistoryWhere(campaignId, viewer),
+      // Hide legacy persisted STT markers ("[empty transcript]") — filter, not delete.
+      NOT: { AND: [{ username: '[ambient]' }, { content: { startsWith: '[' } }, { content: { endsWith: ']' } }] },
+    },
     orderBy: { createdAt: 'desc' },
     take: limit,
     select: {
@@ -30,6 +41,21 @@ export async function getCopilotHistory(campaignId: string, limit: number = 50) 
 
   return messages.map(m => ({
     ...m,
-    actions: m.actions ?? null,
+    actions: parseCopilotActions(m.actions),
   }));
+}
+
+/**
+ * The column is a JSON string, and most rows hold prompt metadata
+ * (`{"source":"GM_TEXT","canvasAction":null}`), not an action list. The chat
+ * renders `actions` as an array — anything else becomes [].
+ */
+export function parseCopilotActions(raw: string | null | undefined): unknown[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

@@ -20,6 +20,9 @@ import { prisma } from '@/lib/db';
 import { chat, type DayaClientOverrides } from './model-client';
 import { writeMemoryEntry } from './memory';
 import { RECALL_TUNING } from './recall-tuning';
+import { climb, ladderCompare, RUNG_RANK, type Rung } from './ladder';
+import { parseChain, type MemoryChain } from './chain';
+import { classifyDomains } from './domains';
 
 export { RECALL_TUNING };
 
@@ -38,7 +41,7 @@ export interface RecallRequest {
   cue: string;
   cueRefs?: string[];
   mood: { morale: number; stress: number; grief: number };
-  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number };
+  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number; /** Mike 09-23: godlike attributes → perfect recall unless deliberately fooled */ godlike?: boolean };
   thornBlocks: ThornBlock[];
   nowCycle: number;
   budget?: number;
@@ -50,11 +53,26 @@ export interface RecallRequest {
    * src/daya/mechanics/thorns.ts's isRuminationLockActive(); defaults false
    * so every pre-WP8 caller/test keeps its existing behavior unchanged. */
   ruminationLockActive?: boolean;
+  /** Ladder recall (Mike 09-23): the being's ACTIVE goals and its derived survival situation. */
+  goals?: Array<{ id: string; description: string }>;
+  situation?: { threatened: boolean; frequencyLow: boolean };
+  /**
+   * Perception units 6+7 (Mike Q8): true = an explicit look / recall — sensed-but-unnoticed memories
+   * (noticed=false) may surface too ("now that you think about it, there were blue books"). Default false.
+   */
+  includeUnnoticed?: boolean;
+}
+
+/** Drop sensed-but-unnoticed rows unless asked for. Rows without the column (pre-migration mocks) count as noticed. Pure. */
+export function visibleToRecall<T extends { noticed?: boolean | null }>(rows: T[], includeUnnoticed: boolean): T[] {
+  return includeUnnoticed ? rows : rows.filter((r) => r.noticed !== false);
 }
 
 export interface SurfacedMemory {
   memoryId: string;
   score: number;
+  /** Which rung of the ladder surfaced it: survival > goals > domain > chain > words. */
+  rung?: Rung;
 }
 
 export interface RecallResult {
@@ -270,6 +288,9 @@ export interface ParsedMemory {
   salience: number;
   entityRefs: string[];
   narrativeCycle: number;
+  domain?: string | null;
+  domains?: string[];
+  chain?: MemoryChain;
 }
 
 export interface ScoredCandidate {
@@ -399,7 +420,8 @@ function mergeClassification(raw: string, patch: Record<string, unknown>): strin
 
 export async function recall(req: RecallRequest, overrides: DayaClientOverrides = {}): Promise<RecallResult> {
   const cueRefs = req.cueRefs ?? [];
-  const rows = await prisma.dayaMemoryEntry.findMany({ where: { entityId: req.entityId } });
+  // Sensed-but-unnoticed rows (perception units 6+7) stay out of normal surfacing; an explicit look/recall asks for them.
+  const rows = visibleToRecall(await prisma.dayaMemoryEntry.findMany({ where: { entityId: req.entityId } }), req.includeUnnoticed === true);
   const classificationById = new Map(rows.map((r) => [r.id, r.classification]));
 
   const parsed: ParsedMemory[] = rows.map((r) => ({
@@ -410,16 +432,34 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
     salience: r.salience,
     entityRefs: parseEntityRefs(r.entityRefs),
     narrativeCycle: r.narrativeCycle,
+    domain: r.domain ?? null,
+    domains: parseEntityRefs(r.domains ?? '[]'),
+    chain: parseChain(r.chain),
   }));
 
   const scored = parsed.map((m) => scoreCandidate(m, req.cue, cueRefs, req.mood, req.nowCycle, req.thornBlocks, req.ruminationLockActive ?? false));
 
-  const theta = wisdomThreshold(req.soulState.wisdomMax);
-  const budget = req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur);
+  const godlike = req.soulState.godlike === true;
+  const theta = godlike ? 0 : wisdomThreshold(req.soulState.wisdomMax);
+  const budget = godlike ? Number.MAX_SAFE_INTEGER : (req.budget ?? wisdomBudget(req.soulState.wisdomMax, req.soulState.wisdomCur));
 
+  // Ladder (Mike 09-23): classify the cue, then survival → goals → domain → chain → words.
+  // A memory standing on the goals rung or higher is reachable at half the
+  // words-threshold — what a being cares about stays reachable even when the
+  // words don't match; the flat pile still needs the full threshold.
+  const cueDomains = classifyDomains(req.cue).all;
+  const ladderCtx = { cue: req.cue, cueRefs, goals: req.goals ?? [], situation: req.situation ?? { threatened: false, frequencyLow: false }, cueDomains };
+  const rungOf = new Map<string, ReturnType<typeof climb>>();
+  for (const c of scored) {
+    rungOf.set(c.memory.id, climb({ id: c.memory.id, content: c.memory.content, valence: c.memory.valence, arousal: c.memory.arousal, domain: c.memory.domain ?? null, domains: c.memory.domains ?? [], chain: c.memory.chain ?? parseChain(null) }, ladderCtx));
+  }
   let passing = scored
-    .filter((c) => Number.isFinite(c.score) && c.score >= theta)
-    .sort((a, b) => b.score - a.score);
+    .filter((c) => {
+      if (!Number.isFinite(c.score)) return false;
+      const r = rungOf.get(c.memory.id)!;
+      return c.score >= theta || (RUNG_RANK[r.rung] >= RUNG_RANK.goals && c.score >= theta * 0.5);
+    })
+    .sort((a, b) => ladderCompare({ ...rungOf.get(a.memory.id)!, score: a.score }, { ...rungOf.get(b.memory.id)!, score: b.score }));
 
   passing = await maybeRerank(passing, req.cue, overrides);
 
@@ -428,7 +468,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
   const surfacedList: ScoredCandidate[] = [];
   const deferred: string[] = [];
   for (const c of withinBudget) {
-    if (witPasses(req.entityId, c.memory.id, req.nowCycle, req.soulState.witMax)) {
+    if (godlike || witPasses(req.entityId, c.memory.id, req.nowCycle, req.soulState.witMax)) {
       surfacedList.push(c);
     } else {
       deferred.push(c.memory.id);
@@ -447,6 +487,21 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
         .catch(() => undefined);
     }),
   );
+  // Thinking about it refreshes it (Mike 2026-10-09): what the surfaced memories are about, if the being already
+  // knows it, has its familiarity refreshed (services/familiarity-thought — never teaches, never throws outward).
+  if (!godlike && surfacedList.length > 0) {
+    try {
+      const { refreshFamiliarityByThought } = await import('@/services/familiarity-thought');
+      await refreshFamiliarityByThought({
+        perceiverId: req.entityId,
+        subjectIds: [...new Set(surfacedList.flatMap((c) => c.memory.entityRefs))],
+        texts: surfacedList.filter((c) => c.thornMatch?.mode !== 'distort').map((c) => c.memory.content),
+        refs: { memoryId: surfacedList[0].memory.id },
+      });
+    } catch (err) {
+      console.warn('[daya/recall] familiarity refresh by thought failed (non-fatal):', err);
+    }
+  }
 
   // Prose: normal content, or a vague distort line for Thorn-distorted memories.
   const proseLines = surfacedList.map((c) =>
@@ -470,17 +525,30 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
       // Self-ingest the failed attempt itself (source perception, low salience).
       // Awaited so the write is durable before recall() returns (never throws
       // outward — a self-ingest failure is logged, not propagated).
+      // Mike 09-26 ("fix the failed recall rows"): ONE row per reached-for
+      // memory per stretch of real time — the being loop recalls several
+      // times per wake and every stimulus was leaving two identical rows.
+      // parentMemoryId names the memory that wouldn't come.
       try {
-        await writeMemoryEntry({
-          entityId: req.entityId,
-          narrativeCycle: req.nowCycle,
-          source: 'perception',
-          content: failedFeel,
-          valence: 0,
-          arousal: 0.1,
-          salience: 0.1,
-          classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'failed recall attempt' },
+        const since = new Date(Date.now() - RECALL_TUNING.failedRecallDedupeMs);
+        const already = await prisma.dayaMemoryEntry.findFirst({
+          where: { entityId: req.entityId, parentMemoryId: best.memory.id, realTime: { gte: since }, classification: { contains: 'failed recall attempt' } },
+          select: { id: true },
         });
+        if (!already) {
+          await writeMemoryEntry({
+            entityId: req.entityId,
+            narrativeCycle: req.nowCycle,
+            source: 'perception',
+            content: failedFeel,
+            valence: 0,
+            arousal: 0.1,
+            salience: 0.1,
+            parentMemoryId: best.memory.id,
+            skipDreamPressure: true,
+            classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'failed recall attempt' },
+          });
+        }
       } catch (err) {
         console.error('[daya/recall] failed-recall self-ingest failed (non-fatal):', err);
       }
@@ -489,7 +557,7 @@ export async function recall(req: RecallRequest, overrides: DayaClientOverrides 
 
   return {
     prose,
-    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score })),
+    surfaced: surfacedList.map((c) => ({ memoryId: c.memory.id, score: c.score, rung: rungOf.get(c.memory.id)?.rung })),
     failedFeel,
     deferred,
   };

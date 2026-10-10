@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
+import { recordProvenanceSafe } from '@/services/provenance';
 
 // Content schemas live in forge-schemas.ts (no server-only deps) so
 // scripts can import the same validation gate. Re-exported for callers.
@@ -166,6 +167,11 @@ export async function createForgeItem(
       createdBy: userId,
     },
   });
+
+  // Provenance manifest at write-time (2026-09-20). A GM-authored draft is a
+  // human act; JEWL's forge tools pass through here too and are stamped by
+  // the tool wrapper as 'ai' where they call recordProvenance themselves.
+  recordProvenanceSafe({ assetType: 'forge_item', assetId: item.id, campaignId, creatorUserId: userId, creatorKind: 'human', content: validatedData });
 
   return { ...item, data: validatedData };
 }

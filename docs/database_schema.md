@@ -307,6 +307,12 @@ ADMIN-tunable economy constants. Key-value store; service layer falls back to co
 - `value`: String — JSON shape varies per key (e.g. `DripConfig` for "drip")
 - `updatedBy`: String? — ADMIN userId of last edit
 
+### CopilotMessage
+JEWL conversation rows (`role` user | assistant). No schema change on 2026-10-08, but `userId` now carries meaning on BOTH roles:
+- user rows: the human who wrote it (or JEWL's own id for `[system]` triggers)
+- assistant rows (from 2026-10-08): the RECIPIENT — the human who prompted; JEWL's own autonomous ticks / work cycles → the campaign GM. Older assistant rows have `userId = null`.
+- Read rule (JEWL history is private per user): a viewer is served only rows whose `userId` is theirs; `null` rows are ADMIN-only. See `ai/copilot/history-privacy.ts`.
+
 ### JewlMistake
 GM mistake-bounty flagging corpus. A GM flags a JEWL CopilotMessage as wrong; the flag is a CLAIM — no KRMA moves until resolved (transfer-on-acceptance, T19). JEWL acknowledges (bounty pays JEWL→GM) or disputes (Et'herling adjudicates: upheld pays, overturned pays nothing).
 - `copilotMessageId` + `gmUserId`: unique pair (same GM can't double-flag)
@@ -502,3 +508,75 @@ Durable JEWL job worked across message boundaries; the work-loop fires cycles wh
 - `continueUnattended`: GM answered the spoken hand-off question yes → cycles run with no client connected
 - `cycleCount`/`lastCycleAt` (loop bookkeeping; round-robin ordering), `startedAt`/`endedAt`, `createdBy`, `blockedReason`
 - Indexes: `[status, lastCycleAt]`, `[campaignId, status]`. No Campaign relation field (scalar campaignId only).
+
+## Encounter (Unit 1, migration 20260905095440_encounter_unit1)
+| Field | Type | Notes |
+|---|---|---|
+| id | String | cuid |
+| campaignId | String | FK Campaign |
+| name | String | |
+| status | String | PLANNED / ACTIVE / PAUSED / RESOLVED |
+| round | Int | rounds completed |
+| locationId | String? | reserved (Location link; unused in v0) |
+| state | String | JSON<EncounterState> — participants[], intentions[] (next round), sceneNarration, rounds[] (RoundResult log), lastPlan{} |
+| createdBy | String | user id |
+
+`EncounterState` is defined in `src/sim/encounter/state.ts`; participants/intentions become rows when the canvas card needs them. Each run round also writes a `CampaignEvent` (type game_event, eventType encounter_round) and one `DayaMemoryEntry` (source perception) per participant that has a DayaEntity.
+
+## Provenance (2026-09-20, migration 20260920224102_provenance_consent)
+One manifest per creative act (docs/research/growth-provenance-ledger-briefing-2026-09-18.md).
+| Field | Type | Notes |
+|---|---|---|
+| assetType | String | forge_item / campaign_item / character / portrait / encounter_round / text |
+| assetId | String | e.g. `<encounterId>:<round>` for rounds |
+| campaignId | String? | |
+| creatorUserId | String? | human principal |
+| creatorEntityId | String? | DayaEntity id when an AI being authored/co-authored |
+| creatorKind | String | human / ai / composite |
+| tool | String? | model / lane / adapter |
+| ingredients | String | JSON string[] "assetType:assetId" — the creation DAG |
+| memoryRefs | String | JSON string[] DayaMemoryEntry ids — the ledger bridge |
+| rights | String | JSON { aiTraining (from consent), remix: null, commercial: null } |
+| contentHash | String? | sha256 at creation |
+
+**User** gained `aiTrainingConsent` (Boolean, default false) + `aiTrainingConsentAt`. Set via PUT /api/profile { aiTrainingConsent }.
+
+**Campaign** gained `networkMode` (String, default META): META = consent required to enter, play trains GROWTH; DISCONNECTED = features only, never trains (migration 20260920_campaign_network_mode).
+
+## DayaIdentityProbe (2026-09-20, migration 20260921025242)
+One row per (entity, sweep, question): entityId, runId, probeVersion, questionKey, question, response, model. First run per entity = its IDENTITY_HASH baseline. Metrics (drift-from-self, divergence-between-entities) are computed, not stored. **Responses may carry a protagonist's story — the API never returns them, only metrics.**
+
+**DayaEntity** gained `dreamPressure` (Float, default 0): every ledger write adds salience×10; at 150 (env DAYA_DREAM_PRESSURE_THRESHOLD) the entity dreams and the counter resets.
+
+## CanonEvent (Mike 2026-09-20 — the infallible base reality; migration canon_ledger_truthref)
+Append-only, never edited (no write route). One row per resolved act: campaignId, cycle, seq, kind (encounter_round | check | negate | block | redirect | damage | downed | move | hold | dialogue | declaration…), locationId?, actorId?, targetId?, narration (diegetic, numberless), detail (JSON: the sim's numbers), consequences (JSON: pool/part/item deltas), sourceType/sourceId, parentId (round → its acts), provenanceId. **DayaMemoryEntry** gained `truthRef` (the CanonEvent a lived memory perceived); the round memory's classification also lists `truthRefs[]` for the acts the being could witness. The Watcher reads all of it; players have no route.
+
+## Memory chain + domains (Mike 2026-09-23; migration memory_chain_domains)
+**DayaMemoryEntry** gained `pillar` (MERCY|BALANCE|SEVERITY, null until the seat is ruled), `domain` (primary key from src/daya/domains.ts), `domains` (JSON string[], overlap is the rule), `chain` (JSON<MemoryChain>: truthRefs, entities, items, locationId, goalIds, antecedentId). Classified at write-time by the keyword classifier unless the caller passes an explicit classification.
+**CanonEvent** gained `itemIds`, `goalIds`, `domains` (JSON string[]) — the truth-side chain.
+**DayaMemoryEntry** gained (migration `20261010000000_memory_noticed`, perception units 6+7) `noticed` Boolean default true — false = SENSED-BUT-UNNOTICED (stored; kept out of normal recall via `visibleToRecall`, surfaced by `RecallRequest.includeUnnoticed` / Attend) — and `perceivedVia` String default `'[]'` (JSON string[]: the senses that carried it — sight, hearing, smell, taste, touch, a mind sense name, or `self` for the source). Written only when `PERCEPTION_REACH=on` (`services/perception-reach.ts`); every existing and flag-off row keeps the defaults. An event that does not REACH a being leaves no row at all. Under the flag a noticed row's `salience` is the world-sim's score when the model judged (the stub keeps the old fixed heuristics).
+
+**DayaMemoryEntry.visibleForm** String? (migration `20261010010000_memory_visible_form`, perception unit 8) — cache of the row's VISIBLE FORM (the perceived feed line, `services/visible-form.ts`): JSON `{sig, form}`, `sig` = sha1 of every render input (truth rows, perception, the named entities' familiarity), so a changed input re-renders. `correctCanon` clears it for every row resting on the corrected event. null = not rendered yet.
+
+**DayaMemoryEntry.firstVisibleForm** String? (migration `20261010020000_familiarity_change_first_visible_form`, Mike 2026-10-09 "all knowledge relabels past entries; the system keeps the record") — the FIRST visible form ever rendered for the row, frozen: JSON `{form, sig, familiarity, perception, nowCycle, renderedAt}` (`familiarity` = the per-entity per-aspect F-levels the render used, faded to `nowCycle`). Written by `renderViewerFeed` in the same write as the live cache, guarded `WHERE firstVisibleForm IS NULL`; never overwritten or cleared (correctCanon / introductions / Watcher invalidation clear `visibleForm` only). Rows already rendered before this migration are not back-filled (their true first render is unknown); their snapshot is taken at their next fresh render. Read via `getFirstVisibleForm(memoryId)`; no route.
+
+## VineEntry (Mike 2026-09-22; migration vines_godhead_tree)
+The vine is the custodian's memory of a goal: goalId, campaignId, custodianId? (GodHead), custodianPillar? (the coloring), side (custodian | resistance), canonEventId, cycle, reading. Written when canon touches a goal; the resistance's opposing custodians record the same event on the resisting entity's own vines.
+**GodHead** gained `parentId` (custodian tree; null = main seat) and `domainKey` (one of the ten domains; blank until Mike seats them).
+
+**CanonEvent.detail** (2026-10-06, U2c-4, Mike's ruling "sentences grouped into beats"): spoken narration is one row per completed sentence; its `detail` JSON carries `beatId` (a uuid shared by every row of one beat — narration up to the GM handing the turn over), and the `game_event` CampaignEvent it posts carries the same `beatId` in its payload. Typed prose rows have no beatId. No column, no migration.
+
+**CampaignEvent.payload — TABLE feed fields** (2026-10-07, ruling-feed-segment-colours-pillars; `types/terminal.ts` `TableFeedFields`): table rows written from 2026-10-07 carry, all optional: `via` (`typed` | `spoken` | `being`), `cycle` (Campaign.currentCycle when recorded — the in-world time the feed shows first), `raw` (the pre-processed text when it differs from the cleaned one: the typed message, the heard transcript chunk, or a being's `Say:`/`Do:` action). Declarations (`game_event`, eventType `declaration`) also carry table-prose's split: `narration` (pure narration, null = speech alone) and `speech` (`[{speakerId, speakerLabel, text}]`). Written by `declareCanon({feed})` (canon.ts `declarationPayload`) and table-speak's `postChat`. Older rows have none; the feed falls back to parsing the text. No column, no migration.
+
+## Familiarity (Mike 2026-10-08/09 perception rulings; migration 20261009120000_familiarity)
+How well one being knows one ASPECT of one thing. Columns: `campaignId` (→ Campaign), `perceiverId` (→ DayaEntity, cascade — the same id `DayaMemoryEntry.entityId` uses), `subjectId` (CampaignItem / Character / Location id; the perceiver's own characterId for SELF), `subjectKind` (ITEM | CHARACTER | NPC | LOCATION | GODHEAD | SELF — the EntityRelationship type vocabulary plus SELF), `aspectKind` (aspect key, e.g. `damage`, `ability:<id>`, `property:<slug>`), `score` Float 0..1 (→ F0–F5 via `scoreToFidelity`, F5 sealed at ≥0.95), `lastSource` (exposure | use | own | inspect | seed), `lastCycle` Float? (migration 20261009180000_familiarity_last_cycle — campaign clock in meta cycles at the last write, the same unit `DayaMemoryEntry.narrativeCycle` / memory decay use; the per-row fade anchor; null on rows written before it), `createdAt`, `updatedAt`. Unique (perceiverId, subjectId, aspectKind); indexes on campaignId, (perceiverId, subjectKind), subjectId. The stored score is unfaded as of `lastCycle` — fade is a read-time view (`familiarityAt(row, nowCycle)`); a new write fades the prior score to its cycle before growing it. Written by `services/familiarity.ts` (`recordExposure`) and `services/familiarity-seed.ts` (first-contact `seed` rows: Godhead 1.0 / self 0.8 / owned 0.7 / known category 0.5). Read by `daya/perceive.ts` (a being's rows for its LOCATION, aspects appearance/identity, set the scene attunement; no row → flat 0.8) and the Watcher view `GET /api/campaigns/[id]/familiarity`. No schema change in unit 4.
+
+## FamiliarityChange (migration 20261010020000_familiarity_change_first_visible_form, 2026-10-09)
+APPEND-ONLY history of every `Familiarity` write. Columns: `campaignId`, `perceiverId` (DayaEntity id), `subjectId`, `subjectKind`, `aspectKind`, `fromScore` Float? (stored unfaded score before the write; null = first contact), `fromCycle` Float? (the prior row's `lastCycle`, so the faded value can be rebuilt), `toScore` Float, `source` (exposure | use | own | inspect | seed | introduced | watcher | wrong), `cycle` Float? (campaign clock of the write), optional refs `memoryId` / `canonEventId` / `checkId`, `createdAt`. Indexes (campaignId, perceiverId, createdAt) and (perceiverId, subjectId, aspectKind). No foreign keys — the record outlives its being/campaign. Written ONLY by `services/familiarity.writeFamiliarity` (one `createMany` per transaction, inside the writer's existing per-being transaction); no code updates or deletes a row; no API route — `listFamiliarityChanges` (GM/ADMIN-gated service helper) is the only reader.
+**Familiarity.impression / FamiliarityChange.fromImpression + toImpression** String? (migration `20261010030000_familiarity_impression`, applied via libsql + checksum row; Mike 2026-10-09 "shows as gold for that entity until it is fixed") — the WRONG value one perceiver believes of one aspect (display-ready, worded like a tooltip value). Set by an inspection fumble (source 'wrong'); shown as fact in that perceiver's tooltips / roster; cleared ("fixed") by any later non-wrong write that brings the aspect to F3+ — the change row records from → to (gold → null). Truth record untouched.
+
+## SkillDomainRelevance (perception unit 3, Mike 2026-10-09; migration 20261009190000_skill_domain_relevance)
+How relevant a freeform skill name is to each of the ten head domains (`daya/domains.ts`). Columns: `scope` (`'*'` = global, else a campaignId), `campaignId` String? (→ Campaign, cascade; set iff scope is a campaign), `skillName` (normalized: trimmed, lower-case, single spaces), `domain` (head-domain key), `relevance` Float 0..1, `source` (`model` | `gm`), `createdAt`, `updatedAt`. Unique (scope, skillName, domain); index campaignId. Skills are freeform JSON in `Character.data` (no Skill table), so model scores are GLOBAL rows, scored once per skill on the classify lane; a GM override is a `gm` row in that GM's campaign scope (ADMIN may write global `gm` rows). Resolution per domain: campaign gm → global gm → global model. The model only creates missing rows (never overwrites). Written/read by `services/skill-relevance.ts`.
+
+`ItemAbility.school` (optional, in `CampaignItem.data.itemAbilities[]`, 2026-10-09): the enchantment's magic school (one of the ten `MagicSchool` names) — perception tags the ability Fortune + that school's domain; absent → Fortune only. No migration.
+`grantsSenses` (optional JSON array of `SenseGrantSpec {sense, effectiveness?, name?}`, 2026-10-09 morning ruling "a sense could come from anything") on `CampaignItem.data` (and body-part nodes in `Character.data.bodyAnatomy`), on `data.itemAbilities[]`, and on `Character.data.traits[]` (nectar / thorn / blossom). `sense` = sight/hearing/smell/taste/touch/mind (others kept, unmodelled); effectiveness 0..1 default 1, scaled by the source's condition. No content ships with one. Forge schemas accept it (item, item ability, trait).

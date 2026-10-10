@@ -85,11 +85,19 @@ const forgePrimaMateriaSchema = z.object({
   charges: z.number().int().min(0).optional(),
 }).optional();
 
+/** types/growth SenseGrantSpec — a sense granted by an item / ability / trait (Mike 2026-10-09). */
+export const senseGrantSpecSchema = z.object({
+  sense: z.string().min(1).max(40),
+  effectiveness: z.number().min(0).max(1).optional(),
+  name: z.string().max(100).optional(),
+});
+
 const itemAbilitySchema = z.object({
   name: z.string().max(100),
   description: z.string().max(500),
   mechanicalEffect: z.string().max(300).optional(),
   kv: z.number().optional(),
+  grantsSenses: z.array(senseGrantSpecSchema).max(6).optional(),
 });
 
 const forgeItemDataSchema = z.object({
@@ -108,8 +116,15 @@ const forgeItemDataSchema = z.object({
   ]).optional(),
   value: z.number().min(0).optional(),
   notes: z.string().max(1000).optional(),
-  // Item sub-type (weapon, armor, etc.)
-  itemType: z.enum(['weapon', 'armor', 'accessory', 'consumable', 'tool', 'artifact', 'prima_materia', 'misc']).optional(),
+  // Item sub-type (weapon, armor, etc.). 'kit' = a possession with a KV
+  // budget drawn down on plausible demand (r-2026-08-24-16 — Mike marks it
+  // controversial but fun-chosen; plausibility gate + finite budget are the
+  // mitigations; ontology-consistent with crystallization).
+  itemType: z.enum(['weapon', 'armor', 'accessory', 'consumable', 'tool', 'artifact', 'prima_materia', 'kit', 'misc']).optional(),
+  /** REQUIRED when itemType='kit': the finite draw-down pool. Anything
+   *  plausibly in the kit and needed is pulled FROM this budget on demand —
+   *  never pre-itemized. */
+  kvBudget: z.number().int().min(1).max(500).optional(),
   // Canonical GrowthWorldItem fields (item-fields canon 2026-05-14)
   primaryMaterial: z.string().max(100).optional(),
   subordinateMaterials: z.array(z.string().max(100)).max(10).optional(),
@@ -118,6 +133,7 @@ const forgeItemDataSchema = z.object({
   weightLbs: z.number().min(0).optional(),
   quality: z.number().int().min(1).max(10).optional(),
   itemAbilities: z.array(itemAbilitySchema).max(20).optional(),
+  grantsSenses: z.array(senseGrantSpecSchema).max(6).optional(),
   shots: z.number().int().min(0).optional(),
   reload: z.string().max(100).optional(),
   damageScaling: z.union([z.boolean(), z.string().max(100)]).optional(),
@@ -158,15 +174,41 @@ const forgeItemDataSchema = z.object({
   ...maturityFlagsField,
 });
 
+// Tangible, TABLE-TRACKABLE time units only — there is no "scene" in
+// GROWTH, and no one counts fictional minutes at a table (Mike,
+// 2026-08-26). Sub-hour states exist only in encounter mode, where the
+// unit is ROUNDS (1 round = 6 seconds, Combat_Grid_System.md); outside
+// encounters, short-lived states are phrased as conditions ("while exits
+// remain unassessed"), not clock time.
+const effectDurationSchema = z.object({
+  amount: z.number().positive(),
+  unit: z.enum(['rounds', 'hours', 'days', 'cycles']),
+});
+
 const rollModifierSchema = z.object({
   flat: z.number(),
   skillNamePattern: z.string().max(100).optional(),
   governorAttribute: z.string().max(50).optional(),
+  /** Pillar-breadth target: applies to every roll governed by any of the
+   *  pillar's attributes ("+2 to Body-pillar checks"). Stock-catalog
+   *  compliance pass 2026-08-26 — most stock mechanics need this or
+   *  allChecks; per-attribute targeting alone couldn't express them. */
+  pillar: z.enum(['body', 'spirit', 'soul']).optional(),
+  /** Universal target ("−1 to all checks"). Mutually exclusive with
+   *  governorAttribute/pillar. */
+  allChecks: z.boolean().optional(),
   label: z.string().max(100).optional(),
   // Lexicon scope (Mike ruling 2026-08-24): "raw" = attribute checks only;
   // "governed" = every roll whose skill has this governor. Ambiguous prose
   // is a defect — structured entries say which they mean.
   scope: z.enum(['raw', 'governed']).optional(),
+  /** Timed window measured from the moment the condition became true
+   *  (e.g. −2 Wit-governed for 3 rounds after entering; rounds only tick
+   *  in encounter mode). Still lazily evaluable — anchor time comes from
+   *  the adjudicated condition. Before 2026-08-26 this field wasn't in
+   *  the schema: Zod stripped it silently while the raw stored JSON kept
+   *  it, so drafts could carry durations the system never saw. */
+  duration: effectDurationSchema.optional(),
 });
 
 // ── Structured trait effects (Mike rulings 2026-08-24, #5/#9) ─────────────
@@ -196,10 +238,7 @@ export const traitEffectSchema = z.discriminatedUnion('kind', [
     spawnsBlossom: z.string().max(100).optional(),
     appliesCondition: z.string().max(100).optional(),
     /** Tangible time only — there is no "scene" in GROWTH. */
-    duration: z.object({
-      amount: z.number().positive(),
-      unit: z.enum(['hours', 'days', 'cycles']),
-    }).optional(),
+    duration: effectDurationSchema.optional(),
   }),
 ]);
 export type TraitEffect = z.infer<typeof traitEffectSchema>;
@@ -225,6 +264,7 @@ const forgeTraitDataSchema = z.object({
   // cross-referencing depend on this being stable.
   category: z.enum(TRAIT_CATEGORIES as unknown as [string, ...string[]]).optional(),
   rollModifiers: z.array(rollModifierSchema).max(10).optional(),
+  grantsSenses: z.array(senseGrantSpecSchema).max(6).optional(),
   /** Structured effects (rulings 2026-08-24 #5/#9): preferred over prose
    *  mechanicalEffect + loose rollModifiers for NEW authoring. */
   effects: z.array(traitEffectSchema).max(6).optional(),
@@ -240,7 +280,7 @@ const forgeTraitDataSchema = z.object({
     z.object({
       kind: z.literal('time'),
       amount: z.number().positive(),
-      unit: z.enum(['hours', 'days', 'cycles']),
+      unit: z.enum(['rounds', 'hours', 'days', 'cycles']),
     }),
     z.object({ kind: z.literal('trigger'), text: z.string().min(1).max(300) }),
   ]).optional(),
@@ -453,7 +493,15 @@ export function validateForgeData(type: string, data: unknown) {
     case 'root': return forgeRootDataSchema.parse(data);
     case 'branch': return forgeBranchDataSchema.parse(data);
     case 'skill': return forgeSkillDataSchema.parse(data);
-    case 'item': return forgeItemDataSchema.parse(data);
+    case 'item': {
+      const parsed = forgeItemDataSchema.parse(data);
+      if (parsed.itemType === 'kit' && typeof parsed.kvBudget !== 'number') {
+        throw new ValidationError(
+          "Kits require a kvBudget (r-2026-08-24-16) — the finite pool draws are pulled from.",
+        );
+      }
+      return parsed;
+    }
     case 'nectar':
     case 'thorn': return forgeTraitDataSchema.parse(data);
     case 'blossom': {

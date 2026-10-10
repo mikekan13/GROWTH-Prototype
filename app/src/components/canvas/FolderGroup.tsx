@@ -3,6 +3,9 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import RestPanel from './RestPanel';
 import type { CanvasFolder } from '@/types/canvas';
+import { lodForZoom, folderLabelSize, depthHeaderFill, depthBodyFill, depthPrefix } from './canvas-lod';
+import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
+import { locationTitleTooltip, countTooltip, characterChipTooltip, detailsTooltip, memberNames, subLocationNames } from './folder-tooltips';
 import type { GrowthCharacter } from '@/types/growth';
 
 interface NodePosition {
@@ -38,6 +41,8 @@ interface CharacterInfo {
   id: string;
   name: string;
   data: GrowthCharacter;
+  /** Portrait URL when one exists — header "who is here" chips use it, else initials. */
+  portrait?: string | null;
 }
 
 interface FolderGroupProps {
@@ -86,7 +91,22 @@ function locationDetailsPanelHeight(li: NonNullable<CanvasFolder['locationInfo']
   return descH + gridH + tagsH + notesH + gaps + PANEL_PADDING;
 }
 const SOUL_BLUE = '#002f6c';
+/** Name-tile size for an EMPTY location (canvas-layout.LAYOUT.emptyW/H mirror it). */
+const TILE_W = 560;
+const TILE_H = 150;
 const HANDLE_SIZE = 36;
+/** Finger-sized resize handles on touch devices (2026-10-06, with the mobile
+ *  session). Read through useSyncExternalStore so the server snapshot (false)
+ *  matches the first client render and SVG geometry never hydration-mismatches. */
+const HANDLE_SIZE_COARSE = 52;
+const coarseQuery = () => (typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null);
+function useCoarsePointer(): boolean {
+  return React.useSyncExternalStore(
+    (cb) => { const q = coarseQuery(); q?.addEventListener('change', cb); return () => q?.removeEventListener('change', cb); },
+    () => coarseQuery()?.matches ?? false,
+    () => false,
+  );
+}
 
 /** Compact details strip: one-line essence + the expand affordance. */
 const COMPACT_DETAILS_H = 44;
@@ -122,6 +142,8 @@ export function calcContentBounds(
    *  folder rect is its footprint, so the parent's area encompasses the
    *  sub-folder. World-recursive design: folders nest. */
   childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>,
+  /** Headroom reserved ABOVE each child folder for its label (drawn above its box) — without it a child's name lands in its parent's header (2026-09-28). */
+  childLabelAllowance = 0,
 ): ContentBounds | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let hasNodes = false;
@@ -131,7 +153,7 @@ export function calcContentBounds(
     if (childRect) {
       hasNodes = true;
       minX = Math.min(minX, childRect.x);
-      minY = Math.min(minY, childRect.y);
+      minY = Math.min(minY, childRect.y - childLabelAllowance);
       maxX = Math.max(maxX, childRect.x + childRect.width);
       maxY = Math.max(maxY, childRect.y + childRect.height);
       continue;
@@ -199,6 +221,7 @@ export function getDisplayBounds(content: ContentBounds, folder: CanvasFolder) {
 // ── SVG Background Rect + Resize Handles ──
 
 export function FolderGroupRect({
+  nodeNames,
   folder,
   nodePositions,
   dragOffsets,
@@ -208,6 +231,7 @@ export function FolderGroupRect({
   characters,
   onFolderResize,
   onFolderResizeEnd,
+  onFolderResizeStart,
   onToggleDetails,
   onFolderDragStart,
   onActionsToggle,
@@ -217,6 +241,7 @@ export function FolderGroupRect({
   viewBox,
   isDropTarget = false,
   onDrillIn,
+  zoom = 1,
 }: {
   folder: CanvasFolder;
   nodePositions: Map<string, NodePosition>;
@@ -225,9 +250,15 @@ export function FolderGroupRect({
   expandedNodes: Set<string>;
   childFolderRects?: Map<string, { x: number; y: number; width: number; height: number }>;
   characters: CharacterInfo[];
+  /** Every canvas node id → display name (plus location folders keyed by
+   *  locationInfo.locationId). Optional: the header tooltips list items and
+   *  sub-locations by name when it is present, by count when it is not. */
+  nodeNames?: Map<string, string>;
   onFolderResize?: (folderId: string, width: number, height: number, posX?: number, posY?: number) => void;
   /** Fired once when a resize gesture ENDS — compaction/overlap pass. */
   onFolderResizeEnd?: (folderId: string) => void;
+  /** Fired on the handle's mousedown — the canvas must know a resize has begun BEFORE any drag could start on the same gesture (2026-10-01: a resize that also became a folder drag re-parented rooms into each other). */
+  onFolderResizeStart?: (folderId: string) => void;
   /** Toggle the location details panel (compact strip ↔ full panel). */
   onToggleDetails?: (folderId: string) => void;
   onFolderDragStart: (folderId: string, startSvg: { x: number; y: number }) => void;
@@ -241,20 +272,22 @@ export function FolderGroupRect({
   viewBox?: { x: number; y: number; width: number; height: number };
   isDropTarget?: boolean;
   onDrillIn?: (entityId: string | null) => void;
+  /** Canvas zoom (1 = in, 6 = out) — semantic zoom + label scaling (canvas-lod). */
+  zoom?: number;
 }) {
+  // ONE resize handle, bottom-right (Mike 2026-10-06: "remove all the resize
+  // areas around a folder and instead place one only in the lower right
+  // corner"). The anchor is the top-left, so resizing never moves the folder.
   const [resizing, setResizing] = useState<{
-    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner';
     startX: number;
     startY: number;
     startW: number;
     startH: number;
-    startPosX: number;
-    startPosY: number;
   } | null>(null);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects),
-    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, folderLabelSize(zoom) + 16),
+    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, zoom]
   );
 
   // Collapse chip — small (Mike 2026-08-03: much smaller), just enough
@@ -263,8 +296,12 @@ export function FolderGroupRect({
 
   // Much smaller floors (Mike 2026-08-03) — a room folder can be a tight
   // little box; the header still fits at 280 wide.
-  const MIN_FOLDER_W = 280;
-  const MIN_FOLDER_H = 120;
+  // An EMPTY location is a compact folder — same header and chips as every other place, just small
+  // (Mike 2026-09-28: places must all display the same way; the header portrait box is the icon slot).
+  const handleSize = useCoarsePointer() ? HANDLE_SIZE_COARSE : HANDLE_SIZE;
+  const isTile = !content && !!folder.locationInfo && !folder.collapsed;
+  const MIN_FOLDER_W = isTile ? TILE_W : 280;
+  const MIN_FOLDER_H = isTile ? TILE_H : 120;
 
   const bounds = useMemo(() => {
     if (!content) {
@@ -290,13 +327,15 @@ export function FolderGroupRect({
     const anchorY = (folder.posY != null ? Math.min(folder.posY + folderOffset.y, content.y) : content.y);
     const contentRight = content.x + content.minWidth;
     const contentBottom = content.y + content.minHeight;
-    // Right edge: max of (user-padded right, content right, absolute minimum).
-    const basePosX = folder.posX != null ? folder.posX + folderOffset.x : content.x;
-    const rightEdge = Math.max(basePosX + MIN_FOLDER_W, basePosX + (folder.userWidth || 0), contentRight);
+    // Right/bottom edges measure the user size from the SAME anchor the box
+    // is drawn from (2026-10-01: measuring it from posX/posY while drawing
+    // from min(pos, content) made a right-edge drag jump the HEIGHT by the
+    // anchor gap on its first frame — "instantly expanded past its sub
+    // folder"). This matches getDisplayBounds / folderRectById / the settle
+    // engine, so every consumer agrees on one rect.
+    const rightEdge = Math.max(anchorX + MIN_FOLDER_W, anchorX + (folder.userWidth || 0), contentRight);
     const width = rightEdge - anchorX;
-    // Bottom edge: same shape as right.
-    const basePosY = folder.posY != null ? folder.posY + folderOffset.y : content.y;
-    const bottomEdge = Math.max(basePosY + MIN_FOLDER_H, basePosY + (folder.userHeight || 0), contentBottom);
+    const bottomEdge = Math.max(anchorY + MIN_FOLDER_H, anchorY + (folder.userHeight || 0), contentBottom);
     let height = bottomEdge - anchorY;
     // Party folders: clamp bottom edge above KRMA line (y=0)
     if (folder.type === 'party') {
@@ -308,30 +347,22 @@ export function FolderGroupRect({
     return clampDraftingRect(folder, { x: anchorX, y: anchorY, width, height });
   }, [content, folder, dragOffsets]);
 
-  // Resize mouse handlers
-  const handleResizeStart = useCallback((
-    e: React.MouseEvent,
-    edge: 'right' | 'bottom' | 'corner' | 'left' | 'left-corner' | 'top' | 'top-corner' | 'top-left-corner',
-  ) => {
+  // Resize handlers (pointer events — touch depends on it)
+  const handleResizeStart = useCallback((e: React.PointerEvent | React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (!bounds) return;
-    // Capture the folder's TRUE origin and user-padded size — not the
-    // content-clamped display values. The resize math writes posX/userWidth
-    // directly, so the start values must match what we're modifying;
-    // otherwise drags silently no-op (when posX > content.x) and produce
-    // unexpected jumps on subsequent drags. Falls back to displayed bounds
-    // on first resize (no posX/userWidth stored yet).
+    onFolderResizeStart?.(folder.id);
+    // The drawn rect IS the gesture's baseline — user sizes are measured
+    // from the drawn anchor, so starting anywhere else makes the first
+    // frame jump (2026-10-01).
     setResizing({
-      edge,
       startX: e.clientX,
       startY: e.clientY,
-      startW: folder.userWidth ?? bounds.width,
-      startH: folder.userHeight ?? bounds.height,
-      startPosX: folder.posX ?? bounds.x,
-      startPosY: folder.posY ?? bounds.y,
+      startW: bounds.width,
+      startH: bounds.height,
     });
-  }, [bounds, folder.posX, folder.posY, folder.userWidth, folder.userHeight]);
+  }, [bounds, folder.id, onFolderResizeStart]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -353,60 +384,17 @@ export function FolderGroupRect({
       const dx = (e.clientX - resizing.startX) * scaleX;
       const dy = (e.clientY - resizing.startY) * scaleY;
 
-      let newW = resizing.startW;
-      let newH = resizing.startH;
-      let newPosX: number | undefined;
-      let newPosY: number | undefined;
-
-      if (resizing.edge === 'right' || resizing.edge === 'corner' || resizing.edge === 'top-corner') {
-        newW = Math.max(minW, resizing.startW + dx);
-      }
-      if (resizing.edge === 'left' || resizing.edge === 'left-corner' || resizing.edge === 'top-left-corner') {
-        // Left edge: dragging left increases width, dragging right decreases.
-        // The right edge must stay anchored at startPosX + startW.
-        const startRight = resizing.startPosX + resizing.startW;
-        newW = Math.max(minW, resizing.startW - dx);
-        newPosX = startRight - newW;
-        // Folder must encompass content — posX can't exceed content.x
-        // (visual left edge is anchored to leftmost member). Clamp the user
-        // intent to that limit so the drag stops where the visual stops,
-        // instead of silently writing an unreachable posX that breaks the
-        // next drag's start values.
-        if (!isLocation && content && newPosX > content.x) {
-          newPosX = content.x;
-          newW = startRight - newPosX;
-        }
-      }
-      if (resizing.edge === 'bottom' || resizing.edge === 'corner' || resizing.edge === 'left-corner') {
-        newH = Math.max(minH, resizing.startH + dy);
-        // Party folders: bottom edge can't cross the KRMA line (y=0)
-        if (folder.type === 'party') {
-          const maxH = -boundsY; // bottom edge flush with KRMA line
-          if (maxH > 0 && newH > maxH) newH = maxH;
-        }
-      }
-      if (resizing.edge === 'top' || resizing.edge === 'top-corner' || resizing.edge === 'top-left-corner') {
-        // Top edge: dragging up grows the folder upward, dragging down
-        // shrinks it. The bottom edge stays anchored at startPosY + startH.
-        const startBottom = resizing.startPosY + resizing.startH;
-        newH = Math.max(minH, resizing.startH - dy);
-        newPosY = startBottom - newH;
-        // Encompass clamp (mirror of the left edge): non-location folders
-        // can't push their top edge below the topmost member.
-        if (!isLocation && content && newPosY > content.y) {
-          newPosY = content.y;
-          newH = startBottom - newPosY;
-        }
-        // Drafting locations live BELOW the crystallization line — the top
-        // edge never crosses above y=0 as a resize side effect.
-        const isDrafting = !!folder.locationInfo && folder.locationInfo.status !== 'ACTIVE';
-        if (isDrafting && newPosY < 0) {
-          newPosY = 0;
-          newH = startBottom;
-        }
+      // Bottom-right corner: width and height grow from the top-left anchor;
+      // the folder never moves while resizing.
+      const newW = Math.max(minW, resizing.startW + dx);
+      let newH = Math.max(minH, resizing.startH + dy);
+      // Party folders: bottom edge can't cross the KRMA line (y=0)
+      if (folder.type === 'party') {
+        const maxH = -boundsY; // bottom edge flush with KRMA line
+        if (maxH > 0 && newH > maxH) newH = maxH;
       }
 
-      onFolderResize?.(folder.id, newW, newH, newPosX, newPosY);
+      onFolderResize?.(folder.id, newW, newH);
     };
 
     const handleUp = () => {
@@ -416,11 +404,11 @@ export function FolderGroupRect({
       onFolderResizeEnd?.(folder.id);
     };
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
+    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointerup', handleUp);
     return () => {
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup', handleUp);
     };
   }, [resizing, content, folder.id, onFolderResize, svgRef, viewBox]);
 
@@ -428,8 +416,12 @@ export function FolderGroupRect({
 
   const color = folder.type === 'party' ? SOUL_BLUE : (folder.color || SOUL_BLUE);
   const collapsed = !!folder.collapsed;
-  const labelFontSize = 36;
-  const countFontSize = 32;
+  // Semantic zoom + depth encoding (Mike 2026-09-28): a place's palette steps
+  // by how deep it sits; labels grow as the Watcher zooms out.
+  const depth = folder.locationInfo?.depth;
+  const lod = lodForZoom(zoom);
+  const headerFill = folder.locationInfo ? depthHeaderFill(depth) : color;
+  const bodyFill = folder.locationInfo ? depthBodyFill(depth) : '#19191930';
   const btnW = 160;
   const btnH = 42;
   const btnFontSize = 20;
@@ -437,6 +429,43 @@ export function FolderGroupRect({
 
   // TKV: sum of all characters' TKV in this folder
   const folderChars = characters.filter(c => folder.nodeIds.includes(c.id));
+
+  // Title lives INSIDE the header bar (Mike 2026-10-06: "the title should be
+  // within the header bar"). Near: a tidy first row beside the portrait, with
+  // the action row under it. Mid/far: the action row hides (unreadable that
+  // small anyway) and the title scales up with zoom, centred on the bar, so a
+  // place stays legible zoomed out. Width is capped so it never runs into the
+  // who-is-here chips or the collapse toggle; overflow ellipsises.
+  const showActionRow = !!folder.locationInfo && lod === 'near';
+  const showPortrait = !!folder.locationInfo && lod !== 'far';
+  const chipCount = (!collapsed && folder.locationInfo && folderChars.length > 0)
+    ? Math.min(folderChars.length, 6) + (folderChars.length > 6 ? 1 : 0) : 0;
+  const titleLeft = showPortrait ? 84 : folder.type === 'party' ? btnW + 24 : 16;
+  const titleRightReserve = toggleSize + 28 + chipCount * 60;
+  const titleAvailW = Math.max(60, bounds.width - titleLeft - titleRightReserve);
+  // Styled like the rulebook's section headers (Mike 2026-10-06: "gold text
+  // and blue backgrounds"): Bebas Neue caps in --accent-gold on a Soul-blue
+  // (#002f6c) badge that hugs the text like a tape strip (VISUAL-DESIGN-SPEC §5).
+  const TITLE_PAD_X = 12;
+  const titleChars = folder.name.length + (depth ?? 0) + String(folder.nodeIds.length).length + (folder.type === 'party' ? 7 : 4);
+  const titleMax = lod === 'near' ? 32 : lod === 'mid' ? Math.min(folderLabelSize(zoom), 60) : folderLabelSize(zoom);
+  // Bebas Neue is condensed: ~0.5em per char including the tracking.
+  const titleFont = Math.max(18, Math.min(titleMax, Math.floor((titleAvailW - 2 * TITLE_PAD_X) / (titleChars * 0.5))));
+  const titleLineH = Math.ceil(titleFont * 1.1) + 4;
+  const titleTop = showActionRow ? 4 : (HEADER_HEIGHT - titleLineH) / 2;
+  /** Rough rendered width — the TKV / KRMA tiles slide right of it. */
+  const titleEstW = titleChars * titleFont * 0.5 + 2 * TITLE_PAD_X;
+
+  // Header tooltips (Mike 2026-10-06): the dynamic ComplexTooltip with its
+  // inception layer, on the title badge, the content counts, the who-is-here
+  // chips and the dETAILS strip. Models live in folder-tooltips.ts. They close
+  // while the folder is being dragged.
+  const isFolderDragging = dragOffsets.has(`__folder__${folder.id}`);
+  const li = folder.locationInfo;
+  const itemNames = memberNames(folder, nodeTypes, 'item', nodeNames);
+  const subNames = subLocationNames(folder, childFolderRects, nodeNames);
+  const titleTip = li ? locationTitleTooltip(folder, li, folderChars, itemNames, subNames) : null;
+  const tipTriggerStyle: React.CSSProperties = { pointerEvents: 'auto', cursor: 'help' };
   const totalTKV = folderChars.reduce((sum, c) => {
     const val = c.data?.tkv;
     return sum + (typeof val === 'number' ? val : typeof val === 'string' ? parseFloat(val) || 0 : 0);
@@ -467,7 +496,7 @@ export function FolderGroupRect({
           height={displayHeight}
           rx={8}
           ry={8}
-          fill={isDropTarget ? '#22ab9440' : '#19191930'}
+          fill={isDropTarget ? '#22ab9440' : bodyFill}
           stroke={isDropTarget ? '#22ab94cc' : '#22ab9444'}
           strokeWidth={isDropTarget ? 4 : 2}
           style={{ pointerEvents: 'none', ...(isDropTarget ? { filter: 'drop-shadow(0 0 16px rgba(34,171,148,0.6))' } : undefined) }}
@@ -484,13 +513,13 @@ export function FolderGroupRect({
         height={collapsed ? HEADER_HEIGHT : locationHeaderHeight(folder)}
         rx={8}
         ry={8}
-        fill={isDropTarget ? 'var(--terminal-prime)' : color}
+        fill={isDropTarget ? 'var(--terminal-prime)' : headerFill}
         fillOpacity={1}
         stroke={isDropTarget ? 'var(--terminal-prime)' : 'none'}
         strokeWidth={isDropTarget ? 3 : 0}
         data-folder-location-id={folder.locationInfo?.locationId || undefined}
         style={{ cursor: 'grab', pointerEvents: 'auto', ...(isDropTarget ? { filter: 'drop-shadow(0 0 12px rgba(34,171,148,0.5))' } : undefined) }}
-        onMouseDown={handleHeaderDrag}
+        onPointerDown={handleHeaderDrag}
       />
       {/* Drop affordance: unmistakable "this is where it lands" pill —
           the tint alone read as "strange highlight" (Mike 2026-08-03). */}
@@ -531,31 +560,74 @@ export function FolderGroupRect({
         />
       )}
 
-      {/* Folder label — above the folder box */}
-      <text
-        x={bounds.x + 8}
-        y={bounds.y - 6}
-        fill={folder.type === 'party' ? 'var(--terminal-prime)' : color}
-        fontSize={labelFontSize}
-        fontWeight={700}
-        fontFamily="var(--font-terminal), Consolas, monospace"
-        letterSpacing="0.12em"
-        style={{ pointerEvents: 'none' }}
+      {/* Folder title — INSIDE the header bar (2026-10-06). Locations drop the
+          □ glyph: the portrait box is the icon slot. The depth prefix (one ▸
+          per level) stays, dimmed, so "inside inside" still reads. */}
+      <foreignObject
+        x={bounds.x + titleLeft}
+        y={bounds.y + titleTop}
+        width={titleAvailW}
+        height={titleLineH}
+        style={{ pointerEvents: 'none', overflow: 'visible' }}
       >
-        {folder.type === 'party' ? <><tspan letterSpacing="-0.53em">{'\u265F'}<tspan fontSize="1.15em">{'\u265F'}</tspan>{'\u265F'}</tspan>{' '}</> : '\u25A1 '}{folder.name.toUpperCase()}
-        <tspan fill={`${folder.type === 'party' ? '#22ab94' : color}99`} fontSize={countFontSize} dx={6}>
-          ({folder.nodeIds.length})
-        </tspan>
-      </text>
+        {/* The badge is a tooltip trigger AND still a drag handle: pointerdown
+            is forwarded to the header drag. data-folder-location-id lets the
+            touch carry gesture find the folder from a finger on the title. */}
+        <div
+          style={{ width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}
+          data-folder-location-id={li?.locationId || undefined}
+          data-folder-id={folder.id}
+        >
+          <ComplexTooltip
+            inline
+            disabled={!titleTip || isFolderDragging}
+            title={titleTip?.title ?? folder.name}
+            modifiers={titleTip?.modifiers ?? []}
+            totalValue={0}
+            totalLabel={titleTip?.totalLabel}
+            totalText={titleTip?.totalText}
+            hideTotal={titleTip?.hideTotal}
+            triggerStyle={{ ...tipTriggerStyle, maxWidth: '100%', verticalAlign: 'top', cursor: 'grab' }}
+            onTriggerPointerDown={handleHeaderDrag}
+          >
+          <div
+            style={{
+              display: 'inline-block',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              background: SOUL_BLUE, // #002f6c — Mike 2026-10-06: the badge blue is Soul blue, not surface-dark
+              color: 'var(--accent-gold, #D0A030)',
+              fontFamily: 'var(--font-bebas-neue), "Bebas Neue", Impact, sans-serif',
+              fontSize: titleFont,
+              fontWeight: 400,
+              letterSpacing: '0.05em',
+              lineHeight: 1.1,
+              padding: `2px ${TITLE_PAD_X}px`,
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              verticalAlign: 'top',
+              // Tape-strip edge: a hair off square, like the rulebook badges.
+              clipPath: 'polygon(0 3%, 100% 0, 99.7% 100%, 0.3% 96%)',
+            }}
+            title={folder.name}
+          >
+            {folder.type === 'party'
+              ? <><span style={{ letterSpacing: '-0.53em' }}>{'\u265F'}<span style={{ fontSize: '1.15em' }}>{'\u265F'}</span>{'\u265F'}</span>{' '}</>
+              : folder.locationInfo ? null : '\u25A1 '}
+            {depthPrefix(depth) && <span style={{ opacity: 0.55 }}>{depthPrefix(depth)}</span>}
+            {folder.name}
+            <span style={{ opacity: 0.6, fontSize: '0.8em', marginLeft: '0.35em' }}>({folder.nodeIds.length})</span>
+          </div>
+          </ComplexTooltip>
+        </div>
+      </foreignObject>
 
       {/* TKV readout (party folders only) — standard red label over purple number, slides right if label is too close */}
       {folder.type === 'party' && (() => {
         const tkvW = 320;
-        // Approximate label width: Consolas 36px + 0.12em letter-spacing ≈ 25px per char
-        const charWidth = labelFontSize * 0.7;
-        const labelChars = folder.name.length + ` (${folder.nodeIds.length})`.length;
-        const chessPieceW = folder.type === 'party' ? 50 : 0; // ♟♟♟ prefix
-        const labelRight = bounds.x + 8 + chessPieceW + labelChars * charWidth + 16;
+        const labelRight = bounds.x + titleLeft + titleEstW + 16;
         const centeredX = bounds.x + bounds.width / 2 - tkvW / 2;
         const tkvX = Math.max(centeredX, labelRight);
         return (
@@ -586,7 +658,7 @@ export function FolderGroupRect({
           counts. Renders only for Location auto-folders (those with
           locationInfo). Sits inside the 80 px header rectangle to the left
           of the KRMA reserve. */}
-      {folder.locationInfo && (
+      {showPortrait && folder.locationInfo && (
         <>
           {/* Portrait box */}
           <foreignObject
@@ -621,179 +693,163 @@ export function FolderGroupRect({
             </div>
           </foreignObject>
 
-          {/* AI Generate button (stub — pipeline TBD). The unified AI image
-              generation is the SOLE path for getting visuals onto entities.
-              No file upload — generation is the design constraint. */}
-          <foreignObject
-            x={bounds.x + 80}
-            y={bounds.y + 8}
-            width={120}
-            height={30}
-            style={{ pointerEvents: 'auto', overflow: 'visible' }}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                window.dispatchEvent(
-                  new CustomEvent('growth:ai-generate-image', {
-                    detail: {
-                      entityType: 'location',
-                      entityId: folder.locationInfo?.locationId,
-                      target: 'portrait',
-                    },
-                  }),
-                );
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                padding: '5px 10px',
-                background: 'rgba(0,0,0,0.6)',
-                border: '1px solid rgba(34,171,148,0.6)',
-                color: 'var(--terminal-prime)',
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                fontSize: 11,
-                letterSpacing: '0.08em',
-                cursor: 'pointer',
-                borderRadius: 2,
-                textShadow: '0 0 4px rgba(34,171,148,0.4)',
-              }}
-              title="Generate location portrait via the AI image pipeline"
-            >
-              ✨ GENERATE
-            </button>
-          </foreignObject>
-
-          {/* CRYSTALLIZE button — visible only when the location is in
-              PLANNING status. Fires a custom event the canvas catches
-              and turns into a confirmation modal. */}
-          {folder.locationInfo.status === 'PLANNING' && (
+          {/* Action row + content counts — the bar's second line, under the
+              title (2026-10-06). Near LOD only: at mid/far these 11px buttons
+              are unreadable and the title takes the whole bar. The row's own
+              surface passes pointer events through so the header still drags;
+              only the buttons catch them. */}
+          {showActionRow && folder.locationInfo && (
             <foreignObject
-              x={bounds.x + 340}
-              y={bounds.y + 8}
-              width={170}
-              height={30}
-              style={{ pointerEvents: 'auto', overflow: 'visible' }}
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.dispatchEvent(
-                    new CustomEvent('growth:crystallize-location', {
-                      detail: {
-                        locationId: folder.locationInfo?.locationId,
-                        locationName: folder.name,
-                        krmaReserve: folder.locationInfo?.krmaReserve,
-                        contentCounts: folder.locationInfo?.contentCounts,
-                      },
-                    }),
-                  );
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  padding: '5px 10px',
-                  background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
-                  border: '1px solid var(--krma-gold)',
-                  color: '#000',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  boxShadow: '0 0 12px rgba(255,204,120,0.5)',
-                }}
-                title="Crystallize: commit this location and its subtree to the active world"
-              >
-                ✦ CRYSTALLIZE
-              </button>
-            </foreignObject>
-          )}
-
-          {/* Drill-in button — re-focuses the canvas on this location's
-              interior. The drilled-in view shows only this location's
-              immediate children + a breadcrumb at the top of the canvas. */}
-          {onDrillIn && folder.locationInfo.locationId && (
-            <foreignObject
-              x={bounds.x + 210}
-              y={bounds.y + 8}
-              width={120}
-              height={30}
-              style={{ pointerEvents: 'auto', overflow: 'visible' }}
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDrillIn(folder.locationInfo!.locationId);
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  padding: '5px 10px',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,204,120,0.6)',
-                  color: 'var(--krma-gold)',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  textShadow: '0 0 4px rgba(255,204,120,0.4)',
-                }}
-                title="Drill in: focus the canvas on this location's interior"
-              >
-                ▸ ENTER
-              </button>
-            </foreignObject>
-          )}
-
-          {/* Content-type count row */}
-          {folder.locationInfo.contentCounts && (
-            <foreignObject
-              x={bounds.x + 80}
+              x={bounds.x + 84}
               y={bounds.y + 44}
-              width={500}
-              height={28}
+              width={titleAvailW}
+              height={32}
               style={{ pointerEvents: 'none', overflow: 'visible' }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 18,
-                  alignItems: 'center',
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  fontSize: 22,
-                  color: 'rgba(255,255,255,0.8)',
-                }}
-              >
-                {(folder.locationInfo.contentCounts.locations ?? 0) > 0 && (
-                  <span title="Sub-locations">
-                    <span style={{ color: 'var(--terminal-prime)', marginRight: 4 }}>⌂</span>
-                    {folder.locationInfo.contentCounts.locations}
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 30, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                {/* AI Generate button (stub — pipeline TBD). The unified AI image
+                    generation is the SOLE path for getting visuals onto entities.
+                    No file upload — generation is the design constraint. */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.dispatchEvent(
+                      new CustomEvent('growth:ai-generate-image', {
+                        detail: {
+                          entityType: 'location',
+                          entityId: folder.locationInfo?.locationId,
+                          target: 'portrait',
+                        },
+                      }),
+                    );
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  style={{
+                    pointerEvents: 'auto',
+                    padding: '5px 10px',
+                    background: 'rgba(0,0,0,0.6)',
+                    border: '1px solid rgba(34,171,148,0.6)',
+                    color: 'var(--terminal-prime)',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    cursor: 'pointer',
+                    borderRadius: 2,
+                    textShadow: '0 0 4px rgba(34,171,148,0.4)',
+                  }}
+                  title="Generate location portrait via the AI image pipeline"
+                >
+                  ✨ GENERATE
+                </button>
+
+                {/* Drill-in button — re-focuses the canvas on this location's
+                    interior. The drilled-in view shows only this location's
+                    immediate children + a breadcrumb at the top of the canvas. */}
+                {onDrillIn && folder.locationInfo.locationId && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDrillIn(folder.locationInfo!.locationId);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    style={{
+                      pointerEvents: 'auto',
+                      padding: '5px 10px',
+                      background: 'rgba(0,0,0,0.6)',
+                      border: '1px solid rgba(255,204,120,0.6)',
+                      color: 'var(--krma-gold)',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      fontSize: 11,
+                      letterSpacing: '0.08em',
+                      cursor: 'pointer',
+                      borderRadius: 2,
+                      textShadow: '0 0 4px rgba(255,204,120,0.4)',
+                    }}
+                    title="Drill in: focus the canvas on this location's interior"
+                  >
+                    ▸ ENTER
+                  </button>
                 )}
-                {(folder.locationInfo.contentCounts.characters ?? 0) > 0 && (
-                  <span title="Characters / PCs">
-                    <span style={{ color: 'var(--pillar-body)', marginRight: 4 }}>✴</span>
-                    {folder.locationInfo.contentCounts.characters}
-                  </span>
+
+                {/* CRYSTALLIZE button — visible only when the location is in
+                    PLANNING status. Fires a custom event the canvas catches
+                    and turns into a confirmation modal. */}
+                {folder.locationInfo.status === 'PLANNING' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(
+                        new CustomEvent('growth:crystallize-location', {
+                          detail: {
+                            locationId: folder.locationInfo?.locationId,
+                            locationName: folder.name,
+                            krmaReserve: folder.locationInfo?.krmaReserve,
+                            contentCounts: folder.locationInfo?.contentCounts,
+                          },
+                        }),
+                      );
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    style={{
+                      pointerEvents: 'auto',
+                      padding: '5px 10px',
+                      background: 'linear-gradient(135deg, var(--krma-gold), #d09f55)',
+                      border: '1px solid var(--krma-gold)',
+                      color: '#000',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      fontSize: 11,
+                      letterSpacing: '0.12em',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      borderRadius: 2,
+                      boxShadow: '0 0 12px rgba(255,204,120,0.5)',
+                    }}
+                    title="Crystallize: commit this location and its subtree to the active world"
+                  >
+                    ✦ CRYSTALLIZE
+                  </button>
                 )}
-                {(folder.locationInfo.contentCounts.npcs ?? 0) > 0 && (
-                  <span title="NPCs">
-                    <span style={{ color: 'var(--krma-gold)', marginRight: 4 }}>✴</span>
-                    {folder.locationInfo.contentCounts.npcs}
-                  </span>
-                )}
-                {(folder.locationInfo.contentCounts.items ?? 0) > 0 && (
-                  <span title="Items">
-                    <span style={{ color: '#8e7cc3', marginRight: 4 }}>❖</span>
-                    {folder.locationInfo.contentCounts.items}
-                  </span>
+
+                {/* Content-type counts, same line, after the actions */}
+                {folder.locationInfo.contentCounts && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 18,
+                      alignItems: 'center',
+                      marginLeft: 10,
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
+                      fontSize: 22,
+                      color: 'rgba(255,255,255,0.8)',
+                    }}
+                  >
+                    {([
+                      { kind: 'locations' as const, glyph: '⌂', color: 'var(--terminal-prime)', count: folder.locationInfo.contentCounts.locations ?? 0, names: subNames, chars: undefined },
+                      { kind: 'characters' as const, glyph: '✴', color: 'var(--pillar-body)', count: folder.locationInfo.contentCounts.characters ?? 0, names: null, chars: folderChars },
+                      { kind: 'npcs' as const, glyph: '✴', color: 'var(--krma-gold)', count: folder.locationInfo.contentCounts.npcs ?? 0, names: null, chars: folderChars },
+                      { kind: 'items' as const, glyph: '❖', color: '#8e7cc3', count: folder.locationInfo.contentCounts.items ?? 0, names: itemNames, chars: undefined },
+                    ]).filter(c => c.count > 0).map(c => {
+                      const tip = countTooltip(c.kind, c.count, c.names, c.chars);
+                      return (
+                        <ComplexTooltip key={c.kind} inline title={tip.title} modifiers={tip.modifiers} totalValue={0} hideTotal
+                          disabled={isFolderDragging} triggerStyle={tipTriggerStyle} onTriggerPointerDown={handleHeaderDrag}>
+                          <span>
+                            <span style={{ color: c.color, marginRight: 4 }}>{c.glyph}</span>
+                            {c.count}
+                          </span>
+                        </ComplexTooltip>
+                      );
+                    })}
+                  </div>
                 )}
                 {folder.locationInfo.locationType && (
                   <span
+                    // Phones (< md): 14px world units and brighter, else it is a 10px smudge.
+                    // Desktop keeps 10px / 40% exactly (md: classes).
+                    className="text-[14px] md:text-[10px] text-white/70 md:text-white/40"
                     style={{
                       marginLeft: 'auto',
-                      fontSize: 10,
-                      color: 'rgba(255,255,255,0.4)',
+                      fontFamily: 'var(--font-terminal), Consolas, monospace',
                       textTransform: 'uppercase',
                       letterSpacing: '0.12em',
                     }}
@@ -839,9 +895,15 @@ export function FolderGroupRect({
                 >
                   {'▸'} dETAILS
                 </button>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {folder.locationInfo.description || <span style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>(no description)</span>}
-                </span>
+                {(() => {
+                  const tip = detailsTooltip(folder.locationInfo);
+                  return (
+                    <ComplexTooltip title={tip.title} modifiers={tip.modifiers} totalValue={0} hideTotal disabled={isFolderDragging}
+                      triggerStyle={{ flex: 1, minWidth: 0, width: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'help' }}>
+                      {folder.locationInfo.description || <span style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.3)' }}>(no description)</span>}
+                    </ComplexTooltip>
+                  );
+                })()}
               </div>
             </foreignObject>
           )}
@@ -1000,9 +1062,7 @@ export function FolderGroupRect({
           return n.toLocaleString();
         };
         const kW = 320;
-        const charWidth = labelFontSize * 0.7;
-        const labelChars = folder.name.length + ` (${folder.nodeIds.length})`.length;
-        const labelRight = bounds.x + 8 + labelChars * charWidth + 16;
+        const labelRight = bounds.x + titleLeft + titleEstW + 16;
         const centeredX = bounds.x + bounds.width / 2 - kW / 2;
         const kX = Math.max(centeredX, labelRight);
         return (
@@ -1095,116 +1155,93 @@ export function FolderGroupRect({
         </button>
       </foreignObject>
 
-      {/* Resize handles — only when expanded */}
-      {!collapsed && (
-        <>
-          {/* Right edge */}
-          <rect
-            x={bounds.x + bounds.width - HANDLE_SIZE / 2}
-            y={bounds.y + displayHeight / 2 - 40}
-            width={HANDLE_SIZE}
-            height={80}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'right' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'right')}
-          />
-          {/* Left edge */}
-          <rect
-            x={bounds.x - HANDLE_SIZE / 2}
-            y={bounds.y + displayHeight / 2 - 40}
-            width={HANDLE_SIZE}
-            height={80}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'left' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ew-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'left')}
-          />
-          {/* Bottom edge */}
-          <rect
-            x={bounds.x + bounds.width / 2 - 40}
-            y={bounds.y + displayHeight - HANDLE_SIZE / 2}
-            width={80}
-            height={HANDLE_SIZE}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'bottom' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'bottom')}
-          />
-          {/* Bottom-right corner */}
-          <rect
-            x={bounds.x + bounds.width - HANDLE_SIZE}
-            y={bounds.y + displayHeight - HANDLE_SIZE}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'corner')}
-          />
-          {/* Bottom-left corner */}
-          <rect
-            x={bounds.x}
-            y={bounds.y + displayHeight - HANDLE_SIZE}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'left-corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'left-corner')}
-          />
-          {/* Top edge — straddles the boundary so it never fights the
-              title-bar drag inside the header chrome */}
-          <rect
-            x={bounds.x + bounds.width / 2 - 40}
-            y={bounds.y - HANDLE_SIZE / 2}
-            width={80}
-            height={HANDLE_SIZE}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'top' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'ns-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'top')}
-          />
-          {/* Top-right corner */}
-          <rect
-            x={bounds.x + bounds.width - HANDLE_SIZE / 2}
-            y={bounds.y - HANDLE_SIZE / 2}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'top-corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nesw-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'top-corner')}
-          />
-          {/* Top-left corner */}
-          <rect
-            x={bounds.x - HANDLE_SIZE / 2}
-            y={bounds.y - HANDLE_SIZE / 2}
-            width={HANDLE_SIZE}
-            height={HANDLE_SIZE}
-            rx={3}
-            fill={`${color}${resizing?.edge === 'top-left-corner' ? 'aa' : '66'}`}
-            stroke={`${color}44`}
-            strokeWidth={1}
-            style={{ cursor: 'nwse-resize', pointerEvents: 'auto' }}
-            onMouseDown={(e) => handleResizeStart(e, 'top-left-corner')}
-          />
-        </>
-      )}
+      {/* "Who is here" chips (2026-09-28): every character in this place, as a
+          portrait/initials chip in the header bar — the room's headline is its people. */}
+      {!collapsed && folder.locationInfo && folderChars.length > 0 && (() => {
+        const CHIP = 26, STEP = 60, MAX = 6;
+        const shown = folderChars.slice(0, MAX);
+        const extra = folderChars.length - shown.length;
+        const slots = shown.length + (extra > 0 ? 1 : 0);
+        const rightEdge = bounds.x + bounds.width - toggleSize - 28;
+        const rowW = slots * STEP;
+        // HTML chips (not SVG circles) so each one can be a ComplexTooltip
+        // trigger — hover for the person's pillars, inception into each pillar.
+        return (
+          <foreignObject
+            x={rightEdge - rowW - CHIP}
+            y={bounds.y + 40 - CHIP - 4}
+            width={rowW}
+            height={2 * CHIP + 8}
+            style={{ pointerEvents: 'none', overflow: 'visible' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: STEP - 2 * CHIP, height: 2 * CHIP + 8 }}>
+              {shown.map((c) => {
+                const initials = c.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                const tip = characterChipTooltip(c);
+                return (
+                  <ComplexTooltip key={c.id} inline title={tip.title} modifiers={tip.modifiers} totalValue={0}
+                    totalLabel={tip.totalLabel} totalText={tip.totalText} disabled={isFolderDragging}
+                    triggerStyle={tipTriggerStyle} onTriggerPointerDown={handleHeaderDrag}>
+                    <div
+                      title={c.name}
+                      style={{
+                        width: 2 * CHIP, height: 2 * CHIP, borderRadius: '50%', boxSizing: 'border-box',
+                        background: '#0d0d1a', border: '3px solid var(--krma-gold)', overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {c.portrait ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.portrait} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontWeight: 700, fontSize: CHIP * 1.05, color: 'var(--krma-gold)', lineHeight: 1 }}>{initials}</span>
+                      )}
+                    </div>
+                  </ComplexTooltip>
+                );
+              })}
+              {extra > 0 && (
+                <span style={{ width: 2 * CHIP, textAlign: 'center', fontSize: 22, color: '#CBD9E8', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>+{extra}</span>
+              )}
+            </div>
+          </foreignObject>
+        );
+      })()}
+
+      {/* THE resize handle — bottom-right corner only (Mike 2026-10-06). The
+          hit area is handleSize square (52 on a finger, 36 on a mouse); the
+          visible grip is three short diagonal strokes tucked into the corner,
+          brighter while dragging. Only when expanded. */}
+      {!collapsed && (() => {
+        const hx = bounds.x + bounds.width - handleSize;
+        const hy = bounds.y + displayHeight - handleSize;
+        const gripAlpha = resizing ? 'ee' : '99';
+        const grip = (inset: number) => ({
+          x1: bounds.x + bounds.width - 6 - inset, y1: bounds.y + displayHeight - 6,
+          x2: bounds.x + bounds.width - 6, y2: bounds.y + displayHeight - 6 - inset,
+        });
+        return (
+          <g data-resize-handle="corner">
+            {/* data-no-hold: the canvas touch tracker must leave this pointerdown
+                alone (no pan, no carry) so a finger can resize from the corner. */}
+            <rect
+              x={hx}
+              y={hy}
+              width={handleSize}
+              height={handleSize}
+              rx={4}
+              fill={resizing ? `${color}33` : 'transparent'}
+              style={{ cursor: 'nwse-resize', pointerEvents: 'auto', touchAction: 'none' }}
+              data-no-hold
+              onPointerDown={handleResizeStart}
+            />
+            {[8, 15, 22].map(inset => {
+              const g = grip(inset);
+              return <line key={inset} {...g} stroke={`${color}${gripAlpha}`} strokeWidth={2} strokeLinecap="round" style={{ pointerEvents: 'none' }} />;
+            })}
+          </g>
+        );
+      })()}
     </g>
   );
 }
@@ -1260,8 +1297,8 @@ export default function FolderGroup({
   }, [folder.id]);
 
   const content = useMemo(
-    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects),
-    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects]
+    () => calcContentBounds(folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, folderLabelSize(zoom) + 16),
+    [folder, nodePositions, dragOffsets, nodeTypes, expandedNodes, childFolderRects, zoom]
   );
 
   const bounds = useMemo(() => {

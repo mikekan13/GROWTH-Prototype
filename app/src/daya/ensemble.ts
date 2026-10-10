@@ -17,6 +17,8 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { currentCycleOf } from '@/services/history';
+import { refreshFamiliarityByThought } from '@/services/familiarity-thought';
+import { parseSegments } from '@/lib/feed-segments';
 import type { GrowthCharacter } from '@/types/growth';
 
 import { resolveDayaEntityId } from './entity';
@@ -26,6 +28,7 @@ import { ingestStimulus, writeMemoryEntry } from './memory';
 import { recall, stemmedJaccard } from './recall';
 import { render, type Observer, type BiasProfile, type VoiceParams, type AffectVector } from './renderer';
 import { currentFacts, type WorldFactRecord } from './world-ledger';
+import { perceive } from './perceive';
 import { resolveIntent, type AdjudicationResult, type MechanicsRollHook } from './adjudicator';
 import { enforceSeal } from './seal';
 import { runJewlToolAction } from './jewl-action';
@@ -34,8 +37,27 @@ import {
   buildDesiresBlock,
   toWantClause,
   parseSpiritOutput,
+  buildSpiritListeningPrompt,
+  buildSpiritAnsweringPrompt,
+  LISTENING_MAX_TOKENS,
+  ANSWERING_MAX_TOKENS,
   type DesireSourceItem,
+  type SpiritAsk,
 } from './prompts/roles/spirit';
+import {
+  ListenQueue,
+  settledWithin,
+  createSpeechGate,
+  foldPerception,
+  getListening,
+  setListening,
+  ANSWER_LISTEN_CAP_MS,
+  SOUL_REFRESH_MS,
+  HEARD_KEEP,
+  type BeingSpeakingEvent,
+  type GateKind,
+  type ListeningState,
+} from './listening';
 import { buildSoulPrompt, buildDeltaSummary } from './prompts/roles/soul';
 import {
   buildBodyOutwardPrompt,
@@ -62,6 +84,8 @@ interface PersonaProfileData {
    * step through the unrestricted copilot tool dispatch, instead of the
    * default self-only path every other entity uses. */
   omniscient?: boolean;
+  /** Mike 09-23: a Godhead is the same mechanism with a godlike sheet — recall threshold zero, budget everything, unfoolable except on purpose. */
+  godlike?: boolean;
 }
 
 function parsePersonaProfile(raw: string): PersonaProfileData {
@@ -91,7 +115,7 @@ interface EntityContext {
   sheet: Partial<GrowthCharacter> | null;
   persona: PersonaProfileData;
   mood: AffectVector;
-  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number };
+  soulState: { wisdomMax: number; wisdomCur: number; witMax: number; witCur: number; godlike?: boolean };
 }
 
 async function loadEntityContext(characterId: string): Promise<EntityContext> {
@@ -118,6 +142,7 @@ async function loadEntityContext(characterId: string): Promise<EntityContext> {
     wisdomCur: wisdom ? wisdom.current : 10,
     witMax: wit ? wit.level + wit.augmentPositive - wit.augmentNegative : 10,
     witCur: wit ? wit.current : 10,
+    godlike: persona.godlike === true || persona.omniscient === true,
   };
 
   return { characterId, entityDaId, campaignId, cycle, name: character.name, sheet, persona, mood, soulState };
@@ -264,24 +289,34 @@ async function runBodyInward(
 // ── Attention rendering (Attend: -> renderer, depth-capped recursion) ────
 
 async function renderAttention(ctx: EntityContext, attendContent: string, overrides: DayaClientOverrides): Promise<string> {
-  if (!ctx.campaignId) return 'Nothing more comes into focus.';
-  const facts = await currentFacts(ctx.campaignId);
-  if (facts.length === 0) return 'Nothing more comes into focus.';
-
-  let best = facts[0];
-  let bestScore = -1;
-  for (const f of facts) {
-    const score = stemmedJaccard(attendContent, `${f.subjectKey} ${f.fact}`);
-    if (score > bestScore) {
-      bestScore = score;
-      best = f;
+  // Per-entity believed world (Mike 09-05 senses contract; MEMORY-DESIGN §5):
+  // a being attends to what IT has perceived — its own perception/dialogue/
+  // seed memories — never the campaign's global fact list. Only an omniscient
+  // (JEWL-tier) entity reads the Terminal's truth directly.
+  let best: { subjectKey: string; fact: string } | null = null;
+  if (ctx.persona.omniscient) {
+    if (!ctx.campaignId) return 'Nothing more comes into focus.';
+    const facts = await currentFacts(ctx.campaignId);
+    let bestScore = -1;
+    for (const f of facts) {
+      const score = stemmedJaccard(attendContent, `${f.subjectKey} ${f.fact}`);
+      if (score > bestScore) { bestScore = score; best = { subjectKey: f.subjectKey, fact: f.fact }; }
+    }
+  } else {
+    const own = await prisma.dayaMemoryEntry.findMany({
+      where: { entityId: ctx.entityDaId, source: { in: ['perception', 'dialogue', 'seed'] } },
+      select: { id: true, content: true },
+      orderBy: { realTime: 'desc' },
+      take: 400,
+    });
+    let bestScore = -1;
+    for (const m of own) {
+      const score = stemmedJaccard(attendContent, m.content);
+      if (score > bestScore) { bestScore = score; best = { subjectKey: `memory:${m.id}`, fact: m.content }; }
     }
   }
+  if (!best) return 'Nothing more comes into focus.';
 
-  // Omniscient perception (WP13 spec §2-2): a JEWL-tier entity's ensemble
-  // uses the renderer's Terminal-truth bypass for ALL perception — he sees
-  // True Sheets, never a Believed/rendered view. Every other entity keeps
-  // its own attunement/bias/mood lens, unchanged.
   const observer: Observer = ctx.persona.omniscient
     ? { entityId: null, attunement: 1, biasProfile: {}, mood: ctx.mood, voice: ctx.persona.voice ?? {} }
     : {
@@ -309,7 +344,7 @@ const ATTEND_DEPTH_CAP = 1;
 async function runStimulusPipeline(
   characterId: string,
   source: string,
-  content: string,
+  truthContent: string,
   depth: number,
   overrides: DayaClientOverrides,
 ): Promise<HandlerResult> {
@@ -319,11 +354,30 @@ async function runStimulusPipeline(
   // pre-WP13 behavior.
   const omniscient = ctx.persona.omniscient === true;
 
+  // 0. The murky mirror (Mike 09-26): the world never reaches a being raw.
+  // Perception and dialogue are composed with the place the being stands in
+  // (who is present, what is there, the standing facts), filtered by its
+  // senses and rendered through its own observer. Everything downstream —
+  // thorns, recall, soul, spirit — reacts to what was PERCEIVED. Godlike
+  // beings and depth>0 attention re-entries skip it.
+  let content = truthContent;
+  let mirrorAudit: Record<string, unknown> | undefined;
+  if ((source === 'perception' || source === 'dialogue') && depth === 0 && !omniscient && !ctx.soulState.godlike && ctx.campaignId) {
+    try {
+      const p = await perceive(characterId, ctx.campaignId, truthContent, source, overrides);
+      content = p.prose;
+      mirrorAudit = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, truthChars: truthContent.length, observer: p.observer } };
+    } catch (err) {
+      console.error('[daya/ensemble] perception composer failed; stimulus ingested raw (non-fatal):', err);
+    }
+  }
+
   // 1. Tagger: ingest + classify. OOC content is processed but never
   // persisted (WP6 residency law) — and never wakes Spirit, since it isn't
   // lived experience.
-  const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content }, overrides);
+  const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source, content, extraClassification: mirrorAudit }, overrides);
   if (!ingest.persisted) {
+    console.log(`[daya/ensemble] ${source} for ${ctx.name} classified ${ingest.tags.classification.icOoc} (${ingest.tags.classification.rationaleTag ?? 'no rationale'}) — not persisted, loop ends`);
     return {};
   }
 
@@ -338,7 +392,14 @@ async function runStimulusPipeline(
     isRuminationLockActive(ctx.entityDaId),
   ]);
 
-  // 2. Recall (stat-gated). Crosses into the phenomenal zone -> sealed.
+  // 2. Recall (stat-gated, ladder-ordered — Mike 09-23: survival → goals → domain → chain → words).
+  // Survival is DERIVED here from the sheet + this moment, never authored.
+  const activeGoals = await prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } });
+  const freq = ctx.sheet?.attributes?.frequency;
+  const situation = {
+    threatened: ingest.tags.arousal >= 0.7 && ingest.tags.valence < 0,
+    frequencyLow: !!freq && freq.level > 0 && freq.current <= freq.level * 0.25,
+  };
   const recallResult = await recall(
     {
       entityId: ctx.entityDaId,
@@ -348,6 +409,8 @@ async function runStimulusPipeline(
       thornBlocks: activeThornBlocks,
       nowCycle: ctx.cycle,
       ruminationLockActive,
+      goals: activeGoals,
+      situation,
     },
     overrides,
   );
@@ -428,12 +491,12 @@ async function runStimulusPipeline(
         salience: 0.2,
         classification: { contentCategory: 'dialogue', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'own words spoken' },
       });
-      return { memoryEntryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
+      return { memoryEntryId: ingest.memoryEntryId, spokenMemoryId: memory.id, action: { kind: 'speak', content: speakSealed.text } };
     }
 
     case 'act': {
       if (!ctx.campaignId) {
-        return { action: { kind: 'act', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
       // Unrestricted action (WP13 spec §2-3): a JEWL-tier entity's 'Do:'
@@ -458,7 +521,7 @@ async function runStimulusPipeline(
           salience: 0.3,
           classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'unrestricted action dispatch' },
         });
-        return { action: { kind: 'act', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
       }
 
       const facts = await currentFacts(ctx.campaignId);
@@ -492,12 +555,12 @@ async function runStimulusPipeline(
         { kind: 'adjudication_result', entityId: characterId, payload: adjudication as unknown as Record<string, unknown> },
         overrides,
       );
-      return { action: { kind: 'act', content: action.content } };
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'act', content: action.content } };
     }
 
     case 'attend': {
       if (depth >= ATTEND_DEPTH_CAP) {
-        return { action: { kind: 'attend', content: action.content } };
+        return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'attend', content: action.content } };
       }
       const rendered = await renderAttention(ctx, action.content, overrides);
       return runStimulusPipeline(characterId, 'perception', rendered, depth + 1, overrides);
@@ -523,7 +586,7 @@ async function runStimulusPipeline(
         salience: 0.05,
         classification: { contentCategory: 'perception', sensitivity: 'safe', icOoc: 'IC', rationaleTag: 'rest, no action' },
       });
-      return { action: { kind: 'rest' } };
+      return { memoryEntryId: ingest.memoryEntryId, action: { kind: 'rest' } };
     }
   }
 }
@@ -673,3 +736,466 @@ registerHandler('vine_tick', (trigger, overrides) => {
 // through the full trigger-kind dispatch in events.ts.
 export { runStimulusPipeline };
 export type { AdjudicationResult };
+
+// ── The split loop (U2b, TABLE-RHYTHM-DESIGN-2026-10-01 §1) ───────────────
+// The table's four beats are the loop's clock. While the GM holds the floor a
+// being LISTENS (listenStimulus): mirror → memory → recall → felt state → a
+// short monologue, none of it on a clock. At the ask it ANSWERS (answerAsk):
+// one short streamed call built on what listening left behind.
+// runStimulusPipeline above is untouched and keeps serving its own callers.
+
+export interface TableStimulus {
+  source: 'perception' | 'dialogue';
+  content: string;
+}
+
+export interface ListenTimings {
+  perceiveMs: number;
+  ingestMs: number;
+  recallMs: number;
+  /** null = the felt-state brief was recent enough to reuse. */
+  soulMs: number | null;
+  spiritMs: number;
+  totalMs: number;
+  /** 'full' = took the whole place in; 'new' = only the stimulus and what changed; 'raw' = unmirrored (godlike, or the mirror failed). */
+  standing: 'full' | 'new' | 'raw';
+}
+
+export interface ListenResult {
+  /** 'not_lived' = the tagger classed it out-of-character: processed, never persisted, nothing carried forward. */
+  status: 'listened' | 'not_lived';
+  /** The memory row that IS the perception — what truthRef should point at. */
+  memoryEntryId?: string;
+  /** false when the monologue call failed or tripped the seal; the earlier inner state stands. */
+  innerUpdated: boolean;
+  timings: ListenTimings;
+}
+
+const FELT_FALLBACK = 'Right now, in your body and mood: steady, holding your own.';
+
+function isMirrored(ctx: EntityContext): boolean {
+  return ctx.persona.omniscient !== true && !ctx.soulState.godlike && !!ctx.campaignId;
+}
+
+/**
+ * One stretch of listening for one being. Call it through listenAtTable so
+ * stretches for the same being never overlap.
+ */
+export async function listenStimulus(
+  characterId: string,
+  stimulus: TableStimulus,
+  overrides: DayaClientOverrides = {},
+): Promise<ListenResult> {
+  const t0 = Date.now();
+  const ctx = await loadEntityContext(characterId);
+  const omniscient = ctx.persona.omniscient === true;
+  const prior = getListening(characterId);
+
+  // The mirror. The place is taken in once; after that a stretch carries only itself and what changed there.
+  let content = stimulus.content;
+  let standing: ListenTimings['standing'] = 'raw';
+  let locationId = prior?.locationId ?? null;
+  let mirrorAudit: Record<string, unknown> | undefined;
+  if (isMirrored(ctx)) {
+    try {
+      const p = await perceive(characterId, ctx.campaignId!, stimulus.content, stimulus.source, overrides, { standing: 'once' });
+      content = p.prose;
+      standing = p.standing;
+      locationId = p.locationId;
+      mirrorAudit = { mirror: { fidelityLevel: p.fidelityLevel, distortions: p.distortions, locationId: p.locationId, truthLines: p.truthLines, truthChars: stimulus.content.length, observer: p.observer, standing: p.standing } };
+    } catch (err) {
+      console.error('[daya/ensemble] perception composer failed while listening; stretch ingested raw (non-fatal):', err);
+    }
+  }
+  const tPerceived = Date.now();
+
+  // Felt state runs beside the tagger; mood does not turn every few seconds, so a recent brief is reused.
+  const soulFresh = !!prior?.feltStateBrief && tPerceived - prior.feltAt < SOUL_REFRESH_MS;
+  const runSoul = async () => { const s = Date.now(); const brief = await runSoulSim(ctx, overrides); return { brief, ms: Date.now() - s }; };
+  const soulPending = soulFresh ? null : runSoul();
+  const desiresPending = buildDesiresBlockForCharacter(characterId);
+
+  const [ingest, desiresBlock] = await Promise.all([
+    ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: stimulus.source, content, extraClassification: mirrorAudit }, overrides),
+    desiresPending,
+  ]);
+  const tIngested = Date.now();
+  if (!ingest.persisted) {
+    const soul = soulPending ? await soulPending : null;
+    return { status: 'not_lived', innerUpdated: false, timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: 0, soulMs: soul?.ms ?? null, spiritMs: 0, totalMs: Date.now() - t0, standing } };
+  }
+
+  // Thorns and recall react to what was PERCEIVED, exactly as in the serial pipeline.
+  const [thornFire, activeThornBlocks, ruminationLockActive, activeGoals] = await Promise.all([
+    detectAndFireThorns({ characterId, entityDaId: ctx.entityDaId, cycle: ctx.cycle, stimulusContent: content }),
+    loadActiveThornBlocks(ctx.entityDaId),
+    isRuminationLockActive(ctx.entityDaId),
+    prisma.goal.findMany({ where: { characterId, status: 'ACTIVE' }, select: { id: true, description: true } }),
+  ]);
+  const freq = ctx.sheet?.attributes?.frequency;
+  const recallResult = await recall(
+    {
+      entityId: ctx.entityDaId,
+      cue: content,
+      mood: ctx.mood,
+      soulState: ctx.soulState,
+      thornBlocks: activeThornBlocks,
+      nowCycle: ctx.cycle,
+      ruminationLockActive,
+      goals: activeGoals,
+      situation: {
+        threatened: ingest.tags.arousal >= 0.7 && ingest.tags.valence < 0,
+        frequencyLow: !!freq && freq.level > 0 && freq.current <= freq.level * 0.25,
+      },
+    },
+    overrides,
+  );
+  const rawRecallBlock = [recallResult.prose ?? recallResult.failedFeel ?? 'Nothing in particular comes to mind.', ...thornFire.fired.map((f) => f.feltLine)]
+    .filter(Boolean)
+    .join(' ');
+  const recallBlock = omniscient
+    ? rawRecallBlock
+    : (await enforceSeal(rawRecallBlock, { entityId: ctx.entityDaId, subsystem: 'recall', fallback: 'Something stirs, but nothing clear enough to name.' })).text;
+  const tRecalled = Date.now();
+
+  // A thorn that just fired moved the mood: the brief is taken again even if it was fresh.
+  const soul = soulPending ? await soulPending : thornFire.fired.length ? await runSoul() : null;
+  const soulMs = soul?.ms ?? null;
+  const feltStateBrief = soul?.brief ?? prior?.feltStateBrief ?? FELT_FALLBACK;
+  const feltAt = soul ? Date.now() : prior?.feltAt ?? 0;
+
+  // The monologue: what goes through the being while someone else has the floor. Nothing is said.
+  const tSpirit = Date.now();
+  const fullTake = standing === 'full' || !prior?.standingScene;
+  let innerState = prior?.innerState ?? '';
+  let innerUpdated = false;
+  try {
+    const prompt = buildSpiritListeningPrompt({
+      name: ctx.name,
+      identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
+      voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, her own cadence.',
+      feltStateBrief,
+      standingScene: fullTake ? content : prior!.standingScene,
+      recallBlock,
+      desiresBlock,
+      innerSoFar: innerState,
+      heard: fullTake ? 'You are only now taking in where you are.' : content,
+    });
+    const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
+    const sealed = omniscient ? { text: raw, usedFallback: false } : await enforceSeal(raw, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
+    if (!sealed.usedFallback && sealed.text) {
+      innerState = sealed.text;
+      innerUpdated = true;
+    }
+  } catch (err) {
+    console.error('[daya/ensemble] listening monologue failed; earlier inner state stands (non-fatal):', err);
+  }
+  // Thinking about it refreshes it: what the monologue dwells on, if already known, does not fade (familiarity-thought).
+  if (innerUpdated && !omniscient && !ctx.soulState.godlike) {
+    await refreshFamiliarityByThought({ perceiverId: ctx.entityDaId, texts: [innerState], refs: { memoryId: ingest.memoryEntryId ?? null } })
+      .catch((err) => console.warn('[daya/ensemble] familiarity refresh by thought failed (non-fatal):', err));
+  }
+  const tDone = Date.now();
+
+  // Fold into the LATEST state: an answer may have been given while this stretch was being worked.
+  const folded = foldPerception(getListening(characterId), { prose: content, standing: standing === 'full' ? 'full' : 'new', locationId }, tDone);
+  setListening(characterId, { ...folded, innerState, feltStateBrief, feltAt, recallBlock, desiresBlock });
+
+  return {
+    status: 'listened',
+    memoryEntryId: ingest.memoryEntryId,
+    innerUpdated,
+    timings: { perceiveMs: tPerceived - t0, ingestMs: tIngested - tPerceived, recallMs: tRecalled - tIngested, soulMs, spiritMs: tDone - tSpirit, totalMs: tDone - t0, standing },
+  };
+}
+
+interface QueuedListen {
+  stimulus: TableStimulus;
+  overrides: DayaClientOverrides;
+  result?: ListenResult;
+  error?: unknown;
+}
+
+/** Stretches joined in the order they were said; narration anywhere in them makes the whole a perception. */
+function joinStimuli(batch: TableStimulus[]): TableStimulus {
+  if (batch.length === 1) return batch[0];
+  return { source: batch.some((b) => b.source === 'perception') ? 'perception' : 'dialogue', content: batch.map((b) => b.content).join('\n') };
+}
+
+const listenQueue = new ListenQueue<QueuedListen>(async (characterId, batch) => {
+  try {
+    const result = await listenStimulus(characterId, joinStimuli(batch.map((b) => b.stimulus)), batch[0].overrides);
+    for (const item of batch) item.result = result;
+  } catch (err) {
+    for (const item of batch) item.error = err;
+  }
+});
+
+/**
+ * Hand a being one stretch of what is happening at the table. One listen runs
+ * at a time per being; stretches that arrive meanwhile are joined into the
+ * next one. Resolves with that listen's result — or null when an answer took
+ * the stretch over before it started (answerAsk then digests and stores it).
+ */
+export async function listenAtTable(
+  characterId: string,
+  stimulus: TableStimulus,
+  overrides: DayaClientOverrides = {},
+): Promise<ListenResult | null> {
+  const item: QueuedListen = { stimulus, overrides };
+  await listenQueue.push(characterId, item);
+  if (item.error) throw item.error;
+  return item.result ?? null;
+}
+
+/** What turned the moment to the being: the GM handing over the turn, or someone speaking to it. */
+export type TableAsk =
+  | { kind: 'turn' }
+  | { kind: 'spoken'; by: string; text: string };
+
+export interface AnswerTimings {
+  /** Time spent waiting on a listen still in flight (at most ANSWER_LISTEN_CAP_MS). */
+  waitMs: number;
+  /** 'complete' = built on a finished listen; 'capped' = the cap ran out and the rest went through the unvoiced envelope; 'none' = nothing had been listened to. */
+  listen: 'complete' | 'capped' | 'none';
+  /** Model call sent → first piece of text. */
+  ttftMs: number | null;
+  /** Ask received → first word shown. */
+  firstWordMs: number | null;
+  /** Ask received → the final line ready. */
+  lineMs: number;
+  tokensOut: number;
+  retracted: boolean;
+  revoiced: boolean;
+}
+
+export interface AnswerResult {
+  utteranceId: string;
+  action: { kind: GateKind; content?: string };
+  timings: AnswerTimings;
+  /** Settles once the bookkeeping behind the line is done (memory rows, the act). Never rejects. */
+  after: Promise<{ memoryEntryId?: string; spokenMemoryId?: string }>;
+}
+
+/** Same steps as the 'act' branch of runStimulusPipeline; fold the two together when the serial path is retired. */
+async function actOnIntent(ctx: EntityContext, intent: string, overrides: DayaClientOverrides): Promise<void> {
+  if (!ctx.campaignId) return;
+  if (ctx.persona.omniscient === true) {
+    const toolResult = await runJewlToolAction(ctx.entityDaId, ctx.campaignId, intent, overrides);
+    const summary = toolResult.toolName
+      ? `Acted: invoked ${toolResult.toolName}${toolResult.error ? ` — failed (${toolResult.error})` : ' — done'}.`
+      : `Weighed acting on "${intent}" but no lever applied.`;
+    await writeMemoryEntry({
+      entityId: ctx.entityDaId,
+      narrativeCycle: ctx.cycle,
+      source: 'action',
+      content: summary,
+      valence: 0,
+      arousal: 0.1,
+      salience: 0.3,
+      classification: { contentCategory: 'reasoning', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'unrestricted action dispatch' },
+    });
+    return;
+  }
+  const facts = await currentFacts(ctx.campaignId);
+  const outward = await runBodyOutward(ctx, intent, facts, overrides);
+  const care = await careScalarForCharacter(ctx.characterId, ctx.mood);
+  const mechanicsHook: MechanicsRollHook = async (hookArgs) => {
+    const result = await resolveEffortCheck({
+      characterId: hookArgs.characterId,
+      intent: hookArgs.intent,
+      attribute: hookArgs.attribute,
+      dr: hookArgs.dr,
+      effortContext: outward.effortContext,
+      care,
+      overrides,
+    });
+    if (!result) return null;
+    return { total: result.total, success: result.success, drFinal: result.drFinal, governingAttribute: result.governingAttribute };
+  };
+  const adjudication = await resolveIntent(
+    { campaignId: ctx.campaignId, entityCharacterId: ctx.characterId, intent: outward.intent, cycle: ctx.cycle },
+    overrides,
+    mechanicsHook,
+  );
+  await wake({ kind: 'adjudication_result', entityId: ctx.characterId, payload: adjudication as unknown as Record<string, unknown> }, overrides);
+}
+
+/** Read a finished (non-streamed) reply the way the stream is read: first line, label stripped. */
+function readLine(text: string): { kind: GateKind; content: string } {
+  const gate = createSpeechGate(() => {});
+  gate.push(text);
+  const { kind, content } = gate.end();
+  return { kind, content };
+}
+
+/**
+ * The being's turn. Everything it needs was prepared while it listened; this
+ * is ONE short streamed call. Spoken words reach `onEvent` as they come, each
+ * stretch seal-checked before it is shown; a hit that only shows once words
+ * are out retracts the line and falls back to the non-streamed re-voice. The
+ * line that is returned and stored is always the one that passed the seal.
+ */
+export async function answerAsk(
+  characterId: string,
+  ask: TableAsk,
+  opts: { onEvent?: (event: BeingSpeakingEvent) => void; overrides?: DayaClientOverrides } = {},
+): Promise<AnswerResult> {
+  const t0 = Date.now();
+  const overrides = opts.overrides ?? {};
+  const emit = (event: BeingSpeakingEvent) => {
+    try { opts.onEvent?.(event); } catch (err) { console.error('[daya/ensemble] being_speaking listener threw (non-fatal):', err); }
+  };
+  const ctx = await loadEntityContext(characterId);
+  const mirrored = isMirrored(ctx);
+  // Through the mirror with no model call: nothing raw reaches the being, and nothing here waits on the lane.
+  const unvoiced = async (s: TableStimulus, standing: 'once' | 'always' = 'once'): Promise<{ prose: string; standing: 'full' | 'new' }> => {
+    if (!mirrored) return { prose: s.content, standing: 'new' };
+    const p = await perceive(characterId, ctx.campaignId!, s.content, s.source, overrides, { standing, voice: false });
+    return { prose: p.prose, standing: p.standing };
+  };
+
+  // A listen may still be in flight for the last thing the GM said. Wait for it, but only so long.
+  const settled = await settledWithin(listenQueue.idle(characterId), ANSWER_LISTEN_CAP_MS);
+  const inFlight = settled ? [] : listenQueue.inFlight(characterId).map((i) => i.stimulus);
+  const takenBack = settled ? [] : listenQueue.takePending(characterId).map((i) => i.stimulus);
+  const waitMs = Date.now() - t0;
+
+  // What the listen had not delivered yet. The in-flight stretch will store itself; the taken-back ones are stored below.
+  const lateHeard: string[] = [];
+  for (const s of inFlight) lateHeard.push((await unvoiced(s)).prose);
+  const takenBackHeard: Array<{ source: TableStimulus['source']; prose: string; standing: 'full' | 'new' }> = [];
+  for (const s of takenBack) takenBackHeard.push({ source: s.source, ...(await unvoiced(s)) });
+
+  let spoken: { source: 'dialogue'; prose: string; standing: 'full' | 'new' } | null = null;
+  let askArg: SpiritAsk = { kind: 'turn' };
+  if (ask.kind === 'spoken') {
+    spoken = { source: 'dialogue', ...(await unvoiced({ source: 'dialogue', content: `${ask.by}: ${ask.text}` })) };
+    askArg = { kind: 'spoken', heard: spoken.prose || 'Someone is speaking to you, but you cannot make out the words.' };
+  }
+  const spokenHeard = spoken?.prose || null;
+
+  let state = getListening(characterId);
+  const listen: AnswerTimings['listen'] = !settled ? 'capped' : state ? 'complete' : 'none';
+  if (!state) {
+    // Nothing was listened to (a cold ask): the place through the unvoiced mirror, and no felt-state call.
+    const scene = (await unvoiced({ source: 'perception', content: '' }, 'always')).prose;
+    const cold: ListeningState = {
+      locationId: null, standingScene: scene, heard: [], innerState: '', feltStateBrief: FELT_FALLBACK, feltAt: 0,
+      recallBlock: '', desiresBlock: await buildDesiresBlockForCharacter(characterId), updatedAt: Date.now(),
+    };
+    state = cold;
+  }
+  const heard = [...state.heard, ...lateHeard, ...takenBackHeard.map((h) => h.prose)].filter(Boolean);
+
+  const prompt = buildSpiritAnsweringPrompt({
+    name: ctx.name,
+    identityNarrative: ctx.persona.identityNarrative ?? `${ctx.name}, living her own life, day to day.`,
+    voiceNotes: ctx.persona.voiceNotes ?? 'Plain, direct, her own cadence.',
+    feltStateBrief: state.feltStateBrief || FELT_FALLBACK,
+    standingScene: state.standingScene || 'Nothing beyond what is right in front of you.',
+    innerState: state.innerState,
+    heard,
+    ask: askArg,
+  });
+  const answerCall = (extra: { hint?: string; stream?: (delta: string) => boolean | void; stop?: boolean }) =>
+    chat(
+      {
+        tier: 'L1',
+        subsystem: 'spirit_answer',
+        entityId: ctx.entityDaId,
+        messages: [{ role: 'system', content: prompt }, ...(extra.hint ? [{ role: 'user' as const, content: extra.hint }] : [])],
+        maxTokens: ANSWERING_MAX_TOKENS,
+        ...(extra.stop === false ? {} : { stop: ['\n'] }),
+        ...(extra.stream ? { onToken: extra.stream } : {}),
+      },
+      overrides,
+    );
+
+  const utteranceId = crypto.randomUUID();
+  let firstWordAt: number | null = null;
+  const gate = createSpeechGate((delta, whole) => {
+    if (firstWordAt === null) firstWordAt = Date.now();
+    emit({ phase: 'partial', utteranceId, characterId, text: whole, delta });
+  });
+  emit({ phase: 'start', utteranceId, characterId, characterName: ctx.name });
+
+  let call: Awaited<ReturnType<typeof chat>>;
+  try {
+    call = await answerCall({ stream: gate.push });
+  } catch (err) {
+    // Close what 'start' opened; the caller maps the error (warming / offline) for the GM's eyes.
+    emit({ phase: 'final', utteranceId, characterId, action: 'rest', text: '', revoiced: false });
+    throw err;
+  }
+  const streamed = gate.end();
+  const fallback = `${ctx.name} pauses, unsure what to say, and lets the moment sit.`;
+  const revoice = async () => (await answerCall({ hint: SPIRIT_REVOICE_HINT })).text;
+
+  let line: { kind: GateKind; content: string } = { kind: streamed.kind, content: streamed.content };
+  let revoiced = false;
+  if (streamed.retracted) {
+    // D1: the seal caught the line mid-stream. Withdraw what was shown, then today's path: one re-voice, else the template.
+    console.warn(`[daya/ensemble] streamed line retracted for ${ctx.name}: rule=${streamed.retracted.rule} shown=${streamed.shown}`);
+    if (streamed.shown) emit({ phase: 'retract', utteranceId, characterId, reason: 'seal', rule: streamed.retracted.rule });
+    const sealed = await enforceSeal(streamed.raw, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
+    // The template is a narrator's sentence, not her words: she lets the moment pass rather than speak it.
+    line = sealed.usedFallback ? { kind: 'rest', content: '' } : readLine(sealed.text);
+    revoiced = true;
+  } else if (!streamed.raw.trim()) {
+    // The stop sequence can swallow a reply that opens with a line break: ask once more without it.
+    const sealed = await enforceSeal((await answerCall({ stop: false })).text, { entityId: ctx.entityDaId, subsystem: 'spirit_answer', fallback, revoice });
+    line = sealed.usedFallback ? { kind: 'rest', content: '' } : readLine(sealed.text);
+    revoiced = true;
+  }
+  const lineMs = Date.now() - t0;
+  emit({ phase: 'final', utteranceId, characterId, action: line.kind, text: line.content, revoiced });
+
+  // What it just did is part of what it carries into the next stretch.
+  const own = line.kind === 'speak' ? `You said: "${line.content}"` : line.kind === 'act' ? `You: ${line.content}` : null;
+  const carried = [...heard, ...(spokenHeard ? [spokenHeard] : []), ...(own ? [own] : [])].slice(-HEARD_KEEP);
+  setListening(characterId, { ...(getListening(characterId) ?? state), heard: carried, updatedAt: Date.now() });
+
+  // Everything behind the line happens after it is out.
+  const after = (async () => {
+    const out: { memoryEntryId?: string; spokenMemoryId?: string } = {};
+    try {
+      const unstored = [...takenBackHeard, ...(spoken ? [spoken] : [])];
+      for (const h of unstored) {
+        if (!h.prose) continue;
+        const ingest = await ingestStimulus({ entityId: ctx.entityDaId, cycle: ctx.cycle, source: h.source, content: h.prose, extraClassification: { mirror: { voiced: false, standing: h.standing } } }, overrides);
+        if (ingest.persisted) out.memoryEntryId = ingest.memoryEntryId;
+      }
+      if (line.kind === 'speak') {
+        const memory = await writeMemoryEntry({
+          entityId: ctx.entityDaId,
+          narrativeCycle: ctx.cycle,
+          source: 'dialogue',
+          content: line.content,
+          valence: 0,
+          arousal: 0.1,
+          salience: 0.2,
+          classification: { contentCategory: 'dialogue', sensitivity: 'sensitive', icOoc: 'IC', rationaleTag: 'own words spoken' },
+        });
+        out.spokenMemoryId = memory.id;
+      } else if (line.kind === 'act') {
+        await actOnIntent(ctx, line.content, overrides);
+      }
+      // ((thought)) segments in its own line are thought: known subjects in them are refreshed (familiarity-thought).
+      const thoughts = line.kind === 'rest' ? [] : parseSegments(line.content).filter((s) => s.kind === 'thought').map((s) => s.text);
+      if (thoughts.length && !ctx.persona.omniscient && !ctx.soulState.godlike) {
+        await refreshFamiliarityByThought({ perceiverId: ctx.entityDaId, texts: thoughts, refs: { memoryId: out.spokenMemoryId ?? null } });
+      }
+    } catch (err) {
+      console.error('[daya/ensemble] bookkeeping after an answer failed (non-fatal):', err);
+    }
+    return out;
+  })();
+
+  return {
+    utteranceId,
+    action: line.kind === 'rest' ? { kind: 'rest' } : { kind: line.kind, content: line.content },
+    timings: { waitMs, listen, ttftMs: call.ttftMs ?? null, firstWordMs: firstWordAt === null ? null : firstWordAt - t0, lineMs, tokensOut: call.tokensOut, retracted: streamed.retracted !== null, revoiced },
+    after,
+  };
+}

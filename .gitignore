@@ -35,4 +35,9 @@ logs/
 NUL
 **/NUL
 dev.db.backup*
+dev.db-wal
+dev.db-shm
 *.empty-wipe-*
+
+# Playwright MCP session logs
+.playwright-mcp/

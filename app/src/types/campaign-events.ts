@@ -217,10 +217,51 @@ export interface JewlHighlightEvent {
   durationMs: number;
 }
 
+// ── A being's line as it is spoken (U2c, TABLE-RHYTHM-DESIGN-2026-10-01) ──
+
+/**
+ * One step of a being's line growing at the table. Order per utterance:
+ * start → partial… → [retract] → final. `partial.text` is always the WHOLE
+ * line so far, so a client that missed a piece is still right. `retract`
+ * withdraws everything shown for that utterance (a rule is named, the words
+ * that tripped it never are); the `final` that follows carries the line as
+ * stored. A `final` always closes a `start`, also when the being stays silent
+ * (`action: 'rest'`, empty text). Only `action: 'speak'` ever has partials.
+ * What the being did is `action`, never `kind`: on the wire `kind` is the
+ * stream's own discriminator ('being_speaking').
+ */
+export type BeingSpeakingPhase =
+  | { phase: 'start'; utteranceId: string; characterId: string; characterName: string }
+  | { phase: 'partial'; utteranceId: string; characterId: string; text: string; delta: string }
+  | { phase: 'retract'; utteranceId: string; characterId: string; reason: 'seal'; rule: string }
+  | { phase: 'final'; utteranceId: string; characterId: string; action: 'speak' | 'act' | 'attend' | 'rest'; text: string; revoiced: boolean };
+
+/** Transient: never persisted. The spoken line itself still arrives as a `terminal_event` chat. */
+export type BeingSpeakingStreamEvent = { kind: 'being_speaking' } & BeingSpeakingPhase;
+
 // ── Heartbeat ─────────────────────────────────────────────────────────────
 
 export interface HeartbeatEvent {
   kind: 'heartbeat';
+}
+
+/**
+ * Perception (PERCEPTION_FEED): pushed to ONE viewer (targetUserId) when a memory row of a character whose
+ * feed they read was written — the character's owner, and the campaign's Watcher (for "view as"). No text
+ * at all: only which character's memory moved. The client re-reads that feed (built server-side).
+ */
+export interface PerceivedFeedStaleEvent {
+  kind: 'perceived_feed_stale';
+  characterId?: string;
+}
+
+/**
+ * Planning board (inspect chips): pushed to ONE viewer (targetUserId) — a chip's owner, the campaign's
+ * Watcher, and whoever acted — when a chip is posted, edited, withdrawn or committed. No text at all;
+ * the client re-reads GET /intents, which filters per viewer.
+ */
+export interface BoardChangedEvent {
+  kind: 'board_changed';
 }
 
 // ── Union ─────────────────────────────────────────────────────────────────
@@ -241,7 +282,10 @@ export type StreamEventData =
   | DayaWorkSessionEvent
   | JewlFocusEvent
   | JewlHighlightEvent
-  | HeartbeatEvent;
+  | BeingSpeakingStreamEvent
+  | HeartbeatEvent
+  | PerceivedFeedStaleEvent
+  | BoardChangedEvent;
 
 /** The envelope sent over SSE */
 export interface CampaignStreamEvent {

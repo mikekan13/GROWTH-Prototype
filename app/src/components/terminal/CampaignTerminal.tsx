@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import TerminalEventRow from './TerminalEventRow';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import CommandInput from './CommandInput';
 import type { CommandInputHandle } from './CommandInput';
 import type { TerminalEvent, TerminalFilter, ChangeLogPayload, GameSessionInfo } from '@/types/terminal';
@@ -13,6 +12,20 @@ import { diceEvents } from '@/lib/dice-events';
 import type { RollResult } from '@/types/dice';
 import type { DiceRollPayload, CommandPayload } from '@/types/terminal';
 import CopilotChat from './CopilotChat';
+import TableSpeakBar from './TableSpeakBar';
+import PlanningChips from './PlanningChips';
+import BeingSpeakingLines from './BeingSpeakingLines';
+import { RECORDER_CHUNK_EVENT, RECORDER_CHUNK_MS_DEFAULT, RECORDER_CHUNK_MS_LIVE, TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
+import TableFeed from './table-feed/TableFeed';
+import { perceptionFeedOn, PERCEIVED_FEED_STALE_EVENT } from '@/lib/perception-feed';
+import ViewAsPicker, { readViewAs, writeViewAs, type ViewAsCharacter } from './table-feed/ViewAsPicker';
+import { pageCutoff, keepFrom, mergeEvents, withoutLoggedSessionLines } from './table-feed/feed-paging';
+import { matchEvent, type FoldKeep } from './table-feed/feed-tree';
+import { withNarration, feedKeep, isFeedLine } from './table-feed/feed-split';
+import MechanicalLog from './MechanicalLog';
+import type { FeedEntity } from './table-feed/TableFeedRows';
+import EncounterPanel from './EncounterPanel';
+import SessionWarmupOverlay from './SessionWarmupOverlay';
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -41,17 +54,20 @@ interface CampaignTerminalProps {
   connectedUsers?: Array<{ userId: string; username: string; role: string }>;
   /** All characters in this campaign (for GM skill check targeting) */
   campaignCharacters?: Array<{ id: string; name: string }>;
+  /** Characters, places and items of the campaign — the TABLE feed's portraits and entity spans. */
+  tableEntities?: FeedEntity[];
+  /** Fold the drawer (the ▾ at the end of the tab row). */
+  onClose?: () => void;
 }
 
 // ── Filter Config ──────────────────────────────────────────────────────────
 
-const FILTERS: { key: TerminalFilter; label: string; icon: string }[] = [
-  { key: 'all', label: 'All', icon: '' },
-  { key: 'chat', label: 'Chat', icon: '\uD83D\uDCAC' },
-  { key: 'dice', label: 'Dice', icon: '\uD83C\uDFB2' },
-  { key: 'changes', label: 'Changes', icon: '\u25C8' },
-  { key: 'events', label: 'Events', icon: '\u2550' },
-];
+/** Rows per source per page of the one feed's history. */
+const FEED_PAGE = 60;
+
+/** The Terminal feed shows narrative lines only (Mike 2026-10-08); the mechanics are in the jEWL tab's Log. */
+const FEED_KEEP: FoldKeep = (e) => feedKeep(e);
+
 
 // Map filter keys to event types for querying
 function filterToTypes(filter: TerminalFilter): string[] | undefined {
@@ -83,36 +99,147 @@ export default function CampaignTerminal({
   connected,
   connectedUsers,
   campaignCharacters,
+  tableEntities,
+  onClose,
 }: CampaignTerminalProps) {
+  // 'terminal' = the one feed (TERMINAL and TABLE merged, Mike 2026-10-08).
   const [terminalMode, setTerminalMode] = useState<'terminal' | 'copilot'>('terminal');
+  // Inside the jEWL tab: the conversation, or the mechanical Log (Mike 2026-10-08).
+  const [jewlView, setJewlView] = useState<'conversation' | 'log'>('conversation');
+  /** The Log rows a feed line's link jumped to. */
+  const [logReveal, setLogReveal] = useState<Set<string> | null>(null);
+  const openLog = useCallback((ids: string[]) => {
+    setLogReveal(new Set(ids));
+    setJewlView('log');
+    setTerminalMode('copilot');
+  }, []);
   const [events, setEvents] = useState<TerminalEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<TerminalFilter>('all');
+  // Perception unit 9 (NEXT_PUBLIC_PERCEPTION_FEED): the server says whether this feed is the viewer's
+  // perceived one (a Trailblazer) — it filters; the client only renders the tokens and re-reads on a nudge.
+  const [perceivedFeed, setPerceivedFeed] = useState(false);
+  // Unit 10: the Watcher's "view as character" — null = the truth record. Remembered per viewer (localStorage only).
+  const [viewAs, setViewAsState] = useState<string | null>(null);
+  const viewAsOffered = perceptionFeedOn() && (_userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN');
+  const viewer = _userId ?? 'anon';
+  useEffect(() => { if (viewAsOffered) setViewAsState(readViewAs(campaignId, viewer)); }, [viewAsOffered, campaignId, viewer]);
+  const setViewAs = useCallback((id: string | null) => { writeViewAs(campaignId, viewer, id); setViewAsState(id); }, [campaignId, viewer]);
+  const viewAsRef = useRef<string | null>(null);
+  viewAsRef.current = viewAs;
+  const viewAsCharacters = useMemo<ViewAsCharacter[]>(() => (tableEntities ?? [])
+    .filter((e) => e.kind === 'character' || e.kind === 'npc')
+    .map((e) => ({ id: e.id, name: e.name, kind: e.kind as ViewAsCharacter['kind'] }))
+    .sort((a, b) => a.name.localeCompare(b.name)), [tableEntities]);
+  // No filter chips (Mike 2026-10-08): the one feed is searched, not filtered.
+  const activeFilter = 'all' as TerminalFilter;
   const [reverting, setReverting] = useState<string | null>(null);
   const [sessions, setSessions] = useState<GameSessionInfo[]>([]);
   const [activeSession, setActiveSession] = useState<GameSessionInfo | null>(null);
-  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
+  // Session-start loading screen (Mike 2026-10-01): shown once per active
+  // session, for the GM, while the self-hosted core cold-starts.
+  const [warmup, setWarmup] = useState<{ startedAt: string; number: number } | null>(null);
+  const warmupSeenRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<CommandInputHandle>(null);
 
+  // TABLE mode = GM roleplay through NPCs; only exists while a session is
+  // live (Mike 2026-09-02: "another tab there that is only available when
+  // the canvas is in session mode").
+  const isGM = _userRole === 'WATCHER' || _userRole === 'GODHEAD' || _userRole === 'ADMIN';
+  const tableAvailable = isGM && !!activeSession;
+
+  // Recorder chunk length (U2c): while a session is live AND the engine's split
+  // loop is on, the always-on mic sends shorter chunks so beings hear the table
+  // sooner. `splitLoop` comes from GET /table (a missing field = false), so this
+  // is a no-op until the server exposes it and the switch is on.
+  const [splitLoop, setSplitLoop] = useState(false);
+  useEffect(() => {
+    if (!activeSession || !isGM) { setSplitLoop(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/table`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { splitLoop?: boolean };
+        if (!cancelled) setSplitLoop(data.splitLoop === true);
+      } catch { /* leave false */ }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId, activeSession, isGM]);
+  useEffect(() => {
+    const ms = activeSession && splitLoop ? RECORDER_CHUNK_MS_LIVE : RECORDER_CHUNK_MS_DEFAULT;
+    window.dispatchEvent(new CustomEvent(RECORDER_CHUNK_EVENT, { detail: { ms } }));
+  }, [activeSession, splitLoop]);
+
+  // P1 ◆ on the TABLE tab while the mic feeds the table (same source as the
+  // JEWL header and the TERMINAL toggle; JewlChip owns the 12 s TTL).
+  const [tableFeedLive, setTableFeedLive] = useState<{ heard: number; holding: boolean } | null>(null);
+  useEffect(() => {
+    const onFeed = (e: Event) => {
+      const d = (e as CustomEvent<{ fed?: boolean; heard?: number; holding?: boolean }>).detail;
+      setTableFeedLive(d?.fed ? { heard: d.heard ?? 0, holding: !!d.holding } : null);
+    };
+    window.addEventListener(TABLE_FEED_EVENT, onFeed);
+    return () => window.removeEventListener(TABLE_FEED_EVENT, onFeed);
+  }, []);
+
+
+  // A session just became active (started here, or already live on a reload):
+  // one lane check; if the core is not answering yet, raise the loading screen.
+  useEffect(() => {
+    if (!activeSession || !isGM) return;
+    if (warmupSeenRef.current === activeSession.id) return;
+    warmupSeenRef.current = activeSession.id;
+    const { id, startedAt, number } = activeSession;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/lane`);
+        if (!res.ok || cancelled) return;
+        const lane = (await res.json()) as { phase: string };
+        if (cancelled || warmupSeenRef.current !== id) return;
+        if (lane.phase !== 'ready' && lane.phase !== 'disabled') setWarmup({ startedAt, number });
+      } catch { /* the speak bar's status strip still covers it */ }
+    })();
+    return () => { cancelled = true; };
+  }, [activeSession, isGM, campaignId]);
+  useEffect(() => { if (!activeSession) setWarmup(null); }, [activeSession]);
+  const closeWarmup = useCallback(() => setWarmup(null), []);
+
   // ── Fetch merged events ──────────────────────────────────────────────────
 
-  const fetchEvents = useCallback(async () => {
-    try {
+  // One feed, paged (Mike 2026-10-08): the newest page on open, earlier
+  // sessions as the reader scrolls back. `olderCursor` = where the next older
+  // page starts; null = the campaign's beginning is loaded.
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  /** Set right before older rows are prepended, so the view can hold its place. */
+  const prependAnchorRef = useRef<{ height: number; top: number } | null>(null);
+
+  const fetchPage = useCallback(async (cursor?: string): Promise<{ rows: TerminalEvent[]; cutoff: string | null }> => {
       const filterTypes = filterToTypes(activeFilter);
+      const wantEvents = activeFilter !== 'changes';
+      const wantChanges = activeFilter === 'all' || activeFilter === 'changes';
 
       // Fetch changelog entries
-      const clParams = new URLSearchParams({ campaignId, limit: '100' });
-      const clRes = await fetch(`/api/changelog?${clParams}`, { cache: 'no-store' });
-      const clData = clRes.ok ? await clRes.json() : { entries: [] };
+      const clParams = new URLSearchParams({ campaignId, limit: String(FEED_PAGE) });
+      if (cursor) clParams.set('cursor', cursor);
+      if (viewAs) clParams.set('viewAs', viewAs);
+      const clRes = wantChanges ? await fetch(`/api/changelog?${clParams}`, { cache: 'no-store' }) : null;
+      const clData = clRes?.ok ? await clRes.json() : { entries: [], nextCursor: null };
 
       // Fetch campaign events
-      const evParams = new URLSearchParams({ limit: '100' });
+      const evParams = new URLSearchParams({ limit: String(FEED_PAGE) });
+      if (cursor) evParams.set('cursor', cursor);
+      if (viewAs) evParams.set('viewAs', viewAs);
       if (filterTypes && activeFilter !== 'changes') {
         evParams.set('types', filterTypes.filter(t => t !== 'changelog').join(','));
       }
-      const evRes = await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' });
-      const evData = evRes.ok ? await evRes.json() : { events: [] };
+      const evRes = wantEvents ? await fetch(`/api/campaigns/${campaignId}/events?${evParams}`, { cache: 'no-store' }) : null;
+      // A view the server refuses (not this campaign's Watcher, character gone) falls back to the truth record.
+      if (viewAs && evRes && (evRes.status === 403 || evRes.status === 404)) { setViewAs(null); return { rows: [], cutoff: null }; }
+      const evData = evRes?.ok ? await evRes.json() : { events: [], nextCursor: null };
+      if (perceptionFeedOn() && evRes?.ok) setPerceivedFeed(evData.perceived === true);
 
       // Wrap changelog entries as TerminalEvents
       const changelogEvents: TerminalEvent[] = (clData.entries || []).map((entry: ChangeLogEntry) => ({
@@ -173,12 +300,44 @@ export default function CampaignTerminal({
 
       merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-      setEvents(merged);
-      setLoading(false);
-    } catch {
-      setLoading(false);
-    }
-  }, [campaignId, activeFilter]);
+      // Both sources come newest-first; keep only what is newer than the later
+      // of their oldest rows (while a source has more), so no gap shows.
+      const evRows = (evData.events || []) as Array<{ createdAt: string }>;
+      const clRows = (clData.entries || []) as Array<{ createdAt: string }>;
+      const cutoff = pageCutoff([
+        { oldest: evRows.length ? evRows[evRows.length - 1].createdAt : null, hasMore: wantEvents && !!evData.nextCursor },
+        { oldest: clRows.length ? clRows[clRows.length - 1].createdAt : null, hasMore: wantChanges && !!clData.nextCursor },
+      ]);
+      return { rows: keepFrom(merged, cutoff), cutoff };
+  }, [campaignId, activeFilter, viewAs, setViewAs]);
+
+  /** The newest page. `reset` (open / filter change) replaces the feed; otherwise new rows merge in and older pages stay. */
+  const fetchEvents = useCallback(async (reset = false) => {
+    try {
+      const asked = viewAsRef.current;
+      const { rows, cutoff } = await fetchPage();
+      if (asked !== viewAsRef.current) return; // the view changed meanwhile — never mix two views' rows
+      setEvents(prev => (reset ? rows : mergeEvents(prev, rows)));
+      if (reset) setOlderCursor(cutoff);
+    } catch { /* keep what is shown */ }
+    setLoading(false);
+  }, [fetchPage]);
+
+  /** Scrolled back to the top: the next older page, held in place. */
+  const loadOlder = useCallback(async () => {
+    if (!olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const asked = viewAsRef.current;
+      const { rows, cutoff } = await fetchPage(olderCursor);
+      if (asked !== viewAsRef.current) { setLoadingOlder(false); return; }
+      const el = scrollRef.current;
+      if (el) prependAnchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
+      setEvents(prev => mergeEvents(prev, rows));
+      setOlderCursor(cutoff);
+    } catch { /* try again on the next scroll */ }
+    setLoadingOlder(false);
+  }, [olderCursor, loadingOlder, fetchPage]);
 
   // ── Fetch sessions ─────────────────────────────────────────────────────
 
@@ -194,7 +353,7 @@ export default function CampaignTerminal({
 
   useEffect(() => {
     if (visible) {
-      fetchEvents();
+      fetchEvents(true);
       fetchSessions();
     }
   }, [visible, fetchEvents, fetchSessions]);
@@ -202,6 +361,8 @@ export default function CampaignTerminal({
   // Merge stream events into the event list (replaces 5s polling)
   useEffect(() => {
     if (!streamEvents || streamEvents.length === 0) return;
+    // Viewing as a character: the Watcher's stream carries the truth — the view re-reads on the memory push instead.
+    if (viewAsRef.current) return;
     setEvents(prev => {
       const existingIds = new Set(prev.map(e => e.id));
       const newEvents = streamEvents.filter(e => !existingIds.has(e.id));
@@ -222,12 +383,42 @@ export default function CampaignTerminal({
     return () => clearInterval(interval);
   }, [visible, fetchEvents, fetchSessions]);
 
-  // Auto-scroll to bottom on new events
+  // Perceived feed: the server pushes a text-free nudge to this viewer alone when their character's memory
+  // row is written (lib/perceived-feed-push; CampaignCanvas relays it) — read the feed once. The 30 s
+  // fallback poll above is the only timer.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (!visible || !perceptionFeedOn() || !perceivedFeed) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const onStale = (e: Event) => {
+      // Viewing as a character: only that character's memory moving matters.
+      const cid = (e as CustomEvent<{ characterId?: string | null }>).detail?.characterId;
+      if (viewAsRef.current && cid && cid !== viewAsRef.current) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { void fetchEvents(); }, 150);
+    };
+    window.addEventListener(PERCEIVED_FEED_STALE_EVENT, onStale);
+    return () => { window.removeEventListener(PERCEIVED_FEED_STALE_EVENT, onStale); if (t) clearTimeout(t); };
+  }, [visible, perceivedFeed, fetchEvents]);
+
+  // Newest at the bottom: new rows pin the view to the bottom — unless older
+  // rows were just prepended (scrolling back), then the view holds its place.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const anchor = prependAnchorRef.current;
+    if (anchor) {
+      prependAnchorRef.current = null;
+      el.scrollTop = anchor.top + (el.scrollHeight - anchor.height);
+      return;
     }
+    el.scrollTop = el.scrollHeight;
   }, [events.length]);
+
+  // Scrolled to the top of what is loaded → the next older page.
+  const onFeedScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (el && el.scrollTop < 80 && olderCursor && !loadingOlder) void loadOlder();
+  }, [olderCursor, loadingOlder, loadOlder]);
 
   // Listen for roll-skill events from SkillsCard
   useEffect(() => {
@@ -715,171 +906,136 @@ export default function CampaignTerminal({
     fetchEvents();
   }, [campaignId, character, onCharacterUpdate, onRestComplete, fetchEvents, fetchSessions, executeDiceApiCall]);
 
-  const toggleSessionCollapse = (sessionId: string) => {
-    setCollapsedSessions(prev => {
-      const next = new Set(prev);
-      if (next.has(sessionId)) next.delete(sessionId);
-      else next.add(sessionId);
-      return next;
-    });
-  };
+  // ── The one feed (Mike 2026-10-08) ─────────────────────────────────────────
+  // One feed, laid out as a fold tree (chapter > session > rest > encounter),
+  // with one search field. The logged session_start/_end lines give way to the
+  // session folds.
+  const feedEvents = useMemo(() => withoutLoggedSessionLines(events), [events]);
+  const emptyFrom = olderCursor ? (events[0]?.timestamp ?? null) : null;
+  const [query, setQuery] = useState('');
+  const searching = query.trim().length > 0;
+  // Narrative only, play only: mechanical rows become numberless lines where the
+  // mapper knows them, and every feed line links to the mechanics behind it.
+  const narrated = useMemo(() => withNarration(feedEvents, sessions), [feedEvents, sessions]);
+  const hits = useMemo(() => {
+    if (!searching) return 0;
+    const q = query.trim().toLowerCase();
+    return narrated.events.filter(e => isFeedLine(e, sessions) && matchEvent(e, q)).length;
+  }, [narrated, sessions, query, searching]);
 
-  // ── Group events by session ──────────────────────────────────────────────
+  const refreshEvents = useCallback(() => { void fetchEvents(); }, [fetchEvents]);
 
-  interface EventGroup {
-    sessionId: string | null;
-    sessionInfo: GameSessionInfo | null;
-    label: string;
-    events: TerminalEvent[];
-  }
+  // The encounter folds into the tree (no tab): its running state is matched to
+  // its fold, whose body carries the full EncounterPanel. GM, live session only.
+  const [liveEncounter, setLiveEncounter] = useState<{ id: string | null; name: string } | null>(null);
+  const refreshEncounter = useCallback(async () => {
+    if (!tableAvailable) { setLiveEncounter(null); return; }
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/encounters`);
+      if (!res.ok) return;
+      const j = (await res.json()) as { encounters?: Array<{ id: string; name: string; status: string }> };
+      const live = (j.encounters ?? []).find(e => e.status === 'ACTIVE' || e.status === 'PAUSED');
+      setLiveEncounter(live ? { id: live.id, name: live.name } : null);
+    } catch { /* the fold just shows the create form */ }
+  }, [campaignId, tableAvailable]);
+  useEffect(() => { void refreshEncounter(); }, [refreshEncounter]);
+  const onEncounterEvent = useCallback(() => { void refreshEncounter(); void fetchEvents(); }, [refreshEncounter, fetchEvents]);
+  const encounter = useMemo(() => (tableAvailable ? {
+    live: liveEncounter,
+    render: () => <EncounterPanel campaignId={campaignId} campaignCharacters={campaignCharacters || []} onEvent={onEncounterEvent} />,
+  } : undefined), [tableAvailable, liveEncounter, campaignId, campaignCharacters, onEncounterEvent]);
 
-  const groupedEvents: EventGroup[] = (() => {
-    if (sessions.length === 0) {
-      // No sessions — show all events flat
-      return [{ sessionId: null, sessionInfo: null, label: 'All Activity', events }];
-    }
+  // No text input when no session is live (Mike 2026-10-08: "No need for
+  // inputs when not in play… They work with JEWL for any of that"). The
+  // session itself still needs a switch, and `/session` typed into the old
+  // input was the only one — so the GM gets a button that runs that same path.
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const toggleSession = useCallback(async () => {
+    if (sessionBusy) return;
+    if (activeSession && !window.confirm(`End session ${activeSession.number}? Improvisations settle at session end.`)) return;
+    setSessionBusy(true);
+    try { await handleCommandSubmit(activeSession ? '/session end' : '/session start'); } finally { setSessionBusy(false); }
+  }, [sessionBusy, activeSession, handleCommandSubmit]);
 
-    const groups: EventGroup[] = [];
-
-    // Group events by sessionId
-    const bySession = new Map<string | null, TerminalEvent[]>();
-    for (const ev of events) {
-      const sid = ev.sessionId ?? null;
-      if (!bySession.has(sid)) bySession.set(sid, []);
-      bySession.get(sid)!.push(ev);
-    }
-
-    // Build ordered groups: between-session events come between sessions
-    // For now, simple: null session first, then each session in order
-    const betweenEvents = bySession.get(null) || [];
-    if (betweenEvents.length > 0) {
-      groups.push({ sessionId: null, sessionInfo: null, label: 'Between Sessions', events: betweenEvents });
-    }
-
-    for (const session of sessions) {
-      const sessionEvents = bySession.get(session.id) || [];
-      groups.push({
-        sessionId: session.id,
-        sessionInfo: session,
-        label: `Session ${session.number}${session.name ? `: ${session.name}` : ''}`,
-        events: sessionEvents,
-      });
-    }
-
-    return groups;
-  })();
+  const bebas = 'var(--font-bebas-neue), Bebas Neue, sans-serif';
+  const mono = 'var(--font-terminal), Consolas, monospace';
+  const tabStyle = (on: boolean): React.CSSProperties => ({
+    fontFamily: bebas, fontSize: 19, letterSpacing: '0.07em', height: 36, padding: '3px 9px 0', border: 0,
+    whiteSpace: 'nowrap', cursor: 'pointer', flex: 'none',
+    background: on ? '#002f6c' : 'none', color: on ? '#ffcc78' : '#002f6c', transform: on ? 'rotate(-1deg)' : undefined,
+  });
 
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: '#0a0a1a' }}>
-      {/* Header */}
-      <div className="flex-shrink-0 p-3 border-b" style={{ borderColor: 'rgba(34, 171, 148, 0.3)' }}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span style={{ color: connected ? 'var(--terminal-prime)' : '#666', fontSize: '14px' }} title={connected ? 'Connected (live)' : 'Disconnected (polling)'}>
-              {connected ? '\u25C8' : '\u25CB'}
-            </span>
-            <h2 className="text-sm uppercase tracking-widest" style={{
-              fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-              color: 'var(--terminal-prime)',
-              fontSize: '18px',
-            }}>CAMPAIGN TERMINAL</h2>
-            {connectedUsers && connectedUsers.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5" style={{
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                color: '#22ab9480',
-                border: '1px solid rgba(34,171,148,0.2)',
-              }} title={connectedUsers.map(u => u.username).join(', ')}>
-                {connectedUsers.length} online
-              </span>
-            )}
-            {activeSession && (
-              <span className="text-[13px] px-2 py-0.5" style={{
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                color: 'var(--terminal-prime)',
-                border: '1px solid rgba(34,171,148,0.4)',
-                borderRadius: '2px',
-              }}>
-                SESSION {activeSession.number} ACTIVE
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Mode toggle: Terminal / Co-pilot */}
-            <div className="flex" style={{ border: '1px solid rgba(34,171,148,0.4)', borderRadius: '2px' }}>
-              <button
-                onClick={() => setTerminalMode('terminal')}
-                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                style={{
-                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                  letterSpacing: '0.05em',
-                  color: terminalMode === 'terminal' ? '#0a0a1a' : '#888',
-                  backgroundColor: terminalMode === 'terminal' ? 'var(--terminal-prime)' : 'transparent',
-                }}
-              >
-                Terminal
-              </button>
-              <button
-                onClick={() => setTerminalMode('copilot')}
-                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                style={{
-                  fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                  letterSpacing: '0.05em',
-                  color: terminalMode === 'copilot' ? '#0a0a1a' : '#D0A030',
-                  backgroundColor: terminalMode === 'copilot' ? '#D0A030' : 'transparent',
-                  borderLeft: '1px solid rgba(34,171,148,0.4)',
-                }}
-              >
-                JEWL
-              </button>
-            </div>
-            {terminalMode === 'terminal' && (
-              <button
-                onClick={() => { fetchEvents(); fetchSessions(); }}
-                className="px-2 py-1 text-[12px] uppercase tracking-wider transition-colors"
-                style={{
-                  fontFamily: 'var(--font-terminal), Consolas, monospace',
-                  color: 'var(--terminal-prime)',
-                  border: '1px solid rgba(34, 171, 148, 0.4)',
-                  backgroundColor: 'transparent',
-                }}
-                onMouseOver={e => (e.currentTarget.style.backgroundColor = 'rgba(34, 171, 148, 0.15)')}
-                onMouseOut={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-              >
-                REFRESH
-              </button>
-            )}
-          </div>
-        </div>
+    <div className="h-full flex flex-col" style={{ backgroundColor: '#cfe2f2' }} data-drawer>
+      {warmup && isGM && (
+        <SessionWarmupOverlay
+          campaignId={campaignId}
+          startedAt={warmup.startedAt}
+          sessionNumber={warmup.number}
+          onReady={closeWarmup}
+          onDismiss={closeWarmup}
+        />
+      )}
 
-        {/* Filter buttons (terminal mode only) */}
-        {terminalMode === 'terminal' && (
-        <div className="flex gap-1 flex-wrap">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setActiveFilter(f.key)}
-              className="px-2 py-1 text-[13px] uppercase tracking-wider transition-colors"
-              style={{
-                fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                letterSpacing: '0.05em',
-                color: activeFilter === f.key ? '#0a0a1a' : '#888',
-                backgroundColor: activeFilter === f.key ? 'var(--terminal-prime)' : 'transparent',
-                border: `1px solid ${activeFilter === f.key ? 'var(--terminal-prime)' : 'rgba(255,255,255,0.1)'}`,
-                borderRadius: '2px',
-              }}
-            >
-              {f.icon && <span className="mr-1">{f.icon}</span>}
-              {f.label}
-            </button>
-          ))}
-        </div>
+      {/* Header (v7 tab row): the feed · JEWL · ◆ state · session switch (GM) · fold. */}
+      <div role="tablist" aria-label="Terminal drawer" data-drawer-tabs style={{
+        display: 'flex', alignItems: 'center', height: 42, flex: 'none', padding: '0 0 0 6px', gap: 2,
+        background: '#CBD9E8', borderBottom: '3px solid #002f6c', overflow: 'hidden',
+      }}>
+        <button role="tab" aria-selected={terminalMode === 'terminal'} onClick={() => setTerminalMode('terminal')} style={tabStyle(terminalMode === 'terminal')}>Terminal</button>
+        <button role="tab" aria-selected={terminalMode === 'copilot'} onClick={() => setTerminalMode('copilot')} style={tabStyle(terminalMode === 'copilot')}>jEWL</button>
+        <span style={{ flex: 1, minWidth: 4 }} />
+        {(tableFeedLive || activeSession) && (
+          <span
+            data-table-feed-indicator={tableFeedLive ? '' : undefined}
+            title={tableFeedLive
+              ? (tableFeedLive.holding ? 'Holding an unfinished sentence for the next chunk' : 'The mic is feeding the table')
+              : `Session ${activeSession!.number} is live`}
+            style={{ fontFamily: bebas, fontSize: 17, letterSpacing: '0.05em', color: '#002f6c', whiteSpace: 'nowrap', flex: 'none', paddingTop: 3 }}
+          >
+            <span style={{ fontFamily: mono, fontSize: 13, verticalAlign: '1px', marginRight: 3, color: tableFeedLive ? (tableFeedLive.holding ? '#b07a00' : '#2f6fb0') : '#0f6e5e' }}>{'◆'}</span>
+            {tableFeedLive ? `Table · ${tableFeedLive.heard}` : `Live · S${activeSession!.number}`}
+          </span>
+        )}
+        {isGM && (
+          <button onClick={() => void toggleSession()} disabled={sessionBusy} data-no-hold title={activeSession ? 'End the session' : 'Start a session'} style={{
+            fontFamily: bebas, fontSize: 16, letterSpacing: '0.06em', height: 36, minWidth: 36, padding: '2px 8px 0', border: 0, cursor: 'pointer', flex: 'none',
+            whiteSpace: 'nowrap', background: 'none', color: activeSession ? '#b0303b' : '#0f6e5e',
+            boxShadow: `inset 0 0 0 2px ${activeSession ? '#b0303b' : '#0f6e5e'}`, marginLeft: 4,
+          }}>
+            {sessionBusy ? '…' : activeSession ? '■ End' : '▶ Session'}
+          </button>
+        )}
+        <span
+          title={connected ? `Live${connectedUsers?.length ? ` — ${connectedUsers.map(u => u.username).join(', ')}` : ''}` : 'Disconnected (polling)'}
+          style={{ fontFamily: mono, fontSize: 12, color: connected ? '#0f6e5e' : '#6b7380', whiteSpace: 'nowrap', flex: 'none', marginLeft: 6 }}
+        >
+          {connected ? '◈' : '○'}
+        </span>
+        {onClose && (
+          <button aria-label="Fold the terminal" data-no-hold onClick={onClose} style={{ width: 40, height: 36, flex: 'none', border: 0, background: 'none', color: '#002f6c', fontSize: 16, cursor: 'pointer' }}>{'▾'}</button>
         )}
       </div>
 
-      {/* Co-pilot Chat */}
+      {/* JEWL — his own tab (Mike 2026-10-08): the conversation, or the Log of mechanics. */}
       {terminalMode === 'copilot' && (
+        <div role="tablist" aria-label="jEWL view" data-jewl-view style={{
+          display: 'flex', flex: 'none', gap: 6, padding: '6px 10px 6px 14px', background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)',
+        }}>
+          {(['conversation', 'log'] as const).map(v => (
+            <button key={v} role="tab" aria-selected={jewlView === v} data-no-hold onClick={() => { setJewlView(v); if (v === 'conversation') setLogReveal(null); }} style={{
+              minHeight: 36, padding: '2px 10px 0', border: 0, cursor: 'pointer', fontFamily: bebas, fontSize: 17, letterSpacing: '0.06em',
+              background: jewlView === v ? '#000' : 'transparent', color: jewlView === v ? '#f5f4ef' : '#002f6c',
+              boxShadow: jewlView === v ? undefined : 'inset 0 0 0 1.5px #002f6c',
+            }}>
+              {v === 'conversation' ? 'Conversation' : 'Log'}
+            </button>
+          ))}
+        </div>
+      )}
+      {terminalMode === 'copilot' && jewlView === 'conversation' && (
         <CopilotChat
           campaignId={campaignId}
           visible={visible && terminalMode === 'copilot'}
@@ -888,98 +1044,126 @@ export default function CampaignTerminal({
           userRole={_userRole}
         />
       )}
+      {terminalMode === 'copilot' && jewlView === 'log' && (
+        <MechanicalLog
+          campaignId={campaignId}
+          events={feedEvents}
+          sessions={sessions}
+          entities={tableEntities ?? []}
+          emptyFrom={emptyFrom}
+          isGM={isGM}
+          perceived={perceivedFeed}
+          onRevert={handleRevert}
+          reverting={reverting}
+          reveal={logReveal}
+          hasOlder={!!olderCursor}
+          loadingOlder={loadingOlder}
+          onLoadOlder={() => void loadOlder()}
+        />
+      )}
 
-      {/* Event Feed (terminal mode only) */}
       {terminalMode === 'terminal' && (<>
-      {/* Event Feed */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1">
-        {loading && events.length === 0 && (
-          <div className="text-center py-8 text-[13px]" style={{
-            fontFamily: 'var(--font-terminal), Consolas, monospace',
-            color: 'rgba(34, 171, 148, 0.5)',
-          }}>Loading...</div>
-        )}
-
-        {!loading && events.length === 0 && (
-          <div className="text-center py-8">
-            <div className="text-[13px] mb-1" style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: 'rgba(34, 171, 148, 0.4)',
-            }}>Terminal ready</div>
-            <div className="text-[13px]" style={{
-              fontFamily: 'var(--font-terminal), Consolas, monospace',
-              color: 'rgba(255,255,255,0.2)',
-            }}>Type a message or use /commands. Activity will appear here.</div>
+        {/* One search field over the feed: matching lines, their folds opened. */}
+        <div style={{ flex: 'none', padding: '6px 10px 6px 14px', background: '#cfe2f2', borderBottom: '1px solid rgba(0,47,108,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search the record"
+              aria-label="Search the record"
+              className="text-[16px] md:text-[14px]"
+              data-feed-search
+              style={{
+                flex: 1, minWidth: 0, height: 36, outline: 0, padding: '0 8px',
+                fontFamily: mono, color: '#000', background: '#fff', border: 0, borderLeft: '4px solid #002f6c',
+              }}
+            />
+            {viewAsOffered && (
+              <ViewAsPicker characters={viewAsCharacters} value={viewAs} onChange={setViewAs} />
+            )}
           </div>
-        )}
-
-        {groupedEvents.map((group, gi) => {
-          const isCollapsed = group.sessionId ? collapsedSessions.has(group.sessionId) : false;
-
-          return (
-            <div key={group.sessionId || `between-${gi}`}>
-              {/* Session header (only show if there are sessions) */}
-              {sessions.length > 0 && (
-                <div
-                  className="flex items-center gap-2 px-2 py-1 cursor-pointer my-1"
-                  onClick={() => group.sessionId && toggleSessionCollapse(group.sessionId)}
-                  style={{
-                    backgroundColor: 'rgba(34,171,148,0.08)',
-                    borderRadius: '2px',
-                    border: '1px solid rgba(34,171,148,0.15)',
-                  }}
-                >
-                  {group.sessionId && (
-                    <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      {isCollapsed ? '\u25B6' : '\u25BC'}
-                    </span>
-                  )}
-                  <span className="text-[12px] uppercase tracking-wider flex-1" style={{
-                    fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif',
-                    color: 'var(--terminal-prime)',
-                    letterSpacing: '0.1em',
-                  }}>
-                    {group.label}
-                  </span>
-                  <span className="text-[12px]" style={{
-                    fontFamily: 'var(--font-terminal), Consolas, monospace',
-                    color: 'rgba(255,255,255,0.2)',
-                  }}>
-                    {group.events.length} events
-                  </span>
-                  {group.sessionInfo?.endedAt && (
-                    <span className="text-[12px]" style={{
-                      fontFamily: 'var(--font-terminal), Consolas, monospace',
-                      color: 'rgba(255,255,255,0.15)',
-                    }}>ended</span>
-                  )}
-                </div>
-              )}
-
-              {/* Events (hidden if session is collapsed) */}
-              {!isCollapsed && (
-                <div className="space-y-1">
-                  {group.events.map(event => (
-                    <TerminalEventRow
-                      key={event.id}
-                      event={event}
-                      onRevert={handleRevert}
-                      reverting={reverting}
-                    />
-                  ))}
-                </div>
+          {searching && (
+            <div data-search-status style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, fontFamily: mono, fontSize: 12, color: '#393937' }}>
+              <span>{hits} match{hits === 1 ? '' : 'es'} in loaded history{olderCursor ? ' — earlier history is not searched yet' : ''}</span>
+              {olderCursor && (
+                <button onClick={() => void loadOlder()} disabled={loadingOlder} data-no-hold style={{
+                  minHeight: 36, padding: '0 4px', border: 0, background: 'none', cursor: 'pointer', fontFamily: mono, fontWeight: 700, fontSize: 12,
+                }}>
+                  <span style={{ background: '#000', color: '#f5f4ef', padding: '1px 5px' }}>{loadingOlder ? '[...LOADING...]' : '[SEARCH EARLIER]'}</span>
+                </button>
               )}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
 
-      {/* Command Input */}
-      <CommandInput
-        ref={commandInputRef}
-        onSubmit={handleCommandSubmit}
-        placeholder={character ? `Type a message or /command as ${character.name}...` : 'Type a message or /command...'}
-      />
+        <div
+          ref={scrollRef}
+          onScroll={onFeedScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden"
+          style={{ backgroundColor: '#cfe2f2', minHeight: 0 }}
+          data-feed-scroll
+        >
+          {olderCursor && !searching && (
+            <div style={{ padding: '8px 12px 0 14px' }}>
+              <button onClick={() => void loadOlder()} disabled={loadingOlder} data-no-hold style={{
+                minHeight: 36, padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left',
+                fontFamily: mono, fontWeight: 700, fontSize: 13, lineHeight: 1.62,
+              }}>
+                <span style={{ background: '#000', color: '#f5f4ef', padding: '1px 5px' }}>{loadingOlder ? '[...LOADING EARLIER...]' : '[...EARLIER HISTORY...]'}</span>
+              </button>
+            </div>
+          )}
+          {!olderCursor && !loading && !searching && feedEvents.length > 0 && (
+            <div style={{ padding: '10px 14px 0', fontFamily: mono, fontSize: 12, color: '#393937' }}>[BEGINNING OF THE RECORD]</div>
+          )}
+          <TableFeed
+            campaignId={campaignId}
+            events={narrated.events}
+            keep={FEED_KEEP}
+            dropBetween
+            logRefs={narrated.logRefs}
+            onOpenLog={openLog}
+            entities={tableEntities ?? []}
+            loading={loading}
+            onRevert={handleRevert}
+            reverting={reverting}
+            sessions={sessions}
+            emptyFrom={emptyFrom}
+            foldKey={`growth:feed-folds:${campaignId}`}
+            perceived={perceivedFeed}
+            query={query}
+            encounter={encounter}
+          />
+          {/* Beings still speaking (U2c): their lines grow here, under the last
+              logged event, and yield to the logged chat row when it lands. */}
+          <BeingSpeakingLines
+            active={!!activeSession && !searching && !viewAs}
+            events={events}
+            entities={tableEntities}
+            onGrow={() => {
+              const el = scrollRef.current;
+              if (!el) return;
+              const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+              if (nearBottom) el.scrollTop = el.scrollHeight;
+            }}
+          />
+        </div>
+
+        {/* Input only in play: the GM narrates through the speak bar; a
+            Trailblazer speaks as their character. Out of play there is none
+            (the /command path lives on in handleCommandSubmit + CommandInput). */}
+        {/* The planning board (inspect chips): who is about to do what, until the GM's next move commits it. */}
+        {activeSession && <PlanningChips campaignId={campaignId} entities={tableEntities} />}
+        {activeSession && (isGM ? (
+          <TableSpeakBar campaignId={campaignId} onEvent={refreshEvents} />
+        ) : (
+          <CommandInput
+            ref={commandInputRef}
+            onSubmit={handleCommandSubmit}
+            placeholder={character ? `Speak or act as ${character.name}…` : 'Type a message…'}
+          />
+        ))}
       </>)}
     </div>
   );

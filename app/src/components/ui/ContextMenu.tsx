@@ -50,7 +50,10 @@ export function ctxMenuStyle(text: string) {
 
 // ── ^v^v undulating border ────────────────────────────────────────────────
 
-export function CtxMenuBorder({ count = 50 }: { count?: number } = {}) {
+/** `flush`: keep the strips inside the host's box (no half-band overhang) — for
+ *  edge-to-edge hosts like the phone JEWL sheet, where the overhang would poke
+ *  past the viewport (2026-10-06). Default keeps today's framed look. */
+export function CtxMenuBorder({ count = 50, flush = false }: { count?: number; flush?: boolean } = {}) {
   useEffect(() => { ensureCtxMenuStyles(); }, []);
 
   const charSize = 10;
@@ -89,18 +92,21 @@ export function CtxMenuBorder({ count = 50 }: { count?: number } = {}) {
   };
 
   const half = bandH / 2;
+  // Horizontal overhang past the host's left/right edges: half a band when
+  // framed, none when flush (the top/bottom overhang is kept either way).
+  const side = flush ? 0 : -half;
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.3))' }}>
-      <div style={{ ...textBase, top: -half, left: -half, right: -half, height: bandH, display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ ...textBase, top: -half, left: side, right: side, height: bandH, display: 'flex', alignItems: 'flex-end' }}>
         {hChars}
       </div>
-      <div style={{ ...textBase, bottom: -half, left: -half, right: -half, height: bandH, display: 'flex', alignItems: 'flex-start' }}>
+      <div style={{ ...textBase, bottom: -half, left: side, right: side, height: bandH, display: 'flex', alignItems: 'flex-start' }}>
         {hChars}
       </div>
-      <div style={{ ...textBase, left: -half, top: half, bottom: half, width: bandH, writingMode: 'vertical-lr', display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ ...textBase, left: side, top: half, bottom: half, width: bandH, writingMode: 'vertical-lr', display: 'flex', alignItems: 'flex-end' }}>
         {vChars}
       </div>
-      <div style={{ ...textBase, right: -half, top: half, bottom: half, width: bandH, writingMode: 'vertical-lr', display: 'flex', alignItems: 'flex-start' }}>
+      <div style={{ ...textBase, right: side, top: half, bottom: half, width: bandH, writingMode: 'vertical-lr', display: 'flex', alignItems: 'flex-start' }}>
         {vChars}
       </div>
     </div>
