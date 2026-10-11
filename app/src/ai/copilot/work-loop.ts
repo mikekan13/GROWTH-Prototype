@@ -29,6 +29,11 @@ import {
   updateWorkSession,
 } from '@/services/daya-work-session';
 import { getJewlGodHead } from './jewl-identity';
+import {
+  GENESIS_CHAT_USERNAME,
+  isGenesisGoal,
+  logGenesisReport,
+} from '@/services/character-genesis-progress';
 
 const BREATHER_MS = 4_000;
 /** Consecutive tool-less cycles before a session is judged stalled and
@@ -130,6 +135,10 @@ async function runCycle(session: {
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
   const { dispatchPrompt } = await import('./runtime');
+  // Genesis is chat-quiet (Mike 2026-10-11): the cycle's full reply goes to
+  // the Log as a genesis report; the chat gets one status line per
+  // transition (daya-work-session → announceGenesisStatus).
+  const genesis = isGenesisGoal(session.goal);
   let response;
   try {
     response = await dispatchPrompt({
@@ -139,8 +148,23 @@ async function runCycle(session: {
       actorName: 'JEWL',
       actorRole: 'GODHEAD',
       text,
+      ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME } : {}),
     });
     state.dispatchFailures.delete(session.id);
+    if (genesis) {
+      try {
+        await logGenesisReport({
+          campaignId: session.campaignId,
+          goal: session.goal,
+          message: response.message,
+          cycle: session.cycleCount + 1,
+          jewlUserId: jewl.characterUserId,
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[daya-work-loop] genesis report not logged:', err);
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const fails = (state.dispatchFailures.get(session.id) ?? 0) + 1;

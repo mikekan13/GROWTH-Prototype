@@ -222,6 +222,7 @@ async function saveAssistantResponse(
   campaignId: string,
   response: JewlResponse,
   recipientUserId: string | null,
+  username?: string,
 ): Promise<string> {
   const row = await prisma.copilotMessage.create({
     data: {
@@ -229,6 +230,7 @@ async function saveAssistantResponse(
       role: 'assistant',
       content: response.message,
       userId: recipientUserId,
+      ...(username ? { username } : {}),
       actions: JSON.stringify({
         toolCalls: response.toolCalls.map(tc => ({
           name: tc.name,
@@ -521,7 +523,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     },
   };
 
-  await saveAssistantResponse(prompt.campaignId, response, replyRecipientId(prompt, campaignRow?.gmUserId));
+  await saveAssistantResponse(prompt.campaignId, response, replyRecipientId(prompt, campaignRow?.gmUserId), prompt.replyUsername);
 
   // ai/network: unified metering (per-GM cost attribution) + fine-tune trace
   // capture (Mike 2026-08-23: dev-era dispatches ARE the distillation corpus

@@ -20,7 +20,7 @@ import type { TerminalEvent, GameSessionInfo } from '@/types/terminal';
 import { sessionFor } from './feed-sections';
 import { narrateMechanical } from './mechanical-narration';
 
-export type LogKind = 'stats' | 'location' | 'items' | 'krma' | 'planning' | 'checks';
+export type LogKind = 'stats' | 'location' | 'items' | 'krma' | 'planning' | 'checks' | 'genesis';
 export const LOG_KINDS: Array<{ kind: LogKind; label: string }> = [
   { kind: 'stats', label: 'Stats' },
   { kind: 'location', label: 'Location' },
@@ -28,6 +28,8 @@ export const LOG_KINDS: Array<{ kind: LogKind; label: string }> = [
   { kind: 'krma', label: 'KRMA' },
   { kind: 'planning', label: 'Planning' },
   { kind: 'checks', label: 'Checks' },
+  // JEWL's genesis work-cycle reports (Mike 2026-10-11) — the Watcher's only.
+  { kind: 'genesis', label: 'Genesis' },
 ];
 
 const LOCATION_TYPES = new Set(['relocation', 'moved', 'located_at', 'arrival', 'departure']);
@@ -50,6 +52,7 @@ export function mechanicalKind(e: TerminalEvent): LogKind | null {
       if (et.startsWith('skill_')) return 'checks';
       if (et.startsWith('krma_')) return 'krma';
       if (et.startsWith('opportunity_') || et.startsWith('planning')) return 'planning';
+      if (et.startsWith('genesis')) return 'genesis';
       return null;
     }
     default:
@@ -119,7 +122,7 @@ export interface LogFilter {
 export function logKeep(e: TerminalEvent, where: 'session' | 'between', f: LogFilter): boolean {
   if (isNarratedLine(e)) return false;
   const kind = mechanicalKind(e);
-  if (kind === 'krma' && !f.isGM) return false;
+  if ((kind === 'krma' || kind === 'genesis') && !f.isGM) return false;
   if (kind === null && where !== 'between') return false;
   if (f.kinds.size > 0 && (kind === null || !f.kinds.has(kind))) return false;
   if (f.characterId && e.characterId !== f.characterId) return false;

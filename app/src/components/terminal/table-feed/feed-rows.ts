@@ -166,6 +166,11 @@ function gameEventRow(e: TerminalEvent, p: GameEventPayload): FeedRowModel | nul
   if (p.eventType === 'session_start' || p.eventType === 'session_end') {
     return { type: 'system', key: e.id, timestamp: e.timestamp, cycle: p.cycle, lines: [`[${text.toUpperCase()}]`] };
   }
+  if (p.eventType === 'genesis_report') {
+    // JEWL's full genesis cycle report (Log only): first line = who · cycle.
+    const [head, ...body] = text.split('\n');
+    return { type: 'event', key: e.id, timestamp: e.timestamp, cycle: p.cycle, tag: `[GENESIS · ${head}]`, lines: body.length ? body : [head] };
+  }
   if (p.eventType.startsWith('skill_')) {
     return { type: 'check', key: e.id, timestamp: e.timestamp, cycle: p.cycle, lines: [text] };
   }

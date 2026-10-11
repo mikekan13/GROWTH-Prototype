@@ -69,7 +69,7 @@ export default function MechanicalLog({
   );
 
   const characters = useMemo(() => logCharacters(events.filter((e) => mechanicalKind(e) !== null)), [events]);
-  const kindsShown = useMemo(() => LOG_KINDS.filter((k) => k.kind !== 'krma' || isGM), [isGM]);
+  const kindsShown = useMemo(() => LOG_KINDS.filter((k) => (k.kind !== 'krma' && k.kind !== 'genesis') || isGM), [isGM]);
 
   const toggleKind = (k: LogKind) => setKinds((prev) => {
     const next = new Set(prev);

@@ -14,7 +14,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { kickWorkLoop } from '@/ai/copilot/work-loop';
 import { openWorkSession } from './daya-work-session';
 
@@ -49,7 +49,9 @@ export async function submitCharacterGenesis(opts: {
   }
   const campaignId = character.campaignId;
 
-  // One gestation at a time per character — resume, don't duplicate.
+  // One gestation at a time per character — a second submit is refused
+  // (409) instead of silently answering 200 (Mike 2026-10-11). The loop is
+  // still nudged so an idle active session picks back up.
   const existing = await prisma.dayaWorkSession.findFirst({
     where: {
       campaignId,
@@ -60,7 +62,11 @@ export async function submitCharacterGenesis(opts: {
   });
   if (existing) {
     kickWorkLoop();
-    return { sessionId: existing.id, status: existing.status, alreadyRunning: true };
+    throw new ConflictError(
+      existing.status === 'blocked'
+        ? 'Genesis is already running for this character and is waiting on you — see its progress on the character page.'
+        : 'Genesis is already running for this character — see its progress on the character page.',
+    );
   }
 
   const name = input.characterName?.trim() || character.name;

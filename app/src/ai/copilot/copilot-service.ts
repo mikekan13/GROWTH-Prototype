@@ -14,6 +14,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { copilotHistoryWhere, type CopilotHistoryViewer } from './history-privacy';
+import { GENESIS_CHAT_USERNAME } from '@/services/character-genesis-progress';
 
 export async function getCopilotHistory(
   campaignId: string,
@@ -24,7 +25,11 @@ export async function getCopilotHistory(
     where: {
       ...copilotHistoryWhere(campaignId, viewer),
       // Hide legacy persisted STT markers ("[empty transcript]") — filter, not delete.
-      NOT: { AND: [{ username: '[ambient]' }, { content: { startsWith: '[' } }, { content: { endsWith: ']' } }] },
+      AND: [
+        { NOT: { AND: [{ username: '[ambient]' }, { content: { startsWith: '[' } }, { content: { endsWith: ']' } }] } },
+        // Genesis work-cycle reports live in the Log, not the chat (Mike 2026-10-11).
+        { OR: [{ username: null }, { username: { not: GENESIS_CHAT_USERNAME } }] },
+      ],
     },
     orderBy: { createdAt: 'desc' },
     take: limit,

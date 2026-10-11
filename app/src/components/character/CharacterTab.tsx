@@ -10,6 +10,7 @@ import { safeJsonParse } from '@/lib/safe-json';
 import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
+import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
 
 // Body-part section re-enabled (Mike 2026-08-17 body-spawn ruling): it now
 // reads the SPAWNED body-part items (character.bodyAnatomy) — per-part
@@ -131,7 +132,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set(['HEAD']));
   const [selectedSeedName, setSelectedSeedName] = useState<string>('');
   const [submittingGenesis, setSubmittingGenesis] = useState(false);
-  const [genesisMsg, setGenesisMsg] = useState('');
+  const [genesisSubmitError, setGenesisSubmitError] = useState<string | null>(null);
   const [campaignSeeds, setCampaignSeeds] = useState<CampaignSeedItem[]>([]);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -281,7 +282,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     setBackstorySubmitted(false);
     setDirty(false);
     setLastSaved(null);
-    setGenesisMsg('');
+    setGenesisSubmitError(null);
     setDescribeError(null);
 
     if (effectiveCharacter?.data) {
@@ -356,6 +357,39 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     const timer = setInterval(fetchGenome, 6000);
     return () => clearInterval(timer);
   }, [genomeInfo?.stage, fetchGenome]);
+
+  // Genesis loading screen (Mike 2026-10-11). SERVER truth, not local state:
+  // any in-flight genesis session for this character (active/blocked) shows
+  // the overlay — on any device, after navigation or reload — and replaces
+  // the Submit button. Done → the born moment, then the sheet.
+  const genesisCharId = effectiveCharacter?.id ?? null;
+  const { progress: genesis, liveTool: genesisTool, refetch: refetchGenesis } = useGenesisProgress({
+    characterId: genesisCharId, campaignId, enabled: isGM && !!genesisCharId,
+  });
+  const genesisRunning = genesisInFlight(genesis);
+  const [genesisDismissedFor, setGenesisDismissedFor] = useState<string | null>(null);
+  const [genesisSawLiveFor, setGenesisSawLiveFor] = useState<string | null>(null);
+  const [genesisBornSeenFor, setGenesisBornSeenFor] = useState<string | null>(null);
+  if (genesisRunning && genesisCharId && genesisSawLiveFor !== genesisCharId) setGenesisSawLiveFor(genesisCharId);
+  const genesisBornNow = genesis?.state === 'done' && !!genesisCharId
+    && genesisSawLiveFor === genesisCharId && genesisBornSeenFor !== genesisCharId;
+  const showGenesisOverlay = !!genesisCharId && genesisDismissedFor !== genesisCharId
+    && (submittingGenesis || !!genesisSubmitError || genesisRunning || genesisBornNow);
+  const showGenesisBadge = !!genesisCharId && !showGenesisOverlay && (genesisRunning || genesisBornNow);
+  const finishGenesis = useCallback(() => {
+    if (genesisCharId) setGenesisBornSeenFor(genesisCharId);
+    void fetchGenome();
+  }, [genesisCharId, fetchGenome]);
+  useEffect(() => {
+    if (!genesisBornNow || !showGenesisOverlay) return;
+    const t = setTimeout(finishGenesis, 8000); // the born moment, then the sheet
+    return () => clearTimeout(t);
+  }, [genesisBornNow, showGenesisOverlay, finishGenesis]);
+  const dismissGenesis = () => {
+    if (genesisSubmitError) { setGenesisSubmitError(null); return; }
+    if (genesis?.state === 'done') { finishGenesis(); return; }
+    if (genesisCharId) setGenesisDismissedFor(genesisCharId);
+  };
 
   const updateHeight = useCallback((value: number) => {
     setPhysicalDescription(prev => ({ ...prev, height: value }));
@@ -590,7 +624,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const submitToJewl = async () => {
     if (!effectiveCharacter?.id || !backstoryText.trim() || submittingGenesis) return;
     setSubmittingGenesis(true);
-    setGenesisMsg('');
+    setGenesisSubmitError(null);
+    setGenesisDismissedFor(null);
     try {
       if (dirty) await save();
       const res = await fetch(`/api/characters/${effectiveCharacter.id}/genesis`, {
@@ -608,13 +643,12 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Genesis submission failed');
-      setGenesisMsg(data.alreadyRunning
-        ? 'Genesis already in progress — JEWL is on it.'
-        : 'Submitted — JEWL has opened a genesis session and is working.');
+      // 409 = a run is already in flight: no error — the overlay shows it.
+      if (!res.ok && res.status !== 409) throw new Error(data.error || 'Genesis submission failed');
       fetchGenome();
+      await refetchGenesis();
     } catch (err) {
-      setGenesisMsg(err instanceof Error ? err.message : 'Genesis submission failed');
+      setGenesisSubmitError(err instanceof Error ? err.message : 'Genesis submission failed');
     } finally {
       setSubmittingGenesis(false);
     }
@@ -630,6 +664,16 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
   return (
     <div className="absolute inset-0 overflow-y-auto" style={{ backgroundColor: '#0a0a1a' }}>
+      {showGenesisOverlay && (
+        <GenesisLoadingOverlay
+          progress={submittingGenesis ? null : genesis}
+          liveTool={genesisTool}
+          submitError={genesisSubmitError}
+          onDismiss={dismissGenesis}
+          onViewSheet={finishGenesis}
+        />
+      )}
+      {showGenesisBadge && <GenesisBadge progress={genesis} onOpen={() => setGenesisDismissedFor(null)} />}
       <div className="max-w-4xl mx-auto p-6 space-y-5">
 
         {/* TOP ROW — Name centered */}
@@ -1311,7 +1355,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               ? 'Trailblazer-submitted backstory. Use to inform seed, root, and branch creation.'
               : 'Your history, personality, motivations, fears. Your Watcher builds your mechanical character from this.'}
           </div>
-          {isEditable ? (
+          {isEditable && !genesisRunning ? (
             <textarea
               value={backstoryText}
               onChange={e => { setBackstoryText(e.target.value); setDirty(true); }}
@@ -1349,7 +1393,21 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             >
               {saving ? 'Saving...' : dirty ? 'Save Draft' : 'Saved'}
             </button>
-            {isGM && effectiveCharacter?.id && (
+            {isGM && effectiveCharacter?.id && genesisRunning && (
+              <button
+                onClick={() => setGenesisDismissedFor(null)}
+                className="px-6 py-2 text-xs uppercase tracking-wider"
+                style={{
+                  fontFamily: 'var(--font-terminal), Consolas, monospace',
+                  backgroundColor: '#000', color: 'var(--terminal-prime)',
+                  border: '1px solid var(--terminal-prime)', borderRadius: '2px', cursor: 'pointer',
+                }}
+                title="JEWL is building this character — open the genesis progress screen."
+              >
+                ◆ Genesis running · {genesis?.step ?? '…'}/{genesis?.total ?? 6} — view
+              </button>
+            )}
+            {isGM && effectiveCharacter?.id && !genesisRunning && (
               <button
                 onClick={submitToJewl}
                 disabled={submittingGenesis || !backstoryText.trim()}
@@ -1366,11 +1424,6 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               >
                 {submittingGenesis ? 'Submitting…' : '◆ Submit to JEWL'}
               </button>
-            )}
-            {genesisMsg && (
-              <span className="text-xs" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                {genesisMsg}
-              </span>
             )}
             {/* The Watcher IS the approver — submitting to yourself makes no sense (Mike 2026-10-11). */}
             {!isGM && <button

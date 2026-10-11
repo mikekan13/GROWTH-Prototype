@@ -97,6 +97,18 @@ export async function updateWorkSession(opts: {
     data,
   });
 
+  // Genesis transitions get one short in-voice JEWL line in the GM's chat
+  // (the overlay carries progress; the Log carries the report). Best-effort.
+  if (opts.status && opts.status !== session.status && opts.status !== 'active'
+    && session.goal.startsWith('Character genesis')) {
+    void import('./character-genesis-progress')
+      .then(m => m.announceGenesisStatus(updated))
+      .catch(err => {
+        // eslint-disable-next-line no-console
+        console.error('[daya-work-session] genesis status line failed:', err);
+      });
+  }
+
   if (opts.status === 'blocked') emit(session.campaignId, 'blocked', updated, updated.blockedReason ?? undefined);
   else if (opts.status === 'done') emit(session.campaignId, 'done', updated, opts.progressNote);
   else if (opts.status === 'cancelled') emit(session.campaignId, 'cancelled', updated);

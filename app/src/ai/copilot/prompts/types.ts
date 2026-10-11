@@ -64,6 +64,10 @@ export interface JewlPrompt {
   canvasAction?: CanvasActionPayload;
   /** Optional attached media (multimodal). */
   media?: JewlMedia[];
+  /** Stamp the saved reply row with this username (e.g. '[genesis]' keeps a
+   *  genesis work cycle's long report out of the visible chat — it goes to
+   *  the Log instead; Mike 2026-10-11). JEWL still sees it in his history. */
+  replyUsername?: string;
 }
 
 /** Outcome of executing one tool call. */

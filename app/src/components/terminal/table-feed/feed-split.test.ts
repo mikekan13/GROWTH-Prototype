@@ -121,3 +121,18 @@ describe('the two trees', () => {
     expect(logCharacters(rows())).toEqual([{ id: 'ash', name: 'Ash' }]);
   });
 });
+
+describe('genesis reports in the Log (2026-10-11)', () => {
+  const report = () => ev(5, { kind: 'game_event', eventType: 'genesis_report', description: 'Violet · cycle 3\n| Block | Type |\n| Root | 17 yrs |' }, { actor: 'ai_copilot', characterId: 'v', characterName: 'Violet' });
+  it('is a Genesis Log row, the Watcher only, never a feed line', () => {
+    const e = report();
+    expect(mechanicalKind(e)).toBe('genesis');
+    expect(logKeep(e, 'between', { kinds: new Set(), characterId: null, isGM: true })).toBe(true);
+    expect(logKeep(e, 'between', { kinds: new Set(), characterId: null, isGM: false })).toBe(false);
+    expect(feedKeep(e)).toBe(false);
+  });
+  it('renders the report body as lines under a who · cycle tag', () => {
+    const [row] = buildFeedRows([report()], []);
+    expect(row).toMatchObject({ type: 'event', tag: '[GENESIS · Violet · cycle 3]', lines: ['| Block | Type |', '| Root | 17 yrs |'] });
+  });
+});
