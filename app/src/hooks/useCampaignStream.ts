@@ -47,6 +47,89 @@ interface UseCampaignStreamReturn {
   on: <K extends StreamEventData['kind']>(kind: K, handler: KindHandler<K>) => () => void;
 }
 
+// ── Shared connection (one EventSource per campaign per tab) ─────────────
+//
+// Several components subscribe to the same campaign stream (canvas, JEWL chip,
+// death-save dialog...). Each used to open its own EventSource, i.e. its own
+// long-lived HTTP/1.1 socket. Browsers cap sockets per host at 6 across ALL
+// tabs, so two or three campaign tabs filled the pool and every other request
+// queued forever — in dev the first casualty was the app/layout chunk
+// ("ChunkLoadError: Loading chunk app/layout failed (timeout)", 2026-10-11).
+// Hook instances now share one refcounted EventSource per campaignId.
+
+interface StreamListener {
+  onOpen: () => void;
+  onEvent: (event: CampaignStreamEvent) => void;
+  onError: () => void;
+}
+
+interface SharedStream {
+  es: EventSource;
+  listeners: Set<StreamListener>;
+  open: boolean;
+  users: ConnectedUser[];
+}
+
+const sharedStreams = new Map<string, SharedStream>();
+
+function acquireStream(campaignId: string, listener: StreamListener): { shared: SharedStream; release: () => void } {
+  let shared = sharedStreams.get(campaignId);
+  if (!shared) {
+    const es = new EventSource(`/api/campaigns/${campaignId}/stream`);
+    const s: SharedStream = { es, listeners: new Set(), open: false, users: [] };
+    es.onopen = () => {
+      s.open = true;
+      for (const l of [...s.listeners]) l.onOpen();
+    };
+    es.onmessage = (e: MessageEvent) => {
+      let event: CampaignStreamEvent;
+      try {
+        event = JSON.parse(e.data);
+      } catch {
+        return; // Ignore malformed events
+      }
+      const { data } = event;
+      if (data.kind === 'state_sync') s.users = data.connectedUsers;
+      if (data.kind === 'connection') {
+        if (data.status === 'connected') {
+          if (!s.users.some(u => u.userId === data.userId)) {
+            s.users = [...s.users, { userId: data.userId, username: data.username, role: data.role }];
+          }
+        } else {
+          s.users = s.users.filter(u => u.userId !== data.userId);
+        }
+      }
+      // A being speaking at the table (U2c, 2026-10-06): start / partial /
+      // retract / final for one utterance. Re-broadcast ONCE per tab as a
+      // window event so the terminal's growing line can listen without the
+      // whole campaign tree re-rendering on every partial.
+      if (data.kind === 'being_speaking') {
+        window.dispatchEvent(new CustomEvent('growth:being-speaking', { detail: data }));
+      }
+      for (const l of [...s.listeners]) l.onEvent(event);
+    };
+    es.onerror = () => {
+      s.open = false;
+      for (const l of [...s.listeners]) l.onError();
+      // EventSource auto-reconnects with exponential backoff
+    };
+    sharedStreams.set(campaignId, s);
+    shared = s;
+  }
+  const s = shared;
+  s.listeners.add(listener);
+  return {
+    shared: s,
+    release: () => {
+      s.listeners.delete(listener);
+      if (s.listeners.size === 0) {
+        s.es.close();
+        if (sharedStreams.get(campaignId) === s) sharedStreams.delete(campaignId);
+      }
+    },
+  };
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────
 
 export function useCampaignStream({
@@ -59,7 +142,6 @@ export function useCampaignStream({
   const [connected, setConnected] = useState(false);
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlersRef = useRef<Map<string, Set<(data: any, env: CampaignStreamEvent) => void>>>(new Map());
 
@@ -92,74 +174,46 @@ export function useCampaignStream({
   useEffect(() => {
     if (!enabled || !campaignId) return;
 
-    const es = new EventSource(`/api/campaigns/${campaignId}/stream`);
-    eventSourceRef.current = es;
-
-    es.onopen = () => {
-      setConnected(true);
-      onConnectRef.current?.();
-    };
-
-    es.onmessage = (e: MessageEvent) => {
-      let event: CampaignStreamEvent;
-      try {
-        event = JSON.parse(e.data);
-      } catch {
-        return; // Ignore malformed events
-      }
-
-      const { data } = event;
-
-      // ── Built-in handlers ─────────────────────────────────────────────
-
-      if (data.kind === 'state_sync') {
-        setConnectedUsers(data.connectedUsers);
-      }
-
-      if (data.kind === 'connection') {
-        if (data.status === 'connected') {
-          setConnectedUsers(prev => {
-            if (prev.some(u => u.userId === data.userId)) return prev;
-            return [...prev, { userId: data.userId, username: data.username, role: data.role }];
-          });
-        } else {
-          setConnectedUsers(prev => prev.filter(u => u.userId !== data.userId));
+    let sharedRef: SharedStream | null = null;
+    const listener: StreamListener = {
+      onOpen: () => {
+        setConnected(true);
+        onConnectRef.current?.();
+      },
+      onEvent: (event) => {
+        const { data } = event;
+        if ((data.kind === 'state_sync' || data.kind === 'connection') && sharedRef) {
+          setConnectedUsers(sharedRef.users);
         }
-      }
-
-      // A being speaking at the table (U2c, 2026-10-06): start / partial /
-      // retract / final for one utterance. Re-broadcast as a window event so
-      // the terminal's growing line can listen without the whole campaign
-      // tree re-rendering on every partial (partials arrive per token burst).
-      if (data.kind === 'being_speaking') {
-        window.dispatchEvent(new CustomEvent('growth:being-speaking', { detail: data }));
-      }
-
-      // ── Dispatch to subscribers ───────────────────────────────────────
-
-      onEventRef.current?.(event);
-
-      const kindHandlers = handlersRef.current.get(data.kind);
-      if (kindHandlers) {
-        for (const handler of kindHandlers) {
-          try {
-            handler(data, event);
-          } catch {
-            // Don't let a broken subscriber crash the bus
+        onEventRef.current?.(event);
+        const kindHandlers = handlersRef.current.get(data.kind);
+        if (kindHandlers) {
+          for (const handler of kindHandlers) {
+            try {
+              handler(data, event);
+            } catch {
+              // Don't let a broken subscriber crash the bus
+            }
           }
         }
-      }
+      },
+      onError: () => {
+        setConnected(false);
+        onDisconnectRef.current?.();
+      },
     };
 
-    es.onerror = () => {
-      setConnected(false);
-      onDisconnectRef.current?.();
-      // EventSource auto-reconnects with exponential backoff
-    };
+    const { shared, release } = acquireStream(campaignId, listener);
+    sharedRef = shared;
+    // Joining an already-open shared stream: catch up on its state.
+    if (shared.open) {
+      setConnected(true);
+      setConnectedUsers(shared.users);
+      onConnectRef.current?.();
+    }
 
     return () => {
-      es.close();
-      eventSourceRef.current = null;
+      release();
       setConnected(false);
     };
   }, [campaignId, enabled]);
