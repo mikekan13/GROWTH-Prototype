@@ -1372,7 +1372,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 {genesisMsg}
               </span>
             )}
-            <button
+            {/* The Watcher IS the approver — submitting to yourself makes no sense (Mike 2026-10-11). */}
+            {!isGM && <button
               onClick={async () => {
                 if (!characterName || !backstoryText || submittingBackstory) return;
                 // Save current draft first so the Watcher sees the latest.
@@ -1422,7 +1423,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               }}
             >
               {submittingBackstory ? 'Submitting...' : backstorySubmitted ? 'Re-submit to Watcher' : 'Submit to Watcher'}
-            </button>
+            </button>}
             {lastSaved && !dirty && (
               <span className="text-xs" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                 Last saved {lastSaved}
