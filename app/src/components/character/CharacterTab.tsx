@@ -373,21 +373,24 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   if (genesisRunning && genesisCharId && genesisSawLiveFor !== genesisCharId) setGenesisSawLiveFor(genesisCharId);
   const genesisBornNow = genesis?.state === 'done' && !!genesisCharId
     && genesisSawLiveFor === genesisCharId && genesisBornSeenFor !== genesisCharId;
+  // Watcher steps (JEWL's drafts awaiting consent) keep the screen up after
+  // the build finishes, until every one is submitted (Mike 2026-10-11).
+  const genesisNeedsGm = (genesis?.gmSteps?.length ?? 0) > 0;
   const showGenesisOverlay = !!genesisCharId && genesisDismissedFor !== genesisCharId
-    && (submittingGenesis || !!genesisSubmitError || genesisRunning || genesisBornNow);
-  const showGenesisBadge = !!genesisCharId && !showGenesisOverlay && (genesisRunning || genesisBornNow);
+    && (submittingGenesis || !!genesisSubmitError || genesisRunning || genesisBornNow || genesisNeedsGm);
+  const showGenesisBadge = !!genesisCharId && !showGenesisOverlay && (genesisRunning || genesisBornNow || genesisNeedsGm);
   const finishGenesis = useCallback(() => {
     if (genesisCharId) setGenesisBornSeenFor(genesisCharId);
     void fetchGenome();
   }, [genesisCharId, fetchGenome]);
   useEffect(() => {
-    if (!genesisBornNow || !showGenesisOverlay) return;
+    if (!genesisBornNow || !showGenesisOverlay || genesisNeedsGm) return;
     const t = setTimeout(finishGenesis, 8000); // the born moment, then the sheet
     return () => clearTimeout(t);
   }, [genesisBornNow, showGenesisOverlay, finishGenesis]);
   const dismissGenesis = () => {
     if (genesisSubmitError) { setGenesisSubmitError(null); return; }
-    if (genesis?.state === 'done') { finishGenesis(); return; }
+    if (genesis?.state === 'done') finishGenesis();
     if (genesisCharId) setGenesisDismissedFor(genesisCharId);
   };
 
@@ -670,7 +673,10 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           liveTool={genesisTool}
           submitError={genesisSubmitError}
           onDismiss={dismissGenesis}
-          onViewSheet={finishGenesis}
+          onViewSheet={() => { finishGenesis(); if (genesisCharId) setGenesisDismissedFor(genesisCharId); }}
+          campaignId={campaignId}
+          onStepsChanged={() => { void refetchGenesis(); }}
+          onOpenForge={() => { if (genesisCharId) setGenesisDismissedFor(genesisCharId); }}
         />
       )}
       {showGenesisBadge && <GenesisBadge progress={genesis} onOpen={() => setGenesisDismissedFor(null)} />}

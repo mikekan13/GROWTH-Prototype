@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import type { GenesisProgress } from '@/services/character-genesis-progress';
+import { GenesisGmSteps } from './GenesisGmSteps';
 
 export type { GenesisProgress };
 
@@ -205,10 +206,15 @@ export interface GenesisLoadingOverlayProps {
   fixedNow?: number;
   /** Harness: seed the rolling log. */
   initialLog?: string[];
+  /** Watcher steps (submit JEWL's drafts): needs the campaign + a refetch. */
+  campaignId?: string;
+  onStepsChanged?: () => void;
+  onOpenForge?: () => void;
 }
 
 export function GenesisLoadingOverlay({
   progress, liveTool, submitError, onDismiss, onViewSheet, fixedNow, initialLog,
+  campaignId, onStepsChanged, onOpenForge,
 }: GenesisLoadingOverlayProps) {
   const state = submitError ? 'error' : progress?.state ?? 'none';
   const running = state === 'running' || state === 'waiting' || state === 'none';
@@ -266,7 +272,8 @@ export function GenesisLoadingOverlay({
         <div className="gn-title">
           <span className="gn-title-k">{'// GENESIS'}</span>
           <span className="gn-title-v">
-            {state === 'done' ? 'a being is born'
+            {state === 'done' && (progress?.gmSteps?.length ?? 0) > 0 ? `a being is born · ${progress?.gmSteps?.length} need${progress?.gmSteps?.length === 1 ? 's' : ''} you`
+              : state === 'done' ? 'a being is born'
               : state === 'error' ? 'genesis halted'
                 : state === 'waiting' ? 'paused · waiting on the watcher'
                   : 'JEWL is assembling a being'}
@@ -312,7 +319,12 @@ export function GenesisLoadingOverlay({
             </div>
           </div>
         )}
-        {state === 'waiting' && progress?.wait && WAIT_COPY[progress.wait] && (
+        {campaignId && progress && (progress.gmSteps?.length ?? 0) > 0 && (
+          <GenesisGmSteps steps={progress.gmSteps} campaignId={campaignId}
+            onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} />
+        )}
+        {state === 'waiting' && progress?.wait && WAIT_COPY[progress.wait]
+          && !(progress.wait === 'approval' && campaignId && (progress.gmSteps?.length ?? 0) > 0) && (
           <div className="gn-waitbox" role="status">
             <div className="gn-wait-t">{WAIT_COPY[progress.wait].title}</div>
             <div className="gn-wait-b">
@@ -377,8 +389,10 @@ export function GenesisBadge({ progress, onOpen, fixedNow }: {
   const fills = pillarFills(progress);
   const started = progress.startedAt ? Date.parse(progress.startedAt) : now;
   const ended = progress.endedAt ? Date.parse(progress.endedAt) : null;
-  const tone = progress.state === 'error' ? 'err' : progress.state === 'waiting' ? 'wait' : progress.state === 'done' ? 'done' : 'run';
-  const text = progress.state === 'done' ? 'BORN · VIEW'
+  const needs = (progress.gmSteps ?? []).length;
+  const tone = progress.state === 'error' ? 'err' : progress.state === 'waiting' || needs > 0 ? 'wait' : progress.state === 'done' ? 'done' : 'run';
+  const text = progress.state === 'done' && needs > 0 ? `BORN · ${needs} NEED${needs === 1 ? 'S' : ''} YOU`
+    : progress.state === 'done' ? 'BORN · VIEW'
     : progress.state === 'error' ? 'GENESIS HALTED'
       : progress.state === 'waiting' ? `NEEDS YOU · ${progress.step}/${progress.total}`
         : `GENESIS ${progress.step}/${progress.total} · ${fmtElapsed((ended ?? now) - started)}`;

@@ -348,6 +348,19 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     return () => window.removeEventListener('growth:dice-settled', handler);
   }, [campaign.id, contestedState]);
 
+  // Genesis GM steps "FORGE ↗" (2026-10-11): open the Forge on that draft.
+  const [forgeFocus, setForgeFocus] = useState<{ id: string; type: string; nonce: number } | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; type?: string }>).detail;
+      if (!d?.id || !d.type) return;
+      setForgeFocus({ id: d.id, type: d.type, nonce: Date.now() });
+      setActiveTab('forge');
+    };
+    window.addEventListener('growth:open-forge', handler);
+    return () => window.removeEventListener('growth:open-forge', handler);
+  }, []);
+
   // ── Contested check line (ref-based for smooth animation) ──
   const [defenderPickerTarget, setDefenderPickerTarget] = useState<{ id: string; name: string } | null>(null);
   const contestedLineRef = useRef<SVGLineElement>(null);
@@ -1786,6 +1799,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             campaignId={campaign.id}
             isGM={userRole === 'WATCHER' || userRole === 'ADMIN' || userRole === 'GODHEAD'}
             userId={userId || ''}
+            focus={forgeFocus}
           />
         )}
 

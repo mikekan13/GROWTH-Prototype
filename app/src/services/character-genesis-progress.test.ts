@@ -231,3 +231,38 @@ describe('announceGenesisStatus / logGenesisReport', () => {
     expect(await logGenesisReport({ campaignId: 'c1', goal: GOAL, message: '  ', cycle: 4, jewlUserId: 'j' })).toBeNull();
   });
 });
+
+describe('GM steps — JEWL drafts awaiting the Watcher', () => {
+  const draft = {
+    id: 'f1', type: 'thorn', status: 'draft', name: 'Sealed Past', karmicValue: BigInt(-12),
+    createdAt: t0,
+    relationshipTags: JSON.stringify({ evaluation: { evaluator: 'formula (pre-Kai)', price: -12 } }),
+    data: JSON.stringify({
+      description: 'A wound sealed shut.', pillar: 'spirit', mechanicalEffect: 'Recall falters near the wound.',
+      effects: [
+        { kind: 'persistent', name: 'Fault line', condition: 'recalling childhood', modifiers: [{ flat: -3, governorAttribute: 'focus', label: 'recall' }] },
+        { kind: 'triggered', name: 'Anchor', trigger: 'a sensory anchor surfaces', appliesCondition: 'Confused' },
+      ],
+      _proposalNote: 'Her amnesia is the campaign hook.',
+    }),
+  };
+
+  it('maps a pending draft to a full step card', () => {
+    const p = deriveGenesisProgress({ ...base, session: session({ status: 'blocked', blockedReason: 'batch' }), entityAuthored: true, forged: [draft, { ...draft, id: 'f2', status: 'published' }] });
+    expect(p.gmSteps).toHaveLength(1);
+    expect(p.gmSteps[0]).toEqual({
+      id: 'f1', type: 'thorn', name: 'Sealed Past', kv: -12, pricedBy: 'formula (pre-Kai)',
+      description: 'A wound sealed shut.',
+      rules: ['Recall falters near the wound.', 'Fault line — while recalling childhood: -3 focus (recall)', 'Anchor — when a sensory anchor surfaces, applies Confused'],
+      ageAdded: null, purpose: 'Her amnesia is the campaign hook.', draftedAt: t0.toISOString(),
+    });
+  });
+
+  it('keeps listing after the build is done until every draft is submitted', () => {
+    const done = deriveGenesisProgress({ ...base, session: session({ status: 'done', endedAt: t0 }), entityAuthored: true, forged: [draft] });
+    expect(done.state).toBe('done');
+    expect(done.gmSteps.map(g => g.id)).toEqual(['f1']);
+    const cleared = deriveGenesisProgress({ ...base, session: session({ status: 'done', endedAt: t0 }), entityAuthored: true, forged: [{ ...draft, status: 'published' }] });
+    expect(cleared.gmSteps).toEqual([]);
+  });
+});

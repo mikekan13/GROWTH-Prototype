@@ -53,7 +53,39 @@ export interface GenesisFacts {
   entityAuthored: boolean;
   memoryCount: number;
   /** JEWL's Forge drafts in this campaign during the session window. */
-  forged: Array<{ type: string; status: string }>;
+  forged: ForgedRow[];
+}
+
+/** A Forge row JEWL drafted during the session (full rows for GM steps). */
+export interface ForgedRow {
+  type: string;
+  status: string;
+  id?: string;
+  name?: string;
+  data?: string;
+  karmicValue?: bigint | number | null;
+  createdAt?: Date;
+  relationshipTags?: string | null;
+}
+
+/** A step only the Watcher can take: one of JEWL's drafts awaiting the
+ *  GM's consent in the Forge ([[jewl-never-approves-forge-consent-2026-08-26]]).
+ *  Submitting goes through the Forge's own publish route — never here. */
+export interface GenesisGmStep {
+  id: string;
+  type: string;
+  name: string;
+  kv: number | null;
+  /** Who priced it: 'formula (pre-Kai)', Kai, … — provenance of the number. */
+  pricedBy: string | null;
+  description: string | null;
+  /** Rule text: the prose summary plus one line per structured effect. */
+  rules: string[];
+  /** Root/branch: calendar years the block adds. */
+  ageAdded: number | null;
+  /** JEWL's GM-facing note — what the draft is for. */
+  purpose: string | null;
+  draftedAt: string | null;
 }
 
 export interface GenesisProgress {
@@ -75,6 +107,8 @@ export interface GenesisProgress {
   };
   wait: GenesisWaitKind | null;
   error: 'cancelled' | 'provider' | null;
+  /** Drafts awaiting the Watcher — listed until every one is done. */
+  gmSteps: GenesisGmStep[];
   startedAt: string | null;
   endedAt: string | null;
   lastCycleAt: string | null;
@@ -90,6 +124,61 @@ export function classifyWait(reason: string | null, pendingApproval: number): Ge
   if (r.startsWith('ai provider failing')) return 'provider';
   if (r.startsWith('no actionable work')) return 'stalled';
   return pendingApproval > 0 ? 'approval' : 'question';
+}
+
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
+/** One effect entry → one readable rule line (no invention: fields as written). */
+function effectLine(e: Record<string, unknown>): string | null {
+  const name = str(e.name);
+  if (e.kind === 'triggered') {
+    const parts = [str(e.trigger) && `when ${str(e.trigger)}`, str(e.appliesCondition) && `applies ${str(e.appliesCondition)}`,
+      str(e.spawnsBlossom) && `spawns ${str(e.spawnsBlossom)}`].filter(Boolean);
+    return [name, parts.join(', ')].filter(Boolean).join(' — ') || null;
+  }
+  const mods = Array.isArray(e.modifiers) ? e.modifiers as Array<Record<string, unknown>> : [];
+  const modText = mods.map(m => {
+    const flat = typeof m.flat === 'number' ? (m.flat >= 0 ? `+${m.flat}` : `${m.flat}`) : '';
+    const target = str(m.governorAttribute) ?? str(m.skillNamePattern) ?? str(m.pillar) ?? (m.allChecks ? 'all checks' : null);
+    return [flat, target, str(m.label) && `(${str(m.label)})`].filter(Boolean).join(' ');
+  }).filter(Boolean).join('; ');
+  const cond = str(e.condition);
+  return [name, [cond && `while ${cond}`, modText].filter(Boolean).join(': ')].filter(Boolean).join(' — ') || null;
+}
+
+/** A pending JEWL draft → the Watcher's step card (pure). */
+export function toGmStep(row: ForgedRow): GenesisGmStep | null {
+  if (row.status !== 'draft' || !row.id || !row.name) return null;
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(row.data ?? '{}') as Record<string, unknown>; } catch { /* raw */ }
+  let pricedBy: string | null = null;
+  try {
+    const tags = JSON.parse(row.relationshipTags ?? 'null') as { evaluation?: { evaluator?: unknown } } | null;
+    pricedBy = str(tags?.evaluation?.evaluator);
+  } catch { /* none */ }
+  const rules: string[] = [];
+  const summary = str(data.mechanicalEffect);
+  if (summary) rules.push(summary);
+  if (Array.isArray(data.effects)) {
+    for (const e of data.effects) {
+      const line = e && typeof e === 'object' ? effectLine(e as Record<string, unknown>) : null;
+      if (line) rules.push(line);
+    }
+  }
+  return {
+    id: row.id,
+    type: row.type,
+    name: row.name,
+    kv: row.karmicValue != null ? Number(row.karmicValue) : (typeof data.declaredKv === 'number' ? data.declaredKv : null),
+    pricedBy: pricedBy ?? (typeof data.declaredKv === 'number' ? 'declared by JEWL' : null),
+    description: str(data.description),
+    rules,
+    ageAdded: typeof data.ageAdded === 'number' ? data.ageAdded : null,
+    purpose: str(data._proposalNote),
+    draftedAt: row.createdAt ? row.createdAt.toISOString() : null,
+  };
 }
 
 /** Pure derivation — every stage below the highest one with evidence is done. */
@@ -115,7 +204,7 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
     return {
       state: 'none', sessionId: null, current: null, step: 0, total, counts,
       stages: GENESIS_STAGES.map(st => ({ ...st, status: 'pending' as const })),
-      wait: null, error: null, startedAt: null, endedAt: null, lastCycleAt: null,
+      wait: null, error: null, gmSteps: [], startedAt: null, endedAt: null, lastCycleAt: null,
     };
   }
 
@@ -155,6 +244,7 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
     counts,
     wait,
     error,
+    gmSteps: facts.forged.map(toGmStep).filter((g): g is GenesisGmStep => g !== null),
     startedAt: s.startedAt.toISOString(),
     endedAt: s.endedAt ? s.endedAt.toISOString() : null,
     lastCycleAt: s.lastCycleAt ? s.lastCycleAt.toISOString() : null,
@@ -211,7 +301,7 @@ async function loadGenesisFacts(
     } catch { /* unparsable profile = not authored */ }
   }
 
-  let forged: Array<{ type: string; status: string }> = [];
+  let forged: ForgedRow[] = [];
   if (session) {
     const jewl = await getJewlGodHead();
     forged = await prisma.forgeItem.findMany({
@@ -220,7 +310,11 @@ async function loadGenesisFacts(
         createdBy: jewl.characterUserId,
         createdAt: { gte: session.startedAt, ...(session.endedAt ? { lte: session.endedAt } : {}) },
       },
-      select: { type: true, status: true },
+      select: {
+        id: true, type: true, status: true, name: true, data: true,
+        karmicValue: true, createdAt: true, relationshipTags: true,
+      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 

@@ -44,6 +44,9 @@ interface ForgeWorkshopProps {
   campaignId: string;
   isGM: boolean;
   userId: string;
+  /** Open on one draft (genesis GM steps "FORGE ↗", 2026-10-11). A new
+   *  nonce re-applies the same item. */
+  focus?: { id: string; type: string; nonce: number } | null;
 }
 
 // ── Block Type Config ─────────────────────────────────────────────────────
@@ -808,7 +811,7 @@ function BlueprintCard({
 
 // ── Main Component ────────────────────────────────────────────────────────
 
-export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorkshopProps) {
+export default function ForgeWorkshop({ campaignId, isGM, userId, focus }: ForgeWorkshopProps) {
   const [activeType, setActiveType] = useState<BlockType>('seed');
   const [view, setView] = useState<'campaign' | 'global'>('campaign');
   const [campaignItems, setCampaignItems] = useState<Blueprint[]>([]);
@@ -816,6 +819,16 @@ export default function ForgeWorkshop({ campaignId, isGM, userId }: ForgeWorksho
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+
+  // A focus request lands once per nonce: its type tab, campaign view, selected.
+  const [seenFocus, setSeenFocus] = useState<number | null>(null);
+  if (focus && focus.nonce !== seenFocus && BLOCK_TYPES.some(t => t.key === focus.type)) {
+    setSeenFocus(focus.nonce);
+    setActiveType(focus.type as BlockType);
+    setView('campaign');
+    setSearch('');
+    setSelectedId(focus.id);
+  }
 
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
