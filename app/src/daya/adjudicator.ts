@@ -171,6 +171,7 @@ export async function resolveIntent(
     {
       tier: 'C',
       subsystem: 'adjudicator',
+      contentClass: 'fiction',
       entityId: entityDaId,
       messages: [
         { role: 'system', content: buildAdjudicatorPrompt() },

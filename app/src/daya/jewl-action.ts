@@ -84,6 +84,7 @@ export async function runJewlToolAction(
       {
         tier: 'C',
         subsystem: 'jewl_action',
+        contentClass: 'fiction',
         entityId: entityDaId,
         messages: [{ role: 'system', content: buildToolDecisionPrompt(intent) }],
         maxTokens: 300,

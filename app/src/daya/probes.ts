@@ -142,7 +142,7 @@ export async function runProbeSweep(entityIds: string[]): Promise<ProbeRunResult
     for (const q of PROBE_SET_V1) {
       try {
         const res = await chat({
-          tier: 'L1', subsystem: 'probe', entityId,
+          tier: 'L1', subsystem: 'probe', contentClass: 'fiction', entityId,
           messages: [{ role: 'system', content: system }, { role: 'user', content: q.question }],
           maxTokens: 220, temperature: 0.4, rationale: 'identity probe sweep (individuation measurement)',
         });

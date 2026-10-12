@@ -662,6 +662,7 @@ export async function runDreamConsolidation(
           {
             tier: 'L1',
             subsystem: 'dream',
+            contentClass: 'fiction',
             entityId: ctx.entityDaId,
             messages: [
               { role: 'system', content: prompt },

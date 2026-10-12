@@ -305,7 +305,7 @@ async function main(): Promise<void> {
     // Is the lane warm? One token, timed. (Cold: this is the call that waits out the worker's start.)
     step('probing the lane');
     const probeAt = Date.now();
-    await chat({ tier: 'L1', subsystem: 'u2-probe', messages: [{ role: 'user', content: 'ok' }], maxTokens: 1 });
+    await chat({ tier: 'L1', subsystem: 'u2-probe', contentClass: 'fiction', messages: [{ role: 'user', content: 'ok' }], maxTokens: 1 });
     const probeMs = Date.now() - probeAt;
     quiet(`\nlane probe: ${probeMs} ms — ${DRY ? 'DRY RUN (fake lane, fake cloud)' : probeMs < 5000 ? 'warm' : 'it was COLD; warm now'}`);
 

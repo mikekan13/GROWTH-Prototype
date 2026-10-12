@@ -127,7 +127,7 @@ export async function tagStimulusWithModel(
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await chat(
-        { tier, subsystem: 'tagger', entityId, messages, maxTokens: 400, temperature: attempt === 0 ? 0.2 : 0 },
+        { tier, subsystem: 'tagger', contentClass: 'fiction', entityId, messages, maxTokens: 400, temperature: attempt === 0 ? 0.2 : 0 },
         overrides,
       );
       const parsed = parseTaggerJson(result.text);

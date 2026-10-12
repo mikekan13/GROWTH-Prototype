@@ -190,7 +190,7 @@ async function runSoulSim(ctx: EntityContext, overrides: DayaClientOverrides): P
   const prompt = buildSoulPrompt({ stateJson, deltaSummary });
 
   const attempt = () =>
-    chat({ tier: 'L1', subsystem: 'soul', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 200 }, overrides);
+    chat({ tier: 'L1', subsystem: 'soul', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 200 }, overrides);
 
   let raw: string;
   try {
@@ -238,7 +238,7 @@ async function callSpiritOnce(
   const messages: DayaChatMessage[] = [{ role: 'system', content: prompt }];
   if (retryHint) messages.push({ role: 'user', content: retryHint });
 
-  const result = await chat({ tier: 'L1', subsystem: 'spirit', entityId: ctx.entityDaId, messages, maxTokens: 500 }, overrides);
+  const result = await chat({ tier: 'L1', subsystem: 'spirit', contentClass: 'fiction', entityId: ctx.entityDaId, messages, maxTokens: 500 }, overrides);
   return result.text;
 }
 
@@ -255,7 +255,7 @@ async function runBodyOutward(
 ): Promise<BodyOutwardResult> {
   const prompt = buildBodyOutwardPrompt({ intent: intentPlain, facts: facts.map((f) => ({ subjectKey: f.subjectKey, fact: f.fact })) });
   try {
-    const result = await chat({ tier: 'L1', subsystem: 'body', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 200 }, overrides);
+    const result = await chat({ tier: 'L1', subsystem: 'body', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 200 }, overrides);
     const parsed = parseBodyOutwardResponse(result.text);
     if (parsed) return parsed;
   } catch (err) {
@@ -273,7 +273,7 @@ async function runBodyInward(
   const prompt = buildBodyInwardPrompt({ outcomeBand, experienceContent });
   let raw: string;
   try {
-    raw = (await chat({ tier: 'L1', subsystem: 'body', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 150 }, overrides)).text;
+    raw = (await chat({ tier: 'L1', subsystem: 'body', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 150 }, overrides)).text;
   } catch (err) {
     console.error('[daya/ensemble] body inward call failed (falling back to template):', err);
     return 'Something registers, plain and physical, though the details blur.';
@@ -683,7 +683,7 @@ async function vineTickHandler(
 
   let raw: string;
   try {
-    raw = (await chat({ tier: 'L1', subsystem: 'spirit', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 200 }, overrides)).text;
+    raw = (await chat({ tier: 'L1', subsystem: 'spirit', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: 200 }, overrides)).text;
   } catch (err) {
     console.error('[daya/ensemble] vine_tick call failed (falling back to template):', err);
     raw = `Time passed. ${ctx.name} kept at it, in small ways.`;
@@ -881,7 +881,7 @@ export async function listenStimulus(
       innerSoFar: innerState,
       heard: fullTake ? 'You are only now taking in where you are.' : content,
     });
-    const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
+    const raw = (await chat({ tier: 'L1', subsystem: 'spirit_listen', contentClass: 'fiction', entityId: ctx.entityDaId, messages: [{ role: 'system', content: prompt }], maxTokens: LISTENING_MAX_TOKENS }, overrides)).text.trim();
     const sealed = omniscient ? { text: raw, usedFallback: false } : await enforceSeal(raw, { entityId: ctx.entityDaId, subsystem: 'spirit_listen', fallback: '' });
     if (!sealed.usedFallback && sealed.text) {
       innerState = sealed.text;
@@ -1103,6 +1103,7 @@ export async function answerAsk(
       {
         tier: 'L1',
         subsystem: 'spirit_answer',
+        contentClass: 'fiction',
         entityId: ctx.entityDaId,
         messages: [{ role: 'system', content: prompt }, ...(extra.hint ? [{ role: 'user' as const, content: extra.hint }] : [])],
         maxTokens: ANSWERING_MAX_TOKENS,

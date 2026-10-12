@@ -152,7 +152,7 @@ export async function askTerminal(campaignId: string, actor: { userId: string; r
     const factList = r.facts.map(f => `[c:${f.id}] (cycle ${f.cycle.toFixed(3)}, ${f.kind}${f.actorId ? `, actor ${nameOf.get(f.actorId) ?? f.actorId}` : ''}${f.targetId ? `, target ${nameOf.get(f.targetId) ?? f.targetId}` : ''}) ${f.narration}`).join('\n');
     const vineList = r.vines.map(v => `[c:${v.canonEventId}] (${v.side}${v.custodianPillar ? `, ${v.custodianPillar}` : ''}) ${v.reading}`).join('\n');
     const res = await chat({
-      tier: 'C', subsystem: 'terminal-recall',
+      tier: 'C', subsystem: 'terminal-recall', contentClass: 'fiction',
       messages: [
         { role: 'system', content: `You are the Terminal of the campaign "${campaign.name}", answering its Watcher. You have PERFECT recollection and NO imagination: answer ONLY from the record below. Every sentence you write must end with the citation(s) of the record lines it rests on, in the exact form [c:ID]. If the record does not answer the question, write exactly: The record holds nothing on that. Never add a fact that has no citation. Be brief and concrete.` },
         { role: 'user', content: `Question: ${question}\n\nRECORD:\n${factList}${vineList ? `\n\nCUSTODIANS' READINGS:\n${vineList}` : ''}` },

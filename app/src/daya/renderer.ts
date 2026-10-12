@@ -181,6 +181,7 @@ async function voiceRendering(params: VoicingParams): Promise<{ prose: string; u
       {
         tier: 'L1',
         subsystem: 'renderer',
+        contentClass: 'fiction',
         entityId: entityDaId,
         messages: finalMessages,
         maxTokens: req.subject === 'scene' ? 450 : 200,

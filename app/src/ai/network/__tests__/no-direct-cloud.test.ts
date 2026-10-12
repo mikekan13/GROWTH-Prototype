@@ -1,8 +1,10 @@
 /**
  * The wall is the only door (Mike 2026-10-12): no module reaches a cloud model
  * except through ai/network (route() + the wall). This lint scans src/** for
- * direct Anthropic usage and for the indirect Claude-tier doors (daya
- * model-client tier 'C', the godhead text provider) outside the transports.
+ * direct Anthropic usage outside the transports. The indirect Claude doors
+ * route themselves: DAYA's model-client sends every Claude-backed tier
+ * through routedChatText, and ClaudeProvider is a face over it — both
+ * require a content class.
  *
  * KNOWN_PENDING holds the callers not yet moved behind route() (unit 6). The
  * test fails when a NEW file appears, and when a listed file no longer
@@ -20,7 +22,6 @@ const PATTERNS: Array<[string, RegExp]> = [
   ['@anthropic-ai/sdk', /@anthropic-ai\/sdk/],
   ['api.anthropic.com', /api\.anthropic\.com/],
   ['getAnthropicClient', /\bgetAnthropicClient\b/],
-  ["model-client tier 'C'", /tier:\s*'C'/],
 ];
 
 /** The transports themselves — the door's own hinges. */
@@ -33,16 +34,7 @@ const ALLOWED = [
 
 /** Unit 6: still calling the cloud outside route(). Shrink, never grow. */
 const KNOWN_PENDING = [
-  'daya/adjudicator.ts',
-  'daya/clamp.ts',
-  'daya/jewl-action.ts',
-  'daya/mechanics/skill-fit.ts',
-  'daya/model-client.ts',
-  'daya/recall.ts',
   'godhead/agent.ts',
-  'services/bridge.ts',
-  'services/reconciliation.ts',
-  'services/terminal-recall.ts',
 ].sort();
 
 function walk(dir: string, out: string[] = []): string[] {

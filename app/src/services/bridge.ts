@@ -121,7 +121,7 @@ async function forecastInterval(args: {
   const names = args.travellers.map((t) => t.name);
   try {
     const res = await chat({
-      tier: 'C', subsystem: 'bridge',
+      tier: 'C', subsystem: 'bridge', contentClass: 'fiction',
       messages: [
         { role: 'system', content: `You are the simulation of a GROWTH campaign, rendering the interval between two moments the Watcher (GM) cut across. The record must have no gap: forecast, plainly and plausibly, what would lead from where the travellers were to where the Watcher now has them — leaving, the way there, arriving — in at most ${BRIDGE_TUNING.maxSteps} steps. Stay inside the world as recorded; invent no new named people or places; keep it ordinary and physical. Each step is diegetic narration a witness would perceive, third person, present tense, no numbers in the prose. Respond with ONLY JSON: {"elapsedMinutes": number, "steps": [{"narration": string, "minutesFromStart": number, "involves": string[] (names from the travellers list, or [] for the world moving on its own)}]}.` },
         { role: 'user', content: `TRAVELLERS: ${names.join(', ')}\n\nWHERE THEY WERE: ${args.from.name ?? 'nowhere in particular'}${args.from.description ? ` — ${args.from.description}` : ''}\n\nWHERE THE WATCHER NOW HAS THEM: ${args.to.name ?? 'the narrated place'}${args.to.description ? ` — ${args.to.description}` : ''}\n\nTHE RECORD, MOST RECENT LAST:\n${recent.reverse().map((r) => `- [${r.kind}] ${r.narration.slice(0, 200)}`).join('\n') || '(nothing yet)'}\n\nTHE WATCHER'S NEW NARRATION (the moment being cut TO — do not restate it, lead up to it):\n${args.destinationNarration}` },

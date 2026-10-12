@@ -158,6 +158,7 @@ export async function planRound(input: PlanInput): Promise<PlanResult> {
     const res = await chat({
       tier: 'L1',
       subsystem: 'sim.plan',
+      contentClass: 'fiction',
       entityId: input.entityId,
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       maxTokens: 600,

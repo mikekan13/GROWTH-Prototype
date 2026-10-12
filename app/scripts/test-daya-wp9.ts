@@ -106,8 +106,8 @@ async function testFix1Concurrency() {
   };
 
   const [r1, r2] = await Promise.all([
-    chat({ tier: 'C', subsystem: 'wp9-fix1-test', model: 'claude-haiku-4-6', messages: [{ role: 'user', content: 'a' }] }, { anthropicClient: client }),
-    chat({ tier: 'C', subsystem: 'wp9-fix1-test', model: 'claude-opus-4-6', messages: [{ role: 'user', content: 'b' }] }, { anthropicClient: client }),
+    chat({ tier: 'C', subsystem: 'wp9-fix1-test', contentClass: 'fiction', model: 'claude-haiku-4-6', messages: [{ role: 'user', content: 'a' }] }, { anthropicClient: client }),
+    chat({ tier: 'C', subsystem: 'wp9-fix1-test', contentClass: 'fiction', model: 'claude-opus-4-6', messages: [{ role: 'user', content: 'b' }] }, { anthropicClient: client }),
   ]);
 
   check('concurrent call 1 resolved with ITS OWN requested model, not the other call\'s', r1.text === 'resp-for-claude-haiku-4-6', r1.text);

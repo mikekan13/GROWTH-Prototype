@@ -136,6 +136,7 @@ export async function auditClampedOutput(
     {
       tier: 'C',
       subsystem: 'clamp-audit',
+      contentClass: 'fiction',
       entityId: params.entityId,
       messages: [
         { role: 'system', content: CLAMP_AUDIT_SYSTEM_PROMPT },

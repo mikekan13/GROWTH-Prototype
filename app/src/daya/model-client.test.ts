@@ -11,6 +11,7 @@ import { callOpenAiCompatible, parseSseLines, meteredRationale, STREAM_STOPPED_N
 const BASE_PARAMS = {
   tier: 'L1' as const,
   subsystem: 'test',
+  contentClass: 'fiction' as const,
   messages: [{ role: 'user' as const, content: 'hi' }],
 };
 

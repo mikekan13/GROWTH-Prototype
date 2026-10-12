@@ -23,6 +23,7 @@ import {
   type DayaClientOverrides,
   type DayaTier,
 } from './model-client';
+import type { ContentClass } from '@/ai/network/types';
 import { generateClampConstraints, buildClampPromptText, auditClampedOutput, type ClampConstraints } from './clamp';
 import { classifyTraffic, stripAndForward, assertClean } from './sanitize';
 
@@ -53,6 +54,9 @@ export interface RouteRequest {
   identifiers?: string[]; // known entity/character/campaign NAMES — tokenized by stripAndForward AND swept by assertClean
   rawKeys?: string[]; // opaque DB keys (campaignId, etc.) that should never appear at all — swept by assertClean only, never tokenized (there's nothing to replace them WITH)
   icOoc?: 'IC' | 'OOC';
+  /** The wall's class for this payload. Default: OOC → table (never Claude;
+   *  model-client routes it local or refuses), otherwise fiction. */
+  contentClass?: ContentClass;
 }
 
 export interface RoutingDecision {
@@ -309,6 +313,7 @@ async function executeDecision(
     {
       tier: decision.tier,
       subsystem: req.subsystem,
+      contentClass: req.contentClass ?? (req.icOoc === 'OOC' ? 'table' : 'fiction'),
       entityId: req.entityId,
       messages,
       maxTokens: decision.maxTokens,

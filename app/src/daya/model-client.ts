@@ -7,6 +7,14 @@
  *   C  — cloud (Anthropic) — reuses the credentials the godhead agent
  *        runtime already relies on (see src/godhead/agent.ts)
  *
+ * THE WALL (Mike 2026-10-12): every call declares a ContentClass. Whenever a
+ * call would reach Claude (tier C, or an L1/L2 tier run Claude-backed) it
+ * goes through ai/network's routedChatText ONCE, here: route() decides the
+ * lane by class (table/real → the local lane or WallViolationError, never
+ * Claude), fiction crosses through the tone filter and the table guard.
+ * Callers only pass a class. Entity cognition over in-world perception,
+ * memory and canon is fiction.
+ *
  * Every call writes a DayaModelCall metering row (tokens, $, subsystem tag)
  * before returning — cost/token accounting can never be bypassed by calling
  * a provider SDK directly instead of this client. A tier with missing
@@ -14,10 +22,9 @@
  * falls back to a different tier.
  */
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
-import { recordAiCall } from '@/ai/network';
+import { recordAiCall, routedChatText, mayCrossWall, type AnthropicMessagesClient, type ContentClass } from '@/ai/network';
 
 export type DayaTier = 'L1' | 'L2' | 'C';
 
@@ -29,6 +36,9 @@ export interface DayaChatMessage {
 export interface DayaChatParams {
   tier: DayaTier;
   subsystem: string;   // which DAYA subsystem is calling (tagger, adjudicator, dream, ...)
+  /** REQUIRED: what the payload is (the wall). table/real never reach Claude. */
+  contentClass: ContentClass;
+  campaignId?: string;
   entityId?: string;   // DayaEntity id this call is on behalf of, if any
   messages: DayaChatMessage[];
   maxTokens?: number;
@@ -108,28 +118,8 @@ export type DayaFetch = (
   init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
 ) => Promise<DayaFetchResponse>;
 
-/** Minimal shape of the Anthropic client this module needs — decoupled from
- * the full SDK type so tests can inject a plain fake without fighting the
- * SDK's overloaded streaming/non-streaming signatures. */
-export interface AnthropicLike {
-  messages: {
-    create: (params: {
-      model: string;
-      max_tokens: number;
-      temperature?: number;
-      system?: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }>;
-      messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-    }) => Promise<{
-      content: Array<{ type: string; text?: string }>;
-      usage: {
-        input_tokens: number;
-        output_tokens: number;
-        cache_read_input_tokens?: number;
-        cache_creation_input_tokens?: number;
-      };
-    }>;
-  };
-}
+/** The Anthropic client shape a test (or caller) may inject — ai/network's. */
+export type AnthropicLike = AnthropicMessagesClient;
 
 export interface DayaClientOverrides {
   fetchImpl?: DayaFetch;
@@ -424,44 +414,37 @@ export async function callOpenAiCompatible(
   };
 }
 
+/** The Claude-backed path — through the wall (routedChatText), metered here. */
 async function callAnthropic(
   params: DayaChatParams,
   client: AnthropicLike | undefined,
-): Promise<{ text: string; tokensIn: number; tokensOut: number; cacheRead: number; cacheWrite: number; model: string }> {
-  if (!client && !process.env.ANTHROPIC_API_KEY) {
+): Promise<{ text: string; tokensIn: number; tokensOut: number; cacheRead: number; cacheWrite: number; model: string; crossed: boolean }> {
+  if (!client && !process.env.ANTHROPIC_API_KEY && mayCrossWall(params.contentClass)) {
     throw new DayaTierUnavailableError(params.tier, 'ANTHROPIC_API_KEY not configured');
   }
-  const anthropic: AnthropicLike = client ?? (new Anthropic() as unknown as AnthropicLike);
-  const model = anthropicModelForTier(params.tier, params.model);
-
   const system = params.messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
   const nonSystem = params.messages
     .filter((m): m is { role: 'user' | 'assistant'; content: string } => m.role !== 'system');
 
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: params.maxTokens ?? 1024,
-    temperature: params.temperature ?? 0.7,
-    // Prompt caching (2026-08-23 network build): DAYA's Claude consults were
-    // the one path still paying full price for stable system prefixes.
-    system: system
-      ? [{ type: 'text' as const, text: system, cache_control: { type: 'ephemeral' as const } }]
-      : undefined,
-    messages: nonSystem,
-  });
-
-  const text = response.content
-    .filter(b => b.type === 'text' && typeof b.text === 'string')
-    .map(b => b.text as string)
-    .join('\n');
-
+  const res = await routedChatText(
+    { caller: `daya:${params.subsystem}`, lane: 'godhead', contentClass: params.contentClass, campaignId: params.campaignId },
+    {
+      system,
+      messages: nonSystem,
+      model: anthropicModelForTier(params.tier, params.model),
+      maxTokens: params.maxTokens ?? 1024,
+      temperature: params.temperature ?? 0.7,
+    },
+    { anthropicClient: client, meter: false },
+  );
   return {
-    text,
-    tokensIn: response.usage.input_tokens,
-    tokensOut: response.usage.output_tokens,
-    cacheRead: response.usage.cache_read_input_tokens ?? 0,
-    cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
-    model,
+    text: res.text,
+    tokensIn: res.usage.inputTokens,
+    tokensOut: res.usage.outputTokens,
+    cacheRead: res.usage.cacheReadTokens,
+    cacheWrite: res.usage.cacheWriteTokens,
+    model: res.model,
+    crossed: res.lane.crossesWall,
   };
 }
 
@@ -493,8 +476,9 @@ export async function chat(
   let cacheRead = 0;
   let cacheWrite = 0;
   let text: string, tokensIn: number, tokensOut: number, model: string;
+  let crossed = false;
   if (viaAnthropic) {
-    ({ text, tokensIn, tokensOut, model, cacheRead, cacheWrite } = await callAnthropic(params, overrides.anthropicClient));
+    ({ text, tokensIn, tokensOut, model, cacheRead, cacheWrite, crossed } = await callAnthropic(params, overrides.anthropicClient));
     // No token stream on this transport: the consumer gets the whole answer as one piece.
     if (params.onToken && text) params.onToken(text);
   } else {
@@ -508,9 +492,10 @@ export async function chat(
   // DAYA-local DayaModelCall table lacks. Fire-and-forget.
   recordAiCall({
     lane: `daya-${params.tier.toLowerCase()}`,
-    provider: viaAnthropic ? 'anthropic' : 'openai-compat',
+    provider: crossed ? 'anthropic' : 'openai-compat',
     model,
     caller: `daya:${params.subsystem}`,
+    campaignId: params.campaignId,
     usage: { inputTokens: tokensIn, outputTokens: tokensOut, cacheReadTokens: cacheRead, cacheWriteTokens: cacheWrite },
     sanitized: params.sanitized ?? false,
   });

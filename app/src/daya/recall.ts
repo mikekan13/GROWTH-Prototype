@@ -366,6 +366,7 @@ async function maybeRerank(
       {
         tier: 'C',
         subsystem: 'recall',
+        contentClass: 'fiction',
         messages: [
           {
             role: 'system',

@@ -56,7 +56,7 @@ interface Proposed { description: string; priority: number; why: string }
   console.log(`persona: narrative ${persona.identityNarrative?.length ?? 0} chars, voice ${persona.voiceNotes?.length ?? 0} chars; ${seeds.length} seed memories`);
 
   const res = await chat({
-    tier: 'C', subsystem: 'goal-proposal', entityId: character.daya.id,
+    tier: 'C', subsystem: 'goal-proposal', contentClass: 'fiction', entityId: character.daya.id,
     messages: [
       { role: 'system', content: `You propose the ACTIVE goals of a tabletop character for the GM, from the character's own identity and memories. Goals are what the character is actually trying to do or protect right now — concrete, first-person-actionable, in plain language ("Find who took the ledger", "Keep Ruth from finding out"). Not themes, not traits. Priority 1 = most urgent … 5 = background. Respond with ONLY a JSON array of at most ${room} objects: [{"description": string (≤120 chars), "priority": 1-5, "why": one short sentence citing the memory or narrative line it rests on}]. Do not repeat any of the existing goals.` },
       { role: 'user', content: `CHARACTER: ${character.name}\n\nIDENTITY NARRATIVE:\n${persona.identityNarrative ?? '(none)'}\n\nVOICE NOTES:\n${persona.voiceNotes ?? '(none)'}\n\nSEED MEMORIES (most salient first):\n${seeds.map((s, i) => `${i + 1}. ${s.content}`).join('\n')}\n\nEXISTING ACTIVE GOALS:\n${existing.length ? existing.map((g) => `- (p${g.priority}) ${g.description}`).join('\n') : '(none)'}` },

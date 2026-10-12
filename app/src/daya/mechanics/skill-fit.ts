@@ -144,6 +144,7 @@ export async function judgeSkillFit(
       {
         tier: 'C',
         subsystem: 'skill_fit',
+        contentClass: 'fiction',
         entityId,
         messages: stripped,
         maxTokens: 200,

@@ -51,7 +51,7 @@ function mockAnthropicCapture(responseText = 'Acknowledged.') {
         const systemText = typeof params.system === 'string'
           ? params.system
           : params.system?.map(b => b.text).join('\n\n');
-        calls.push({ model: params.model, system: systemText, messages: params.messages });
+        calls.push({ model: params.model, system: systemText, messages: params.messages as Array<{ role: string; content: string }> });
         return {
           content: [{ type: 'text', text: responseText }],
           usage: { input_tokens: 10, output_tokens: 10 },

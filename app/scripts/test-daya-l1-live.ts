@@ -9,6 +9,7 @@ import { chat } from '../src/daya/model-client';
   const r = await chat({
     tier: 'L1',
     subsystem: 'l1_live_smoke',
+    contentClass: 'fiction',
     messages: [
       { role: 'system', content: 'You are Sam, a weary night-shift nurse. Speak only in character, briefly, in your own voice. No lists, no meta.' },
       { role: 'user', content: 'A coworker asks how your shift is going. Answer in one or two sentences.' },

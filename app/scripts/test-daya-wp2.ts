@@ -83,6 +83,7 @@ async function main() {
       {
         tier: 'L1',
         subsystem: `${TEST_SUBSYSTEM_PREFIX}_l1`,
+        contentClass: 'fiction',
         messages: [{ role: 'user', content: 'probe' }],
       },
       { fetchImpl: l1Fetch },
@@ -108,6 +109,7 @@ async function main() {
       {
         tier: 'C',
         subsystem: `${TEST_SUBSYSTEM_PREFIX}_c`,
+        contentClass: 'fiction',
         messages: [{ role: 'system', content: 'sys' }, { role: 'user', content: 'probe' }],
         rationale: 'test probe',
       },
@@ -137,7 +139,7 @@ async function main() {
     // ── 4. Unavailable tier throws, never silently falls back ─────────────
     let threw: unknown = null;
     try {
-      await chat({ tier: 'L2', subsystem: `${TEST_SUBSYSTEM_PREFIX}_l2_unavail`, messages: [{ role: 'user', content: 'x' }] });
+      await chat({ tier: 'L2', subsystem: `${TEST_SUBSYSTEM_PREFIX}_l2_unavail`, contentClass: 'fiction', messages: [{ role: 'user', content: 'x' }] });
     } catch (e) {
       threw = e;
     }
@@ -149,7 +151,7 @@ async function main() {
     delete process.env.ANTHROPIC_API_KEY;
     let cThrew: unknown = null;
     try {
-      await chat({ tier: 'C', subsystem: `${TEST_SUBSYSTEM_PREFIX}_c_unavail`, messages: [{ role: 'user', content: 'x' }] });
+      await chat({ tier: 'C', subsystem: `${TEST_SUBSYSTEM_PREFIX}_c_unavail`, contentClass: 'fiction', messages: [{ role: 'user', content: 'x' }] });
     } catch (e) {
       cThrew = e;
     }
@@ -162,6 +164,7 @@ async function main() {
       const smoke = await chat({
         tier: 'C',
         subsystem: `${TEST_SUBSYSTEM_PREFIX}_smoke`,
+        contentClass: 'fiction',
         messages: [{ role: 'user', content: 'Reply with exactly the word: pong' }],
         maxTokens: 16,
       });
