@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const h = vi.hoisted(() => ({
   callClaude: vi.fn(),
   toned: [] as string[],
+  tableState: '',
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -24,7 +25,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 vi.mock('./context-assembler', () => ({
-  assembleContext: vi.fn(async () => ({ campaignSummary: 'summary', tableState: '', retrievedData: '', rulesContext: '' })),
+  assembleContext: vi.fn(async () => ({ campaignSummary: 'summary', tableState: h.tableState, retrievedData: '', rulesContext: '' })),
 }));
 vi.mock('./tools/memory', () => ({
   loadJewlMemoryForCampaign: vi.fn(async () => []),
@@ -47,7 +48,8 @@ vi.mock('@/ai/network/metering', () => ({ recordAiCall: vi.fn(), estimateUsd: vi
 vi.mock('@/ai/network/traces', () => ({ recordTrace: vi.fn() }));
 vi.mock('@/ai/network/tone-filter', () => ({
   toneFilter: (t: string) => { h.toned.push(t); return t; },
-  toneFilterAsync: async (t: string) => { h.toned.push(t); return t; },
+  // Stand-in softening: proves the sent text is the filter's output.
+  toneFilterAsync: async (t: string) => { h.toned.push(t); return t.replace(/GRAPHIC/g, 'SOFTENED'); },
 }));
 
 import { dispatchPrompt } from './runtime';
@@ -68,6 +70,7 @@ beforeEach(() => {
     usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
   });
   h.toned.length = 0;
+  h.tableState = '';
 });
 afterEach(() => {
   for (const k of LOCAL_VARS) {
@@ -115,5 +118,24 @@ describe('genesis work cycles cross only through the wall', () => {
   ])('a genesis plan carrying %s cannot reach cloud', async (_label, backstory) => {
     await expect(genesisCycle(backstory)).rejects.toBeInstanceOf(WallViolationError);
     expect(h.callClaude).not.toHaveBeenCalled();
+  });
+
+  it('a table row in the system context block is withheld before cloud', async () => {
+    h.tableState = ['Mara: HP 9/12, at the lamp shop', '[ambient] my kid just got home, one sec', 'Orrin: asleep'].join('\n');
+    await genesisCycle(BACKSTORY);
+    expect(h.callClaude).toHaveBeenCalledTimes(1);
+    const system: string = h.callClaude.mock.calls[0][0].systemPrompt;
+    expect(system).not.toContain('my kid');
+    expect(system).toContain('[withheld: table talk]');
+    expect(system).toContain('Orrin: asleep');
+  });
+
+  it('a graphic passage in the system context block crosses toned', async () => {
+    h.tableState = 'Mara: scarred — GRAPHIC detail of the burn';
+    await genesisCycle(BACKSTORY);
+    expect(h.toned.some((t) => t.includes('GRAPHIC detail of the burn'))).toBe(true);
+    const system: string = h.callClaude.mock.calls[0][0].systemPrompt;
+    expect(system).toContain('SOFTENED detail of the burn');
+    expect(system).not.toContain('GRAPHIC');
   });
 });

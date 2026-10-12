@@ -68,6 +68,18 @@ export async function historyForLane(rows: HistoryRow[], crossesWall: boolean, c
   return { lines: await Promise.all(lines), sawNonFiction };
 }
 
+/**
+ * JEWL's system context block (table state, sheets, locations, memories —
+ * all built from DB content) as a lane may see it. On a cloud lane every
+ * line carrying a table/real marker is withheld (so assertNoTableContent
+ * then passes), and the rest goes through the awaited tone filter.
+ */
+export async function contextForLane(block: string, crossesWall: boolean, ctx?: ToneFilterContext, tally?: ToneTally): Promise<string> {
+  if (!crossesWall) return block;
+  const kept = block.split('\n').map((line) => (hasTableMarker(line) ? WITHHELD : line)).join('\n');
+  return toned(kept, ctx, tally);
+}
+
 /** A tool result's content as a lane may see it (the tool-result choke point). */
 export async function toolResultForLane(content: string, crossesWall: boolean, ctx?: ToneFilterContext, tally?: ToneTally): Promise<string> {
   if (!crossesWall) return content;

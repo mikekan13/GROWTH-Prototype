@@ -12,7 +12,7 @@ import 'server-only';
 import { z } from 'zod';
 import { replyRecipientId } from './history-privacy';
 import { promptContentClass } from './content-class';
-import { historyForLane, toolResultForLane, messageTexts } from './cloud-history';
+import { historyForLane, toolResultForLane, contextForLane, messageTexts } from './cloud-history';
 import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
@@ -339,7 +339,10 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   const memoryBlock = formatJewlMemoryBlock(jewlMemories);
   const timeBlock = formatTimeAwarenessBlock(timeSnap);
 
-  const contextBlock = [
+  // Built from DB content (table state, sheets, locations, memories): on a
+  // cloud lane it crosses only as the prompt does — table-marked lines
+  // withheld, the rest through the awaited tone filter (contextForLane).
+  const rawContextBlock = [
     timeBlock,
     '',
     '=== CAMPAIGN DATA ===',
@@ -354,6 +357,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     context.rulesContext ? `\n=== RULES REFERENCE ===\n${context.rulesContext}` : '',
     `\n${memoryBlock}`,
   ].filter(Boolean).join('\n');
+  const contextBlock = await contextForLane(rawContextBlock, toCloud, toneCtx, tally);
 
   const systemPrompt = buildJewlSystemPrompt(DEFAULT_REGISTER);
   const isProvingGround = prompt.campaignId === INCUBATOR_CAMPAIGN_ID;
