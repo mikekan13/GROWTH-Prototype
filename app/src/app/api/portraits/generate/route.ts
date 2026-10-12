@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { generatePortrait, generateFromDescription } from '@/ai/portraits/portrait-service';
 import { deriveStyleProfile, loadCharacterBackstory } from '@/ai/portraits/style-profile';
+import { assertSeedSetForPortrait } from '@/services/seed-pick';
 import type { PortraitCharacterData, PortraitOverrides, CampaignStyleConfig } from '@/ai/portraits/types';
 
 // FLUX.2 on H100 finishes in well under a minute per image, but leave a
@@ -58,6 +59,10 @@ export async function POST(request: NextRequest) {
       ?? (characterData?.characterId && characterData.characterId !== 'creation-preview'
         ? characterData.characterId
         : undefined);
+    // SEED FIRST (Mike 2026-10-12): no image until the character has a seed
+    // (JEWL sets it on genesis submit; the GM can choose one in Appearance).
+    await assertSeedSetForPortrait({ characterId: dbCharacterId, inlineSeedName: characterData?.seed?.name });
+
     let genome = characterData?.backstory?.trim() ?? '';
     if (genome.length < 40 && dbCharacterId) {
       genome = (await loadCharacterBackstory(dbCharacterId)).trim();

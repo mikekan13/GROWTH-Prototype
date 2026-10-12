@@ -23,6 +23,7 @@ import { genesisPillars, pillarFills } from '@/lib/jewl-work';
 import { JewlWorkScreen, WORK_CSS, fmtElapsed, useNow, type WorkScreenModel } from '@/components/jewl/JewlWorkScreen';
 import { GenesisGmSteps } from './GenesisGmSteps';
 import { GenesisProds, GenesisOpenThreads } from './GenesisProds';
+import { seedLine, seedGate } from '@/lib/seed-state';
 
 export type { GenesisProgress };
 
@@ -154,6 +155,8 @@ export function diffLogLines(prev: GenesisProgress | null, next: GenesisProgress
     if (next.state === 'waiting' && prev.state !== 'waiting') out.push('paused · waiting on the watcher');
     if (next.state === 'running' && prev.state === 'waiting') out.push('resumed');
   }
+  // Seed first (2026-10-12): the moment the seed lands, say so (catalog name only).
+  if (next.seed?.name && next.seed.name !== prev?.seed?.name) out.push(seedLine(next.seed));
   return out;
 }
 
@@ -247,6 +250,12 @@ export function GenesisLoadingOverlay({
   const currentStage = progress?.stages.find(s => s.status === 'current');
   const errorKind = submitError ? 'submit' : progress?.error ?? null;
   const stepsN = progress?.gmSteps?.length ?? 0;
+  // Seed first (2026-10-12): JEWL sets it on submit, within seconds.
+  const seedName = progress?.seed?.name ?? null;
+  const apr = seedGate(seedName);
+  // `seed` undefined = this progress source doesn't carry it (the work popup) — no chip.
+  const choosingSeed = !seedName && state !== 'error' && state !== 'done'
+    && (progress === null || progress.seed === null);
 
   const model: WorkScreenModel = {
     ariaLabel: 'JEWL genesis progress',
@@ -279,17 +288,31 @@ export function GenesisLoadingOverlay({
       onClose={onDismiss}
       tabs={tabs}
       headExtra={onOpenAppearance && state !== 'error' ? (
+        // Appearance needs a seed (Mike 2026-10-12) — locked until it lands.
         <button type="button" className="gn-apr" data-no-hold onClick={onOpenAppearance}
-          title="Work on the look, photos and style while JEWL keeps building — the badge tracks him.">
+          disabled={apr.locked} aria-disabled={apr.locked}
+          style={apr.locked ? { opacity: 0.45, cursor: 'default' } : undefined}
+          title={apr.title
+            ?? 'Work on the look, photos and style while JEWL keeps building — the badge tracks him.'}>
           APPEARANCE ↗
         </button>
       ) : null}
-      beforePillars={(progress?.seedWarnings?.length ?? 0) > 0 ? (
-        // Seed withheld from JEWL — persistent, never only in the rolling log
-        <div className="gn-seedwarn" role="alert">
-          {(progress?.seedWarnings ?? []).map((w, i) => <div key={i}>{seedWarningLine(w)}</div>)}
-        </div>
-      ) : null}
+      beforePillars={(
+        <>
+          {(choosingSeed || seedName) && (
+            <div className="gn-seed" data-testid="genesis-seed" role="status"
+              style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 11, letterSpacing: '0.08em', color: seedName ? '#22ab94' : '#D07818', margin: '2px 0 6px' }}>
+              {seedName ? `SEED · ${seedName.toUpperCase()}` : 'CHOOSING A SEED…'}
+            </div>
+          )}
+          {(progress?.seedWarnings?.length ?? 0) > 0 && (
+            // Seed withheld from JEWL — persistent, never only in the rolling log
+            <div className="gn-seedwarn" role="alert">
+              {(progress?.seedWarnings ?? []).map((w, i) => <div key={i}>{seedWarningLine(w)}</div>)}
+            </div>
+          )}
+        </>
+      )}
     >
       {/* Done / error / waiting blocks */}
       {state === 'done' && c && (
@@ -315,7 +338,7 @@ export function GenesisLoadingOverlay({
       {campaignId && progress?.prodding && progress.sessionId && (
         <GenesisProds prods={progress.prods ?? []} campaignId={campaignId} sessionId={progress.sessionId}
           characterName={characterName} waiting={state === 'waiting'}
-          onChanged={() => onStepsChanged?.()} onOpenAppearance={onOpenAppearance}
+          onChanged={() => onStepsChanged?.()} onOpenAppearance={seedName ? onOpenAppearance : undefined}
           initialOpenId={prodAnswerOpenId} initialDraft={prodAnswerDraft} />
       )}
       {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
@@ -323,7 +346,7 @@ export function GenesisLoadingOverlay({
       )}
       {campaignId && progress && stepsN > 0 && (
         <GenesisGmSteps steps={progress.gmSteps} campaignId={campaignId}
-          onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} onOpenAppearance={onOpenAppearance} />
+          onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} onOpenAppearance={seedName ? onOpenAppearance : undefined} />
       )}
       {state === 'waiting' && progress?.wait && WAIT_COPY[progress.wait]
         && !(progress.wait === 'approval' && campaignId && stepsN > 0)
