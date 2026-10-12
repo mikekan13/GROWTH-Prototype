@@ -12,6 +12,19 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * The local (inside-the-wall) model lane failed upstream — e.g. the RunPod
+ * sync proxy's 502 HTML page over a vLLM context-length 400. `message` is
+ * the technical line for logs; `userMessage` is the honest short line the
+ * table sees instead of "Internal server error" (incident 2026-10-12).
+ */
+export class LocalLaneError extends AppError {
+  constructor(message: string, public userMessage: string, public upstreamStatus: number) {
+    super(message, 502);
+    this.name = 'LocalLaneError';
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(message: string) {
     super(message, 400);

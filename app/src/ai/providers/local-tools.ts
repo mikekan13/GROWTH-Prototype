@@ -15,6 +15,15 @@
 
 import 'server-only';
 import { screenModelOutput } from '@/lib/lawfulness-hooks';
+import { LocalLaneError } from '@/lib/errors';
+import {
+  isRetryableLocalFailure,
+  localMaxModelLen,
+  logLocalPlan,
+  LOCAL_LANE_USER_MESSAGE,
+  planLocalRequest,
+  upstreamErrorMessage,
+} from '@/ai/network/local-window';
 import type {
   CallClaudeWithToolsOptions,
   ClaudeContentBlock,
@@ -110,27 +119,48 @@ export async function callLocalWithTools(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (opts.apiKey) headers.Authorization = `Bearer ${opts.apiKey}`;
 
-  const response = await fetch(`${opts.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: opts.model,
-      max_tokens: opts.maxTokens ?? 2048,
-      temperature: opts.temperature ?? 0.7,
-      messages: convertMessages(opts),
-      tools: opts.tools.map(t => ({
-        type: 'function',
-        function: { name: t.name, description: t.description, parameters: t.inputSchema },
-      })),
-      // vLLM Qwen3.x: suppress <think> blocks; parser configured server-side.
-      chat_template_kwargs: { enable_thinking: false },
-    }),
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 8 * 60_000),
-  });
+  const tools = opts.tools.map(t => ({
+    type: 'function',
+    function: { name: t.name, description: t.description, parameters: t.inputSchema },
+  }));
+  const converted = convertMessages(opts);
+  const requested = opts.maxTokens ?? 2048;
+  const window = localMaxModelLen();
+  const toolsText = JSON.stringify(tools);
 
+  // Fit the 32k window (incident 2026-10-12): trim if needed, clamp
+  // max_tokens; on the proxy-rewrapped overflow shape retry ONCE harder.
+  const send = (fraction: number) => {
+    const plan = planLocalRequest(converted, requested, { window, extraText: toolsText, fraction });
+    logLocalPlan(plan);
+    return fetch(`${opts.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: opts.model,
+        max_tokens: plan.maxTokens,
+        temperature: opts.temperature ?? 0.7,
+        messages: plan.messages,
+        tools,
+        // vLLM Qwen3.x: suppress <think> blocks; parser configured server-side.
+        chat_template_kwargs: { enable_thinking: false },
+      }),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 8 * 60_000),
+    });
+  };
+
+  let response = await send(1);
   if (!response.ok) {
     const detail = await response.text().catch(() => 'unknown error');
-    throw new Error(`Local lane error (${response.status}): ${detail.slice(0, 500)}`);
+    if (!isRetryableLocalFailure(response.status, detail)) {
+      throw new Error(`Local lane error (${response.status}): ${detail.slice(0, 500)}`);
+    }
+    console.warn(`[local] ${upstreamErrorMessage(response.status)}; retrying once with a shorter context`);
+    response = await send(0.7);
+    if (!response.ok) {
+      await response.text().catch(() => '');
+      throw new LocalLaneError(upstreamErrorMessage(response.status), LOCAL_LANE_USER_MESSAGE, response.status);
+    }
   }
 
   const data = (await response.json()) as {
