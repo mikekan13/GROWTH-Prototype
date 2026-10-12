@@ -12,6 +12,7 @@ import 'server-only';
 import { z } from 'zod';
 import { replyRecipientId } from './history-privacy';
 import { promptContentClass } from './content-class';
+import { historyForLane, toolResultForLane, messageTexts } from './cloud-history';
 import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
@@ -27,7 +28,18 @@ import {
   type ClaudeToolSpec,
 } from '../providers/claude-tools';
 import { broadcastEvent } from '@/lib/campaign-stream';
-import { resolveLane, workCycleLane, tableLane, recordAiCall, recordTrace } from '@/ai/network';
+import {
+  route,
+  workCycleLane,
+  tableLane,
+  recordAiCall,
+  recordTrace,
+  assertNoTableContent,
+  toneFilter,
+  WallViolationError,
+  type ContentClass,
+  type ResolvedLane,
+} from '@/ai/network';
 
 // System prompt is versioned (T18): src/ai/copilot/prompts/system/
 // v2 encodes the 15 behavioral laws from JEWL_Golden_Voice_Dataset_Seed.md.
@@ -213,11 +225,18 @@ async function saveUserPrompt(prompt: JewlPrompt): Promise<string> {
       }),
       metadata: null,
       // The wall: typed lines are fiction unless the table-talk ooc rules fire.
-      contentClass: promptContentClass(prompt.source, prompt.text ?? ''),
+      contentClass: promptClassOf(prompt),
     },
     select: { id: true },
   });
   return row.id;
+}
+
+/** The prompt's content class. Attached audio is transcribed into the prompt
+ *  (buildUserContentBlocks) — raw transcript, so the whole prompt is table. */
+function promptClassOf(prompt: JewlPrompt): ContentClass {
+  if (prompt.media?.some(m => m.kind === 'audio')) return 'table';
+  return promptContentClass(prompt.source, prompt.text ?? '');
 }
 
 /** Save JEWL's response as a CopilotMessage, stamped with its recipient. */
@@ -225,7 +244,8 @@ async function saveAssistantResponse(
   campaignId: string,
   response: JewlResponse,
   recipientUserId: string | null,
-  username?: string,
+  username: string | undefined,
+  contentClass: ContentClass,
 ): Promise<string> {
   const row = await prisma.copilotMessage.create({
     data: {
@@ -234,6 +254,7 @@ async function saveAssistantResponse(
       content: response.message,
       userId: recipientUserId,
       ...(username ? { username } : {}),
+      contentClass,
       actions: JSON.stringify({
         toolCalls: response.toolCalls.map(tc => ({
           name: tc.name,
@@ -280,18 +301,37 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // route through tableLane(): 'judgment' by default, 'local' under the
   // privacy-wall play configuration (JEWL_TABLE_LANE=local).
   const isWorkCycle = prompt.source === 'JEWL_WORK_CYCLE';
-  const lane = isWorkCycle ? workCycleLane() : tableLane();
-  const resolvedLane = resolveLane(lane);
+  // THE WALL (Mike 2026-10-12): route() decides by the prompt's content
+  // class — a table/real prompt runs local or not at all; never cloud.
+  const promptClass = promptClassOf(prompt);
+  let resolvedLane: ResolvedLane;
+  try {
+    resolvedLane = route({
+      caller: 'jewl-dispatch',
+      lane: isWorkCycle ? workCycleLane() : tableLane(),
+      campaignId: prompt.campaignId,
+      contentClass: promptClass,
+    });
+  } catch (err) {
+    if (!(err instanceof WallViolationError)) throw err;
+    // Table talk with no local lane: JEWL stays quiet. Logged without text.
+    console.warn(`[jewl-dispatch] ${promptClass} prompt held inside the wall (no local lane); no reply.`);
+    return { message: '', toolCalls: [] };
+  }
+  const lane = resolvedLane.lane;
+  const toCloud = resolvedLane.crossesWall;
 
   // 2. Conversation history — now timestamped. Each row carries createdAt
-  //    so JEWL can reason about pacing without having to ask.
+  //    so JEWL can reason about pacing without having to ask. A cloud lane
+  //    sees fiction only (table/real dropped, split lines as their icText).
   const history = await prisma.copilotMessage.findMany({
     where: { campaignId: prompt.campaignId },
     orderBy: { createdAt: 'desc' },
     take: (isWorkCycle ? MAX_HISTORY_WORK_CYCLE : MAX_HISTORY) + 1,
-    select: { role: true, content: true, username: true, createdAt: true },
+    select: { role: true, content: true, username: true, createdAt: true, contentClass: true, icText: true, actions: true },
   });
   const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
+  const laneHistory = historyForLane(pastMessages, toCloud);
 
   const memoryBlock = formatJewlMemoryBlock(jewlMemories);
   const timeBlock = formatTimeAwarenessBlock(timeSnap);
@@ -323,20 +363,18 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // 3. Build the messages array. History is text-only; the new prompt
   //    is formatted via formatPromptText.
   const messages: ClaudeMessageInput[] = [
-    ...pastMessages.map<ClaudeMessageInput>(m => {
-      // Prefix every history line with its ISO timestamp so JEWL can
-      // reason about pacing — see [[jewl-time-awareness-2026-06-17]] for
-      // why this is load-bearing rather than cosmetic.
-      const stamp = m.createdAt.toISOString();
-      const tag = m.username ? `[${stamp}] [${m.username}]` : `[${stamp}]`;
-      return {
-        role: m.role as 'user' | 'assistant',
-        content: [{ type: 'text', text: `${tag}: ${m.content}` }],
-      };
-    }),
+    // Every history line is prefixed with its ISO timestamp so JEWL can
+    // reason about pacing — see [[jewl-time-awareness-2026-06-17]] for why
+    // this is load-bearing rather than cosmetic.
+    ...laneHistory.lines.map<ClaudeMessageInput>(l => ({
+      role: l.role,
+      content: [{ type: 'text', text: l.text }],
+    })),
     {
       role: 'user',
-      content: await buildUserContentBlocks(prompt),
+      content: (await buildUserContentBlocks(prompt)).map(b =>
+        toCloud && b.type === 'text' ? { ...b, text: toneFilter(b.text) } : b,
+      ),
     },
   ];
 
@@ -385,6 +423,9 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     : callClaudeWithTools;
 
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+    // The wall's last check before every cloud round: nothing table/real in
+    // the system prompt, the history or any tool result (throws, never sends).
+    if (toCloud) assertNoTableContent([fullSystemPrompt, ...messageTexts(messages)], 'jewl-dispatch');
     const result = await callModel({
       systemPrompt: fullSystemPrompt,
       messages,
@@ -508,8 +549,16 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       toolCallsMade.push(tcRecord);
     }
 
-    // Add the tool results as a user turn so Claude can reason about them.
-    messages.push({ role: 'user', content: userToolResults });
+    // Add the tool results as a user turn so the model can reason about
+    // them. THE choke point where DB text re-enters the model's context: on
+    // a cloud lane every result is scrubbed (table/real rows dropped, split
+    // lines as their icText, marked strings withheld) and tone-filtered.
+    messages.push({
+      role: 'user',
+      content: userToolResults.map(b =>
+        b.type === 'tool_result' ? { ...b, content: toolResultForLane(b.content, toCloud) } : b,
+      ),
+    });
   }
 
   if (announcedWorking) announceWorking({ phase: 'done' });
@@ -526,7 +575,12 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     },
   };
 
-  await saveAssistantResponse(prompt.campaignId, response, replyRecipientId(prompt, campaignRow?.gmUserId), prompt.replyUsername);
+  // The reply's class: a reply written inside the wall from table/real
+  // context may echo it, so it stays inside too; a cloud reply saw fiction only.
+  const replyClass: ContentClass = promptClass !== 'fiction'
+    ? promptClass
+    : (!toCloud && laneHistory.sawNonFiction ? 'table' : 'fiction');
+  await saveAssistantResponse(prompt.campaignId, response, replyRecipientId(prompt, campaignRow?.gmUserId), prompt.replyUsername, replyClass);
 
   // ai/network: unified metering (per-GM cost attribution) + fine-tune trace
   // capture (Mike 2026-08-23: dev-era dispatches ARE the distillation corpus
@@ -563,7 +617,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       usage: totalUsage,
     },
     // The dispatch's content class rides along so the corpus filter can act.
-    flags: { contentClass: 'fiction' },
+    flags: { contentClass: replyClass },
   });
 
   return response;

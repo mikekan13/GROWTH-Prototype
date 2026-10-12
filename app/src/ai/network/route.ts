@@ -24,18 +24,23 @@ import 'server-only';
 import { assertClean, stripAndForward } from '@/daya/sanitize';
 import { resolveLane, localLane } from './config';
 import { toneFilter } from './tone-filter';
+import { WallViolationError } from './errors';
+import { assertNoTableContent, type RowLike } from './table-guard';
 import { mayCrossWall, type ResolvedLane, type TaskDescriptor } from './types';
 
-export class WallViolationError extends Error {
-  constructor(message: string, public readonly hits: string[] = []) {
-    super(message);
-    this.name = 'WallViolationError';
-  }
-}
+export { WallViolationError };
 
 /** Resolve the lane for a task. Never silently downgrades the wall: table or
- *  real content with no live local lane throws rather than leaking. */
-export function route(task: TaskDescriptor): ResolvedLane {
+ *  real content with no live local lane throws rather than leaking. When the
+ *  caller hands over its prompt (`payload`) and the lane is cloud, the payload
+ *  must carry no table/real content (assertNoTableContent) or this throws. */
+export function route(task: TaskDescriptor, payload?: Array<string | RowLike | null | undefined>): ResolvedLane {
+  const lane = pickLane(task);
+  if (lane.crossesWall && payload?.length) assertNoTableContent(payload, task.caller);
+  return lane;
+}
+
+function pickLane(task: TaskDescriptor): ResolvedLane {
   const localLive = localLane() !== null;
 
   // (a) the content class overrides everything: table/real stay inside.
@@ -89,5 +94,6 @@ export function prepareCloudText(
   if (!mayCrossWall(task.contentClass)) {
     throw new WallViolationError(`Task '${task.caller}' tried to send ${task.contentClass} content on cloud lane '${lane.lane}'.`);
   }
+  assertNoTableContent([text], task.caller);
   return toneFilter(enforceWall(text, identifiers));
 }
