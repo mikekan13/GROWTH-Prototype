@@ -23,25 +23,36 @@ export type LaneName =
 
 export type ProviderKind = 'anthropic' | 'openai-compat' | 'ollama';
 
-/** Privacy class of the content a task carries. Drives the sanitize seam. */
-export type PrivacyClass =
-  | 'trusted-dev'  // Mike's own dev-era content — no strip (his ruling:
-                   // JEWL has Claude; the boundary is player-sensitive DATA)
-  | 'safe'         // classified safe to forward as-is
-  | 'sensitive';   // must NOT reach a cloud transport un-stripped
+/**
+ * Content class of what a task carries — THE wall's vocabulary
+ * (Mike 2026-10-12: cloud = the Soul pillar, heavy reasoning; local = the
+ * Spirit pillar, the live table and the gatekeeper).
+ *   fiction — backstory, memories, scenes, in-character speech, drafts.
+ *             MAY reach a cloud lane, through enforceWall + toneFilter.
+ *   table   — ambient mic transcript, out-of-character chatter. NEVER cloud.
+ *   real    — anything about the actual humans. NEVER cloud.
+ * There is no "trusted" bypass class: every task declares one of these.
+ */
+export type ContentClass = 'fiction' | 'table' | 'real';
+
+/** True when content of this class may cross the wall to a cloud transport. */
+export function mayCrossWall(c: ContentClass): boolean {
+  return c === 'fiction';
+}
 
 /** What a call site declares about the work it wants done. */
 export interface TaskDescriptor {
   /** Stable caller id for metering/traces, e.g. 'jewl-dispatch'. */
   caller: string;
   /** Lane request. Callers usually name the lane directly; route() may
-   *  override based on flags/privacy (never silently downgrading privacy). */
+   *  override based on flags/content class (never silently downgrading the wall). */
   lane: LaneName;
   campaignId?: string;
   /** Content maturity flags (forge vocab) — a routing signal: flagged
    *  generation prefers the local lane when it is live. */
   maturityFlags?: string[];
-  privacy?: PrivacyClass;
+  /** REQUIRED: what the payload is. table/real never leave the wall. */
+  contentClass: ContentClass;
 }
 
 /** A resolved lane: which model on which transport, with lane options. */

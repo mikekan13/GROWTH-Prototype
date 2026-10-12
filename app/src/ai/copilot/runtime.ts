@@ -559,9 +559,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       rounds,
       usage: totalUsage,
     },
-    // Dev-era JEWL runs trusted-dev privacy (Mike's ruling: the boundary is
-    // player-sensitive DATA); tag rides along so the corpus filter can act.
-    flags: { privacy: 'trusted-dev' },
+    // The dispatch's content class rides along so the corpus filter can act.
+    flags: { contentClass: 'fiction' },
   });
 
   return response;

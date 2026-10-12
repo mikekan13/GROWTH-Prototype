@@ -44,7 +44,7 @@ vi.mock('@/lib/db', () => {
   return { prisma };
 });
 vi.mock('@/services/history', () => ({ currentCycleOf: async () => 1 }));
-vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null) }));
 vi.mock('@/daya/perceive', () => ({ perceive: vi.fn(async () => ({ prose: 'You see the door slam.', fidelityLevel: 4, distortions: [], observer: {} })) }));
 vi.mock('@/daya/model-client', () => ({ chat: vi.fn(), DayaTierUnavailableError: class extends Error {}, DayaWarmingTimeoutError: class extends Error {} }));
 vi.mock('@/services/bridge', () => ({ bridgeContinuity: vi.fn() }));

@@ -7,7 +7,7 @@
  * So every dispatch appends one JSONL record with the FULL loop: system
  * prompt (deduped by hash), messages incl. tool_use/tool_result blocks,
  * outcome, and the flags needed to keep the training set on the right side
- * of the wall (maturity/privacy tags ride along).
+ * of the wall (maturity/content-class tags ride along).
  *
  * Storage: app/traces/YYYY-MM-DD.jsonl + traces/systems/<hash>.txt
  * (system prompts are ~50K tokens and near-identical across a day — stored
@@ -45,7 +45,7 @@ export interface TraceRecord {
     rounds?: number;
     usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   };
-  flags: { maturityFlags?: string[]; privacy?: string };
+  flags: { maturityFlags?: string[]; contentClass?: string };
   /** AI-training consent resolved at write-time (GM + every ACTIVE member). */
   consent: TrainingConsent;
 }

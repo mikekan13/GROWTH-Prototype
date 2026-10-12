@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ prisma: {} }));
-vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null) }));
 vi.mock('@/services/history', () => ({ currentCycleOf: async () => 0 }));
 
 import { renderVisibleForm, truthRowsFromCanon, renderSignature, type TruthEntity, type TruthLine, type ViewerPerception } from './visible-form';

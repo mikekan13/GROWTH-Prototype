@@ -19,7 +19,7 @@ const w = vi.hoisted(() => ({
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn(async () => ({ user: currentUser })) }));
 vi.mock('@/lib/campaign-stream', () => ({ broadcastEvent: vi.fn() }));
 vi.mock('@/services/history', () => ({ currentCycleOf: async () => 1 }));
-vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null) }));
 vi.mock('@/lib/db', () => {
   type Where = Record<string, unknown>;
   const matchEvent = (e: (typeof w.campaignEvents)[number], where: Where): boolean => {

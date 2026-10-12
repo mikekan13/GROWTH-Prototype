@@ -83,7 +83,7 @@ vi.mock('@/services/skill-relevance', async () => {
   const rel = (scores: Record<string, number>) => Object.fromEntries(actual.SKILL_RELEVANCE_TUNING && ['dissolution', 'restoration', 'force', 'abjuration', 'divination', 'enchantment', 'illusion', 'alteration', 'conjuration', 'fortune'].map((d) => [d, { relevance: scores[d] ?? 0, source: 'model' }]));
   return { ...actual, getRelevance: vi.fn(async (name: string) => (name.toLowerCase() === 'swordsmanship' ? rel({ force: 0.9, abjuration: 0.6 }) : rel({}))) };
 });
-vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null) }));
 
 const { clearBoard, listIntents } = await import('@/lib/planning-board');
 const svc = await import('./inspection');

@@ -23,7 +23,7 @@ import { prisma } from '@/lib/db';
 import { ValidationError } from '@/lib/errors';
 import { requireCampaignGM } from '@/services/campaign-access';
 import { DOMAINS, classifyDomains } from '@/daya/domains';
-import { route, anthropicChatText, openAiCompatChat, recordAiCall } from '@/ai/network';
+import { routedChatText } from '@/ai/network';
 import { ASPECT_KINDS, HEAD_DOMAIN_KEYS, aspectDomains, isHeadDomain, type HeadDomainKey } from '@/sim/perception/aspects';
 import type { GrowthWorldItem } from '@/types/item';
 
@@ -107,21 +107,13 @@ export function parseScorerOutput(text: string): Partial<DomainScores> {
 
 /** The small-model scorer: one short call on the classify lane. Throws when nothing parses. */
 export const modelScorer: SkillDomainScorer = async (skillName, { campaignId }) => {
-  const lane = route({ caller: 'skill-relevance', lane: 'classify', campaignId, privacy: 'safe' });
   const { system, user } = buildScorerPrompt(skillName);
-  const opts = { maxTokens: 120, temperature: 0 };
-  let res: { text: string; model: string; usage: Parameters<typeof recordAiCall>[0]['usage'] };
-  if (lane.provider === 'anthropic') {
-    res = await anthropicChatText({ model: lane.model, system, cacheSystem: true, messages: [{ role: 'user', content: user }], ...opts });
-  } else if (lane.provider === 'openai-compat' && lane.baseUrl) {
-    res = await openAiCompatChat({
-      baseUrl: lane.baseUrl, apiKey: lane.apiKey, model: lane.model,
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...opts,
-    });
-  } else {
-    throw new Error(`skill-relevance: unsupported provider ${lane.provider}`);
-  }
-  recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller: 'skill-relevance', campaignId, usage: res.usage });
+  // 'fiction': the payload is a game skill name and the head domains — game
+  // text, nothing from the table or about the humans playing.
+  const res = await routedChatText(
+    { caller: 'skill-relevance', lane: 'classify', campaignId, contentClass: 'fiction' },
+    { system, user, maxTokens: 120, temperature: 0 },
+  );
   const scores = parseScorerOutput(res.text);
   if (Object.keys(scores).length === 0) throw new Error(`skill-relevance: unparseable scorer output for "${skillName}"`);
   return scores;

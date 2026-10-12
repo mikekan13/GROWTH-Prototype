@@ -3,7 +3,7 @@
  *
  * sim/senses/reach.ts decides (one batched world-sim call per canon event);
  * this module feeds it (beings in range: organs, place, focus, Wisdom), carries
- * the call on the 'classify' lane, and writes the results:
+ * the call on the LOCAL lane, and writes the results:
  *   - not reached → NO memory row (the caller skips the being),
  *   - reached, unnoticed → a row with noticed=false (kept out of normal recall),
  *   - reached, noticed → the row as before + perceivedVia (+ the world-sim's salience),
@@ -14,7 +14,7 @@
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
-import { route, anthropicChatText, openAiCompatChat, recordAiCall } from '@/ai/network';
+import { localLane, routedChatText } from '@/ai/network';
 import { senseProfileFromSheet, type SenseItemSource } from '@/sim/senses/field';
 import { judgeReach, perceptionReachOn, type ReachBeing, type ReachEvent, type ReachJudgement, type ReachModel, type ReachVerdict } from '@/sim/senses/reach';
 import { recordExposureBatch, type ExposureSubject } from '@/services/familiarity';
@@ -27,20 +27,20 @@ export { perceptionReachOn };
 
 // ── The model transport ───────────────────────────────────────────────────
 
-/** The world-sim call on the classify lane (Haiku today, the local small model when that lane points at it). */
-export function reachModelFor(campaignId?: string | null, caller = 'perception-reach'): ReachModel {
+/**
+ * The world-sim call on the LOCAL lane (Mike 2026-10-12: perception reach is
+ * live-table work — the Spirit pillar). Class 'fiction': the payload is the
+ * canon event and the beings in range. Null when the local lane is not
+ * configured — judgeReach then uses the stub (never a cloud fallback). The
+ * 4 s cap and the stub-on-failure live in judgeReach (sim/senses/reach).
+ */
+export function reachModelFor(campaignId?: string | null, caller = 'perception-reach'): ReachModel | null {
+  if (!localLane()) return null;
   return async ({ system, user, maxTokens }) => {
-    const lane = route({ caller, lane: 'classify', campaignId: campaignId ?? undefined, privacy: 'trusted-dev' });
-    const opts = { maxTokens, temperature: 0 };
-    let res: { text: string; model: string; usage: Parameters<typeof recordAiCall>[0]['usage'] };
-    if (lane.provider === 'anthropic') {
-      res = await anthropicChatText({ model: lane.model, system, cacheSystem: true, messages: [{ role: 'user', content: user }], ...opts });
-    } else if (lane.provider === 'openai-compat' && lane.baseUrl) {
-      res = await openAiCompatChat({ baseUrl: lane.baseUrl, apiKey: lane.apiKey, model: lane.model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...opts });
-    } else {
-      throw new Error(`perception-reach: unsupported provider ${lane.provider}`);
-    }
-    recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller, campaignId: campaignId ?? undefined, usage: res.usage });
+    const res = await routedChatText(
+      { caller, lane: 'local', campaignId: campaignId ?? undefined, contentClass: 'fiction' },
+      { system, user, maxTokens, temperature: 0 },
+    );
     return res.text;
   };
 }

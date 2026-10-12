@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ prisma: {} }));
 vi.mock('@/services/history', () => ({ currentCycleOf: async () => 1 }));
-vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null) }));
 
 import { formToFeedEvents, segmentsToMessage, entityRef, inspectionForm, inspectionClsOf } from './perceived-feed';
 import { buildFeedRows } from '@/components/terminal/table-feed/feed-rows';

@@ -207,7 +207,9 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Module | File | Purpose |
 |--------|------|---------|
 | Config | `ai/network/config.ts` | THE one env surface for every AI lane (judgment/classify/grunt/godhead/local); legacy vars honored as fallbacks |
-| Route | `ai/network/route.ts` | `route(task)` picks lane from task weight + maturity flags + privacy class; `enforceWall()` = strip+assertClean seam; sensitive NEVER crosses to cloud (fail-closed) |
+| Route | `ai/network/route.ts` | `route(task)` picks lane from REQUIRED content class (`fiction`/`table`/`real`) + maturity flags + task weight; table/real NEVER cross to cloud (local or `WallViolationError`); `enforceWall()` = strip+assertClean seam; `prepareCloudText()` = enforceWall + toneFilter for fiction on a cloud lane |
+| Routed chat | `ai/network/chat.ts` | `routedChatText(task, {system,user})` — route → wall → transport → metering; the door services use instead of a transport |
+| Tone filter | `ai/network/tone-filter.ts` | `toneFilter(text)` — local tone-down of graphic content before cloud; identity stub (unit 4 fills it) |
 | AnthropicTransport | `ai/network/transports/anthropic.ts` | Shared Anthropic client + `anthropicChatText` (optional system caching, full usage incl. cache stats) |
 | OpenAiCompatTransport | `ai/network/transports/openai-compat.ts` | Local-lane chat (RunPod serverless vLLM `growth-text` / any OpenAI-compatible) |
 | Metering | `ai/network/metering.ts` | `recordAiCall` → unified `AiCall` ledger (tokens, cacheRead/Write, est. USD, campaignId); report via `scripts/ai-costs.ts` |

@@ -41,7 +41,7 @@ import { perceptionReachOn } from '@/sim/senses/reach';
 import { familiarityAt, scoreToFidelity, witMaxFromSheet } from '@/services/familiarity';
 import { currentCycleOf } from '@/services/history';
 import { decodePerceivedVia } from '@/daya/perceived-via';
-import { route, anthropicChatText, openAiCompatChat, recordAiCall } from '@/ai/network';
+import { routedChatText } from '@/ai/network';
 
 // ── Shapes ────────────────────────────────────────────────────────────────
 
@@ -502,22 +502,32 @@ const REWRITE_SYSTEM = [
   'If it was only heard, describe the sound of it. Answer with the sentence only.',
 ].join('\n');
 
-/** The rewrite on the 'classify' lane (Haiku today; the local small model when that lane points at it), time-capped. */
+/**
+ * Table talk never feeds the rewrite: a line carrying the ambient-transcript
+ * or out-of-character marker is not sent to any model (the deterministic
+ * fallback renders it). Canon rows are in-character by construction (the
+ * table-talk split drops OOC before canon) — this is the belt to that brace.
+ */
+export function isTableMarked(text: string): boolean {
+  return /\[ambient\]|TABLE_AMBIENT|TABLE_DROPPED|^\s*[([]*\s*(?:ooc\b|out of character\b)/i.test(text);
+}
+
+/**
+ * The rewrite on the 'classify' lane, time-capped. Class 'fiction': the payload
+ * is one in-character canon action; table-marked lines never go (above).
+ */
 export function vagueRewriteModelFor(campaignId: string): VagueRewriteModel {
   return async ({ text, seen }) => {
-    const lane = route({ caller: 'visible-form', lane: 'classify', campaignId, privacy: 'trusted-dev' });
+    if (isTableMarked(text)) return null;
     const user = `Action: ${JSON.stringify(text.slice(0, 400))}\nPerceived: ${seen === 'poorly' ? 'seen badly' : 'heard, not seen'}`;
-    const opts = { maxTokens: 40, temperature: 0 };
-    const call = async () => {
-      if (lane.provider === 'anthropic') return anthropicChatText({ model: lane.model, system: REWRITE_SYSTEM, cacheSystem: true, messages: [{ role: 'user', content: user }], ...opts });
-      if (lane.provider === 'openai-compat' && lane.baseUrl) return openAiCompatChat({ baseUrl: lane.baseUrl, apiKey: lane.apiKey, model: lane.model, messages: [{ role: 'system', content: REWRITE_SYSTEM }, { role: 'user', content: user }], ...opts });
-      throw new Error(`visible-form: unsupported provider ${lane.provider}`);
-    };
+    const call = () => routedChatText(
+      { caller: 'visible-form', lane: 'classify', campaignId, contentClass: 'fiction' },
+      { system: REWRITE_SYSTEM, user, maxTokens: 40, temperature: 0 },
+    );
     const res = await new Promise<Awaited<ReturnType<typeof call>>>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('visible-form: rewrite timed out')), VISIBLE_FORM_TUNING.rewriteTimeoutMs);
       call().then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
     });
-    recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller: 'visible-form', campaignId, usage: res.usage });
     return res.text;
   };
 }

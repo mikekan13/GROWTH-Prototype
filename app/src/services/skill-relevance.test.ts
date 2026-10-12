@@ -25,7 +25,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 vi.mock('@/ai/network', () => ({
-  route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(),
+  route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null),
 }));
 vi.mock('@/services/campaign-access', () => ({ requireCampaignGM: vi.fn() }));
 

@@ -1,24 +1,30 @@
 /**
  * ai/network/route — pick the lane, enforce the wall.
  *
- * route() turns a TaskDescriptor into a ResolvedLane using three signals
- * (design-intent doc, "build shape"):
- *   (a) content maturity flags — flagged generation prefers the local lane
- *       when it is live (privacy + latitude);
- *   (b) privacy class — 'sensitive' content may NOT cross the wall to a
- *       cloud transport; it routes local or the call fails closed;
- *   (c) task weight — the caller's requested lane (judgment/classify/grunt).
+ * THE RULING (Mike 2026-10-12): cloud models (Claude) are the Soul pillar —
+ * heavy reasoning. The local model is the Spirit pillar — the live table and
+ * the GATEKEEPER. Every task declares a ContentClass:
+ *   fiction → the requested lane; a cloud lane gets the text only after
+ *             enforceWall (identifier strip) and toneFilter (local tone-down).
+ *   table   → the local lane, or WallViolationError. Never cloud.
+ *   real    → the local lane, or WallViolationError. Never cloud.
  *
- * enforceWall() is the structural seam: cloud-bound payloads that carry a
- * sensitivity classification must pass assertClean() (daya/sanitize) or the
- * dispatch is refused — a hard fail, never a soft warning. INV-119: no real
- * names/emails/account identifiers in cloud prompts.
+ * route() turns a TaskDescriptor into a ResolvedLane using three signals:
+ *   (a) content class — table/real never cross (above);
+ *   (b) content maturity flags — flagged generation prefers the local lane
+ *       when it is live;
+ *   (c) task weight — the caller's requested lane.
+ *
+ * enforceWall() is the identifier seam (INV-119: no real names/emails/
+ * account identifiers in cloud prompts). prepareCloudText() is what a
+ * fiction payload passes on its way to a cloud lane.
  */
 
 import 'server-only';
 import { assertClean, stripAndForward } from '@/daya/sanitize';
 import { resolveLane, localLane } from './config';
-import type { ResolvedLane, TaskDescriptor } from './types';
+import { toneFilter } from './tone-filter';
+import { mayCrossWall, type ResolvedLane, type TaskDescriptor } from './types';
 
 export class WallViolationError extends Error {
   constructor(message: string, public readonly hits: string[] = []) {
@@ -27,22 +33,22 @@ export class WallViolationError extends Error {
   }
 }
 
-/** Resolve the lane for a task. Never silently downgrades privacy: a
- *  sensitive task with no live local lane throws rather than leaking. */
+/** Resolve the lane for a task. Never silently downgrades the wall: table or
+ *  real content with no live local lane throws rather than leaking. */
 export function route(task: TaskDescriptor): ResolvedLane {
   const localLive = localLane() !== null;
 
-  // (b) privacy overrides everything: sensitive content stays inside the wall.
-  if (task.privacy === 'sensitive') {
+  // (a) the content class overrides everything: table/real stay inside.
+  if (!mayCrossWall(task.contentClass)) {
     if (!localLive) {
       throw new WallViolationError(
-        `Task '${task.caller}' carries sensitive content but the local lane is not configured — refusing to route to a cloud transport (fail-closed).`,
+        `Task '${task.caller}' carries ${task.contentClass} content but the local lane is not configured — refusing to route to a cloud transport (fail-closed).`,
       );
     }
     return resolveLane('local');
   }
 
-  // (a) mature-flagged generation prefers local latitude when available.
+  // (b) mature-flagged generation prefers local latitude when available.
   if ((task.maturityFlags?.length ?? 0) > 0 && localLive) {
     return resolveLane('local');
   }
@@ -52,15 +58,9 @@ export function route(task: TaskDescriptor): ResolvedLane {
 }
 
 /**
- * The wall seam for cloud-bound consult payloads: strip identifiers, then
- * hard-verify nothing survived. Returns the cleaned text. Throws
- * WallViolationError when the sweep still finds an identifier — the caller
- * must reroute local or abort, never send.
- *
- * Dev-era note: JEWL's own judgment lane runs privacy 'trusted-dev' (Mike's
- * ruling — the boundary is player-sensitive DATA, not capability) and does
- * not pass through here. This seam is for consult-shaped payloads carrying
- * classified-sensitive content.
+ * The identifier seam: strip identifiers, then hard-verify nothing survived.
+ * Returns the cleaned text. Throws WallViolationError when the sweep still
+ * finds an identifier — the caller must reroute local or abort, never send.
  */
 export function enforceWall(text: string, identifiers: string[]): string {
   const { text: stripped } = stripAndForward(text, identifiers);
@@ -72,4 +72,22 @@ export function enforceWall(text: string, identifiers: string[]): string {
     );
   }
   return stripped;
+}
+
+/**
+ * What one piece of a payload passes before it is sent on `lane`. Inside the
+ * wall (local) it is returned unchanged. On a cloud lane: the task must be
+ * fiction, then enforceWall, then toneFilter.
+ */
+export function prepareCloudText(
+  task: Pick<TaskDescriptor, 'caller' | 'contentClass'>,
+  lane: ResolvedLane,
+  text: string,
+  identifiers: string[] = [],
+): string {
+  if (!lane.crossesWall) return text;
+  if (!mayCrossWall(task.contentClass)) {
+    throw new WallViolationError(`Task '${task.caller}' tried to send ${task.contentClass} content on cloud lane '${lane.lane}'.`);
+  }
+  return toneFilter(enforceWall(text, identifiers));
 }

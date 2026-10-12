@@ -15,7 +15,7 @@ vi.mock('@/lib/db', () => ({
     },
   },
 }));
-vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn() }));
+vi.mock('@/ai/network', () => ({ route: vi.fn(), anthropicChatText: vi.fn(), openAiCompatChat: vi.fn(), recordAiCall: vi.fn(), routedChatText: vi.fn(), localLane: vi.fn(() => null) }));
 vi.mock('@/services/history', () => ({ currentCycleOf: async () => 0 }));
 vi.mock('@/services/familiarity', async (orig) => ({
   ...(await orig<typeof import('@/services/familiarity')>()),

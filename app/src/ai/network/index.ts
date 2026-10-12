@@ -16,7 +16,9 @@ export {
   workCycleLane,
   tableLane,
 } from './config';
-export { route, enforceWall, WallViolationError } from './route';
+export { route, enforceWall, prepareCloudText, WallViolationError } from './route';
+export { toneFilter } from './tone-filter';
+export { routedChatText, type RoutedChatInput, type RoutedChatResult } from './chat';
 export { anthropicChatText, getAnthropicClient } from './transports/anthropic';
 export { openAiCompatChat } from './transports/openai-compat';
 export { recordAiCall, estimateUsd } from './metering';
