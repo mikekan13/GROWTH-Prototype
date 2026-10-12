@@ -23,7 +23,7 @@
 import 'server-only';
 import { assertClean, stripAndForward } from '@/daya/sanitize';
 import { resolveLane, localLane } from './config';
-import { toneFilter } from './tone-filter';
+import { toneFilterAsync } from './tone-filter';
 import { WallViolationError } from './errors';
 import { assertNoTableContent, type RowLike } from './table-guard';
 import { mayCrossWall, type ResolvedLane, type TaskDescriptor } from './types';
@@ -82,18 +82,19 @@ export function enforceWall(text: string, identifiers: string[]): string {
 /**
  * What one piece of a payload passes before it is sent on `lane`. Inside the
  * wall (local) it is returned unchanged. On a cloud lane: the task must be
- * fiction, then enforceWall, then toneFilter.
+ * fiction, then enforceWall, then the tone filter — AWAITED, so the first
+ * send of a graphic passage crosses softened, never as the placeholder.
  */
-export function prepareCloudText(
-  task: Pick<TaskDescriptor, 'caller' | 'contentClass'>,
+export async function prepareCloudText(
+  task: Pick<TaskDescriptor, 'caller' | 'contentClass' | 'campaignId'>,
   lane: ResolvedLane,
   text: string,
   identifiers: string[] = [],
-): string {
+): Promise<string> {
   if (!lane.crossesWall) return text;
   if (!mayCrossWall(task.contentClass)) {
     throw new WallViolationError(`Task '${task.caller}' tried to send ${task.contentClass} content on cloud lane '${lane.lane}'.`);
   }
   assertNoTableContent([text], task.caller);
-  return toneFilter(enforceWall(text, identifiers));
+  return toneFilterAsync(enforceWall(text, identifiers), { caller: task.caller, campaignId: task.campaignId });
 }

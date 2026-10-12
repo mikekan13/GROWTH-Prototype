@@ -39,19 +39,19 @@ describe('route() — content classes', () => {
 });
 
 describe('prepareCloudText()', () => {
-  it('passes fiction through the identifier wall on a cloud lane', () => {
+  it('passes fiction through the identifier wall on a cloud lane', async () => {
     const lane = route(task('fiction'));
-    expect(prepareCloudText(task('fiction'), lane, 'Mike Kantack opens the door', ['Mike Kantack'])).not.toContain('Mike Kantack');
+    expect(await prepareCloudText(task('fiction'), lane, 'Mike Kantack opens the door', ['Mike Kantack'])).not.toContain('Mike Kantack');
   });
 
-  it('refuses table content on a cloud lane', () => {
+  it('refuses table content on a cloud lane', async () => {
     const lane = route(task('fiction'));
-    expect(() => prepareCloudText(task('table'), lane, 'hang on, bathroom break')).toThrow(WallViolationError);
+    await expect(prepareCloudText(task('table'), lane, 'hang on, bathroom break')).rejects.toThrow(WallViolationError);
   });
 
-  it('leaves text untouched inside the wall', () => {
+  it('leaves text untouched inside the wall', async () => {
     process.env.AI_LOCAL_BASE_URL = 'http://local.test/v1';
     const lane = route(task('table'));
-    expect(prepareCloudText(task('table'), lane, 'hang on, cycle 3')).toBe('hang on, cycle 3');
+    expect(await prepareCloudText(task('table'), lane, 'hang on, cycle 3')).toBe('hang on, cycle 3');
   });
 });

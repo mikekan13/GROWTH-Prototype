@@ -5,12 +5,12 @@
  * Inside the wall (local lane) JEWL sees the whole history as written. On a
  * cloud lane it sees fiction only: table/real rows are dropped, a split
  * ambient line crosses as its icText (never the raw transcript), and every
- * text passes the tone filter. Tool results — the other way DB text re-enters
+ * text passes the tone filter (awaited: the first send crosses softened). Tool results — the other way DB text re-enters
  * the model's context — are scrubbed the same way at one choke point.
  */
 import type { ContentClass } from '@/ai/network/types';
 import { scrubForCloud, hasTableMarker, WITHHELD } from '@/ai/network/table-guard';
-import { toneFilter } from '@/ai/network/tone-filter';
+import { toneFilterAsync, type ToneFilterContext } from '@/ai/network/tone-filter';
 import { rowContentClass, AMBIENT_USERNAME, UI_USERNAME } from './content-class';
 
 export interface HistoryRow {
@@ -35,9 +35,9 @@ export interface LaneHistory {
 }
 
 /** The history lines a lane may see. */
-export function historyForLane(rows: HistoryRow[], crossesWall: boolean): LaneHistory {
+export async function historyForLane(rows: HistoryRow[], crossesWall: boolean, ctx?: ToneFilterContext): Promise<LaneHistory> {
   let sawNonFiction = false;
-  const lines: LaneHistoryLine[] = [];
+  const lines: Array<LaneHistoryLine | Promise<LaneHistoryLine>> = [];
   for (const m of rows) {
     const cls: ContentClass = rowContentClass(m);
     if (cls !== 'fiction') sawNonFiction = true;
@@ -55,21 +55,21 @@ export function historyForLane(rows: HistoryRow[], crossesWall: boolean): LaneHi
     const body = (m.icText && m.icText.trim()) ? m.icText : m.content;
     if (hasTableMarker(body)) continue;
     const tag = who ? `[${stamp}] [${who}]` : `[${stamp}]`;
-    lines.push({ role, text: toneFilter(`${tag}: ${body}`) });
+    lines.push(toneFilterAsync(`${tag}: ${body}`, ctx).then((text) => ({ role, text })));
   }
-  return { lines, sawNonFiction };
+  return { lines: await Promise.all(lines), sawNonFiction };
 }
 
 /** A tool result's content as a lane may see it (the tool-result choke point). */
-export function toolResultForLane(content: string, crossesWall: boolean): string {
+export async function toolResultForLane(content: string, crossesWall: boolean, ctx?: ToneFilterContext): Promise<string> {
   if (!crossesWall) return content;
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    return hasTableMarker(content) ? WITHHELD : toneFilter(content);
+    return hasTableMarker(content) ? WITHHELD : toneFilterAsync(content, ctx);
   }
-  return toneFilter(JSON.stringify(scrubForCloud(parsed)));
+  return toneFilterAsync(JSON.stringify(scrubForCloud(parsed)), ctx);
 }
 
 type Block = { type: string; text?: string; content?: string; input?: unknown };

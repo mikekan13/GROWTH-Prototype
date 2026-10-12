@@ -31,8 +31,10 @@ export interface RoutedChatResult {
 
 export async function routedChatText(task: TaskDescriptor, input: RoutedChatInput): Promise<RoutedChatResult> {
   const lane = route(task, [input.system, input.user]);
-  const system = prepareCloudText(task, lane, input.system, input.identifiers);
-  const user = prepareCloudText(task, lane, input.user, input.identifiers);
+  const [system, user] = await Promise.all([
+    prepareCloudText(task, lane, input.system, input.identifiers),
+    prepareCloudText(task, lane, input.user, input.identifiers),
+  ]);
   const opts = { maxTokens: input.maxTokens, temperature: input.temperature ?? 0 };
   let res: { text: string; model: string; usage: AiUsage };
   if (lane.provider === 'anthropic') {

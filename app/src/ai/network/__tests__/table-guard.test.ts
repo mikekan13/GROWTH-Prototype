@@ -15,8 +15,8 @@ beforeEach(() => { savedLocal = process.env.AI_LOCAL_BASE_URL; delete process.en
 afterEach(() => { if (savedLocal === undefined) delete process.env.AI_LOCAL_BASE_URL; else process.env.AI_LOCAL_BASE_URL = savedLocal; });
 
 describe('an ambient row never reaches a cloud lane', () => {
-  it('the cloud history drops raw and legacy ambient rows', () => {
-    const h = historyForLane([ambientRaw, legacyAmbient, typed, reply], true);
+  it('the cloud history drops raw and legacy ambient rows', async () => {
+    const h = await historyForLane([ambientRaw, legacyAmbient, typed, reply], true);
     const text = h.lines.map((l) => l.text).join('\n');
     expect(text).not.toContain('soda');
     expect(text).not.toContain('pizza');
@@ -26,8 +26,8 @@ describe('an ambient row never reaches a cloud lane', () => {
     expect(h.sawNonFiction).toBe(true);
   });
 
-  it('inside the wall the local lane sees everything as written', () => {
-    const h = historyForLane([ambientRaw, typed], false);
+  it('inside the wall the local lane sees everything as written', async () => {
+    const h = await historyForLane([ambientRaw, typed], false);
     expect(h.lines[0].text).toContain('[[ambient]]: grab me a soda');
   });
 
@@ -57,8 +57,8 @@ describe('an ambient row never reaches a cloud lane', () => {
 });
 
 describe('a mixed utterance crosses only as its icText', () => {
-  it('the cloud history carries the in-character words under a neutral tag', () => {
-    const h = historyForLane([ambientSplit], true);
+  it('the cloud history carries the in-character words under a neutral tag', async () => {
+    const h = await historyForLane([ambientSplit], true);
     expect(h.lines).toHaveLength(1);
     expect(h.lines[0].text).toContain('Ruth, where is the key?');
     expect(h.lines[0].text).not.toContain('soda');
@@ -87,14 +87,14 @@ describe('a tool result containing a table row is scrubbed', () => {
     expect(s.name).toBe('Ruth');
   });
 
-  it('the runtime choke point scrubs on a cloud lane and passes through local', () => {
+  it('the runtime choke point scrubs on a cloud lane and passes through local', async () => {
     const raw = JSON.stringify(output);
-    const cloud = toolResultForLane(raw, true);
+    const cloud = await toolResultForLane(raw, true);
     expect(cloud).not.toContain('pizza');
     expect(cloud).not.toContain('soda');
     expect(cloud).not.toContain('opened inventory');
     expect(() => assertNoTableContent(messageTexts([{ content: [{ type: 'tool_result', content: cloud }] }]), 't')).not.toThrow();
-    expect(toolResultForLane(raw, false)).toBe(raw);
-    expect(toolResultForLane('plain [ambient] text', true)).toBe(WITHHELD);
+    expect(await toolResultForLane(raw, false)).toBe(raw);
+    expect(await toolResultForLane('plain [ambient] text', true)).toBe(WITHHELD);
   });
 });

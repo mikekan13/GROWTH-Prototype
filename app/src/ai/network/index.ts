@@ -17,7 +17,7 @@ export {
   tableLane,
 } from './config';
 export { route, enforceWall, prepareCloudText, WallViolationError } from './route';
-export { toneFilter } from './tone-filter';
+export { toneFilter, toneFilterAsync, type ToneFilterContext } from './tone-filter';
 export { assertNoTableContent, scrubForCloud, hasTableMarker, isTableRow, WITHHELD, type RowLike } from './table-guard';
 export { routedChatText, type RoutedChatInput, type RoutedChatResult } from './chat';
 export { anthropicChatText, getAnthropicClient } from './transports/anthropic';

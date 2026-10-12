@@ -35,7 +35,7 @@ import {
   recordAiCall,
   recordTrace,
   assertNoTableContent,
-  toneFilter,
+  toneFilterAsync,
   WallViolationError,
   type ContentClass,
   type ResolvedLane,
@@ -331,7 +331,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     select: { role: true, content: true, username: true, createdAt: true, contentClass: true, icText: true, actions: true },
   });
   const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
-  const laneHistory = historyForLane(pastMessages, toCloud);
+  const toneCtx = { caller: 'jewl-dispatch', campaignId: prompt.campaignId };
+  const laneHistory = await historyForLane(pastMessages, toCloud, toneCtx);
 
   const memoryBlock = formatJewlMemoryBlock(jewlMemories);
   const timeBlock = formatTimeAwarenessBlock(timeSnap);
@@ -372,9 +373,9 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     })),
     {
       role: 'user',
-      content: (await buildUserContentBlocks(prompt)).map(b =>
-        toCloud && b.type === 'text' ? { ...b, text: toneFilter(b.text) } : b,
-      ),
+      content: await Promise.all((await buildUserContentBlocks(prompt)).map(async b =>
+        toCloud && b.type === 'text' ? { ...b, text: await toneFilterAsync(b.text, toneCtx) } : b,
+      )),
     },
   ];
 
@@ -555,9 +556,9 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     // lines as their icText, marked strings withheld) and tone-filtered.
     messages.push({
       role: 'user',
-      content: userToolResults.map(b =>
-        b.type === 'tool_result' ? { ...b, content: toolResultForLane(b.content, toCloud) } : b,
-      ),
+      content: await Promise.all(userToolResults.map(async b =>
+        b.type === 'tool_result' ? { ...b, content: await toolResultForLane(b.content, toCloud, toneCtx) } : b,
+      )),
     });
   }
 
