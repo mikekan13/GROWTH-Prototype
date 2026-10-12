@@ -14,7 +14,14 @@
  */
 
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
+import {
+  callClaudeWithTools,
+  type ClaudeContentBlock,
+  type ClaudeMessageInput,
+  type ClaudeToolSpec,
+} from '@/ai/providers/claude-tools';
+import { route, prepareCloudText, assertNoTableContent, type ResolvedLane, type TaskDescriptor } from '@/ai/network';
+import { toolResultForLane, messageTexts } from '@/ai/copilot/cloud-history';
 import { prisma } from '@/lib/db';
 import { getClaudeToolDefinitions, executeTool } from './tools/registry';
 import type { ToolContext } from './tools/registry';
@@ -75,13 +82,25 @@ interface GodHeadIdentity {
 
 // ── Agent Class ───────────────────────────────────────────────────────────
 
+/**
+ * THE WALL (Mike 2026-10-12): a god-head reasons over the world's fiction —
+ * entities, wallets, goals, blueprints, its own memory. route() decides the
+ * lane (class fiction); on a cloud lane the system prompt, the trigger and
+ * every tool result pass the tone filter and the table guard (tool results
+ * scrubbed of table/real rows), and the payload is checked before every
+ * round. The tool-use transport is the one ai/providers/claude-tools exposes.
+ */
+const GODHEAD_TASK: TaskDescriptor = {
+  caller: 'godhead-agent',
+  lane: 'godhead',
+  contentClass: 'fiction',
+};
+
 export class GodHeadAgent {
-  private client: Anthropic;
   private identity: GodHeadIdentity;
   private model: string;
 
   constructor(identity: GodHeadIdentity, model?: string) {
-    this.client = new Anthropic();
     this.identity = identity;
     // Resolution order: explicit override → god-head's stored default → runtime default.
     this.model = model || identity.defaultModel || DEFAULT_MODEL;
@@ -155,8 +174,12 @@ export class GodHeadAgent {
         ? `\n\n## Your Working Memory\n${memories.map(m => `- **${m.key}:** ${m.value}`).join('\n')}`
         : '';
 
+      const lane: ResolvedLane = route(GODHEAD_TASK);
+      const toCloud = lane.crossesWall;
+      const toneCtx = { caller: GODHEAD_TASK.caller };
+
       // Build system prompt
-      const systemPrompt = [
+      const rawSystemPrompt = [
         this.identity.systemPrompt,
         `\n\n## Your Identity`,
         `- Name: ${this.identity.name}`,
@@ -172,51 +195,66 @@ export class GodHeadAgent {
         `- Your decisions have real consequences. KRMA you spend is real.`,
         `- Be true to your personality and domain. You have motivations and preferences.`,
       ].join('\n');
+      const systemPrompt = await prepareCloudText(GODHEAD_TASK, lane, rawSystemPrompt);
 
       // Build initial messages
-      const messages: Anthropic.MessageParam[] = [
-        {
-          role: 'user',
-          content: `[TRIGGER: ${triggerType}]\n\n${JSON.stringify(triggerData, null, 2)}`,
-        },
-      ];
+      const trigger = await prepareCloudText(
+        GODHEAD_TASK,
+        lane,
+        `[TRIGGER: ${triggerType}]\n\n${JSON.stringify(triggerData, null, 2)}`,
+      );
+      const messages: ClaudeMessageInput[] = [{ role: 'user', content: [{ type: 'text', text: trigger }] }];
 
       // Get tool definitions
-      const tools = getClaudeToolDefinitions();
+      const tools: ClaudeToolSpec[] = getClaudeToolDefinitions().map(t => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.input_schema,
+      }));
+
+      // Local lane (inside the wall) runs the same loop over the local transport.
+      const callModel = lane.provider === 'openai-compat'
+        ? async (o: Parameters<typeof callClaudeWithTools>[0]) => {
+            const { callLocalWithTools } = await import('@/ai/providers/local-tools');
+            return callLocalWithTools({ ...o, model: lane.model, baseUrl: lane.baseUrl!, apiKey: lane.apiKey });
+          }
+        : callClaudeWithTools;
+      const model = toCloud ? this.model : lane.model;
 
       // ── Agent Loop ────────────────────────────────────────────────────
 
       while (steps < MAX_STEPS) {
-        const response = await this.client.messages.create({
-          model: this.model,
-          max_tokens: 4096,
-          system: systemPrompt,
+        // The wall's last check before every cloud round.
+        if (toCloud) assertNoTableContent([systemPrompt, ...messageTexts(messages)], GODHEAD_TASK.caller);
+        const response = await callModel({
+          systemPrompt,
           messages,
-          tools: tools as Anthropic.Tool[],
+          tools,
+          model,
+          maxTokens: 4096,
           temperature: this.identity.temperature,
         });
 
         // Track token usage
-        totalInputTokens += response.usage.input_tokens;
-        totalOutputTokens += response.usage.output_tokens;
+        totalInputTokens += response.usage.inputTokens;
+        totalOutputTokens += response.usage.outputTokens;
 
         // Record token usage
         await prisma.godHeadTokenUsage.create({
           data: {
             godHeadId: this.identity.id,
             invocationId: invocation.id,
-            model: this.model,
-            inputTokens: response.usage.input_tokens,
-            outputTokens: response.usage.output_tokens,
+            model,
+            inputTokens: response.usage.inputTokens,
+            outputTokens: response.usage.outputTokens,
           },
         });
 
         // Check if the agent is done (no tool use)
-        if (response.stop_reason === 'end_turn') {
+        if (response.stopReason === 'end_turn') {
           // Extract text response
-          const finalText = response.content
-            .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-            .map(b => b.text)
+          const finalText = response.blocks
+            .flatMap(b => (b.type === 'text' ? [b.text] : []))
             .join('\n');
 
           // Update invocation as done
@@ -241,14 +279,14 @@ export class GodHeadAgent {
         }
 
         // Process tool calls
-        if (response.stop_reason === 'tool_use') {
+        if (response.stopReason === 'tool_use') {
           // Add assistant response to messages
-          messages.push({ role: 'assistant', content: response.content });
+          messages.push({ role: 'assistant', content: response.blocks });
 
           // Execute each tool call
-          const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          const toolResults: ClaudeContentBlock[] = [];
 
-          for (const block of response.content) {
+          for (const block of response.blocks) {
             if (block.type !== 'tool_use') continue;
 
             steps++;
@@ -267,12 +305,16 @@ export class GodHeadAgent {
               },
             });
 
+            // The tool-result choke point: DB text re-entering the model's
+            // context is scrubbed (table/real rows dropped) and tone-filtered.
             toolResults.push({
               type: 'tool_result',
               tool_use_id: block.id,
-              content: result.success
-                ? JSON.stringify(result.data)
-                : `ERROR: ${result.error}`,
+              content: await toolResultForLane(
+                result.success ? JSON.stringify(result.data) : `ERROR: ${result.error}`,
+                toCloud,
+                toneCtx,
+              ),
               is_error: !result.success,
             });
           }

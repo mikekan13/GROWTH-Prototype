@@ -31,10 +31,10 @@
 import 'server-only';
 import { randomInt } from 'crypto';
 import { prisma } from '@/lib/db';
-import { resolveLane } from '@/ai/network';
+import { route } from '@/ai/network';
 import { recordAiCall, recordTrace } from '@/ai/network';
 import { callLocalWithTools } from '@/ai/providers/local-tools';
-import { callClaudeWithTools, type ClaudeContentBlock, type ClaudeMessageInput, type ClaudeToolSpec } from '@/ai/providers/claude-tools';
+import type { ClaudeContentBlock, ClaudeMessageInput, ClaudeToolSpec } from '@/ai/providers/claude-tools';
 import { converseWithEntity } from '@/daya/conversation';
 import { currentFacts } from '@/daya/world-ledger';
 
@@ -193,7 +193,8 @@ export async function runWatcherTurn(opts: {
   playerText: string;
 }): Promise<WatcherTurnResult> {
   const ctx = await buildContext(opts.campaignId);
-  const lane = resolveLane('local');
+  // Raw play content: class table — route() keeps it on the local lane or refuses.
+  const lane = route({ caller: 'watcher-gm', lane: 'local', contentClass: 'table', campaignId: opts.campaignId });
 
   // Persist the player's line first.
   await prisma.campaignEvent.create({
@@ -217,9 +218,8 @@ export async function runWatcherTurn(opts: {
     };
   }).filter(m => (m.content[0] as { text: string }).text);
 
-  const call = lane.provider === 'openai-compat'
-    ? (o: Parameters<typeof callClaudeWithTools>[0]) => callLocalWithTools({ ...o, model: lane.model, baseUrl: lane.baseUrl!, apiKey: lane.apiKey })
-    : callClaudeWithTools;
+  const call = (o: Omit<Parameters<typeof callLocalWithTools>[0], 'model' | 'baseUrl' | 'apiKey'>) =>
+    callLocalWithTools({ ...o, model: lane.model, baseUrl: lane.baseUrl!, apiKey: lane.apiKey });
 
   const toolCallsMade: Array<{ name: string; summary: string }> = [];
   let narration = '';
@@ -231,7 +231,7 @@ export async function runWatcherTurn(opts: {
   for (let i = 0; i < MAX_ROUNDS + 2; i++) {
     const result = await call({
       systemPrompt: systemPrompt(ctx),
-      messages, tools: TOOLS, model: lane.model, maxTokens: 1500, temperature: 0.8,
+      messages, tools: TOOLS, maxTokens: 1500, temperature: 0.8,
     });
     rounds++;
     inTok += result.usage.inputTokens; outTok += result.usage.outputTokens;
