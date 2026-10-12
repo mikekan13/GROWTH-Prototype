@@ -1,7 +1,8 @@
 /**
  * JEWL system-prompt builder (T18).
  *
- * - Versioned: JEWL_PROMPT_VERSION env selects v1/v2 (default v2). Rollback
+ * - Versioned: JEWL_PROMPT_VERSION env selects v1–v4 (default v4: core +
+ *   per-dispatch-kind addenda, 2026-10-12). Rollback
  *   is flipping the env var — old versions are frozen files.
  * - Register (Law 8, INV-117): campaign tone flag + account age band are
  *   INJECTED here, never baked into the prompt text. Until T36 wires real
@@ -14,6 +15,9 @@
 import { SYSTEM_PROMPT_V1 } from './v1';
 import { SYSTEM_PROMPT_V2 } from './v2';
 import { SYSTEM_PROMPT_V3 } from './v3';
+import { SYSTEM_PROMPT_V4_CORE, V4_ADDENDA, type PersonaKind } from './v4';
+
+export type { PersonaKind } from './v4';
 
 export type CampaignTone = 'adult' | 'all-ages';
 export type AccountAgeBand = 'adult' | 'minor' | 'unknown';
@@ -33,11 +37,14 @@ const VERSIONS: Record<string, string> = {
   v1: SYSTEM_PROMPT_V1,
   v2: SYSTEM_PROMPT_V2,
   v3: SYSTEM_PROMPT_V3,
+  // v4 = core + per-kind addenda (2026-10-12); its FULL form for callers
+  // that name no kind.
+  v4: `${SYSTEM_PROMPT_V4_CORE}${V4_ADDENDA.FULL}`,
 };
 
 export function activePromptVersion(): string {
-  const v = process.env.JEWL_PROMPT_VERSION ?? 'v3';
-  return VERSIONS[v] ? v : 'v3';
+  const v = process.env.JEWL_PROMPT_VERSION ?? 'v4';
+  return VERSIONS[v] ? v : 'v4';
 }
 
 function registerBlock(reg: RegisterInputs): string {
@@ -64,8 +71,18 @@ function registerBlock(reg: RegisterInputs): string {
  * (The Prime build-state preamble and context blocks are appended by the
  * runtime — they are per-dispatch, not personality.)
  */
-export function buildJewlSystemPrompt(register: RegisterInputs = DEFAULT_REGISTER): string {
-  return `${VERSIONS[activePromptVersion()]}\n\n${registerBlock(register)}`;
+export function buildJewlSystemPrompt(register: RegisterInputs = DEFAULT_REGISTER, kind: PersonaKind = 'FULL'): string {
+  const version = activePromptVersion();
+  // Older versions are frozen whole-prompts: the rollback ignores the kind.
+  if (version !== 'v4') return `${VERSIONS[version]}\n\n${registerBlock(register)}`;
+  // v4: core → register → the kind's addendum. Pure in (kind, register), so
+  // the system block is byte-identical across rounds of a kind (caching).
+  return `${buildJewlPersonaCore(register)}${V4_ADDENDA[kind]}`;
+}
+
+/** The v4 persona CORE with its register block (≤2.5k est. tokens — tested). */
+export function buildJewlPersonaCore(register: RegisterInputs = DEFAULT_REGISTER): string {
+  return `${SYSTEM_PROMPT_V4_CORE}\n\n${registerBlock(register)}`;
 }
 
 /**

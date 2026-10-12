@@ -20,7 +20,7 @@ import { priceBlueprintByType } from '@/services/forge-pricing';
 import { getJewlGodHead } from '../jewl-identity';
 import { registerJewlTool } from './registry';
 import { coerceForgeBlueprintInput, FORGE_BODY_LIMITS } from './forge-blueprint-coerce';
-import { ARCHETYPE_LAW, archetypeRejection, checkArchetype, isArchetypeType } from '@/services/block-archetype';
+import { archetypeRejection, checkArchetype, isArchetypeType } from '@/services/block-archetype';
 import {
   attachBlockToCharacter,
   findGenesisSession,
@@ -83,16 +83,15 @@ const inputSchema = z.object({
 
 export const proposeForgeBlueprintTool: JewlTool = {
   name: 'propose_forge_blueprint',
+  // ≤900 chars (per-lane tool sets, 2026-10-12): the full ARCHETYPE_LAW rides
+  // in the genesis cycle brief; here it is one line, and the handler enforces it.
   description:
-    'Draft a REUSABLE gameplay blueprint (character seed/root/branch, skill, item, ' +
-    'trait) and submit it to Kai for evaluation. You are recorded as the author. ' +
-    'Kai prices, the GM signs off, then it goes live. Returns the draft id so the ' +
-    'GM can review it in the Forge panel. Do NOT use this for world-building — ' +
-    'rooms, buildings, places of any kind are Locations: use create_location. ' +
-    'Do NOT use this to apply existing items — only to propose NEW blueprints. ' +
-    'REUSE FIRST: if a stock or campaign block already fits the archetype, attach_block it ' +
-    'with the bearer\'s story instead of drafting a duplicate. ' +
-    ARCHETYPE_LAW + ' ' +
+    'Draft a NEW reusable blueprint (seed/root/branch, skill, item, nectar/blossom/thorn) for Kai to ' +
+    'price and the GM to sign off; returns the draft id. Never for places (create_location) or to ' +
+    'apply existing blocks (attach_block). REUSE FIRST: if stock or a campaign block fits, attach_block it. ' +
+    'ARCHETYPE LAW (enforced): name, description and rule text carry no proper or campaign nouns and pass ' +
+    'the stranger test; the bearer\'s specifics go in attachmentStory (+ optional localName). dataJson must ' +
+    'match the canonical schema for its type (rejections name the bad fields). ' +
     FORGE_BODY_LIMITS,
   inputSchema,
   coerce: coerceForgeBlueprintInput,

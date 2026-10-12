@@ -270,6 +270,7 @@ async function runCycle(session: {
       ...(allowedTools ? { allowedTools } : {}),
       ...(excludedTools ? { excludedTools } : {}),
       ...(stageTools ? { stageTools } : {}),
+      kind: genesis ? 'GENESIS' : 'WORK_CYCLE',
       ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME, toneRef: { table: 'DayaWorkSession', id: session.id } } : {}),
     });
     await flushSeedWithheld(seedWatch, session);
