@@ -14,6 +14,7 @@ import { getAnthropicClient } from '@/ai/network/transports/anthropic';
 import { judgmentModel } from '@/ai/network/config';
 import { auditCloudCall, utf8Bytes, type ToneTally } from '@/ai/network/audit';
 import type { ContentClass } from '@/ai/network/types';
+import { withTransientRetry } from '@/ai/network/retry';
 
 /** A simplified tool spec the runtime feeds in. */
 export interface ClaudeToolSpec {
@@ -134,7 +135,11 @@ export async function callClaudeWithTools(
     return { role: m.role, content: content as unknown as Anthropic.Messages.MessageParam['content'] };
   });
 
-  const response = await client.messages.create(
+  // 429 / 529 / overloaded: back off and retry HERE, per round, so a busy
+  // provider never re-runs tool calls already executed this dispatch
+  // (perf pass 2026-10-12). The SDK's own retries are off for this call so
+  // the attempt budget is ours alone: 3 tries, jittered.
+  const response = await withTransientRetry(() => client.messages.create(
     {
       model,
       max_tokens: opts.maxTokens ?? 2048,
@@ -157,8 +162,15 @@ export async function callClaudeWithTools(
       // longer than 10 minutes" guard and REFUSE to send — which surfaces
       // as JEWL "thinking" forever with no reply and no error in the chat.
       timeout: 9 * 60 * 1000,
+      maxRetries: 0,
     },
-  );
+  ), {
+    onRetry: ({ attempt, waitMs, err }) => {
+      const status = (err as { status?: unknown })?.status;
+      // eslint-disable-next-line no-console
+      console.warn(`[claude-tools] transient ${String(status ?? 'error')} — retry ${attempt + 1}/3 in ${Math.round(waitMs)}ms`);
+    },
+  });
 
   return {
     stopReason: response.stop_reason ?? 'end_turn',

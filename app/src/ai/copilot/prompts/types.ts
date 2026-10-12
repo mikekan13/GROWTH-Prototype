@@ -71,6 +71,10 @@ export interface JewlPrompt {
   /** Restrict this dispatch to these tools (offered AND executable). A
    *  genesis PRODDING cycle may only raise prods (Mike 2026-10-12). */
   allowedTools?: string[];
+  /** Withhold these tools from this dispatch (neither offered nor
+   *  executable) — e.g. search_catalog in a genesis build cycle whose
+   *  campaign-visible catalog is empty (perf pass 2026-10-12). */
+  excludedTools?: string[];
 }
 
 /** Outcome of executing one tool call. */

@@ -105,6 +105,19 @@ export async function updateWorkSession(opts: {
     data,
   });
 
+  // Born → awake (2026-10-12): a genesis reaching its final stage wakes the
+  // character so the table loop can voice her. Before the status line, so
+  // "is born" is true when it is said. Best-effort — never blocks Born.
+  if (opts.status === 'done' && session.status !== 'done' && session.goal.startsWith('Character genesis')) {
+    try {
+      const { awakenGenesisCharacter } = await import('./character-genesis-born');
+      await awakenGenesisCharacter(session.goal);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[daya-work-session] born character not awakened:', err);
+    }
+  }
+
   // Genesis transitions get one short in-voice JEWL line in the GM's chat
   // (the overlay carries progress; the Log carries the report). Best-effort.
   if (opts.status && opts.status !== session.status && opts.status !== 'active'

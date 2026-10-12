@@ -22,6 +22,7 @@ import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory
 import { transcribeAudio } from '@/ai/providers/stt';
 import { loadTimeAwareness, formatTimeAwarenessBlock } from './time-awareness';
 import { getJewlTool, listJewlTools } from './tools';
+import { coerceToolInput, describeLimits } from './tools/coerce';
 import type { JewlToolContext } from './tools/types';
 import type { JewlPrompt, JewlResponse, JewlToolCallResult } from './prompts/types';
 import {
@@ -135,17 +136,31 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
 const STAGE_ONLY_TOOLS = new Set(['raise_prod', 'end_prod_round']);
 
 /** May this dispatch offer / execute this tool? */
-export function toolOffered(name: string, allowedTools?: string[]): boolean {
+export function toolOffered(name: string, allowedTools?: string[], excludedTools?: string[]): boolean {
+  if (excludedTools?.includes(name)) return false;
   return allowedTools ? allowedTools.includes(name) : !STAGE_ONLY_TOOLS.has(name);
 }
 
-/** Prepare the tools list for the Claude call. */
-function buildToolSpecs(allowedTools?: string[]): ClaudeToolSpec[] {
-  return listJewlTools().filter(t => toolOffered(t.name, allowedTools)).map(t => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: zodToJsonSchema(t.inputSchema),
-  }));
+/** Tool specs are pure functions of the registered tools — memoised so the
+ *  cached prompt prefix (tools precede system) is byte-identical every
+ *  round and every cycle. */
+const specCache = new Map<string, ClaudeToolSpec>();
+function toolSpec(t: { name: string; description: string; inputSchema: z.ZodTypeAny }): ClaudeToolSpec {
+  let spec = specCache.get(t.name);
+  if (!spec) {
+    const inputSchema = zodToJsonSchema(t.inputSchema);
+    const limits = describeLimits(inputSchema);
+    spec = { name: t.name, description: limits ? `${t.description}\n${limits}` : t.description, inputSchema };
+    specCache.set(t.name, spec);
+  }
+  return spec;
+}
+
+/** Prepare the tools list for the Claude call. Each description carries its
+ *  exact length limits (perf pass 2026-10-12: rejected calls were ~⅓ of
+ *  genesis output tokens). */
+export function buildToolSpecs(allowedTools?: string[], excludedTools?: string[]): ClaudeToolSpec[] {
+  return listJewlTools().filter(t => toolOffered(t.name, allowedTools, excludedTools)).map(toolSpec);
 }
 
 /** Serialize a JewlPrompt into the user-side text Claude receives. */
@@ -425,7 +440,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ];
 
   // 4. Tool-use loop.
-  const tools = buildToolSpecs(prompt.allowedTools);
+  const tools = buildToolSpecs(prompt.allowedTools, prompt.excludedTools);
   const toolCtx: JewlToolContext = {
     campaignId: prompt.campaignId,
     actorId: prompt.actorId,
@@ -545,7 +560,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     }
     const userToolResults: ClaudeContentBlock[] = [];
     for (const tu of toolUseBlocks) {
-      const offered = toolOffered(tu.name, prompt.allowedTools);
+      const offered = toolOffered(tu.name, prompt.allowedTools, prompt.excludedTools);
       const tool = offered ? getJewlTool(tu.name) : undefined;
       let tcRecord: JewlToolCallResult;
       if (!tool) {
@@ -558,11 +573,15 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
           is_error: true,
         });
       } else {
+        // Trim-not-reject (perf pass 2026-10-12): over-long text is cut at a
+        // sentence and trivial shapes fixed BEFORE the handler's own Zod
+        // parse — which stays the judge of anything still wrong.
+        const input = coerceToolInput(tool, tu.input).value as Record<string, unknown>;
         try {
-          const handlerResult = await tool.handler(tu.input, toolCtx);
+          const handlerResult = await tool.handler(input, toolCtx);
           tcRecord = {
             name: tu.name,
-            input: tu.input,
+            input,
             output: handlerResult.output,
             affected: handlerResult.affected
               ? {
@@ -582,7 +601,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
           announceWorking({ phase: 'tool', tool: tu.name, label: `${tu.name.replace(/_/g, ' ')}${inputName}` });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          tcRecord = { name: tu.name, input: tu.input, error: msg };
+          tcRecord = { name: tu.name, input, error: msg };
           userToolResults.push({
             type: 'tool_result',
             tool_use_id: tu.id,

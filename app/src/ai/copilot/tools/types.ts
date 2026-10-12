@@ -51,6 +51,10 @@ export interface JewlTool {
   description: string;
   /** Zod schema for the input. JSON Schema is derived from this. */
   inputSchema: z.ZodTypeAny;
+  /** Optional tool-specific repair run at the runtime boundary AFTER the
+   *  generic schema trim (coerce.ts) — e.g. a nested JSON body. Never
+   *  throws; returns the input unchanged when nothing applies. */
+  coerce?: (input: unknown) => { value: unknown; coerced: string[] };
   /** Implementation. Throw to surface error to JEWL + GM. */
   handler: (input: unknown, ctx: JewlToolContext) => Promise<JewlToolHandlerResult>;
 }

@@ -19,6 +19,7 @@ import { validateForgeData } from '@/services/forge-schemas';
 import { priceBlueprintByType } from '@/services/forge-pricing';
 import { getJewlGodHead } from '../jewl-identity';
 import { registerJewlTool } from './registry';
+import { coerceForgeBlueprintInput, FORGE_BODY_LIMITS } from './forge-blueprint-coerce';
 import type { JewlTool, JewlToolHandlerResult } from './types';
 
 const FORGE_TYPES = [
@@ -66,8 +67,10 @@ export const proposeForgeBlueprintTool: JewlTool = {
     'Kai prices, the GM signs off, then it goes live. Returns the draft id so the ' +
     'GM can review it in the Forge panel. Do NOT use this for world-building — ' +
     'rooms, buildings, places of any kind are Locations: use create_location. ' +
-    'Do NOT use this to apply existing items — only to propose NEW blueprints.',
+    'Do NOT use this to apply existing items — only to propose NEW blueprints. ' +
+    FORGE_BODY_LIMITS,
   inputSchema,
+  coerce: coerceForgeBlueprintInput,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);
 

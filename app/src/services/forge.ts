@@ -541,6 +541,34 @@ export async function searchGlobalCatalog(opts: {
   }));
 }
 
+/** What the stock catalog holds, per type (the same rows searchGlobalCatalog
+ *  can return). When the whole catalog is tiny, `entries` names every row so
+ *  a caller can say what exists without a search (perf pass 2026-10-12). */
+export interface CatalogSnapshot {
+  counts: Record<string, number>;
+  total: number;
+  entries?: Array<{ type: string; name: string }>;
+}
+
+export async function getGlobalCatalogSnapshot(listUpTo = 5): Promise<CatalogSnapshot> {
+  const where = { isGlobal: true, status: { in: ['published', 'global'] } };
+  const groups = await prisma.forgeItem.groupBy({ by: ['type'], where, _count: { _all: true } });
+  const counts: Record<string, number> = {};
+  let total = 0;
+  for (const g of groups) {
+    counts[g.type] = g._count._all;
+    total += g._count._all;
+  }
+  if (total === 0 || total > listUpTo) return { counts, total };
+  const rows = await prisma.forgeItem.findMany({
+    where,
+    select: { type: true, name: true },
+    orderBy: [{ type: 'asc' }, { name: 'asc' }],
+    take: listUpTo,
+  });
+  return { counts, total, entries: rows };
+}
+
 export async function pullFromGlobalCatalog(
   globalItemId: string,
   campaignId: string,
