@@ -177,7 +177,7 @@ export default function PossessionsCard({ characterId, characterName, onClose }:
               className="text-center text-xs"
               style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', color: 'rgba(255,255,255,0.4)' }}
             >
-              No possessions.
+              none yet
             </div>
           )}
           {!err && rows && rows.length > 0 && (

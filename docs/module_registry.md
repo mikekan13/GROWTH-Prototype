@@ -73,6 +73,10 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 
 ## Infrastructure (lib/)
 
+- `lib/character-sheet-facts.ts` — client-safe shapes + pure readers for the blocks API: `shapeBlockLinks` (dedupe/hide superseded), `computeDisplayAge` (currentCycle − birthCycle → identity.age → null), `formatAge`, `readCompletion` (defensive), `blockTooltip`.
+- `services/character-sheet-facts.ts` — `getCharacterSheetFacts(characterId, user)`; `services/inventory.ts` `InventoryItemView` now carries paint (`story`, `archetypeName`).
+
+
 | Module | File | Purpose |
 |--------|------|---------|
 | Auth | `lib/auth.ts` | Password hashing, session management, cookie handling, typed auth/forbidden errors |
@@ -126,6 +130,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Canvas | RestPanel | GM rest UI — short/long toggle, character checkboxes with warnings (Overwhelmed/F=0), apply + results. Long Rest: per-character trainable-upgrade picker grouped by pillar, Frequency-budget-guarded (r-2026-07-15-01) |
 | Canvas Cards | CharacterCard | Expanded/compact character sheet on canvas, dynamic name sizing, drag support |
 | Canvas Cards | InventoryCard | Draggable inventory sub-panel showing real CampaignItems (HeldItemData). Weight level display, carry capacity tracking, condition/material/damage info, equip toggle, remove-from-inventory button, drop-target highlighting |
+| Character | CharacterGenesisSections (+ useCharacterSheetFacts) | 2026-10-12 sheet audit: renders what genesis made from the right sources — Seed/Roots/Branches/Nectars/Thorns from CharacterBlockLink (LOCAL name first, archetype beneath + tooltip, rule text, KV, maturity chips; legacy sheet fields only when no links), age (cycle rule, never 0) + fated age, TKV, memory count/last time, completion badge, 3-tier carry, GRO.vines (AI-CHOSEN marker). Used by CharacterSheet, Tapestry CharacterTab; BlockRow reused by TraitsCard; CharacterCard reads the same hooks |
 | Canvas Cards | PossessionsCard | Possession relationships sub-panel (entities owned via 'owns' EntityRelationship edges) |
 | Canvas Cards | SkillsCard | Skill sub-panel with governor badges, +/- level, trainable badge (r-2026-07-15-01), Roll button (GM: inline DR row → one-click server check; else terminal prefill), Request button (player), forge-picker add form (GM). No categories or combat flags |
 | Canvas Cards | LocationCard | Expandable location card on canvas. Compact (280px) and expanded (480px) views. Shows description, tech/wealth/danger levels, features, ley lines, tags |
@@ -477,6 +482,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/characters/[id]/inventory/equip | POST, DELETE | InventoryService (equip/unequip item to body region) |
 | /api/characters/[id]/lock | GET, POST | PersonaLock (get lock status, write persona lock after portrait accepted) |
 | /api/characters/[id]/mechanics | PATCH | CharacterService (assignMechanics — seeds Seed/Root/Branch from Forge) |
+| /api/characters/[id]/blocks | GET | services/character-sheet-facts — CharacterBlockLink ⨝ ForgeItem (deduped by forgeItemId; superseded drafts hidden), age, TKV, memories {count,lastAt}, vines. Owner / campaign members / ADMIN |
 | /api/characters/[id]/possessions | GET, POST, DELETE | PossessionService (list/add/remove possession relationships) |
 | /api/characters/[id]/request-changes | POST | ApplicationService / BackstoryService (GM request revision) |
 | /api/dice/deathsave | POST | DiceService (death save roll — separate from /check for UI routing) |

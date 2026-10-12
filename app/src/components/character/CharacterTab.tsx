@@ -10,6 +10,7 @@ import { safeJsonParse } from '@/lib/safe-json';
 import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
+import CharacterGenesisSections from './CharacterGenesisSections';
 import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
 import { GenesisOpenThreads } from './GenesisProds';
 import { GenesisSeedScreenDialog, type SeedScreenFindingView } from './GenesisSeedScreen';
@@ -856,6 +857,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               </div>
             )}
           </div>
+        )}
+
+        {/* WHAT GENESIS MADE (2026-10-12 audit) — Seed/Roots/Branches/Traits from
+            the block links (local name first, archetype beneath), age, TKV,
+            memories, carry tiers, GRO.vines. Shown once the story has moved on. */}
+        {effectiveCharacter?.id && (genomeInfo?.stage ?? 'story') !== 'story' && (
+          <CharacterGenesisSections characterId={effectiveCharacter.id} />
         )}
 
         {/* APPEARANCE — separate from genesis and editable DURING it (Mike
