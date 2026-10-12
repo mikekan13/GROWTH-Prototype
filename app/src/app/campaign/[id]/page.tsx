@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
 import { locationDepths } from '@/components/canvas/canvas-lod';
 import { recomputeAugments } from '@/lib/character-actions';
+import { warmLocalLane } from '@/lib/local-warm';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -59,6 +60,9 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED'].includes(m.status));
 
   if (!isAdmin && !isGM && !isMember) redirect('/terminal');
+
+  // Watcher opening the table: wake the scale-to-zero local lane (fire-and-forget, deduped).
+  if (isGM || isAdmin) warmLocalLane(campaign.id);
 
   // Trailblazer roster for the canvas card's controller dropdown. Filter out
   // people who haven't joined yet (INTERESTED/REJECTED). The GM is offered

@@ -190,6 +190,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | `types/item.ts` | ItemType, WorldItem fields, damage/armor/material types, HeldItemData (bridge type for inventory display) |
 | `types/material.ts` | Material system: ResistType (soft/hard), MaterialMod union type, Material interface, weight level labels, condition labels, armor layer rules |
 | `lib/item-properties.ts` | Item PROPERTY lookup (universal descriptors — Sharp, Brittle…; freeform strings, no catalog). `ITEM_PROPERTY_DOMAINS` (slug → extra head-domain tags; EMPTY — Mike/Forge content), `getPropertyDomains(name)`, `propertySlug(name)`. Read by perception `aspectDomains('property:<slug>')` |
+| `lib/local-warm.ts` | Local-lane warm ping (2026-10-12): `warmLocalLane(campaignId)` fires one fire-and-forget `max_tokens:1` chat request at `${AI_LOCAL_BASE_URL}/chat/completions` (no-op if unset; deduped 10 min per campaign, in-memory). Called when the Watcher/ADMIN opens a campaign: `/campaign/[id]` page, `/watcher/campaign/[id]` page, SSE `/api/campaigns/[id]/stream` connect. Logs one line, never bodies. Test `local-warm.test.ts` |
 | `lib/materials.ts` | Material catalog (25+ materials: Linen→Dragonscale), getMaterial(), combineMaterials(), getAvailableMaterials() |
 | `types/encounter.ts` | EncounterType (combat/social/exploration/puzzle/event), EncounterPhase (intention/resolution/impact), Encounter fields, participant/round tracking types |
 | `types/crystallization.ts` | CrystallizationEntry, CrystallizationLedger, crystallize/dissolve request/response types |

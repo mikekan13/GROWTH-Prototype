@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { canManageCampaign } from '@/lib/permissions';
+import { warmLocalLane } from '@/lib/local-warm';
 import DashboardShell from '@/components/DashboardShell';
 import Link from 'next/link';
 
@@ -32,6 +33,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   if (!campaign) redirect('/watcher');
   if (!canManageCampaign(session.user.id, session.user.role, campaign)) redirect('/watcher');
+  warmLocalLane(campaign.id);
 
   // Members who don't have a character yet
   const characterUserIds = new Set(campaign.characters.map(c => c.userId));

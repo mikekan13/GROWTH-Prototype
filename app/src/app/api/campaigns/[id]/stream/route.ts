@@ -20,6 +20,9 @@ import {
 import { kickWorkLoop } from '@/ai/copilot/work-loop';
 import { feedViewerFor, type FeedViewer } from '@/services/perceived-feed';
 import { perceptionFeedOn } from '@/lib/perception-feed';
+import { prisma } from '@/lib/db';
+import { canManageCampaign } from '@/lib/permissions';
+import { warmLocalLane } from '@/lib/local-warm';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -82,6 +85,13 @@ export async function GET(
       // F-3: the GM is back at the table — attended work sessions that
       // idled while nobody was connected become runnable again.
       kickWorkLoop();
+
+      // The Watcher (GM/ADMIN) connected: wake the scale-to-zero local lane.
+      // Fire-and-forget + deduped per campaign; never blocks the stream.
+      prisma.campaign
+        .findUnique({ where: { id: campaignId }, select: { gmUserId: true } })
+        .then(c => { if (c && canManageCampaign(user.id, user.role, c)) warmLocalLane(campaignId); })
+        .catch(() => {});
     },
 
     cancel() {
