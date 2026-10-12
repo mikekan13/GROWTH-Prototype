@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
   fluid: 10_000,
   created: [] as Array<Record<string, unknown>>,
   updates: [] as Array<Record<string, unknown>>,
-  crystallize: vi.fn(async () => ({})),
+  crystallize: vi.fn(async (..._args: unknown[]) => ({})),
   wrap: vi.fn(async () => ({ entityId: 'e1', status: 'DORMANT' })),
   author: vi.fn(async () => ({})),
   seedMem: vi.fn(async (_id: string, _role: string, m: unknown[]) => m.map((_, i) => ({ memoryEntryId: `m${i}` }))),
