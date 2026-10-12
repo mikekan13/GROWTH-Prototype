@@ -71,6 +71,10 @@ export interface JewlPrompt {
   /** Restrict this dispatch to these tools (offered AND executable). A
    *  genesis PRODDING cycle may only raise prods (Mike 2026-10-12). */
   allowedTools?: string[];
+  /** Tag the tone filter's pass over THIS prompt's text with a row pointer, so
+   *  an observer can tell which withholds hit it (genesis: the seed — the
+   *  `[genesis] seed-withheld` warning, 2026-10-12). Never the text. */
+  toneRef?: { table: string; id: string };
 }
 
 /** Outcome of executing one tool call. */

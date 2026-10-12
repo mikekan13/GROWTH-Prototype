@@ -12,6 +12,7 @@ import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
 import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
 import { GenesisOpenThreads } from './GenesisProds';
+import { GenesisSeedScreenDialog, type SeedScreenFindingView } from './GenesisSeedScreen';
 
 // Body-part section re-enabled (Mike 2026-08-17 body-spawn ruling): it now
 // reads the SPAWNED body-part items (character.bodyAnatomy) — per-part
@@ -395,6 +396,24 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     if (genesisCharId) setGenesisDismissedFor(genesisCharId);
   };
 
+  // APPEARANCE IS SEPARATE from genesis (Mike 2026-10-12): "tagged to the
+  // graphical creation of a character and should be something the user can
+  // work on while JEWL is doing everything else." Appearance ↗ steps the
+  // overlay aside (the badge keeps tracking JEWL) and opens the look editor.
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const appearanceRef = useRef<HTMLDivElement>(null);
+  const openAppearance = useCallback(() => {
+    setAppearanceOpen(true);
+    if (genesisCharId) setGenesisDismissedFor(genesisCharId);
+    setTimeout(() => appearanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  }, [genesisCharId]);
+  const appearanceUnlocked = genomeInfo?.stage === 'ready' || genomeInfo?.stage === 'gestating'
+    || genesisRunning || appearanceOpen;
+
+  // Pre-submit seed screen (2026-10-12): findings that would be withheld.
+  const [seedFindings, setSeedFindings] = useState<SeedScreenFindingView[] | null>(null);
+  const backstoryRef = useRef<HTMLTextAreaElement>(null);
+
   const updateHeight = useCallback((value: number) => {
     setPhysicalDescription(prev => ({ ...prev, height: value }));
     setDirty(true);
@@ -623,10 +642,35 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     || !isGM
     || (effectiveCharacter?.entityType != null && effectiveCharacter.entityType !== 'PLAYER_CHARACTER');
 
-  // Genesis: hand the genome (backstory + appearance) to JEWL, who opens a
-  // gestation work session (expansion → ledger → catalog-first mechanics).
-  const submitToJewl = async () => {
+  // Genesis: hand the genome (the backstory — appearance is separate,
+  // 2026-10-12) to JEWL, who opens a gestation work session (expansion →
+  // ledger → catalog-first mechanics). The seed is screened FIRST: anything
+  // the wall would withhold is shown to the GM before a session (or a cent)
+  // is spent; `force` = Submit anyway.
+  const submitToJewl = async (force = false) => {
     if (!effectiveCharacter?.id || !backstoryText.trim() || submittingGenesis) return;
+    const genome = {
+      backstory: backstoryText,
+      characterName,
+      desiredAge,
+      selectedSeed: selectedSeedName || undefined,
+      referencePhotos, // only the COUNT reaches the plan
+    };
+    if (!force) {
+      try {
+        const res = await fetch(`/api/characters/${effectiveCharacter.id}/genesis/screen`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(genome),
+        });
+        if (res.ok) {
+          const r = await res.json() as { clear: boolean; findings: SeedScreenFindingView[] };
+          if (!r.clear) { setSeedFindings(r.findings); return; }
+        }
+        // A screen failure never blocks the submit — the wall still runs.
+      } catch { /* fall through to submit */ }
+    }
+    setSeedFindings(null);
     setSubmittingGenesis(true);
     setGenesisSubmitError(null);
     setGenesisDismissedFor(null);
@@ -635,16 +679,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
       const res = await fetch(`/api/characters/${effectiveCharacter.id}/genesis`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          backstory: backstoryText,
-          characterName,
-          desiredAge,
-          selectedSeed: selectedSeedName || undefined,
-          physicalDescription,
-          referencePhotos,
-          styleColors,
-          styleAesthetics,
-        }),
+        body: JSON.stringify(genome),
       });
       const data = await res.json();
       // 409 = a run is already in flight: no error — the overlay shows it.
@@ -679,6 +714,18 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           characterName={characterName || effectiveCharacter?.name}
           onStepsChanged={() => { void refetchGenesis(); }}
           onOpenForge={() => { if (genesisCharId) setGenesisDismissedFor(genesisCharId); }}
+          onOpenAppearance={openAppearance}
+        />
+      )}
+      {seedFindings && (
+        <GenesisSeedScreenDialog
+          findings={seedFindings}
+          busy={submittingGenesis}
+          onEdit={() => {
+            setSeedFindings(null);
+            setTimeout(() => { backstoryRef.current?.focus(); backstoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
+          }}
+          onSubmitAnyway={() => { void submitToJewl(true); }}
         />
       )}
       {showGenesisBadge && <GenesisBadge progress={genesis} onOpen={() => setGenesisDismissedFor(null)} />}
@@ -832,6 +879,13 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             </div>
           )}
         </div>
+        </>)}
+
+        {/* APPEARANCE — separate from genesis and editable DURING it (Mike
+            2026-10-12; supersedes the 08-08 "look unlocks after gestation"
+            gate for these sections). The seed selector above stays post-genome. */}
+        {appearanceUnlocked && (<>
+        <div ref={appearanceRef} id="character-appearance" style={{ scrollMarginTop: 12 }} />
 
         {/* ── SECTION: Reference Photos ── */}
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
@@ -1327,6 +1381,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           )}
         </div>
 
+        </>)}
+
+        {genomeInfo?.stage === 'ready' && (<>
         {/* INVENTORY */}
         {SHOW_INVENTORY && (
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
@@ -1367,6 +1424,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             <textarea
               value={backstoryText}
               onChange={e => { setBackstoryText(e.target.value); setDirty(true); }}
+              ref={backstoryRef}
               placeholder="Write your character's story here..."
               className="w-full text-sm p-3 resize-none"
               style={{
@@ -1422,7 +1480,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             )}
             {isGM && effectiveCharacter?.id && !genesisRunning && (
               <button
-                onClick={submitToJewl}
+                onClick={() => { void submitToJewl(); }}
                 disabled={submittingGenesis || !backstoryText.trim()}
                 className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
                 style={{
@@ -1433,7 +1491,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                   borderRadius: '2px',
                   cursor: backstoryText.trim() && !submittingGenesis ? 'pointer' : 'default',
                 }}
-                title="Hand the genome (backstory + appearance) to JEWL — he gestates the full person, then builds the mechanics catalog-first."
+                title="Hand the genome (the backstory) to JEWL — he gestates the full person, then builds the mechanics catalog-first. Appearance stays yours to shape alongside."
               >
                 {submittingGenesis ? 'Submitting…' : '◆ Submit to JEWL'}
               </button>

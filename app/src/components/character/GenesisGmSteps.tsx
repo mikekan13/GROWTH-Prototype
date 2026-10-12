@@ -35,13 +35,15 @@ async function publish(campaignId: string, id: string): Promise<RowResult> {
   }
 }
 
-export function GenesisGmSteps({ steps, campaignId, onChanged, onOpenForge }: {
+export function GenesisGmSteps({ steps, campaignId, onChanged, onOpenForge, onOpenAppearance }: {
   steps: GenesisGmStep[];
   campaignId: string;
   /** Refetch progress after submits (rows leave once the server agrees). */
   onChanged: () => void;
   /** Leaving for the Forge (the overlay steps aside). */
   onOpenForge?: () => void;
+  /** Appearance is separate from genesis (2026-10-12) — edit it alongside. */
+  onOpenAppearance?: () => void;
 }) {
   const [results, setResults] = useState<Record<string, RowResult>>({});
   // Rows submitted here stay on screen (✓) after the server drops them.
@@ -81,6 +83,9 @@ export function GenesisGmSteps({ steps, campaignId, onChanged, onOpenForge }: {
       <style>{GS_CSS}</style>
       <div className="gs-head">
         <span className="gs-title">NEEDS YOU · {open.length}</span>
+        {onOpenAppearance && (
+          <button type="button" className="gn-apr" data-no-hold onClick={onOpenAppearance}>APPEARANCE ↗</button>
+        )}
         {open.length > 1 && !confirming && (
           <button type="button" className="gs-all" data-no-hold disabled={busy} onClick={() => setConfirming(true)}>
             SUBMIT ALL

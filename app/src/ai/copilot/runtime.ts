@@ -403,8 +403,11 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
 
   // 3. Build the messages array. History is text-only; the new prompt
   //    is formatted via formatPromptText.
+  // The prompt's own text may carry a pointer (genesis: the session whose
+  // plan rides in it) so a withhold there is attributable (2026-10-12).
+  const promptToneCtx = prompt.toneRef ? { ...toneCtx, ref: prompt.toneRef } : toneCtx;
   const tonedText = async (text: string) => {
-    const out = await toneFilterAsync(text, toneCtx);
+    const out = await toneFilterAsync(text, promptToneCtx);
     if (out !== text) tally.toned++;
     return out;
   };

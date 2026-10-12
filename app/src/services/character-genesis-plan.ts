@@ -6,20 +6,25 @@
  * (runtime.ts dispatchPrompt, source JEWL_WORK_CYCLE).
  */
 
+/**
+ * APPEARANCE IS SEPARATE (Mike 2026-10-12): "appearance is a separate thing
+ * that although can use details from the backstory to help it, is tagged to
+ * the graphical creation of a character and should be something the user can
+ * work on while JEWL is doing everything else." So the brief carries NO
+ * physical-description JSON and NO style aesthetics — only the reference-photo
+ * COUNT. Appearance is edited alongside genesis (the overlay's Appearance ↗),
+ * never fed through it. (Its JSON in the plan is also what tripped the
+ * minor-sexual screen on Violet's run 2: "nude-pink lip".)
+ */
 export interface GenesisPlanInput {
   backstory: string;
   desiredAge?: number;
   selectedSeed?: string;
-  physicalDescription?: Record<string, unknown>;
+  /** Only the count crosses — never the content. */
   referencePhotos?: string[];
-  styleAesthetics?: string[];
 }
 
 export function buildGenesisPlan(input: GenesisPlanInput, name: string, characterId: string): string {
-  const appearance = input.physicalDescription && Object.keys(input.physicalDescription).length > 0
-    ? JSON.stringify(input.physicalDescription)
-    : '(none recorded — derive from the backstory, flag for the Watcher)';
-
   return [
     `GENESIS BRIEF — ${name} (character [${characterId}])`,
     '',
@@ -27,11 +32,10 @@ export function buildGenesisPlan(input: GenesisPlanInput, name: string, characte
     `NAME: ${name}`,
     input.desiredAge != null ? `AGE: ${input.desiredAge}` : null,
     input.selectedSeed ? `SEED PREFERENCE: ${input.selectedSeed}` : null,
-    `APPEARANCE: ${appearance}`,
     input.referencePhotos?.length
       ? `REFERENCE PHOTOS: ${input.referencePhotos.length} uploaded (identity lock runs separately)`
       : null,
-    input.styleAesthetics?.length ? `STYLE: ${input.styleAesthetics.join(', ')}` : null,
+    'APPEARANCE: not part of this brief — the player/GM shapes the look separately (graphical creation).',
     'BACKSTORY:',
     input.backstory.trim(),
     '',

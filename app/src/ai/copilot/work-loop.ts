@@ -36,6 +36,7 @@ import {
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
 import { planWorkCycle, type CycleProd } from './work-cycle-text';
+import { watchSeedWithheld, seedWithheldNotes } from '@/services/genesis-seed-screen';
 
 const BREATHER_MS = 4_000;
 /** Consecutive tool-less cycles before a session is judged stalled and
@@ -99,6 +100,24 @@ async function runLoop(): Promise<void> {
   }
 }
 
+/** Log + note any tone-filter withholds that hit this genesis cycle's seed. Never throws. */
+async function flushSeedWithheld(
+  watch: ReturnType<typeof watchSeedWithheld> | null,
+  session: { id: string; progress: string },
+): Promise<void> {
+  if (!watch) return;
+  try {
+    const events = watch.stop();
+    if (!events.length) return;
+    for (const note of seedWithheldNotes(session.id, events, parseProgress(session.progress))) {
+      await updateWorkSession({ sessionId: session.id, progressNote: note });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[daya-work-loop] seed-withheld note failed:', err instanceof Error ? err.message : err);
+  }
+}
+
 async function runCycle(session: {
   id: string;
   campaignId: string;
@@ -143,6 +162,9 @@ async function runCycle(session: {
   // the Log as a genesis report; the chat gets one status line per
   // transition (daya-work-session → announceGenesisStatus).
   const genesis = isGenesisGoal(session.goal);
+  // Never silent again (2026-10-12): a withhold on the seed is logged and
+  // surfaced in the genesis overlay's feed (fixed-format progress note).
+  const seedWatch = genesis ? watchSeedWithheld(session.id) : null;
   let response;
   try {
     response = await dispatchPrompt({
@@ -153,8 +175,9 @@ async function runCycle(session: {
       actorRole: 'GODHEAD',
       text,
       ...(allowedTools ? { allowedTools } : {}),
-      ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME } : {}),
+      ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME, toneRef: { table: 'DayaWorkSession', id: session.id } } : {}),
     });
+    await flushSeedWithheld(seedWatch, session);
     state.dispatchFailures.delete(session.id);
     if (genesis) {
       try {
@@ -171,6 +194,7 @@ async function runCycle(session: {
       }
     }
   } catch (err) {
+    await flushSeedWithheld(seedWatch, session);
     const msg = err instanceof Error ? err.message : String(err);
     // The wall refused the cycle (its plan or context carries table/real
     // content): retrying cannot help — block now and say why, without text.

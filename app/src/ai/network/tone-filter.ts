@@ -53,6 +53,7 @@ import {
   TONE_EXTRA_AGE_CUES,
   TONE_SEXUAL_CUES,
   TONE_SEXUAL_VIOLENCE_CUES,
+  cuesAreLocal,
   localPairs,
   matchCues,
 } from '@/lib/content-cues';
@@ -129,6 +130,32 @@ export function screen(text: string): ScreenResult {
     }
   }
   return { categories, hitCount };
+}
+
+/** One screen hit with its offset and matched cue word — for the pre-submit screen. */
+export interface ScreenFinding {
+  category: ToneCategory;
+  index: number;
+  word: string;
+}
+
+/**
+ * WHERE the screen fires in a text (cue offsets + words), using exactly the
+ * screen()'s rules — minor-sexual only for LOCAL pairs, reported at the
+ * sexual cue. Pure; never logs. Callers show the GM the sentence around it.
+ */
+export function explainScreen(text: string): ScreenFinding[] {
+  const out: ScreenFinding[] = [];
+  for (const [cat, patterns] of Object.entries(SCREEN) as Array<[ToneCategory, RegExp[]]>) {
+    for (const m of matchCues(text, patterns)) out.push({ category: cat, index: m.index, word: m.word });
+  }
+  const age = matchCues(text, AGE_CUES);
+  if (age.length) {
+    for (const s of matchCues(text, [...TONE_SEXUAL_CUES, ...TONE_SEXUAL_VIOLENCE_CUES])) {
+      if (age.some((a) => cuesAreLocal(text, a.index, s.index))) out.push({ category: 'minor-sexual', index: s.index, word: s.word });
+    }
+  }
+  return out.sort((a, b) => a.index - b.index);
 }
 
 /** The minor-sexual hard block: fixed, no detail, nothing derived. */

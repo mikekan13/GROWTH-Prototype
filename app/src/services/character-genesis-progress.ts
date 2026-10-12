@@ -24,6 +24,7 @@
  * they ship to the GM (and only the GM) so genesis can be a dialogue.
  */
 import 'server-only';
+import { parseSeedWithheldNotes } from '@/lib/genesis-seed-notes';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { getJewlGodHead } from '@/ai/copilot/jewl-identity';
@@ -86,6 +87,8 @@ export interface GenesisFacts {
     blockedReason: string | null;
     /** 'PRODDING' while JEWL asks before building; 'BUILDING' after Build. */
     stage?: string | null;
+    /** Progress notes JSON — ONLY the fixed-format seed-withheld notes are read from it. */
+    progress?: string | null;
   } | null;
   /** The session's prods, round then order. */
   prods?: ProdFact[];
@@ -156,6 +159,9 @@ export interface GenesisProgress {
   startedAt: string | null;
   endedAt: string | null;
   lastCycleAt: string | null;
+  /** The tone filter withheld/toned part of the SEED from JEWL (2026-10-12) —
+   *  fixed vocabulary only (categories + outcome), never text. */
+  seedWarnings: Array<{ categories: string[]; outcome: 'blocked' | 'withheld' | 'softened' }>;
 }
 
 const BLOCK_TYPES = new Set(['seed', 'root', 'branch']);
@@ -262,7 +268,7 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
       state: 'none', sessionId: null, current: null, step: 0, total, counts,
       stages: GENESIS_STAGES.map(st => ({ ...st, status: 'pending' as const })),
       wait: null, error: null, gmSteps: [], prodding: false, prods, openThreads,
-      startedAt: null, endedAt: null, lastCycleAt: null,
+      startedAt: null, endedAt: null, lastCycleAt: null, seedWarnings: [],
     };
   }
 
@@ -315,7 +321,16 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
     startedAt: s.startedAt.toISOString(),
     endedAt: s.endedAt ? s.endedAt.toISOString() : null,
     lastCycleAt: s.lastCycleAt ? s.lastCycleAt.toISOString() : null,
+    seedWarnings: parseSeedWithheldNotes(notesOf(s.progress)),
   };
+}
+
+function notesOf(json: string | null | undefined): string[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json) as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch { return []; }
 }
 
 /** Chat rows a genesis work cycle writes are stamped with this username and
@@ -340,7 +355,7 @@ export function parseGenesisGoal(goal: string): { name: string; characterId: str
 type SessionRow = NonNullable<GenesisFacts['session']>;
 const SESSION_SELECT = {
   id: true, status: true, cycleCount: true, startedAt: true,
-  endedAt: true, lastCycleAt: true, blockedReason: true, stage: true,
+  endedAt: true, lastCycleAt: true, blockedReason: true, stage: true, progress: true,
 } as const;
 
 async function loadGenesisFacts(

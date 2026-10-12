@@ -145,12 +145,23 @@ export function pillarFills(p: GenesisProgress | null): { body: number; spirit: 
   return { body, spirit, soul };
 }
 
+/** The feed line for a seed withhold (fixed vocabulary only). */
+export function seedWarningLine(w: { categories: string[]; outcome: string }): string {
+  const cats = w.categories.join(', ') || 'unspecified';
+  return w.outcome === 'softened'
+    ? `⚠ part of the seed was toned down for JEWL: ${cats}`
+    : `⚠ part of the seed was withheld from JEWL: ${cats}`;
+}
+
 /** One Terminal log line per observed change — counts and stage names only. */
 export function diffLogLines(prev: GenesisProgress | null, next: GenesisProgress): string[] {
   const out: string[] = [];
   if (!prev || prev.sessionId !== next.sessionId) {
     out.push(`genesis session open · step ${next.step}/${next.total}`);
   }
+  // Never silent (2026-10-12): every new seed withhold gets a feed line.
+  const prevWarn = prev && prev.sessionId === next.sessionId ? (prev.seedWarnings ?? []).length : 0;
+  for (const w of (next.seedWarnings ?? []).slice(prevWarn)) out.push(seedWarningLine(w));
   if (prev && prev.current !== next.current && next.current) {
     const st = next.stages.find(s => s.key === next.current);
     if (st) out.push(`stage → ${st.label.toLowerCase()}`);
@@ -229,11 +240,14 @@ export interface GenesisLoadingOverlayProps {
   prodAnswerDraft?: string;
   onStepsChanged?: () => void;
   onOpenForge?: () => void;
+  /** Appearance is SEPARATE from genesis (Mike 2026-10-12): open the
+   *  look/photo/style editor while JEWL keeps working (the badge tracks him). */
+  onOpenAppearance?: () => void;
 }
 
 export function GenesisLoadingOverlay({
   progress, liveTool, submitError, onDismiss, onViewSheet, fixedNow, initialLog,
-  campaignId, onStepsChanged, onOpenForge, characterName, prodAnswerOpenId, prodAnswerDraft,
+  campaignId, onStepsChanged, onOpenForge, onOpenAppearance, characterName, prodAnswerOpenId, prodAnswerDraft,
 }: GenesisLoadingOverlayProps) {
   const state = submitError ? 'error' : progress?.state ?? 'none';
   const running = state === 'running' || state === 'waiting' || state === 'none';
@@ -283,6 +297,12 @@ export function GenesisLoadingOverlay({
         {/* Terminal header */}
         <div className="gn-head">
           <span className="gn-badge">tHE TERmInAl</span>
+          {onOpenAppearance && state !== 'error' && (
+            <button type="button" className="gn-apr" data-no-hold onClick={onOpenAppearance}
+              title="Work on the look, photos and style while JEWL keeps building — the badge tracks him.">
+              APPEARANCE ↗
+            </button>
+          )}
           <span className="gn-head-r">
             {state === 'done' ? 'COMPLETE' : progress?.step ? `STEP ${progress.step}/${progress.total}` : 'OPENING'}
             {' · '}<span className="gn-num">{elapsed}</span>
@@ -300,6 +320,13 @@ export function GenesisLoadingOverlay({
                       : 'JEWL is assembling a being'}
           </span>
         </div>
+
+        {/* Seed withheld from JEWL — persistent, never only in the rolling log */}
+        {(progress?.seedWarnings?.length ?? 0) > 0 && (
+          <div className="gn-seedwarn" role="alert">
+            {(progress?.seedWarnings ?? []).map((w, i) => <div key={i}>{seedWarningLine(w)}</div>)}
+          </div>
+        )}
 
         {/* Pillars */}
         <div className="gn-pillars" aria-label="Pillars assembled">
@@ -343,7 +370,7 @@ export function GenesisLoadingOverlay({
         {campaignId && progress?.prodding && progress.sessionId && (
           <GenesisProds prods={progress.prods ?? []} campaignId={campaignId} sessionId={progress.sessionId}
             characterName={characterName} waiting={state === 'waiting'}
-            onChanged={() => onStepsChanged?.()}
+            onChanged={() => onStepsChanged?.()} onOpenAppearance={onOpenAppearance}
             initialOpenId={prodAnswerOpenId} initialDraft={prodAnswerDraft} />
         )}
         {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
@@ -351,7 +378,7 @@ export function GenesisLoadingOverlay({
         )}
         {campaignId && progress && (progress.gmSteps?.length ?? 0) > 0 && (
           <GenesisGmSteps steps={progress.gmSteps} campaignId={campaignId}
-            onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} />
+            onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} onOpenAppearance={onOpenAppearance} />
         )}
         {state === 'waiting' && progress?.wait && WAIT_COPY[progress.wait]
           && !(progress.wait === 'approval' && campaignId && (progress.gmSteps?.length ?? 0) > 0)
@@ -384,7 +411,7 @@ export function GenesisLoadingOverlay({
 
         {/* Rolling Terminal log */}
         <div className="gn-log" aria-live="polite">
-          {log.map(l => <div key={l.id} className="gn-line"><span className="gn-pr">&gt;</span> {l.text}</div>)}
+          {log.map(l => <div key={l.id} className={`gn-line${l.text.startsWith('⚠') ? ' gn-line-warn' : ''}`}><span className="gn-pr">&gt;</span> {l.text}</div>)}
           {state === 'running' && <div className="gn-line gn-line-now"><span className="gn-pr">&gt;</span> {currentStage ? toolVerb(liveTool) : 'listening'}<span className="gn-caret">_</span></div>}
         </div>
 
@@ -449,7 +476,7 @@ const GENESIS_CSS = `
 .gn-scan{pointer-events:none;position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);z-index:0}
 .gn-scan::after{content:"";position:absolute;left:0;right:0;height:90px;background:linear-gradient(180deg,transparent,rgba(34,171,148,.07),transparent);animation:gn-sweep 5.5s linear infinite}
 .gn-col{position:relative;z-index:1;max-width:412px;margin:0 auto;padding:18px 16px 28px;display:flex;flex-direction:column;gap:16px;min-height:100%}
-.gn-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.gn-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .gn-badge{background:#fff;color:#000;padding:2px 8px;font-size:13px;letter-spacing:.06em}
 .gn-head-r{color:#22ab94;font-size:12px;letter-spacing:.08em}
 .gn-num{font-variant-numeric:tabular-nums;color:#fff}
@@ -481,6 +508,9 @@ const GENESIS_CSS = `
 .gn-line{opacity:.55;animation:gn-type .3s steps(8,end) both;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gn-line:nth-last-child(-n+3){opacity:.8}.gn-line:last-child,.gn-line-now{opacity:1}
 .gn-line-now{color:#D07818}
+.gn-line-warn{color:#f7525f;opacity:1!important}
+.gn-seedwarn{border-left:4px solid #f7525f;background:#1a0606;color:#f0d6d8;padding:8px 10px;font-size:12px;line-height:1.5;display:flex;flex-direction:column;gap:2px}
+.gn-apr{font-family:var(--font-terminal,Consolas,monospace);font-size:12px;letter-spacing:.06em;min-height:32px;padding:4px 10px;background:#000;color:#FFCC78;border:1px solid #FFCC78;cursor:pointer}
 .gn-pr{color:#D07818}
 .gn-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:auto}
 .gn-meta{font-size:12px;color:#8a8a8a}

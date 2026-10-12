@@ -33,7 +33,7 @@ export function prodChatLine(open: number, name?: string | null): string {
 }
 
 export function GenesisProds({
-  prods, campaignId, sessionId, characterName, waiting, onChanged, initialOpenId, initialDraft,
+  prods, campaignId, sessionId, characterName, waiting, onChanged, initialOpenId, initialDraft, onOpenAppearance,
 }: {
   prods: GenesisProdView[];
   campaignId: string;
@@ -45,6 +45,8 @@ export function GenesisProds({
   /** Harness: open the answer field on this prod with this draft. */
   initialOpenId?: string;
   initialDraft?: string;
+  /** Appearance is separate from genesis (2026-10-12) — edit it alongside. */
+  onOpenAppearance?: () => void;
 }) {
   const [answering, setAnswering] = useState<string | null>(initialOpenId ?? null);
   const [draft, setDraft] = useState(initialDraft ?? '');
@@ -111,7 +113,12 @@ export function GenesisProds({
       <style>{GP_CSS}</style>
       <div className="gp-head">
         <span className="gp-title">NEEDS YOU · {open.length}</span>
-        <span className="gp-sub-r">{prods.length} prod{prods.length === 1 ? '' : 's'}</span>
+        <span className="gp-sub-r">
+          {onOpenAppearance && (
+            <button type="button" className="gn-apr" data-no-hold onClick={onOpenAppearance} style={{ marginRight: 8 }}>APPEARANCE ↗</button>
+          )}
+          {prods.length} prod{prods.length === 1 ? '' : 's'}
+        </span>
       </div>
       <div className="gp-jewl"><span className="gp-jewl-k">JEWL ›</span> {waiting || prods.length > 0
         ? prodChatLine(open.length, characterName)

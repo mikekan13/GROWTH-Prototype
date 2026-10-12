@@ -2,8 +2,9 @@
  * Character genesis — the "submit to JEWL" leg of the birth process
  * ([[character-genesis-pipeline-2026-08-08]]).
  *
- * The backstory + appearance the human wrote is the GENOME (inviolable
- * canon). Submitting opens a DAYA work session where JEWL gestates the
+ * The backstory the human wrote is the GENOME (inviolable canon). Appearance
+ * is SEPARATE (Mike 2026-10-12) — the player/GM shapes it alongside genesis;
+ * its fields are still accepted here but never enter the plan. Submitting opens a DAYA work session where JEWL gestates the
  * person — exhaustive expansion (chronology, psychology, relationships,
  * voice, believed-sheet gaps), the episodic memory ledger (sealed,
  * experiential), then catalog-first mechanical translation (pull stock
@@ -18,6 +19,7 @@ import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { kickWorkLoop } from '@/ai/copilot/work-loop';
 import { openWorkSession } from './daya-work-session';
 import { buildGenesisPlan } from './character-genesis-plan';
+import { screenGenesisPlan, type SeedScreenResult } from './genesis-seed-screen';
 
 const genesisInputSchema = z.object({
   backstory: z.string().min(40, 'Backstory is too short to gestate — the genome needs at least a few sentences.'),
@@ -73,6 +75,11 @@ export async function submitCharacterGenesis(opts: {
   const name = input.characterName?.trim() || character.name;
   // The plan carries the backstory: fiction, crossing only through the wall.
   const plan = buildGenesisPlan(input, name, character.id);
+  // Never silent (2026-10-12): a seed the wall would withhold is visible in the log.
+  const pre = screenGenesisPlan(plan, { participantAges: input.desiredAge != null ? [input.desiredAge] : undefined });
+  if (!pre.clear) {
+    console.warn(`[genesis] seed-withheld at submit character=${character.id} categories=${[...new Set(pre.findings.filter(f => f.outcome !== 'toned').map(f => f.category))].join('+')} (GM chose Submit anyway)`);
+  }
 
   const session = await openWorkSession({
     campaignId,
@@ -86,4 +93,28 @@ export async function submitCharacterGenesis(opts: {
   kickWorkLoop();
 
   return { sessionId: session.id, status: session.status, alreadyRunning: false };
+}
+
+/**
+ * Pre-submit seed screen (2026-10-12): assemble the REAL plan exactly as
+ * submit would and run the wall's screens on it — BEFORE a session opens, so
+ * nothing is spent. Same permission as submit (route: Watcher-or-above).
+ * Returns each passage that would be blocked/withheld/toned, to the sentence.
+ */
+export async function screenCharacterGenesis(opts: {
+  characterId: string;
+  input: unknown;
+}): Promise<SeedScreenResult> {
+  const input = genesisInputSchema.parse(opts.input);
+  const character = await prisma.character.findUnique({
+    where: { id: opts.characterId },
+    select: { id: true, name: true, campaignId: true },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!character.campaignId) {
+    throw new ValidationError('Character has no campaign — genesis runs inside a campaign world.');
+  }
+  const name = input.characterName?.trim() || character.name;
+  const plan = buildGenesisPlan(input, name, character.id);
+  return screenGenesisPlan(plan, { participantAges: input.desiredAge != null ? [input.desiredAge] : undefined });
 }
