@@ -2,7 +2,9 @@
  * Character sheet facts (2026-10-12 sheet audit) — the read side of what
  * genesis made: CharacterBlockLink rows joined to their ForgeItem archetypes
  * (with narrative paint), the canonical age, TKV, the memory-ledger count and
- * the GRO.vines (Goal rows). Read-only; campaign members may read it.
+ * the GRO.vines (Goal rows). Read-only. The owner, the campaign's Watcher and
+ * ADMIN read it in full; other campaign members get the reduced view
+ * (archetype name + kind + maturity chips; no story/paint/rule text/KV/vines).
  *
  * Pure shaping lives in lib/character-sheet-facts.ts (client-safe).
  */
@@ -13,12 +15,13 @@ import { requireCampaignMember } from '@/services/campaign-access';
 import { calculateCharacterTKV } from '@/lib/kv-calculator';
 import {
   shapeBlockLinks,
+  reduceBlockView,
   computeDisplayAge,
   type CharacterSheetFacts,
   type CharacterVineView,
   type RawBlockLinkRow,
 } from '@/lib/character-sheet-facts';
-import { isAdminRole } from '@/lib/permissions';
+import { isAdminRole, canSeePrivateCharacterContent } from '@/lib/permissions';
 import { getCharacterCompletion } from '@/services/character-completion';
 import type { GrowthCharacter } from '@/types/growth';
 
@@ -34,17 +37,21 @@ function firstOpenOpportunity(raw: string | null | undefined): string | null {
   }
 }
 
-/** Gate: the character's owner, or a member/GM of its campaign, or ADMIN. */
+/**
+ * Gate: the character's owner, or a member/GM of its campaign, or ADMIN.
+ * Returns whether the reader sees the private (full) content.
+ */
 async function assertCanRead(
   character: { userId: string; campaignId: string | null },
   user: { id: string; role: string },
-) {
-  if (character.userId === user.id) return;
+): Promise<boolean> {
+  if (character.userId === user.id) return true;
   if (character.campaignId) {
-    await requireCampaignMember(character.campaignId, user);
-    return;
+    const campaign = await requireCampaignMember(character.campaignId, user);
+    return canSeePrivateCharacterContent(user.id, user.role, character, campaign);
   }
   if (!isAdminRole(user.role)) throw new ForbiddenError('You cannot view this character');
+  return canSeePrivateCharacterContent(user.id, user.role, character, null);
 }
 
 export async function getCharacterSheetFacts(
@@ -56,7 +63,7 @@ export async function getCharacterSheetFacts(
     select: { id: true, userId: true, campaignId: true, data: true },
   });
   if (!character) throw new NotFoundError('Character not found');
-  await assertCanRead(character, user);
+  const full = await assertCanRead(character, user);
 
   let sheet: Record<string, unknown> = {};
   try { sheet = JSON.parse(character.data) as Record<string, unknown>; } catch { /* empty sheet */ }
@@ -122,15 +129,17 @@ export async function getCharacterSheetFacts(
     }
   }
 
+  const blocks = shapeBlockLinks(raw);
   return {
-    blocks: shapeBlockLinks(raw),
+    view: full ? 'full' : 'reduced',
+    blocks: full ? blocks : blocks.map(reduceBlockView),
     age: computeDisplayAge(sheet as Parameters<typeof computeDisplayAge>[0], campaign?.currentCycle ?? null),
     tkv,
     memories: {
       count: memoryAgg._count?._all ?? 0,
       lastAt: memoryAgg._max?.realTime ? new Date(memoryAgg._max.realTime).toISOString() : null,
     },
-    vines,
+    vines: full ? vines : [],
     completion: await getCharacterCompletion(characterId).catch(() => null),
   };
 }

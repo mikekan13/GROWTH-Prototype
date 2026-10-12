@@ -75,6 +75,22 @@ export function canSeeCopilotRow(
   return row.userId === viewerId;
 }
 
+/**
+ * Private character content (2026-10-12, per the perception ruling): a
+ * character's block stories, local names, history, rule text and KV are read
+ * in full only by the character's owner, the campaign's own Watcher and ADMIN.
+ * Other campaign members see the archetype name, kind and maturity chips.
+ * (A PLAYER controller is the owner — setCharacterController moves userId.)
+ */
+export function canSeePrivateCharacterContent(
+  userId: string,
+  userRole: string,
+  character: { userId: string | null },
+  campaign: { gmUserId: string } | null,
+): boolean {
+  return character.userId === userId || campaign?.gmUserId === userId || userRole === 'ADMIN';
+}
+
 export function canViewCharacter(
   userId: string,
   userRole: string,

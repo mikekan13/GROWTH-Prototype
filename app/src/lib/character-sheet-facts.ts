@@ -65,6 +65,8 @@ export interface CharacterAgeView {
 }
 
 export interface CharacterSheetFacts {
+  /** 'full' = owner / campaign Watcher / ADMIN; 'reduced' = other campaign members (no story/paint/rule text/KV/vines). */
+  view?: 'full' | 'reduced';
   blocks: CharacterBlockView[];
   age: CharacterAgeView;
   /** Sheet `tkv` when written, else computed from the sheet. */
@@ -199,6 +201,31 @@ export function computeDisplayAge(
 /** Render helper: "—" for unknown, never 0. */
 export function formatAge(age: CharacterAgeView | null | undefined): string {
   return age && age.value !== null ? String(age.value) : '—';
+}
+
+/**
+ * The reduced block row another campaign member sees: archetype name + kind +
+ * maturity chips. Story, local name, history, description, rule text and KV
+ * are private to the owner / Watcher / ADMIN.
+ */
+export function reduceBlockView(b: CharacterBlockView): CharacterBlockView {
+  return {
+    linkId: b.linkId,
+    forgeItemId: b.forgeItemId,
+    kind: b.kind,
+    archetypeName: b.archetypeName,
+    localName: null,
+    displayName: b.archetypeName,
+    story: '',
+    history: [],
+    description: null,
+    ruleText: null,
+    kv: null,
+    maturityFlags: b.maturityFlags,
+    status: b.status,
+    pillar: null,
+    ageAdded: null,
+  };
 }
 
 /** Blocks of one kind (convenience for renderers). */

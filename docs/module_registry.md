@@ -483,7 +483,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/characters/[id]/inventory/equip | POST, DELETE | InventoryService (equip/unequip item to body region) |
 | /api/characters/[id]/lock | GET, POST | PersonaLock (get lock status, write persona lock after portrait accepted) |
 | /api/characters/[id]/mechanics | PATCH | CharacterService (assignMechanics — seeds Seed/Root/Branch from Forge) |
-| /api/characters/[id]/blocks | GET | services/character-sheet-facts — CharacterBlockLink ⨝ ForgeItem (deduped by forgeItemId; superseded drafts hidden), age, TKV, memories {count,lastAt}, vines. Owner / campaign members / ADMIN |
+| /api/characters/[id]/blocks | GET | services/character-sheet-facts — CharacterBlockLink ⨝ ForgeItem (deduped by forgeItemId; superseded drafts hidden), age, TKV, memories {count,lastAt}, vines, real completion. Owner / campaign Watcher / ADMIN = full rows (`view:'full'`); other campaign members = reduced (`view:'reduced'`: archetype name + kind + maturity chips; no story/localName/history/ruleText/KV/vines — `lib/permissions#canSeePrivateCharacterContent`, `reduceBlockView`); non-members 403 |
 | /api/characters/[id]/possessions | GET, POST, DELETE | PossessionService (list/add/remove possession relationships) |
 | /api/characters/[id]/request-changes | POST | ApplicationService / BackstoryService (GM request revision) |
 | /api/dice/deathsave | POST | DiceService (death save roll — separate from /check for UI routing) |

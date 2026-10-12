@@ -6,7 +6,8 @@ import { getCharacterSheetFacts } from '@/services/character-sheet-facts';
 /**
  * GET the blocks genesis made (CharacterBlockLink ⨝ ForgeItem, with narrative
  * paint), plus the sheet facts the card renders beside them: canonical age,
- * TKV, memory-ledger count/last time and GRO.vines. Campaign members only.
+ * TKV, memory-ledger count/last time and GRO.vines. Owner / campaign Watcher /
+ * ADMIN get full rows; other campaign members a reduced view; others 403.
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

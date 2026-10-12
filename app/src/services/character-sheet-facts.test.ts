@@ -73,6 +73,35 @@ describe('getCharacterSheetFacts — permissions', () => {
   });
 });
 
+describe('getCharacterSheetFacts — private block stories (perception ruling)', () => {
+  it('the owner reads full rows (story, local name, KV, vines)', async () => {
+    const f = await getCharacterSheetFacts('violet', { id: 'owner', role: 'TRAILBLAZER' });
+    expect(f.view).toBe('full');
+    expect(f.blocks[1]).toMatchObject({ localName: "Rosemary's House", story: 's', kv: 61 });
+    expect(f.vines).toHaveLength(1);
+  });
+  it('the campaign Watcher and ADMIN read full rows', async () => {
+    for (const u of [{ id: 'gm', role: 'WATCHER' }, { id: 'mike', role: 'ADMIN' }]) {
+      const f = await getCharacterSheetFacts('violet', u);
+      expect(f.view).toBe('full');
+      expect(f.blocks[1].story).toBe('s');
+    }
+  });
+  it('another Trailblazer at the table gets archetype name + kind + maturity chips only', async () => {
+    const f = await getCharacterSheetFacts('violet', { id: 'p1', role: 'TRAILBLAZER' });
+    expect(f.view).toBe('reduced');
+    expect(f.blocks.map(b => `${b.kind}:${b.displayName}`)).toEqual(['seed:Human', 'root:Grandparent Household']);
+    for (const b of f.blocks) {
+      expect(b).toMatchObject({ localName: null, story: '', history: [], ruleText: null, description: null, kv: null });
+      expect(Array.isArray(b.maturityFlags)).toBe(true);
+    }
+    expect(f.vines).toEqual([]);
+  });
+  it('a non-member is refused (403)', async () => {
+    await expect(getCharacterSheetFacts('violet', { id: 'stranger', role: 'TRAILBLAZER' })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
 describe('getCharacterSheetFacts — shape', () => {
   it('dedupes by forgeItemId and hides the superseded draft root', async () => {
     const f = await getCharacterSheetFacts('violet', { id: 'gm', role: 'WATCHER' });
