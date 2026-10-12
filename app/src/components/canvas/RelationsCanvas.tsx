@@ -48,6 +48,8 @@ interface CanvasNode {
   status?: string;
   color?: string;
   portrait?: string | null;
+  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
+  awaitingImage?: boolean;
   characterData?: Record<string, unknown> | null;
   /** Character has a GodHead row (AI persona exists). */
   hasAIPersona?: boolean;
@@ -3305,6 +3307,7 @@ export default function RelationsCanvas({
       y: visualY,
       status: node.status,
       portrait: node.portrait,
+      awaitingImage: node.awaitingImage,
       characterData: node.characterData as CharacterNodeData['characterData'],
       hasAIPersona: node.hasAIPersona,
       aiActionMode: node.aiActionMode,

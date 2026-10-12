@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { AwaitingImageBadge } from '@/components/character/AwaitingImageBadge';
 
 interface Entity {
   id: string;
@@ -14,6 +15,8 @@ interface Entity {
   stewardName: string | null;
   activeGoals: number;
   createdAt: string;
+  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
+  awaitingImage?: boolean;
 }
 
 interface EntitiesPanelProps {
@@ -161,6 +164,7 @@ export default function EntitiesPanel({ campaignId, isGM, onSelectCharacter }: E
                   <span className="text-white text-[11px] font-bold font-[family-name:var(--font-header)] tracking-wider truncate">
                     {entity.name}
                   </span>
+                  <AwaitingImageBadge awaiting={entity.awaitingImage} />
                   {isDraft && isGM && (
                     <span className="text-[9px] font-[family-name:var(--font-terminal)] text-[#3EB89A]/50 ml-1">
                       ▸ resume

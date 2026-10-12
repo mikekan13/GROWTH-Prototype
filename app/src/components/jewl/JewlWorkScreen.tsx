@@ -180,11 +180,15 @@ export function JewlWorkScreen(props: JewlWorkScreenProps) {
 // ── Shared pieces for the popup ──────────────────────────────────────────
 
 const KIND_TAG: Record<NeedsYouItem['kind'], string> = {
-  prod: 'ASK', draft: 'DRAFT', question: 'WORD', stalled: 'QUIET', reconciliation: 'CANON',
+  prod: 'ASK', draft: 'DRAFT', question: 'WORD', stalled: 'QUIET', reconciliation: 'CANON', portrait: 'IMAGE',
 };
 
 /** The Needs-you list: every GM-blocking item, tagged by kind. */
-export function NeedsYouList({ items, title = 'NEEDS YOU' }: { items: NeedsYouItem[]; title?: string }) {
+export function NeedsYouList({ items, title = 'NEEDS YOU', onOpenPortrait }: {
+  items: NeedsYouItem[]; title?: string;
+  /** BORN ≠ DONE: a Portrait item opens that character's Appearance ↗. */
+  onOpenPortrait?: (characterId: string) => void;
+}) {
   if (items.length === 0) return null;
   return (
     <div className="jw-needs" role="region" aria-label="Needs you">
@@ -196,6 +200,10 @@ export function NeedsYouList({ items, title = 'NEEDS YOU' }: { items: NeedsYouIt
             <span className="jw-need-b">
               <span className="jw-need-t">{i.title}</span>
               {i.detail && <span className="jw-need-d">{i.detail}</span>}
+              {i.kind === 'portrait' && i.characterId && onOpenPortrait && (
+                <button type="button" className="gn-apr jw-need-go" data-no-hold
+                  onClick={() => onOpenPortrait(i.characterId!)}>APPEARANCE ↗</button>
+              )}
             </span>
           </li>
         ))}
@@ -303,6 +311,8 @@ export const WORK_CSS = `
 .jw-tag{background:#D07818;color:#000;font-size:10px;letter-spacing:.08em;padding:2px 5px}
 .jw-need-reconciliation .jw-tag{background:#22ab94}
 .jw-need-draft .jw-tag{background:#FFCC78}
+.jw-need-portrait .jw-tag{background:#22ab94}
+.jw-need-go{align-self:flex-start;margin-top:4px;min-height:32px}
 .jw-need-b{display:flex;flex-direction:column;gap:2px;min-width:0}
 .jw-need-t{color:#fff}
 .jw-need-d{color:#9a9a9a;font-size:12px;line-height:1.4}

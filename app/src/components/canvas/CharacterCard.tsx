@@ -18,6 +18,7 @@ import { parseDie } from '@/lib/dice-utils';
 import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
 import type { PossessionRow } from './PossessionsCard';
+import { AwaitingImageBadge } from '@/components/character/AwaitingImageBadge';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -29,6 +30,8 @@ export interface CharacterNodeData {
   y: number;
   status?: string;
   portrait?: string | null;
+  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
+  awaitingImage?: boolean;
   /** True if the character has a GodHead row attached (persona + memory exists). */
   hasAIPersona?: boolean;
   /** True if AI is currently choosing actions for this character. Toggled from
@@ -989,6 +992,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               ) : (
                 <img src="/EmptyPortrait.png" alt="Empty Portrait" className="w-full h-full object-contain" />
               )}
+              <AwaitingImageBadge awaiting={node.awaitingImage} style={{ position: 'absolute', left: 0, bottom: 6 }} />
             </div>
           </div>
 
@@ -1234,6 +1238,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
               ) : (
                 <img src="/EmptyPortrait.png" alt="Empty Portrait" className="w-full h-full object-cover" />
               )}
+              <AwaitingImageBadge awaiting={node.awaitingImage} size="lg" style={{ position: 'absolute', left: 0, bottom: 12 }} />
             </div>
           </div>
 
@@ -1653,6 +1658,8 @@ export default React.memo(CharacterCard, (prev, next) => (
   prev.node.x === next.node.x &&
   prev.node.y === next.node.y &&
   prev.node.characterData === next.node.characterData &&
+  prev.node.awaitingImage === next.node.awaitingImage &&
+  prev.node.portrait === next.node.portrait &&
   prev.node.aiActionMode === next.node.aiActionMode &&
   prev.node.hasAIPersona === next.node.hasAIPersona &&
   prev.node.controllerUserId === next.node.controllerUserId &&

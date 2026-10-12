@@ -25,7 +25,7 @@ export type PillarKey = 'body' | 'spirit' | 'soul';
 export interface WorkPillar { key: PillarKey; label: 'BODY' | 'SPIRIT' | 'SOUL'; count: number; sub: string; fill: number }
 export interface WorkStage { key: string; label: string; status: 'done' | 'current' | 'pending' }
 
-export type NeedsYouKind = 'prod' | 'draft' | 'question' | 'stalled' | 'reconciliation';
+export type NeedsYouKind = 'prod' | 'draft' | 'question' | 'stalled' | 'reconciliation' | 'portrait';
 export interface NeedsYouItem {
   id: string;
   kind: NeedsYouKind;
@@ -33,6 +33,8 @@ export interface NeedsYouItem {
   sessionId: string | null;
   title: string;
   detail?: string | null;
+  /** 'portrait' items: the character whose Appearance ↗ finishes it. */
+  characterId?: string;
 }
 
 export interface WorkSessionView {
@@ -127,7 +129,22 @@ export function genesisPillars(p: GenesisProgress | null): WorkPillar[] {
   ];
 }
 
-export function genesisNeedsYou(sessionId: string, name: string, p: GenesisProgress): NeedsYouItem[] {
+/** BORN ≠ DONE (2026-10-12): born, but the official portrait is unfinished —
+ *  the Portrait step. id = the character id so session + campaign copies dedupe. */
+export function portraitNeedsYou(characterId: string, name: string, sessionId: string | null): NeedsYouItem {
+  return {
+    id: characterId, kind: 'portrait', sessionId, characterId,
+    title: `Portrait · ${name}`,
+    detail: 'Born — awaiting image. Finish the official portrait in Appearance ↗.',
+  };
+}
+
+/** True when a finished genesis still waits on its portrait. */
+export function genesisAwaitingImage(p: GenesisProgress | null | undefined): boolean {
+  return !!p && p.state === 'done' && !!p.completion && p.completion.image !== 'done';
+}
+
+export function genesisNeedsYou(sessionId: string, name: string, p: GenesisProgress, characterId?: string): NeedsYouItem[] {
   const out: NeedsYouItem[] = [];
   for (const prod of p.prods ?? []) {
     if (prod.status === 'OPEN') out.push({ id: prod.id, kind: 'prod', sessionId, title: `JEWL asks about ${name}`, detail: prod.question });
@@ -137,6 +154,7 @@ export function genesisNeedsYou(sessionId: string, name: string, p: GenesisProgr
   }
   if (p.state === 'waiting' && p.wait === 'question') out.push({ id: `${sessionId}:q`, kind: 'question', sessionId, title: `JEWL needs a word about ${name}`, detail: 'Answer him in the chat.' });
   if (p.state === 'waiting' && p.wait === 'stalled') out.push({ id: `${sessionId}:stall`, kind: 'stalled', sessionId, title: `${name}'s genesis has gone quiet`, detail: 'Tell JEWL to continue.' });
+  if (characterId && genesisAwaitingImage(p)) out.push(portraitNeedsYou(characterId, name, sessionId));
   return out;
 }
 
@@ -160,7 +178,7 @@ export function genesisSessionView(opts: {
     total: p.total,
     pillars: genesisPillars(p),
     cycles: p.counts.cycles,
-    needsYou: genesisNeedsYou(opts.id, opts.name, p),
+    needsYou: genesisNeedsYou(opts.id, opts.name, p, opts.characterId),
     log: opts.log ?? [],
     blockedReason: null, // genesis wait reasons are classified, never shipped
     startedAt: p.startedAt,
@@ -335,4 +353,13 @@ export const JEWL_WORK_OPEN_EVENT = 'jewl:work-open';
 export function openJewlWork(sessionId: string): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(JEWL_WORK_OPEN_EVENT, { detail: { sessionId } }));
+}
+
+/** Window event that opens a character's Appearance ↗ (the Portrait step,
+ *  BORN ≠ DONE 2026-10-12) — the campaign canvas switches to that character. */
+export const CHARACTER_APPEARANCE_OPEN_EVENT = 'growth:open-appearance';
+
+export function openCharacterAppearance(characterId: string): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(CHARACTER_APPEARANCE_OPEN_EVENT, { detail: { characterId } }));
 }

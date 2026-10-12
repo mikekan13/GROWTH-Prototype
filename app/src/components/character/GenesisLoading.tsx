@@ -19,8 +19,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import type { GenesisProgress } from '@/services/character-genesis-progress';
-import { genesisPillars, pillarFills } from '@/lib/jewl-work';
-import { JewlWorkScreen, WORK_CSS, fmtElapsed, useNow, type WorkScreenModel } from '@/components/jewl/JewlWorkScreen';
+import { genesisPillars, pillarFills, genesisAwaitingImage, portraitNeedsYou, openCharacterAppearance } from '@/lib/jewl-work';
+import { JewlWorkScreen, NeedsYouList, WORK_CSS, fmtElapsed, useNow, type WorkScreenModel } from '@/components/jewl/JewlWorkScreen';
 import { GenesisGmSteps } from './GenesisGmSteps';
 import { GenesisProds, GenesisOpenThreads } from './GenesisProds';
 import { seedLine, seedGate } from '@/lib/seed-state';
@@ -218,12 +218,14 @@ export interface GenesisLoadingOverlayProps {
   onOpenAppearance?: () => void;
   /** JEWL's work popup: session tabs above the header. */
   tabs?: ReactNode;
+  /** BORN ≠ DONE: the character whose Portrait step the Needs-you item opens. */
+  characterId?: string | null;
 }
 
 export function GenesisLoadingOverlay({
   progress, liveTool, submitError, onDismiss, onViewSheet, fixedNow, initialLog,
   campaignId, onStepsChanged, onOpenForge, onOpenAppearance, characterName, prodAnswerOpenId, prodAnswerDraft,
-  tabs,
+  tabs, characterId,
 }: GenesisLoadingOverlayProps) {
   const state = submitError ? 'error' : progress?.state ?? 'none';
   const running = state === 'running' || state === 'waiting' || state === 'none';
@@ -257,15 +259,27 @@ export function GenesisLoadingOverlay({
   // `seed` undefined = this progress source doesn't carry it (the work popup) — no chip.
   const choosingSeed = !seedName && state !== 'error' && state !== 'done'
     && (progress === null || progress.seed === null);
+  // BORN ≠ DONE (Mike 2026-10-12): born, but the portrait step is the user's —
+  // the screen holds at "awaiting image" until an official portrait lands.
+  const awaitingImage = state === 'done' && genesisAwaitingImage(progress);
+  const fullyDone = state === 'done' && !!progress?.completion?.done;
+  const portraitItems = awaitingImage
+    ? [portraitNeedsYou(characterId ?? 'portrait', characterName || 'this character', progress?.sessionId ?? null)]
+    : [];
+  const openPortrait = (id: string) => {
+    if (onOpenAppearance) onOpenAppearance();
+    else if (id !== 'portrait') openCharacterAppearance(id);
+  };
 
   const model: WorkScreenModel = {
     ariaLabel: 'JEWL genesis progress',
     born: state === 'done',
     stageKey: progress?.current ?? null,
-    headRight: state === 'done' ? 'COMPLETE' : progress?.step ? `STEP ${progress.step}/${progress.total}` : 'OPENING',
+    headRight: awaitingImage ? 'AWAITING IMAGE' : state === 'done' ? 'COMPLETE' : progress?.step ? `STEP ${progress.step}/${progress.total}` : 'OPENING',
     elapsed,
     titleKey: '// GENESIS',
     titleValue: state === 'done' && stepsN > 0 ? `a being is born · ${stepsN} need${stepsN === 1 ? 's' : ''} you`
+      : awaitingImage ? 'a being is born · awaiting image'
       : state === 'done' ? 'a being is born'
         : state === 'error' ? 'genesis halted'
           : progress?.prodding && state === 'waiting' ? 'JEWL has questions before he builds'
@@ -318,11 +332,21 @@ export function GenesisLoadingOverlay({
       {/* Done / error / waiting blocks */}
       {state === 'done' && c && (
         <div className="gn-bornbox">
-          <div className="gn-born-word">BORN</div>
+          <div className="gn-born-word">{fullyDone ? 'DONE' : 'BORN'}</div>
+          {(awaitingImage || fullyDone) && (
+            <div className="gn-born-state" data-testid="genesis-completion" role="status"
+              style={{ fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: 12, letterSpacing: '0.1em', color: awaitingImage ? '#D07818' : '#22ab94' }}>
+              {awaitingImage ? 'BORN · AWAITING IMAGE' : 'BORN · PORTRAIT LOCKED · DONE'}
+            </div>
+          )}
           <div className="gn-born-sub">
             {c.memories} memories sealed · {c.blocksForged} blocks · {c.traitsForged} traits · {elapsed}
           </div>
-          <div className="gn-born-note">The dossier and sheet await your review.</div>
+          <div className="gn-born-note">
+            {awaitingImage
+              ? 'Playable now — the portrait finishes them. Lock the official image in Appearance ↗.'
+              : 'The dossier and sheet await your review.'}
+          </div>
           <button type="button" className="gn-btn gn-btn-gold" onClick={onViewSheet}>VIEW THE SHEET</button>
         </div>
       )}
@@ -350,6 +374,7 @@ export function GenesisLoadingOverlay({
           characterName={characterName} waiting={state === 'waiting'} midBuild
           onChanged={() => onStepsChanged?.()} />
       )}
+      {portraitItems.length > 0 && <NeedsYouList items={portraitItems} onOpenPortrait={openPortrait} />}
       {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
         <GenesisOpenThreads threads={progress?.openThreads ?? []} />
       )}
@@ -387,8 +412,11 @@ export function GenesisBadge({ progress, onOpen, fixedNow }: {
   const started = progress.startedAt ? Date.parse(progress.startedAt) : now;
   const ended = progress.endedAt ? Date.parse(progress.endedAt) : null;
   const needs = (progress.gmSteps ?? []).length;
-  const tone = progress.state === 'error' ? 'err' : progress.state === 'waiting' || needs > 0 ? 'wait' : progress.state === 'done' ? 'done' : 'run';
+  const awaiting = genesisAwaitingImage(progress);
+  const tone = progress.state === 'error' ? 'err' : progress.state === 'waiting' || needs > 0 || awaiting ? 'wait' : progress.state === 'done' ? 'done' : 'run';
   const text = progress.state === 'done' && needs > 0 ? `BORN · ${needs} NEED${needs === 1 ? 'S' : ''} YOU`
+    : awaiting ? 'BORN · AWAITING IMAGE'
+    : progress.state === 'done' && progress.completion?.done ? 'DONE · VIEW'
     : progress.state === 'done' ? 'BORN · VIEW'
     : progress.state === 'error' ? 'GENESIS HALTED'
       : progress.state === 'waiting' ? `NEEDS YOU · ${progress.step}/${progress.total}`

@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { JewlWorkScreenBody } from './JewlWorkScreen';
+import { JewlWorkScreenBody, NeedsYouList } from './JewlWorkScreen';
 import { JewlStatusLine, idleScreenModel } from './JewlWorkPopup';
 import { jewlStateLine, needsYouCount, type JewlWorkPayload } from '@/lib/jewl-work';
 
@@ -53,5 +53,18 @@ describe('status line', () => {
     const none = renderToStaticMarkup(createElement(JewlStatusLine, { line: 'idle — watching', count: 0, cycling: true, waiting: false, onOpen: () => {} }));
     expect(none).not.toContain('data-jewl-needs');
     expect(none).toContain('jw-status-on');
+  });
+});
+
+describe('Portrait needs-you item (born ≠ done)', () => {
+  const item = { id: 'c1', kind: 'portrait' as const, sessionId: null, characterId: 'c1', title: 'Portrait · Violet', detail: 'Born — awaiting image.' };
+  it('renders IMAGE tag + Appearance ↗ when it can open the character', () => {
+    const html = renderToStaticMarkup(createElement(NeedsYouList, { items: [item], onOpenPortrait: () => {} }));
+    expect(html).toContain('IMAGE');
+    expect(html).toContain('Portrait · Violet');
+    expect(html).toContain('APPEARANCE ↗');
+  });
+  it('no opener → no button', () => {
+    expect(renderToStaticMarkup(createElement(NeedsYouList, { items: [item] }))).not.toContain('APPEARANCE');
   });
 });
