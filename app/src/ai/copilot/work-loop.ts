@@ -34,6 +34,8 @@ import {
   isGenesisGoal,
   logGenesisReport,
 } from '@/services/character-genesis-progress';
+import { WallViolationError } from '@/ai/network/errors';
+import { buildWorkCycleText } from './work-cycle-text';
 
 const BREATHER_MS = 4_000;
 /** Consecutive tool-less cycles before a session is judged stalled and
@@ -118,19 +120,7 @@ async function runCycle(session: {
   } catch { /* treasury is context, never a blocker */ }
 
   const recentNotes = parseProgress(session.progress).slice(-5);
-  const text = [
-    `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}.`,
-    `GOAL: ${session.goal}`,
-    session.plan ? `YOUR PLAN: ${session.plan}` : 'YOUR PLAN: (none recorded — set one via update_work_session if useful)',
-    ...(treasuryLine ? [treasuryLine] : []),
-    recentNotes.length
-      ? `YOUR RECENT PROGRESS NOTES:\n${recentNotes.map(n => `- ${n}`).join('\n')}`
-      : 'No progress notes yet — this is the first working cycle.',
-    'Continue THIS job now: do the next concrete piece of work with your tools, then record ONE progress line via update_work_session. ' +
-      'Check the recent conversation — if the GM said anything since your last cycle, let it steer you. ' +
-      'If you are waiting on the GM (Forge approvals, an unanswered load-bearing question), set status=blocked with the reason and stop. ' +
-      'When the job is genuinely COMPLETE, set status=done and tell the GM in 2-3 lines what stands ready — never an inventory; one Forge pointer if drafts wait.',
-  ].join('\n');
+  const text = buildWorkCycleText(session, treasuryLine, recentNotes);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
@@ -167,6 +157,20 @@ async function runCycle(session: {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // The wall refused the cycle (its plan or context carries table/real
+    // content): retrying cannot help — block now and say why, without text.
+    if (err instanceof WallViolationError) {
+      state.dispatchFailures.delete(session.id);
+      try {
+        await updateWorkSession({
+          sessionId: session.id,
+          status: 'blocked',
+          blockedReason: 'The work cycle carries table or real-life content, which never leaves the table. Edit the plan/backstory and resume.',
+          progressNote: '[system] auto-blocked: the wall refused the cycle (table/real content)',
+        });
+      } catch { /* session may have been closed mid-cycle */ }
+      return;
+    }
     const fails = (state.dispatchFailures.get(session.id) ?? 0) + 1;
     state.dispatchFailures.set(session.id, fails);
     // eslint-disable-next-line no-console
