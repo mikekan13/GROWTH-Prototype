@@ -12,6 +12,12 @@ export const createCampaignItemSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
   holderId: z.string().nullable().optional(),
   locationId: z.string().nullable().optional(),
+  // NARRATIVE PAINT (Mike 2026-10-12): `name` is the instance's local name;
+  // these tie it to its agnostic archetype and carry its story. Never mechanics.
+  sourceForgeItemId: z.string().nullable().optional(),
+  story: z.string().max(600).nullable().optional(),
+  /** Origin line for the object's history ledger. */
+  origin: z.string().max(300).optional(),
 });
 
 export const updateCampaignItemSchema = z.object({
@@ -79,6 +85,9 @@ export async function createCampaignItem(
       holderId: input.holderId ?? null,
       locationId: input.locationId ?? null,
       createdBy: userId,
+      sourceForgeItemId: input.sourceForgeItemId ?? null,
+      story: input.story ?? null,
+      history: JSON.stringify([{ kind: 'origin', at: new Date().toISOString(), text: input.origin ?? 'placed' }]),
     },
   });
   // Provenance manifest at write-time (2026-09-20).

@@ -693,6 +693,35 @@ model GenesisProd {
   @@index([campaignId, characterId])
 }
 
+/// Character ↔ block link (2026-10-12, [[story-attachment-two-ledgers-2026-08-19]]):
+/// the character's INSTANCE of a generic Forge block. The block (ForgeItem)
+/// stays a campaign-agnostic archetype — mechanics ledger; the bearer's
+/// specifics (who, where, which key, which years) live HERE in `story` —
+/// story ledger. May point at a draft (genesis attaches before approval).
+model CharacterBlockLink {
+  id          String   @id @default(cuid())
+  campaignId  String
+  characterId String
+  forgeItemId String
+  /// NARRATIVE PAINT (Mike 2026-10-12) — kind-agnostic (blocks AND items),
+  /// never changes mechanics. Local name ("Rosemary's keepsake"); the block's
+  /// own name stays the archetype ("Silver Butter Knife").
+  localName   String?
+  /// Bearer-specific story (<=600 chars) — MAY carry proper nouns.
+  story       String
+  /// JSON [{kind, at, text}] — the instance's history; seeded with an origin entry.
+  history     String   @default("[]")
+  /// The genesis work session that made the link (null = attached outside genesis).
+  sessionId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([characterId, forgeItemId])
+  @@index([campaignId, characterId])
+  @@index([forgeItemId])
+  @@index([sessionId])
+}
+
 model PlayerRequest {
   id          String     @id @default(cuid())
   campaign    Campaign   @relation(fields: [campaignId], references: [id])
@@ -739,6 +768,11 @@ model CampaignItem {
   locationId  String?  // locationId where item resides (null = carried/unknown)
   status      String   @default("ACTIVE") // ACTIVE, DESTROYED, CONSUMED, LOST
   createdBy   String   // userId of creator (GM)
+  // NARRATIVE PAINT (Mike 2026-10-12): `name` is the instance's LOCAL name;
+  // the archetype is the Forge blueprint it came from. Paint never changes mechanics.
+  sourceForgeItemId String?
+  story       String?  // instance story (may carry proper nouns)
+  history     String   @default("[]") // JSON [{kind, at, text}] — object ledger; origin entry at instantiation
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

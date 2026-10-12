@@ -36,6 +36,7 @@ const TOOL_VERBS: Record<string, string> = {
   search_catalog: 'searching the catalog',
   draw_from_kit: 'pulling stock blocks',
   propose_forge_blueprint: 'forging a block',
+  attach_block: 'attaching a block',
   forge_list_drafts: 'checking the Forge',
   forge_read: 'reading the Forge',
   edit_character_sheet: 'writing the sheet',

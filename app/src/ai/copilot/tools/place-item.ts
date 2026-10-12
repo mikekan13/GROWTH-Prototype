@@ -35,6 +35,10 @@ const inputSchema = z.object({
     'Instantiate from a PUBLISHED Forge blueprint (name or id). Refused while the blueprint ' +
       'is still a draft awaiting GM approval — tell the GM and continue building elsewhere.',
   ),
+  story: z.string().max(600).optional().describe(
+    'NARRATIVE PAINT: this instance\'s story (whose it was, where it came from) — may carry proper nouns. ' +
+      'With fromForgeItem, `name` is the instance\'s LOCAL name ("Rosemary\'s keepsake"); the blueprint keeps its archetype name.',
+  ),
 });
 
 export const placeItemTool: JewlTool = {
@@ -74,6 +78,7 @@ export const placeItemTool: JewlTool = {
 
     let type: (typeof ITEM_TYPES)[number] = parsed.type ?? 'misc';
     let forgeData: Record<string, unknown> = {};
+    let source: { id: string; name: string } | null = null;
     if (parsed.fromForgeItem) {
       const ref = parsed.fromForgeItem.trim();
       const blueprint =
@@ -94,6 +99,7 @@ export const placeItemTool: JewlTool = {
           },
         };
       }
+      source = { id: blueprint.id, name: blueprint.name };
       try {
         forgeData = JSON.parse(blueprint.data) as Record<string, unknown>;
       } catch {
@@ -121,6 +127,9 @@ export const placeItemTool: JewlTool = {
       data,
       locationId,
       holderId,
+      sourceForgeItemId: source?.id ?? null,
+      story: parsed.story ?? null,
+      origin: source ? `instantiated from the Forge archetype "${source.name}"` : 'placed directly',
     });
 
     // Canvas folder membership is driven by located_at EDGES, not the

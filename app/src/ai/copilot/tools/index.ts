@@ -26,6 +26,7 @@ import './forge-blueprint';
 import './forge-list-drafts';
 import './forge-read';
 import './forge-withdraw';
+import './attach-block';
 import './catalog';
 import './work-session';
 import './memory';
