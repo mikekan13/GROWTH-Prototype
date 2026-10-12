@@ -1414,3 +1414,31 @@ model AiCall {
   @@index([campaignId, createdAt])
   @@index([lane, createdAt])
 }
+
+// Lawfulness screen (Mike 2026-10-12, unit 8 of the wall build). The wall keeps
+// content PRIVATE; this keeps it LEGAL. One row per screened hit, append-only and
+// hash-chained like the KRMA ledger (sequenceNumber + prevHash → hash). Holds a
+// POINTER to the offending row (refTable + refId), never a copy of the text.
+// Review fields are the only mutable part and sit OUTSIDE the hash.
+model LawfulnessFlag {
+  id             String    @id @default(cuid())
+  sequenceNumber Int       @unique
+  createdAt      DateTime  @default(now())
+  campaignId     String?   // table the content was produced at (null = no table)
+  userId         String?   // who produced the content (null = a model / unattributed)
+  category       String    // MINOR_SEXUAL | REAL_PERSON_THREAT | REAL_PERSON_SEXUAL_IMAGE
+  lane           String    // local | cloud | input | image
+  source         String    // TYPED | AMBIENT | MODEL_OUTPUT | IMAGE_PROMPT | IMAGE_REFERENCE
+  refTable       String?   // CopilotMessage | DayaMemoryEntry | ForgeItem | PortraitGeneration | …
+  refId          String?
+  screenHits     String    @default("[]") // JSON: pattern ids that fired — never text
+  status         String    @default("OPEN") // OPEN | REVIEWED | ACTIONED
+  reviewerId     String?
+  reviewNote     String?
+  reviewedAt     DateTime?
+  prevHash       String
+  hash           String
+
+  @@index([campaignId, createdAt])
+  @@index([status, createdAt])
+}

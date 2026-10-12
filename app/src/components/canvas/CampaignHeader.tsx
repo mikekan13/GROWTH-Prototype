@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link';
 import CampaignClock from '@/components/time/CampaignClock';
 import CanvasHistoryControls from '@/components/canvas/CanvasHistoryControls';
+import LawfulnessBadge from '@/components/canvas/LawfulnessBadge';
 
 /**
  * Campaign header in the rulebook's ORDER voice — Option 2 (Mike 2026-10-07).
@@ -204,6 +205,9 @@ export default function CampaignHeader({
     <div className="gh-strip" role="group" aria-label="KRMA ledger">{krmaTile}{fldTile}{cryTile}</div>
   ) : null;
 
+  // Lawfulness flags at this table (2026-10-12) — Watcher only; renders nothing until one exists.
+  const flagBadge = isGM ? <LawfulnessBadge campaignId={campaign.id} /> : null;
+
   const gear = isGM ? (
     <Link href={`/watcher/campaign/${campaign.id}/settings`} className="gh-ic" title="Campaign Settings" aria-label="Campaign Settings">
       <GearIcon />
@@ -234,6 +238,7 @@ export default function CampaignHeader({
             {clock}
             <div className="gh-spacer" />
             {onCanvas && <CanvasHistoryControls tone="powder" size={40} />}
+            {flagBadge}
             {gear}
           </div>
           <nav className="gh-row" aria-label="Campaign views">
@@ -250,6 +255,7 @@ export default function CampaignHeader({
               {name}
               {clock}
             </div>
+            {flagBadge}
             {gear}
           </div>
           {showTiles && <div className="gh-mid">{strip}</div>}

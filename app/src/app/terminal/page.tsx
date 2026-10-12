@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import DashboardShell from '@/components/DashboardShell';
 import GlitchText from '@/components/GlitchText';
 import Link from 'next/link';
+import ModerationPanel from '@/components/terminal/ModerationPanel';
 import { getGlobalMetrics } from '@/services/krma/wallet';
 import { getPrimeCampaign, PRIME_CAMPAIGN_DISPLAY } from '@/lib/prime-campaign';
 
@@ -90,6 +91,9 @@ export default async function TerminalDashboard() {
             </div>
           </Link>
         )}
+
+        {/* Moderation — lawfulness flags queue (2026-10-12) */}
+        <ModerationPanel campaignNames={Object.fromEntries(campaigns.map(c => [c.id, c.name]))} />
 
         {/* Main grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

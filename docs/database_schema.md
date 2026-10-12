@@ -581,3 +581,15 @@ How relevant a freeform skill name is to each of the ten head domains (`daya/dom
 
 `ItemAbility.school` (optional, in `CampaignItem.data.itemAbilities[]`, 2026-10-09): the enchantment's magic school (one of the ten `MagicSchool` names) — perception tags the ability Fortune + that school's domain; absent → Fortune only. No migration.
 `grantsSenses` (optional JSON array of `SenseGrantSpec {sense, effectiveness?, name?}`, 2026-10-09 morning ruling "a sense could come from anything") on `CampaignItem.data` (and body-part nodes in `Character.data.bodyAnatomy`), on `data.itemAbilities[]`, and on `Character.data.traits[]` (nectar / thorn / blossom). `sense` = sight/hearing/smell/taste/touch/mind (others kept, unmodelled); effectiveness 0..1 default 1, scaled by the source's condition. No content ships with one. Forge schemas accept it (item, item ability, trait).
+
+## LawfulnessFlag (Mike 2026-10-12, wall unit 8a; migration 20261012083604_lawfulness_flag)
+Append-only, hash-chained moderation record. One row per category a lawfulness screen blocked.
+`sequenceNumber` (unique, 1..n) · `createdAt` · `campaignId?` · `userId?` (who produced the content) ·
+`category` MINOR_SEXUAL | REAL_PERSON_THREAT | REAL_PERSON_SEXUAL_IMAGE · `lane` local | cloud | input | image ·
+`source` TYPED | AMBIENT | MODEL_OUTPUT | IMAGE_PROMPT | IMAGE_REFERENCE · `refTable` + `refId` = POINTER to the
+offending row (CopilotMessage / DayaMemoryEntry / ForgeItem / PortraitGeneration) — never a copy of the text ·
+`screenHits` JSON pattern ids (e.g. `["age:teen-word","sex:acts"]`, `structural-age`) — never text ·
+`prevHash` / `hash` = sha256 over seq, createdAt, campaign, user, category, lane, source, ref, hits, prevHash
+(genesis `LAWFULNESS_FLAG_GENESIS`; `verifyFlagChain()` detects edits, gaps, reorders).
+Mutable review fields, OUTSIDE the hash: `status` OPEN | REVIEWED | ACTIONED, `reviewerId`, `reviewNote`, `reviewedAt`.
+Indexes: (campaignId, createdAt), (status, createdAt).

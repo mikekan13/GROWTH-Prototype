@@ -87,3 +87,22 @@ export function canEditCharacter(
 ): boolean {
   return character.userId === userId || character.campaign?.gmUserId === userId || isAdminRole(userRole);
 }
+
+/**
+ * Lawfulness flags (Mike 2026-10-12): ADMIN sees and reviews every flag; a
+ * campaign's own Watcher sees and reviews (REVIEWED) the flags raised at THEIR
+ * table. A flag with no campaign is ADMIN-only. Only ADMIN may mark ACTIONED
+ * or read the flagged content itself.
+ */
+export function canSeeLawfulnessFlag(
+  userId: string,
+  userRole: string,
+  campaign: { gmUserId: string } | null,
+): boolean {
+  if (userRole === 'ADMIN') return true;
+  return !!campaign && campaign.gmUserId === userId;
+}
+
+export function canActionLawfulnessFlag(userRole: string): boolean {
+  return userRole === 'ADMIN';
+}

@@ -69,6 +69,7 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | SubscriptionDripService | `services/subscription-drip.ts` | Anti-frontloading bell-curve KRMA drip calculator. Computes how many drips are owed and how much each is worth based on month index | ledger, Prisma |
 | TimeService | `services/time.ts` | Timescale CRUD, campaign clock get/advance/set, ensureDefaultTimescale, resolveTimescaleForLocation (walks located_at upward), characterDualAge. Clock advance/set triggers sweepExpiredBlossoms (T23) + blossom_expired history | Prisma, blossom |
 | TraitModifierService | `services/trait-modifiers.ts` | Sums roll-affecting effects from Nectars/Blossoms/Thorns into a single bonus for skill checks and death saves | Prisma, growth types |
+| LawfulnessService | `services/lawfulness.ts` | Lawfulness screen (wall unit 8a, 2026-10-12). `screenText` / `screenImageRequest` = code-only regex co-occurrence (MINOR_SEXUAL textual + structural-age from recorded character ages; REAL_PERSON_THREAT incl. doxxing; REAL_PERSON_SEXUAL_IMAGE); dark fiction passes. `raiseFlag` / `verifyFlagChain` (hash-chained `LawfulnessFlag`), `listFlags` (ADMIN all, Watcher own tables, no text), `reviewFlag` (Watcher REVIEWED own table; ADMIN only ACTIONED), `getFlagWithReferent` (ADMIN reads text by pointer), `resolveCharacterAges`, `loadNameContext`. `WITHHELD_STRING`. |
 
 ## Infrastructure (lib/)
 
@@ -87,6 +88,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Character Actions | `lib/character-actions.ts` | Pure functions for character state mutations: attribute CRUD (update/spend/restore/setLevel), skill CRUD (add/remove/updateLevel/update with governors), rest (restShort/restLong). Returns { character, changes[] } for audit trail |
 | Terminal Commands | `lib/terminal-commands.ts` | Command parser + executor for Campaign Terminal: /roll, /check, /deathsave, /spend, /restore, /rest, /session, /inject. /check and /deathsave use DiceService, /rest calls campaign REST API, /inject manages Godhead overrides |
 | KV Calculator | `lib/kv-calculator.ts` | Client-side KRMA Value calculation utilities for character/entity valuation |
+| Lawfulness Patterns | `lib/lawfulness-patterns.ts` | Lawfulness cue lists (age, sexual, nudity, threat verbs, real referents, locators) with stable ids; `findCues`, window = 400 chars. Extend by adding `{id, re}`. |
+| Lawfulness Hooks | `lib/lawfulness-hooks.ts` | The 8b one-liners: `screenInput(text, ctx)`, `screenModelOutput(text, ctx)`, `screenImage(req)` → `{text, blocked, categories}`; raise flags as a side effect; load table names / resolve participant ages. |
 
 ## Components
 
@@ -176,6 +179,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | Branding | GlitchText | Glitch text effect component for reality layer transitions |
 | Branding | EyetehrnetLogo | EŶ∃tehrNET hub logo component |
 | Layout | DashboardShell | Role-aware page wrapper with header |
+| Moderation | LawfulnessBadge | `canvas/LawfulnessBadge.tsx` — Watcher's flag badge beside the header gear (only when this table has flags); tap → category + status list, no text. |
+| Moderation | ModerationPanel | `terminal/ModerationPanel.tsx` — Terminal (ADMIN) moderation queue: open-count badge, status filter, list, referent text by pointer, REVIEWED/ACTIONED + note. |
 
 ## Types
 
@@ -469,6 +474,9 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | /api/krma/wallets/character/[id]/transactions | GET | KRMA Wallet (character wallet transaction history) |
 | /api/hub | GET | HubService (list LISTED campaigns, public, filterable) |
 | /api/hub/[id] | GET | HubService (campaign listing detail, public) |
+| /api/lawfulness/flags | GET | LawfulnessService.listFlags (`?campaignId=&status=`) — Lawfulness flags — ADMIN all; Watcher own campaigns (no pointer/text); others []. |
+| /api/lawfulness/flags/[id] | GET | LawfulnessService.getFlagWithReferent — ADMIN only — flag + flagged row's text fetched by pointer. |
+| /api/lawfulness/flags/[id]/review | POST | LawfulnessService.reviewFlag `{status: REVIEWED/ACTIONED, note?}` — Watcher REVIEWED own table; ADMIN only ACTIONED. |
 
 ## Reality Simulation — `app/src/sim/` (Unit 1, 2026-09-05)
 Design authority: `REALITY-SIM-DESIGN-2026-09-02.md`. The simulation layer under DAYA; every entity (PC/NPC/creature/object) runs the same loop, player/GM override the ACT step only.
