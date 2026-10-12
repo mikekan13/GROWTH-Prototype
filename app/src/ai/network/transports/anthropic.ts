@@ -25,10 +25,39 @@ export function getAnthropicClient(): Anthropic {
   return cachedClient;
 }
 
+/** A text or base64 image block (multimodal user turns). */
+export type AnthropicTextOrImageBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+
+/** The minimal client shape this transport needs — the SDK client, or a
+ *  test/DAYA-injected fake. */
+export interface AnthropicMessagesClient {
+  messages: {
+    create: (params: {
+      model: string;
+      max_tokens: number;
+      temperature?: number;
+      system?: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }>;
+      stop_sequences?: string[];
+      messages: Array<{ role: 'user' | 'assistant'; content: string | AnthropicTextOrImageBlock[] }>;
+    }) => Promise<{
+      model?: string;
+      content: Array<{ type: string; text?: string }>;
+      usage: {
+        input_tokens: number;
+        output_tokens: number;
+        cache_read_input_tokens?: number | null;
+        cache_creation_input_tokens?: number | null;
+      };
+    }>;
+  };
+}
+
 export interface AnthropicChatOptions {
   model: string;
   system?: string;
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  messages: Array<{ role: 'user' | 'assistant'; content: string | AnthropicTextOrImageBlock[] }>;
   maxTokens?: number;
   temperature?: number;
   stopSequences?: string[];
@@ -43,8 +72,11 @@ export interface AnthropicChatResult {
   usage: AiUsage;
 }
 
-export async function anthropicChatText(opts: AnthropicChatOptions): Promise<AnthropicChatResult> {
-  const client = getAnthropicClient();
+export async function anthropicChatText(
+  opts: AnthropicChatOptions,
+  injected?: AnthropicMessagesClient,
+): Promise<AnthropicChatResult> {
+  const client: AnthropicMessagesClient = injected ?? (getAnthropicClient() as unknown as AnthropicMessagesClient);
 
   const system = opts.system
     ? opts.cacheSystem
@@ -62,13 +94,13 @@ export async function anthropicChatText(opts: AnthropicChatOptions): Promise<Ant
   });
 
   const text = response.content
-    .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
-    .map(b => b.text)
+    .filter(b => b.type === 'text' && typeof b.text === 'string')
+    .map(b => b.text as string)
     .join('');
 
   return {
     text,
-    model: response.model,
+    model: response.model ?? opts.model,
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,

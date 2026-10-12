@@ -93,7 +93,7 @@ krmaReserve: ${formState.krmaReserve != null ? formState.krmaReserve : '(empty)'
 
   let raw: string;
   try {
-    const provider = getGodheadProvider();
+    const provider = getGodheadProvider({ caller: 'location-form-suggest', contentClass: 'fiction', campaignId });
     raw = await provider.chat(
       [
         { role: 'system', content: systemPrompt },

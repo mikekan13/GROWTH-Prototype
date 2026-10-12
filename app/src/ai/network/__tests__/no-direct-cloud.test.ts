@@ -21,24 +21,18 @@ const PATTERNS: Array<[string, RegExp]> = [
   ['api.anthropic.com', /api\.anthropic\.com/],
   ['getAnthropicClient', /\bgetAnthropicClient\b/],
   ["model-client tier 'C'", /tier:\s*'C'/],
-  ['godhead provider (Claude)', /\bgetGodheadProvider\s*\(/],
-  ['ClaudeProvider', /\bnew\s+ClaudeProvider\s*\(/],
 ];
 
 /** The transports themselves — the door's own hinges. */
 const ALLOWED = [
   'ai/network/',
-  'ai/providers/claude.ts',       // text provider over the network transport
+  'ai/providers/claude.ts',       // AIProvider face over routedChatText (takes a content class)
   'ai/providers/claude-tools.ts', // tool-use transport; runtime reaches it only via route()
   'ai/providers/index.ts',        // provider factory
 ];
 
 /** Unit 6: still calling the cloud outside route(). Shrink, never grow. */
 const KNOWN_PENDING = [
-  'ai/copilot/create-dialog.ts',
-  'ai/copilot/form-suggest.ts',
-  'ai/portraits/style-profile.ts',
-  'app/api/references/describe/route.ts',
   'daya/adjudicator.ts',
   'daya/clamp.ts',
   'daya/jewl-action.ts',
@@ -47,8 +41,6 @@ const KNOWN_PENDING = [
   'daya/recall.ts',
   'godhead/agent.ts',
   'services/bridge.ts',
-  'services/entity-quick-gen.ts',
-  'services/goal-custodian.ts',
   'services/reconciliation.ts',
   'services/terminal-recall.ts',
 ].sort();

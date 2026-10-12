@@ -183,7 +183,8 @@ export async function generateEntityDraft(
     validated.prompt,
   ].filter(Boolean).join('\n');
 
-  const provider = new ClaudeProvider();
+  // The GM's description of a fictional entity: fiction, through the wall.
+  const provider = new ClaudeProvider({ caller: 'entity-quick-gen', contentClass: 'fiction', campaignId: validated.campaignId });
   const raw = await provider.chat(
     [
       { role: 'system', content: system },

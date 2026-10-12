@@ -1,33 +1,20 @@
 import 'server-only';
 import type { AIProvider } from '../types';
 import { OllamaProvider } from './ollama';
-import { ClaudeProvider } from './claude';
+import { ClaudeProvider, type ClaudeProviderTask } from './claude';
 
-let cachedProvider: AIProvider | null = null;
-let cachedClaudeProvider: AIProvider | null = null;
+let cachedOllama: AIProvider | null = null;
 
-/** Default AI provider (Ollama for QoL features, configurable via AI_PROVIDER env) */
-export function getAIProvider(): AIProvider {
-  if (cachedProvider) return cachedProvider;
-
-  const provider = process.env.AI_PROVIDER || 'ollama';
-
-  switch (provider) {
-    case 'claude':
-      cachedProvider = new ClaudeProvider();
-      break;
-    case 'ollama':
-    default:
-      cachedProvider = new OllamaProvider();
-      break;
-  }
-
-  return cachedProvider;
+/** Default AI provider (Ollama for QoL features, configurable via AI_PROVIDER
+ *  env). The task is what the wall needs when the provider is Claude. */
+export function getAIProvider(task: ClaudeProviderTask): AIProvider {
+  if ((process.env.AI_PROVIDER || 'ollama') === 'claude') return new ClaudeProvider(task);
+  if (!cachedOllama) cachedOllama = new OllamaProvider();
+  return cachedOllama;
 }
 
-/** Claude provider specifically for God-head operations (deep reasoning required) */
-export function getGodheadProvider(): AIProvider {
-  if (cachedClaudeProvider) return cachedClaudeProvider;
-  cachedClaudeProvider = new ClaudeProvider();
-  return cachedClaudeProvider;
+/** Claude provider for God-head operations (deep reasoning), routed through
+ *  the wall: the caller declares what the text is. */
+export function getGodheadProvider(task: ClaudeProviderTask): AIProvider {
+  return new ClaudeProvider(task);
 }

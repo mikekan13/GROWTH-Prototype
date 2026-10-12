@@ -6,17 +6,20 @@ import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
 
-const CLAUDE_API_KEY = process.env.ANTHROPIC_API_KEY || '';
-const CLAUDE_API_URL = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com';
-// Same env knob + fallback as the JEWL runtime (runtime.ts) — the old
-// claude-sonnet-4-20250514 fallback was retired 2026-06-15 and 404s.
-const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
 /**
  * POST /api/references/describe
  * Analyze a reference photo with AI to generate physical descriptions.
- * Uses campaign AI settings to pick local (Ollama vision) or cloud (Claude).
+ *
+ * THE WALL (Mike 2026-10-12): these are the character's identity-lock
+ * reference photos — the same uploads PuLID locks the face from, i.e. photos
+ * of a REAL person. Real-life content never reaches a cloud model, so this
+ * route runs on the local vision model only; a campaign set to 'cloud' is
+ * refused, not silently downgraded or sent.
+ * [QUESTION] Mike: when a reference is clearly not a real person (concept
+ * art, an AI render), may it be described by Claude as fiction? Until then
+ * every reference is treated as real.
  *
  * Body: { imagePath: string, bodyParts: string[], seedName?: string, campaignId: string }
  */
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'imagePath or imagePaths is required' }, { status: 400 });
     }
 
-    // Read and resize all images to fit Claude's 5MB limit
+    // Read and resize all images to a vision model's size limit
     const MAX_BYTES = 4_000_000; // 4MB target (leaves room for base64 overhead)
     const MAX_DIMENSION = 2048;
     const images: Array<{ base64: string; mediaType: string }> = [];
@@ -70,17 +73,16 @@ export async function POST(request: NextRequest) {
       localVisionModel = settings.localVisionModel || 'llava';
     }
 
-    let textContent: string;
-
-    if (providerChoice === 'local') {
-      // Local only supports single image
-      textContent = await describeWithOllama(images[0].base64, prompt, localVisionModel);
-    } else {
-      if (!CLAUDE_API_KEY) {
-        return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
-      }
-      textContent = await describeWithClaude(images, prompt);
+    if (providerChoice !== 'local') {
+      // eslint-disable-next-line no-console
+      console.warn('[wall✗] caller=references-describe class=real reason=real-person-photo');
+      return NextResponse.json(
+        { error: 'Reference photos are of a real person and are described on the local vision model only. Set the campaign reference-description provider to local.' },
+        { status: 422 },
+      );
     }
+    // Local only supports single image
+    const textContent = await describeWithOllama(images[0].base64, prompt, localVisionModel);
 
     // Parse the JSON response
     let parsed: Record<string, unknown>;
@@ -163,42 +165,6 @@ STYLE PREFERENCES — infer from the photos:
 }
 
 Return ONLY valid JSON, no markdown. Keys: UPPERCASE body part names (HEAD, TORSO, LEFT_UPPER_ARM, etc.) plus "overall" plus "style".`;
-}
-
-// ── Claude (Cloud) ───────────────────────────────────────────────────────
-
-async function describeWithClaude(images: Array<{ base64: string; mediaType: string }>, prompt: string): Promise<string> {
-  // Build content array: all images first, then the text prompt
-  const content: Array<Record<string, unknown>> = [];
-  for (const img of images) {
-    content.push({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.base64 } });
-  }
-  content.push({ type: 'text', text: images.length > 1
-    ? `You have ${images.length} reference photos of the SAME person from different angles. Cross-reference all photos to determine accurate features.\n\n${prompt}`
-    : prompt });
-
-  const response = await fetch(`${CLAUDE_API_URL}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 2000,
-      messages: [{ role: 'user', content }],
-    }),
-    signal: AbortSignal.timeout(90_000), // More time for multiple images
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Claude API error (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json() as { content: Array<{ type: string; text?: string }> };
-  return data.content.filter(b => b.type === 'text').map(b => b.text || '').join('');
 }
 
 // ── Ollama (Local) ───────────────────────────────────────────────────────

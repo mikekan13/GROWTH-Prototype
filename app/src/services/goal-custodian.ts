@@ -56,7 +56,8 @@ export async function assignGoalCustodian(goalId: string): Promise<{
     return { godheadName: '', pillar: '', reason: 'No God-heads seeded yet' };
   }
 
-  const provider = getGodheadProvider();
+  // Goals and their entity context are fiction.
+  const provider = getGodheadProvider({ caller: 'goal-custodian', contentClass: 'fiction', campaignId: goal.campaignId ?? undefined });
 
   const userPrompt = `New goal created:
 "${goal.description}" (Priority: ${goal.priority}/5)

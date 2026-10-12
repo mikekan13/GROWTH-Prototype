@@ -14,8 +14,11 @@ interface SuggestedPrompt {
   category: string;
 }
 
+/** Campaign premises and a player's character answers are fiction. */
+const APPLICATION_TASK = { caller: 'application-ai', contentClass: 'fiction' as const };
+
 export async function suggestApplicationPrompts(campaign: CampaignContext): Promise<SuggestedPrompt[]> {
-  const provider = getAIProvider();
+  const provider = getAIProvider(APPLICATION_TASK);
   const prompt = buildSuggestPromptsPrompt(campaign);
 
   const raw = await provider.generateText(prompt, { temperature: 0.8, maxTokens: 1024 });
@@ -42,7 +45,7 @@ export async function expandApplicationResponse(
   response: string,
   campaign: CampaignContext,
 ): Promise<string> {
-  const provider = getAIProvider();
+  const provider = getAIProvider(APPLICATION_TASK);
   const prompt = buildExpandResponsePrompt(promptText, response, campaign);
 
   const expanded = await provider.generateText(prompt, { temperature: 0.7, maxTokens: 1024 });

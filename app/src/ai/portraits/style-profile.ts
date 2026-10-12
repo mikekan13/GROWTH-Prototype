@@ -15,8 +15,8 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/db';
+import { routedChatText } from '@/ai/network';
 
-const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 export interface StyleProfile {
   era: string;
@@ -61,45 +61,29 @@ export async function deriveStyleProfile(
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+    // The backstory is fiction: it may reach Claude, through the wall.
+    const { text } = await routedChatText(
+      { caller: 'portrait-style-profile', lane: 'judgment', contentClass: 'fiction' },
+      {
+        system: '',
+        maxTokens: 400,
+        temperature: 0.7,
+        user:
+          'From this character backstory, infer the material culture they would dress in. ' +
+          'GROWTH campaigns span any genre — read the ERA and culture from the story itself ' +
+          '(a time-traveler from the future wears futuristic garments even in a medieval world).' +
+          (styleAesthetics?.length
+            ? ` The character's personal style preferences: ${styleAesthetics.join(', ')} — let these tint the choices.`
+            : '') +
+          `\n\nBACKSTORY:\n${backstory.slice(0, 4000)}\n\n` +
+          'Reply with ONLY a JSON object, no prose:\n' +
+          '{"era": "<one-line era/culture summary>", ' +
+          '"underclothing": "<concrete garment description for a neutral reference image — specific nouns, fabric, cut; plain and unornamented>", ' +
+          '"garmentNorms": "<one line: what this person\'s everyday clothing looks like>", ' +
+          '"materials": "<comma list of typical materials>"}',
       },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 400,
-        messages: [{
-          role: 'user',
-          content:
-            'From this character backstory, infer the material culture they would dress in. ' +
-            'GROWTH campaigns span any genre — read the ERA and culture from the story itself ' +
-            '(a time-traveler from the future wears futuristic garments even in a medieval world).' +
-            (styleAesthetics?.length
-              ? ` The character's personal style preferences: ${styleAesthetics.join(', ')} — let these tint the choices.`
-              : '') +
-            `\n\nBACKSTORY:\n${backstory.slice(0, 4000)}\n\n` +
-            'Reply with ONLY a JSON object, no prose:\n' +
-            '{"era": "<one-line era/culture summary>", ' +
-            '"underclothing": "<concrete garment description for a neutral reference image — specific nouns, fabric, cut; plain and unornamented>", ' +
-            '"garmentNorms": "<one line: what this person\'s everyday clothing looks like>", ' +
-            '"materials": "<comma list of typical materials>"}',
-        }],
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) {
-      console.warn('[style-profile] Claude error', res.status);
-      return null;
-    }
-    const data = await res.json() as { content: Array<{ type: string; text?: string }> };
-    const text = data.content?.find(b => b.type === 'text')?.text ?? '';
+    );
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]) as Partial<StyleProfile>;
