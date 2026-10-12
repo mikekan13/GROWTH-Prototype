@@ -361,6 +361,7 @@ async function markDropped(campaignId: string, actor: TableActor, kind: string, 
         username: '[ambient]',
         userId: actor.userId,
         actions: JSON.stringify({ source: 'TABLE_DROPPED', kind, rule }),
+        contentClass: 'table', // the wall: dropped table talk never reaches a cloud lane
       },
     });
   } catch (err) { console.warn('[table-speak] could not mark dropped table talk', err); }

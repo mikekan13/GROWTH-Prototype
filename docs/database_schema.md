@@ -312,6 +312,7 @@ JEWL conversation rows (`role` user | assistant). No schema change on 2026-10-08
 - user rows: the human who wrote it (or JEWL's own id for `[system]` triggers)
 - assistant rows (from 2026-10-08): the RECIPIENT — the human who prompted; JEWL's own autonomous ticks / work cycles → the campaign GM. Older assistant rows have `userId = null`.
 - Read rule (JEWL history is private per user): a viewer is served only rows whose `userId` is theirs; `null` rows are ADMIN-only. See `ai/copilot/history-privacy.ts`.
+- **`contentClass String?` + `icText String?` (migration `20261012080806_copilot_message_content_class`, the wall).** `fiction | table | real`; table/real never reach a cloud lane. Ambient mic rows (`[ambient]`, TABLE_AMBIENT) and dropped table talk (TABLE_DROPPED) are written `table`; `[ui]` breadcrumbs `real`; typed JEWL prompts `fiction` unless the table-talk ooc rules fire (`table`). The LOCAL classifier splits each ambient row: IC → `fiction` + `icText` (the in-character words — what a cloud lane gets instead of `content`); OOC → stays `table` (stamped `actions.localSplit`). Null = legacy row, inferred from markers by `ai/copilot/content-class.ts` `rowContentClass()` (ambient → table, ui → real, else fiction).
 
 ### JewlMistake
 GM mistake-bounty flagging corpus. A GM flags a JEWL CopilotMessage as wrong; the flag is a CLAIM — no KRMA moves until resolved (transfer-on-acceptance, T19). JEWL acknowledges (bounty pays JEWL→GM) or disputes (Et'herling adjudicates: upheld pays, overturned pays nothing).

@@ -712,6 +712,12 @@ model CopilotMessage {
   username   String?
   actions    String?  // JSON: CopilotAction[] — proposed actions
   metadata   String?  // JSON: retrieval context, tokens used, etc.
+  // The wall (2026-10-12): fiction | table | real. table/real never reach a
+  // cloud lane. Null = legacy row (ambient-marked → table, else fiction).
+  contentClass String?
+  // In-character text the LOCAL split pulled out of a mixed utterance —
+  // what a cloud lane gets instead of `content`.
+  icText     String?
   createdAt  DateTime @default(now())
 
   @@index([campaignId, createdAt])

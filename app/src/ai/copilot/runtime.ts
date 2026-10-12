@@ -11,6 +11,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { replyRecipientId } from './history-privacy';
+import { promptContentClass } from './content-class';
 import { prisma } from '@/lib/db';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
@@ -211,6 +212,8 @@ async function saveUserPrompt(prompt: JewlPrompt): Promise<string> {
         canvasAction: prompt.canvasAction ?? null,
       }),
       metadata: null,
+      // The wall: typed lines are fiction unless the table-talk ooc rules fire.
+      contentClass: promptContentClass(prompt.source, prompt.text ?? ''),
     },
     select: { id: true },
   });

@@ -18,6 +18,8 @@ export interface RoutedChatInput {
   temperature?: number;
   /** Real-world identifiers to strip before a cloud lane (enforceWall). */
   identifiers?: string[];
+  /** Local lane only: abort after this long (serverless cold starts otherwise wait minutes). */
+  timeoutMs?: number;
 }
 
 export interface RoutedChatResult {
@@ -39,6 +41,7 @@ export async function routedChatText(task: TaskDescriptor, input: RoutedChatInpu
     res = await openAiCompatChat({
       baseUrl: lane.baseUrl, apiKey: lane.apiKey, model: lane.model,
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...opts,
+      ...(input.timeoutMs ? { timeoutMs: input.timeoutMs } : {}),
     });
   } else {
     throw new Error(`${task.caller}: unsupported provider ${lane.provider}`);

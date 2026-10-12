@@ -1,37 +1,46 @@
 /**
- * Ambient-stream classifier — the cheap pre-filter for JEWL.
+ * Ambient-stream classifier — the gatekeeper in front of JEWL.
  *
  * Per [[jewl-always-on-audio-when-active]] JEWL listens continuously while
- * the GM is on a campaign page. We can't run the expensive Sonnet tool-use
- * loop on every 10-second audio chunk — a 4-hour session would burn cost
- * and noise. Instead, after each chunk we ask a cheap Haiku call:
+ * the GM is on a campaign page. After each chunk the classifier asks:
  *
  *     "Given recent activity, should JEWL react RIGHT NOW?"
  *
- * If the answer is "silent", we do nothing — context piles up in the log
- * for the next decision. If the answer is anything else, we wake the full
- * dispatchPrompt loop, which runs Sonnet with tools and lands a reply in
- * the chat. Cost model (rough):
+ * THE WALL (Mike 2026-10-12): the classifier reads the raw mic transcript —
+ * content class 'table' — so it runs on the LOCAL lane only (the Spirit
+ * pillar, the gatekeeper), never on Claude. In the same call the local model
+ * splits each raw mic line into in-character (fiction) or table talk, and
+ * pulls the in-character words out of a mixed line. Split lines are stamped:
+ * IC → contentClass 'fiction' + icText; OOC → stays 'table'. Only fiction
+ * ever reaches a cloud lane afterwards.
  *
- *   Haiku classifier per chunk:    ~$0.0004
- *   Sonnet dispatchPrompt when fired: ~$0.006
- *   Whisper per chunk:                ~$0.001
+ * No local lane, a local error or a timeout → verdict 'silent' and the rows
+ * stay 'table'. There is NO cloud fallback.
  *
- * Total ≈ $2 for a 4-hour live session. Production-acceptable.
- *
- * The classifier is rate-limited per campaign (default = once every 8s)
- * so a noisy burst of chunks doesn't fire it on every single one.
+ * The classifier is rate-limited per campaign so a noisy burst of chunks
+ * doesn't fire it on every single one.
  */
 
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { dispatchPrompt } from './runtime';
 import type { JewlPrompt } from './prompts/types';
-import { resolveLane, anthropicChatText, recordAiCall } from '@/ai/network';
+import { routedChatText } from '@/ai/network';
+import { rowContentClass, AMBIENT_USERNAME } from './content-class';
+import {
+  CLASSIFIER_SYSTEM,
+  buildClassifierUser,
+  parseClassifierOutput,
+  type Verdict,
+  type WindowLine,
+} from './classifier-format';
 
 const CLASSIFIER_MIN_INTERVAL_MS = 1_500;
 const CONTEXT_WINDOW_MS = 90_000; // last 90s of activity feeds the classifier
 const MAX_CONTEXT_MESSAGES = 25;
+const MAX_LINE_CHARS = 400;
+/** The audio-chunk POST awaits the verdict — cap the local call. */
+const CLASSIFIER_TIMEOUT_MS = Number(process.env.CLASSIFIER_LOCAL_TIMEOUT_MS ?? 15_000);
 
 // In-process throttle keyed by campaign id. Resets when the Next.js process
 // restarts, which is fine — over-firing once during a dev hot reload is
@@ -45,12 +54,10 @@ export interface ClassifierActorContext {
   actorRole: string;
 }
 
-type Verdict = 'silent' | 'react' | 'act' | 'proact';
-
 /**
  * Run the classifier if the campaign hasn't been classified recently. If
  * the verdict is anything other than 'silent', dispatch a full JEWL prompt
- * (Sonnet + tools) with source=TABLE_AMBIENT.
+ * with source=TABLE_AMBIENT.
  *
  * Safe to call from a fire-and-forget context — all errors land in the
  * console and never throw to the caller.
@@ -72,20 +79,21 @@ export async function maybeFireClassifier(
     verdict = out.verdict;
     reasoning = out.reasoning;
   } catch (err) {
+    // Never the text — only that the local gate failed (no lane / error / timeout).
     // eslint-disable-next-line no-console
-    console.error('[classifier] failed:', err);
+    console.error('[classifier] local gate failed; staying silent:', err instanceof Error ? err.name : 'error');
     return { verdict: 'silent', throttled: false };
   }
 
   // eslint-disable-next-line no-console
-  console.log(`[classifier] campaign=${ctx.campaignId} verdict=${verdict}${reasoning ? ` (${reasoning})` : ''}`);
+  console.log(`[classifier] campaign=${ctx.campaignId} verdict=${verdict}`);
 
   // Stamp the verdict onto the most recent ambient message so the chip
   // can show why JEWL stayed silent (or fired). Lightweight diagnostic
   // surface — no UI yet, but the data is queryable.
   try {
     const latest = await prisma.copilotMessage.findFirst({
-      where: { campaignId: ctx.campaignId, username: '[ambient]' },
+      where: { campaignId: ctx.campaignId, username: AMBIENT_USERNAME },
       orderBy: { createdAt: 'desc' },
       select: { id: true, actions: true },
     });
@@ -112,6 +120,8 @@ export async function maybeFireClassifier(
 
   if (verdict === 'silent') return { verdict, throttled: false };
 
+  // The dispatch text is an instruction to JEWL, not transcript. A cloud
+  // lane sees only the in-character lines of the history (runtime filter).
   const prompt: JewlPrompt = {
     source: 'TABLE_AMBIENT',
     campaignId: ctx.campaignId,
@@ -120,124 +130,91 @@ export async function maybeFireClassifier(
     actorRole: ctx.actorRole,
     text:
       `Classifier verdict: ${verdict.toUpperCase()}. ` +
-      `Review the last ~90s of [ambient] transcripts and [ui] activity breadcrumbs. ` +
-      `Reply, run a tool, voice an NPC, or stay silent (empty output) if the classifier was overeager. ` +
-      `If the breadcrumbs show someone stuck or bouncing between surfaces, you may reach out first — offer help, ask what they need, or needle them a little. Stay in character.`,
+      `Review the latest in-character lines spoken at the table in the recent history. ` +
+      `Reply, run a tool, voice an NPC, or stay silent (empty output) if the classifier was overeager. Stay in character.`,
   };
-  // Fire-and-forget the Sonnet dispatch so the audio-chunk POST can return
-  // the verdict immediately. The chip uses the verdict to flip a "thinking"
-  // indicator on; the actual reply lands via the 5s history poll.
+  // Fire-and-forget the dispatch so the audio-chunk POST can return the
+  // verdict immediately; the reply lands via the history poll.
   void dispatchPrompt(prompt).catch(err => {
     // eslint-disable-next-line no-console
-    console.error('[classifier] dispatch failed:', err);
+    console.error('[classifier] dispatch failed:', err instanceof Error ? err.name : 'error');
   });
   return { verdict, throttled: false };
 }
 
+type WindowRow = {
+  id: string;
+  role: string;
+  content: string;
+  username: string | null;
+  actions: string | null;
+  contentClass: string | null;
+  createdAt: Date;
+};
+
+function actionsOf(row: WindowRow): Record<string, unknown> {
+  try { return row.actions ? (JSON.parse(row.actions) as Record<string, unknown>) : {}; } catch { return {}; }
+}
+
+/** A raw mic line the local model has not split yet. */
+function needsSplit(row: WindowRow): boolean {
+  if (row.role !== 'user' || row.username !== AMBIENT_USERNAME) return false;
+  const a = actionsOf(row);
+  if (a.source !== 'TABLE_AMBIENT' || a.localSplit) return false;
+  return rowContentClass(row) === 'table';
+}
+
 async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoning: string }> {
   const cutoff = new Date(Date.now() - CONTEXT_WINDOW_MS);
-  const recent = await prisma.copilotMessage.findMany({
+  const recent = (await prisma.copilotMessage.findMany({
     where: { campaignId, createdAt: { gte: cutoff } },
     orderBy: { createdAt: 'desc' },
     take: MAX_CONTEXT_MESSAGES,
-    select: {
-      role: true,
-      content: true,
-      username: true,
-      createdAt: true,
-    },
-  });
+    select: { id: true, role: true, content: true, username: true, actions: true, contentClass: true, createdAt: true },
+  })) as WindowRow[];
   if (recent.length === 0) return { verdict: 'silent', reasoning: 'no recent activity' };
 
-  const lines = recent
-    .reverse()
-    .map(m => {
-      const who = m.role === 'assistant' ? 'JEWL' : (m.username || 'user');
-      const ts = m.createdAt.toISOString().slice(11, 19);
-      return `[${ts}] ${who}: ${m.content.slice(0, 400)}`;
-    })
-    .join('\n');
+  const rows = recent.reverse();
+  const lines: WindowLine[] = rows.map((m, i) => ({
+    n: i + 1,
+    who: m.role === 'assistant' ? 'JEWL' : (m.username || 'user'),
+    ts: m.createdAt.toISOString().slice(11, 19),
+    text: m.content.slice(0, MAX_LINE_CHARS),
+    split: needsSplit(m),
+  }));
+  const splitNs = lines.filter((l) => l.split).map((l) => l.n);
 
-  const system = [
-    'You are a cheap pre-filter for a TTRPG copilot named JEWL. JEWL listens',
-    'to the table continuously and decides moment-by-moment whether to engage.',
-    'Your job: classify the LATEST [ambient] transcript (the bottommost one)',
-    'into ONE of:',
-    '',
-    '  silent  - the LATEST transcript is genuine silence, table noise, or a',
-    '            known Whisper hallucination ("Thank you.", "Thanks for watching.",',
-    '            "Bye.", standalone "you", "I", "music", "applause", a list of',
-    '            disconnected single proper nouns with no verb/clause, a short',
-    '            repeated syllable like "Keter, Kether, Kether").',
-    '  react   - the LATEST transcript is real speech with content. Default here.',
-    '  act     - the LATEST transcript clearly asks for a tool call (apply damage,',
-    '            advance clock, create entity, voice an NPC, move a character).',
-    '  proact  - long silence after an unresolved beat that JEWL should check on,',
-    '            OR the [ui] breadcrumb trail shows someone stuck or flailing.',
-    '',
-    'CRITICAL RULES (apply in this order):',
-    '0. If the LATEST line is a [ui] breadcrumb: default silent. Verdict proact',
-    '   ONLY when the recent [ui] trail shows a real pattern — 3+ surface',
-    '   switches in ~2 minutes, repeatedly opening/closing the same thing, or',
-    '   minutes of aimless bouncing with nothing accomplished. One navigation',
-    '   is never a pattern.',
-    '1. Look ONLY at the LATEST [ambient] line. Earlier context is just background.',
-    '2. If the latest [ambient] post-dates JEWL\'s last reply AND contains real',
-    '   words (a clause, a sentence, a directive), default REACT or ACT.',
-    '   "Already replied" suppression applies ONLY when the latest [ambient] is',
-    '   a verbatim or near-verbatim repeat of what JEWL just heard.',
-    '3. JEWL\'s prior assistant turns are CONTEXT, never grounds for silent. Do',
-    '   not classify "GM repeated himself" as silent — assume the GM had a',
-    '   reason (often: the UI didn\'t reflect JEWL\'s reply yet).',
-    '4. When the GM follows up after JEWL\'s reply (e.g. JEWL asked "who?" and',
-    '   the next [ambient] gives a name), that is ALWAYS react or act.',
-    '5. Drop silence-hallucinations only when the entire latest line IS the',
-    '   hallucination, not when real speech contains a stray hallucinated word.',
-    '',
-    'OUTPUT FORMAT: one line, verdict word first, optional reason after a colon.',
-    '  silent: latest line is just "Thank you."',
-    '  react: GM answered the name question ("Valmir")',
-    '  act: GM said "advance the clock by an hour"',
-    '  proact: 4 min after combat ended, JEWL has not checked in',
-  ].join('\n');
+  // Class 'table': raw transcript. route() sends it local or throws — never cloud.
+  const res = await routedChatText(
+    { caller: 'ambient-classifier', lane: 'local', campaignId, contentClass: 'table' },
+    {
+      system: CLASSIFIER_SYSTEM,
+      user: buildClassifierUser(lines),
+      maxTokens: 96 + splitNs.length * 120,
+      temperature: 0,
+      timeoutMs: CLASSIFIER_TIMEOUT_MS,
+    },
+  );
+  const reading = parseClassifierOutput(res.text, splitNs);
 
-  const user = [
-    'Recent activity (last ~90s):',
-    '',
-    lines,
-    '',
-    'Verdict?',
-  ].join('\n');
+  // Persist the split. IC → fiction + icText (the whole line when the model
+  // gave no extraction); OOC → stays table. Best-effort per row.
+  const splitAt = new Date().toISOString();
+  await Promise.all(lines.filter((l) => l.split).map(async (l) => {
+    const row = rows[l.n - 1];
+    const s = reading.split.get(l.n) ?? { kind: 'ooc' as const };
+    const actions = JSON.stringify({ ...actionsOf(row), localSplit: s.kind, localSplitAt: splitAt, ...(reading.parsed ? {} : { localSplitFallback: true }) });
+    try {
+      await prisma.copilotMessage.update({
+        where: { id: row.id },
+        data: s.kind === 'ic'
+          ? { contentClass: 'fiction', icText: (s.icText ?? row.content).slice(0, 4000), actions }
+          : { contentClass: 'table', actions },
+      });
+    } catch {
+      // the row stays 'table' — the safe side
+    }
+  }));
 
-  const laneCfg = resolveLane('classify');
-  const res = await anthropicChatText({
-    model: laneCfg.model,
-    system,
-    // The classifier system prompt is stable across fires — cache it so the
-    // 8s-cadence ambient gate reads the prefix at 10% price.
-    cacheSystem: true,
-    maxTokens: 96,
-    temperature: 0,
-    messages: [{ role: 'user', content: user }],
-  });
-  recordAiCall({
-    lane: 'classify',
-    provider: laneCfg.provider,
-    model: res.model,
-    caller: 'ambient-classifier',
-    campaignId,
-    usage: res.usage,
-  });
-  const text = res.text.trim();
-  const lower = text.toLowerCase();
-  // Capture the optional reason — everything after the first colon.
-  const reasonMatch = text.match(/:\s*(.+)$/);
-  const reasoning = reasonMatch ? reasonMatch[1].trim() : '';
-  let verdict: Verdict = 'silent';
-  // Order matters: check 'proact' before 'react' since 'proactive' contains 'react'.
-  if (lower.startsWith('proact')) verdict = 'proact';
-  else if (lower.startsWith('react')) verdict = 'react';
-  else if (lower.startsWith('act')) verdict = 'act';
-  else verdict = 'silent';
-  return { verdict, reasoning };
+  return { verdict: reading.verdict, reasoning: reading.reasoning };
 }

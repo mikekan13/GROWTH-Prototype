@@ -64,6 +64,8 @@ export async function POST(
         username: '[ui]',
         userId: session.user.id,
         actions: JSON.stringify({ source: 'UI_ACTIVITY' }),
+        // The wall: what the actual human is doing in the app — never cloud.
+        contentClass: 'real',
       },
     });
 

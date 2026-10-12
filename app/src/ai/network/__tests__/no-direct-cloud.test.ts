@@ -35,7 +35,6 @@ const ALLOWED = [
 
 /** Unit 6: still calling the cloud outside route(). Shrink, never grow. */
 const KNOWN_PENDING = [
-  'ai/copilot/classifier.ts', // unit 2 moves it local
   'ai/copilot/create-dialog.ts',
   'ai/copilot/form-suggest.ts',
   'ai/portraits/style-profile.ts',
@@ -84,5 +83,10 @@ describe('the wall is the only door to cloud', () => {
 
   it('every KNOWN_PENDING file still violates (drop it from the list once fixed)', () => {
     expect(KNOWN_PENDING.filter((f) => !found.includes(f))).toEqual([]);
+  });
+
+  it('the ambient classifier is not a pending caller (it runs local)', () => {
+    expect(KNOWN_PENDING).not.toContain('ai/copilot/classifier.ts');
+    expect(found).not.toContain('ai/copilot/classifier.ts');
   });
 });

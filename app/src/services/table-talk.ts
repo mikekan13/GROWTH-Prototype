@@ -176,6 +176,16 @@ const OOC_TABLE_RE = /^\s*(?:(?:sorry|ok|okay|wait|uh|um|oh|hey|alright|all righ
 const LEADING_ASIDE_RE = /^\s*(\(\([^)]*\)\)|\([^)]*\)|\[[^\]]*\])\s+(\S.*)$/;
 const OOC_MAX_WORDS = 12;
 
+/**
+ * The same `ooc` rules readTableTalk applies to a sentence, applied to one
+ * whole typed message (the wall: a typed line these rules call table talk is
+ * content class 'table', never sent to a cloud lane). Pure.
+ */
+export function isOocTableTalk(text: string): boolean {
+  if (OOC_PREFIX_RE.test(text) || OOC_WRAPPED_RE.test(text)) return true;
+  return OOC_TABLE_RE.test(text) && text.trim().split(/\s+/).length <= OOC_MAX_WORDS;
+}
+
 const NOT_MOTION = '(?!\\s+(?:over|out|up|down|away|aside|off|into|onto|through|across|back|around|(?:your|his|her|their|its) eyes)\\b)';
 const CHECK_RES: Array<[string, RegExp]> = [
   ['check:roll-imperative', new RegExp(`^${LEAD}(?:${NAME_LIST}\\s*[,:]?\\s*)?(?:(?:go ahead and|please|now|everyone|everybody|all of you|you all)[,\\s]+)*roll\\b${NOT_MOTION}`, 'i')],

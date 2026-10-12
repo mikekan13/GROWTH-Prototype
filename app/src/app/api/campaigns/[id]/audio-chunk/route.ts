@@ -144,6 +144,9 @@ export async function POST(
           source: 'TABLE_AMBIENT',
           sttProvider: stt.provider,
         }),
+        // The wall: raw mic transcript is table content until the LOCAL
+        // classifier splits the in-character words out (classifier.ts).
+        contentClass: 'table',
       },
     });
 
@@ -166,10 +169,11 @@ export async function POST(
 
     // Per [[jewl-always-on-audio-when-active]] there is no wake word — JEWL
     // is supposed to decide moment-by-moment whether to react. We delegate
-    // that decision to a cheap Haiku classifier (see classifier.ts). The
-    // classifier verdict is AWAITED (~500ms Haiku call) so the chip can
-    // show a "thinking" state immediately when JEWL wakes Sonnet. The
-    // Sonnet dispatch (the slow part) is still fire-and-forget inside
+    // that decision to the LOCAL-lane classifier (see classifier.ts — the
+    // wall: raw transcript never reaches Claude), which also splits the
+    // in-character words from table talk. The verdict is AWAITED (time-
+    // capped) so the chip can show a "thinking" state immediately. The
+    // dispatch (the slow part) is still fire-and-forget inside
     // maybeFireClassifier — the chip picks the reply up via the 5s poll.
     let classifierVerdict: string | undefined;
     {

@@ -222,7 +222,8 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 |--------|------|---------|
 | CopilotService | `ai/copilot/copilot-service.ts` | `getCopilotHistory(campaignId, viewer)` — JEWL history PRIVATE PER USER (viewer's own rows + JEWL replies to them; unattributed rows ADMIN-only) |
 | CopilotHistoryPrivacy | `ai/copilot/history-privacy.ts` | Pure: `replyRecipientId` (JEWL reply `userId` = the human who prompted; JEWL's own ticks/work cycles → campaign GM) + `copilotHistoryWhere` |
-| Classifier | `ai/copilot/classifier.ts` | Haiku-powered no-wake-word intent classifier. Routes to CopilotService (Sonnet) only when GM/player input warrants; idle audio dropped |
+| Classifier | `ai/copilot/classifier.ts` | LOCAL-lane (never Claude — the wall) no-wake-word gate: verdict silent/react/act/proact AND the per-utterance split of raw mic lines into in-character (→ `contentClass='fiction'` + `icText`) vs table talk (stays `table`). No local lane / error / timeout → silent, rows stay table. Wire format + parser: `classifier-format.ts` (unparseable → silent, all OOC) |
+| Content class | `ai/copilot/content-class.ts` | `rowContentClass(row)` (stamp, else legacy markers), `typedMessageClass(text)` (table-talk ooc rules → table), `promptContentClass(source,text)` |
 | Runtime | `ai/copilot/runtime.ts` | Claude API call wrapper with retry, streaming, tool-use loop |
 | ContextAssembler | `ai/copilot/context-assembler.ts` | `buildTableState` — injects TABLE STATE block: all non-draft character attributes, conditions, traits + rollModifiers, held/equipped items. Soft cap 15 characters |
 | CreateDialog | `ai/copilot/create-dialog.ts` | JEWL entity/location creation dialog handler (new + edit modes) |
