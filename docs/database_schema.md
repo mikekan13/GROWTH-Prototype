@@ -593,3 +593,9 @@ offending row (CopilotMessage / DayaMemoryEntry / ForgeItem / PortraitGeneration
 (genesis `LAWFULNESS_FLAG_GENESIS`; `verifyFlagChain()` detects edits, gaps, reorders).
 Mutable review fields, OUTSIDE the hash: `status` OPEN | REVIEWED | ACTIONED, `reviewerId`, `reviewNote`, `reviewedAt`.
 Indexes: (campaignId, createdAt), (status, createdAt).
+
+## Maturity — DOB + adult-only campaigns (Mike 2026-10-12; migration 20261012120000_maturity_dob_adult_only)
+**User** gained `dateOfBirth` (DateTime?, never logged). Required at registration; existing users with null get a one-time prompt (POST /api/auth/date-of-birth, set-once). Null = treated as a minor; ADMIN exempt (`lib/age.ts#isAdult`).
+**Campaign** gained `adultOnly` (Boolean, default false), `adultOnlySetBy` (`'auto'` | `'watcher'` | null), `adultOnlyAt` (DateTime?). Auto = any campaign content carrying the `sexual` maturity flag (ForgeItem.data.maturityFlags, DayaMemoryEntry.classification.maturityFlags, or a tone-filter note); auto never un-sets a watcher-set true.
+**CampaignMember.status** gained value `REMOVED` — an under-18 member when the table turned 18+ (row + characters kept; excluded from member lists, seat counts and the view gate).
+**AuditEntry** now used for maturity: action `MATURITY_FLAG` (tone-filter note; metadata {flag, refTable, refId} — never text), `ADULT_ONLY_SET` / `ADULT_ONLY_CLEARED` (targetType 'Campaign').

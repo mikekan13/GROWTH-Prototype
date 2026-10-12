@@ -1,5 +1,7 @@
 import { getSession } from '@/lib/auth';
 import DashboardShell from '@/components/DashboardShell';
+import DateOfBirthPrompt from '@/components/maturity/DateOfBirthPrompt';
+import { needsDateOfBirth } from '@/lib/age';
 import HubLogo from './HubLogo';
 import HubClient from './HubClient';
 import Link from 'next/link';
@@ -48,6 +50,7 @@ export default async function HubPage() {
   if (session) {
     return (
       <DashboardShell username={session.user.username} role={session.user.role}>
+        {needsDateOfBirth(session.user) && <DateOfBirthPrompt />}
         {content}
       </DashboardShell>
     );

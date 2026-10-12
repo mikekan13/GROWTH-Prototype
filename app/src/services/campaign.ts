@@ -6,6 +6,8 @@ import { isWatcherOrAbove, isAdminRole, canManageCampaign } from '@/lib/permissi
 import { createCampaignWallet } from '@/services/krma/wallet';
 import { createDraftCharacterForMember } from '@/services/character';
 import { assertMetaConsent } from '@/services/consent';
+import { assertMayEnterCampaign, REMOVED_STATUS } from '@/services/maturity';
+import { canSeeAdultListings } from '@/lib/permissions';
 
 // --- Schemas ---
 
@@ -34,7 +36,13 @@ export const updateCampaignSchema = z.object({
 
 // --- Service Functions ---
 
-export async function listCampaigns(userId: string) {
+export async function listCampaigns(
+  userId: string,
+  viewer?: { role: string; dateOfBirth?: Date | string | null },
+) {
+  // Adult-only tables (2026-10-12): a minor never sees them in their list,
+  // and a member removed when the table turned 18+ no longer lists it.
+  const adultFilter = viewer && canSeeAdultListings(viewer) ? {} : { adultOnly: false };
   const [gmCampaigns, playerCampaigns] = await Promise.all([
     prisma.campaign.findMany({
       where: { gmUserId: userId },
@@ -42,7 +50,7 @@ export async function listCampaigns(userId: string) {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.campaign.findMany({
-      where: { members: { some: { userId } } },
+      where: { members: { some: { userId, status: { not: REMOVED_STATUS } } }, ...adultFilter },
       include: {
         gmUser: { select: { username: true } },
         characters: { where: { userId }, select: { id: true, name: true } },
@@ -113,10 +121,11 @@ export async function getCampaignDetail(campaignId: string, userId: string, user
 export async function joinCampaign(userId: string, inviteCode: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { inviteCode: inviteCode.trim() },
-    include: { _count: { select: { members: true } } },
+    include: { _count: { select: { members: { where: { status: { not: REMOVED_STATUS } } } } } },
   });
 
   if (!campaign) throw new NotFoundError('Invalid invite code');
+  await assertMayEnterCampaign(userId, campaign);
   if (campaign.status !== 'ACTIVE') throw new ValidationError('Campaign is not active');
   if (campaign._count.members >= campaign.maxTrailblazers) throw new ValidationError('Campaign is full');
   if (campaign.gmUserId === userId) throw new ValidationError('You are the GM of this campaign');
@@ -146,6 +155,7 @@ export async function expressInterest(userId: string, campaignId: string) {
   if (campaign.gmUserId === userId) {
     throw new ConflictError("You are this campaign's GM and cannot apply to it.");
   }
+  await assertMayEnterCampaign(userId, campaign);
 
   await assertMetaConsent(userId, campaign, 'express interest in');
 
@@ -158,10 +168,10 @@ export async function expressInterest(userId: string, campaignId: string) {
     if (existing.status === 'INTERESTED') {
       throw new ConflictError('You already have a pending request for this campaign.');
     }
-    if (existing.status !== 'REJECTED') {
+    if (existing.status !== 'REJECTED' && existing.status !== REMOVED_STATUS) {
       throw new ConflictError("You're already a member of this campaign.");
     }
-    // Recycle the REJECTED row back to INTERESTED rather than create a duplicate.
+    // Recycle the REJECTED (or age-REMOVED, now eligible) row back to INTERESTED rather than create a duplicate.
     const member = await prisma.campaignMember.update({
       where: { id: existing.id },
       data: { status: 'INTERESTED', joinedAt: new Date() },
@@ -195,6 +205,8 @@ export async function reviewInterest(
   if (member.status !== 'INTERESTED') {
     throw new ValidationError(`Cannot ${action.toLowerCase()} a member with status ${member.status}`);
   }
+  // Accepting = inviting to the table: a minor cannot be invited to an 18+ table.
+  if (action === 'BACKSTORY') await assertMayEnterCampaign(member.userId, member.campaign);
 
   const updated = await prisma.campaignMember.update({
     where: { id: memberId },

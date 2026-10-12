@@ -24,6 +24,7 @@ export default function AuthForm() {
           email: form.get('email'),
           password: form.get('password'),
           accessCode: form.get('accessCode') || undefined,
+          dateOfBirth: form.get('dateOfBirth'),
         };
 
     try {
@@ -92,6 +93,19 @@ export default function AuthForm() {
               required
               className="w-full px-3 py-2 bg-black border border-[var(--accent-teal)]/30 text-[var(--accent-teal)] placeholder:text-[var(--accent-teal)]/25 font-[family-name:var(--font-body)] text-sm tracking-wider focus:outline-none focus:border-[var(--accent-teal)]"
             />
+            {/* Mike 2026-10-12: age source = date of birth (some tables are 18+). */}
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-[0.2em] font-[family-name:var(--font-terminal)] text-[var(--accent-teal)]/50 mb-1">
+                Date of birth
+              </span>
+              <input
+                name="dateOfBirth"
+                type="date"
+                required
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full px-3 py-2 bg-black border border-[var(--accent-teal)]/30 text-[var(--accent-teal)] font-[family-name:var(--font-body)] text-sm tracking-wider focus:outline-none focus:border-[var(--accent-teal)] [color-scheme:dark]"
+              />
+            </label>
           </>
         )}
 

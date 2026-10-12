@@ -1,5 +1,8 @@
 // Reusable authorization helpers — eliminates duplicated isGM/isAdmin checks
 
+import { ForbiddenError } from '@/lib/errors';
+import { isAdult } from '@/lib/age';
+
 export function isAdminRole(role: string): boolean {
   return role === 'GODHEAD' || role === 'ADMIN';
 }
@@ -105,4 +108,36 @@ export function canSeeLawfulnessFlag(
 
 export function canActionLawfulnessFlag(userRole: string): boolean {
   return userRole === 'ADMIN';
+}
+
+/**
+ * Adult-only tables (Mike 2026-10-12): a campaign carrying `sexual` content is
+ * 18+. Minors (lib/age#isAdult — unknown DOB counts as a minor, ADMIN exempt)
+ * cannot join, be invited to, view or find it. The campaign's own GM always
+ * enters their own table.
+ */
+export function canEnterAdultCampaign(
+  user: { id: string; role: string; dateOfBirth?: Date | string | null },
+  campaign: { gmUserId: string; adultOnly?: boolean | null },
+  now: Date = new Date(),
+): boolean {
+  if (!campaign.adultOnly) return true;
+  if (campaign.gmUserId === user.id) return true;
+  return isAdult(user, now);
+}
+
+/** Listings/search: may this viewer (null = signed out) see adultOnly campaigns? */
+export function canSeeAdultListings(
+  viewer: { role: string; dateOfBirth?: Date | string | null } | null,
+  now: Date = new Date(),
+): boolean {
+  return !!viewer && isAdult(viewer, now);
+}
+
+/** 403 for a minor at an adult-only table. */
+export class AdultOnlyError extends ForbiddenError {
+  constructor(message: string = 'This table is 18+') {
+    super(message);
+    this.name = 'AdultOnlyError';
+  }
 }

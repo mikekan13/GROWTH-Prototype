@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { isWatcherOrAbove } from '@/lib/permissions';
+import { isWatcherOrAbove, canEnterAdultCampaign } from '@/lib/permissions';
+import AdultOnlyNotice from '@/components/maturity/AdultOnlyNotice';
 import DashboardShell from '@/components/DashboardShell';
 import ProfileSummary from '@/components/profile/ProfileSummary';
 import Link from 'next/link';
@@ -14,6 +15,8 @@ export default async function CampaignListingPage({ params }: { params: Promise<
     where: { id },
     select: {
       id: true,
+      adultOnly: true,
+      gmUserId: true,
       name: true,
       genre: true,
       description: true,
@@ -50,6 +53,13 @@ export default async function CampaignListingPage({ params }: { params: Promise<
     ? JSON.parse(campaign.gmUser.watcherProfile) : null;
 
   const session = await getSession();
+
+  // Adult-only tables (2026-10-12): minors and signed-out viewers get the 18+ notice.
+  if (campaign.adultOnly && !(session && canEnterAdultCampaign(session.user, campaign))) {
+    return session
+      ? <DashboardShell username={session.user.username} role={session.user.role}><AdultOnlyNotice /></DashboardShell>
+      : <div className="min-h-screen bg-[var(--surface-calm)] p-8"><AdultOnlyNotice /></div>;
+  }
 
   let isMember = false;
 

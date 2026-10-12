@@ -30,6 +30,9 @@ model User {
   // on every trace and provenance manifest; default NO.
   aiTrainingConsent   Boolean   @default(false)
   aiTrainingConsentAt DateTime?
+  // Maturity (Mike 2026-10-12): age source = date of birth at registration.
+  // Null = unknown → treated as a minor (ADMIN exempt). Never logged.
+  dateOfBirth        DateTime?
   createdAt          DateTime   @default(now())
 }
 
@@ -262,6 +265,13 @@ model Campaign {
   // network, whose play trains GROWTH). DISCONNECTED keeps the features but
   // never uses the table's data to train. Set at creation.
   networkMode         String               @default("META") // META | DISCONNECTED
+  // Maturity (Mike 2026-10-12): a table carrying `sexual`-flagged content is
+  // 18+ — minors cannot join, be invited to, view or find it. 'auto' = set by
+  // services/maturity (content flags / tone-filter hits); 'watcher' = set by
+  // the campaign's Watcher. Auto never un-sets a watcher-set true.
+  adultOnly           Boolean              @default(false)
+  adultOnlySetBy      String?              // 'auto' | 'watcher'
+  adultOnlyAt         DateTime?
   maxTrailblazers     Int                  @default(5)
   characters          Character[]
   members             CampaignMember[]

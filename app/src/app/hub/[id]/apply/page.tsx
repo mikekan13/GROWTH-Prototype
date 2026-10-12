@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { canEnterAdultCampaign } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import HubApplyForm from '@/components/hub/HubApplyForm';
 
@@ -27,6 +28,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
       applicationTemplate: true,
       requiredFields: true,
       gmUserId: true,
+      adultOnly: true,
       _count: { select: { members: true } },
     },
   });
@@ -37,6 +39,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
   if (campaign.listingStatus !== 'LISTED' || campaign.status !== 'ACTIVE') redirect(`/hub/${id}`);
   if (campaign._count.members >= campaign.maxTrailblazers) redirect(`/hub/${id}`);
   if (campaign.gmUserId === session.user.id) redirect(`/hub/${id}`);
+  if (!canEnterAdultCampaign(session.user, campaign)) redirect(`/hub/${id}`);
 
   // Check not already member
   const existing = await prisma.campaignMember.findUnique({

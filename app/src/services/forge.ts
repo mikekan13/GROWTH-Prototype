@@ -4,6 +4,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { emit as emitGodHeadEvent } from '@/services/godhead-dispatcher';
 import { recordProvenanceSafe } from '@/services/provenance';
+import { recomputeCampaignAdultOnlySafe } from '@/services/maturity';
 
 // Content schemas live in forge-schemas.ts (no server-only deps) so
 // scripts can import the same validation gate. Re-exported for callers.
@@ -172,6 +173,7 @@ export async function createForgeItem(
   // human act; JEWL's forge tools pass through here too and are stamped by
   // the tool wrapper as 'ai' where they call recordProvenance themselves.
   recordProvenanceSafe({ assetType: 'forge_item', assetId: item.id, campaignId, creatorUserId: userId, creatorKind: 'human', content: validatedData });
+  await recomputeCampaignAdultOnlySafe(campaignId); // `sexual` → 18+ table (2026-10-12)
 
   return { ...item, data: validatedData };
 }
@@ -205,6 +207,7 @@ export async function updateForgeItem(
     where: { id: itemId },
     data: updateData,
   });
+  if (input.data) await recomputeCampaignAdultOnlySafe(item.campaignId);
 
   return serializeForgeItem(updated);
 }
@@ -220,6 +223,7 @@ export async function publishForgeItem(itemId: string, userId: string, userRole:
     where: { id: itemId },
     data: { status: 'published' },
   });
+  await recomputeCampaignAdultOnlySafe(updated.campaignId);
 
   // T31: lifecycle emission — godheads see the catalog grow.
   void emitGodHeadEvent('blueprint.published', {
@@ -296,6 +300,7 @@ export async function deleteForgeItem(itemId: string, userId: string, userRole: 
   }
 
   await prisma.forgeItem.delete({ where: { id: itemId } });
+  await recomputeCampaignAdultOnlySafe(item.campaignId); // an auto-set 18+ may clear
   return { deleted: true };
 }
 
@@ -430,6 +435,7 @@ export async function resolvePlayerRequest(
       });
     });
 
+    if (updated.forgeItemId) await recomputeCampaignAdultOnlySafe(request.campaignId);
     return { ...updated, data: JSON.parse(updated.data) };
   } catch (e) {
     if ((e as { code?: string }).code === 'P2002') {
@@ -603,6 +609,7 @@ export async function pullFromGlobalCatalog(
     where: { id: globalItemId },
     data: { useCount: { increment: 1 } },
   });
+  await recomputeCampaignAdultOnlySafe(campaignId);
 
   return { ...serializeForgeItem(copy), alreadyExists: false };
 }

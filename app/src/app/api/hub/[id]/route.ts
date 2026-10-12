@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { errorResponse } from '@/lib/api';
+import { getSession } from '@/lib/auth';
 import { getCampaignListing } from '@/services/hub';
 
 export async function GET(
@@ -8,7 +9,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const listing = await getCampaignListing(id);
+    const session = await getSession();
+    const listing = await getCampaignListing(id, session?.user ?? null);
     return NextResponse.json(listing);
   } catch (error) {
     return errorResponse(error);

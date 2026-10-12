@@ -18,7 +18,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const members = await prisma.campaignMember.findMany({
-      where: { campaignId: id },
+      // Members removed when the table turned 18+ leave the list (row kept).
+      where: { campaignId: id, status: { not: 'REMOVED' } },
       include: {
         user: {
           select: {

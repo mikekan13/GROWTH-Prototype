@@ -5,6 +5,9 @@ import CampaignCanvas from '@/components/CampaignCanvas';
 import { locationDepths } from '@/components/canvas/canvas-lod';
 import { recomputeAugments } from '@/lib/character-actions';
 import { warmLocalLane } from '@/lib/local-warm';
+import { canEnterAdultCampaign } from '@/lib/permissions';
+import { REMOVED_STATUS } from '@/services/maturity';
+import AdultOnlyNotice from '@/components/maturity/AdultOnlyNotice';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -57,7 +60,10 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   // Allow access if user is admin, GM, or a campaign member
   const isAdmin = session.user.role === 'GODHEAD' || session.user.role === 'ADMIN';
   const isGM = campaign.gmUserId === session.user.id;
-  const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED'].includes(m.status));
+  const isMember = campaign.members.some(m => m.userId === session.user.id && !['INTERESTED', 'REJECTED', REMOVED_STATUS].includes(m.status));
+
+  // Adult-only tables (2026-10-12): a minor sees "This table is 18+", never the campaign.
+  if (!canEnterAdultCampaign(session.user, campaign)) return <AdultOnlyNotice backHref="/trailblazer" />;
 
   if (!isAdmin && !isGM && !isMember) redirect('/terminal');
 

@@ -1,4 +1,5 @@
 import 'server-only';
+import { recomputeCampaignAdultOnlySafe } from '@/services/maturity';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ValidationError, NotFoundError, ForbiddenError } from '@/lib/errors';
@@ -668,6 +669,7 @@ export async function confirmForgeAuthoring(
     }
     throw e;
   }
+  await recomputeCampaignAdultOnlySafe(campaignId); // `sexual` → 18+ table (2026-10-12)
 
   // BigInt → Number before the row crosses NextResponse.json (bug hunt C2).
   return {

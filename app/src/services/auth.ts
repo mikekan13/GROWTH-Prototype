@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { AuthError, ConflictError } from '@/lib/errors';
+import { dateOfBirthSchema } from '@/lib/age';
 import { hashPassword, verifyPassword, createSession } from '@/lib/auth';
 import { validateAccessCode } from '@/services/access-code';
 import { issueToken } from '@/lib/auth-tokens';
@@ -18,7 +19,11 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
   accessCode: z.string().optional(),
+  // Mike 2026-10-12: age source = date of birth at registration (required).
+  dateOfBirth: dateOfBirthSchema,
 });
+
+export const setDateOfBirthSchema = z.object({ dateOfBirth: dateOfBirthSchema });
 
 // --- Service Functions ---
 
@@ -63,7 +68,7 @@ export async function registerUser(input: z.infer<typeof registerSchema>) {
 
   const user = await prisma.$transaction(async (tx) => {
     const newUser = await tx.user.create({
-      data: { username: input.username, email: input.email, passwordHash, role: grantedRole },
+      data: { username: input.username, email: input.email, passwordHash, role: grantedRole, dateOfBirth: input.dateOfBirth },
     });
 
     await tx.wallet.create({
@@ -106,4 +111,17 @@ export async function registerUser(input: z.infer<typeof registerSchema>) {
     user: { id: user.id, username: user.username, role: user.role },
     redirect: user.role === 'ADMIN' ? '/terminal' : '/hub',
   };
+}
+
+/**
+ * One-time date of birth for an account created before DOB was required
+ * (Mike 2026-10-12). Set once — a DOB already on file cannot be changed here.
+ * Never logged.
+ */
+export async function setDateOfBirth(userId: string, dateOfBirth: Date): Promise<{ ok: true }> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { dateOfBirth: true } });
+  if (!user) throw new AuthError();
+  if (user.dateOfBirth) throw new ConflictError('Date of birth is already on file');
+  await prisma.user.update({ where: { id: userId }, data: { dateOfBirth } });
+  return { ok: true };
 }

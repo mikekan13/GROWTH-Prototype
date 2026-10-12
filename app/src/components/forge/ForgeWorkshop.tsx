@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
+import { maturityFlagLabel } from '@/lib/maturity-flags';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -634,7 +635,7 @@ function BlockDetail({ type, data, kv, traitLookup = {} }: { type: string; data:
       {Array.isArray(data.maturityFlags) && (data.maturityFlags as string[]).length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {(data.maturityFlags as string[]).map(f => (
-            <Chip key={f} color="#D0A030">⚠ {f}</Chip>
+            <Chip key={f} color="#D0A030">⚠ {maturityFlagLabel(f)}</Chip>
           ))}
         </div>
       )}

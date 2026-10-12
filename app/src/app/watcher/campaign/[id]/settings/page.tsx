@@ -5,6 +5,7 @@ import { canManageCampaign } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import Link from 'next/link';
 import CampaignSettingsForm from '@/components/campaign/CampaignSettingsForm';
+import AdultOnlyToggle from '@/components/maturity/AdultOnlyToggle';
 import { getCampaignAISettings } from '@/ai/campaign-ai';
 
 export default async function CampaignSettingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -69,6 +70,12 @@ export default async function CampaignSettingsPage({ params }: { params: Promise
             requiredFields,
             aiSettings,
           }}
+        />
+
+        <AdultOnlyToggle
+          campaignId={campaign.id}
+          initialAdultOnly={campaign.adultOnly}
+          initialSetBy={campaign.adultOnlySetBy}
         />
 
       </div>

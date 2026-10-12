@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { isWatcherOrAbove } from '@/lib/permissions';
+import { isWatcherOrAbove, canSeeAdultListings } from '@/lib/permissions';
 import DashboardShell from '@/components/DashboardShell';
 import ProfileSummary from '@/components/profile/ProfileSummary';
 import Link from 'next/link';
@@ -45,10 +45,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       })
     : [];
 
+  const viewerSession = await getSession();
   // Actually query by the user — need a different approach since we don't have ID in this scope
   const listedCampaignsByUser = isWatcherOrAbove(user.role)
     ? await prisma.campaign.findMany({
-        where: { gmUser: { username }, listingStatus: 'LISTED', status: 'ACTIVE' },
+        where: { gmUser: { username }, listingStatus: 'LISTED', status: 'ACTIVE', ...(canSeeAdultListings(viewerSession?.user ?? null) ? {} : { adultOnly: false }) },
         select: { id: true, name: true, genre: true },
       })
     : [];

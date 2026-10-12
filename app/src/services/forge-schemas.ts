@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { ValidationError } from '@/lib/errors';
 import { SKILL_GOVERNORS, MAGIC_SCHOOLS, TRAIT_CATEGORIES } from '@/types/growth';
+import { MATURITY_FLAGS } from '@/lib/maturity-flags';
 // ── Forge Item Types ──────────────────────────────────────────────────────
 
 export const FORGE_ITEM_TYPES = ['seed', 'root', 'branch', 'skill', 'item', 'nectar', 'blossom', 'thorn', 'spell'] as const;
@@ -51,12 +52,11 @@ const blockConditionFields = {
 // (display + honest authoring); tomorrow the signal for BOTH campaign
 // audience filtering AND the model router (mature-flagged generation
 // routes to the local lane; cloud does the unflagged heavy lifting).
-// Controlled vocabulary — extend by ruling only.
-export const MATURITY_FLAGS = [
-  'mental-health', 'violence', 'substance', 'trauma', 'illness-detail',
-] as const;
+// Controlled vocabulary — extend by ruling only; ONE source of truth in
+// lib/maturity-flags.ts (`sexual` added 2026-10-12 → adult-only tables).
+export { MATURITY_FLAGS };
 const maturityFlagsField = {
-  maturityFlags: z.array(z.enum(MATURITY_FLAGS)).max(5).optional(),
+  maturityFlags: z.array(z.enum(MATURITY_FLAGS)).max(MATURITY_FLAGS.length).optional(),
 };
 
 const forgeSkillDataSchema = z.object({

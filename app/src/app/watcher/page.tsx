@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import DashboardShell from '@/components/DashboardShell';
+import DateOfBirthPrompt from '@/components/maturity/DateOfBirthPrompt';
+import { needsDateOfBirth } from '@/lib/age';
 import Link from 'next/link';
 import CampaignCreator from '@/components/CampaignCreator';
 import TransactionHistory from '@/components/krma/TransactionHistory';
@@ -38,6 +40,7 @@ export default async function WatcherDashboard() {
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
+      {needsDateOfBirth(session.user) && <DateOfBirthPrompt />}
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div className="section-badge inline-block">

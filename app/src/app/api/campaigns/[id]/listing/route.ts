@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth, getSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { getCampaignListing, updateListing, updateListingSchema } from '@/services/hub';
 
@@ -9,7 +9,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const listing = await getCampaignListing(id);
+    const session = await getSession();
+    const listing = await getCampaignListing(id, session?.user ?? null);
     return NextResponse.json(listing);
   } catch (error) {
     return errorResponse(error);

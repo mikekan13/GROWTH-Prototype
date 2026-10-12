@@ -6,7 +6,7 @@ import { listCampaigns, createCampaign, createCampaignSchema } from '@/services/
 export async function GET() {
   try {
     const session = await requireAuth();
-    const result = await listCampaigns(session.user.id);
+    const result = await listCampaigns(session.user.id, session.user);
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error);

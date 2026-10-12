@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import DashboardShell from '@/components/DashboardShell';
+import DateOfBirthPrompt from '@/components/maturity/DateOfBirthPrompt';
+import { needsDateOfBirth, isAdult } from '@/lib/age';
+import { REMOVED_STATUS } from '@/services/maturity';
 import JoinCampaign from '@/components/JoinCampaign';
 import RedeemCode from '@/components/RedeemCode';
 import Link from 'next/link';
@@ -14,7 +17,12 @@ export default async function TrailblazerDashboard() {
   // Get campaign memberships, characters, and applications
   const [memberships, characters] = await Promise.all([
     prisma.campaignMember.findMany({
-      where: { userId: session.user.id },
+      // Adult-only tables (2026-10-12): removed members and minors never see them.
+      where: {
+        userId: session.user.id,
+        status: { not: REMOVED_STATUS },
+        ...(isAdult(session.user) ? {} : { campaign: { adultOnly: false } }),
+      },
       include: {
         campaign: { select: { id: true, name: true, genre: true, status: true } },
         application: { select: { status: true } },
@@ -37,6 +45,7 @@ export default async function TrailblazerDashboard() {
 
   return (
     <DashboardShell username={session.user.username} role={session.user.role}>
+      {needsDateOfBirth(session.user) && <DateOfBirthPrompt />}
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="section-badge inline-block">
           Trailblazer Portal

@@ -8,6 +8,7 @@
  */
 
 import 'server-only';
+import { recomputeCampaignAdultOnlySafe } from '@/services/maturity';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { registerTool } from './registry';
@@ -66,6 +67,7 @@ registerTool({
         authorUserId,
       },
     });
+    await recomputeCampaignAdultOnlySafe(item.campaignId); // `sexual` → 18+ table (2026-10-12)
 
     return {
       id: item.id,

@@ -4,6 +4,11 @@ import { prisma } from '@/lib/db';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { canManageCampaign } from '@/lib/permissions';
 import { assertMetaConsent } from '@/services/consent';
+import { assertMayEnterCampaign, REMOVED_STATUS } from '@/services/maturity';
+import { canSeeAdultListings, AdultOnlyError } from '@/lib/permissions';
+
+/** Who is looking (null = signed out). Minors and signed-out viewers never see adult-only tables. */
+export type ListingViewer = { id: string; role: string; dateOfBirth?: Date | string | null } | null;
 
 // --- Schemas ---
 
@@ -31,12 +36,13 @@ export const applySchema = z.object({
 
 // --- Service Functions ---
 
-export async function listListedCampaigns(filters?: z.infer<typeof listingFiltersSchema>) {
+export async function listListedCampaigns(filters?: z.infer<typeof listingFiltersSchema>, viewer: ListingViewer = null) {
   const { search, genre, page = 1, limit = 20 } = filters || {};
 
   const where: Record<string, unknown> = {
     listingStatus: 'LISTED',
     status: 'ACTIVE',
+    ...(canSeeAdultListings(viewer) ? {} : { adultOnly: false }),
   };
 
   if (genre) {
@@ -133,11 +139,13 @@ export async function listListedCampaigns(filters?: z.infer<typeof listingFilter
   };
 }
 
-export async function getCampaignListing(campaignId: string) {
+export async function getCampaignListing(campaignId: string, viewer: ListingViewer = null) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
     select: {
       id: true,
+      adultOnly: true,
+      gmUserId: true,
       name: true,
       genre: true,
       description: true,
@@ -164,6 +172,9 @@ export async function getCampaignListing(campaignId: string) {
   });
 
   if (!campaign) throw new NotFoundError('Campaign not found');
+  if (campaign.adultOnly && campaign.gmUserId !== viewer?.id && !canSeeAdultListings(viewer)) {
+    throw new AdultOnlyError();
+  }
 
   // Parse GM profile for public display (strip topicsToAvoid)
   const gmProfile = campaign.gmUser.profile ? JSON.parse(campaign.gmUser.profile) : null;
@@ -236,10 +247,11 @@ export async function applyToCampaign(
 ) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
-    include: { _count: { select: { members: true } } },
+    include: { _count: { select: { members: { where: { status: { not: REMOVED_STATUS } } } } } },
   });
 
   if (!campaign) throw new NotFoundError('Campaign not found');
+  await assertMayEnterCampaign(userId, campaign);
   if (campaign.listingStatus !== 'LISTED') throw new ValidationError('Campaign is not accepting applications');
   if (campaign.status !== 'ACTIVE') throw new ValidationError('Campaign is not active');
   if (campaign._count.members >= campaign.maxTrailblazers) throw new ValidationError('Campaign is full');

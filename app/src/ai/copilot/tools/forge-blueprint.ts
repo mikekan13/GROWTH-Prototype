@@ -11,6 +11,7 @@
  */
 
 import 'server-only';
+import { recomputeCampaignAdultOnlySafe } from '@/services/maturity';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { emit } from '@/services/godhead-dispatcher';
@@ -164,6 +165,7 @@ export const proposeForgeBlueprintTool: JewlTool = {
         } : {}),
       },
     });
+    await recomputeCampaignAdultOnlySafe(item.campaignId); // `sexual` → 18+ table (2026-10-12)
 
     // Chain submission is a PAID step (godhead evaluation costs KRMA), so
     // it's opt-in per campaign (Mike 2026-08-21): aiSettings.forge
