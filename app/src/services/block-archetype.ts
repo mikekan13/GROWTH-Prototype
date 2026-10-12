@@ -87,7 +87,17 @@ const STOPLIST = new Set([
   'human', 'elf', 'elven', 'dwarf', 'halfling', 'seed', 'root', 'branch', 'nectar', 'thorn', 'blossom', 'skill',
   'krma', 'gm', 'jewl', 'watcher', 'trailblazer', 'godhead', 'terminal', 'body', 'spirit', 'soul',
   'backstory', 'appearance', 'name', 'age',
+  // headings / genres / common capitalised nouns
+  'books', 'book', 'mythology', 'myth', 'myths', 'childhood', 'chapter', 'part', 'parts', 'winter', 'summer',
+  'spring', 'autumn', 'fall', 'history', 'magic', 'music', 'art', 'arts', 'poetry', 'stories', 'story', 'school',
+  'work', 'home', 'life', 'death', 'love', 'war', 'peace', 'solitude', 'craft', 'craftsmanship', 'travel',
+  'travels', 'friends', 'friendship', 'interests', 'hobbies', 'notes', 'summary', 'overview', 'personality',
+  'history', 'background', 'family', 'goals', 'fears', 'skills', 'education', 'career', 'adulthood', 'youth',
+  'legends', 'folklore', 'science', 'nature', 'religion', 'faith', 'church', 'prayer', 'grief', 'loss', 'fire',
+  'water', 'earth', 'night', 'day', 'morning', 'evening', 'dreams', 'memories', 'secrets', 'solitary',
 ]);
+
+const DETERMINERS = new Set(['the', 'a', 'an', 'his', 'her', 'their', 'my', 'our', 'its', 'this', 'that', 'some']);
 
 const WORD = /[A-Za-z][A-Za-z'’-]*/g;
 
@@ -114,10 +124,18 @@ export function extractSeedProperNouns(seedText: string, dbNames: string[] = [])
   const dbTokens = new Set(
     dbNames.flatMap(n => (n.match(WORD) ?? []).map(stripPossessive)).filter(t => isCap(t)),
   );
-  const midSentence = new Set<string>();
+  // Any word seen in lowercase anywhere in the seed is a common word.
+  const lower = new Set<string>();
+  for (const w of seedText.match(WORD) ?? []) {
+    const t = stripPossessive(w);
+    if (/^[a-z]/.test(t)) lower.add(t.toLowerCase());
+  }
+  const midSure = new Map<string, number>(); // mid-sentence, no determiner before
+  const midDet = new Map<string, number>(); // mid-sentence after the/a/her/...
   const count = new Map<string, number>();
   const out = new Set<string>();
-  const qualifies = (w: string) => isCap(w) && !STOPLIST.has(w.toLowerCase()) && w.length >= 3;
+  const qualifies = (w: string) =>
+    isCap(w) && !STOPLIST.has(w.toLowerCase()) && !lower.has(w.toLowerCase()) && w.length >= 3;
   for (const s of sentences(seedText)) {
     const words = (s.match(WORD) ?? []).map(stripPossessive);
     for (let i = 0; i < words.length;) {
@@ -125,21 +143,26 @@ export function extractSeedProperNouns(seedText: string, dbNames: string[] = [])
       let j = i;
       while (j + 1 < words.length && qualifies(words[j + 1])) j++;
       if (j > i) {
-        // A multi-word name ("Rosemary Marsh", "Halloran Street"): the phrase
-        // and its leading tokens are names; the head word ("Street") counts
-        // only if it also stands alone elsewhere.
+        // A multi-word Title Case run ("Rosemary Marsh"): the phrase and its
+        // leading tokens are names; the head word counts only if it also
+        // stands alone elsewhere.
         out.add(words.slice(i, j + 1).join(' '));
         for (let k = i; k < j; k++) out.add(words[k]);
       } else {
         const w = words[i];
         count.set(w, (count.get(w) ?? 0) + 1);
-        if (i > 0) midSentence.add(w);
+        if (i > 0) {
+          const m = DETERMINERS.has(words[i - 1].toLowerCase()) ? midDet : midSure;
+          m.set(w, (m.get(w) ?? 0) + 1);
+        }
       }
       i = j + 1;
     }
   }
-  for (const [w, n] of count) {
-    if (midSentence.has(w) || n >= 2 || dbTokens.has(w)) out.add(w);
+  for (const [w] of count) {
+    const mid = (midSure.get(w) ?? 0) + (midDet.get(w) ?? 0);
+    // "the Key" once is a plain noun; twice mid-sentence it is a titled object.
+    if (dbTokens.has(w) || (midSure.get(w) ?? 0) >= 1 || mid >= 2) out.add(w);
   }
   return [...out].sort();
 }
