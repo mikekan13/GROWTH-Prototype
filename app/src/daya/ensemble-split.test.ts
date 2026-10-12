@@ -240,7 +240,9 @@ describe('answerAsk — one short streamed call at the ask', () => {
 
     expect(events.map((e) => e.phase)).toEqual(['start', 'partial', 'partial', 'partial', 'partial', 'retract', 'final']);
     expect(events.find((e) => e.phase === 'retract')).toMatchObject({ reason: 'seal', rule: 'numeric-mechanics' });
-    expect(JSON.stringify(events.find((e) => e.phase === 'retract'))).not.toContain('14');
+    // Ignore the random utterance id (a UUID can contain "14"); the withdrawn text itself must not leak.
+    const { utteranceId: _uid, ...retractBody } = events.find((e) => e.phase === 'retract') as Record<string, unknown>;
+    expect(JSON.stringify(retractBody)).not.toContain('14');
     expect(events.at(-1)).toMatchObject({ phase: 'final', action: 'speak', text: 'That was a hard climb.', revoiced: true });
 
     expect(lane.calls.map((c) => [c.kind, c.stream, c.hinted])).toEqual([['answer', true, false], ['answer', false, true]]);
