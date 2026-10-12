@@ -117,7 +117,7 @@ async function finish(
     console.error('[lawfulness] flag write failed:', err instanceof Error ? err.message : err);
   }
   console.warn(
-    `[lawfulness] blocked lane=${ctx.lane} source=${ctx.source} campaign=${ctx.campaignId ?? '-'} categories=${result.flags.join(',')}`,
+    `[lawfulness] blocked lane=${ctx.lane} source=${ctx.source} campaign=${ctx.campaignId ?? '-'} categories=${result.flags.join(',')} cues=${(result.cueWords ?? []).join('|') || '-'}`,
   );
   return { text: WITHHELD_STRING, blocked: true, categories: result.flags };
 }

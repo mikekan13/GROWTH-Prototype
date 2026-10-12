@@ -53,6 +53,8 @@ import {
   TONE_EXTRA_AGE_CUES,
   TONE_SEXUAL_CUES,
   TONE_SEXUAL_VIOLENCE_CUES,
+  localPairs,
+  matchCues,
 } from '@/lib/content-cues';
 
 // ── Screen ──────────────────────────────────────────────────────────────────
@@ -94,13 +96,17 @@ const SCREEN: Record<Exclude<ToneCategory, 'minor-sexual'>, RegExp[]> = {
 };
 
 /** Age cues for the minor-sexual hard block — the shared list plus the tone
- *  filter's wider reading. Recall-biased on purpose: any co-occurrence with a
- *  sexual cue in the same chunk blocks the chunk. */
+ *  filter's wider reading. Recall-biased on the WORDS, but the pairing is
+ *  LOCAL (2026-10-12): an age cue and a sexual cue block only when they sit
+ *  within LOCAL_CUE_WINDOW chars or in the same sentence — never merely
+ *  somewhere in the same chunk. */
 const AGE_CUES: RegExp[] = [...SHARED_AGE_CUES, ...TONE_EXTRA_AGE_CUES].map((r) => r.re);
 
 export interface ScreenResult {
   categories: ToneCategory[];
   hitCount: number;
+  /** The matched cue WORDS behind a minor-sexual hit (never surrounding text) — for the block log line. */
+  minorCues?: { age: string[]; sexual: string[] };
 }
 
 const countMatches = (text: string, patterns: RegExp[]) =>
@@ -115,7 +121,13 @@ export function screen(text: string): ScreenResult {
     hitCount += hit;
   }
   const sexualCue = categories.includes('sexual') || categories.includes('sexual-violence');
-  if (sexualCue && countMatches(text, AGE_CUES) > 0) categories.unshift('minor-sexual');
+  if (sexualCue) {
+    const pairs = localPairs(text, matchCues(text, AGE_CUES), matchCues(text, [...TONE_SEXUAL_CUES, ...TONE_SEXUAL_VIOLENCE_CUES]));
+    if (pairs.age.length) {
+      categories.unshift('minor-sexual');
+      return { categories, hitCount, minorCues: pairs };
+    }
+  }
   return { categories, hitCount };
 }
 
@@ -283,12 +295,45 @@ function audit(ctx: ToneFilterContext, index: number, total: number, hits: Scree
   );
 }
 
-/** The hard block: logged by category only, never the text. */
-function block(ctx: ToneFilterContext, index: number, total: number, inLen: number): string {
+/** The matched cue words of a hard block, for the log line — words only, never the text. */
+export function describeBlockCues(hits: ScreenResult): string {
+  const c = hits.minorCues;
+  if (!c) return 'none';
+  return `age:${c.age.join('|') || '-'},sexual:${c.sexual.join('|') || '-'}`;
+}
+
+/** Withhold observers (the genesis seed-withheld warning). Never get the text. */
+export interface WithheldEvent {
+  caller: string;
+  campaignId?: string;
+  ref?: { table: string; id: string };
+  chunk: number;
+  total: number;
+  categories: ToneCategory[];
+  outcome: 'blocked' | 'withheld' | 'softened';
+}
+type WithheldListener = (e: WithheldEvent) => void;
+const withheldListeners = new Set<WithheldListener>();
+
+/** Subscribe to blocks/withholds; returns the unsubscribe. Listener errors are swallowed. */
+export function onToneWithheld(fn: WithheldListener): () => void {
+  withheldListeners.add(fn);
+  return () => withheldListeners.delete(fn);
+}
+
+function notifyWithheld(e: WithheldEvent): void {
+  for (const fn of withheldListeners) {
+    try { fn(e); } catch { /* an observer never breaks the filter */ }
+  }
+}
+
+/** The hard block: logged by category + matched cue WORDS, never the text. */
+function block(ctx: ToneFilterContext, index: number, total: number, inLen: number, hits: ScreenResult): string {
   stats.blocked++;
   console.info(
-    `[tone-filter] caller=${ctx.caller} chunk=${index + 1}/${total} hits=minor-sexual in=${inLen} out=${DISALLOWED_PLACEHOLDER.length} outcome=blocked`,
+    `[tone-filter] caller=${ctx.caller} chunk=${index + 1}/${total} hits=${hits.categories.join('+')} cues=${describeBlockCues(hits)} in=${inLen} out=${DISALLOWED_PLACEHOLDER.length} outcome=blocked`,
   );
+  notifyWithheld({ caller: ctx.caller, campaignId: ctx.campaignId, ref: ctx.ref, chunk: index + 1, total, categories: hits.categories, outcome: 'blocked' });
   return DISALLOWED_PLACEHOLDER;
 }
 
@@ -309,6 +354,7 @@ async function rewriteChunk(raw: string, hits: ScreenResult, ctx: ToneFilterCont
       stats.withheld++;
       failedAt.set(key, Date.now());
       audit(ctx, index, total, hits, raw.length, ph.length, `withheld:${mode}:${why}`);
+      notifyWithheld({ caller: ctx.caller, campaignId: ctx.campaignId, ref: ctx.ref, chunk: index + 1, total, categories: hits.categories, outcome: 'withheld' });
       return ph;
     };
 
@@ -347,6 +393,7 @@ async function rewriteChunk(raw: string, hits: ScreenResult, ctx: ToneFilterCont
     failedAt.delete(key);
     stats.softened++;
     audit(ctx, index, total, hits, raw.length, out.length, `rewritten:${mode}`);
+    notifyWithheld({ caller: ctx.caller, campaignId: ctx.campaignId, ref: ctx.ref, chunk: index + 1, total, categories: hits.categories, outcome: 'softened' });
     return out;
   })();
 
@@ -373,7 +420,7 @@ async function filterAsync(text: string, ctx: ToneFilterContext, mode: Mode): Pr
   const out = await Promise.all(
     chunks.map(async (c, i) => {
       const hits = screen(c);
-      if (hits.categories.includes('minor-sexual')) return block(ctx, i, chunks.length, c.length);
+      if (hits.categories.includes('minor-sexual')) return block(ctx, i, chunks.length, c.length, hits);
       noteSexual(ctx, hits);
       // soft: only flagged chunks. hard: Claude refused something the screen
       // may have missed — every non-blank chunk gets the stricter rewrite.
@@ -418,7 +465,7 @@ export function toneFilter(text: string, ctx: ToneFilterContext = DEFAULT_CTX): 
   return chunks
     .map((c, i) => {
       const hits = screen(c);
-      if (hits.categories.includes('minor-sexual')) return block(ctx, i, chunks.length, c.length);
+      if (hits.categories.includes('minor-sexual')) return block(ctx, i, chunks.length, c.length, hits);
       noteSexual(ctx, hits);
       if (hits.hitCount === 0) return c;
       stats.flaggedChunks++;
@@ -430,6 +477,7 @@ export function toneFilter(text: string, ctx: ToneFilterContext = DEFAULT_CTX): 
         void rewriteChunk(c, hits, ctx, i, chunks.length, 'soft');
       }
       stats.withheld++;
+      notifyWithheld({ caller: ctx.caller, campaignId: ctx.campaignId, ref: ctx.ref, chunk: i + 1, total: chunks.length, categories: hits.categories, outcome: 'withheld' });
       return placeholderFor(c, hits);
     })
     .join('');

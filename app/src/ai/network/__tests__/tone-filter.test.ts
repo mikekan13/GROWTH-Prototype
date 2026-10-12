@@ -182,7 +182,9 @@ describe('minor-sexual hard block', () => {
     expect(toneFilterStats().blocked).toBe(3);
     const lines = info.mock.calls.map((c) => String(c[0]));
     expect(lines.some((l) => l.includes('hits=minor-sexual') && l.includes('outcome=blocked'))).toBe(true);
-    expect(lines.join('\n')).not.toContain('molested');
+    // The matched cue WORDS are logged (2026-10-12) so a false positive is visible; never the text around them.
+    expect(lines.some((l) => l.includes('cues=age:') && l.includes('sexual:molested'))).toBe(true);
+    expect(lines.join('\n')).not.toContain('uncle');
   });
 
   it('blocks only the offending chunk; other chunks pass', async () => {
@@ -254,5 +256,55 @@ describe('maturity hook (unit 9): sexual chunks mark the campaign', () => {
     await toneFilterAsync(SEXUAL, { caller: 'test' });
     await new Promise((r) => setTimeout(r, 0));
     expect(noteSexualContent).not.toHaveBeenCalled();
+  });
+});
+
+// ── 2026-10-12: the Violet false positive ────────────────────────────────────
+describe('colour "nude" and local co-occurrence (Violet, 2026-10-12)', () => {
+  const VIOLET_CHUNK = [
+    '== GENOME (inviolable canon — the GM wrote this; build from it, never against it) ==',
+    'Name: Violet. Age: 24. Seed: Human.',
+    '',
+    '## Childhood',
+    'The girl who waits at the door. Her grandmother raised her above the laundromat, and every evening she sat on the step until the last bus came.',
+    '',
+    'APPEARANCE: {"physicalDescription": "slight, sharp-jawed, dark bob", "cosmetics": "smoky liner, nude-pink lip", "styleAesthetics": "thrifted black layers"}',
+  ].join('\n');
+
+  it('the exact Violet collision (nude-pink lip + girl + Childhood in one chunk) is NOT flagged', () => {
+    expect(VIOLET_CHUNK.length).toBeLessThan(2500);
+    const s = screen(VIOLET_CHUNK);
+    expect(s.categories).not.toContain('minor-sexual');
+    expect(s.categories).not.toContain('sexual');
+    expect(toneFilter(VIOLET_CHUNK, { caller: 't' })).toBe(VIOLET_CHUNK);
+  });
+
+  it('nude/naked as a colour or cosmetic is not a sexual cue', () => {
+    for (const t of ['a nude lip', 'nude-pink gloss', 'nude heels', 'a nude tone', 'beige-nude polish', 'nude eyeshadow palette', 'nude stockings']) {
+      expect(screen(t).categories, t).not.toContain('sexual');
+    }
+  });
+
+  it('"nude" / "naked" alone in prose is still a sexual cue', () => {
+    expect(screen('She swam nude in the quarry at midnight.').categories).toContain('sexual');
+    expect(screen('He stood naked in the rain.').categories).toContain('sexual');
+  });
+
+  it('a real minor-sexual sentence is still blocked', async () => {
+    const bad = 'The girl was made to undress for the men.';
+    expect(screen(bad).categories).toContain('minor-sexual');
+    expect(await toneFilterAsync(bad, { caller: 't' })).toBe(DISALLOWED_PLACEHOLDER);
+  });
+
+  it('age + sexual cues far apart in one chunk are NOT minor-sexual (locality)', () => {
+    const far = 'The girl ran to the well every morning.\n\n' + 'The road wound on through the hills. '.repeat(10) + '\n\nYears later, the two adults made love by the fire.';
+    const s = screen(far);
+    expect(s.categories).toContain('sexual');
+    expect(s.categories).not.toContain('minor-sexual');
+  });
+
+  it('a long single sentence still pairs its cues', () => {
+    const long = 'The child, ' + 'who had walked for many miles along the frozen river road past the abandoned mills and the burned church, '.repeat(3) + 'was molested.';
+    expect(screen(long).categories).toContain('minor-sexual');
   });
 });

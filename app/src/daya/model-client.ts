@@ -543,8 +543,10 @@ export function lawfulStream(onToken: (delta: string) => boolean | void): (delta
   return (delta: string) => {
     if (hit) return false;
     acc += delta;
-    if (mayNeedScreen(acc) && screenText(acc).verdict === 'block') {
+    const verdict = mayNeedScreen(acc) ? screenText(acc) : null;
+    if (verdict?.verdict === 'block') {
       hit = true;
+      console.warn(`[lawfulness] stream stopped categories=${verdict.flags.join(',')} cues=${(verdict.cueWords ?? []).join('|') || '-'}`);
       return false;
     }
     return onToken(delta);

@@ -39,6 +39,7 @@ import {
   escapeRegExp,
   type PatternRule,
 } from '@/lib/lawfulness-patterns';
+import { cuesAreLocal } from '@/lib/content-cues';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,8 @@ export interface ScreenResult {
   flags: LawfulnessCategory[];
   /** Pattern ids that fired, per category. Never text. */
   hits: Partial<Record<LawfulnessCategory, string[]>>;
+  /** On a block: the matched cue WORDS (never surrounding text) — logged, never stored. */
+  cueWords?: string[];
 }
 
 // ── Screening (pure, sync, cheap) ──────────────────────────────────────────
@@ -146,8 +149,35 @@ function withoutFictionalHandles(text: string, cues: Cue[], fictionalNames: stri
   });
 }
 
-function minorSexualHits(text: string, sexual: PatternRule[]): string[] {
-  return coOccur(findCues(text, AGE_CUES), findCues(text, sexual));
+/**
+ * MINOR_SEXUAL, textual path: an age cue and a sexual cue that are LOCAL —
+ * within LOCAL_CUE_WINDOW chars or in the same sentence (2026-10-12; a long
+ * passage with "girl" in one paragraph and a sexual word in another is not
+ * one thought). Returns the rule ids plus the matched cue WORDS (for the log).
+ */
+function minorSexualHits(text: string, sexual: PatternRule[]): { ids: string[]; words: string[] } {
+  const age = cueWords(text, AGE_CUES);
+  const sex = cueWords(text, sexual);
+  const ids = new Set<string>();
+  const words = new Set<string>();
+  for (const a of age) {
+    for (const b of sex) {
+      if (cuesAreLocal(text, a.index, b.index)) {
+        ids.add(a.id); ids.add(b.id); words.add(a.word); words.add(b.word);
+      }
+    }
+  }
+  return { ids: [...ids].sort(), words: [...words].sort() };
+}
+
+/** Matches with their rule id, offset and the matched cue word (lower-cased; never the surrounding text). */
+function cueWords(text: string, rules: PatternRule[]): { id: string; index: number; word: string }[] {
+  const out: { id: string; index: number; word: string }[] = [];
+  for (const rule of rules) {
+    rule.re.lastIndex = 0;
+    for (const m of text.matchAll(rule.re)) out.push({ id: rule.id, index: m.index ?? 0, word: m[0].toLowerCase().replace(/\s+/g, ' ').slice(0, 40) });
+  }
+  return out;
 }
 
 /**
@@ -172,10 +202,15 @@ export function screenText(text: string, ctx: Partial<ScreenContext> = {}): Scre
   // (1) MINOR_SEXUAL — textual: an age cue and a sexual cue in the same window.
   // Structural (belt and braces): a participant RECORDED under 18 + any sexual
   // cue anywhere in the chunk, whether or not the text mentions age.
-  const minor = minorSexualHits(text, SEXUAL_CUES);
+  const textual = minorSexualHits(text, SEXUAL_CUES);
+  const minor = [...textual.ids];
+  const words = new Set(textual.words);
   if (hasMinorAge(ctx.participantAges)) {
-    const sexual = findCues(text, SEXUAL_CUES);
-    if (sexual.length) minor.push('structural-age', ...sexual.map((c) => c.id));
+    const sexual = cueWords(text, SEXUAL_CUES);
+    if (sexual.length) {
+      minor.push('structural-age', ...sexual.map((c) => c.id));
+      for (const c of sexual) words.add(c.word);
+    }
   }
   if (minor.length) hits.MINOR_SEXUAL = [...new Set(minor)].sort();
 
@@ -195,12 +230,17 @@ export function screenText(text: string, ctx: Partial<ScreenContext> = {}): Scre
     locators,
   );
   const real = [...new Set([...threatHits, ...doxHits])].sort();
-  if (real.length) hits.REAL_PERSON_THREAT = real;
+  if (real.length) {
+    hits.REAL_PERSON_THREAT = real;
+    for (const c of cueWords(text, THREAT_VERBS)) words.add(c.word);
+  }
 
   const flags = (Object.keys(hits) as LawfulnessCategory[]).sort(
     (a, b) => LAWFULNESS_CATEGORIES.indexOf(a) - LAWFULNESS_CATEGORIES.indexOf(b),
   );
-  return { verdict: flags.length ? 'block' : 'allow', flags, hits };
+  return flags.length
+    ? { verdict: 'block', flags, hits, cueWords: [...words].sort().slice(0, 12) }
+    : { verdict: 'allow', flags, hits };
 }
 
 export interface ImageScreenRequest {

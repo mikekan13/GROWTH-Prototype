@@ -76,6 +76,17 @@ describe('screenText — MINOR_SEXUAL', () => {
     const far = 'The child ran home. ' + 'The road wound on through the hills. '.repeat(20) + 'Later, two adults at the inn had sex.';
     expect(screenText(far).flags).toEqual([]);
   });
+  it('needs LOCAL co-occurrence: same sentence or within ~200 chars (2026-10-12)', () => {
+    const para = 'The girl who waits at the door.\n\n' + 'Rain on the tin roof, the bus late again, the kettle on. '.repeat(4) + '\n\nThe two adults had sex in the tower.';
+    expect(screenText(para).flags).toEqual([]);
+    const sentence = 'The girl, ' + 'after the long walk past the mills and the burned church and the frozen ford, '.repeat(3) + 'was molested.';
+    expect(screenText(sentence).flags).toEqual(['MINOR_SEXUAL']);
+  });
+  it('a block carries the matched cue words (logged, never stored)', () => {
+    const r = screenText('The teen and the man had sex.');
+    expect(r.cueWords).toEqual(expect.arrayContaining(['teen', 'had sex']));
+    expect(screenText('The ferry left at dawn.').cueWords).toBeUndefined();
+  });
   it('adult sexual content alone is not this screen (the tone filter handles register)', () => {
     expect(screenText('The two adult lovers had sex in the tower.').flags).toEqual([]);
   });

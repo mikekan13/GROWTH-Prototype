@@ -13,7 +13,7 @@
  * find co-occurrence within `CO_OCCURRENCE_WINDOW` characters.
  */
 
-import type { PatternRule } from './content-cues';
+import { NUDE_BODY_WORD, type PatternRule } from './content-cues';
 
 // The minor/age and sexual cue lists live in ONE shared module, also read by
 // the tone filter (unit 8b). Re-exported here so the screen's imports stay put.
@@ -24,7 +24,8 @@ export const CO_OCCURRENCE_WINDOW = 400;
 
 // ── Nudity cues (IMAGE prompts only) ───────────────────────────────────────
 export const NUDITY_CUES: PatternRule[] = [
-  { id: 'img:nudity', re: /\b(?:nude|nudes|naked|topless|bottomless|unclothed|undress\w*|lingerie|bikini|underwear|see-through|breasts?|cleavage)\b/gi },
+  // "nude"/"naked" via NUDE_BODY_WORD: a "nude lip" / "nude-pink" colour is not nudity.
+  { id: 'img:nudity', re: new RegExp(`${NUDE_BODY_WORD}|\\b(?:nudes|topless|bottomless|unclothed|undress\\w*|lingerie|bikini|underwear|see-through|breasts?|cleavage)\\b`, 'gi') },
   { id: 'img:pose', re: /\b(?:boudoir|pin-?up|seductive|provocative|suggestive|spread\s+legs|on\s+all\s+fours)\b/gi },
 ];
 
