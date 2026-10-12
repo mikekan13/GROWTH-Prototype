@@ -142,6 +142,15 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
     },
   });
   if (!prodding) await markBlockedOnProds(session, prod);
+  // The chat IS the question, at every stage (Mike 2026-10-12): full text +
+  // why, with Answer / Leave open / You decide attached.
+  try {
+    const { announceGenesisProd } = await import('./character-genesis-progress');
+    await announceGenesisProd(session, prod);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[genesis-prods] chat message not posted:', err);
+  }
   return prod;
 }
 
@@ -172,13 +181,6 @@ async function markBlockedOnProds(
   }
   await logProdNote(session, `prod · mid-build r${prod.round}.${prod.order}`,
     `[${prod.kind}] ${prod.question}\n   ↳ "${prod.anchorQuote}"\n   hinges on: ${prod.why}`);
-  try {
-    const { announceGenesisProd } = await import('./character-genesis-progress');
-    await announceGenesisProd(session, prod);
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[genesis-prods] chat line not posted:', err);
-  }
 }
 
 export const endProdRoundSchema = z.object({
@@ -326,7 +328,59 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
       resumed = true;
     }
   }
-  return { prod: updated, resumed };
+  // JEWL acknowledges in one line, in the chat where he asked.
+  let ack: string | null = null;
+  try {
+    const { announceProdDecision } = await import('./character-genesis-progress');
+    ack = await announceProdDecision(session, d.decision, resumed);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[genesis-prods] ack not posted:', err);
+  }
+  return { prod: updated, resumed, ack };
+}
+
+/**
+ * The Watcher's plain chat reply while a prod is OPEN IS its answer (Mike
+ * 2026-10-12: "Jewl should just ask there in the chat"). The most recent
+ * OPEN prod of a live genesis session in the campaign takes it as ANSWER;
+ * the reply never goes on to a normal JEWL turn. Null when nothing is open
+ * or the sender is not the campaign GM / ADMIN.
+ */
+export async function answerOpenProdFromChat(opts: {
+  campaignId: string;
+  user: User & { username?: string };
+  text: string;
+}): Promise<{ prodId: string; sessionId: string; resumed: boolean; ack: string | null } | null> {
+  const text = opts.text.trim();
+  if (!text) return null;
+  try {
+    await requireCampaignGM(opts.campaignId, opts.user);
+  } catch {
+    return null;
+  }
+  const open = await prisma.genesisProd.findMany({
+    where: { campaignId: opts.campaignId, status: 'OPEN' },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  });
+  for (const prod of open) {
+    const session = await prisma.dayaWorkSession.findUnique({ where: { id: prod.sessionId }, select: { status: true } });
+    if (!session || session.status === 'done' || session.status === 'cancelled') continue;
+    await prisma.copilotMessage.create({
+      data: {
+        campaignId: opts.campaignId,
+        role: 'user',
+        content: text,
+        userId: opts.user.id,
+        username: opts.user.username ?? null,
+        actions: JSON.stringify({ source: 'GM_TEXT', answeredProdId: prod.id }),
+      },
+    });
+    const r = await decideProd({ campaignId: opts.campaignId, prodId: prod.id, user: opts.user, body: { decision: 'ANSWER', answer: text } });
+    return { prodId: prod.id, sessionId: prod.sessionId, resumed: r.resumed, ack: r.ack };
+  }
+  return null;
 }
 
 export const buildSchema = z.object({ confirmLeaveOpen: z.boolean().optional() });

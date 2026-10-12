@@ -10,6 +10,8 @@ const db = vi.hoisted(() => ({
   kicks: 0,
   logs: [] as Array<Record<string, unknown>>,
   chat: [] as Array<{ sessionId: string; prodId: string; question: string }>,
+  acks: [] as Array<{ d: string; resumed: boolean }>,
+  userMsgs: [] as Array<Record<string, unknown>>,
 }));
 
 function match(row: Row, where: Record<string, unknown> = {}): boolean {
@@ -22,6 +24,9 @@ function apply(row: Row, data: Record<string, unknown>) {
 
 vi.mock('@/lib/db', () => ({
   prisma: {
+    copilotMessage: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { db.userMsgs.push(data); return { id: 'm' }; }),
+    },
     campaign: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         (where.id === 'c1' ? { id: 'c1', gmUserId: 'gm' } : where.id === 'c2' ? { id: 'c2', gmUserId: 'gm2' } : null)),
@@ -69,6 +74,7 @@ vi.mock('./character-genesis-progress', () => ({
     db.chat.push({ sessionId: s.id, prodId: p.id, question: p.question });
     return 'line';
   }),
+  announceProdDecision: vi.fn(async (_s: unknown, d: string, resumed: boolean) => { db.acks.push({ d, resumed }); return `ack ${d}`; }),
   logGenesisReport: vi.fn(async (o: Record<string, unknown>) => { db.logs.push(o); return 'ev'; }),
 }));
 
@@ -95,6 +101,8 @@ beforeEach(() => {
   db.kicks = 0;
   db.logs = [];
   db.chat = [];
+  db.acks = [];
+  db.userMsgs = [];
 });
 
 describe('raise_prod', () => {
@@ -338,5 +346,31 @@ describe('a question is a prod at ANY stage (2026-10-12)', () => {
   it('a non-genesis work cycle gets no raise_prod', () => {
     const plan = planWorkCycle({ id: 'w', goal: 'Build the tavern', plan: null, cycleCount: 0 }, [], '', []);
     expect(plan.stageTools).toBeUndefined();
+  });
+});
+
+describe('JEWL asks in the chat; the chat reply answers (2026-10-12)', () => {
+  it('every raised prod — PRODDING too — goes to the chat as its own message', async () => {
+    await raise(1);
+    expect(db.chat).toEqual([{ sessionId: 's1', prodId: 'p1', question: 'Who set the fire? (1)' }]);
+  });
+
+  it("the Watcher's plain reply answers the open prod, JEWL acks, the session resumes", async () => {
+    session().stage = 'BUILDING';
+    await raise(1);
+    const r = await svc.answerOpenProdFromChat({ campaignId: 'c1', user: { ...GM, username: 'Mike' }, text: 'Fugue.' });
+    expect(r).toMatchObject({ prodId: 'p1', sessionId: 's1', resumed: true, ack: 'ack ANSWER' });
+    expect(db.prods[0]).toMatchObject({ status: 'ANSWERED', answer: 'Fugue.' });
+    expect(session().status).toBe('active');
+    expect(db.userMsgs[0]).toMatchObject({ role: 'user', content: 'Fugue.', userId: 'gm' });
+    expect(db.acks).toEqual([{ d: 'ANSWER', resumed: true }]);
+  });
+
+  it('nothing open, or not the GM → the reply is an ordinary JEWL turn', async () => {
+    expect(await svc.answerOpenProdFromChat({ campaignId: 'c1', user: GM, text: 'hello' })).toBeNull();
+    session().stage = 'BUILDING';
+    await raise(1);
+    expect(await svc.answerOpenProdFromChat({ campaignId: 'c1', user: { id: 'pl', role: 'TRAILBLAZER' }, text: 'x' })).toBeNull();
+    expect(db.prods[0].status).toBe('OPEN');
   });
 });

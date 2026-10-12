@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { dispatchPrompt } from '@/ai/copilot/runtime';
 import { prisma } from '@/lib/db';
+import { answerOpenProdFromChat } from '@/services/genesis-prods';
 import type { JewlPrompt, CanvasActionPayload, JewlPromptSource, JewlMedia } from '@/ai/copilot/prompts/types';
 
 /**
@@ -73,6 +74,15 @@ export async function POST(
         { error: `Prompt text too long (max ${maxChars} characters)` },
         { status: 400 },
       );
+    }
+
+    // JEWL asked in the chat (a genesis prod is OPEN): the Watcher's plain
+    // reply IS the answer — decided, acknowledged, the loop resumes (2026-10-12).
+    if (source === 'GM_TEXT' && text && !body.prompt.canvasAction && !(body.prompt.media?.length)) {
+      const answered = await answerOpenProdFromChat({ campaignId: id, user: session.user, text });
+      if (answered) {
+        return NextResponse.json({ message: answered.ack ?? '', toolCalls: [], prodAnswered: answered });
+      }
     }
 
     const jewlPrompt: JewlPrompt = {

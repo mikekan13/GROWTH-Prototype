@@ -21,6 +21,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import { openJewlWork } from '@/lib/jewl-work';
+import { GenesisProdAsk, genesisProdActionOf } from './GenesisProdAsk';
 
 /**
  * JEWL's name is private canon ([[jewl-identity-and-wallet-private]]). All
@@ -1302,7 +1303,18 @@ export function JewlChip() {
                 const failed = toolCalls ? toolCalls.filter(tc => tc.error).length : 0;
                 return (
                   <div key={m.id} className="jc-turn jc-jewl" data-jewl-msg={m.id}>
-                    {m.workLink ? (
+                    {genesisProdActionOf(m.actions) && campaignId ? (
+                      <>
+                        <p className="jc-msg" style={{ whiteSpace: 'pre-wrap' }}><span className="jc-aside"><b>[{JEWL_TAG}]:</b> {m.content}</span></p>
+                        <GenesisProdAsk action={genesisProdActionOf(m.actions)!} campaignId={campaignId} canDecide={!!session}
+                          onDecided={() => {
+                            void fetch(`/api/campaigns/${campaignId}/copilot/history`)
+                              .then(r => (r.ok ? r.json() : null))
+                              .then(d => { if (d?.messages) setMessages(d.messages); })
+                              .catch(() => { /* the poll reconciles */ });
+                          }} />
+                      </>
+                    ) : m.workLink ? (
                       <button type="button" className="jc-msg jc-worklink" data-no-hold
                         style={{ all: 'unset', boxSizing: 'border-box', display: 'block', width: '100%', cursor: 'pointer', textAlign: 'left', borderLeft: '3px solid #D07818', paddingLeft: 6 }}
                         data-jewl-worklink={m.workLink.sessionId}

@@ -47,12 +47,38 @@ export async function getCopilotHistory(
 
   // Lawfulness: a withheld row (only ever its sender's — the history is per
   // user) shows as the withheld string; the original is ADMIN-only via the flag.
-  return messages.map(m => ({
+  const rows = messages.map(m => ({
     ...m,
     content: isWithheldRow(m) ? WITHHELD_STRING : m.content,
     actions: parseCopilotActions(m.actions),
     workLink: parseGenesisWorkLink(m.actions),
   }));
+
+  // A prod message's decisions show live state: pending while the prod is
+  // OPEN, confirmed (with the outcome) once the GM decided it (2026-10-12).
+  const prodIds = rows.flatMap(r => r.actions)
+    .filter((a): a is { id: string; type: string } => !!a && typeof a === 'object' && (a as { type?: unknown }).type === 'genesis_prod')
+    .map(a => a.id);
+  if (prodIds.length) {
+    const prods = await prisma.genesisProd.findMany({
+      where: { id: { in: prodIds } },
+      select: { id: true, status: true, answer: true },
+    });
+    const byId = new Map(prods.map(p => [p.id, p]));
+    for (const r of rows) {
+      r.actions = r.actions.map(a => {
+        const act = a as { id?: string; type?: string; params?: Record<string, unknown> };
+        if (act?.type !== 'genesis_prod' || !act.id) return a;
+        const p = byId.get(act.id);
+        return {
+          ...act,
+          status: !p || p.status === 'OPEN' ? 'pending' : 'confirmed',
+          params: { ...(act.params ?? {}), prodStatus: p?.status ?? 'OPEN', answer: p?.answer ?? null },
+        };
+      });
+    }
+  }
+  return rows;
 }
 
 /**
@@ -63,7 +89,11 @@ export async function getCopilotHistory(
 export function parseGenesisWorkLink(raw: string | null | undefined): { sessionId: string; characterId: string | null; prodId: string | null } | null {
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as Record<string, unknown> | null;
+    const parsed = JSON.parse(raw) as unknown;
+    // A prod message stores its decisions as an actions array; the link rides in params.
+    const v = (Array.isArray(parsed)
+      ? (parsed.find(a => a && typeof a === 'object' && (a as { type?: unknown }).type === 'genesis_prod') as { params?: unknown } | undefined)?.params
+      : parsed) as Record<string, unknown> | null | undefined;
     if (!v || Array.isArray(v) || typeof v !== 'object') return null;
     if ((v.source !== 'GENESIS_STATUS' && v.source !== 'GENESIS_PROD') || typeof v.sessionId !== 'string') return null;
     return {

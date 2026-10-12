@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { JEWL_CHAT_CSS as JEWL_CSS } from './jewlChatCss';
+import { GenesisProdAsk, type GenesisProdActionView } from '@/components/copilot/GenesisProdAsk';
 
 interface CopilotAction {
   id: string;
@@ -302,7 +303,10 @@ export default function CopilotChat({ campaignId, visible, username, userRole }:
               )}
 
               {/* JEWL's asks — the p 64 held question on the grey bar */}
-              {msg.actions.length > 0 && msg.actions.map(action => (
+              {msg.actions.length > 0 && msg.actions.map(action => action.type === 'genesis_prod' ? (
+                <GenesisProdAsk key={action.id} action={action as unknown as GenesisProdActionView}
+                  campaignId={campaignId} canDecide={isGM} onDecided={() => { /* history reload on next open */ }} />
+              ) : (
                 <div key={action.id} className={`jc-ask jc-${action.status}`} data-jewl-action={action.status}>
                   <p className="jc-msg">
                     <span className="jc-kind">{action.type.replace(/_/g, ' ')}</span>

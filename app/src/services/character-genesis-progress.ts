@@ -462,11 +462,9 @@ export function genesisStatusLine(name: string, p: GenesisProgress, reason?: str
       const openProds = p.prods.filter(x => x.status === 'OPEN');
       const open = openProds.length;
       if (open > 0) {
-        // The chat carries the question itself — never "see the Log" (2026-10-12).
-        const first = `“${clipQuestion(openProds[0].question)}”`;
-        return open === 1
-          ? `One question before I build ${name}: ${first} — answer on ${name}'s page. Answer, leave open, or tell me to decide; press Build when you're ready.`
-          : `${open} questions before I build ${name}. First: ${first} — answer on ${name}'s page. Answer, leave open, or tell me to decide; press Build when you're ready.`;
+        // Each prod already went to the chat as its own message, question in
+        // full with its answers attached (2026-10-12) — this just closes the round.
+        return `That's my ${plural(open, 'question', 'questions')} about ${name} for now — answer above, leave open, or let me decide. Press Build when you're ready.`;
       }
       return `Nothing more to ask about ${name}. Press Build on ${name}'s page when you're ready.`;
     }
@@ -543,10 +541,34 @@ export function clipQuestion(text: string, max = 200): string {
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** The chat line for one prod raised after Build: the question itself and
- *  where to answer it — never "see the Log" (2026-10-12). Pure. */
-export function genesisProdLine(name: string, question: string): string {
-  return `A question before I go on with ${name}: “${clipQuestion(question)}” — answer on ${name}'s page.`;
+/** The chat message for one prod, at any stage: the chat IS the question —
+ *  full text plus the one-line why; the decisions ride as message actions.
+ *  Never "see the Log", never "on <name>'s page" (Mike 2026-10-12). Pure. */
+export function genesisProdMessage(name: string, prod: { question: string; why: string }): string {
+  return `About ${name}: ${prod.question.trim()}\nWhy I ask: ${prod.why.trim()}`;
+}
+
+/** Message action type the chat renders as Answer / Leave open / You decide. */
+export const GENESIS_PROD_ACTION = 'genesis_prod';
+export const PROD_DECISIONS = ['ANSWER', 'LEAVE_OPEN', 'YOU_DECIDE'] as const;
+
+/** The CopilotMessage.actions array for a prod message (rendered by the chat). */
+export function genesisProdActions(
+  session: { id: string; goal: string },
+  prod: { id: string; why: string },
+  status: 'pending' | 'confirmed' = 'pending',
+) {
+  const parsed = parseGenesisGoal(session.goal);
+  return [{
+    id: prod.id,
+    type: GENESIS_PROD_ACTION,
+    description: prod.why,
+    params: {
+      source: 'GENESIS_PROD', prodId: prod.id, sessionId: session.id,
+      characterId: parsed?.characterId ?? null, decisions: [...PROD_DECISIONS],
+    },
+    status,
+  }];
 }
 
 /** Copilot `actions` JSON for a genesis chat line — the Watcher's tap target
@@ -560,23 +582,44 @@ export function genesisChatActions(
   return JSON.stringify({ source, sessionId: session.id, characterId: parsed?.characterId ?? null, ...extra });
 }
 
-/** Post one mid-build prod's question to the GM's JEWL chat. */
+/** Post one prod to the GM's JEWL chat — the message IS the question, with
+ *  Answer / Leave open / You decide attached. Any stage. */
 export async function announceGenesisProd(
   session: { id: string; campaignId: string; goal: string },
-  prod: { id: string; question: string },
+  prod: { id: string; question: string; why?: string },
 ): Promise<string | null> {
   const parsed = parseGenesisGoal(session.goal);
   if (!parsed) return null;
-  const line = genesisProdLine(parsed.name, prod.question);
-  const campaign = await prisma.campaign.findUnique({ where: { id: session.campaignId }, select: { gmUserId: true } });
-  await prisma.copilotMessage.create({
-    data: {
-      campaignId: session.campaignId,
-      role: 'assistant',
-      content: line,
-      userId: campaign?.gmUserId ?? null,
-      actions: genesisChatActions('GENESIS_PROD', session, { prodId: prod.id }),
-    },
-  });
+  const why = prod.why ?? '';
+  const line = genesisProdMessage(parsed.name, { question: prod.question, why });
+  await postJewlChat(session.campaignId, line, JSON.stringify(genesisProdActions(session, { id: prod.id, why })));
   return line;
+}
+
+/** JEWL's one-line acknowledgement when the GM decides a prod. Pure. */
+export function prodDecisionAck(name: string, decision: 'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE', resumed: boolean): string {
+  const said = decision === 'ANSWER' ? 'Got it — I\'ll build on that.'
+    : decision === 'LEAVE_OPEN' ? 'Left open — I won\'t fill it; it\'s for play.'
+      : 'Mine to decide — I\'ll tell you what I chose.';
+  return resumed ? `${said} Back to ${name}.` : said;
+}
+
+/** Post JEWL's acknowledgement of a prod decision to the GM's chat. */
+export async function announceProdDecision(
+  session: { id: string; campaignId: string; goal: string },
+  decision: 'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE',
+  resumed: boolean,
+): Promise<string | null> {
+  const parsed = parseGenesisGoal(session.goal);
+  if (!parsed) return null;
+  const line = prodDecisionAck(parsed.name, decision, resumed);
+  await postJewlChat(session.campaignId, line, JSON.stringify({ source: 'GENESIS_PROD_ACK', sessionId: session.id, decision, resumed }));
+  return line;
+}
+
+async function postJewlChat(campaignId: string, content: string, actions: string) {
+  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { gmUserId: true } });
+  await prisma.copilotMessage.create({
+    data: { campaignId, role: 'assistant', content, userId: campaign?.gmUserId ?? null, actions },
+  });
 }
