@@ -41,7 +41,9 @@ import {
   logGenesisReport,
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
-import { planWorkCycle, type CycleProd, type CycleCatalog } from './work-cycle-text';
+import { planWorkCycle, type CycleProd, type CycleCatalog, type CycleDrafting } from './work-cycle-text';
+import { rejectedShapes } from '@/services/block-archetype';
+import { prisma } from '@/lib/db';
 import { pickSessionsToStart, workConcurrency } from './work-loop-schedule';
 import { getGlobalCatalogSnapshot } from '@/services/forge';
 import { isTransientProviderError } from '@/ai/network/retry';
@@ -222,12 +224,28 @@ async function runCycle(session: {
   // genesis build cycle learns up front what stock exists; near-empty →
   // search_catalog is withheld and JEWL drafts directly.
   let catalog: CycleCatalog | null = null;
+  let drafting: CycleDrafting | null = null;
   if (isGenesisGoal(session.goal) && session.stage !== 'PRODDING') {
     try {
       catalog = await getGlobalCatalogSnapshot();
     } catch { /* unknown catalog → the ordinary catalog-first cycle */ }
+    // Blocks are campaign-agnostic archetypes (Mike 2026-10-12): the law,
+    // this campaign's reusable blocks, and every shape already rejected.
+    try {
+      const blocks = await prisma.forgeItem.findMany({
+        where: { campaignId: session.campaignId, status: { in: ['published', 'draft'] } },
+        select: { type: true, name: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 40,
+      });
+      drafting = { campaignBlocks: blocks, rejected: rejectedShapes(parseProgress(session.progress)) };
+    } catch { drafting = { rejected: rejectedShapes(parseProgress(session.progress)) }; }
+    try {
+      const { loadPendingFeedback } = await import('@/services/genesis-redraft');
+      drafting.feedback = await loadPendingFeedback(session.campaignId, session.id, jewl.characterUserId);
+    } catch { /* feedback also rides in the progress notes */ }
   }
-  const { text, allowedTools, excludedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog);
+  const { text, allowedTools, excludedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.

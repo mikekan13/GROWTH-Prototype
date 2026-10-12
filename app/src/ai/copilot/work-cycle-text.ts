@@ -7,6 +7,7 @@
  * lane it crosses only through route() → toneFilter → assertNoTableContent.
  */
 import { buildProdSections } from '@/services/character-genesis-plan';
+import { ARCHETYPE_LAW } from '@/services/block-archetype';
 
 export interface WorkCycleSession {
   id: string;
@@ -120,7 +121,8 @@ export function catalogGuidance(cat: CycleCatalog): { line: string; excludedTool
     return {
       line: `CATALOG: the stock catalog is empty for ${kinds.filter(k => !(cat.counts[k] ?? 0)).join('/') || 'these kinds'}` +
         ` (${relevant} stock row${relevant === 1 ? '' : 's'} in all).${listed} Do NOT search it — search_catalog is withheld this stage. ` +
-        'Draft every other block directly with propose_forge_blueprint (anchor grades to the locked formulas, not to stock).',
+        'Any block in CAMPAIGN BLOCKS below that fits the archetype: attach_block it with her story. ' +
+        'Draft only the true gaps with propose_forge_blueprint — GENERIC, per the ARCHETYPE LAW (anchor grades to the locked formulas, not to stock).',
       excludedTools: ['search_catalog'],
     };
   }
@@ -128,8 +130,40 @@ export function catalogGuidance(cat: CycleCatalog): { line: string; excludedTool
   return {
     line: 'CATALOG: stock exists (' + kinds.filter(k => cat.counts[k]).map(k => `${k} ${cat.counts[k]}`).join(', ') + ').' +
       (empty.length ? ` Empty for ${empty.join('/')} — draft those directly, never search them.` : '') +
-      ' Search ONCE: a single search_catalog call with queries:[{query, type}, …] covering every block this build needs — never one call per block.',
+      ' Search ONCE: a single search_catalog call with queries:[{query, type}, …] covering every block this build needs — never one call per block.' +
+      ' Where stock or a CAMPAIGN BLOCK fits the archetype, attach_block it with her story — draft only the true gaps.',
   };
+}
+
+// ── Blocks are campaign-agnostic archetypes (Mike 2026-10-12) ───────────
+
+/** What a genesis build cycle knows about drafting. */
+export interface CycleDrafting {
+  /** This campaign's live character-layer blocks (reuse before drafting). */
+  campaignBlocks?: Array<{ type: string; name: string }>;
+  /** Shapes already rejected for this session (validator / GM redraft). */
+  rejected?: string[];
+  /** GM feedback on single drafts still awaiting a redraft — carried verbatim. */
+  feedback?: string[];
+}
+
+/** The ARCHETYPE section of a genesis build cycle. Pure. */
+export function draftingGuidance(d: CycleDrafting): string {
+  const blocks = d.campaignBlocks ?? [];
+  return [
+    ...(d.feedback?.length
+      ? [`GM FEEDBACK — the GM sent these drafts back; redraft each one (and only these) per his note:\n${d.feedback.map(f => `- ${f}`).join('\n')}`]
+      : []),
+    ARCHETYPE_LAW,
+    'REUSE FIRST, EVEN WHEN DRAFTING: before drafting a block, check whether an existing stock or campaign block already fits the archetype — if one does, attach_block it with her bearer-specific story instead of drafting a duplicate. ' +
+      'Every block you DO draft carries characterId + attachmentStory (her specifics; proper nouns allowed there and only there).',
+    blocks.length
+      ? `CAMPAIGN BLOCKS (attach_block before drafting): ${blocks.map(b => `${b.type} "${b.name}"`).join(', ')}`
+      : 'CAMPAIGN BLOCKS: none yet.',
+    ...(d.rejected?.length
+      ? [`REJECTED SHAPES — do not repeat or near-repeat them:\n${d.rejected.map(r => `- ${r}`).join('\n')}`]
+      : []),
+  ].join('\n');
 }
 
 /**
@@ -145,6 +179,7 @@ export function planWorkCycle(
   treasuryLine: string,
   recentNotes: string[],
   catalog?: CycleCatalog | null,
+  drafting?: CycleDrafting | null,
 ): { text: string; allowedTools?: string[]; excludedTools?: string[] } {
   if (session.stage === 'PRODDING') {
     return { text: buildProdCycleText(session, prods), allowedTools: [...PROD_STAGE_TOOLS] };
@@ -153,7 +188,8 @@ export function planWorkCycle(
     ? `${session.plan}\n\n${buildProdSections(prods)}`
     : session.plan;
   const guide = catalog ? catalogGuidance(catalog) : null;
-  const treasury = guide ? [treasuryLine, guide.line].filter(Boolean).join('\n') : treasuryLine;
+  const treasury = [treasuryLine, guide?.line, drafting ? draftingGuidance(drafting) : null]
+    .filter(Boolean).join('\n');
   return {
     text: buildWorkCycleText({ ...session, plan }, treasury, recentNotes),
     ...(guide?.excludedTools ? { excludedTools: guide.excludedTools } : {}),

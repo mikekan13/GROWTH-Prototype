@@ -37,6 +37,7 @@ const TOOL_VERBS: Record<string, string> = {
   search_catalog: 'searching the catalog',
   draw_from_kit: 'pulling stock blocks',
   propose_forge_blueprint: 'forging a block',
+  attach_block: 'attaching a block',
   forge_list_drafts: 'checking the Forge',
   forge_read: 'reading the Forge',
   edit_character_sheet: 'writing the sheet',
@@ -344,7 +345,9 @@ export function GenesisLoadingOverlay({
       {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
         <GenesisOpenThreads threads={progress?.openThreads ?? []} />
       )}
-      {campaignId && progress && stepsN > 0 && (
+      {/* Mounted while 0 steps too: a row sent back with feedback stays
+          "revising…" until its redraft lands (the component renders null when empty). */}
+      {campaignId && progress && !progress.prodding && (
         <GenesisGmSteps steps={progress.gmSteps} campaignId={campaignId}
           onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} onOpenAppearance={seedName ? onOpenAppearance : undefined} />
       )}

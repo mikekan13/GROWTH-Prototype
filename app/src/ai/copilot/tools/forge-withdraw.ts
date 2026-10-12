@@ -11,7 +11,7 @@
 
 import 'server-only';
 import { z } from 'zod';
-import { prisma } from '@/lib/db';
+import { withdrawForgeDraft } from '@/services/forge-withdraw';
 import { getJewlGodHead } from '../jewl-identity';
 import { registerJewlTool } from './registry';
 import type { JewlTool, JewlToolHandlerResult } from './types';
@@ -37,48 +37,16 @@ export const withdrawDraftTool: JewlTool = {
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);
     const jewl = await getJewlGodHead();
-
-    const item = await prisma.forgeItem.findUnique({
-      where: { id: parsed.forgeItemId },
-      select: { id: true, name: true, type: true, status: true, campaignId: true, authorUserId: true },
+    // Shared path (services/forge-withdraw.ts) — the GM's redraft uses it too.
+    const item = await withdrawForgeDraft({
+      forgeItemId: parsed.forgeItemId,
+      campaignId: ctx.campaignId,
+      jewlUserId: jewl.characterUserId,
+      reason: parsed.reason,
+      by: 'JEWL',
     });
-    if (!item) throw new Error(`No forge item with id ${parsed.forgeItemId}`);
-    if (item.campaignId !== ctx.campaignId) {
-      throw new Error('Draft belongs to a different campaign — cannot withdraw.');
-    }
-    if (item.status !== 'draft') {
-      throw new Error(`Only drafts can be withdrawn (this item is '${item.status}').`);
-    }
-    if (item.authorUserId !== jewl.characterUserId) {
-      throw new Error('You can only withdraw drafts you authored.');
-    }
-
-    // Free the name slot (@@unique includes name) so a future re-proposal
-    // never collides with this tombstone; original name kept in the tag.
-    await prisma.forgeItem.update({
-      where: { id: item.id },
-      data: {
-        status: 'superseded',
-        name: `${item.name} [w:${item.id.slice(-4)}]`,
-        relationshipTags: JSON.stringify({
-          withdrawn: {
-            by: 'JEWL',
-            reason: parsed.reason ?? null,
-            at: new Date().toISOString(),
-            originalName: item.name,
-          },
-        }),
-      },
-    });
-
     return {
-      output: {
-        id: item.id,
-        name: item.name,
-        type: item.type,
-        status: 'superseded',
-        note: 'Withdrawn from the review queue; data retained.',
-      },
+      output: { ...item, note: 'Withdrawn from the review queue; data retained.' },
     };
   },
 };

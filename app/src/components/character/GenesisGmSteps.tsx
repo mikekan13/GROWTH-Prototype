@@ -50,10 +50,46 @@ export function GenesisGmSteps({ steps, campaignId, onChanged, onOpenForge, onOp
   const [kept, setKept] = useState<GenesisGmStep[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Per-draft GM feedback (Mike 2026-10-12): one inline note field at a time;
+  // a sent row shows "revising…" until a NEW draft of its kind appears.
+  const [fbOpen, setFbOpen] = useState<string | null>(null);
+  const [fbText, setFbText] = useState('');
+  const [fbFail, setFbFail] = useState<string | null>(null);
+  const [revising, setRevising] = useState<Array<{ step: GenesisGmStep; seen: string[] }>>([]);
+  const stillRevising = revising.filter(r => !steps.some(s => s.type === r.step.type && !r.seen.includes(s.id)));
 
-  const rows = [...steps, ...kept.filter(k => !steps.some(s => s.id === k.id))];
-  const open = steps.filter(s => results[s.id]?.status !== 'ok');
+  const rows = [
+    ...steps,
+    ...kept.filter(k => !steps.some(s => s.id === k.id)),
+    ...stillRevising.map(r => r.step).filter(r => !steps.some(s => s.id === r.id)),
+  ];
+  const isRevising = (id: string) => stillRevising.some(r => r.step.id === id);
+  const open = steps.filter(s => results[s.id]?.status !== 'ok' && !isRevising(s.id));
   if (rows.length === 0) return null;
+
+  const sendFeedback = async (step: GenesisGmStep) => {
+    const note = fbText.trim();
+    if (!note) return;
+    setFbFail(null);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/genesis/drafts/${step.id}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        setFbFail(data.error || `HTTP ${res.status}`);
+        return;
+      }
+      setRevising(r => [...r.filter(x => x.step.id !== step.id), { step, seen: steps.map(s => s.id) }]);
+      setFbOpen(null);
+      setFbText('');
+      onChanged();
+    } catch (err) {
+      setFbFail(err instanceof Error ? err.message : 'network error');
+    }
+  };
 
   const submitOne = async (step: GenesisGmStep) => {
     setResults(r => ({ ...r, [step.id]: { status: 'sending' } }));
@@ -106,8 +142,9 @@ export function GenesisGmSteps({ steps, campaignId, onChanged, onOpenForge, onOp
         {rows.map(step => {
           const r = results[step.id];
           const done = r?.status === 'ok';
+          const rev = isRevising(step.id);
           return (
-            <li key={step.id} className={`gs-row${done ? ' gs-done' : ''}`}>
+            <li key={step.id} className={`gs-row${done || rev ? ' gs-done' : ''}`}>
               <ComplexTooltip
                 title={step.name}
                 modifiers={[]}
@@ -122,14 +159,31 @@ export function GenesisGmSteps({ steps, campaignId, onChanged, onOpenForge, onOp
                 <span className="gs-kv">{kvText(step.kv)}</span>
               </ComplexTooltip>
               <div className="gs-actions">
-                {done ? <span className="gs-ok">✓ SUBMITTED</span> : (
+                {rev ? <span className="gs-rev" role="status">REVISING…</span> : done ? <span className="gs-ok">✓ SUBMITTED</span> : (
                   <button type="button" className="gs-btn gs-btn-go" data-no-hold disabled={busy || r?.status === 'sending'}
                     onClick={() => { void submitOne(step).then(res => { if (res.status === 'ok') onChanged(); }); }}>
                     {r?.status === 'sending' ? '…' : 'SUBMIT'}
                   </button>
                 )}
-                {!done && <button type="button" className="gs-btn" data-no-hold onClick={() => openForge(step)}>FORGE ↗</button>}
+                {!done && !rev && (
+                  <button type="button" className="gs-btn" data-no-hold aria-expanded={fbOpen === step.id}
+                    onClick={() => { setFbOpen(o => (o === step.id ? null : step.id)); setFbText(''); setFbFail(null); }}>
+                    FEEDBACK
+                  </button>
+                )}
+                {!done && !rev && <button type="button" className="gs-btn" data-no-hold onClick={() => openForge(step)}>FORGE ↗</button>}
               </div>
+              {fbOpen === step.id && !rev && (
+                <div className="gs-fb">
+                  <textarea className="gs-fb-in" data-no-hold maxLength={600} rows={2} value={fbText}
+                    aria-label={`Feedback for JEWL on ${step.name}`}
+                    placeholder={step.type === 'seed' ? 'What should change? JEWL may re-pick the seed.' : 'What should change? JEWL redrafts this one.'}
+                    onChange={e => setFbText(e.target.value)} />
+                  <button type="button" className="gs-btn gs-btn-go" data-no-hold disabled={!fbText.trim()}
+                    onClick={() => { void sendFeedback(step); }}>SEND</button>
+                  {fbFail && <div className="gs-fail" role="alert">Not sent: {fbFail}</div>}
+                </div>
+              )}
               {r?.status === 'fail' && <div className="gs-fail" role="alert">Not submitted: {r.message}</div>}
             </li>
           );
@@ -181,4 +235,7 @@ const GS_CSS = `
 .gs-btn-go{border-color:#FFCC78;color:#FFCC78}
 .gs-ok{color:#22ab94;font-size:12px;letter-spacing:.08em}
 .gs-fail{color:#f7525f;font-size:12px}
+.gs-rev{color:#FFCC78;font-size:12px;letter-spacing:.08em}
+.gs-fb{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap}
+.gs-fb-in{flex:1 1 200px;min-height:40px;background:#000;color:#eee;border:1px solid #333;padding:6px;font:13px/1.4 var(--font-terminal),Consolas,monospace;resize:vertical}
 `;

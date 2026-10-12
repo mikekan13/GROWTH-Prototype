@@ -517,6 +517,11 @@ JEWL's question to the GM about a creative gap in the seed, raised in PRODDING. 
 - `cycleCount`/`lastCycleAt` (loop bookkeeping; round-robin ordering), `startedAt`/`endedAt`, `createdBy`, `blockedReason`
 - Indexes: `[status, lastCycleAt]`, `[campaignId, status]`. No Campaign relation field (scalar campaignId only).
 
+## CharacterBlockLink + CampaignItem paint (NARRATIVE PAINT, Mike 2026-10-12 — migration `20261012160000_narrative_paint_block_links`)
+Blocks and items are campaign-agnostic archetypes; the campaign INSTANCE carries the paint (two ledgers, [[story-attachment-two-ledgers-2026-08-19]]). Paint never changes mechanics.
+- **CharacterBlockLink** — a character's instance of a Forge block or item (may point at a draft: genesis attaches before approval). `campaignId`, `characterId`, `forgeItemId` (scalars, no FKs), `localName?` (≤100, e.g. "Rosemary's keepsake"), `story` (≤600, bearer-specific, may carry proper nouns), `history` (JSON `[{kind, at, text}]`, seeded with an `origin` entry), `sessionId?` (the genesis session that made it), `createdAt`/`updatedAt`. Unique (characterId, forgeItemId); indexes (campaignId, characterId), (forgeItemId), (sessionId). Written by `services/block-attachment.ts` (propose_forge_blueprint with characterId+attachmentStory, attach_block); links to withdrawn drafts are deleted by the GM redraft.
+- **CampaignItem** gains `sourceForgeItemId?` (the archetype blueprint), `story?` (≤600), `history` (JSON, default `[]`, origin entry at instantiation). `name` is the instance's LOCAL name. Written by `createCampaignItem` (place_item passes them).
+
 ## Encounter (Unit 1, migration 20260905095440_encounter_unit1)
 | Field | Type | Notes |
 |---|---|---|

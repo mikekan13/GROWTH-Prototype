@@ -20,6 +20,13 @@ import { priceBlueprintByType } from '@/services/forge-pricing';
 import { getJewlGodHead } from '../jewl-identity';
 import { registerJewlTool } from './registry';
 import { coerceForgeBlueprintInput, FORGE_BODY_LIMITS } from './forge-blueprint-coerce';
+import { ARCHETYPE_LAW, archetypeRejection, checkArchetype, isArchetypeType } from '@/services/block-archetype';
+import {
+  attachBlockToCharacter,
+  findGenesisSession,
+  loadArchetypeBans,
+  recordArchetypeRejection,
+} from '@/services/block-attachment';
 import type { JewlTool, JewlToolHandlerResult } from './types';
 
 const FORGE_TYPES = [
@@ -53,6 +60,21 @@ const inputSchema = z.object({
       'targets, balance levers, declared-KV justification. Never shown as ' +
       'the primary GM note.',
   ),
+  // Two ledgers (2026-08-19 / 2026-10-12): the block is the archetype; the
+  // bearer's specifics ride on her link to it.
+  characterId: z.string().min(1).max(64).optional().describe(
+    'The character this block is for (in a genesis: the [id] in the brief). ' +
+      'REQUIRED while a character genesis is building in this campaign.',
+  ),
+  attachmentStory: z.string().min(1).max(600).optional().describe(
+    'REQUIRED with characterId (≤600 chars): the BEARER-SPECIFIC story of this block — ' +
+      'who, where, which object, which years. MAY name people and places. Written to ' +
+      'the character\'s link to the block, never into the block itself.',
+  ),
+  localName: z.string().min(1).max(100).optional().describe(
+    'Optional NARRATIVE PAINT name for her instance ("Rosemary\'s keepsake") — the block\'s own ' +
+      'name stays the archetype ("Silver Butter Knife"). May carry proper nouns.',
+  ),
 });
 // Note: campaignId is taken from the prompt context (the campaign JEWL is
 // operating in). Global-catalog promotion is the Forge chain's job — Kai
@@ -68,6 +90,9 @@ export const proposeForgeBlueprintTool: JewlTool = {
     'GM can review it in the Forge panel. Do NOT use this for world-building — ' +
     'rooms, buildings, places of any kind are Locations: use create_location. ' +
     'Do NOT use this to apply existing items — only to propose NEW blueprints. ' +
+    'REUSE FIRST: if a stock or campaign block already fits the archetype, attach_block it ' +
+    'with the bearer\'s story instead of drafting a duplicate. ' +
+    ARCHETYPE_LAW + ' ' +
     FORGE_BODY_LIMITS,
   inputSchema,
   coerce: coerceForgeBlueprintInput,
@@ -106,6 +131,70 @@ export const proposeForgeBlueprintTool: JewlTool = {
       );
     }
 
+    const campaignId = ctx.campaignId;
+
+    // ARCHETYPE LAW at the boundary (Mike 2026-10-12): Forge content is
+    // campaign-agnostic — blocks AND items (NARRATIVE PAINT ruling); the
+    // bearer's specifics ride on her instance. Locations aren't forged.
+    const archetype = isArchetypeType(parsed.type);
+    if (archetype) {
+      if (parsed.characterId && !parsed.attachmentStory) {
+        throw new Error(
+          'attachmentStory is required with characterId — the bearer-specific story of this block ' +
+            '(who, where, which object, which years; ≤600 chars). It is written to her link to the block.',
+        );
+      }
+      // Items may be drafted for a room, not a person — only character-layer
+      // blocks must name their bearer while a genesis builds.
+      if (!parsed.characterId && parsed.type !== 'item') {
+        const live = await prisma.dayaWorkSession.findMany({
+          where: {
+            campaignId,
+            status: { in: ['active', 'blocked'] },
+            goal: { startsWith: 'Character genesis' },
+            OR: [{ stage: null }, { stage: 'BUILDING' }],
+          },
+          select: { goal: true },
+        });
+        if (live.length) {
+          throw new Error(
+            `A character genesis is building in this campaign (${live.map(s => s.goal.split(' — ')[0]).join('; ')}). ` +
+              'Pass characterId (the [id] in the brief) and attachmentStory (the bearer\'s specifics) with every block you draft for her.',
+          );
+        }
+      }
+      const bans = await loadArchetypeBans(campaignId, parsed.characterId);
+      const hits = checkArchetype(parsed.name, body, bans);
+      if (hits.length) {
+        if (parsed.characterId) {
+          await recordArchetypeRejection({
+            campaignId,
+            characterId: parsed.characterId,
+            type: parsed.type,
+            name: parsed.name,
+            tokens: hits.map(h => h.token),
+          });
+        }
+        throw new Error(archetypeRejection(parsed.name, hits));
+      }
+    }
+    const attachTo = archetype && parsed.characterId && parsed.attachmentStory
+      ? { characterId: parsed.characterId, story: parsed.attachmentStory }
+      : null;
+    const attach = async (forgeItemId: string, origin: string) => {
+      if (!attachTo) return null;
+      const session = await findGenesisSession(campaignId, attachTo.characterId);
+      return attachBlockToCharacter({
+        campaignId,
+        characterId: attachTo.characterId,
+        forgeItemId,
+        story: attachTo.story,
+        localName: parsed.localName ?? null,
+        sessionId: session?.id ?? null,
+        origin,
+      });
+    };
+
     // Stamp both notes into the blueprint body under reserved keys.
     // _proposalNote stays the GM-facing key (Workshop/Panel read it);
     // _chainNote rides to Kai's evaluator with the row.
@@ -116,7 +205,6 @@ export const proposeForgeBlueprintTool: JewlTool = {
     });
 
     const jewl = await getJewlGodHead();
-    const campaignId = ctx.campaignId;
 
     // Uniqueness guard — ForgeItem has @@unique([campaignId, name, type]).
     // Superseded tombstones don't get to hold name slots (round-5 review,
@@ -125,17 +213,46 @@ export const proposeForgeBlueprintTool: JewlTool = {
       where: { campaignId, name: parsed.name, type: parsed.type },
       select: { id: true, status: true },
     });
+    const reused = (id: string, source: 'campaign' | 'stock') => ({
+      output: {
+        id,
+        type: parsed.type,
+        name: parsed.name,
+        reused: true,
+        source,
+        attachedTo: attachTo?.characterId,
+        note: `A ${parsed.type} "${parsed.name}" already exists (${source}) — attached it with the bearer's story instead of drafting a duplicate. ` +
+          'If your mechanics genuinely differ, it is a different archetype: give it a distinct, legible name.',
+      },
+    });
     if (existing) {
       if (existing.status === 'superseded') {
         await prisma.forgeItem.update({
           where: { id: existing.id },
           data: { name: `${parsed.name} [w:${existing.id.slice(-4)}]` },
         });
+      } else if (attachTo) {
+        // Reuse first, even when drafting: the archetype already exists here.
+        await attach(existing.id, `existing campaign ${parsed.type} reused and painted`);
+        return reused(existing.id, 'campaign');
       } else {
         throw new Error(
           `Blueprint already exists for (campaign=${campaignId}, ` +
             `type=${parsed.type}, name=${parsed.name}): ${existing.id}`,
         );
+      }
+    }
+    if (attachTo) {
+      // Stock already holds this archetype → pull it (free) and attach.
+      const stock = await prisma.forgeItem.findFirst({
+        where: { isGlobal: true, name: parsed.name, type: parsed.type },
+        select: { id: true },
+      });
+      if (stock) {
+        const { pullFromGlobalCatalog } = await import('@/services/forge');
+        const copy = await pullFromGlobalCatalog(stock.id, campaignId, ctx.actorId, ctx.actorRole);
+        await attach(copy.id, `pulled from stock and painted`);
+        return reused(copy.id, 'stock');
       }
     }
 
@@ -169,6 +286,7 @@ export const proposeForgeBlueprintTool: JewlTool = {
       },
     });
     await recomputeCampaignAdultOnlySafe(item.campaignId); // `sexual` → 18+ table (2026-10-12)
+    const link = await attach(item.id, `drafted for this character by JEWL`);
 
     // Chain submission is a PAID step (godhead evaluation costs KRMA), so
     // it's opt-in per campaign (Mike 2026-08-21): aiSettings.forge
@@ -207,6 +325,7 @@ export const proposeForgeBlueprintTool: JewlTool = {
         campaignId: item.campaignId,
         isGlobal: item.isGlobal,
         proposedBy: 'JEWL',
+        ...(link ? { attachedTo: link.characterId, attachmentId: link.id } : {}),
         ...(priced ? { suggestedKV: priced.kv, kvBreakdown: priced.breakdown } : {}),
         dispatcherEnqueued: dispatchResult.enqueued,
         dispatcherSkipped: dispatchResult.skipped,
