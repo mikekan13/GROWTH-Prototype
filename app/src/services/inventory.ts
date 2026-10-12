@@ -36,6 +36,9 @@ export interface InventoryItemView {
   weightLbs: number;
   equippedTo: string | null;
   data: GrowthWorldItem;
+  /** NARRATIVE PAINT (2026-10-12): `name` is the LOCAL name; these carry the instance story + archetype. */
+  story?: string | null;
+  archetypeName?: string | null;
 }
 
 export type EncumbranceStatus = 'Fine' | 'Near Limit' | 'Encumbered' | 'Overloaded';
@@ -121,7 +124,17 @@ export async function listInventory(
     where: { holderId: characterId, status: 'ACTIVE' },
     orderBy: { name: 'asc' },
   });
-  const items = rows.map(parseItem);
+  // Narrative paint: join the archetype name for painted instances.
+  const sourceIds = [...new Set(rows.map(r => r.sourceForgeItemId).filter((s): s is string => !!s))];
+  const archetypes = sourceIds.length
+    ? await prisma.forgeItem.findMany({ where: { id: { in: sourceIds } }, select: { id: true, name: true } })
+    : [];
+  const archetypeById = new Map(archetypes.map(a => [a.id, a.name]));
+  const items = rows.map(r => ({
+    ...parseItem(r),
+    story: r.story ?? null,
+    archetypeName: r.sourceForgeItemId ? archetypeById.get(r.sourceForgeItemId) ?? null : null,
+  }));
 
   // Items equipped to regions that no longer exist (body part destroyed or
   // anatomy changed) fall back to carried — visible, never lost.

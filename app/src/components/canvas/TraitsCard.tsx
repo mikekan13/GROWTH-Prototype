@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
+import { BlockRow } from '@/components/character/CharacterGenesisSections';
+import { useCharacterSheetFacts } from '@/components/character/useCharacterSheetFacts';
 
 export interface TraitItem {
   name: string;
@@ -23,6 +25,9 @@ export interface TraitItem {
 
 interface TraitsCardProps {
   traits: TraitItem[];
+  /** When set, the Nectars/Thorns genesis linked (CharacterBlockLink) are read
+   *  and shown first — local name, archetype beneath, rule text, KV, ⚠ chips. */
+  characterId?: string;
   fateDie?: string;
   /** For the bearer-agnostic linter — trait text should say "the bearer", never the character's name. */
   characterName?: string;
@@ -40,7 +45,10 @@ const TYPE_STYLES: Record<string, { color: string; bg: string; icon: string; lab
 
 const FATE_MAX: Record<string, number> = { d4: 4, d6: 6, d8: 8, d12: 12, d20: 20 };
 
-export default function TraitsCard({ traits, fateDie, characterName, onClose, onAddTrait, onRemoveTrait, onUpdateTrait }: TraitsCardProps) {
+export default function TraitsCard({ traits, characterId, fateDie, characterName, onClose, onAddTrait, onRemoveTrait, onUpdateTrait }: TraitsCardProps) {
+  const { data: facts } = useCharacterSheetFacts(characterId, !!characterId);
+  const forged = (facts?.blocks ?? []).filter(b => b.kind === 'nectar' || b.kind === 'blossom' || b.kind === 'thorn');
+  const forgedNames = new Set(forged.flatMap(b => [b.archetypeName.toLowerCase(), b.displayName.toLowerCase()]));
   const [filter, setFilter] = useState<string>('all');
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -84,10 +92,12 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
     setEditingKey(null);
   };
 
-  const safeTraits = Array.isArray(traits) ? traits : [];
-  const nectars = safeTraits.filter(t => t.type === 'nectar');
-  const blossoms = safeTraits.filter(t => t.type === 'blossom');
-  const thorns = safeTraits.filter(t => t.type === 'thorn');
+  // Sheet traits (GM-added by hand) — minus any that genesis already linked.
+  const safeTraits = (Array.isArray(traits) ? traits : []).filter(t => !forgedNames.has(t.name.toLowerCase()));
+  const nectars = [...safeTraits.filter(t => t.type === 'nectar'), ...forged.filter(b => b.kind === 'nectar')];
+  const blossoms = [...safeTraits.filter(t => t.type === 'blossom'), ...forged.filter(b => b.kind === 'blossom')];
+  const thorns = [...safeTraits.filter(t => t.type === 'thorn'), ...forged.filter(b => b.kind === 'thorn')];
+  const forgedShown = filter === 'all' ? forged : forged.filter(b => b.kind === filter);
   const maxPermanent = fateDie ? FATE_MAX[fateDie] : undefined;
   const permanentCount = nectars.length + thorns.length;
 
@@ -247,8 +257,14 @@ export default function TraitsCard({ traits, fateDie, characterName, onClose, on
 
           {/* Traits list */}
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <div className="text-center text-gray-400 text-sm py-4">No traits found</div>
+            {/* Linked at genesis — local name first, archetype beneath, rule text + KV + maturity chips. */}
+            {forgedShown.map(b => (
+              <div key={b.linkId} onMouseDown={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+                <BlockRow block={b} showRule />
+              </div>
+            ))}
+            {filtered.length === 0 && forgedShown.length === 0 ? (
+              <div className="text-center text-gray-400 text-sm py-4">none yet</div>
             ) : filtered.map((trait, i) => {
               const ts = TYPE_STYLES[trait.type] || TYPE_STYLES.nectar;
               return (

@@ -19,6 +19,10 @@ import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
 import type { PossessionRow } from './PossessionsCard';
 import { AwaitingImageBadge } from '@/components/character/AwaitingImageBadge';
+import { useCharacterInventory, useCharacterSheetFacts } from '@/components/character/useCharacterSheetFacts';
+import { resolveBlocks, type LegacySheetLike } from '@/components/character/CharacterGenesisSections';
+import { blocksOfKind, blockTooltip, formatAge, type CharacterBlockView } from '@/lib/character-sheet-facts';
+import { calculateCharacterTKV } from '@/lib/kv-calculator';
 
 // ── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -363,10 +367,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isBarDragging, setIsBarDragging] = useState(false);
-  // Owned-entity possessions fetched live from the relationship API.
-  // The summary box on the expanded card surfaces these; the legacy
-  // free-text data.possessions string falls back when nothing's wired.
-  const [ownedPossessions, setOwnedPossessions] = useState<PossessionRow[]>([]);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [showSkillCheckMenu, setShowSkillCheckMenu] = useState(false);
   const [showContestedMenu, setShowContestedMenu] = useState(false);
@@ -390,22 +390,12 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Load owned-entity possessions whenever the card is expanded.
-  // Same source as PossessionsCard so the summary doesn't lie about
-  // characters that have wired possessions in the relationship table.
-  useEffect(() => {
-    if (!isExpanded || !node?.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/characters/${node.id}/possessions`);
-        if (!res.ok) return;
-        const j = await res.json();
-        if (!cancelled) setOwnedPossessions(j.possessions ?? []);
-      } catch { /* silent — summary just falls back to free-text */ }
-    })();
-    return () => { cancelled = true; };
-  }, [isExpanded, node?.id]);
+  // What genesis made (2026-10-12 audit): blocks with paint, canonical age,
+  // TKV, memories, vines + the 3-tier inventory (equipped / carried /
+  // owned 'owns' links — the same possessions PossessionsCard lists).
+  // Read only when expanded.
+  const { data: facts } = useCharacterSheetFacts(node?.id, isExpanded);
+  const { data: inventoryTiers } = useCharacterInventory(node?.id, isExpanded);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -506,9 +496,22 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   const attributes = data?.attributes;
   const conditions = data?.conditions;
   const seed = data?.creation?.seed;
-  const root = data?.creation?.root;
-  const grovines = data?.grovines || [];
-  const tkv = data?.tkv || 0;
+  // Blocks: CharacterBlockLink rows (genesis) first; legacy sheet creation.* only when none exist.
+  const blocks = resolveBlocks(facts, data as LegacySheetLike | null);
+  const seedBlocks = blocksOfKind(blocks, 'seed');
+  const rootBlocks = blocksOfKind(blocks, 'root');
+  const branchBlocks = blocksOfKind(blocks, 'branch');
+  // GRO.vines: Goal rows (via facts); the sheet's legacy grovines only before facts load.
+  const vineRows: Array<{ id: string; goal: string; resistance: string | null; opportunity: string | null; authoredBy: string | null; kv?: number }> =
+    facts ? facts.vines : (data?.grovines || []).filter(v => v?.goal).map((v, i) => ({ id: `sheet-${i}`, goal: v.goal || '', resistance: null, opportunity: v.opportunity ?? null, authoredBy: null, kv: v.kv }));
+  // Genesis never writes sheet.tkv — fall back to the server-computed TKV,
+  // else compute it from the sheet (compact view doesn't fetch facts).
+  const tkv = data?.tkv ?? facts?.tkv ?? (() => {
+    if (!data?.attributes) return '—';
+    try { return calculateCharacterTKV(data as unknown as GrowthCharacter).total; } catch { return '—'; }
+  })();
+  const blockNames = (list: CharacterBlockView[]) => list.map(b => b.displayName).join(' · ');
+  const blockTitles = (list: CharacterBlockView[]) => list.map(blockTooltip).join('\n\n———\n\n');
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (!onDelete && !onSkillCheck && !onContestedCheck) return;
@@ -1105,12 +1108,18 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
 
   // ── Expanded View (1885x670) — faithful port of prototype ─────────────────
 
-  // Possessions
+  // Possessions — legacy free text only when the inventory read has nothing.
   const possessionsText = data?.possessions || '';
   const possessionsList = possessionsText.split(/\n|,/).map(s => s.trim()).filter(s => s.length > 0);
+  const equippedItems = inventoryTiers?.equipped ?? [];
+  const carriedItems = inventoryTiers?.carried ?? [];
+  const ownedLinks: PossessionRow[] = inventoryTiers?.possessions ?? [];
+  const itemTitle = (i: { name: string; archetypeName?: string | null; story?: string | null; weightLbs: number }) =>
+    [i.archetypeName && i.archetypeName !== i.name ? `archetype: ${i.archetypeName}` : null, i.story, `${i.weightLbs} lbs`].filter(Boolean).join('\n\n');
 
-  // Vine data
-  const vines = grovines.length > 0 ? grovines : [{ goal: '...', opportunity: '...', kv: undefined }];
+  // Age (canon): currentCycle − birthCycle, else identity.age, else "—" — never 0.
+  const ageText = facts ? formatAge(facts.age) : '—';
+  const fatedAgeText = facts?.age.fatedAge ?? (typeof (data as Record<string, unknown> | null)?.fatedAge === 'number' ? (data as Record<string, unknown>).fatedAge as number : null);
 
   // Action totals — canonical formula (Mike 2026-05-20):
   //   actions = floor(sum of LEVELS of pillar attributes / 25), min 1
@@ -1239,6 +1248,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 <img src="/EmptyPortrait.png" alt="Empty Portrait" className="w-full h-full object-cover" />
               )}
               <AwaitingImageBadge awaiting={node.awaitingImage} size="lg" style={{ position: 'absolute', left: 0, bottom: 12 }} />
+              {/* Memory ledger — count + last write (the memories themselves live in the being, not the card). */}
+              {facts && (
+                <div data-testid="card-memories" className="absolute left-0 right-0" style={{ bottom: '70px', textAlign: 'center' }}>
+                  <span style={{ background: '#000', color: '#fff', fontFamily: 'Consolas, monospace', fontSize: '12px', padding: '2px 8px' }}>
+                    {facts.memories.count} memories{facts.memories.lastAt ? ` · last ${facts.memories.lastAt.slice(0, 10)} ${facts.memories.lastAt.slice(11, 16)}` : ''}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1262,37 +1279,65 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
           <div className="flex flex-col">
             {/* Top section: SEED, ROOT, POSSESSIONS, Downtime, Age, Birthday */}
             <div className="flex gap-0.5 mb-2">
+              {/* SEED / ROOT / BRANCH — from CharacterBlockLink paint: LOCAL name
+                  first, archetype beneath + in the tooltip (narrative paint rule). */}
               <div className="space-y-0.5" style={{ width: '154px', marginLeft: '3px' }}>
-                <div className="rounded border border-purple-500/40 p-2 flex flex-col items-center justify-center" style={{ backgroundColor: '#8e7cc3', height: 'calc(50% - 1px)' }}>
-                  <div className="text-[11px] font-bold text-white text-center mb-0.5">{seed?.name || 'Human'}</div>
-                  <div className="text-[8px] font-bold text-white">SEED</div>
-                </div>
-                <div className="rounded border border-red-500/40 p-2 flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--pillar-body)', height: 'calc(50% - 1px)' }}>
-                  <div className="text-[11px] font-bold text-white text-center mb-0.5">{root?.name || 'Unknown'}</div>
-                  <div className="text-[8px] font-bold text-white">ROOT</div>
-                </div>
+                {([
+                  { label: 'SEED', list: seedBlocks, bg: '#8e7cc3', border: 'border-purple-500/40', fallback: seed?.name || '—' },
+                  { label: rootBlocks.length > 1 ? 'ROOTS' : 'ROOT', list: rootBlocks, bg: 'var(--pillar-body)', border: 'border-red-500/40', fallback: '—' },
+                  { label: branchBlocks.length > 1 ? 'BRANCHES' : 'BRANCH', list: branchBlocks, bg: '#6fa8dc', border: 'border-blue-500/40', fallback: '—' },
+                ] as const).map(tile => {
+                  const archetypes = tile.list.filter(b => b.localName && b.localName !== b.archetypeName).map(b => b.archetypeName);
+                  const flags = [...new Set(tile.list.flatMap(b => b.maturityFlags))];
+                  return (
+                    <div key={tile.label} data-testid={`card-tile-${tile.label.toLowerCase()}`} title={tile.list.length ? blockTitles(tile.list) : undefined}
+                      className={`rounded border ${tile.border} px-1 py-1 flex flex-col items-center justify-center cursor-help`}
+                      style={{ backgroundColor: tile.bg, height: 'calc(33.333% - 1px)', overflow: 'hidden' }}>
+                      <div className="text-[11px] font-bold text-white text-center leading-tight">{tile.list.length ? blockNames(tile.list) : tile.fallback}</div>
+                      {/* One block: archetype beneath. Several: archetypes live in the tooltip (room). */}
+                      {archetypes.length > 0 && tile.list.length === 1 && (
+                        <div className="text-[8px] text-white/75 text-center leading-tight" style={{ fontFamily: 'Consolas, monospace' }}>{archetypes.join(' · ')}</div>
+                      )}
+                      <div className="text-[8px] font-bold text-white">{tile.label}{flags.length > 0 && <span style={{ color: 'var(--krma-gold)' }}> ⚠ {flags.join(', ')}</span>}</div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="flex gap-0.5 flex-1">
                 {/* Possessions */}
                 <div className="rounded border border-blue-500/40 p-2 flex flex-col" style={{ backgroundColor: 'var(--pillar-soul)', width: '276px', marginLeft: '8px' }}>
-                  <div className="text-xs font-bold text-white mb-1">POSSESSIONS</div>
-                  <div className="overflow-y-auto flex-1">
-                    {ownedPossessions.length > 0 ? ownedPossessions.map((row, i) => (
-                      <div key={row.id} className="border border-white/20 px-2 py-1" style={{
-                        backgroundColor: i % 2 === 0 ? '#8e7cc3' : '#b4a7d6', minHeight: '24px'
-                      }}>
-                        <div className="text-[10px] leading-relaxed" style={{ color: '#6fa8dc', fontWeight: '500' }}>{row.targetName}</div>
-                      </div>
-                    )) : possessionsList.length > 0 ? possessionsList.map((item, i) => (
-                      <div key={i} className="border border-white/20 px-2 py-1" style={{
-                        backgroundColor: i % 2 === 0 ? '#8e7cc3' : '#b4a7d6', minHeight: '24px'
-                      }}>
-                        <div className="text-[10px] leading-relaxed" style={{ color: '#6fa8dc', fontWeight: '500' }}>{item}</div>
-                      </div>
-                    )) : (
-                      <div className="text-[10px] text-white/50 italic">No possessions yet</div>
+                  {/* Three tiers (GDT §13.5): equipped / carried / owned-not-carried.
+                      Item names are the instance's LOCAL name; archetype + story in the tooltip. */}
+                  <div className="text-xs font-bold text-white mb-1" data-testid="card-carry-heading">
+                    EQUIPPED · CARRIED · OWNED
+                    {inventoryTiers && (
+                      <span className="ml-1 text-[9px] font-normal" style={{ color: 'var(--krma-gold)', fontFamily: 'Consolas, monospace' }}
+                        title="Encumbrance: total lbs held vs Clout × 10">
+                        {inventoryTiers.encumbrance.totalLbs}/{inventoryTiers.encumbrance.capacityLbs} lbs
+                      </span>
                     )}
+                  </div>
+                  <div className="overflow-y-auto flex-1 space-y-0.5">
+                    {([
+                      { tier: 'EQUIPPED', rows: equippedItems.map(i => ({ id: i.id, label: i.name, sub: i.equippedTo?.split('/').pop() ?? null, title: itemTitle(i) })) },
+                      { tier: 'CARRIED', rows: carriedItems.map(i => ({ id: i.id, label: i.name, sub: `${i.weightLbs} lbs`, title: itemTitle(i) })) },
+                      { tier: 'OWNED', rows: ownedLinks.length > 0
+                          ? ownedLinks.map(r => ({ id: r.id, label: r.targetName, sub: (r.targetSubtype ?? r.targetType).toLowerCase(), title: r.note ?? '' }))
+                          : possessionsList.map((p, i) => ({ id: `legacy-${i}`, label: p, sub: null, title: '' })) },
+                    ]).map(group => (
+                      <div key={group.tier}>
+                        <div className="text-[8px] font-bold" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>{group.tier}</div>
+                        {group.rows.length > 0 ? group.rows.map((row, i) => (
+                          <div key={row.id} title={row.title || undefined} className="border border-white/20 px-2 py-0.5 flex justify-between gap-1" style={{ backgroundColor: i % 2 === 0 ? '#8e7cc3' : '#b4a7d6' }}>
+                            <span className="text-[10px] font-bold text-white truncate">{row.label}</span>
+                            {row.sub && <span className="text-[9px] text-white/80" style={{ fontFamily: 'Consolas, monospace' }}>{row.sub}</span>}
+                          </div>
+                        )) : (
+                          <div className="text-[10px] text-white/60 italic">none yet</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1315,11 +1360,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                   <div className="space-y-0.5 h-full">
                     <div className="rounded border border-teal-500/40 p-1 flex flex-col justify-center items-center" style={{ backgroundColor: 'var(--terminal-prime)', height: 'calc(50% - 1px)' }}>
                       <div className="text-[8px] font-bold text-white">AGE</div>
-                      <div className="text-sm font-bold text-white">{data?.age || '0'}</div>
+                      <div className="text-sm font-bold text-white" data-testid="card-age">{ageText}</div>
+                      {fatedAgeText !== null && (
+                        <div className="text-[8px] font-bold text-white/80" title="Fated age (meta cycles)">FATED {fatedAgeText}</div>
+                      )}
                     </div>
                     <div className="rounded border border-purple-500/40 p-1 flex flex-col justify-center items-center" style={{ backgroundColor: '#8e7cc3', height: 'calc(50% - 1px)' }}>
                       <div className="text-[8px] font-bold text-white">BIRTHDAY</div>
-                      <div className="text-[9px] font-bold text-white">{data?.birthday || '00/00/0000'}</div>
+                      <div className="text-[9px] font-bold text-white">{data?.birthday || '—'}</div>
                     </div>
                   </div>
                 </div>
@@ -1341,16 +1389,27 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 {/* Goals */}
                 <div className="relative">
                   <div className="absolute rounded" style={{ borderTop: '18px solid var(--pillar-soul)', borderBottom: '33px solid var(--pillar-soul)', borderLeft: '3px solid var(--pillar-soul)', borderRight: '7px solid var(--pillar-soul)', top: '-10px', bottom: '-3px', left: '-3px', right: '7px', pointerEvents: 'none' }} />
-                  <div className="relative" style={{ marginRight: '14px' }}>
-                    {vines.map((vine, i) => (
-                      <div key={i} className="border border-white/20 flex relative items-center" style={{
+                  <div className="relative" style={{ marginRight: '14px' }} data-testid="card-vines">
+                    {vineRows.length === 0 && (
+                      <div className="border border-white/20 flex items-center px-2 py-2 text-[10px] italic" style={{ backgroundColor: '#f4cccc', minHeight: '40px', color: '#582a72' }}>no vines yet</div>
+                    )}
+                    {vineRows.map((vine, i) => (
+                      <div key={vine.id} className="border border-white/20 flex relative items-center" style={{
                         backgroundColor: i % 2 === 0 ? '#ea9999' : '#f4cccc', minHeight: '40px'
                       }}>
                         <div className="absolute flex items-center justify-center" style={{
                           width: '20px', height: '20px', top: '-1px', left: '-2px',
                           backgroundColor: 'var(--pillar-soul)', color: '#ffffff', fontSize: '10px', fontWeight: 'bold'
                         }}>{i + 1}</div>
-                        <span className="px-2 py-2 pl-8 text-[10px]" style={{ color: '#8e7cc3' }}>{vine.goal || '...'}</span>
+                        <div className="px-2 py-1 pl-8 flex flex-col">
+                          <span className="text-[10px]" style={{ color: '#582a72', fontWeight: 700 }}>
+                            {vine.goal}
+                            {vine.authoredBy === 'ai' && (
+                              <span className="ml-1 px-1 text-[8px]" title="An AI chose this vine" style={{ backgroundColor: 'var(--terminal-prime)', color: '#fff', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif' }}>AI-CHOSEN</span>
+                            )}
+                          </span>
+                          {vine.resistance && <span className="text-[9px]" style={{ color: '#7a1f28' }}>R: {vine.resistance}</span>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1360,11 +1419,14 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 <div className="relative">
                   <div className="absolute rounded" style={{ borderTop: '18px solid var(--pillar-body)', borderBottom: '33px solid var(--pillar-body)', borderLeft: '7px solid var(--pillar-body)', borderRight: '3px solid var(--pillar-body)', top: '-10px', bottom: '-3px', left: '-7px', right: '-3px', pointerEvents: 'none' }} />
                   <div className="relative">
-                    {vines.map((vine, i) => (
-                      <div key={i} className="border border-white/20 flex relative items-center" style={{
+                    {vineRows.length === 0 && (
+                      <div className="border border-white/20 flex items-center px-2 py-2 text-xs italic text-white" style={{ backgroundColor: '#9fc5e8', minHeight: '40px' }}>none yet</div>
+                    )}
+                    {vineRows.map((vine, i) => (
+                      <div key={vine.id} className="border border-white/20 flex relative items-center" style={{
                         backgroundColor: i % 2 === 0 ? '#6fa8dc' : '#9fc5e8', minHeight: '40px'
                       }}>
-                        <span className="px-2 py-2 text-xs text-white flex-1">{vine.opportunity || '...'}</span>
+                        <span className="px-2 py-2 text-xs text-white flex-1">{vine.opportunity || <span className="italic opacity-70">none yet</span>}</span>
                         {vine.kv && (
                           <span className="px-2 py-1 mr-1" style={{
                             fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', fontSize: '10px',

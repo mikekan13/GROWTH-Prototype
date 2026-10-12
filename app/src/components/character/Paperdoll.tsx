@@ -31,6 +31,9 @@ interface InventoryItemView {
   weightLbs: number;
   equippedTo: string | null;
   data: { condition?: number; armorCategory?: string; [k: string]: unknown };
+  /** Narrative paint: `name` is the local name; archetype + story for the tooltip. */
+  story?: string | null;
+  archetypeName?: string | null;
 }
 
 type EncumbranceStatus = 'Fine' | 'Near Limit' | 'Encumbered' | 'Overloaded';
@@ -329,7 +332,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
         </div>
 
         {carried.length === 0 ? (
-          <div className="text-xs text-[var(--surface-dark)]/40 italic">Nothing carried.</div>
+          <div className="text-xs text-[var(--surface-dark)]/40 italic">none yet</div>
         ) : (
           <div>
             {carried.map(item => {
@@ -356,6 +359,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
                       <span
                         className="truncate"
                         style={{ textDecoration: destroyed ? 'line-through' : undefined }}
+                        title={[item.archetypeName && item.archetypeName !== item.name ? `archetype: ${item.archetypeName}` : null, item.story].filter(Boolean).join('\n\n') || undefined}
                       >
                         {item.name}
                       </span>
@@ -423,7 +427,7 @@ export default function Paperdoll({ characterId, canEdit }: PaperdollProps) {
         </div>
 
         {possessions.length === 0 ? (
-          <div className="text-xs text-[var(--surface-dark)]/40 italic">No possessions.</div>
+          <div className="text-xs text-[var(--surface-dark)]/40 italic">none yet</div>
         ) : (
           <div>
             {possessions.map(p => (

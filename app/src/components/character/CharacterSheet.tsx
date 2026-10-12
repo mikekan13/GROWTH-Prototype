@@ -8,6 +8,7 @@ import SkillsSection from './SkillsSection';
 import VitalsSection from './VitalsSection';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
+import CharacterGenesisSections, { type LegacySheetLike } from './CharacterGenesisSections';
 
 interface CharacterSheetProps {
   character: GrowthCharacter;
@@ -30,8 +31,11 @@ const CONDITION_MAP: Record<string, string> = {
 };
 
 export default function CharacterSheet({ character, characterId, onRefresh, canEditInventory }: CharacterSheetProps) {
-  const { identity, attributes, creation, conditions, traits, grovines } = character;
-  const activeConditions = Object.entries(conditions).filter(([, v]) => v);
+  const { identity, attributes, conditions } = character;
+  const creation = character.creation ?? ({} as GrowthCharacter['creation']);
+  const traits = Array.isArray(character.traits) ? character.traits : [];
+  const grovines = Array.isArray(character.grovines) ? character.grovines : [];
+  const activeConditions = Object.entries(conditions ?? {}).filter(([, v]) => v);
   const nectars = traits.filter(t => t.type === 'nectar');
   const blossoms = traits.filter(t => t.type === 'blossom');
   const thorns = traits.filter(t => t.type === 'thorn');
@@ -45,11 +49,12 @@ export default function CharacterSheet({ character, characterId, onRefresh, canE
             {identity.name}
           </h2>
           <span className="text-[var(--accent-teal)] text-sm">
-            {creation.seed?.name || 'Unknown Seed'} | {FATE_DIE_LABELS[creation.seed.baseFateDie]}
+            {creation.seed?.name || '—'}{creation.seed?.baseFateDie ? ` | ${FATE_DIE_LABELS[creation.seed.baseFateDie] ?? creation.seed.baseFateDie}` : ''}
           </span>
         </div>
 
-        {/* TKV + Fated Age */}
+        {/* TKV + Fated Age — legacy header; with a characterId the facts strip below carries these */}
+        {!characterId && (<>
         <div className="flex gap-6 mt-3 text-sm">
           {character.tkv !== undefined && (
             <div>
@@ -72,10 +77,22 @@ export default function CharacterSheet({ character, characterId, onRefresh, canE
             {character.fatedAge > 0 && <span>Fated Age: {character.fatedAge}</span>}
           </div>
         )}
+        </>)}
       </div>
 
-      {/* Seed/Root/Branches */}
-      {(creation.root || creation.branches?.length) && (
+      {/* What genesis made (2026-10-12 audit): blocks with paint, age, TKV,
+          memories, vines — read live. Legacy sections below only without an id. */}
+      {characterId && (
+        <CharacterGenesisSections
+          characterId={characterId}
+          sheet={character as unknown as LegacySheetLike}
+          completion={(character as unknown as Record<string, unknown>).characterCompletion}
+          showCarry={false}
+        />
+      )}
+
+      {/* Seed/Root/Branches (legacy sheet fields) */}
+      {!characterId && (creation.root || creation.branches?.length) && (
         <div className="space-y-2">
           <div className="section-badge inline-block text-sm">Origin</div>
           {creation.root && (
@@ -157,8 +174,8 @@ export default function CharacterSheet({ character, characterId, onRefresh, canE
         </div>
       )}
 
-      {/* GRO.vines */}
-      {grovines.length > 0 && (
+      {/* GRO.vines (legacy sheet field) */}
+      {!characterId && grovines.length > 0 && (
         <div>
           <div className="section-badge inline-block text-sm mb-3">GRO.vines</div>
           <div className="space-y-3">
@@ -180,8 +197,8 @@ export default function CharacterSheet({ character, characterId, onRefresh, canE
         </div>
       )}
 
-      {/* Nectars, Blossoms, Thorns */}
-      {traits.length > 0 && (
+      {/* Nectars, Blossoms, Thorns (legacy sheet field) */}
+      {!characterId && traits.length > 0 && (
         <div>
           <div className="section-badge inline-block text-sm mb-3">Traits</div>
           <div className="space-y-2">
