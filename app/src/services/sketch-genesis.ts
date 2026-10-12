@@ -321,15 +321,25 @@ export async function sketchNpc(opts: {
 }
 
 /**
- * "Deepen later" (minimal): flag a sketch for the deep genesis pipeline to
- * pick up in idle cycles. No scheduler yet — the flag is the contract.
+ * "Deepen later": flag a sketch, then hand it to completeCharacter
+ * (services/genesis-complete.ts, 2026-10-12) — a background genesis session
+ * that runs only the stages the sketch lacks (age, possessions, seeds, world
+ * facts, GRO.vine goals). A refusal there (already running, nothing missing)
+ * leaves the flag set and never fails the mark.
  */
-export async function markForDeepening(characterId: string, actor: { id: string; role: string }): Promise<{ characterId: string; deepenRequested: true }> {
+export async function markForDeepening(characterId: string, actor: { id: string; role: string }): Promise<{ characterId: string; deepenRequested: true; sessionId?: string | null; stages?: string[] }> {
   const row = await prisma.character.findUnique({ where: { id: characterId }, select: { campaignId: true } });
   if (!row || !row.campaignId) throw new NotFoundError('Character not found');
   await requireCampaignGM(row.campaignId, actor);
   await prisma.character.update({ where: { id: characterId }, data: { deepenRequested: true } });
-  return { characterId, deepenRequested: true };
+  try {
+    const { completeCharacter } = await import('./genesis-complete');
+    const r = await completeCharacter(characterId, actor);
+    return { characterId, deepenRequested: true, sessionId: r.sessionId, stages: [...r.stages] };
+  } catch (err) {
+    console.warn(`[sketch-genesis] deepen not opened for ${characterId}: ${err instanceof Error ? err.message : 'error'}`);
+    return { characterId, deepenRequested: true };
+  }
 }
 
 /** Test seam: forget every job. */

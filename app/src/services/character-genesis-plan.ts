@@ -44,7 +44,8 @@ export function buildGenesisPlan(input: GenesisPlanInput, name: string, characte
     '2 LEDGER — daya_seed_memory era by era, sealed experiential language, many small batches',
     '3 MECHANICS — search_catalog first (seed/root/branches); pull stock; forge gaps w/ biography-citing ✎ notes; blocked on the GM batch',
     '4 SHEET — edit_character_sheet once blocks are approved',
-    '5 DONE — quiet 2-3 line completion; full dossier awaits review (committing = ratification)',
+    '5 SHEET DONE — set status=done when the sheet stands; the system then runs AGE → POSSESSIONS → SEEDS → WORLD FACTS → VINES, one stage at a time (each cycle carries its law and tools)',
+    '6 BORN — after VINES: quiet 2-3 line completion; full dossier awaits review (committing = ratification)',
   ].filter((line): line is string => line !== null).join('\n');
 }
 

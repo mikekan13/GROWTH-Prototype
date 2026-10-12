@@ -133,7 +133,11 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
 
 /** Tools offered ONLY when a dispatch names them in allowedTools (the
  *  genesis prod stage, 2026-10-12) — never in ordinary chat or build cycles. */
-const STAGE_ONLY_TOOLS = new Set(['raise_prod', 'end_prod_round']);
+const STAGE_ONLY_TOOLS = new Set([
+  'raise_prod', 'end_prod_round',
+  // Genesis completion stages (2026-10-12): offered only in their own stage cycle.
+  'set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal',
+]);
 
 /** Tools offered ONLY on the table lane — a live dispatch from the Watcher
  *  at the table, never a JEWL work cycle (SKETCH genesis, 2026-10-12: the

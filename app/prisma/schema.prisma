@@ -405,10 +405,16 @@ model Character {
   portrait   String?
   status     String              @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, ACTIVE, DEAD, RETIRED
   // Genesis speed tier (2026-10-12): 'SKETCH' = improvised mid-session in one
-  // call (services/sketch-genesis.ts); null = ordinary/deep genesis.
+  // call (services/sketch-genesis.ts); 'SEED' = a shell another character's
+  // genesis seeded (services/genesis-seeds.ts — no sheet, no model call);
+  // null = ordinary/deep genesis.
   genesisTier     String?
   // "Deepen later": the deep pipeline may pick up sketches with this set.
+  // Marking it opens completeCharacter (services/genesis-complete.ts).
   deepenRequested Boolean @default(false)
+  // Genesis SEED (2026-10-12): the character whose genesis seeded this shell
+  // (a named person from her backstory). Null = not a seed.
+  seededFromId    String?
   backstory  CharacterBackstory?
   changeLogs ChangeLog[]
   portraitGenerations PortraitGeneration[]
@@ -420,6 +426,7 @@ model Character {
   updatedAt  DateTime            @updatedAt
 
   @@index([entityType])
+  @@index([seededFromId])
 }
 
 model CharacterBackstory {
@@ -713,6 +720,10 @@ model CharacterBlockLink {
   history     String   @default("[]")
   /// The genesis work session that made the link (null = attached outside genesis).
   sessionId   String?
+  /// INSTANCE years (2026-10-12): the calendar years THIS bearer spent in the
+  /// block. Null = the archetype's own ageAdded. Starting age = Σ over her
+  /// roots + branches (seeds add 0). Never changes the archetype's mechanics.
+  ageAdded    Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -891,6 +902,11 @@ model Goal {
   // Opportunity moments (T33): the O of GRO — GM-triggered leverage moments.
   opportunities   String?   // JSON: [{ id, description, narrative?, status: OPEN|RESOLVED, outcome?, method?, note?, declaredAt, resolvedAt? }]
   nectarsEarned   Int       @default(0)
+  /// Who authored the GOAL third (2026-10-12): 'ai' = chosen by JEWL at
+  /// genesis (a seated Trailblazer's edit overwrites it → 'trailblazer');
+  /// null = legacy/human. Genesis never authors Resistance (Watcher) or
+  /// Opportunity (godhead).
+  authoredBy      String?
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

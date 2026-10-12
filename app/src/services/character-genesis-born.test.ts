@@ -48,7 +48,8 @@ describe('awakenGenesisCharacter', () => {
 });
 
 describe('updateWorkSession → done on a genesis', () => {
-  const row = { id: 's1', campaignId: 'c1', goal: GOAL, status: 'active', stage: 'BUILDING', progress: '[]' };
+  // Born comes after the LAST completion stage (VINES, 2026-10-12).
+  const row = { id: 's1', campaignId: 'c1', goal: GOAL, status: 'active', stage: 'VINES', progress: '[]' };
 
   it('Born sets the character ACTIVE', async () => {
     db.dayaWorkSession.findUnique.mockResolvedValue(row);

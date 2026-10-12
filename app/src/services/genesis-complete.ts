@@ -1,0 +1,105 @@
+/**
+ * completeCharacter (2026-10-12) — finish a character that is already BORN.
+ *
+ * Violet was born before the completion stages existed: no age/birthCycle,
+ * no possessions, no NPC/location seeds, no world facts, no GRO.vines, a
+ * duplicate root link and an empty creation view. This opens a short genesis
+ * work session that runs ONLY the stages she still lacks
+ * (services/genesis-stages.ts detects them), in order, then she is Born again
+ * (idempotent wake). It is also the sketch tier's "deepen later" hook
+ * (sketch-genesis.markForDeepening).
+ *
+ * Before opening: duplicate block links are removed and the creation view is
+ * mirrored from the links (no model call). Prior prod decisions — above all
+ * the threads the GM LEFT OPEN — ride into the new plan so they stay unfilled.
+ * Watcher/ADMIN only (campaign GM of record).
+ */
+import 'server-only';
+import { prisma } from '@/lib/db';
+import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
+import { requireCampaignGM } from './campaign-access';
+import { openWorkSession } from './daya-work-session';
+import { buildGenesisPlan, buildProdSections, type PlanProd } from './character-genesis-plan';
+import { dedupeBlockLinks, syncCreationFromBlockLinks } from './genesis-sheet-sync';
+import { GENESIS_POST_SHEET_STAGES, detectMissingStages, type GenesisPostSheetStage } from './genesis-stages';
+
+export const COMPLETION_HEADER = '== COMPLETION — this character is already BORN ==';
+
+/** The plan a completion session carries. Pure. */
+export function buildCompletionPlan(brief: string, prods: PlanProd[], stages: GenesisPostSheetStage[]): string {
+  return [
+    brief.trim(),
+    ...(prods.length ? ['', buildProdSections(prods)] : []),
+    '',
+    COMPLETION_HEADER,
+    `Run ONLY these stages, in order: ${stages.join(' → ')}. Each stage's cycle tells you its law and tools.`,
+    'Her genome, memories, blocks and sheet already stand — never redo or redraft them. Build only what these stages add.',
+  ].join('\n');
+}
+
+/** Is this character born (genesis finished, a sketch, or awake)? Pure. */
+export function isBorn(c: { genesisTier: string | null; dayaStatus: string | null; finishedGenesis: boolean }): boolean {
+  return c.finishedGenesis || c.genesisTier === 'SKETCH' || c.dayaStatus === 'ACTIVE';
+}
+
+export async function completeCharacter(characterId: string, actor: { id: string; role: string }) {
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { id: true, name: true, campaignId: true, genesisTier: true, data: true, daya: { select: { status: true } } },
+  });
+  if (!character) throw new NotFoundError('Character not found');
+  if (!character.campaignId) throw new ValidationError('Character has no campaign — completion runs inside a campaign world.');
+  const campaignId = character.campaignId;
+  await requireCampaignGM(campaignId, actor);
+
+  const inFlight = await prisma.dayaWorkSession.findFirst({
+    where: { campaignId, status: { in: ['active', 'blocked'] }, goal: { contains: `[${characterId}]` } },
+    select: { id: true },
+  });
+  if (inFlight) throw new ConflictError('Genesis is already running for this character — see its progress on the character page.');
+
+  const lastDone = await prisma.dayaWorkSession.findFirst({
+    where: { campaignId, status: 'done', goal: { startsWith: 'Character genesis' }, AND: [{ goal: { contains: `[${characterId}]` } }] },
+    orderBy: { startedAt: 'desc' },
+    select: { id: true, plan: true },
+  });
+  if (!isBorn({ genesisTier: character.genesisTier, dayaStatus: character.daya?.status ?? null, finishedGenesis: !!lastDone })) {
+    throw new ValidationError('This character is not born yet — submit her genesis first.');
+  }
+
+  const { removed } = await dedupeBlockLinks(characterId);
+  // Repairs the creation view and the seed's numbers (Fate Die, Frequency
+  // pool) where a born sheet disagrees with her seed; the sync logs them.
+  const { corrections } = await syncCreationFromBlockLinks(characterId);
+
+  const missing = await detectMissingStages(characterId);
+  const stages = GENESIS_POST_SHEET_STAGES.filter(s => missing.has(s));
+  if (!stages.length) return { opened: false as const, sessionId: null, stages, removedDuplicateLinks: removed.length, seedCorrections: corrections };
+
+  const prods: PlanProd[] = lastDone
+    ? await prisma.genesisProd.findMany({
+      where: { sessionId: lastDone.id },
+      orderBy: [{ round: 'asc' }, { order: 'asc' }],
+      select: { id: true, anchorQuote: true, question: true, status: true, answer: true, jewlFill: true },
+    })
+    : [];
+  let brief = lastDone?.plan ?? '';
+  if (!brief) {
+    let sheet: { backstory?: { backstory?: string; notes?: string }; identity?: { age?: number } } = {};
+    try { sheet = JSON.parse(character.data); } catch { sheet = {}; }
+    const story = sheet.backstory?.backstory || sheet.backstory?.notes || '(no backstory recorded — work from her sheet and memories)';
+    brief = buildGenesisPlan({ backstory: story, desiredAge: sheet.identity?.age }, character.name, characterId);
+  }
+
+  const session = await openWorkSession({
+    campaignId,
+    goal: `Character genesis: ${character.name} [${characterId}] — complete the born character: ${stages.join(' → ')}.`,
+    plan: buildCompletionPlan(brief, prods, stages),
+    createdBy: actor.id,
+    stage: stages[0],
+    continueUnattended: true,
+  });
+  const { kickWorkLoop } = await import('@/ai/copilot/work-loop');
+  kickWorkLoop();
+  return { opened: true as const, sessionId: session.id, stages, removedDuplicateLinks: removed.length, seedCorrections: corrections };
+}

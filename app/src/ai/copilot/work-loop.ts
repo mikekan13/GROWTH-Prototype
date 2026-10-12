@@ -42,7 +42,7 @@ import {
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
 import { warnQuestionOutsideProd } from '@/lib/genesis-question';
-import { planWorkCycle, type CycleProd, type CycleCatalog, type CycleDrafting } from './work-cycle-text';
+import { planWorkCycle, type CycleProd, type CycleCatalog, type CycleDrafting, type CompletionContext } from './work-cycle-text';
 import { rejectedShapes } from '@/services/block-archetype';
 import { prisma } from '@/lib/db';
 import { pickSessionsToStart, workConcurrency } from './work-loop-schedule';
@@ -246,7 +246,16 @@ async function runCycle(session: {
       drafting.feedback = await loadPendingFeedback(session.campaignId, session.id, jewl.characterUserId);
     } catch { /* feedback also rides in the progress notes */ }
   }
-  const { text, allowedTools, excludedTools, stageTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting);
+  // Completion stages (2026-10-12): SEEDS / WORLD_FACTS read the GM's own
+  // typed world messages (fiction by the wall) as their sources.
+  let completion: CompletionContext | null = null;
+  if (isGenesisGoal(session.goal) && (session.stage === 'SEEDS' || session.stage === 'WORLD_FACTS')) {
+    try {
+      const { loadGmWorldMessages } = await import('@/services/genesis-stages');
+      completion = { worldMessages: await loadGmWorldMessages(session.campaignId) };
+    } catch { completion = null; }
+  }
+  const { text, allowedTools, excludedTools, stageTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting, completion);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
