@@ -8,6 +8,12 @@
  */
 import { buildProdSections } from '@/services/character-genesis-plan';
 import { ARCHETYPE_LAW } from '@/services/block-archetype';
+import {
+  GENESIS_POST_SHEET_STAGES,
+  isPostSheetStage,
+  type GenesisPostSheetStage,
+  type GmWorldMessage,
+} from '@/lib/genesis-stages';
 
 export interface WorkCycleSession {
   id: string;
@@ -184,6 +190,97 @@ export function genesisQuestionLaw(sessionId: string): string {
   ].join('\n');
 }
 
+// ── Completion stages: after the sheet, before Born (Mike 2026-10-12) ───
+// AGE → POSSESSIONS → SEEDS → WORLD_FACTS → VINES. Each stage's cycle offers
+// ONLY its own tools; "done" walks to the next missing stage (daya-work-session).
+
+/** Tools every completion stage keeps. */
+export const COMPLETION_COMMON_TOOLS = ['update_work_session', 'raise_prod', 'record_delegated_choice'] as const;
+
+/** The tools of each completion stage. */
+export const COMPLETION_STAGE_TOOLS: Record<GenesisPostSheetStage, readonly string[]> = {
+  AGE: ['set_starting_age'],
+  POSSESSIONS: ['search_catalog', 'pull_from_catalog', 'grant_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item', 'read_location'],
+  SEEDS: ['seed_npc', 'seed_location', 'read_location'],
+  WORLD_FACTS: ['establish_world_facts', 'read_location'],
+  VINES: ['author_vine_goal'],
+};
+
+/** The law of each completion stage — carried verbatim in its cycles. */
+export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
+  AGE: [
+    'STAGE: AGE — age is ADDITIVE (canon r-2026-08-19-01).',
+    '- Her starting age = the sum of the years she spent in each root and branch. The seed adds 0. Her current age then runs on the campaign clock from her birthCycle; her fatedAge is the seed\'s lifespan.',
+    '- The brief\'s AGE is canon. If her blocks\' years do not sum to it, assign HER years per block from her chronology (set_starting_age years[]) — an archetype\'s default years are not hers, and her years never change the archetype.',
+    '- A root covers at most 25 years. Call set_starting_age (it refuses a sum that misses the AGE), then finish the stage.',
+  ].join('\n'),
+  POSSESSIONS: [
+    'STAGE: POSSESSIONS — her story\'s prose grants become real things.',
+    '- Read the backstory and settled answers for what she HAS: what she wears, what she carries, what she owns (keepsakes, the tools of her work, the things that name her life). Only what the story grants or her life plainly implies — no loot, no gear lists.',
+    '- CATALOG FIRST: where a stock or campaign item archetype fits, grant_possession it by exact name with HER paint (localName + story). Stock is free.',
+    '- Nothing fits → propose_forge_blueprint type "item": the ARCHETYPE stays campaign-agnostic ("Silver Butter Knife" — no proper nouns, no bearer), with characterId + attachmentStory + localName for her instance. The chain grades it; the Watcher\'s approval spends the KRMA. Grant it once published; while drafts wait, set status=blocked on the Forge.',
+    '- Tiers: equipped = worn on a region of HER body (slot = a region key the tool lists), carried = on her person, owned = the deed only (her home\'s contents she owns, a car, a box in storage — not on her). Weight in real pounds.',
+    '- Wealth that is not a thing (savings, income) is not a possession — say so in your progress note; never invent currency items.',
+  ].join('\n'),
+  SEEDS: [
+    'STAGE: SEEDS — the people and places of her story become seeds for the Watcher.',
+    '- Every PERSON the backstory or the settled answers NAME → seed_npc: who they are to her, valence (-1..+1), what the story says of them, the open thread between them. Never create a person the story does not name. No sheets, no portraits.',
+    '- OPEN THREADS ARE NEVER FILLED: a thread the GM LEFT OPEN rides as openThreadProdId alone. Never write an answer, a hint or a guess for it anywhere.',
+    '- Her home (and her hometown or workplace, where named) → seed_location. Draw it from the GM WORLD MESSAGES below and the backstory and cite the message ids you used; be as specific as those sources, no further. Places are not forged. owned only if she holds the deed.',
+  ].join('\n'),
+  WORLD_FACTS: [
+    'STAGE: WORLD FACTS — the substrate play will touch first.',
+    '- establish_world_facts for her home as the GM described it (what is where, surfaces, objects, their states, sounds), and the standing facts about the people and places you seeded. Dotted stable subjectKeys ("violet_apartment.desk.laptop"), concrete, present tense; batch a place per call.',
+    '- Facts come only from the sources: the GM WORLD MESSAGES below, the backstory, the settled answers. Never state a fact that answers an OPEN THREAD.',
+  ].join('\n'),
+  VINES: [
+    'STAGE: VINES — choose the GOALS of her GRO.vines.',
+    '- A GRO.vine is a three-author contract: the Goal is the entity\'s, the Resistance is the Watcher\'s, the Opportunity is the godhead\'s. You write the GOAL only — never resistance, never opportunity.',
+    '- What she wants, in her own terms, as her history makes her want it — up to her seed\'s slots (the tool says how many). Fewer is fine. An open thread never becomes a goal\'s answer.',
+    '- These are AI-chosen, as simulation is: a Trailblazer seated in her overwrites them.',
+  ].join('\n'),
+};
+
+/** What the completion stage cycles carry beyond the session. */
+export interface CompletionContext {
+  /** The GM's typed world messages (SEEDS / WORLD_FACTS). */
+  worldMessages?: GmWorldMessage[];
+  /** Stock item archetypes in the catalog (POSSESSIONS). */
+  stockItems?: number;
+}
+
+/** One completion-stage cycle's text. Pure. */
+export function buildCompletionStageText(
+  session: WorkCycleSession & { stage: GenesisPostSheetStage },
+  recentNotes: string[],
+  ctx: CompletionContext,
+  extras: string[],
+): string {
+  const stage = session.stage;
+  const order = GENESIS_POST_SHEET_STAGES.map(s => (s === stage ? `[${s}]` : s)).join(' → ');
+  const world = (stage === 'SEEDS' || stage === 'WORLD_FACTS')
+    ? (ctx.worldMessages?.length
+      ? `GM WORLD MESSAGES (what the GM typed about the world — sources; cite ids):\n${ctx.worldMessages.map(m => `[${m.id}] (${m.at}) ${m.text}`).join('\n\n')}`
+      : 'GM WORLD MESSAGES: none — the backstory and settled answers are your only sources.')
+    : null;
+  const catalog = stage === 'POSSESSIONS' && ctx.stockItems != null
+    ? (ctx.stockItems > 0
+      ? `CATALOG: ${ctx.stockItems} stock item archetype${ctx.stockItems === 1 ? '' : 's'}. Search ONCE (one search_catalog call with queries:[…] for every thing she has), then grant.`
+      : 'CATALOG: the stock catalog holds no items — do not search it; reuse campaign items, draft the true gaps.')
+    : null;
+  return [
+    `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}. GENESIS STAGE: ${stage} (${order} → Born).`,
+    `GOAL: ${session.goal}`,
+    COMPLETION_STAGE_LAW[stage],
+    `FINISH: when this stage is complete, call update_work_session({sessionId: "${session.id}", progressNote, status: "done"}) — the system moves genesis to the next stage (Born after the last). One progress line per cycle; quiet, never an inventory.`,
+    ...extras,
+    ...(catalog ? [catalog] : []),
+    ...(world ? [world] : []),
+    recentNotes.length ? `YOUR RECENT PROGRESS NOTES:\n${recentNotes.map(n => `- ${n}`).join('\n')}` : 'No progress notes in this stage yet.',
+    `THE BRIEF (her genome and the GM's decisions):\n${session.plan ?? '(no brief recorded)'}`,
+  ].join('\n\n');
+}
+
 /**
  * What one cycle sends (work-loop.ts). Pure. PRODDING → the prod text and
  * ONLY the prod tools; otherwise the normal cycle, with the GM's prod
@@ -199,6 +296,7 @@ export function planWorkCycle(
   recentNotes: string[],
   catalog?: CycleCatalog | null,
   drafting?: CycleDrafting | null,
+  completion?: CompletionContext | null,
 ): { text: string; allowedTools?: string[]; excludedTools?: string[]; stageTools?: string[] } {
   if (session.stage === 'PRODDING') {
     return { text: buildProdCycleText(session, prods), allowedTools: [...PROD_STAGE_TOOLS] };
@@ -207,6 +305,21 @@ export function planWorkCycle(
   const plan = prods.length && session.plan
     ? `${session.plan}\n\n${buildProdSections(prods)}`
     : session.plan;
+  if (genesis && isPostSheetStage(session.stage)) {
+    const stage = session.stage;
+    const extras = [
+      ...(stage === 'POSSESSIONS' && drafting ? [draftingGuidance(drafting)] : []),
+      genesisQuestionLaw(session.id),
+    ];
+    return {
+      text: buildCompletionStageText({ ...session, plan, stage }, recentNotes, {
+        ...completion,
+        ...(stage === 'POSSESSIONS' && catalog ? { stockItems: catalog.counts.item ?? 0 } : {}),
+      }, extras),
+      allowedTools: [...COMPLETION_COMMON_TOOLS, ...COMPLETION_STAGE_TOOLS[stage]]
+        .filter(t => !(t === 'search_catalog' && stage === 'POSSESSIONS' && catalog && !(catalog.counts.item ?? 0))),
+    };
+  }
   const guide = catalog ? catalogGuidance(catalog) : null;
   const treasury = [treasuryLine, guide?.line, drafting ? draftingGuidance(drafting) : null,
     genesis ? genesisQuestionLaw(session.id) : null]

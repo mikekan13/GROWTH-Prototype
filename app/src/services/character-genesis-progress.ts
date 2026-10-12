@@ -32,6 +32,7 @@ import { requireCampaignGM } from './campaign-access';
 import { readSeedPick } from '@/lib/seed-state';
 import { deriveCharacterCompletion, type CharacterCompletion } from './character-completion';
 import { isProdsBlocked } from '@/lib/genesis-question';
+import { GENESIS_POST_SHEET_STAGES, isPostSheetStage } from '@/lib/genesis-stages';
 
 export const GENESIS_STAGES = [
   { key: 'open', label: 'Genesis session opened' },
@@ -40,6 +41,12 @@ export const GENESIS_STAGES = [
   { key: 'ledger', label: 'Sealing the memory ledger' },
   { key: 'mechanics', label: 'Translating to mechanics · catalog first' },
   { key: 'sheet', label: 'Writing the sheet' },
+  // Completion stages (2026-10-12): after the sheet, before Born.
+  { key: 'age', label: 'Setting her age' },
+  { key: 'possessions', label: 'Possessions · catalog first' },
+  { key: 'seeds', label: 'Seeding people & places' },
+  { key: 'worldfacts', label: 'Establishing world facts' },
+  { key: 'vines', label: 'Choosing GRO.vine goals' },
   { key: 'born', label: 'Born' },
 ] as const;
 
@@ -291,7 +298,9 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
     if (facts.entityAuthored || facts.memoryCount > 0) reached = 3;
     if (facts.forged.length > 0) reached = 4;
     if (facts.forged.length > 0 && pendingApproval === 0 && s.status === 'active') reached = 5;
-    if (s.status === 'done') reached = 6;
+    const post = isPostSheetStage(s.stage) ? GENESIS_POST_SHEET_STAGES.indexOf(s.stage) : -1;
+    if (post >= 0) reached = 6 + post;
+    if (s.status === 'done') reached = GENESIS_STAGES.length - 1;
   }
 
   const done = s.status === 'done';

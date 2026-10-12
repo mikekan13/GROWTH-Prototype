@@ -49,6 +49,7 @@ import './daya-author-entity';
 import './daya-seed-memory';
 import './ask-terminal';
 import './genesis-prods';
+import './genesis-completion';
 import './sketch-npc';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';

@@ -71,6 +71,8 @@ Universal entity sheet — players, NPCs, creatures, and God-heads all use the s
 - `portrait`: Path to portrait image (null until generated)
 - `status`: DRAFT → SUBMITTED → APPROVED → ACTIVE → DEAD | RETIRED
 - `genesisTier` (2026-10-12, migration `20261012140000_character_genesis_tier`): `'SKETCH'` = improvised mid-session in one call by `services/sketch-genesis.ts` (valid wallet-priced sheet + voice + 3–5 memories, DayaEntity ACTIVE); null = ordinary / deep genesis.
+- `genesisTier = 'SEED'` + `seededFromId` (2026-10-12, migration `20261012200000_genesis_completion`): an NPC SEED shell a character's genesis made for a person her backstory names (`services/genesis-seeds.ts#seedNpc`) — entityType NPC, status DRAFT (below the crystallization line, no KV/KRMA), default sheet, `data._seed {fromCharacterId, relation, valence -1..1, openThread, unresolved, openThreadProdId?, sessionId, seededAt}`; edge `knows` character → NPC carries the same. No model call. `seededFromId` (indexed) = the seeding character.
+- `data._genesisStages` (JSON on the sheet): `{AGE|POSSESSIONS|SEEDS|WORLD_FACTS|VINES: iso}` — completion stages finished (services/genesis-stages.ts).
 - `deepenRequested` (same migration, default false): "deepen later" — `markForDeepening()` sets it; the deep genesis pipeline may pick these up in idle cycles (no scheduler yet).
 - Sketch sheets carry `data._npc.description` (the persona line perception reads) and `data._sketch` {tier, seedText, voice, traitHints (plain text, unpriced), repairs, tkv, proposedTkv, clamped, sketchedAt}.
 - Ownership: Player owns PCs, GM owns NPCs, Admin owns God-heads
@@ -348,6 +350,8 @@ Core gameplay loop entity. Tracks a character's narrative goal with God-head cus
   - `completedAt`: DateTime (nullable)
 - Indexes: `(characterId, status)`, `(campaignId, status)`, `(custodianId)`
 
+- `authoredBy` (String?, 2026-10-12, migration `20261012200000_genesis_completion`): who authored the GOAL third — `'ai'` = chosen by JEWL at genesis (`author_vine_goal`, services/genesis-vines.ts), `'trailblazer'` once the seated owner edits it (services/goal.ts#updateGoal), null = legacy/human. Genesis never writes Resistance or Opportunity.
+
 ### EntityRelationship
 Graph edge connecting any two entities in the campaign. Enables God-head context queries.
 - `campaignId`: String (nullable) — null for cross-campaign relationships (God-head networks)
@@ -520,6 +524,7 @@ JEWL's question to the GM about a creative gap in the seed, raised in PRODDING. 
 ## CharacterBlockLink + CampaignItem paint (NARRATIVE PAINT, Mike 2026-10-12 — migration `20261012160000_narrative_paint_block_links`)
 Blocks and items are campaign-agnostic archetypes; the campaign INSTANCE carries the paint (two ledgers, [[story-attachment-two-ledgers-2026-08-19]]). Paint never changes mechanics.
 - **CharacterBlockLink** — a character's instance of a Forge block or item (may point at a draft: genesis attaches before approval). `campaignId`, `characterId`, `forgeItemId` (scalars, no FKs), `localName?` (≤100, e.g. "Rosemary's keepsake"), `story` (≤600, bearer-specific, may carry proper nouns), `history` (JSON `[{kind, at, text}]`, seeded with an `origin` entry), `sessionId?` (the genesis session that made it), `createdAt`/`updatedAt`. Unique (characterId, forgeItemId); indexes (campaignId, characterId), (forgeItemId), (sessionId). Written by `services/block-attachment.ts` (propose_forge_blueprint with characterId+attachmentStory, attach_block); links to withdrawn drafts are deleted by the GM redraft.
+- **CharacterBlockLink.ageAdded** (Int?, 2026-10-12, migration `20261012200000_genesis_completion`) — INSTANCE years: the calendar years THIS bearer spent in the block; null = the archetype's own `ageAdded`. Starting age = Σ over her roots + branches (seeds 0), written by `set_starting_age` (`services/genesis-age.ts`), which also stamps `identity.age`, `birthCycle = currentCycle − age` and the top-level `fatedAge`. Never changes the archetype's mechanics. Duplicate links per archetype (same type + name once a ` [w:xxxx]` redraft tag is stripped) are removed by `services/genesis-sheet-sync.ts#dedupeBlockLinks` (newest live wins).
 - **CampaignItem** gains `sourceForgeItemId?` (the archetype blueprint), `story?` (≤600), `history` (JSON, default `[]`, origin entry at instantiation). `name` is the instance's LOCAL name. Written by `createCampaignItem` (place_item passes them).
 
 ## Encounter (Unit 1, migration 20260905095440_encounter_unit1)

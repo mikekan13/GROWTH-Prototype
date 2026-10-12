@@ -192,9 +192,15 @@ export async function updateGoal(
     }
   }
 
+  // AI-chosen vines are overwritable by the Trailblazer in the entity's seat
+  // (Mike 2026-10-12): the seat's own edit of the GOAL makes it theirs.
+  const seatedEdit = isOwner && !isGM && !isAdminRole(userRole)
+    && (input.description !== undefined || input.priority !== undefined);
+
   return prisma.goal.update({
     where: { id: goalId },
     data: {
+      ...(seatedEdit ? { authoredBy: 'trailblazer' } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.priority !== undefined ? { priority: input.priority } : {}),
       ...(input.resistancePlan !== undefined ? { resistancePlan: input.resistancePlan } : {}),

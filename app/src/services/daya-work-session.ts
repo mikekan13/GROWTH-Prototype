@@ -105,9 +105,35 @@ export async function updateWorkSession(opts: {
   }
 
   const data: Record<string, unknown> = {};
-  if (opts.progressNote) {
+  const stageNotes: string[] = [];
+  // Completion stages (2026-10-12): a genesis in a build-phase stage that
+  // says "done" walks to the next stage its character still lacks
+  // (AGE → POSSESSIONS → SEEDS → WORLD_FACTS → VINES); only after the last
+  // one is she Born.
+  if (opts.status === 'done' && session.goal.startsWith('Character genesis')) {
+    const stages = await import('./genesis-stages');
+    if (stages.isBuildPhaseStage(session.stage)) {
+      const { parseGenesisGoal } = await import('./character-genesis-progress');
+      const characterId = parseGenesisGoal(session.goal)?.characterId;
+      let next: string | null = null;
+      try {
+        next = characterId ? await stages.advanceGenesisStage(characterId, session.stage!) : null;
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[daya-work-session] stage advance failed:', err);
+        next = stages.nextGenesisStage(session.stage, null);
+      }
+      if (next) {
+        data.stage = next;
+        stageNotes.push(`[system] stage ${session.stage} complete → ${next}`);
+        opts = { ...opts, status: session.status === 'active' ? undefined : 'active' };
+      }
+    }
+  }
+  if (opts.progressNote || stageNotes.length) {
     const notes = parseProgress(session.progress);
-    notes.push(opts.progressNote);
+    if (opts.progressNote) notes.push(opts.progressNote);
+    notes.push(...stageNotes);
     data.progress = JSON.stringify(notes.slice(-MAX_PROGRESS_NOTES));
   }
   if (opts.plan !== undefined) data.plan = opts.plan;
@@ -151,7 +177,7 @@ export async function updateWorkSession(opts: {
   if (opts.status === 'blocked') emit(session.campaignId, 'blocked', updated, updated.blockedReason ?? undefined);
   else if (opts.status === 'done') emit(session.campaignId, 'done', updated, opts.progressNote);
   else if (opts.status === 'cancelled') emit(session.campaignId, 'cancelled', updated);
-  else if (opts.progressNote) emit(session.campaignId, 'progress', updated, opts.progressNote);
+  else if (opts.progressNote || stageNotes.length) emit(session.campaignId, 'progress', updated, opts.progressNote ?? stageNotes[0]);
 
   return updated;
 }

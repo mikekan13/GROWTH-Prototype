@@ -58,7 +58,7 @@ describe('WORK_CYCLE / GENESIS tool sets (as before)', () => {
     expect(work).not.toContain('sketch_npc');
     expect(work).not.toContain(REQUEST_TOOL);
     expect(work).toContain('create_location');
-    expect(work.length).toBe(listJewlTools().filter(t => !['sketch_npc', 'raise_prod', 'end_prod_round'].includes(t.name)).length);
+    expect(work.length).toBe(listJewlTools().filter(t => !['sketch_npc', 'raise_prod', 'end_prod_round', 'set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal'].includes(t.name)).length);
   });
 
   it('a genesis prod stage is still restricted to its allow-list', () => {
@@ -158,4 +158,31 @@ describe('location tool specs are slim', () => {
       expect(JSON.stringify(s.inputSchema)).toContain('"maxLength":2500');
     });
   }
+});
+
+describe('genesis completion-stage tools (merge guard, 2026-10-12)', () => {
+  const STAGE = ['set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal'];
+
+  it('exist in the registry', () => {
+    for (const n of STAGE) expect(getJewlTool(n), n).toBeDefined();
+  });
+
+  it('never reach TABLE_CHAT — not offered, not requestable, not on a tick', () => {
+    for (const tick of [false, true]) {
+      const names = buildToolSpecs(undefined, false, undefined, undefined, { kind: 'TABLE_CHAT', tick }).map(t => t.name);
+      const req = requestableTools(undefined, false, undefined, undefined, tick);
+      for (const n of STAGE) {
+        expect(names, n).not.toContain(n);
+        expect(req, n).not.toContain(n);
+      }
+    }
+  });
+
+  it('are absent from ordinary work cycles and offered only when a stage names them', () => {
+    const cycle = buildToolSpecs(undefined, true, undefined, undefined, { kind: 'GENESIS' }).map(t => t.name);
+    for (const n of STAGE) expect(cycle, n).not.toContain(n);
+    const stage = buildToolSpecs(['set_starting_age', 'update_work_session'], true, undefined, undefined, { kind: 'GENESIS' }).map(t => t.name);
+    expect(stage).toContain('set_starting_age');
+    expect(stage).not.toContain('grant_possession');
+  });
 });
