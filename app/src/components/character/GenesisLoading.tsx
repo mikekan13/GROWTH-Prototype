@@ -322,7 +322,9 @@ export function GenesisLoadingOverlay({
       {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
         <GenesisOpenThreads threads={progress?.openThreads ?? []} />
       )}
-      {campaignId && progress && stepsN > 0 && (
+      {/* Mounted while 0 steps too: a row sent back with feedback stays
+          "revising…" until its redraft lands (the component renders null when empty). */}
+      {campaignId && progress && !progress.prodding && (
         <GenesisGmSteps steps={progress.gmSteps} campaignId={campaignId}
           onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} onOpenAppearance={onOpenAppearance} />
       )}

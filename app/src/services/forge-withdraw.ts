@@ -15,6 +15,8 @@ export async function withdrawForgeDraft(opts: {
   jewlUserId: string;
   reason?: string | null;
   by: string;
+  /** Extra audit fields on the withdrawn tag (GM feedback: revisionNote, sessionId). */
+  tag?: Record<string, unknown>;
 }) {
   const item = await prisma.forgeItem.findUnique({
     where: { id: opts.forgeItemId },
@@ -42,6 +44,8 @@ export async function withdrawForgeDraft(opts: {
           reason: opts.reason ?? null,
           at: new Date().toISOString(),
           originalName: item.name,
+          type: item.type,
+          ...(opts.tag ?? {}),
         },
       }),
     },

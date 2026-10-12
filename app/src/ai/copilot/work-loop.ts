@@ -240,6 +240,10 @@ async function runCycle(session: {
       });
       drafting = { campaignBlocks: blocks, rejected: rejectedShapes(parseProgress(session.progress)) };
     } catch { drafting = { rejected: rejectedShapes(parseProgress(session.progress)) }; }
+    try {
+      const { loadPendingFeedback } = await import('@/services/genesis-redraft');
+      drafting.feedback = await loadPendingFeedback(session.campaignId, session.id, jewl.characterUserId);
+    } catch { /* feedback also rides in the progress notes */ }
   }
   const { text, allowedTools, excludedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting);
 

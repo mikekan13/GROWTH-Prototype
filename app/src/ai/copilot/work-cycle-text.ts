@@ -143,12 +143,17 @@ export interface CycleDrafting {
   campaignBlocks?: Array<{ type: string; name: string }>;
   /** Shapes already rejected for this session (validator / GM redraft). */
   rejected?: string[];
+  /** GM feedback on single drafts still awaiting a redraft — carried verbatim. */
+  feedback?: string[];
 }
 
 /** The ARCHETYPE section of a genesis build cycle. Pure. */
 export function draftingGuidance(d: CycleDrafting): string {
   const blocks = d.campaignBlocks ?? [];
   return [
+    ...(d.feedback?.length
+      ? [`GM FEEDBACK — the GM sent these drafts back; redraft each one (and only these) per his note:\n${d.feedback.map(f => `- ${f}`).join('\n')}`]
+      : []),
     ARCHETYPE_LAW,
     'REUSE FIRST, EVEN WHEN DRAFTING: before drafting a block, check whether an existing stock or campaign block already fits the archetype — if one does, attach_block it with her bearer-specific story instead of drafting a duplicate. ' +
       'Every block you DO draft carries characterId + attachmentStory (her specifics; proper nouns allowed there and only there).',

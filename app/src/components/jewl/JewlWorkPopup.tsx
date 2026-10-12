@@ -121,9 +121,8 @@ function SessionScreen({ view, liveTool, campaignId, onClose, onChanged, tabs, f
   return (
     <JewlWorkScreen model={model} log={view.log.map((text, i) => ({ id: `${view.id}:${i}`, text }))} onClose={onClose} tabs={tabs}>
       <NeedsYouList items={others} />
-      {view.gmSteps.length > 0 && (
-        <GenesisGmSteps steps={view.gmSteps} campaignId={campaignId} onChanged={onChanged} onOpenForge={onClose} />
-      )}
+      {/* mounted at 0 too: a row sent back with feedback stays "revising…" until its redraft lands */}
+      <GenesisGmSteps steps={view.gmSteps} campaignId={campaignId} onChanged={onChanged} onOpenForge={onClose} />
     </JewlWorkScreen>
   );
 }
