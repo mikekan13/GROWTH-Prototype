@@ -70,6 +70,9 @@ Universal entity sheet — players, NPCs, creatures, and God-heads all use the s
 - `data`: JSON string containing `GrowthCharacter` (see types/growth.ts)
 - `portrait`: Path to portrait image (null until generated)
 - `status`: DRAFT → SUBMITTED → APPROVED → ACTIVE → DEAD | RETIRED
+- `genesisTier` (2026-10-12, migration `20261012140000_character_genesis_tier`): `'SKETCH'` = improvised mid-session in one call by `services/sketch-genesis.ts` (valid wallet-priced sheet + voice + 3–5 memories, DayaEntity ACTIVE); null = ordinary / deep genesis.
+- `deepenRequested` (same migration, default false): "deepen later" — `markForDeepening()` sets it; the deep genesis pipeline may pick these up in idle cycles (no scheduler yet).
+- Sketch sheets carry `data._npc.description` (the persona line perception reads) and `data._sketch` {tier, seedText, voice, traitHints (plain text, unpriced), repairs, tkv, proposedTkv, clamped, sketchedAt}.
 - Ownership: Player owns PCs, GM owns NPCs, Admin owns God-heads
 - Relations: backstory (optional), portraitGenerations[], personaLock (optional), godHead (optional), goals[], daya (optional — DayaEntity, see DAYA persona harness section)
 

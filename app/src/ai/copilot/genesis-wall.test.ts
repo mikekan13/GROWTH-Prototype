@@ -154,3 +154,15 @@ describe('prod stage tool gate (genesis is a dialogue, 2026-10-12)', () => {
     expect(toolOffered('daya_seed_memory')).toBe(true);
   });
 });
+
+describe('table-lane-only tools (SKETCH genesis, 2026-10-12)', () => {
+  it('sketch_npc is offered on table dispatches and never in a work cycle — even if a cycle names it', () => {
+    expect(toolOffered('sketch_npc')).toBe(true);
+    expect(toolOffered('sketch_npc', undefined, false)).toBe(true);
+    expect(toolOffered('sketch_npc', undefined, true)).toBe(false);
+    expect(toolOffered('sketch_npc', ['sketch_npc'], true)).toBe(false);
+    expect(toolOffered('sketch_npc', [...PROD_STAGE_TOOLS])).toBe(false);
+    // Other tools are unaffected by the work-cycle flag.
+    expect(toolOffered('daya_seed_memory', undefined, true)).toBe(true);
+  });
+});
