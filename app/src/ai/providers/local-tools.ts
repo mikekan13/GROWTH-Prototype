@@ -14,6 +14,7 @@
  */
 
 import 'server-only';
+import { screenModelOutput } from '@/lib/lawfulness-hooks';
 import type {
   CallClaudeWithToolsOptions,
   ClaudeContentBlock,
@@ -161,14 +162,20 @@ export async function callLocalWithTools(
     });
   }
 
+  // LAWFULNESS (unit 8b): the local model is abliterated — every text it
+  // returns, and every tool input it writes, is screened before the loop
+  // stores, shows or acts on it. A blocked text becomes the withheld string;
+  // a blocked tool call is dropped (the withheld string stands in for it).
+  const screened = await screenLocalBlocks(blocks, opts.audit?.campaignId);
+
   // Some servers report finish_reason 'stop' even when tool_calls exist —
   // normalize: tool calls present means the loop must execute them.
-  const hasTools = blocks.some(b => b.type === 'tool_use');
+  const hasTools = screened.some(b => b.type === 'tool_use');
   const stopReason = hasTools ? 'tool_use' : mapStopReason(choice?.finish_reason);
 
   return {
     stopReason,
-    blocks,
+    blocks: screened,
     usage: {
       inputTokens: data.usage?.prompt_tokens ?? 0,
       outputTokens: data.usage?.completion_tokens ?? 0,
@@ -176,4 +183,21 @@ export async function callLocalWithTools(
       cacheWriteTokens: 0,
     },
   };
+}
+
+/** Screen a local round's blocks (lane local, source MODEL_OUTPUT). No row exists yet: ref null. */
+async function screenLocalBlocks(blocks: ClaudeContentBlock[], campaignId?: string): Promise<ClaudeContentBlock[]> {
+  const out: ClaudeContentBlock[] = [];
+  for (const b of blocks) {
+    if (b.type === 'text') {
+      const s = await screenModelOutput(b.text, { campaignId: campaignId ?? null, lane: 'local' });
+      out.push(s.blocked ? { type: 'text', text: s.text } : b);
+    } else if (b.type === 'tool_use') {
+      const s = await screenModelOutput(JSON.stringify(b.input), { campaignId: campaignId ?? null, lane: 'local' });
+      out.push(s.blocked ? { type: 'text', text: s.text } : b);
+    } else {
+      out.push(b);
+    }
+  }
+  return out;
 }

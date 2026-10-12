@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const chatMock = vi.fn();
 vi.mock('../transports/openai-compat', () => ({ openAiCompatChat: (...a: unknown[]) => chatMock(...a) }));
 vi.mock('../metering', () => ({ recordAiCall: vi.fn() }));
+const noteSexualContent = vi.fn(async () => ({ adultOnly: true, changed: true, removed: 0 }));
+vi.mock('@/services/maturity', () => ({ noteSexualContent: (...a: unknown[]) => noteSexualContent(...(a as [])) }));
 
 import {
   toneFilter, toneFilterAsync, toneFilterHarder, toneFilterStats, resetToneFilter, screen, chunk, placeholderFor,
@@ -26,6 +28,7 @@ beforeEach(() => {
   for (const k of LOCAL_VARS) delete process.env[k];
   process.env.AI_LOCAL_BASE_URL = 'http://local.test/v1';
   chatMock.mockReset();
+  noteSexualContent.mockClear();
   resetToneFilter();
   vi.spyOn(console, 'info').mockImplementation(() => {});
 });
@@ -231,5 +234,25 @@ describe('prompt register', () => {
     expect(system).toMatch(/CLINICAL/);
     expect(system).toMatch(/carotid/);
     expect(system).toMatch(/time to unconsciousness/i);
+  });
+});
+
+describe('maturity hook (unit 9): sexual chunks mark the campaign', () => {
+  const SEXUAL = 'They made love in the hayloft until dawn, her moans lost under the rain.';
+  it('a sexual-flagged chunk with a campaignId calls noteSexualContent once per ref', async () => {
+    chatMock.mockResolvedValue(reply('They spent the night together in the hayloft until dawn, the rain loud on the roof above them.'));
+    const ctx = { caller: 'test', campaignId: 'c1', ref: { table: 'DayaMemoryEntry', id: 'm1' } };
+    await toneFilterAsync(SEXUAL, ctx);
+    toneFilter(SEXUAL, ctx);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(noteSexualContent).toHaveBeenCalledTimes(1);
+    expect(noteSexualContent).toHaveBeenCalledWith('c1', { table: 'DayaMemoryEntry', id: 'm1' });
+  });
+  it('a clean chunk, or no campaignId, never calls it', async () => {
+    await toneFilterAsync(CLEAN, { caller: 'test', campaignId: 'c1' });
+    chatMock.mockResolvedValue(reply('They spent the night together in the hayloft until dawn, the rain loud on the roof above them.'));
+    await toneFilterAsync(SEXUAL, { caller: 'test' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(noteSexualContent).not.toHaveBeenCalled();
   });
 });

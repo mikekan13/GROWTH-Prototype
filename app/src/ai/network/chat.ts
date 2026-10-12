@@ -19,6 +19,7 @@ import { anthropicChatText, type AnthropicMessagesClient, type AnthropicTextOrIm
 import { openAiCompatChat } from './transports/openai-compat';
 import { recordAiCall } from './metering';
 import { auditCloudCall, newToneTally, utf8Bytes } from './audit';
+import { screenModelOutput } from '@/lib/lawfulness-hooks';
 import type { AiUsage, ResolvedLane, TaskDescriptor } from './types';
 
 export type RoutedBlock = AnthropicTextOrImageBlock;
@@ -43,6 +44,8 @@ export interface RoutedChatInput {
   identifiers?: string[];
   /** Local lane only: abort after this long (serverless cold starts otherwise wait minutes). */
   timeoutMs?: number;
+  /** Characters in the passage, when known — their RECORDED ages feed the lawfulness screen of the answer. */
+  participantCharacterIds?: string[];
 }
 
 export interface RoutedChatOptions {
@@ -124,5 +127,14 @@ export async function routedChatText(
   if (opts.meter !== false) {
     recordAiCall({ lane: lane.lane, provider: lane.provider, model: res.model, caller: task.caller, campaignId: task.campaignId, usage: res.usage });
   }
-  return { ...res, lane };
+  // LAWFULNESS (unit 8b): every routed text answer is screened before the
+  // caller sees it — the local model is abliterated; on a cloud lane it is a
+  // free second check. Blocked → the withheld string, flag raised (ref null:
+  // the caller has not written its row yet).
+  const lawful = await screenModelOutput(res.text, {
+    campaignId: task.campaignId ?? null,
+    lane: lane.crossesWall ? 'cloud' : 'local',
+    participantCharacterIds: input.participantCharacterIds,
+  });
+  return { ...res, text: lawful.text, lane };
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { assertLawfulInput } from '@/services/lawful-intake';
+import { tableParticipantIds } from '@/services/table-speak';
 import { createCampaignEvent, queryCampaignEvents } from '@/services/campaign-event';
 import { requireCampaignMember, requireEventPoster } from '@/services/campaign-access';
 import { feedViewerFor, queryPerceivedFeed, viewAsViewer } from '@/services/perceived-feed';
@@ -77,6 +79,18 @@ export async function POST(
     const poster = await requireEventPoster(campaignId, session.user, askedCharacterId, askedCharacterName);
     const { characterId, characterName } = poster;
     const actor: TerminalActor = poster.isGM ? 'gm' : 'player';
+
+    // LAWFULNESS (unit 8b): typed table chat is screened before it is stored or
+    // broadcast. Blocked → stored withheld + flagged; 422 with the withheld string.
+    const fields = payload as { message?: unknown; description?: unknown };
+    const typed = [fields.message, fields.description].filter((t): t is string => typeof t === 'string' && t.trim() !== '').join('\n');
+    if (typed) {
+      await assertLawfulInput({
+        campaignId, userId: session.user.id, username: session.user.username, text: typed, origin: 'TERMINAL_EVENT',
+        participantCharacterIds: characterId ? [characterId] : undefined,
+        participants: () => tableParticipantIds(campaignId),
+      });
+    }
 
     const event = await createCampaignEvent({
       campaignId,

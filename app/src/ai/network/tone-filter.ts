@@ -48,6 +48,12 @@ import { localLane } from './config';
 import { openAiCompatChat } from './transports/openai-compat';
 import { recordAiCall } from './metering';
 import { TONE_FILTER_SYSTEM, TONE_FILTER_HARD_SYSTEM, buildToneFilterUser } from '@/ai/prompts/tone-filter';
+import {
+  AGE_CUES as SHARED_AGE_CUES,
+  TONE_EXTRA_AGE_CUES,
+  TONE_SEXUAL_CUES,
+  TONE_SEXUAL_VIOLENCE_CUES,
+} from '@/lib/content-cues';
 
 // ── Screen ──────────────────────────────────────────────────────────────────
 
@@ -82,30 +88,15 @@ const SCREEN: Record<Exclude<ToneCategory, 'minor-sexual'>, RegExp[]> = {
     /\b(peel\w*|strip\w*)\s+(the\s+)?skin\b/i,
     /\b(beat|beaten|whipped|flogged|lashed)\s+(him|her|them)?\s*(bloody|senseless|half to death|nearly to death|daily|for (hours|days))\b/i,
   ],
-  sexual: [
-    /\b(sex|sexual|sexually|sexy|erotic\w*|orgasm\w*|aroused|arousal|intercourse|lust\w*|seduc\w*|foreplay)\b/i,
-    /\b(naked|nude|nudity|undress\w*|stripped (naked|bare))\b/i,
-    /\b(genital\w*|penis|vagina|breasts?|nipples?|cock|clit\w*|groin|crotch)\b/i,
-    /\b(fuck\w*|made love|making love|slept with|bedded|in bed together|moan\w*)\b/i,
-    /\b(brothel|whore\w*|prostitut\w*|harlot|courtesan|concubine)\b/i,
-  ],
-  'sexual-violence': [
-    /\b(rape|raped|rapes|raping|rapist)\b/i,
-    /\b(molest\w*|ravish\w*|defil\w*|incest\w*|grop\w*)\b/i,
-    /\bsexual(ly)?\s+(assault\w*|abus\w*|violen\w*)\b/i,
-    /\bforced\s+(himself|herself|themself|themselves)\s+(on|upon)\b/i,
-  ],
+  // The sexual lists live in the shared cue module (lib/content-cues.ts).
+  sexual: TONE_SEXUAL_CUES,
+  'sexual-violence': TONE_SEXUAL_VIOLENCE_CUES,
 };
 
-/** Age cues for the minor-sexual hard block. Recall-biased on purpose: any
- *  co-occurrence with a sexual cue in the same chunk blocks the chunk. */
-const AGE_CUES: RegExp[] = [
-  /\b(child|children|childhood|kid|kids|minor|minors|underage|under-age|toddler|infant|baby|babies|preteen|pre-teen|tween)\b/i,
-  /\b(teen|teens|teenage\w*|adolescen\w*|pubescen\w*|prepubescen\w*|puberty|juvenile)\b/i,
-  /\b(boy|boys|girl|girls|schoolgirl\w*|schoolboy\w*|lad|lass|youngster\w*)\b/i,
-  /\b([1-9]|1[0-7]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)[- ]years?[- ]old\b/i,
-  /\b(aged?|age of)\s+([1-9]|1[0-7]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)\b/i,
-];
+/** Age cues for the minor-sexual hard block — the shared list plus the tone
+ *  filter's wider reading. Recall-biased on purpose: any co-occurrence with a
+ *  sexual cue in the same chunk blocks the chunk. */
+const AGE_CUES: RegExp[] = [...SHARED_AGE_CUES, ...TONE_EXTRA_AGE_CUES].map((r) => r.re);
 
 export interface ScreenResult {
   categories: ToneCategory[];
@@ -225,6 +216,7 @@ export function toneFilterStats(): Readonly<typeof stats> & { cacheSize: number 
 
 /** Tests only. */
 export function resetToneFilter(): void {
+  notedSexual.clear();
   cache.clear();
   safe.clear();
   inflight.clear();
@@ -257,6 +249,32 @@ export interface ToneFilterContext {
   /** Stable caller id for the audit line + metering. */
   caller: string;
   campaignId?: string;
+  /** Pointer to the row the text came from, when the caller has one (maturity: never the text). */
+  ref?: { table: string; id: string };
+}
+
+// ── Maturity hook (unit 9) ──────────────────────────────────────────────────
+// A chunk the screen reads as `sexual` marks its campaign's content sexual
+// (services/maturity.noteSexualContent → adult-only). Once per distinct
+// campaign+ref, fire-and-forget, never breaks the filter. Minor-sexual is
+// lawfulness's job, not this.
+const notedSexual = new Set<string>();
+
+function noteSexual(ctx: ToneFilterContext, hits: ScreenResult): void {
+  if (!ctx.campaignId || !hits.categories.includes('sexual')) return;
+  const ref = ctx.ref ?? { table: 'tone-filter', id: ctx.caller };
+  const key = `${ctx.campaignId}|${ref.table}|${ref.id}`;
+  if (notedSexual.has(key)) return;
+  notedSexual.add(key);
+  const campaignId = ctx.campaignId;
+  void import('@/services/maturity')
+    .then((m) => m.noteSexualContent(campaignId, ref))
+    .catch((err) => console.error('[tone-filter] maturity note failed:', err instanceof Error ? err.message : err));
+}
+
+/** Test seam. */
+export function clearNotedSexual(): void {
+  notedSexual.clear();
 }
 
 function audit(ctx: ToneFilterContext, index: number, total: number, hits: ScreenResult, inLen: number, outLen: number, outcome: string): void {
@@ -356,6 +374,7 @@ async function filterAsync(text: string, ctx: ToneFilterContext, mode: Mode): Pr
     chunks.map(async (c, i) => {
       const hits = screen(c);
       if (hits.categories.includes('minor-sexual')) return block(ctx, i, chunks.length, c.length);
+      noteSexual(ctx, hits);
       // soft: only flagged chunks. hard: Claude refused something the screen
       // may have missed — every non-blank chunk gets the stricter rewrite.
       if (mode === 'soft' ? hits.hitCount === 0 : !c.trim()) return c;
@@ -400,6 +419,7 @@ export function toneFilter(text: string, ctx: ToneFilterContext = DEFAULT_CTX): 
     .map((c, i) => {
       const hits = screen(c);
       if (hits.categories.includes('minor-sexual')) return block(ctx, i, chunks.length, c.length);
+      noteSexual(ctx, hits);
       if (hits.hitCount === 0) return c;
       stats.flaggedChunks++;
       const key = keyOf(c, 'soft');

@@ -24,7 +24,8 @@ import { prisma } from '@/lib/db';
 import { transcribeAudio } from '@/ai/providers/stt';
 import { maybeFireClassifier } from '@/ai/copilot/classifier';
 import { buildSttVocabulary } from '@/services/stt-vocabulary';
-import { hearSpoken, type SpokenTableResult } from '@/services/table-speak';
+import { hearSpoken, tableParticipantIds, type SpokenTableResult } from '@/services/table-speak';
+import { holdIfUnlawful } from '@/services/lawful-intake';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,6 +133,23 @@ export async function POST(
       return NextResponse.json({ accepted: true, transcribed: false, hallucination: true });
     }
     const capture = recordCapture(campaignId, session.user.id, true);
+
+    // LAWFULNESS (unit 8b): screened after the hallucination filter, before the
+    // line is stored as table talk. A blocked line is stored WITHHELD (the flag
+    // points at it) and goes no further: not to the table, not to the
+    // classifier, not to any model.
+    const held = await holdIfUnlawful({
+      campaignId,
+      userId: session.user.id,
+      username: '[ambient]',
+      text: transcript,
+      source: 'AMBIENT',
+      origin: 'TABLE_AMBIENT',
+      participants: () => tableParticipantIds(campaignId),
+    });
+    if (held.blocked) {
+      return NextResponse.json({ accepted: true, transcribed: true, withheld: true, capture, provider: stt.provider });
+    }
 
     await prisma.copilotMessage.create({
       data: {

@@ -1,3 +1,5 @@
+import { WITHHELD_STRING } from './withheld';
+
 // Typed error classes for service layer → API route error handling
 
 export class AppError extends Error {
@@ -56,5 +58,17 @@ export class LedgerIntegrityError extends AppError {
   constructor(message: string = 'Ledger integrity violation') {
     super(message, 500);
     this.name = 'LedgerIntegrityError';
+  }
+}
+
+/**
+ * Lawfulness (unit 8b): the input was withheld — stored for a human moderator,
+ * flagged, and never processed. The message is the fixed withheld string, so
+ * the sender sees exactly that and nothing derived from the content.
+ */
+export class WithheldContentError extends AppError {
+  constructor(message: string = WITHHELD_STRING) {
+    super(message, 422);
+    this.name = 'WithheldContentError';
   }
 }

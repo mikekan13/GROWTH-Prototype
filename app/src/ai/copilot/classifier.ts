@@ -23,6 +23,7 @@
 
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { isWithheldRow } from '@/lib/withheld';
 import { dispatchPrompt } from './runtime';
 import type { JewlPrompt } from './prompts/types';
 import { routedChatText } from '@/ai/network';
@@ -171,7 +172,7 @@ async function classify(campaignId: string): Promise<{ verdict: Verdict; reasoni
     orderBy: { createdAt: 'desc' },
     take: MAX_CONTEXT_MESSAGES,
     select: { id: true, role: true, content: true, username: true, actions: true, contentClass: true, createdAt: true },
-  })) as WindowRow[];
+  })).filter((r) => !isWithheldRow(r)) as WindowRow[]; // lawfulness: a withheld line never enters the window
   if (recent.length === 0) return { verdict: 'silent', reasoning: 'no recent activity' };
 
   const rows = recent.reverse();

@@ -20,7 +20,7 @@ export const maxDuration = 1800;
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     // Defensive: read as text first so empty/malformed bodies produce a clear 400
     // instead of an Unhandled error at JSON.parse. Was throwing SyntaxError at line 22
     // when something (stale fetch, race, duplicate dispatch) sent an empty body.
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       // Creation mode — inline data, no DB record needed
       result = await generateFromDescription(
         characterData,
-        { campaignStyle, overrides, preferCloud, referenceImagePath, referenceImagePaths, creationMode },
+        { campaignStyle, overrides, preferCloud, referenceImagePath, referenceImagePaths, creationMode, requesterId: session.user.id },
       );
     } else {
       // In-game mode — load from DB. characterId is defined here by the guard above.
@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
         campaignStyle,
         overrides,
         preferCloud,
+        requesterId: session.user.id,
       });
     }
 

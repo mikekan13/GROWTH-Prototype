@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { assertLawfulInput } from '@/services/lawful-intake';
 import { converseWithEntity } from '@/daya/conversation';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
     const input = converseBodySchema.parse(body);
+    await assertLawfulInput({ campaignId: null, characterId: id, userId: session.user.id, username: session.user.username, text: input.message, origin: 'DAYA_CONVERSE', participantCharacterIds: [id] });
     const result = await converseWithEntity(id, session.user.role, input.message);
     return NextResponse.json(result);
   } catch (error) {

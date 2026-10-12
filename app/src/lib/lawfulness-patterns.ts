@@ -13,45 +13,14 @@
  * find co-occurrence within `CO_OCCURRENCE_WINDOW` characters.
  */
 
-export interface PatternRule {
-  id: string;
-  re: RegExp;
-}
+import type { PatternRule } from './content-cues';
+
+// The minor/age and sexual cue lists live in ONE shared module, also read by
+// the tone filter (unit 8b). Re-exported here so the screen's imports stay put.
+export { AGE_CUES, SEXUAL_CUES, NUM_UNDER_18, WORD_UNDER_18, type PatternRule } from './content-cues';
 
 /** Two cues count as co-occurring when their matches start within this many chars. */
 export const CO_OCCURRENCE_WINDOW = 400;
-
-const NUM_UNDER_18 = '(?:[1-9]|1[0-7])';
-const WORD_UNDER_18 =
-  '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)';
-
-// ── MINOR_SEXUAL: age cues ─────────────────────────────────────────────────
-// Any word that can place a minor in the passage. Deliberately broad ("boy",
-// "girl"): it only matters when a SEXUAL cue sits in the same window.
-export const AGE_CUES: PatternRule[] = [
-  // "baby" is left out: adult slang ("hey baby") would pair with "sexy".
-  { id: 'age:child-word', re: /\b(?:child|children|childlike|kid|kids|toddler|toddlers|infant|infants|preteen|pre-teen|tween|tweens)\b/gi },
-  { id: 'age:minor-word', re: /\b(?:minor|minors|underage|under-age|under\s+age|jailbait|loli|lolicon|shota|shotacon)\b/gi },
-  { id: 'age:teen-word', re: /\b(?:teen|teens|teenage|teenager|teenagers|adolescent|adolescents|pubescent|prepubescent|pre-pubescent)\b/gi },
-  { id: 'age:boy-girl', re: /\b(?:boy|boys|girl|girls|schoolgirl|schoolgirls|schoolboy|schoolboys|little\s+(?:one|ones))\b/gi },
-  { id: 'age:grade', re: /\b(?:middle\s+school|elementary\s+school|grade\s+school|junior\s+high|(?:[1-8]|first|second|third|fourth|fifth|sixth|seventh|eighth)(?:st|nd|rd|th)?\s+grade(?:r|rs)?)\b/gi },
-  { id: 'age:numeric', re: new RegExp(`\\b${NUM_UNDER_18}\\s*(?:-|\\s)?\\s*(?:years?|yrs?|y\\/o|yo)(?:\\s*-?\\s*old)?\\b`, 'gi') },
-  { id: 'age:numeric-word', re: new RegExp(`\\b${WORD_UNDER_18}\\s*(?:-|\\s)\\s*(?:years?|yrs?)(?:\\s*-?\\s*old)?\\b`, 'gi') },
-  { id: 'age:aged', re: new RegExp(`\\b(?:aged?|age\\s+of)\\s+(?:${NUM_UNDER_18}|${WORD_UNDER_18})\\b`, 'gi') },
-];
-
-// ── Sexual cues (text) ─────────────────────────────────────────────────────
-// Sexual ACTS / explicit content. Bare nudity ("naked", "undressed") is NOT
-// here: a war passage with a naked, starving child is dark fiction, and a boy
-// undressing for bed is not sexual. Nudity only counts in IMAGE prompts (see
-// NUDITY_CUES). Combat-ambiguous words are left out on purpose: "breast" (an
-// arrow in the breast), "crotch", "penetrated her armour", "stripped her of
-// rank", and profanity used as insults ("fuck", "pussy").
-export const SEXUAL_CUES: PatternRule[] = [
-  { id: 'sex:explicit', re: /\b(?:sex|sexual|sexually|sexy|intercourse|erotic|erotica|porn|porno|pornographic|nsfw|lewd|xxx)\b/gi },
-  { id: 'sex:acts', re: /\b(?:fondl\w*|molest\w*|grop(?:e|ed|es|ing)\s+(?:her|him|them|me)|rape[ds]?|raping|rapist|masturbat\w*|orgasm\w*|ejaculat\w*|fellatio|cunnilingus|blowjob|handjob|copulat\w*|seduc\w*|foreplay|(?:sleep|sleeps|slept|sleeping)\s+with|(?:have|has|had|having)\s+sex)\b/gi },
-  { id: 'sex:anatomy', re: /\b(?:genital\w*|penis|penises|vagina\w*|vulva|clitoris|nipples?|erection|cock)\b/gi },
-];
 
 // ── Nudity cues (IMAGE prompts only) ───────────────────────────────────────
 export const NUDITY_CUES: PatternRule[] = [

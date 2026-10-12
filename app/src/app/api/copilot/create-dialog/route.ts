@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { assertLawfulInput } from '@/services/lawful-intake';
 import { continueLocationCreateDialog } from '@/ai/copilot/create-dialog';
 
 export const dynamic = 'force-dynamic';
@@ -24,9 +25,13 @@ const inputSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
     const body = await request.json();
     const input = inputSchema.parse(body);
+    const lastGm = [...input.conversation].reverse().find((t) => t.role === 'gm');
+    if (lastGm?.content) {
+      await assertLawfulInput({ campaignId: input.campaignId, userId: session.user.id, username: session.user.username, text: lastGm.content, origin: 'CREATE_DIALOG' });
+    }
     const response = await continueLocationCreateDialog(
       input.campaignId,
       input.conversation,

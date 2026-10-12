@@ -12,6 +12,9 @@ import { getPortraitProvider, isPortraitGenerationAvailable, getProviderStatuses
 import { diffVisualState } from './state-diff';
 import { ingredientRef, recordProvenanceSafe } from '@/services/provenance';
 import { extractPortraitData } from './character-adapter';
+import { screenImage } from '@/lib/lawfulness-hooks';
+import { WithheldContentError } from '@/lib/errors';
+import { storeWithheldRow } from '@/services/lawful-intake';
 import type {
   PortraitInput,
   PortraitResult,
@@ -37,6 +40,8 @@ export async function generatePortrait(
     campaignStyle?: CampaignStyleConfig;
     overrides?: PortraitOverrides;
     preferCloud?: boolean;
+    /** Who asked — for the lawfulness flag. */
+    requesterId?: string | null;
   },
 ): Promise<PortraitResult> {
   // 1. Load character data
@@ -70,7 +75,16 @@ export async function generatePortrait(
     bodyDescription: personaLock.bodyDescription,
   } : null;
 
-  // 4. Get provider and generate
+  // 4. LAWFULNESS (unit 8b) — before anything is queued.
+  await assertLawfulImageJob({
+    prompt: portraitScreenText(characterData, options?.overrides),
+    usesRealReference: !!personaLockData?.referenceImagePath,
+    campaignId: character.campaignId,
+    userId: options?.requesterId ?? null,
+    subjectCharacterIds: [characterId],
+  });
+
+  // 5. Get provider and generate
   const provider = await getPortraitProvider(options?.preferCloud);
 
   const input: PortraitInput = {
@@ -136,13 +150,32 @@ export async function generateFromDescription(
     referenceImagePath?: string;
     referenceImagePaths?: string[];
     creationMode?: boolean;
+    /** Who asked + where — for the lawfulness flag. */
+    requesterId?: string | null;
+    campaignId?: string | null;
   },
 ): Promise<PortraitResult> {
-  const provider = await getPortraitProvider(options?.preferCloud);
-
   // Build a persona lock stub if reference image(s) provided.
   // Multiple refs (when available) get chained as FLUX.2 ReferenceLatent anchors.
   const primaryRef = options?.referenceImagePath || options?.referenceImagePaths?.[0];
+
+  // LAWFULNESS (unit 8b) — before anything is queued. A Watcher-enabled nude
+  // creation body counts as nudity for the screen (real face → refused; a
+  // character recorded under 18 → refused).
+  const dbCharacterId = characterData.characterId && characterData.characterId !== 'creation-preview' ? characterData.characterId : undefined;
+  const nude = options?.creationMode === true && options?.campaignStyle?.allowNudity === true;
+  await assertLawfulImageJob({
+    prompt: [portraitScreenText(characterData, options?.overrides), nude ? 'nude' : ''].filter(Boolean).join('\n'),
+    usesRealReference: !!primaryRef,
+    campaignId: options?.campaignId ?? null,
+    userId: options?.requesterId ?? null,
+    subjectCharacterIds: dbCharacterId ? [dbCharacterId] : undefined,
+    subjectAges: typeof characterData.identity?.age === 'number' ? [characterData.identity.age] : undefined,
+    characterId: dbCharacterId,
+  });
+
+  const provider = await getPortraitProvider(options?.preferCloud);
+
   const personaLock: PersonaLockData | null = primaryRef ? {
     referenceImagePath: primaryRef,
     referenceImagePaths: options?.referenceImagePaths,
@@ -393,4 +426,56 @@ function emptyMetadata() {
     height: 0,
     generationTimeMs: 0,
   };
+}
+
+// ============================================================
+// Lawfulness (unit 8b)
+// ============================================================
+
+/** What a refused image job tells the requester. */
+export const IMAGE_REFUSED_MESSAGE = 'Image refused: this request cannot be processed. It has been flagged for review.';
+
+/**
+ * The USER-controllable text of a portrait job: custom prompts and the
+ * sheet's free-text appearance. The pipeline's own fixed recipe (the
+ * creation-mode underwear base, style blocks) is not the requester's words and
+ * is not screened here — see generateFromDescription for the nude toggle.
+ */
+export function portraitScreenText(data: PortraitCharacterData, overrides?: PortraitOverrides): string {
+  return [
+    overrides?.customPrompt,
+    overrides?.customPass2Prompt,
+    data.identity?.physicalDescription,
+    ...(data.identity?.distinguishingFeatures ?? []),
+  ].filter((t): t is string => typeof t === 'string' && t.trim() !== '').join('\n');
+}
+
+/**
+ * Screen an image job before it is queued. Blocked → the prompt is stored as a
+ * withheld row (the flag's pointer, when there is a campaign), a flag is raised
+ * (IMAGE_PROMPT, or IMAGE_REFERENCE when a real face is involved), and the job
+ * is refused with `IMAGE_REFUSED_MESSAGE` (422).
+ */
+export async function assertLawfulImageJob(job: {
+  prompt: string;
+  usesRealReference: boolean;
+  campaignId?: string | null;
+  userId?: string | null;
+  subjectCharacterIds?: string[];
+  subjectAges?: number[];
+  /** For the withheld row when no campaign id is known. */
+  characterId?: string;
+}): Promise<void> {
+  const verdict = await screenImage({
+    prompt: job.prompt,
+    usesRealReference: job.usesRealReference,
+    campaignId: job.campaignId ?? null,
+    userId: job.userId ?? null,
+    subjectCharacterIds: job.subjectCharacterIds,
+    subjectAges: job.subjectAges,
+    onBlocked: async (categories) => job.userId
+      ? storeWithheldRow({ campaignId: job.campaignId, characterId: job.characterId, userId: job.userId, text: job.prompt, origin: 'IMAGE_JOB' }, categories)
+      : null,
+  });
+  if (verdict.blocked) throw new WithheldContentError(IMAGE_REFUSED_MESSAGE);
 }

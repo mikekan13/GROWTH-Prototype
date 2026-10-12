@@ -28,6 +28,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { assertLawfulInput } from '@/services/lawful-intake';
 import { isWatcherOrAbove } from '@/lib/permissions';
 import { createCampaignEvent } from '@/services/campaign-event';
 import { broadcastEvent } from '@/lib/campaign-stream';
@@ -188,6 +189,11 @@ async function attachTruth(listenerId: string, memoryEntryId: string | undefined
   } catch { /* record-keeping only */ }
 }
 
+/** The awake beings at the table — the scene's characters for the lawfulness screen's structural ages. */
+export async function tableParticipantIds(campaignId: string): Promise<string[]> {
+  return (await activeListeners(campaignId)).map((c) => c.id);
+}
+
 async function activeListeners(campaignId: string, excludeId?: string) {
   const characters = await prisma.character.findMany({
     where: { campaignId, ...(excludeId ? { id: { not: excludeId } } : {}) },
@@ -277,6 +283,11 @@ export async function speakProse(
   }
   const message = input.message.trim();
   if (!message) throw new ValidationError('Nothing to say');
+  // LAWFULNESS (unit 8b): blocked → stored withheld + flagged, 422 with the withheld string.
+  await assertLawfulInput({
+    campaignId, userId: actor.userId, username: actor.username, text: message, origin: 'TABLE_PROSE',
+    participants: () => tableParticipantIds(campaignId),
+  });
   if (tableSplitLoop()) return speakProseSplit(campaignId, actor, { ...input, message });
 
   const roster = await prisma.character.findMany({
@@ -776,6 +787,10 @@ export async function speakThroughNpc(
   if (npc.campaignId && npc.campaignId !== campaignId) {
     throw new ValidationError('NPC does not belong to this campaign');
   }
+  await assertLawfulInput({
+    campaignId, userId: actor.userId, username: actor.username, text: input.message, origin: 'TABLE_NPC_SPEAK',
+    participantCharacterIds: [npc.id], participants: () => tableParticipantIds(campaignId),
+  });
 
   // 1. The NPC's line hits the table record first, like normal tabletop.
   await postChat(campaignId, 'gm', actor.userId, actor.username, npc.id, npc.name, input.message, { via: 'typed' });

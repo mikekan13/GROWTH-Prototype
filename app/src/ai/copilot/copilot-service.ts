@@ -15,6 +15,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { copilotHistoryWhere, type CopilotHistoryViewer } from './history-privacy';
 import { GENESIS_CHAT_USERNAME } from '@/services/character-genesis-progress';
+import { isWithheldRow, WITHHELD_STRING } from '@/lib/withheld';
 
 export async function getCopilotHistory(
   campaignId: string,
@@ -44,8 +45,11 @@ export async function getCopilotHistory(
   });
   const messages = recent.reverse();
 
+  // Lawfulness: a withheld row (only ever its sender's — the history is per
+  // user) shows as the withheld string; the original is ADMIN-only via the flag.
   return messages.map(m => ({
     ...m,
+    content: isWithheldRow(m) ? WITHHELD_STRING : m.content,
     actions: parseCopilotActions(m.actions),
   }));
 }

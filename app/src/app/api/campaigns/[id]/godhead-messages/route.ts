@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
+import { assertLawfulInput } from '@/services/lawful-intake';
 import { prisma } from '@/lib/db';
 import { canManageCampaign, isAdminRole } from '@/lib/permissions';
 import { NotFoundError, ForbiddenError } from '@/lib/errors';
@@ -74,6 +75,7 @@ export async function POST(
     }
     const body = await request.json();
     const { godheadName, content } = PostSchema.parse(body);
+    await assertLawfulInput({ campaignId, userId: session.user.id, username: session.user.username, text: content, origin: 'GM_TO_GODHEAD' });
     const godhead = await prisma.godHead.findUnique({ where: { name: godheadName } });
     if (!godhead) throw new NotFoundError('Godhead not found');
     const msg = await prisma.godHeadMessage.create({

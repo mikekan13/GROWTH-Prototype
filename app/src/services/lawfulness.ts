@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { ForbiddenError, NotFoundError, LedgerIntegrityError } from '@/lib/errors';
 import { canSeeLawfulnessFlag, canActionLawfulnessFlag } from '@/lib/permissions';
+import { WITHHELD_STRING } from '@/lib/withheld';
 import {
   AGE_CUES,
   SEXUAL_CUES,
@@ -50,8 +51,8 @@ export type LawfulnessSource = (typeof LAWFULNESS_SOURCES)[number];
 export const LAWFULNESS_STATUSES = ['OPEN', 'REVIEWED', 'ACTIONED'] as const;
 export type LawfulnessStatus = (typeof LAWFULNESS_STATUSES)[number];
 
-/** The fixed string a caller substitutes for blocked content. No detail, nothing derived. */
-export const WITHHELD_STRING = '[withheld: this content cannot be processed]';
+/** The fixed string a caller substitutes for blocked content (lives in lib/withheld). */
+export { WITHHELD_STRING };
 
 /** Pointer to the row that holds the offending content. */
 export interface FlagRef {
@@ -147,6 +148,17 @@ function withoutFictionalHandles(text: string, cues: Cue[], fictionalNames: stri
 
 function minorSexualHits(text: string, sexual: PatternRule[]): string[] {
   return coOccur(findCues(text, AGE_CUES), findCues(text, sexual));
+}
+
+/**
+ * Cheap pre-check: false means the passage CANNOT block (every category needs a
+ * sexual cue, a threat verb or a personal locator), so the hooks skip the name
+ * and age lookups. Pure; never a reason to block on its own.
+ */
+export function mayNeedScreen(text: string): boolean {
+  if (!text || !text.trim()) return false;
+  const any = (rules: PatternRule[]) => rules.some((r) => { r.re.lastIndex = 0; const hit = r.re.test(text); r.re.lastIndex = 0; return hit; });
+  return any(SEXUAL_CUES) || any(THREAT_VERBS) || any(LOCATORS);
 }
 
 /**

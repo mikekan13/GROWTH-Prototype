@@ -25,6 +25,8 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import { recordAiCall, routedChatText, mayCrossWall, type AnthropicMessagesClient, type ContentClass } from '@/ai/network';
+import { screenModelOutput } from '@/lib/lawfulness-hooks';
+import { screenText, mayNeedScreen } from '@/services/lawfulness';
 
 export type DayaTier = 'L1' | 'L2' | 'C';
 
@@ -59,6 +61,9 @@ export interface DayaChatParams {
    * this on a hit). L1/L2 stream over SSE; a Claude-backed tier calls it once
    * with the whole text. The metering row is written the same either way. */
   onToken?: (delta: string) => boolean | void;
+  /** Characters in the passage besides the entity itself, when known — their RECORDED
+   * ages feed the lawfulness screen of the answer (structural age: fiction is not exempt). */
+  participantCharacterIds?: string[];
 }
 
 export interface DayaChatResult {
@@ -482,7 +487,18 @@ export async function chat(
     // No token stream on this transport: the consumer gets the whole answer as one piece.
     if (params.onToken && text) params.onToken(text);
   } else {
-    ({ text, tokensIn, tokensOut, model, ttftMs, stopped } = await callOpenAiCompatible(params.tier as 'L1' | 'L2', params, fetchImpl));
+    // LAWFULNESS (unit 8b): the local persona core is abliterated. A streamed
+    // answer is watched as it grows (textual screen, pure) and stopped at the
+    // first hit — the offending piece is never handed on; the whole answer is
+    // screened below either way.
+    const guarded = params.onToken ? lawfulStream(params.onToken) : undefined;
+    ({ text, tokensIn, tokensOut, model, ttftMs, stopped } = await callOpenAiCompatible(
+      params.tier as 'L1' | 'L2',
+      guarded ? { ...params, onToken: guarded } : params,
+      fetchImpl,
+    ));
+    // Claude-backed tiers were already screened inside routedChatText (cloud lane).
+    text = await screenLocalAnswer(text, params);
   }
   const totalMs = Date.now() - startedAt;
 
@@ -516,4 +532,41 @@ export async function chat(
   });
 
   return { text, tokensIn, tokensOut, totalMs, ...(ttftMs !== undefined ? { ttftMs } : {}), ...(stopped ? { stopped } : {}) };
+}
+
+// ── Lawfulness (unit 8b) ───────────────────────────────────────────────────
+
+/** Wrap a stream consumer: stop the generation at the first lawfulness hit, never forwarding that piece. */
+export function lawfulStream(onToken: (delta: string) => boolean | void): (delta: string) => boolean | void {
+  let acc = '';
+  let hit = false;
+  return (delta: string) => {
+    if (hit) return false;
+    acc += delta;
+    if (mayNeedScreen(acc) && screenText(acc).verdict === 'block') {
+      hit = true;
+      return false;
+    }
+    return onToken(delta);
+  };
+}
+
+/** Screen a local tier's answer: the entity's own character + any named participants supply recorded ages. */
+async function screenLocalAnswer(text: string, params: DayaChatParams): Promise<string> {
+  if (!mayNeedScreen(text)) return text;
+  const ids = [...(params.participantCharacterIds ?? [])];
+  if (params.entityId) {
+    try {
+      const e = await prisma.dayaEntity.findUnique({ where: { id: params.entityId }, select: { characterId: true } });
+      if (e?.characterId) ids.push(e.characterId);
+    } catch (err) {
+      console.error('[lawfulness] entity lookup failed:', err instanceof Error ? err.message : err);
+    }
+  }
+  const s = await screenModelOutput(text, {
+    campaignId: params.campaignId ?? null,
+    lane: 'local',
+    participantCharacterIds: ids.length ? ids : undefined,
+  });
+  return s.text;
 }

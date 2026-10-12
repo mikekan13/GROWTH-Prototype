@@ -21,6 +21,7 @@ import 'server-only';
 import {
   screenText,
   screenImageRequest,
+  mayNeedScreen,
   raiseFlagsForResult,
   loadNameContext,
   resolveCharacterAges,
@@ -54,6 +55,13 @@ interface BaseHookContext {
   participantAges?: number[];
   /** …or their ids — resolved to recorded ages from the character sheets. */
   participantCharacterIds?: string[];
+  /**
+   * Called once when the content is blocked, BEFORE the flag is raised: store
+   * the withheld row here and return its pointer — the flag then points at it
+   * (Mike: "flagged for a human moderator to inspect"). A throw is logged and
+   * the flag is raised without a pointer; the verdict stands either way.
+   */
+  onBlocked?: (categories: LawfulnessCategory[]) => Promise<FlagRef | null | void>;
 }
 
 /** Ages given + ages resolved from ids. A lookup failure keeps whatever ages were given. */
@@ -65,6 +73,13 @@ async function ages(given?: number[], ids?: string[]): Promise<number[] | undefi
     console.error('[lawfulness] age lookup failed:', err instanceof Error ? err.message : err);
     return given;
   }
+}
+
+/** The context minus the callback (a ScreenContext is plain data). */
+function strip<T extends BaseHookContext>(ctx: T): Omit<T, 'onBlocked'> {
+  const { onBlocked: _cb, ...rest } = ctx;
+  void _cb;
+  return rest;
 }
 
 async function names(ctx: BaseHookContext): Promise<{ realNames?: string[]; fictionalNames?: string[] }> {
@@ -79,8 +94,23 @@ async function names(ctx: BaseHookContext): Promise<{ realNames?: string[]; fict
   }
 }
 
-async function finish(original: string, result: ScreenResult, ctx: ScreenContext): Promise<HookResult> {
-  if (result.verdict === 'allow') return { text: original, blocked: false, categories: [] };
+const ALLOW = (text: string): HookResult => ({ text, blocked: false, categories: [] });
+
+async function finish(
+  original: string,
+  result: ScreenResult,
+  ctx: ScreenContext,
+  onBlocked?: BaseHookContext['onBlocked'],
+): Promise<HookResult> {
+  if (result.verdict === 'allow') return ALLOW(original);
+  if (onBlocked) {
+    try {
+      const ref = await onBlocked(result.flags);
+      if (ref) ctx = { ...ctx, ref };
+    } catch (err) {
+      console.error('[lawfulness] storing the withheld row failed:', err instanceof Error ? err.message : err);
+    }
+  }
   try {
     await raiseFlagsForResult(result, ctx);
   } catch (err) {
@@ -97,8 +127,9 @@ export async function screenInput(
   text: string,
   ctx: BaseHookContext & { source?: Extract<LawfulnessSource, 'TYPED' | 'AMBIENT'> },
 ): Promise<HookResult> {
-  const full: ScreenContext = { ...ctx, ...(await names(ctx)), participantAges: await ages(ctx.participantAges, ctx.participantCharacterIds), lane: 'input', source: ctx.source ?? 'TYPED' };
-  return finish(text, screenText(text, full), full);
+  if (!mayNeedScreen(text)) return ALLOW(text);
+  const full: ScreenContext = { ...strip(ctx), ...(await names(ctx)), participantAges: await ages(ctx.participantAges, ctx.participantCharacterIds), lane: 'input', source: ctx.source ?? 'TYPED' };
+  return finish(text, screenText(text, full), full, ctx.onBlocked);
 }
 
 /** A model's output before anyone reads it or it is stored. Default lane: local. */
@@ -106,8 +137,9 @@ export async function screenModelOutput(
   text: string,
   ctx: BaseHookContext & { lane?: Extract<LawfulnessLane, 'local' | 'cloud'> },
 ): Promise<HookResult> {
-  const full: ScreenContext = { ...ctx, ...(await names(ctx)), participantAges: await ages(ctx.participantAges, ctx.participantCharacterIds), lane: ctx.lane ?? 'local', source: 'MODEL_OUTPUT' };
-  return finish(text, screenText(text, full), full);
+  if (!mayNeedScreen(text)) return ALLOW(text);
+  const full: ScreenContext = { ...strip(ctx), ...(await names(ctx)), participantAges: await ages(ctx.participantAges, ctx.participantCharacterIds), lane: ctx.lane ?? 'local', source: 'MODEL_OUTPUT' };
+  return finish(text, screenText(text, full), full, ctx.onBlocked);
 }
 
 /** An image job before it is queued. `text` is the prompt (or the withheld string). */
@@ -121,6 +153,7 @@ export async function screenImage(req: {
   /** Recorded ages of the depicted characters, or their ids (resolved from the sheets). */
   subjectAges?: number[];
   subjectCharacterIds?: string[];
+  onBlocked?: BaseHookContext['onBlocked'];
 }): Promise<HookResult> {
   const result = screenImageRequest({ ...req, subjectAges: await ages(req.subjectAges, req.subjectCharacterIds) });
   const ctx: ScreenContext = {
@@ -130,5 +163,5 @@ export async function screenImage(req: {
     lane: 'image',
     source: result.flags.includes('REAL_PERSON_SEXUAL_IMAGE') ? 'IMAGE_REFERENCE' : 'IMAGE_PROMPT',
   };
-  return finish(req.prompt, result, ctx);
+  return finish(req.prompt, result, ctx, req.onBlocked);
 }

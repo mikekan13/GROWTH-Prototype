@@ -14,6 +14,9 @@ import { replyRecipientId } from './history-privacy';
 import { promptContentClass } from './content-class';
 import { historyForLane, toolResultForLane, contextForLane, messageTexts } from './cloud-history';
 import { prisma } from '@/lib/db';
+import { holdIfUnlawful } from '@/services/lawful-intake';
+import { screenInput } from '@/lib/lawfulness-hooks';
+import { withoutWithheld, WITHHELD_STRING } from '@/lib/withheld';
 import { assembleContext } from './context-assembler';
 import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory';
 import { transcribeAudio } from '@/ai/providers/stt';
@@ -178,9 +181,11 @@ async function buildUserContentBlocks(p: JewlPrompt): Promise<ClaudeContentBlock
       });
     } else if (m.kind === 'audio') {
       const stt = await transcribeAudio(m.dataUrl);
+      // Lawfulness: the attached transcript is human input too (no row of its own: ref null).
+      const heard = await screenInput(stt.transcript, { campaignId: p.campaignId, userId: p.actorId, source: 'AMBIENT' });
       blocks.push({
         type: 'text',
-        text: `[audio transcript via ${stt.provider}] ${stt.transcript}`,
+        text: `[audio transcript via ${stt.provider}] ${heard.text}`,
       });
     }
   }
@@ -277,7 +282,26 @@ async function saveAssistantResponse(
  * tool calls (looping until Claude stops calling tools), saves the prompt
  * and response as CopilotMessages, returns the response with UI hints.
  */
+/** Sources whose text a human wrote or spoke — screened for lawfulness before anything else. */
+const HUMAN_SOURCES = new Set<JewlPrompt['source']>(['GM_TEXT', 'GM_CANVAS_ACTION', 'GM_MISTAKE_FLAG', 'GM_VOICE', 'PLAYER_VOICE']);
+
 export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> {
+  // LAWFULNESS (unit 8b): human input is screened before it is saved or
+  // modelled. Blocked → stored withheld (the flag points at it), and the
+  // sender gets the withheld string — no model call, no reply row.
+  if (HUMAN_SOURCES.has(prompt.source)) {
+    const text = prompt.text || prompt.canvasAction?.intent || '';
+    const held = await holdIfUnlawful({
+      campaignId: prompt.campaignId,
+      userId: prompt.actorId,
+      username: prompt.actorName,
+      text,
+      source: prompt.source === 'GM_VOICE' || prompt.source === 'PLAYER_VOICE' ? 'AMBIENT' : 'TYPED',
+      origin: prompt.source,
+    });
+    if (held.blocked) return { message: WITHHELD_STRING, toolCalls: [], metadata: { withheld: true } };
+  }
+
   const promptMessageId = await saveUserPrompt(prompt);
 
   // 1. Context block (existing assembler — leans on entity mentions). The
@@ -331,7 +355,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     take: (isWorkCycle ? MAX_HISTORY_WORK_CYCLE : MAX_HISTORY) + 1,
     select: { role: true, content: true, username: true, createdAt: true, contentClass: true, icText: true, actions: true },
   });
-  const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
+  // Withheld rows (lawfulness) never reach any model, local or cloud.
+  const pastMessages = withoutWithheld(history.reverse().slice(0, -1)); // exclude the prompt we just saved
   const toneCtx = { caller: 'jewl-dispatch', campaignId: prompt.campaignId };
   const tally = newToneTally();
   const laneHistory = await historyForLane(pastMessages, toCloud, toneCtx, tally);

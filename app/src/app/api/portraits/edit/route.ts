@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getLocalProvider } from '@/ai/portraits/providers';
+import { assertLawfulImageJob } from '@/ai/portraits/portrait-service';
+import { WithheldContentError } from '@/lib/errors';
+import { errorResponse } from '@/lib/api';
 
 export const maxDuration = 600;
 
@@ -18,7 +21,7 @@ export const maxDuration = 600;
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth();
+    const session = await requireAuth();
 
     const raw = await request.text();
     if (!raw || !raw.trim()) {
@@ -43,6 +46,16 @@ export async function POST(request: NextRequest) {
     if (!editPrompt || typeof editPrompt !== 'string') {
       return NextResponse.json({ error: 'editPrompt is required' }, { status: 400 });
     }
+
+    // LAWFULNESS (unit 8b): the source is a character portrait (an identity
+    // anchor built from reference photos) — treated as a real reference.
+    await assertLawfulImageJob({
+      prompt: editPrompt,
+      usesRealReference: true,
+      userId: session.user.id,
+      subjectCharacterIds: typeof characterId === 'string' ? [characterId] : undefined,
+      characterId: typeof characterId === 'string' ? characterId : undefined,
+    });
 
     const provider = getLocalProvider();
     const result = await provider.editImage(sourceImagePath, editPrompt, {
@@ -69,6 +82,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof WithheldContentError) return errorResponse(error);
     console.error('[portraits/edit] Error:', error);
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: msg, stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined }, { status: 500 });
