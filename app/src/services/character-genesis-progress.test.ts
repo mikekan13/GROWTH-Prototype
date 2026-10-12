@@ -9,6 +9,7 @@ const db = vi.hoisted(() => ({
   forgeWhere: null as unknown,
   chat: [] as Array<Record<string, unknown>>,
   events: [] as Array<Record<string, unknown>>,
+  prods: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/lib/db', () => ({
     dayaWorkSession: { findFirst: vi.fn(async () => db.session), findUnique: vi.fn(async () => db.session) },
     copilotMessage: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { db.chat.push(data); return { id: 'm1' }; }) },
     dayaEntity: { findUnique: vi.fn(async () => db.entity) },
+    genesisProd: { findMany: vi.fn(async () => db.prods) },
     forgeItem: {
       findMany: vi.fn(async (args: { where: unknown }) => { db.forgeWhere = args.where; return db.forged; }),
     },
@@ -54,15 +56,16 @@ describe('deriveGenesisProgress', () => {
   it('no session → none, all pending', () => {
     const p = deriveGenesisProgress({ ...base, session: null });
     expect(p.state).toBe('none');
-    expect(statuses(p)).toBe('pppppp');
+    expect(statuses(p)).toBe('ppppppp');
   });
 
-  it('fresh session → expansion current', () => {
+  it('fresh session past the prods (legacy / after Build) → expansion current', () => {
     const p = deriveGenesisProgress({ ...base, session: session() });
     expect(p.state).toBe('running');
     expect(p.current).toBe('expansion');
-    expect(statuses(p)).toBe('dcpppp');
-    expect(p.step).toBe(2);
+    expect(statuses(p)).toBe('ddcpppp');
+    expect(p.step).toBe(3);
+    expect(p.prodding).toBe(false);
     expect(p.total).toBe(GENESIS_STAGES.length);
   });
 
@@ -70,7 +73,7 @@ describe('deriveGenesisProgress', () => {
     const p = deriveGenesisProgress({ ...base, session: session(), entityAuthored: true, memoryCount: 12 });
     expect(p.current).toBe('ledger');
     expect(p.counts.memories).toBe(12);
-    expect(statuses(p)).toBe('ddcppp');
+    expect(statuses(p)).toBe('dddcppp');
   });
 
   it('drafts forged → mechanics current, counts by kind', () => {
@@ -110,7 +113,7 @@ describe('deriveGenesisProgress', () => {
     });
     expect(p.state).toBe('done');
     expect(p.current).toBe('born');
-    expect(statuses(p)).toBe('dddddd');
+    expect(statuses(p)).toBe('ddddddd');
     expect(p.endedAt).toBe('2026-10-11T10:01:00.000Z');
   });
 
@@ -264,5 +267,42 @@ describe('GM steps — JEWL drafts awaiting the Watcher', () => {
     expect(done.gmSteps.map(g => g.id)).toEqual(['f1']);
     const cleared = deriveGenesisProgress({ ...base, session: session({ status: 'done', endedAt: t0 }), entityAuthored: true, forged: [{ ...draft, status: 'published' }] });
     expect(cleared.gmSteps).toEqual([]);
+  });
+});
+
+describe('genesis is a dialogue — the prod stage (2026-10-12)', () => {
+  const prod = (id: string, status: string, over: Record<string, unknown> = {}) => ({
+    id, round: 1, order: Number(id.slice(1)), anchorQuote: `anchor ${id}`, question: `question ${id}?`,
+    why: 'w', kind: 'CREATIVE', status, answer: null, jewlFill: null, decidedAt: null, ...over,
+  });
+
+  it('PRODDING → listening current with the prod count; nothing else advances', () => {
+    const p = deriveGenesisProgress({
+      ...base, session: session({ stage: 'PRODDING' }), entityAuthored: true, memoryCount: 9,
+      prods: [prod('p1', 'OPEN'), prod('p2', 'ANSWERED', { answer: 'a' })],
+    });
+    expect(p.prodding).toBe(true);
+    expect(p.current).toBe('prodding');
+    expect(statuses(p)).toBe('dcppppp');
+    expect(p.stages[1].label).toBe('Listening · 2 prods');
+    expect(p.prods.map(x => x.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('blocked in PRODDING waits on the prods; the chat line counts the open ones', () => {
+    const p = deriveGenesisProgress({
+      ...base, session: session({ stage: 'PRODDING', status: 'blocked', blockedReason: 'waiting on the GM — prods' }),
+      prods: [prod('p1', 'OPEN'), prod('p2', 'OPEN'), prod('p3', 'OPEN'), prod('p4', 'OPEN'), prod('p5', 'LEFT_OPEN')],
+    });
+    expect(p.state).toBe('waiting');
+    expect(p.wait).toBe('prods');
+    expect(genesisStatusLine('Violet', p)).toBe("I've got 4 questions before I build — they're on Violet's page. Answer, leave open, or tell me to decide; press Build when you're ready.");
+  });
+
+  it('after Build the left-open prods are the open threads', () => {
+    const p = deriveGenesisProgress({
+      ...base, session: session({ stage: 'BUILDING', status: 'done', endedAt: t0 }),
+      prods: [prod('p1', 'ANSWERED', { answer: 'a' }), prod('p2', 'LEFT_OPEN'), prod('p3', 'DELEGATED', { jewlFill: 'f' })],
+    });
+    expect(p.openThreads).toEqual([{ id: 'p2', anchorQuote: 'anchor p2', question: 'question p2?' }]);
   });
 });

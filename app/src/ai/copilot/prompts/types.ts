@@ -68,6 +68,9 @@ export interface JewlPrompt {
    *  genesis work cycle's long report out of the visible chat — it goes to
    *  the Log instead; Mike 2026-10-11). JEWL still sees it in his history. */
   replyUsername?: string;
+  /** Restrict this dispatch to these tools (offered AND executable). A
+   *  genesis PRODDING cycle may only raise prods (Mike 2026-10-12). */
+  allowedTools?: string[];
 }
 
 /** Outcome of executing one tool call. */

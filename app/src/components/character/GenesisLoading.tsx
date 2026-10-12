@@ -20,6 +20,7 @@ import { createPortal } from 'react-dom';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import type { GenesisProgress } from '@/services/character-genesis-progress';
 import { GenesisGmSteps } from './GenesisGmSteps';
+import { GenesisProds, GenesisOpenThreads } from './GenesisProds';
 
 export type { GenesisProgress };
 
@@ -38,6 +39,9 @@ const TOOL_VERBS: Record<string, string> = {
   edit_character_sheet: 'writing the sheet',
   update_work_session: 'logging progress',
   establish_world_facts: 'recording world facts',
+  raise_prod: 'raising a question for you',
+  end_prod_round: 'handing you the questions',
+  record_delegated_choice: 'recording what he chose',
 };
 export function toolVerb(tool: string | undefined | null): string {
   if (!tool) return 'working';
@@ -126,7 +130,7 @@ function useNow(active: boolean, fixedNow?: number): number {
   return fixedNow ?? now;
 }
 
-const STAGE_ORDER = ['open', 'expansion', 'ledger', 'mechanics', 'sheet', 'born'] as const;
+const STAGE_ORDER = ['open', 'prodding', 'expansion', 'ledger', 'mechanics', 'sheet', 'born'] as const;
 
 /** Pillar fill 0..1 — Soul (mind/memory) fills with the person and the
  *  ledger, Spirit with the traits forged, Body with the blocks and sheet. */
@@ -135,9 +139,9 @@ export function pillarFills(p: GenesisProgress | null): { body: number; spirit: 
   if (p.state === 'done') return { body: 1, spirit: 1, soul: 1 };
   const at = Math.max(0, STAGE_ORDER.indexOf((p.current ?? 'open') as typeof STAGE_ORDER[number]));
   const c = p.counts;
-  const soul = at <= 1 ? 0.12 : Math.min(1, 0.3 + 0.7 * Math.min(1, c.memories / 40));
-  const spirit = at < 3 ? 0.04 : Math.min(1, 0.25 + 0.6 * Math.min(1, c.traitsForged / 6) + (at >= 4 ? 0.15 : 0));
-  const body = at < 3 ? 0.04 : Math.min(1, 0.2 + 0.5 * Math.min(1, c.blocksForged / 4) + (at >= 4 ? 0.2 : 0));
+  const soul = at <= 2 ? 0.12 : Math.min(1, 0.3 + 0.7 * Math.min(1, c.memories / 40));
+  const spirit = at < 4 ? 0.04 : Math.min(1, 0.25 + 0.6 * Math.min(1, c.traitsForged / 6) + (at >= 5 ? 0.15 : 0));
+  const body = at < 4 ? 0.04 : Math.min(1, 0.2 + 0.5 * Math.min(1, c.blocksForged / 4) + (at >= 5 ? 0.2 : 0));
   return { body, spirit, soul };
 }
 
@@ -160,6 +164,12 @@ export function diffLogLines(prev: GenesisProgress | null, next: GenesisProgress
     if (dt > 0) out.push(`forge +${dt} trait${dt === 1 ? '' : 's'} drafted`);
     const da = next.counts.approved - prev.counts.approved;
     if (da > 0) out.push(`watcher approved ${da}`);
+    const np = next.prods?.length ?? 0;
+    const pp = prev.prods?.length ?? 0;
+    if (np > pp) out.push(`jewl raised +${np - pp} question${np - pp === 1 ? '' : 's'}`);
+    const decided = (p: GenesisProgress) => (p.prods ?? []).filter(x => x.status !== 'OPEN').length;
+    const dd = decided(next) - decided(prev);
+    if (dd > 0 && np === pp) out.push(`watcher decided ${dd}`);
     if (next.counts.cycles > prev.counts.cycles) out.push(`cycle ${next.counts.cycles} complete`);
     if (next.state === 'waiting' && prev.state !== 'waiting') out.push('paused · waiting on the watcher');
     if (next.state === 'running' && prev.state === 'waiting') out.push('resumed');
@@ -168,6 +178,10 @@ export function diffLogLines(prev: GenesisProgress | null, next: GenesisProgress
 }
 
 const WAIT_COPY: Record<string, { title: string; body: string }> = {
+  prods: {
+    title: 'JEWL HAS QUESTIONS',
+    body: 'Before he builds, JEWL asks about the gaps in the story. Answer, leave open, or let him decide, then press Build.',
+  },
   approval: {
     title: 'WAITING ON YOU',
     body: 'drafts await your approval in the Forge. JEWL resumes on his own once you approve.',
@@ -208,13 +222,18 @@ export interface GenesisLoadingOverlayProps {
   initialLog?: string[];
   /** Watcher steps (submit JEWL's drafts): needs the campaign + a refetch. */
   campaignId?: string;
+  /** Shown in JEWL's prod line ("they're on Violet's page"). */
+  characterName?: string | null;
+  /** Harness: open the answer field on this prod with this draft. */
+  prodAnswerOpenId?: string;
+  prodAnswerDraft?: string;
   onStepsChanged?: () => void;
   onOpenForge?: () => void;
 }
 
 export function GenesisLoadingOverlay({
   progress, liveTool, submitError, onDismiss, onViewSheet, fixedNow, initialLog,
-  campaignId, onStepsChanged, onOpenForge,
+  campaignId, onStepsChanged, onOpenForge, characterName, prodAnswerOpenId, prodAnswerDraft,
 }: GenesisLoadingOverlayProps) {
   const state = submitError ? 'error' : progress?.state ?? 'none';
   const running = state === 'running' || state === 'waiting' || state === 'none';
@@ -275,8 +294,10 @@ export function GenesisLoadingOverlay({
             {state === 'done' && (progress?.gmSteps?.length ?? 0) > 0 ? `a being is born · ${progress?.gmSteps?.length} need${progress?.gmSteps?.length === 1 ? 's' : ''} you`
               : state === 'done' ? 'a being is born'
               : state === 'error' ? 'genesis halted'
-                : state === 'waiting' ? 'paused · waiting on the watcher'
-                  : 'JEWL is assembling a being'}
+                : progress?.prodding && state === 'waiting' ? 'JEWL has questions before he builds'
+                  : progress?.prodding ? 'JEWL is reading the seed'
+                    : state === 'waiting' ? 'paused · waiting on the watcher'
+                      : 'JEWL is assembling a being'}
           </span>
         </div>
 
@@ -319,12 +340,22 @@ export function GenesisLoadingOverlay({
             </div>
           </div>
         )}
+        {campaignId && progress?.prodding && progress.sessionId && (
+          <GenesisProds prods={progress.prods ?? []} campaignId={campaignId} sessionId={progress.sessionId}
+            characterName={characterName} waiting={state === 'waiting'}
+            onChanged={() => onStepsChanged?.()}
+            initialOpenId={prodAnswerOpenId} initialDraft={prodAnswerDraft} />
+        )}
+        {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
+          <GenesisOpenThreads threads={progress?.openThreads ?? []} />
+        )}
         {campaignId && progress && (progress.gmSteps?.length ?? 0) > 0 && (
           <GenesisGmSteps steps={progress.gmSteps} campaignId={campaignId}
             onChanged={() => onStepsChanged?.()} onOpenForge={onOpenForge} />
         )}
         {state === 'waiting' && progress?.wait && WAIT_COPY[progress.wait]
-          && !(progress.wait === 'approval' && campaignId && (progress.gmSteps?.length ?? 0) > 0) && (
+          && !(progress.wait === 'approval' && campaignId && (progress.gmSteps?.length ?? 0) > 0)
+          && !(progress.wait === 'prods' && campaignId) && (
           <div className="gn-waitbox" role="status">
             <div className="gn-wait-t">{WAIT_COPY[progress.wait].title}</div>
             <div className="gn-wait-b">

@@ -11,6 +11,7 @@ import IdentityLockWizard from './IdentityLockWizard';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
 import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
+import { GenesisOpenThreads } from './GenesisProds';
 
 // Body-part section re-enabled (Mike 2026-08-17 body-spawn ruling): it now
 // reads the SPAWNED body-part items (character.bodyAnatomy) — per-part
@@ -675,6 +676,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           onDismiss={dismissGenesis}
           onViewSheet={() => { finishGenesis(); if (genesisCharId) setGenesisDismissedFor(genesisCharId); }}
           campaignId={campaignId}
+          characterName={characterName || effectiveCharacter?.name}
           onStepsChanged={() => { void refetchGenesis(); }}
           onOpenForge={() => { if (genesisCharId) setGenesisDismissedFor(genesisCharId); }}
         />
@@ -1382,6 +1384,11 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           )}
         </div>
 
+        {/* Open threads the GM left at genesis — mysteries for play (2026-10-12) */}
+        {isGM && genesis && !genesis.prodding && (genesis.openThreads?.length ?? 0) > 0 && (
+          <GenesisOpenThreads threads={genesis.openThreads ?? []} />
+        )}
+
         {/* Action buttons */}
         {isEditable && (
           <div className="flex items-center gap-3">
@@ -1410,7 +1417,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 }}
                 title="JEWL is building this character — open the genesis progress screen."
               >
-                ◆ Genesis running · {genesis?.step ?? '…'}/{genesis?.total ?? 6} — view
+                ◆ {genesis?.prodding ? `JEWL has questions · ${(genesis.prods ?? []).filter(p => p.status === 'OPEN').length} open` : `Genesis running · ${genesis?.step ?? '…'}/${genesis?.total ?? 7}`} — view
               </button>
             )}
             {isGM && effectiveCharacter?.id && !genesisRunning && (

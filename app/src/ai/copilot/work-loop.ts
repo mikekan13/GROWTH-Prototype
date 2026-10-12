@@ -35,7 +35,7 @@ import {
   logGenesisReport,
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
-import { buildWorkCycleText } from './work-cycle-text';
+import { planWorkCycle, type CycleProd } from './work-cycle-text';
 
 const BREATHER_MS = 4_000;
 /** Consecutive tool-less cycles before a session is judged stalled and
@@ -106,6 +106,7 @@ async function runCycle(session: {
   plan: string | null;
   progress: string;
   cycleCount: number;
+  stage?: string | null;
 }): Promise<void> {
   const jewl = await getJewlGodHead();
   await touchCycle(session.id);
@@ -120,7 +121,20 @@ async function runCycle(session: {
   } catch { /* treasury is context, never a blocker */ }
 
   const recentNotes = parseProgress(session.progress).slice(-5);
-  const text = buildWorkCycleText(session, treasuryLine, recentNotes);
+  // Genesis is a dialogue (2026-10-12): a PRODDING cycle only asks the GM
+  // (prod tools only); after Build the GM's decisions ride in the plan.
+  let prods: CycleProd[] = [];
+  if (isGenesisGoal(session.goal)) {
+    try {
+      const { listSessionProds } = await import('@/services/genesis-prods');
+      prods = await listSessionProds(session.id);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[daya-work-loop] prods not loaded:', err);
+      if (session.stage === 'PRODDING') return; // never ask blind — try again next pass
+    }
+  }
+  const { text, allowedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
@@ -138,6 +152,7 @@ async function runCycle(session: {
       actorName: 'JEWL',
       actorRole: 'GODHEAD',
       text,
+      ...(allowedTools ? { allowedTools } : {}),
       ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME } : {}),
     });
     state.dispatchFailures.delete(session.id);

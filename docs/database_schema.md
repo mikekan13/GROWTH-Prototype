@@ -505,6 +505,10 @@ See `types/growth.ts` for full interface. Key sections:
 ## DayaWorkSession (F-3 "keep existing" — DAYA v0.x, 2026-08-07)
 Durable JEWL job worked across message boundaries; the work-loop fires cycles while `status='active'`; JEWL closes it himself (self-deactivation — no caps/TTLs by ruling).
 - `status`: `active | blocked | done | cancelled` (blocked = waiting on GM; forge-batch-watch reactivates)
+- `stage` (2026-10-12): `PRODDING` (genesis opens asking the GM; only the Build route moves it on; JEWL can't set done; forge-batch resume skips it) | `BUILDING` (after Build) | null (legacy / non-genesis). `prodRound`: the prod round JEWL is raising (0 = none open; end_prod_round closes it).
+
+## GenesisProd (genesis is a dialogue, 2026-10-12 — migration `20261012130000_genesis_prods`)
+JEWL's question to the GM about a creative gap in the seed, raised in PRODDING. `sessionId`, `campaignId`, `characterId` (no FKs), `round`/`order` (≤5 per round), `anchorQuote` (≤300 chars, the seed passage), `question`, `why` (one line: what hinges on it), `kind` `CREATIVE|MECHANICAL_CHECK`, `status` `OPEN|ANSWERED|LEFT_OPEN|DELEGATED`, `answer?`, `jewlFill?` (JEWL's recorded choice when delegated), `decidedById?`, `decidedAt?`, `createdAt`. Indexes (sessionId, round, order), (campaignId, characterId).
 - `goal` (the job), `plan` (his own, revisable), `progress` (JSON `string[]` — append-only cycle notes, capped 200)
 - `continueUnattended`: GM answered the spoken hand-off question yes → cycles run with no client connected
 - `cycleCount`/`lastCycleAt` (loop bookkeeping; round-robin ordering), `startedAt`/`endedAt`, `createdBy`, `blockedReason`

@@ -79,6 +79,9 @@ export async function submitCharacterGenesis(opts: {
     goal: `Character genesis: ${name} [${character.id}] — gestate the person from their genome, then translate the biography into mechanics (catalog-first).`,
     plan,
     createdBy: opts.actorId,
+    // Genesis is a dialogue (Mike 2026-10-12): JEWL prods the GM first; only
+    // the GM's Build moves the session on to gestation.
+    stage: 'PRODDING',
   });
   kickWorkLoop();
 

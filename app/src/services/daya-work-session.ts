@@ -51,12 +51,15 @@ export async function openWorkSession(opts: {
   plan?: string;
   continueUnattended?: boolean;
   createdBy: string;
+  /** Genesis opens in 'PRODDING' (JEWL asks the GM before building). */
+  stage?: string;
 }) {
   const session = await prisma.dayaWorkSession.create({
     data: {
       campaignId: opts.campaignId,
       goal: opts.goal,
       plan: opts.plan,
+      ...(opts.stage ? { stage: opts.stage } : {}),
       continueUnattended: opts.continueUnattended ?? false,
       createdBy: opts.createdBy,
     },
@@ -76,6 +79,11 @@ export async function updateWorkSession(opts: {
   if (!session) throw new NotFoundError('Work session not found');
   if (session.status === 'done' || session.status === 'cancelled') {
     throw new ValidationError(`Work session is already ${session.status}`);
+  }
+  // Genesis is a dialogue (2026-10-12): nothing ends a session that is still
+  // asking the GM — only the GM's Build moves it past PRODDING.
+  if (session.stage === 'PRODDING' && opts.status === 'done') {
+    throw new ValidationError('Genesis is still in the prod stage — the GM has not pressed Build. Raise prods or end the round; never close it.');
   }
 
   const data: Record<string, unknown> = {};
@@ -152,9 +160,9 @@ export async function listWorkSessions(campaignId: string, includeClosed = false
 /** Forge batch resolved (or similar unblock) — put blocked sessions back
  *  to work. Returns how many resumed. */
 export async function resumeBlockedWorkSessions(campaignId: string): Promise<number> {
-  const blocked = await prisma.dayaWorkSession.findMany({
+  const blocked = (await prisma.dayaWorkSession.findMany({
     where: { campaignId, status: 'blocked' },
-  });
+  })).filter(s => s.stage !== 'PRODDING'); // prods wait on the GM's answers / Build, not the Forge
   for (const session of blocked) {
     await updateWorkSession({
       sessionId: session.id,

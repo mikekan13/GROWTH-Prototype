@@ -52,8 +52,8 @@ vi.mock('@/ai/network/tone-filter', () => ({
   toneFilterAsync: async (t: string) => { h.toned.push(t); return t.replace(/GRAPHIC/g, 'SOFTENED'); },
 }));
 
-import { dispatchPrompt } from './runtime';
-import { buildWorkCycleText } from './work-cycle-text';
+import { dispatchPrompt, toolOffered } from './runtime';
+import { buildWorkCycleText, PROD_STAGE_TOOLS } from './work-cycle-text';
 import { buildGenesisPlan } from '@/services/character-genesis-plan';
 import { WallViolationError, workCycleLane, resolveLane } from '@/ai/network';
 
@@ -137,5 +137,20 @@ describe('genesis work cycles cross only through the wall', () => {
     const system: string = h.callClaude.mock.calls[0][0].systemPrompt;
     expect(system).toContain('SOFTENED detail of the burn');
     expect(system).not.toContain('GRAPHIC');
+  });
+});
+
+describe('prod stage tool gate (genesis is a dialogue, 2026-10-12)', () => {
+  it('a PRODDING dispatch can offer and run only the prod tools; ordinary dispatches never see them', () => {
+    const prod = [...PROD_STAGE_TOOLS];
+    expect(toolOffered('raise_prod', prod)).toBe(true);
+    expect(toolOffered('end_prod_round', prod)).toBe(true);
+    for (const t of ['daya_seed_memory', 'daya_author_entity', 'propose_forge_blueprint', 'edit_character_sheet', 'update_work_session']) {
+      expect(toolOffered(t, prod)).toBe(false);
+    }
+    expect(toolOffered('raise_prod')).toBe(false);
+    expect(toolOffered('end_prod_round')).toBe(false);
+    expect(toolOffered('record_delegated_choice')).toBe(true);
+    expect(toolOffered('daya_seed_memory')).toBe(true);
   });
 });

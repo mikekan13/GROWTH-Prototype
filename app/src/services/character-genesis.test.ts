@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConflictError } from '@/lib/errors';
 
-const st = vi.hoisted(() => ({ existing: null as null | { id: string; status: string }, opened: 0, kicks: 0 }));
+const st = vi.hoisted(() => ({ existing: null as null | { id: string; status: string }, opened: 0, kicks: 0, stage: undefined as unknown }));
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -12,7 +12,7 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/ai/copilot/work-loop', () => ({ kickWorkLoop: vi.fn(() => { st.kicks++; }) }));
 vi.mock('./daya-work-session', () => ({
-  openWorkSession: vi.fn(async () => { st.opened++; return { id: 's-new', status: 'active' }; }),
+  openWorkSession: vi.fn(async (o: { stage?: string }) => { st.opened++; st.stage = o.stage; return { id: 's-new', status: 'active' }; }),
 }));
 
 const { submitCharacterGenesis } = await import('./character-genesis');
@@ -25,6 +25,8 @@ describe('submitCharacterGenesis', () => {
   it('opens one session when none is running', async () => {
     await expect(submit()).resolves.toMatchObject({ sessionId: 's-new', alreadyRunning: false });
     expect(st.opened).toBe(1);
+    // Genesis is a dialogue (2026-10-12): it opens asking, not building.
+    expect(st.stage).toBe('PRODDING');
   });
 
   it('refuses a second concurrent run with a 409 and opens nothing', async () => {

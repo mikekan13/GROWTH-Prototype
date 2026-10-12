@@ -130,9 +130,18 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   return z.toJSONSchema(schema) as Record<string, unknown>;
 }
 
+/** Tools offered ONLY when a dispatch names them in allowedTools (the
+ *  genesis prod stage, 2026-10-12) — never in ordinary chat or build cycles. */
+const STAGE_ONLY_TOOLS = new Set(['raise_prod', 'end_prod_round']);
+
+/** May this dispatch offer / execute this tool? */
+export function toolOffered(name: string, allowedTools?: string[]): boolean {
+  return allowedTools ? allowedTools.includes(name) : !STAGE_ONLY_TOOLS.has(name);
+}
+
 /** Prepare the tools list for the Claude call. */
-function buildToolSpecs(): ClaudeToolSpec[] {
-  return listJewlTools().map(t => ({
+function buildToolSpecs(allowedTools?: string[]): ClaudeToolSpec[] {
+  return listJewlTools().filter(t => toolOffered(t.name, allowedTools)).map(t => ({
     name: t.name,
     description: t.description,
     inputSchema: zodToJsonSchema(t.inputSchema),
@@ -416,7 +425,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ];
 
   // 4. Tool-use loop.
-  const tools = buildToolSpecs();
+  const tools = buildToolSpecs(prompt.allowedTools);
   const toolCtx: JewlToolContext = {
     campaignId: prompt.campaignId,
     actorId: prompt.actorId,
@@ -536,10 +545,11 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     }
     const userToolResults: ClaudeContentBlock[] = [];
     for (const tu of toolUseBlocks) {
-      const tool = getJewlTool(tu.name);
+      const offered = toolOffered(tu.name, prompt.allowedTools);
+      const tool = offered ? getJewlTool(tu.name) : undefined;
       let tcRecord: JewlToolCallResult;
       if (!tool) {
-        const err = `Unknown tool: ${tu.name}`;
+        const err = offered ? `Unknown tool: ${tu.name}` : `Tool ${tu.name} is not available in this stage.`;
         tcRecord = { name: tu.name, input: tu.input, error: err };
         userToolResults.push({
           type: 'tool_result',

@@ -19,6 +19,9 @@
  * classified into fixed kinds server-side; the free text never leaves.
  * (Mike lifted the blind-play spoiler firewall 2026-10-11 — story content
  * now lives in the Log's genesis reports; the overlay stays process-only.)
+ * EXCEPTION, by design (2026-10-12): PRODS — JEWL's questions to the GM in the
+ * PRODDING stage quote the seed the GM wrote and carry the GM's own answers;
+ * they ship to the GM (and only the GM) so genesis can be a dialogue.
  */
 import 'server-only';
 import { prisma } from '@/lib/db';
@@ -28,6 +31,7 @@ import { requireCampaignGM } from './campaign-access';
 
 export const GENESIS_STAGES = [
   { key: 'open', label: 'Genesis session opened' },
+  { key: 'prodding', label: 'Listening' },
   { key: 'expansion', label: 'Gestating the person' },
   { key: 'ledger', label: 'Sealing the memory ledger' },
   { key: 'mechanics', label: 'Translating to mechanics · catalog first' },
@@ -38,7 +42,38 @@ export const GENESIS_STAGES = [
 export type GenesisStageKey = (typeof GENESIS_STAGES)[number]['key'];
 
 /** Fixed vocabulary for why genesis is waiting — never the raw reason text. */
-export type GenesisWaitKind = 'approval' | 'question' | 'provider' | 'stalled';
+export type GenesisWaitKind = 'approval' | 'question' | 'provider' | 'stalled' | 'prods';
+
+/** A prod as the GM sees it (genesis is a dialogue, 2026-10-12). Prods are
+ *  GM-facing questions BY DESIGN — they quote the seed the GM wrote. */
+export interface GenesisProdView {
+  id: string;
+  round: number;
+  order: number;
+  anchorQuote: string;
+  question: string;
+  why: string;
+  kind: string;
+  status: string;
+  answer: string | null;
+  jewlFill: string | null;
+  decidedAt: string | null;
+}
+
+/** The prod fields progress reads (a GenesisProd row satisfies it). */
+export interface ProdFact {
+  id: string;
+  round: number;
+  order: number;
+  anchorQuote: string;
+  question: string;
+  why: string;
+  kind: string;
+  status: string;
+  answer: string | null;
+  jewlFill: string | null;
+  decidedAt: Date | null;
+}
 
 export interface GenesisFacts {
   session: {
@@ -49,7 +84,11 @@ export interface GenesisFacts {
     endedAt: Date | null;
     lastCycleAt: Date | null;
     blockedReason: string | null;
+    /** 'PRODDING' while JEWL asks before building; 'BUILDING' after Build. */
+    stage?: string | null;
   } | null;
+  /** The session's prods, round then order. */
+  prods?: ProdFact[];
   entityAuthored: boolean;
   memoryCount: number;
   /** JEWL's Forge drafts in this campaign during the session window. */
@@ -109,6 +148,11 @@ export interface GenesisProgress {
   error: 'cancelled' | 'provider' | null;
   /** Drafts awaiting the Watcher — listed until every one is done. */
   gmSteps: GenesisGmStep[];
+  /** In the prod stage: JEWL asks, the GM answers / leaves open / delegates; Build moves on. */
+  prodding: boolean;
+  prods: GenesisProdView[];
+  /** Prods the GM left open — mysteries for play, never filled by JEWL. */
+  openThreads: Array<{ id: string; anchorQuote: string; question: string }>;
   startedAt: string | null;
   endedAt: string | null;
   lastCycleAt: string | null;
@@ -181,6 +225,14 @@ export function toGmStep(row: ForgedRow): GenesisGmStep | null {
   };
 }
 
+export function toProdView(p: ProdFact): GenesisProdView {
+  return {
+    id: p.id, round: p.round, order: p.order, anchorQuote: p.anchorQuote, question: p.question,
+    why: p.why, kind: p.kind, status: p.status, answer: p.answer, jewlFill: p.jewlFill,
+    decidedAt: p.decidedAt ? p.decidedAt.toISOString() : null,
+  };
+}
+
 /** Pure derivation — every stage below the highest one with evidence is done. */
 export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
   const total = GENESIS_STAGES.length;
@@ -199,25 +251,36 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
     approved,
   };
 
+  const prods = (facts.prods ?? []).map(toProdView);
+  const openThreads = prods.filter(p => p.status === 'LEFT_OPEN')
+    .map(p => ({ id: p.id, anchorQuote: p.anchorQuote, question: p.question }));
+  const listenLabel = `Listening · ${prods.length} prod${prods.length === 1 ? '' : 's'}`;
+
   const s = facts.session;
   if (!s) {
     return {
       state: 'none', sessionId: null, current: null, step: 0, total, counts,
       stages: GENESIS_STAGES.map(st => ({ ...st, status: 'pending' as const })),
-      wait: null, error: null, gmSteps: [], startedAt: null, endedAt: null, lastCycleAt: null,
+      wait: null, error: null, gmSteps: [], prodding: false, prods, openThreads,
+      startedAt: null, endedAt: null, lastCycleAt: null,
     };
   }
 
-  // Highest stage reached (index into GENESIS_STAGES).
-  let reached = 1; // the session exists → open is done, expansion under way
-  if (facts.entityAuthored || facts.memoryCount > 0) reached = 2;
-  if (facts.forged.length > 0) reached = 3;
-  if (facts.forged.length > 0 && pendingApproval === 0 && s.status === 'active') reached = 4;
-  if (s.status === 'done') reached = 5;
+  // Highest stage reached (index into GENESIS_STAGES). Only the GM's Build
+  // moves a session out of PRODDING (services/genesis-prods.ts).
+  const prodding = s.stage === 'PRODDING';
+  let reached = prodding ? 1 : 2; // open is done; listening, or expansion under way
+  if (!prodding) {
+    if (facts.entityAuthored || facts.memoryCount > 0) reached = 3;
+    if (facts.forged.length > 0) reached = 4;
+    if (facts.forged.length > 0 && pendingApproval === 0 && s.status === 'active') reached = 5;
+    if (s.status === 'done') reached = 6;
+  }
 
   const done = s.status === 'done';
   const stages = GENESIS_STAGES.map((st, i) => ({
     ...st,
+    label: st.key === 'prodding' ? listenLabel : st.label,
     status: (i < reached || (done && i === reached)) ? 'done' as const
       : i === reached ? 'current' as const
         : 'pending' as const,
@@ -230,6 +293,7 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
   else if (s.status === 'cancelled') { state = 'error'; error = 'cancelled'; }
   else if (s.status === 'blocked') {
     wait = classifyWait(s.blockedReason, pendingApproval);
+    if (prodding && wait !== 'stalled') wait = wait === 'provider' ? 'provider' : 'prods';
     if (wait === 'provider') { state = 'error'; error = 'provider'; }
     else state = 'waiting';
   }
@@ -245,6 +309,9 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
     wait,
     error,
     gmSteps: facts.forged.map(toGmStep).filter((g): g is GenesisGmStep => g !== null),
+    prodding,
+    prods,
+    openThreads,
     startedAt: s.startedAt.toISOString(),
     endedAt: s.endedAt ? s.endedAt.toISOString() : null,
     lastCycleAt: s.lastCycleAt ? s.lastCycleAt.toISOString() : null,
@@ -273,7 +340,7 @@ export function parseGenesisGoal(goal: string): { name: string; characterId: str
 type SessionRow = NonNullable<GenesisFacts['session']>;
 const SESSION_SELECT = {
   id: true, status: true, cycleCount: true, startedAt: true,
-  endedAt: true, lastCycleAt: true, blockedReason: true,
+  endedAt: true, lastCycleAt: true, blockedReason: true, stage: true,
 } as const;
 
 async function loadGenesisFacts(
@@ -318,7 +385,18 @@ async function loadGenesisFacts(
     });
   }
 
-  return { session, entityAuthored, memoryCount: entity?._count.memories ?? 0, forged };
+  const prods: ProdFact[] = session
+    ? await prisma.genesisProd.findMany({
+        where: { sessionId: session.id },
+        orderBy: [{ round: 'asc' }, { order: 'asc' }],
+        select: {
+          id: true, round: true, order: true, anchorQuote: true, question: true, why: true,
+          kind: true, status: true, answer: true, jewlFill: true, decidedAt: true,
+        },
+      })
+    : [];
+
+  return { session, prods, entityAuthored, memoryCount: entity?._count.memories ?? 0, forged };
 }
 
 /** GM-only: live genesis progress for a character (latest genesis session). */
@@ -354,6 +432,13 @@ export function genesisStatusLine(name: string, p: GenesisProgress): string | nu
     return `${name}'s genesis is closed before birth. Submit again from the character page to start fresh.`;
   }
   if (p.state === 'waiting') {
+    if (p.wait === 'prods') {
+      const open = p.prods.filter(x => x.status === 'OPEN').length;
+      if (open > 0) {
+        return `I've got ${plural(open, 'question', 'questions')} before I build — ${open === 1 ? "it's" : "they're"} on ${name}'s page. Answer, leave open, or tell me to decide; press Build when you're ready.`;
+      }
+      return `Nothing more to ask about ${name}. Press Build on ${name}'s page when you're ready.`;
+    }
     if (p.wait === 'approval') {
       return `${name}'s mechanics are drafted — ${plural(c.pendingApproval, 'piece waits', 'pieces wait')} for you in the Forge. Approve and I'll write the sheet. ${log}`;
     }
@@ -388,7 +473,9 @@ export async function logGenesisReport(opts: {
   campaignId: string;
   goal: string;
   message: string;
-  cycle: number;
+  cycle?: number;
+  /** Replaces "cycle N" in the row's first line (e.g. "prods · round 1"). */
+  heading?: string;
   jewlUserId: string;
 }): Promise<string | null> {
   const text = opts.message.trim();
@@ -406,7 +493,7 @@ export async function logGenesisReport(opts: {
     payload: {
       kind: 'game_event',
       eventType: GENESIS_REPORT_EVENT,
-      description: `${parsed.name} · cycle ${opts.cycle}
+      description: `${parsed.name} · ${opts.heading ?? `cycle ${opts.cycle ?? '?'}`}
 ${text}`,
     },
   });

@@ -652,9 +652,40 @@ model DayaWorkSession {
   startedAt          DateTime  @default(now())
   endedAt            DateTime?
   createdBy          String // actor that opened it (JEWL's user id)
+  /// Genesis phase (2026-10-12): "PRODDING" = JEWL asks the GM before building
+  /// (only the Build route moves it on); "BUILDING" = after Build; null = legacy/non-genesis.
+  stage              String?
+  /// Prod round JEWL is currently raising (0 = none open). end_prod_round closes it.
+  prodRound          Int       @default(0)
 
   @@index([status, lastCycleAt])
   @@index([campaignId, status])
+}
+
+/// Genesis prod (2026-10-12, [[ruling-genesis-is-a-dialogue-jewl-prods-gm-2026-10-12]]):
+/// a question JEWL raises to the GM about a creative gap in the seed before he
+/// builds. The GM answers, leaves it open (a mystery found in play — JEWL must
+/// never fill it) or delegates (JEWL fills it and records his choice in jewlFill).
+model GenesisProd {
+  id          String    @id @default(cuid())
+  sessionId   String // DayaWorkSession
+  campaignId  String
+  characterId String
+  round       Int
+  order       Int
+  anchorQuote String // <=300 chars: the seed passage that raised it
+  question    String
+  why         String // one line: what hinges on it
+  kind        String // CREATIVE | MECHANICAL_CHECK
+  status      String    @default("OPEN") // OPEN | ANSWERED | LEFT_OPEN | DELEGATED
+  answer      String?
+  jewlFill    String? // what JEWL chose when delegated
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([sessionId, round, order])
+  @@index([campaignId, characterId])
 }
 
 model PlayerRequest {

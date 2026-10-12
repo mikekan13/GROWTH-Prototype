@@ -47,6 +47,7 @@ import './daya-recall-probe';
 import './daya-author-entity';
 import './daya-seed-memory';
 import './ask-terminal';
+import './genesis-prods';
 
 export { getJewlTool, listJewlTools, registerJewlTool } from './registry';
 export type { JewlTool, JewlToolContext, JewlToolHandlerResult, JewlToolAffectedObjects } from './types';
