@@ -55,6 +55,15 @@ describe('parseClassifierOutput — the local split', () => {
     expect(u).toContain('1. [10:00:00] JEWL: Who?');
     expect(u).toContain('2. [10:00:05] SPLIT [ambient]: Ruth.');
   });
+
+  it('the user block names every split line the answer must carry', () => {
+    const u = buildClassifierUser([
+      { n: 1, who: '[ambient]', ts: '10:00:00', text: 'a', split: true },
+      { n: 2, who: 'JEWL', ts: '10:00:01', text: 'b', split: false },
+      { n: 3, who: '[ambient]', ts: '10:00:02', text: 'c', split: true },
+    ]);
+    expect(u).toContain('exactly 2 split line(s): #1, #3.');
+  });
 });
 
 describe('content class of copilot rows', () => {

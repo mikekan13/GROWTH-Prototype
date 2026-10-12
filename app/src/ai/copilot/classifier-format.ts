@@ -66,15 +66,21 @@ export const CLASSIFIER_SYSTEM = [
   '#<n> IC',
   '#<n> OOC',
   '#<n> IC: <in-character words only>',
-  'One #<n> line per SPLIT line.',
+  'Write one #<n> line for EVERY SPLIT line, in order — including the plainly in-character',
+  'ones (write "#<n> IC"). Never skip a line; a skipped line is lost.',
 ].join('\n');
 
 export function buildClassifierUser(lines: WindowLine[]): string {
+  // Naming the exact numbers expected keeps the 27B from listing only the
+  // OOC/mixed lines (live smoke 2026-10-12: pure-IC lines were skipped).
+  const splitNs = lines.filter((l) => l.split).map((l) => `#${l.n}`);
   return [
     'Recent activity (last ~90s):',
     ...lines.map((l) => `${l.n}. [${l.ts}] ${l.split ? 'SPLIT ' : ''}${l.who}: ${l.text}`),
     '',
-    'Answer now.',
+    splitNs.length
+      ? `Answer now: the VERDICT line, then exactly ${splitNs.length} split line(s): ${splitNs.join(', ')}.`
+      : 'Answer now: the VERDICT line only.',
   ].join('\n');
 }
 
