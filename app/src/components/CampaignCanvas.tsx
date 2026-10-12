@@ -13,6 +13,7 @@ import { BOARD_CHANGED_EVENT } from '@/components/terminal/PlanningChips';
 import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
+import { JewlStatusButton } from '@/components/jewl/JewlWorkPopup';
 import { TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import type { FeedEntity } from '@/components/terminal/table-feed/TableFeedRows';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
@@ -1429,8 +1430,10 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     <div className="h-dvh bg-[var(--surface-dark)] flex flex-col overflow-hidden">
       {/* ── JEWL construction site — visible while he lays work down (F-2).
           The ⚒ badge names the last committed piece; page data refreshes
-          progressively underneath so his builds materialize live. */}
-      {jewlWorking?.active && (
+          progressively underneath so his builds materialize live.
+          For the Watcher this ticker became JEWL's status line (2026-10-12):
+          always there, tap → his work screen — rendered at the top of <main>. */}
+      {!isGM && jewlWorking?.active && (
         <div
           className="fixed left-1/2 -translate-x-1/2 z-[95] pointer-events-none"
           style={{ top: 72 }}
@@ -1468,6 +1471,13 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
       {/* Canvas content area — fills remaining space */}
       <main ref={mainRef} className="flex-1 relative overflow-hidden">
+        {/* JEWL's status line (Mike 2026-10-12): one-line state + Needs-you
+            badge; tap → the work screen over this page. */}
+        {isGM && (
+          <div className="absolute left-1/2 -translate-x-1/2 z-[95] pointer-events-none" style={{ top: 6, maxWidth: 'calc(100vw - 32px)' }} data-jewl-status>
+            <JewlStatusButton campaignId={campaign.id} />
+          </div>
+        )}
         {/* Contested mode banner */}
         {contestedState?.phase === 'selecting_defender' && (
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center gap-4 py-2 px-4" style={{

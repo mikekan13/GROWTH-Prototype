@@ -358,7 +358,7 @@ const SESSION_SELECT = {
   endedAt: true, lastCycleAt: true, blockedReason: true, stage: true, progress: true,
 } as const;
 
-async function loadGenesisFacts(
+export async function loadGenesisFacts(
   characterId: string,
   campaignId: string,
   sessionId?: string,
