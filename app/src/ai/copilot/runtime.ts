@@ -37,6 +37,7 @@ import {
   assertNoTableContent,
   toneFilterAsync,
   WallViolationError,
+  newToneTally,
   type ContentClass,
   type ResolvedLane,
 } from '@/ai/network';
@@ -332,7 +333,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   });
   const pastMessages = history.reverse().slice(0, -1); // exclude the prompt we just saved
   const toneCtx = { caller: 'jewl-dispatch', campaignId: prompt.campaignId };
-  const laneHistory = await historyForLane(pastMessages, toCloud, toneCtx);
+  const tally = newToneTally();
+  const laneHistory = await historyForLane(pastMessages, toCloud, toneCtx, tally);
 
   const memoryBlock = formatJewlMemoryBlock(jewlMemories);
   const timeBlock = formatTimeAwarenessBlock(timeSnap);
@@ -363,6 +365,11 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
 
   // 3. Build the messages array. History is text-only; the new prompt
   //    is formatted via formatPromptText.
+  const tonedText = async (text: string) => {
+    const out = await toneFilterAsync(text, toneCtx);
+    if (out !== text) tally.toned++;
+    return out;
+  };
   const messages: ClaudeMessageInput[] = [
     // Every history line is prefixed with its ISO timestamp so JEWL can
     // reason about pacing — see [[jewl-time-awareness-2026-06-17]] for why
@@ -374,7 +381,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     {
       role: 'user',
       content: await Promise.all((await buildUserContentBlocks(prompt)).map(async b =>
-        toCloud && b.type === 'text' ? { ...b, text: await toneFilterAsync(b.text, toneCtx) } : b,
+        toCloud && b.type === 'text' ? { ...b, text: await tonedText(b.text) } : b,
       )),
     },
   ];
@@ -440,6 +447,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       // the SDK's non-streaming long-request guard; the truncation
       // continuation below handles anything bigger across rounds.
       maxTokens: Number(process.env.JEWL_MAX_OUTPUT_TOKENS ?? 8_192),
+      audit: { caller: 'jewl-dispatch', lane, contentClass: promptClass, campaignId: prompt.campaignId, tally },
     });
     totalInputTokens += result.usage.inputTokens;
     totalOutputTokens += result.usage.outputTokens;
@@ -557,7 +565,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     messages.push({
       role: 'user',
       content: await Promise.all(userToolResults.map(async b =>
-        b.type === 'tool_result' ? { ...b, content: await toolResultForLane(b.content, toCloud, toneCtx) } : b,
+        b.type === 'tool_result' ? { ...b, content: await toolResultForLane(b.content, toCloud, toneCtx, tally) } : b,
       )),
     });
   }

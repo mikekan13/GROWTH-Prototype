@@ -24,3 +24,4 @@ export { anthropicChatText, getAnthropicClient, type AnthropicMessagesClient } f
 export { openAiCompatChat } from './transports/openai-compat';
 export { recordAiCall, estimateUsd } from './metering';
 export { recordTrace } from './traces';
+export { auditCloudCall, auditRefusal, cloudAuditLine, newToneTally, utf8Bytes, type CloudAudit, type ToneTally } from './audit';

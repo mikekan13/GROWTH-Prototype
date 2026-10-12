@@ -8,6 +8,9 @@
  * the awaited tone filter) and the whole payload passes assertNoTableContent.
  * Inside the wall (local lane) nothing is changed and images are dropped
  * (the local text lane cannot see them).
+ *
+ * A request that actually goes to Claude emits exactly one audit line
+ * ([wall→cloud], ai/network/audit.ts) — sizes and counts, never text.
  */
 
 import 'server-only';
@@ -15,6 +18,7 @@ import { route, prepareCloudText } from './route';
 import { anthropicChatText, type AnthropicMessagesClient, type AnthropicTextOrImageBlock } from './transports/anthropic';
 import { openAiCompatChat } from './transports/openai-compat';
 import { recordAiCall } from './metering';
+import { auditCloudCall, newToneTally, utf8Bytes } from './audit';
 import type { AiUsage, ResolvedLane, TaskDescriptor } from './types';
 
 export type RoutedBlock = AnthropicTextOrImageBlock;
@@ -71,7 +75,8 @@ export async function routedChatText(
   const messages: RoutedMessage[] = input.messages ?? [{ role: 'user', content: input.user ?? '' }];
   const lane = route(task, [input.system, ...textsOf(messages)]);
 
-  const prep = (text: string) => prepareCloudText(task, lane, text, input.identifiers);
+  const tally = newToneTally();
+  const prep = (text: string) => prepareCloudText(task, lane, text, input.identifiers, tally);
   const [system, ...prepared] = await Promise.all([
     prep(input.system),
     ...messages.map(async (m): Promise<RoutedMessage> => (
@@ -84,6 +89,14 @@ export async function routedChatText(
   const common = { maxTokens: input.maxTokens, temperature: input.temperature ?? 0 };
   let res: { text: string; model: string; usage: AiUsage };
   if (lane.provider === 'anthropic') {
+    auditCloudCall({
+      caller: task.caller,
+      lane: lane.lane,
+      contentClass: task.contentClass,
+      bytesIn: utf8Bytes(system, ...prepared.flatMap((m) => blocksOf(m.content).map((b) => (b.type === 'text' ? b.text : b.source.data)))),
+      chunksToned: tally.toned,
+      campaignId: task.campaignId,
+    });
     res = await anthropicChatText({
       model: input.model ?? lane.model,
       system: system || undefined,

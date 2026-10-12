@@ -11,6 +11,7 @@
 import type { ContentClass } from '@/ai/network/types';
 import { scrubForCloud, hasTableMarker, WITHHELD } from '@/ai/network/table-guard';
 import { toneFilterAsync, type ToneFilterContext } from '@/ai/network/tone-filter';
+import type { ToneTally } from '@/ai/network/audit';
 import { rowContentClass, AMBIENT_USERNAME, UI_USERNAME } from './content-class';
 
 export interface HistoryRow {
@@ -35,7 +36,14 @@ export interface LaneHistory {
 }
 
 /** The history lines a lane may see. */
-export async function historyForLane(rows: HistoryRow[], crossesWall: boolean, ctx?: ToneFilterContext): Promise<LaneHistory> {
+/** Tone one cloud-bound text, counting it on the tally when it changed. */
+async function toned(text: string, ctx?: ToneFilterContext, tally?: ToneTally): Promise<string> {
+  const out = await toneFilterAsync(text, ctx);
+  if (tally && out !== text) tally.toned++;
+  return out;
+}
+
+export async function historyForLane(rows: HistoryRow[], crossesWall: boolean, ctx?: ToneFilterContext, tally?: ToneTally): Promise<LaneHistory> {
   let sawNonFiction = false;
   const lines: Array<LaneHistoryLine | Promise<LaneHistoryLine>> = [];
   for (const m of rows) {
@@ -55,21 +63,21 @@ export async function historyForLane(rows: HistoryRow[], crossesWall: boolean, c
     const body = (m.icText && m.icText.trim()) ? m.icText : m.content;
     if (hasTableMarker(body)) continue;
     const tag = who ? `[${stamp}] [${who}]` : `[${stamp}]`;
-    lines.push(toneFilterAsync(`${tag}: ${body}`, ctx).then((text) => ({ role, text })));
+    lines.push(toned(`${tag}: ${body}`, ctx, tally).then((text) => ({ role, text })));
   }
   return { lines: await Promise.all(lines), sawNonFiction };
 }
 
 /** A tool result's content as a lane may see it (the tool-result choke point). */
-export async function toolResultForLane(content: string, crossesWall: boolean, ctx?: ToneFilterContext): Promise<string> {
+export async function toolResultForLane(content: string, crossesWall: boolean, ctx?: ToneFilterContext, tally?: ToneTally): Promise<string> {
   if (!crossesWall) return content;
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    return hasTableMarker(content) ? WITHHELD : toneFilterAsync(content, ctx);
+    return hasTableMarker(content) ? WITHHELD : toned(content, ctx, tally);
   }
-  return toneFilterAsync(JSON.stringify(scrubForCloud(parsed)), ctx);
+  return toned(JSON.stringify(scrubForCloud(parsed)), ctx, tally);
 }
 
 type Block = { type: string; text?: string; content?: string; input?: unknown };

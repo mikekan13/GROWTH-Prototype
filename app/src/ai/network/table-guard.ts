@@ -10,10 +10,12 @@
  *     results): drops table/real rows, swaps a fiction row's raw content for
  *     its icText, withholds marked strings. What it returns passes the check.
  *
- * Pure; no imports beyond the network's own error type.
+ * No imports beyond the network's own error type and audit line.
  */
 
 import { WallViolationError } from './errors';
+import { auditRefusal } from './audit';
+import type { ContentClass } from './types';
 
 /** Markers that only ever ride on table content. */
 const TABLE_MARKER_RE = /\[ambient\]|\[ui\]|"source"\s*:\s*"(?:TABLE_AMBIENT|TABLE_DROPPED|UI_ACTIVITY)"|"contentClass"\s*:\s*"(?:table|real)"/;
@@ -60,23 +62,27 @@ function looksLikeRow(v: object): boolean {
 }
 
 /** Throws WallViolationError if anything in `items` is table/real content. */
-export function assertNoTableContent(items: Array<string | RowLike | null | undefined>, caller: string): void {
+export function assertNoTableContent(
+  items: Array<string | RowLike | null | undefined>,
+  caller: string,
+  declared: ContentClass = 'fiction',
+): void {
   items.forEach((item, i) => {
     if (item == null) return;
     if (typeof item === 'string') {
       if (hasTableMarker(item)) {
-        console.warn(`[wall] blocked table content bound for cloud (caller=${caller}, item=${i}, kind=marker)`);
+        auditRefusal(caller, declared, `table-marker item=${i}`);
         throw new WallViolationError(`Task '${caller}' tried to send table content to a cloud lane (marker in item ${i}).`);
       }
       return;
     }
     if (isTableRow(item)) {
-      console.warn(`[wall] blocked table content bound for cloud (caller=${caller}, item=${i}, kind=row)`);
+      auditRefusal(caller, declared, `table-row item=${i}`);
       throw new WallViolationError(`Task '${caller}' tried to send a table/real row to a cloud lane (item ${i}).`);
     }
     for (const v of [item.content, item.icText]) {
       if (typeof v === 'string' && hasTableMarker(v)) {
-        console.warn(`[wall] blocked table content bound for cloud (caller=${caller}, item=${i}, kind=marker)`);
+        auditRefusal(caller, declared, `table-marker item=${i}`);
         throw new WallViolationError(`Task '${caller}' tried to send table content to a cloud lane (marker in item ${i}).`);
       }
     }

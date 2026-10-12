@@ -20,7 +20,9 @@ import type {
   ClaudeToolUseResult,
 } from './claude-tools';
 
-export interface CallLocalWithToolsOptions extends CallClaudeWithToolsOptions {
+/** Inside the wall: no cloud audit line, so `audit` is optional here. */
+export interface CallLocalWithToolsOptions extends Omit<CallClaudeWithToolsOptions, 'audit'> {
+  audit?: CallClaudeWithToolsOptions['audit'];
   baseUrl: string;
   apiKey?: string;
   /** Required for the local lane — the served-model-name. */

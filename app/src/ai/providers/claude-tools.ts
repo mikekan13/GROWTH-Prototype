@@ -12,6 +12,8 @@ import 'server-only';
 import type Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient } from '@/ai/network/transports/anthropic';
 import { judgmentModel } from '@/ai/network/config';
+import { auditCloudCall, utf8Bytes, type ToneTally } from '@/ai/network/audit';
+import type { ContentClass } from '@/ai/network/types';
 
 /** A simplified tool spec the runtime feeds in. */
 export interface ClaudeToolSpec {
@@ -63,6 +65,31 @@ export interface CallClaudeWithToolsOptions {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  /** REQUIRED — the wall's audit for this request: one [wall→cloud] line per
+   *  round actually sent to Claude (the local transport ignores it). The
+   *  caller reached this transport through route(). */
+  audit: {
+    caller: string;
+    lane: string;
+    contentClass: ContentClass;
+    campaignId?: string;
+    /** Pieces of this payload the tone filter changed. */
+    tally?: ToneTally;
+  };
+}
+
+/** Every byte a request carries (text, tool I/O, image data). */
+function payloadBytes(opts: CallClaudeWithToolsOptions): number {
+  const parts: string[] = [opts.systemPrompt];
+  for (const m of opts.messages) {
+    for (const b of m.content) {
+      if (b.type === 'text') parts.push(b.text);
+      else if (b.type === 'tool_result') parts.push(b.content);
+      else if (b.type === 'tool_use') parts.push(JSON.stringify(b.input ?? {}));
+      else if (b.type === 'image') parts.push(b.source.data);
+    }
+  }
+  return utf8Bytes(...parts);
 }
 
 /**
@@ -76,6 +103,14 @@ export async function callClaudeWithTools(
   // Default: Sonnet 4.6 — JEWL is copilot tier (tool-use + reasoning), not the
   // godhead-deep-reasoning tier that gets Opus. Override via env if needed.
   const model = opts.model || judgmentModel();
+  auditCloudCall({
+    caller: opts.audit.caller,
+    lane: opts.audit.lane,
+    contentClass: opts.audit.contentClass,
+    bytesIn: payloadBytes(opts),
+    chunksToned: opts.audit.tally?.toned ?? 0,
+    campaignId: opts.audit.campaignId,
+  });
 
   // PROMPT CACHING (2026-08-22 — the credit burn was 3.78M input tokens in
   // 73 dispatches, avg 52K/dispatch, because every tool-loop round resent

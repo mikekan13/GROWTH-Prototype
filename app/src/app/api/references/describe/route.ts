@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { getCampaignAISettings, resolveProvider } from '@/ai/campaign-ai';
+import { auditRefusal } from '@/ai/network/audit';
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
@@ -74,8 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (providerChoice !== 'local') {
-      // eslint-disable-next-line no-console
-      console.warn('[wall✗] caller=references-describe class=real reason=real-person-photo');
+      auditRefusal('references-describe', 'real', 'real-person-photo');
       return NextResponse.json(
         { error: 'Reference photos are of a real person and are described on the local vision model only. Set the campaign reference-description provider to local.' },
         { status: 422 },

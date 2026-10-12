@@ -20,7 +20,7 @@ import {
   type ClaudeMessageInput,
   type ClaudeToolSpec,
 } from '@/ai/providers/claude-tools';
-import { route, prepareCloudText, assertNoTableContent, type ResolvedLane, type TaskDescriptor } from '@/ai/network';
+import { route, prepareCloudText, assertNoTableContent, newToneTally, type ResolvedLane, type TaskDescriptor } from '@/ai/network';
 import { toolResultForLane, messageTexts } from '@/ai/copilot/cloud-history';
 import { prisma } from '@/lib/db';
 import { getClaudeToolDefinitions, executeTool } from './tools/registry';
@@ -177,6 +177,7 @@ export class GodHeadAgent {
       const lane: ResolvedLane = route(GODHEAD_TASK);
       const toCloud = lane.crossesWall;
       const toneCtx = { caller: GODHEAD_TASK.caller };
+      const tally = newToneTally();
 
       // Build system prompt
       const rawSystemPrompt = [
@@ -195,13 +196,15 @@ export class GodHeadAgent {
         `- Your decisions have real consequences. KRMA you spend is real.`,
         `- Be true to your personality and domain. You have motivations and preferences.`,
       ].join('\n');
-      const systemPrompt = await prepareCloudText(GODHEAD_TASK, lane, rawSystemPrompt);
+      const systemPrompt = await prepareCloudText(GODHEAD_TASK, lane, rawSystemPrompt, [], tally);
 
       // Build initial messages
       const trigger = await prepareCloudText(
         GODHEAD_TASK,
         lane,
         `[TRIGGER: ${triggerType}]\n\n${JSON.stringify(triggerData, null, 2)}`,
+        [],
+        tally,
       );
       const messages: ClaudeMessageInput[] = [{ role: 'user', content: [{ type: 'text', text: trigger }] }];
 
@@ -233,6 +236,7 @@ export class GodHeadAgent {
           model,
           maxTokens: 4096,
           temperature: this.identity.temperature,
+          audit: { caller: GODHEAD_TASK.caller, lane: lane.lane, contentClass: GODHEAD_TASK.contentClass, tally },
         });
 
         // Track token usage
@@ -314,6 +318,7 @@ export class GodHeadAgent {
                 result.success ? JSON.stringify(result.data) : `ERROR: ${result.error}`,
                 toCloud,
                 toneCtx,
+                tally,
               ),
               is_error: !result.success,
             });

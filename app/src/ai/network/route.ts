@@ -26,6 +26,7 @@ import { resolveLane, localLane } from './config';
 import { toneFilterAsync } from './tone-filter';
 import { WallViolationError } from './errors';
 import { assertNoTableContent, type RowLike } from './table-guard';
+import { auditRefusal, type ToneTally } from './audit';
 import { mayCrossWall, type ResolvedLane, type TaskDescriptor } from './types';
 
 export { WallViolationError };
@@ -36,7 +37,7 @@ export { WallViolationError };
  *  must carry no table/real content (assertNoTableContent) or this throws. */
 export function route(task: TaskDescriptor, payload?: Array<string | RowLike | null | undefined>): ResolvedLane {
   const lane = pickLane(task);
-  if (lane.crossesWall && payload?.length) assertNoTableContent(payload, task.caller);
+  if (lane.crossesWall && payload?.length) assertNoTableContent(payload, task.caller, task.contentClass);
   return lane;
 }
 
@@ -46,6 +47,7 @@ function pickLane(task: TaskDescriptor): ResolvedLane {
   // (a) the content class overrides everything: table/real stay inside.
   if (!mayCrossWall(task.contentClass)) {
     if (!localLive) {
+      auditRefusal(task.caller, task.contentClass, 'no-local-lane');
       throw new WallViolationError(
         `Task '${task.caller}' carries ${task.contentClass} content but the local lane is not configured — refusing to route to a cloud transport (fail-closed).`,
       );
@@ -84,17 +86,29 @@ export function enforceWall(text: string, identifiers: string[]): string {
  * wall (local) it is returned unchanged. On a cloud lane: the task must be
  * fiction, then enforceWall, then the tone filter — AWAITED, so the first
  * send of a graphic passage crosses softened, never as the placeholder.
+ * `tally` counts the pieces the tone filter changed (the audit line).
  */
 export async function prepareCloudText(
   task: Pick<TaskDescriptor, 'caller' | 'contentClass' | 'campaignId'>,
   lane: ResolvedLane,
   text: string,
   identifiers: string[] = [],
+  tally?: ToneTally,
 ): Promise<string> {
   if (!lane.crossesWall) return text;
   if (!mayCrossWall(task.contentClass)) {
+    auditRefusal(task.caller, task.contentClass, 'class-may-not-cross');
     throw new WallViolationError(`Task '${task.caller}' tried to send ${task.contentClass} content on cloud lane '${lane.lane}'.`);
   }
-  assertNoTableContent([text], task.caller);
-  return toneFilterAsync(enforceWall(text, identifiers), { caller: task.caller, campaignId: task.campaignId });
+  assertNoTableContent([text], task.caller, task.contentClass);
+  let walled: string;
+  try {
+    walled = enforceWall(text, identifiers);
+  } catch (err) {
+    auditRefusal(task.caller, task.contentClass, 'identifier-survived');
+    throw err;
+  }
+  const toned = await toneFilterAsync(walled, { caller: task.caller, campaignId: task.campaignId });
+  if (tally && toned !== walled) tally.toned++;
+  return toned;
 }
