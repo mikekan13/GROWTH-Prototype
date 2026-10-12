@@ -404,6 +404,11 @@ model Character {
   data       String              // JSON<GrowthCharacter>
   portrait   String?
   status     String              @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, ACTIVE, DEAD, RETIRED
+  // Genesis speed tier (2026-10-12): 'SKETCH' = improvised mid-session in one
+  // call (services/sketch-genesis.ts); null = ordinary/deep genesis.
+  genesisTier     String?
+  // "Deepen later": the deep pipeline may pick up sketches with this set.
+  deepenRequested Boolean @default(false)
   backstory  CharacterBackstory?
   changeLogs ChangeLog[]
   portraitGenerations PortraitGeneration[]

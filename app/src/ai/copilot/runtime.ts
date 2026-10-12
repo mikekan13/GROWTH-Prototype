@@ -134,14 +134,20 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
  *  genesis prod stage, 2026-10-12) — never in ordinary chat or build cycles. */
 const STAGE_ONLY_TOOLS = new Set(['raise_prod', 'end_prod_round']);
 
+/** Tools offered ONLY on the table lane — a live dispatch from the Watcher
+ *  at the table, never a JEWL work cycle (SKETCH genesis, 2026-10-12: the
+ *  Watcher says "give me a grumpy innkeeper" mid-session). */
+const TABLE_ONLY_TOOLS = new Set(['sketch_npc']);
+
 /** May this dispatch offer / execute this tool? */
-export function toolOffered(name: string, allowedTools?: string[]): boolean {
+export function toolOffered(name: string, allowedTools?: string[], isWorkCycle = false): boolean {
+  if (isWorkCycle && TABLE_ONLY_TOOLS.has(name)) return false;
   return allowedTools ? allowedTools.includes(name) : !STAGE_ONLY_TOOLS.has(name);
 }
 
 /** Prepare the tools list for the Claude call. */
-function buildToolSpecs(allowedTools?: string[]): ClaudeToolSpec[] {
-  return listJewlTools().filter(t => toolOffered(t.name, allowedTools)).map(t => ({
+function buildToolSpecs(allowedTools?: string[], isWorkCycle = false): ClaudeToolSpec[] {
+  return listJewlTools().filter(t => toolOffered(t.name, allowedTools, isWorkCycle)).map(t => ({
     name: t.name,
     description: t.description,
     inputSchema: zodToJsonSchema(t.inputSchema),
@@ -425,7 +431,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ];
 
   // 4. Tool-use loop.
-  const tools = buildToolSpecs(prompt.allowedTools);
+  const tools = buildToolSpecs(prompt.allowedTools, isWorkCycle);
   const toolCtx: JewlToolContext = {
     campaignId: prompt.campaignId,
     actorId: prompt.actorId,
@@ -545,7 +551,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     }
     const userToolResults: ClaudeContentBlock[] = [];
     for (const tu of toolUseBlocks) {
-      const offered = toolOffered(tu.name, prompt.allowedTools);
+      const offered = toolOffered(tu.name, prompt.allowedTools, isWorkCycle);
       const tool = offered ? getJewlTool(tu.name) : undefined;
       let tcRecord: JewlToolCallResult;
       if (!tool) {
