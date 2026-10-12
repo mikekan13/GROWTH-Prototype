@@ -486,6 +486,22 @@ const forgeBranchDataSchema = z.object({
   ...maturityFlagsField,
 });
 
+/** The Zod body schema for a Forge type (null for an unknown type) — the
+ *  JEWL tool boundary repairs over-long text against it before validation. */
+export function forgeDataSchemaFor(type: string): z.ZodTypeAny | null {
+  switch (type) {
+    case 'seed': return forgeSeedDataSchema;
+    case 'root': return forgeRootDataSchema;
+    case 'branch': return forgeBranchDataSchema;
+    case 'skill': return forgeSkillDataSchema;
+    case 'item': return forgeItemDataSchema;
+    case 'nectar':
+    case 'thorn':
+    case 'blossom': return forgeTraitDataSchema;
+    default: return null;
+  }
+}
+
 // Data schema depends on type
 export function validateForgeData(type: string, data: unknown) {
   switch (type) {

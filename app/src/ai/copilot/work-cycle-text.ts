@@ -91,22 +91,71 @@ export function buildProdCycleText(session: WorkCycleSession, prods: CycleProd[]
   ].join('\n\n');
 }
 
+// ── Catalog-first only when there IS a catalog (perf pass 2026-10-12) ───
+// Measured: 20 of 21 search_catalog calls in a deep genesis returned nothing
+// (the stock catalog held one Human seed) — ~40 s of searches for nothing.
+
+/** The block kinds a genesis build drafts or pulls. */
+export const GENESIS_CATALOG_KINDS = ['seed', 'root', 'branch', 'skill', 'nectar', 'thorn', 'blossom', 'item'] as const;
+/** At or below this many stock rows across those kinds the catalog is
+ *  "near-empty": searching it is a waste of rounds. */
+export const CATALOG_NEAR_EMPTY = 5;
+
+export interface CycleCatalog {
+  counts: Record<string, number>;
+  total: number;
+  entries?: Array<{ type: string; name: string }>;
+}
+
+/** The CATALOG line for a genesis build cycle, and whether search_catalog
+ *  is withheld. Pure. */
+export function catalogGuidance(cat: CycleCatalog): { line: string; excludedTools?: string[] } {
+  const kinds = GENESIS_CATALOG_KINDS;
+  const relevant = kinds.reduce((n, k) => n + (cat.counts[k] ?? 0), 0);
+  if (relevant <= CATALOG_NEAR_EMPTY) {
+    const have = (cat.entries ?? []).filter(e => (kinds as readonly string[]).includes(e.type));
+    const listed = have.length
+      ? ` It holds only: ${have.map(e => `${e.type} "${e.name}"`).join(', ')} — pull_from_catalog one of those by exact name where it fits.`
+      : '';
+    return {
+      line: `CATALOG: the stock catalog is empty for ${kinds.filter(k => !(cat.counts[k] ?? 0)).join('/') || 'these kinds'}` +
+        ` (${relevant} stock row${relevant === 1 ? '' : 's'} in all).${listed} Do NOT search it — search_catalog is withheld this stage. ` +
+        'Draft every other block directly with propose_forge_blueprint (anchor grades to the locked formulas, not to stock).',
+      excludedTools: ['search_catalog'],
+    };
+  }
+  const empty = kinds.filter(k => !(cat.counts[k] ?? 0));
+  return {
+    line: 'CATALOG: stock exists (' + kinds.filter(k => cat.counts[k]).map(k => `${k} ${cat.counts[k]}`).join(', ') + ').' +
+      (empty.length ? ` Empty for ${empty.join('/')} — draft those directly, never search them.` : '') +
+      ' Search ONCE: a single search_catalog call with queries:[{query, type}, …] covering every block this build needs — never one call per block.',
+  };
+}
+
 /**
  * What one cycle sends (work-loop.ts). Pure. PRODDING → the prod text and
  * ONLY the prod tools; otherwise the normal cycle, with the GM's prod
  * decisions appended to a genesis plan (SETTLED / OPEN THREADS / DELEGATED).
+ * A genesis build cycle given a catalog snapshot carries the CATALOG line
+ * (and withholds search_catalog when the catalog is near-empty).
  */
 export function planWorkCycle(
   session: WorkCycleSession & { stage?: string | null },
   prods: CycleProd[],
   treasuryLine: string,
   recentNotes: string[],
-): { text: string; allowedTools?: string[] } {
+  catalog?: CycleCatalog | null,
+): { text: string; allowedTools?: string[]; excludedTools?: string[] } {
   if (session.stage === 'PRODDING') {
     return { text: buildProdCycleText(session, prods), allowedTools: [...PROD_STAGE_TOOLS] };
   }
   const plan = prods.length && session.plan
     ? `${session.plan}\n\n${buildProdSections(prods)}`
     : session.plan;
-  return { text: buildWorkCycleText({ ...session, plan }, treasuryLine, recentNotes) };
+  const guide = catalog ? catalogGuidance(catalog) : null;
+  const treasury = guide ? [treasuryLine, guide.line].filter(Boolean).join('\n') : treasuryLine;
+  return {
+    text: buildWorkCycleText({ ...session, plan }, treasury, recentNotes),
+    ...(guide?.excludedTools ? { excludedTools: guide.excludedTools } : {}),
+  };
 }

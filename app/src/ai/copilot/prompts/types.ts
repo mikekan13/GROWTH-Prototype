@@ -75,6 +75,10 @@ export interface JewlPrompt {
    *  an observer can tell which withholds hit it (genesis: the seed — the
    *  `[genesis] seed-withheld` warning, 2026-10-12). Never the text. */
   toneRef?: { table: string; id: string };
+  /** Withhold these tools from this dispatch (neither offered nor
+   *  executable) — e.g. search_catalog in a genesis build cycle whose
+   *  campaign-visible catalog is empty (perf pass 2026-10-12). */
+  excludedTools?: string[];
 }
 
 /** Outcome of executing one tool call. */

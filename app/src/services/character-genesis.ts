@@ -89,6 +89,9 @@ export async function submitCharacterGenesis(opts: {
     // Genesis is a dialogue (Mike 2026-10-12): JEWL prods the GM first; only
     // the GM's Build moves the session on to gestation.
     stage: 'PRODDING',
+    // Background by default (perf pass 2026-10-12): genesis keeps working
+    // server-side with no canvas open.
+    continueUnattended: true,
   });
   kickWorkLoop();
 

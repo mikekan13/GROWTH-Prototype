@@ -35,7 +35,17 @@ const searchSchema = z.object({
   full: z.boolean().optional().describe(
     'Return complete data blocks instead of summaries. Use on a SMALL result set when you need full stats — e.g. grading anchors for a new design.',
   ),
+  queries: z.array(z.object({
+    query: z.string().max(200).optional(),
+    type: z.enum(CATALOG_TYPES).optional(),
+    category: z.string().max(50).optional(),
+  })).min(1).max(20).optional().describe(
+    'BULK: several searches in ONE call (each {query?, type?, category?}; limit/full apply to each). ' +
+      'Use this to look up every block a build needs at once instead of one call per block.',
+  ),
 });
+
+type CatalogRow = Awaited<ReturnType<typeof searchGlobalCatalog>>[number];
 
 /** Trimmed row: enough to recognize the entry and judge its grade. */
 function summarize(entry: { id: string; name: string; type: string; karmicValue: number | null; data: Record<string, unknown> }) {
@@ -65,28 +75,36 @@ export const searchCatalogTool: JewlTool = {
     '(items, materials, vehicles, buildings, traits, roots, branches, ' +
     'skills). Stock is public and FREE: pulling it costs no KRMA. Search ' +
     'here BEFORE authoring anything new; use full:true on close matches ' +
-    'to read complete stats as grading anchors.',
+    'to read complete stats as grading anchors. Need several lookups? Pass ' +
+    'queries:[…] — ONE call, one result set per query.',
   inputSchema: searchSchema,
   handler: async (input): Promise<JewlToolHandlerResult> => {
     const parsed = searchSchema.parse(input);
+    const limit = parsed.limit ?? 20;
+    const shape = (entries: CatalogRow[]) => ({
+      count: entries.length,
+      ...(entries.length === limit
+        ? { note: 'Result set hit the limit — narrow the query or raise limit.' }
+        : {}),
+      entries: parsed.full
+        ? entries.map(e => ({ id: e.id, name: e.name, type: e.type, kv: e.karmicValue, data: e.data }))
+        : entries.map(summarize),
+    });
+    if (parsed.queries?.length) {
+      const results = [];
+      for (const q of parsed.queries) {
+        const entries = await searchGlobalCatalog({ type: q.type, query: q.query, category: q.category, limit });
+        results.push({ query: q, ...shape(entries) });
+      }
+      return { output: { ok: true, results } };
+    }
     const entries = await searchGlobalCatalog({
       type: parsed.type,
       query: parsed.query,
       category: parsed.category,
       limit: parsed.limit,
     });
-    return {
-      output: {
-        ok: true,
-        count: entries.length,
-        ...(entries.length === (parsed.limit ?? 20)
-          ? { note: 'Result set hit the limit — narrow the query or raise limit.' }
-          : {}),
-        entries: parsed.full
-          ? entries.map(e => ({ id: e.id, name: e.name, type: e.type, kv: e.karmicValue, data: e.data }))
-          : entries.map(summarize),
-      },
-    };
+    return { output: { ok: true, ...shape(entries) } };
   },
 };
 

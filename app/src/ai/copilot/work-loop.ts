@@ -12,8 +12,14 @@
  * TTLs, completion bounds the run.
  *
  * Attendance: sessions run while their campaign has a live SSE
- * connection, or unconditionally when the GM answered the spoken
- * hand-off question (continueUnattended).
+ * connection, or unconditionally when BACKGROUND — the GM answered the
+ * spoken hand-off question (continueUnattended), or it is a character
+ * genesis (background by default, perf pass 2026-10-12).
+ *
+ * Concurrency (2026-10-12): up to JEWL_WORK_CONCURRENCY (default 2) cycles
+ * run at once, never two on one character; each session takes its own
+ * breather between cycles. SQLite single-writer holds: every write is a
+ * small transaction under the WAL + busy timeout (lib/db).
  *
  * Guarded-global singleton (pod-keepalive pattern) — survives HMR.
  * Runtime is imported dynamically to keep the tools-barrel module graph
@@ -35,7 +41,10 @@ import {
   logGenesisReport,
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
-import { planWorkCycle, type CycleProd } from './work-cycle-text';
+import { planWorkCycle, type CycleProd, type CycleCatalog } from './work-cycle-text';
+import { pickSessionsToStart, workConcurrency } from './work-loop-schedule';
+import { getGlobalCatalogSnapshot } from '@/services/forge';
+import { isTransientProviderError } from '@/ai/network/retry';
 import { watchSeedWithheld, seedWithheldNotes } from '@/services/genesis-seed-screen';
 
 const BREATHER_MS = 4_000;
@@ -49,54 +58,110 @@ const STALL_CYCLES = 3;
  *  400s racked six silent cycles). */
 const MAX_DISPATCH_FAILURES = 3;
 
+/** A cycle that failed on provider weather (429 / 529 / overloaded, after the
+ *  per-round backoff) pauses its session this long — never counted toward
+ *  the auto-block. */
+const TRANSIENT_COOLDOWN_MS = 30_000;
+
 interface WorkLoopState {
   running: boolean;
   /** sessionId → consecutive cycles with zero tool calls. */
   stalls: Map<string, number>;
   /** sessionId → consecutive dispatch crashes. */
   dispatchFailures: Map<string, number>;
+  /** sessionId → the cycle running now (concurrent, perf pass 2026-10-12). */
+  inFlight: Map<string, Promise<void>>;
+  /** sessionId → epoch ms before which it may not start (breather / transient pause). */
+  cooldownUntil: Map<string, number>;
+  /** Resolves the scheduler's current wait (a kick or a finished cycle). */
+  wake?: () => void;
 }
 
 const g = globalThis as unknown as { __dayaWorkLoop?: WorkLoopState };
 if (!g.__dayaWorkLoop) {
-  g.__dayaWorkLoop = { running: false, stalls: new Map(), dispatchFailures: new Map() };
+  g.__dayaWorkLoop = { running: false, stalls: new Map(), dispatchFailures: new Map(), inFlight: new Map(), cooldownUntil: new Map() };
 }
-if (!g.__dayaWorkLoop.dispatchFailures) {
-  // HMR-survivor state from before this field existed.
-  g.__dayaWorkLoop.dispatchFailures = new Map();
-}
+// HMR-survivor state from before these fields existed.
+g.__dayaWorkLoop.dispatchFailures ??= new Map();
+g.__dayaWorkLoop.inFlight ??= new Map();
+g.__dayaWorkLoop.cooldownUntil ??= new Map();
 const state = g.__dayaWorkLoop!;
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+/** One shared dynamic import of the runtime — concurrent cycles await the
+ *  same promise instead of racing their own module loads. */
+let runtimeModule: Promise<typeof import('./runtime')> | undefined;
+const loadRuntime = () => (runtimeModule ??= import('./runtime'));
 
-/** Idempotent: starts the loop if it isn't running. Call from every
- *  entry point that can make a session runnable. */
+/** Idempotent: starts the loop if it isn't running (or wakes it). Call from
+ *  every entry point that can make a session runnable. */
 export function kickWorkLoop(): void {
-  if (state.running) return;
+  if (state.running) {
+    state.wake?.();
+    return;
+  }
   state.running = true;
   void runLoop();
+}
+
+/**
+ * One scheduling pass: start every session that may run now, up to
+ * JEWL_WORK_CONCURRENCY in flight (default 2). Background sessions
+ * (continueUnattended, every genesis) run with no SSE connection open;
+ * attended ones only while their campaign has one. Never two cycles on one
+ * character. Exported for tests.
+ */
+export async function workLoopTick(now = Date.now()): Promise<{ started: string[]; waiting: number; nextWakeAt?: number; open: number }> {
+  const sessions = await getActiveWorkSessions();
+  const plan = pickSessionsToStart({
+    sessions,
+    inFlight: state.inFlight,
+    cooldownUntil: state.cooldownUntil,
+    now,
+    concurrency: workConcurrency(),
+    attended: campaignId => getConnectionCount(campaignId) > 0,
+  });
+  for (const s of plan.start) {
+    const p = runCycle(s)
+      .catch(err => {
+        // eslint-disable-next-line no-console
+        console.error(`[daya-work-loop] cycle crashed for ${s.id}:`, err);
+      })
+      .finally(() => {
+        state.inFlight.delete(s.id);
+        const until = state.cooldownUntil.get(s.id) ?? 0;
+        state.cooldownUntil.set(s.id, Math.max(until, Date.now() + BREATHER_MS));
+        state.wake?.();
+      });
+    state.inFlight.set(s.id, p);
+  }
+  return { started: plan.start.map(s => s.id), waiting: plan.waiting, nextWakeAt: plan.nextWakeAt, open: sessions.length };
 }
 
 async function runLoop(): Promise<void> {
   try {
     for (;;) {
-      const sessions = await getActiveWorkSessions();
-      if (sessions.length === 0) return; // nothing open — loop dies
-      const runnable = sessions.filter(
-        s => s.continueUnattended || getConnectionCount(s.campaignId) > 0,
-      );
-      // Attended sessions with nobody at the table idle silently; the
-      // stream route kicks the loop again when the GM reconnects.
-      if (runnable.length === 0) return;
-
-      await runCycle(runnable[0]); // least-recently-cycled (round-robin)
-      await sleep(BREATHER_MS);
+      const tick = await workLoopTick();
+      if (state.inFlight.size === 0 && tick.started.length === 0 && tick.nextWakeAt === undefined) {
+        // Nothing open, or only attended sessions with nobody at the table:
+        // the loop dies; the stream route / entry points kick it again.
+        return;
+      }
+      // Sleep until a cycle finishes, a kick arrives, or a cooldown ends.
+      const waitMs = tick.nextWakeAt !== undefined
+        ? Math.max(50, tick.nextWakeAt - Date.now())
+        : BREATHER_MS;
+      await new Promise<void>(resolve => {
+        const t = setTimeout(resolve, waitMs);
+        state.wake = () => { clearTimeout(t); resolve(); };
+      });
+      state.wake = undefined;
     }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[daya-work-loop] crashed:', err);
   } finally {
     state.running = false;
+    state.wake = undefined;
   }
 }
 
@@ -153,11 +218,20 @@ async function runCycle(session: {
       if (session.stage === 'PRODDING') return; // never ask blind — try again next pass
     }
   }
-  const { text, allowedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes);
+  // Catalog-first only when there IS a catalog (perf pass 2026-10-12): a
+  // genesis build cycle learns up front what stock exists; near-empty →
+  // search_catalog is withheld and JEWL drafts directly.
+  let catalog: CycleCatalog | null = null;
+  if (isGenesisGoal(session.goal) && session.stage !== 'PRODDING') {
+    try {
+      catalog = await getGlobalCatalogSnapshot();
+    } catch { /* unknown catalog → the ordinary catalog-first cycle */ }
+  }
+  const { text, allowedTools, excludedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
-  const { dispatchPrompt } = await import('./runtime');
+  const { dispatchPrompt } = await loadRuntime();
   // Genesis is chat-quiet (Mike 2026-10-11): the cycle's full reply goes to
   // the Log as a genesis report; the chat gets one status line per
   // transition (daya-work-session → announceGenesisStatus).
@@ -175,6 +249,7 @@ async function runCycle(session: {
       actorRole: 'GODHEAD',
       text,
       ...(allowedTools ? { allowedTools } : {}),
+      ...(excludedTools ? { excludedTools } : {}),
       ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME, toneRef: { table: 'DayaWorkSession', id: session.id } } : {}),
     });
     await flushSeedWithheld(seedWatch, session);
@@ -208,6 +283,14 @@ async function runCycle(session: {
           progressNote: '[system] auto-blocked: the wall refused the cycle (table/real content)',
         });
       } catch { /* session may have been closed mid-cycle */ }
+      return;
+    }
+    // Provider weather (429 / 529 / overloaded) survived the per-round
+    // backoff: pause this session, never count it toward the auto-block.
+    if (isTransientProviderError(err)) {
+      state.cooldownUntil.set(session.id, Date.now() + TRANSIENT_COOLDOWN_MS);
+      // eslint-disable-next-line no-console
+      console.warn(`[daya-work-loop] transient provider error for ${session.id} — pausing ${TRANSIENT_COOLDOWN_MS / 1000}s: ${msg.slice(0, 160)}`);
       return;
     }
     const fails = (state.dispatchFailures.get(session.id) ?? 0) + 1;
