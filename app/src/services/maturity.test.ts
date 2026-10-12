@@ -4,6 +4,7 @@ import { ForbiddenError, ConflictError } from '@/lib/errors';
 import { AdultOnlyError } from '@/lib/permissions';
 
 type Row = Record<string, unknown>;
+let clock = 0;
 const db = {
   users: [] as Row[],
   campaigns: [] as Row[],
@@ -19,6 +20,7 @@ function matches(row: Row, where: Row | undefined): boolean {
     if (v && typeof v === 'object' && !(v instanceof Date)) {
       const o = v as Row;
       if ('not' in o) return row[k] !== o.not;
+      if ('gt' in o) return (row[k] as number) > (o.gt as number);
       if ('in' in o) return (o.in as unknown[]).includes(row[k]);
       if ('contains' in o) return String(row[k] ?? '').includes(String(o.contains));
       return true; // relation filters are not modelled here
@@ -72,7 +74,8 @@ vi.mock('@/lib/db', () => ({
     forgeItem: { findMany: vi.fn(async ({ where }: { where: Row }) => db.forgeItems.filter(f => matches(f, where))) },
     auditEntry: {
       count: vi.fn(async ({ where }: { where: Row }) => db.audits.filter(a => matches(a, where)).length),
-      create: vi.fn(async ({ data }: { data: Row }) => { db.audits.push(data); return data; }),
+      findFirst: vi.fn(async ({ where }: { where: Row }) => [...db.audits].reverse().find(a => matches(a, where)) ?? null),
+      create: vi.fn(async ({ data }: { data: Row }) => { const row = { ...data, timestamp: ++clock }; db.audits.push(row); return row; }),
     },
     dayaMemoryEntry: { findMany: vi.fn(async () => []) },
     copilotMessage: { create: vi.fn(async ({ data }: { data: Row }) => { db.copilot.push(data); return data; }) },
@@ -203,5 +206,43 @@ describe('enforcement', () => {
     findMany.mockClear();
     await listCampaigns('adult', ADULT);
     expect(findMany.mock.calls[1][0].where.adultOnly).toBeUndefined();
+  });
+});
+
+describe('GODHEAD exemption (AI agents have no age)', () => {
+  it('GODHEAD with null DOB enters an 18+ table and is never asked for a DOB', async () => {
+    const { needsDateOfBirth, isAdult } = await import('@/lib/age');
+    expect(isAdult({ role: 'GODHEAD', dateOfBirth: null })).toBe(true);
+    expect(needsDateOfBirth({ role: 'GODHEAD', dateOfBirth: null })).toBe(false);
+    db.users.push({ id: 'god', role: 'GODHEAD', dateOfBirth: null });
+    await maturity.setCampaignAdultOnly('c1', { id: 'gm', role: 'WATCHER' }, true);
+    await expect(requireCampaignMember('c1', { id: 'god', role: 'GODHEAD' })).resolves.toMatchObject({ id: 'c1' });
+  });
+});
+
+describe('ADMIN clearAdultOnly', () => {
+  it('only ADMIN may clear', async () => {
+    await maturity.noteSexualContent('c1', { table: 'CopilotMessage', id: 'x' });
+    await expect(maturity.clearAdultOnly('c1', { id: 'gm', role: 'WATCHER' })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(maturity.clearAdultOnly('c1', { id: 'god', role: 'GODHEAD' })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+  it('refuses while content still carries sexual', async () => {
+    sexualDraft();
+    await maturity.recomputeCampaignAdultOnly('c1');
+    await expect(maturity.clearAdultOnly('c1', { id: 'mike', role: 'ADMIN' })).rejects.toBeInstanceOf(ConflictError);
+  });
+  it('clears a tone-filter auto 18+, records who/when, and a later note re-flags it', async () => {
+    await maturity.noteSexualContent('c1', { table: 'CopilotMessage', id: 'x' });
+    const r = await maturity.clearAdultOnly('c1', { id: 'mike', role: 'ADMIN' });
+    expect(r).toMatchObject({ adultOnly: false, adultOnlySetBy: 'admin:mike' });
+    expect(db.campaigns[0]).toMatchObject({ adultOnly: false, adultOnlySetBy: 'admin:mike' });
+    expect(db.campaigns[0].adultOnlyAt).toBeInstanceOf(Date);
+    expect((await maturity.recomputeCampaignAdultOnly('c1')).adultOnly).toBe(false);
+    await maturity.noteSexualContent('c1', { table: 'CopilotMessage', id: 'y' });
+    expect(db.campaigns[0]).toMatchObject({ adultOnly: true, adultOnlySetBy: 'auto' });
+  });
+  it('does not clear a watcher-set 18+', async () => {
+    await maturity.setCampaignAdultOnly('c1', { id: 'gm', role: 'WATCHER' }, true);
+    await expect(maturity.clearAdultOnly('c1', { id: 'mike', role: 'ADMIN' })).rejects.toBeInstanceOf(ConflictError);
   });
 });

@@ -35,8 +35,32 @@ function carriesAdultFlag(json: string | null | undefined): boolean {
   }
 }
 
-/** Does any content in this campaign carry `sexual`? */
-export async function campaignHasSexualContent(campaignId: string): Promise<boolean> {
+const NOTES_CLEARED_ACTION = 'MATURITY_NOTES_CLEARED';
+
+/** Tone-filter notes count only after the last ADMIN clear. */
+async function notesSinceLastClear(campaignId: string): Promise<number> {
+  const lastClear = await prisma.auditEntry.findFirst({
+    where: { targetType: 'Campaign', targetId: campaignId, action: NOTES_CLEARED_ACTION },
+    orderBy: { timestamp: 'desc' },
+    select: { timestamp: true },
+  });
+  return prisma.auditEntry.count({
+    where: {
+      targetType: 'Campaign', targetId: campaignId, action: NOTE_ACTION,
+      ...(lastClear ? { timestamp: { gt: lastClear.timestamp } } : {}),
+    },
+  });
+}
+
+/**
+ * Does any content in this campaign carry `sexual`? `includeNotes: false`
+ * looks only at the content itself (forge data, memory classification), not
+ * at tone-filter notes — what ADMIN's clear checks.
+ */
+export async function campaignHasSexualContent(
+  campaignId: string,
+  opts: { includeNotes?: boolean } = {},
+): Promise<boolean> {
   const needle = `"${ADULT_ONLY_FLAG}"`;
   const items = await prisma.forgeItem.findMany({
     where: { campaignId, data: { contains: needle } },
@@ -44,10 +68,7 @@ export async function campaignHasSexualContent(campaignId: string): Promise<bool
   });
   if (items.some(i => carriesAdultFlag(i.data))) return true;
 
-  const notes = await prisma.auditEntry.count({
-    where: { targetType: 'Campaign', targetId: campaignId, action: NOTE_ACTION },
-  });
-  if (notes > 0) return true;
+  if (opts.includeNotes !== false && (await notesSinceLastClear(campaignId)) > 0) return true;
 
   const memories = await prisma.dayaMemoryEntry.findMany({
     where: { classification: { contains: needle }, entity: { character: { campaignId } } },
@@ -218,4 +239,39 @@ export async function assertMayEnterCampaign(
     select: { id: true, role: true, dateOfBirth: true },
   });
   if (!user || !canEnterAdultCampaign(user, campaign, now)) throw new AdultOnlyError();
+}
+
+/**
+ * ADMIN clears an AUTO-set 18+ (coordinator ruling 2026-10-12) — e.g. a
+ * tone-filter false positive. Refuses while any content still carries
+ * `sexual`; dismisses tone-filter notes up to now; records who/when in
+ * adultOnlySetBy (`admin:<userId>`) / adultOnlyAt. A watcher-set 18+ is the
+ * Watcher's call and is not cleared here.
+ */
+export async function clearAdultOnly(
+  campaignId: string,
+  adminUser: { id: string; role: string },
+  now: Date = new Date(),
+): Promise<{ adultOnly: false; adultOnlySetBy: string }> {
+  if (adminUser.role !== 'ADMIN') throw new ForbiddenError('Only ADMIN can clear an 18+ table');
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, adultOnly: true, adultOnlySetBy: true },
+  });
+  if (!campaign) throw new NotFoundError('Campaign not found');
+  if (!campaign.adultOnly) throw new ConflictError('This table is not 18+');
+  if (campaign.adultOnlySetBy === 'watcher') {
+    throw new ConflictError("This table was set 18+ by its Watcher — only the Watcher can clear it");
+  }
+  if (await campaignHasSexualContent(campaignId, { includeNotes: false })) {
+    throw new ConflictError('Content in this table still carries the sexual flag — remove the flag first');
+  }
+  const setBy = `admin:${adminUser.id}`;
+  await audit(campaignId, adminUser.id, 'USER', NOTES_CLEARED_ACTION, {});
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { adultOnly: false, adultOnlySetBy: setBy, adultOnlyAt: now },
+  });
+  await audit(campaignId, adminUser.id, 'USER', 'ADULT_ONLY_CLEARED', { setBy: 'admin' });
+  return { adultOnly: false, adultOnlySetBy: setBy };
 }

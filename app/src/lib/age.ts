@@ -1,11 +1,17 @@
 /**
  * Age (Mike 2026-10-12): the age source is the DATE OF BIRTH given at
- * registration. Unknown DOB = treated as a minor; ADMIN is exempt.
+ * registration. Unknown DOB = treated as a minor; ADMIN is exempt, and so is
+ * GODHEAD (AI agents have no age — coordinator ruling 2026-10-12).
  * Never log a date of birth.
  */
 import { z } from 'zod';
 
 export const ADULT_AGE = 18;
+
+/** Roles outside the age system: ADMIN (Mike) and GODHEAD (AI agents). */
+export function isAgeExemptRole(role: string): boolean {
+  return role === 'ADMIN' || role === 'GODHEAD';
+}
 const MAX_AGE = 120;
 
 /** Whole years between dob and now (calendar, UTC). */
@@ -16,21 +22,21 @@ export function ageInYears(dob: Date, now: Date = new Date()): number {
   return age;
 }
 
-/** ≥18 by date of birth. A null DOB is never adult — unless the user is ADMIN. */
+/** ≥18 by date of birth. A null DOB is never adult — unless the role is ADMIN/GODHEAD. */
 export function isAdult(
   user: { role: string; dateOfBirth?: Date | string | null },
   now: Date = new Date(),
 ): boolean {
-  if (user.role === 'ADMIN') return true;
+  if (isAgeExemptRole(user.role)) return true;
   if (!user.dateOfBirth) return false;
   const dob = user.dateOfBirth instanceof Date ? user.dateOfBirth : new Date(user.dateOfBirth);
   if (Number.isNaN(dob.getTime())) return false;
   return ageInYears(dob, now) >= ADULT_AGE;
 }
 
-/** Does this user still owe us a date of birth? ADMIN never does. */
+/** Does this user still owe us a date of birth? ADMIN and GODHEAD never do. */
 export function needsDateOfBirth(user: { role: string; dateOfBirth?: Date | string | null }): boolean {
-  return user.role !== 'ADMIN' && !user.dateOfBirth;
+  return !isAgeExemptRole(user.role) && !user.dateOfBirth;
 }
 
 /**

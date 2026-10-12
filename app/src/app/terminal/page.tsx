@@ -5,6 +5,7 @@ import DashboardShell from '@/components/DashboardShell';
 import GlitchText from '@/components/GlitchText';
 import Link from 'next/link';
 import ModerationPanel from '@/components/terminal/ModerationPanel';
+import AdultOnlyAdminPanel from '@/components/maturity/AdultOnlyAdminPanel';
 import { getGlobalMetrics } from '@/services/krma/wallet';
 import { getPrimeCampaign, PRIME_CAMPAIGN_DISPLAY } from '@/lib/prime-campaign';
 
@@ -94,6 +95,11 @@ export default async function TerminalDashboard() {
 
         {/* Moderation — lawfulness flags queue (2026-10-12) */}
         <ModerationPanel campaignNames={Object.fromEntries(campaigns.map(c => [c.id, c.name]))} />
+
+        {/* 18+ tables — ADMIN may clear an auto-set 18+ (2026-10-12) */}
+        <AdultOnlyAdminPanel
+          campaigns={campaigns.filter(c => c.adultOnly).map(c => ({ id: c.id, name: c.name, setBy: c.adultOnlySetBy }))}
+        />
 
         {/* Main grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
