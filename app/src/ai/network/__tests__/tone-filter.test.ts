@@ -5,7 +5,8 @@ vi.mock('../transports/openai-compat', () => ({ openAiCompatChat: (...a: unknown
 vi.mock('../metering', () => ({ recordAiCall: vi.fn() }));
 
 import {
-  toneFilter, toneFilterAsync, toneFilterStats, resetToneFilter, screen, chunk, placeholderFor,
+  toneFilter, toneFilterAsync, toneFilterHarder, toneFilterStats, resetToneFilter, screen, chunk, placeholderFor,
+  DISALLOWED_PLACEHOLDER,
 } from '../tone-filter';
 
 const LOCAL_VARS = ['AI_LOCAL_BASE_URL', 'DAYA_L1_URL'];
@@ -40,6 +41,28 @@ describe('screen()', () => {
   it('passes ordinary fiction, including plain violence words used in rulings', () => {
     expect(screen(CLEAN).hitCount).toBe(0);
     expect(screen('He was subjected to prolonged violence over three days.').hitCount).toBe(0);
+  });
+  it.each([
+    'She cut his throat and stepped back.',
+    'The arrow took his eye.',
+    'He killed the guard at the gate.',
+    'He bled out before the healer arrived.',
+    'She severed her carotid; she lost consciousness within about 15 seconds.',
+  ])('plain violence crosses as-is: %s', (t) => {
+    expect(screen(t).hitCount).toBe(0);
+  });
+  it('gore-for-effect still triggers', () => {
+    expect(screen('He slit her throat and watched her choke on her own blood.').categories).toContain('gore');
+  });
+  it('keeps naked / slept with / seduced flagged', () => {
+    for (const t of ['She stood naked.', 'He slept with the baker.', 'She seduced the captain.'])
+      expect(screen(t).categories).toContain('sexual');
+  });
+  it('age cue + sexual cue in one chunk = minor-sexual', () => {
+    expect(screen('The twelve-year-old was made to undress.').categories).toContain('minor-sexual');
+    expect(screen('The girl was raped.').categories).toContain('minor-sexual');
+    expect(screen('The girl ran to the well.').categories).not.toContain('minor-sexual');
+    expect(screen('The captain seduced the widow.').categories).not.toContain('minor-sexual');
   });
   it('flags each category', () => {
     expect(screen(GRAPHIC).categories).toContain('torture');
@@ -82,7 +105,7 @@ describe('toneFilterAsync()', () => {
     arrange();
     const out = await toneFilterAsync(GRAPHIC, { caller: 't' });
     expect(out).not.toContain('peeling the skin');
-    expect(out).toMatch(/^\[passage withheld: graphic content \(torture\); severity high; duration three days\]/);
+    expect(out).toMatch(/^\[passage withheld: graphic content \(torture\); severity high; duration three days; body part skin, fingers\]/);
     expect(toneFilterStats().withheld).toBe(1);
   });
 
@@ -140,5 +163,73 @@ describe('toneFilter() — the sync door', () => {
   it('clean text passes unchanged with no call', () => {
     expect(toneFilter(CLEAN)).toBe(CLEAN);
     expect(chatMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('minor-sexual hard block', () => {
+  const BAD = 'When she was a child of nine she was molested by her uncle for two years. [mem-2]';
+
+  it('never crosses in any form — fixed placeholder, no model call, no detail', async () => {
+    const info = console.info as unknown as ReturnType<typeof vi.fn>;
+    expect(await toneFilterAsync(BAD, { caller: 't' })).toBe(DISALLOWED_PLACEHOLDER);
+    expect(toneFilter(BAD, { caller: 't' })).toBe(DISALLOWED_PLACEHOLDER);
+    expect(await toneFilterHarder(BAD, { caller: 't' })).toBe(DISALLOWED_PLACEHOLDER);
+    expect(placeholderFor(BAD)).toBe(DISALLOWED_PLACEHOLDER);
+    expect(chatMock).not.toHaveBeenCalled();
+    expect(toneFilterStats().blocked).toBe(3);
+    const lines = info.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.includes('hits=minor-sexual') && l.includes('outcome=blocked'))).toBe(true);
+    expect(lines.join('\n')).not.toContain('molested');
+  });
+
+  it('blocks only the offending chunk; other chunks pass', async () => {
+    const filler = 'The river ran slow past the mill. '.repeat(80);
+    const text = [filler, BAD, filler].join('\n\n');
+    const out = await toneFilterAsync(text, { caller: 't' });
+    expect(out).toContain(DISALLOWED_PLACEHOLDER);
+    expect(out).not.toContain('molested');
+    expect(out.startsWith('The river ran slow')).toBe(true);
+    expect(chatMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('toneFilterHarder()', () => {
+  it('uses the stricter prompt, rewrites even screen-clean chunks, and caches under :hard', async () => {
+    chatMock.mockResolvedValue(reply(SOFT));
+    await toneFilterAsync(GRAPHIC, { caller: 't' });
+    expect(chatMock).toHaveBeenCalledTimes(1);
+    const softSystem = chatMock.mock.calls[0][0].messages[0].content as string;
+
+    const HARD = 'In the cellar he was held and seriously injured over three days; lasting hand injuries. [mem-7] {gap} __DAYA_TAG Kai never spoke of it again.';
+    chatMock.mockResolvedValue(reply(HARD));
+    expect(await toneFilterHarder(GRAPHIC, { caller: 't' })).toBe(HARD);
+    expect(await toneFilterHarder(GRAPHIC, { caller: 't' })).toBe(HARD); // cached
+    expect(chatMock).toHaveBeenCalledTimes(2);
+    const hardSystem = chatMock.mock.calls[1][0].messages[0].content as string;
+    expect(hardSystem).not.toBe(softSystem);
+    // the soft cache is separate
+    expect(await toneFilterAsync(GRAPHIC, { caller: 't' })).toBe(SOFT);
+
+    chatMock.mockResolvedValue(reply('Tara walked the mill road at dusk. [scene-3] She did not look back.'));
+    await toneFilterHarder(CLEAN, { caller: 't' });
+    expect(chatMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails closed with the mechanics placeholder', async () => {
+    chatMock.mockRejectedValue(new Error('boom'));
+    const out = await toneFilterHarder(GRAPHIC, { caller: 't' });
+    expect(out).toBe(placeholderFor(GRAPHIC));
+    expect(out).not.toContain('peeling');
+  });
+});
+
+describe('prompt register', () => {
+  it('asks for a clinical register that keeps the simulation facts', async () => {
+    chatMock.mockResolvedValue(reply(SOFT));
+    await toneFilterAsync(GRAPHIC, { caller: 't' });
+    const system = chatMock.mock.calls[0][0].messages[0].content as string;
+    expect(system).toMatch(/CLINICAL/);
+    expect(system).toMatch(/carotid/);
+    expect(system).toMatch(/time to unconsciousness/i);
   });
 });
