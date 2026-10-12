@@ -13,6 +13,11 @@
  *                request_tool + any granted tool.
  *   WORK_CYCLE — the full set minus table-only tools (as before).
  *   GENESIS    — a genesis work cycle: as before (stage allow/exclude lists).
+ *
+ * TICK tool set (2026-10-12): a TABLE_CHAT dispatch that is a system wake
+ * (autonomous tick, forge-batch wake) or a canvas gesture carries the light
+ * set PLUS TICK_EXTRA_TOOLS up front, so a forge-batch wake can read and
+ * place without a request_tool round. Persona/history stay TABLE_CHAT's.
  */
 
 export type DispatchKind = 'TABLE_CHAT' | 'WORK_CYCLE' | 'GENESIS';
@@ -35,6 +40,26 @@ export const TABLE_CHAT_TOOLS: readonly string[] = [
   'ask_terminal',
 ];
 
+/** Added on top of TABLE_CHAT_TOOLS for system wakes + canvas gestures. */
+export const TICK_EXTRA_TOOLS: readonly string[] = [
+  'place_item',
+  'arrange_canvas',
+  'read_forge_item',
+];
+
+/** Sources that get the TICK tool set (TABLE_CHAT kind only). */
+const TICK_SOURCES: readonly string[] = ['JEWL_AUTONOMOUS_TICK', 'GM_CANVAS_ACTION'];
+
+/** Is this TABLE_CHAT dispatch a tick (system wake / canvas gesture)? */
+export function isTickSource(source: string): boolean {
+  return TICK_SOURCES.includes(source);
+}
+
+/** The light tools this profile carries up front (before any grant). */
+export function lightToolsFor(profile?: ToolProfile): readonly string[] {
+  return profile?.tick ? [...TABLE_CHAT_TOOLS, ...TICK_EXTRA_TOOLS] : TABLE_CHAT_TOOLS;
+}
+
 export const REQUEST_TOOL = 'request_tool';
 
 /** Heavy tools whose descriptions are held to ≤900 chars (tested). */
@@ -49,6 +74,8 @@ export interface ToolProfile {
   kind: DispatchKind;
   /** Tools request_tool granted for THIS round (TABLE_CHAT only). */
   granted?: readonly string[];
+  /** TICK tool set: light set + TICK_EXTRA_TOOLS (TABLE_CHAT only). */
+  tick?: boolean;
 }
 
 /** The dispatch kind of a prompt. A work cycle is GENESIS when the work loop
@@ -63,7 +90,7 @@ export function dispatchKindOf(p: { source: string; kind?: DispatchKind; replyUs
 export function profileAllows(name: string, profile?: ToolProfile): boolean {
   if (!profile || profile.kind !== 'TABLE_CHAT') return name !== REQUEST_TOOL;
   if (name === REQUEST_TOOL) return true;
-  return TABLE_CHAT_TOOLS.includes(name) || !!profile.granted?.includes(name);
+  return lightToolsFor(profile).includes(name) || !!profile.granted?.includes(name);
 }
 
 /**

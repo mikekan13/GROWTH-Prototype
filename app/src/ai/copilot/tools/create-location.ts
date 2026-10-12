@@ -28,37 +28,31 @@ import type { JewlTool, JewlToolHandlerResult } from './types';
  * lives HERE, field by field.
  */
 export const locationSpecSchema = z.object({
-  structure: z.string().max(2500).optional().describe(
-    'Type, footprint (sq ft/m²), ceiling height, and a layout walkthrough from the entry.',
-  ),
-  surfaces: z.string().max(2500).optional().describe(
-    'Walls, ceiling, flooring: materials, condition-with-stories (an ink stain is work, a worn path is habit), and behavior (creaks, drafts).',
-  ),
-  focalPoint: z.string().max(1200).optional().describe('The element the room is ABOUT, rendered fully.'),
+  // Field descriptions kept terse (2026-10-12): every spec ships this schema
+  // to the model; the field names carry most of the meaning.
+  structure: z.string().max(2500).optional().describe('Type, footprint, ceiling, layout from the entry.'),
+  surfaces: z.string().max(2500).optional().describe('Walls/ceiling/floor: material, wear-with-story, behavior.'),
+  focalPoint: z.string().max(1200).optional().describe('What the room is ABOUT.'),
   lighting: z
     .object({
-      primary: z.string().max(600).optional().describe('Main source + character (e.g. late-autumn ~4PM amber through the front window).'),
-      behavior: z.string().max(800).optional().describe('How the light moves and lands — beams, bounce, shadow zones, dust motes.'),
-      colorTemperature: z.string().max(200).optional().describe('Kelvin values per zone, e.g. "2800-3200K sunbeam; ~4500K desaturated shadow".'),
-      secondarySources: z.array(z.string().max(300)).max(8).optional().describe('Other fixtures, on or off — presence matters even when off.'),
-      effect: z.string().max(300).optional().describe('The mood sentence — what the light DOES to the room.'),
+      primary: z.string().max(600).optional(),
+      behavior: z.string().max(800).optional(),
+      colorTemperature: z.string().max(200).optional().describe('Kelvin per zone.'),
+      secondarySources: z.array(z.string().max(300)).max(8).optional(),
+      effect: z.string().max(300).optional().describe('Mood sentence.'),
     })
     .optional(),
   zones: z
     .array(
       z.object({
         name: z.string().max(100),
-        description: z.string().max(2500).describe(
-          'The zone at full fidelity: furniture, what sits on/under/beside what, every object with a story-reason. Objects themselves are ALSO placed via place_item at this location, with exact placement in each item description.',
-        ),
+        description: z.string().max(2500).describe('Full-fidelity zone; objects also via place_item.'),
       }),
     )
     .max(12)
     .optional()
-    .describe('Areas within this place (desk zone, couch zone...). Zones are description-level; rooms are child Locations.'),
-  environmentalSystems: z.string().max(1200).optional().describe(
-    'What inhabits the space pervasively, plus its generation rule (e.g. "Books are not stored; they inhabit... no book looks new").',
-  ),
+    .describe('Areas in this place; rooms are child Locations.'),
+  environmentalSystems: z.string().max(1200).optional().describe('What pervades the space + its rule.'),
   sensory: z
     .object({
       scent: z.string().max(400).optional(),
@@ -73,38 +67,30 @@ export const locationSpecSchema = z.object({
       note: z.string().max(100).optional(),
     }))
     .max(12)
-    .optional()
-    .describe('Hex reference per element — image generation reads this.'),
+    .optional(),
   generation: z
     .object({
-      heroComposition: z.string().max(600).optional().describe('Camera-favored angle and what anchors the frame.'),
-      constraints: z.array(z.string().max(300)).max(10).optional().describe('Hard rules, e.g. "Nothing matches", "Wear is specific, not procedural".'),
-      openQuestion: z.string().max(300).optional().describe('The one mandatory open question the room asks.'),
-      timeLock: z.string().max(200).optional().describe('If the light/time is locked, say so.'),
+      heroComposition: z.string().max(600).optional(),
+      constraints: z.array(z.string().max(300)).max(10).optional(),
+      openQuestion: z.string().max(300).optional(),
+      timeLock: z.string().max(200).optional(),
     })
     .optional(),
 });
 
 const inputSchema = z.object({
-  name: z.string().min(1).max(200).describe('Name of the place.'),
-  description: z.string().optional().describe(
-    'SHORT narrative essence — one paragraph of what this place is. The depth goes in `spec`, field by field, never dumped here.',
-  ),
-  spec: locationSpecSchema.optional().describe(
-    'The standardized environment spec. REQUIRED in practice for any place being built to play-ready fidelity.',
-  ),
-  parentLocation: z.string().optional().describe(
-    'Name or id of an EXISTING Location to nest this place inside ' +
-      '(e.g. a room inside an apartment). Omit for a top-level place.',
-  ),
-  environment: z.string().optional().describe('Climate / terrain / atmosphere.'),
-  population: z.string().optional().describe('Narrative population descriptor.'),
+  name: z.string().min(1).max(200),
+  description: z.string().optional().describe('SHORT essence; depth goes in spec.'),
+  spec: locationSpecSchema.optional().describe('Standard environment spec (play-ready fidelity).'),
+  parentLocation: z.string().optional().describe('Existing Location (name/id) to nest inside.'),
+  environment: z.string().optional(),
+  population: z.string().optional(),
   dangerLevel: z.number().min(1).max(10).optional(),
-  controlledBy: z.string().optional().describe('Faction / NPC / "contested".'),
-  notes: z.string().optional().describe('GM-only notes.'),
+  controlledBy: z.string().optional(),
+  notes: z.string().optional().describe('GM-only.'),
   tags: z.array(z.string()).optional(),
-  canvasX: z.number().optional().describe('Canvas world X for the card. Omit to auto-place.'),
-  canvasY: z.number().optional().describe('Canvas world Y for the card. Omit to auto-place.'),
+  canvasX: z.number().optional().describe('Omit to auto-place.'),
+  canvasY: z.number().optional(),
 });
 
 /** Location ref resolver (id or name, campaign-scoped) — shared with
@@ -136,12 +122,9 @@ export async function resolveLocationRef(
 export const createLocationTool: JewlTool = {
   name: 'create_location',
   description:
-    'Create a Location in THIS campaign — a room, building, district, region, ' +
-    'any place in the world. It appears on the canvas immediately (a folder ' +
-    'the GM can drill into). Pass parentLocation (name or id) to nest it ' +
-    'inside an existing place — e.g. each room of an apartment is a child of ' +
-    'the apartment. Use THIS for world-building, never propose_forge_blueprint ' +
-    '(the Forge is for reusable character/gameplay blueprints, not places).',
+    'Create a Location in THIS campaign (room, building, district, region); ' +
+    'it appears on the canvas at once. parentLocation nests it (rooms inside ' +
+    'an apartment). World-building uses THIS, never propose_forge_blueprint.',
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);

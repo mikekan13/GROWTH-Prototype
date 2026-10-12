@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildToolSpecs, requestableTools, toolOffered } from './runtime';
 import { getJewlTool, listJewlTools } from './tools';
-import { TABLE_CHAT_TOOLS, HEAVY_TOOLS, REQUEST_TOOL } from './tool-profiles';
+import { TABLE_CHAT_TOOLS, TICK_EXTRA_TOOLS, HEAVY_TOOLS, REQUEST_TOOL, isTickSource } from './tool-profiles';
 import { buildJewlSystemPrompt, buildJewlPersonaCore, DEFAULT_REGISTER } from './prompts/system';
 import { estimateTokens } from '@/ai/network/local-window';
 
@@ -106,4 +106,56 @@ describe('persona core + addenda', () => {
       if (saved === undefined) delete process.env.JEWL_PROMPT_VERSION; else process.env.JEWL_PROMPT_VERSION = saved;
     }
   });
+});
+
+describe('TICK tool set (system wakes + canvas gestures)', () => {
+  const tick = buildToolSpecs(undefined, false, undefined, undefined, { kind: 'TABLE_CHAT', tick: true });
+  const names = tick.map(t => t.name);
+
+  it('the TICK sources are autonomous ticks (incl. forge-batch wakes) and canvas gestures only', () => {
+    expect(isTickSource('JEWL_AUTONOMOUS_TICK')).toBe(true);
+    expect(isTickSource('GM_CANVAS_ACTION')).toBe(true);
+    expect(isTickSource('GM_TEXT')).toBe(false);
+    expect(isTickSource('JEWL_WORK_CYCLE')).toBe(false);
+  });
+
+  it('= the TABLE_CHAT set + place_item, arrange_canvas, read_forge_item (no request_tool round needed)', () => {
+    for (const n of TICK_EXTRA_TOOLS) expect(getJewlTool(n), n).toBeDefined();
+    for (const n of [...TABLE_CHAT_TOOLS, ...TICK_EXTRA_TOOLS, REQUEST_TOOL]) expect(names).toContain(n);
+    for (const h of HEAVY_TOOLS) expect(names).not.toContain(h);
+    const plain = buildToolSpecs(undefined, false, undefined, undefined, { kind: 'TABLE_CHAT' }).map(t => t.name);
+    for (const n of TICK_EXTRA_TOOLS) expect(plain).not.toContain(n);
+  });
+
+  it('tick tools are not requestable on a tick (already offered), but are on plain chat', () => {
+    const req = requestableTools(undefined, false, undefined, undefined, true);
+    for (const n of TICK_EXTRA_TOOLS) expect(req).not.toContain(n);
+    for (const n of TICK_EXTRA_TOOLS) expect(requestableTools()).toContain(n);
+  });
+
+  it('a gesture grant still rides on top of the tick set, base first (cache-stable prefix)', () => {
+    const granted = buildToolSpecs(undefined, false, undefined, undefined, { kind: 'TABLE_CHAT', tick: true, granted: ['create_location'] });
+    expect(granted.map(t => t.name).slice(0, names.length)).toEqual(names);
+    expect(granted.map(t => t.name)).toContain('create_location');
+  });
+});
+
+describe('location tool specs are slim', () => {
+  // The JSON schema (≈2.1k chars without descriptions) + the LIMITS line
+  // (≈1k) are kept intact, so ~3.2k is the floor; prose is what was cut
+  // (create_location was 5,947 chars, update_location 5,562).
+  const stripDesc = (o: unknown): unknown => Array.isArray(o) ? o.map(stripDesc)
+    : o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'description').map(([k, v]) => [k, stripDesc(v)])) : o;
+  const all = buildToolSpecs();
+  for (const n of ['create_location', 'update_location']) {
+    it(`${n}: spec ≤ 4.2k chars, field prose ≤ 800 chars (was ≈2.4k), LIMITS line + schema intact`, () => {
+      const s = all.find(t => t.name === n)!;
+      expect(s, n).toBeDefined();
+      expect(JSON.stringify(s).length).toBeLessThanOrEqual(4_200);
+      const fieldProse = JSON.stringify(s.inputSchema).length - JSON.stringify(stripDesc(s.inputSchema)).length;
+      expect(fieldProse).toBeLessThanOrEqual(800);
+      expect(s.description).toMatch(/\nLIMITS \(hard;.*spec\.zones\[\]\.description ≤2500 chars/);
+      expect(JSON.stringify(s.inputSchema)).toContain('"maxLength":2500');
+    });
+  }
 });

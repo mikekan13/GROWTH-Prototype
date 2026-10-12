@@ -15,14 +15,10 @@ import { resolveLocationRef, locationSpecSchema } from './create-location';
 import type { JewlTool, JewlToolHandlerResult } from './types';
 
 const inputSchema = z.object({
-  location: z.string().min(1).describe('Location to update (name or id).'),
-  name: z.string().min(1).max(200).optional().describe('Rename.'),
-  description: z.string().max(3000).optional().describe(
-    'SHORT narrative essence — depth belongs in `spec`.',
-  ),
-  spec: locationSpecSchema.optional().describe(
-    'The standardized environment spec — REPLACES the stored spec entirely; supply it complete.',
-  ),
+  location: z.string().min(1).describe('Name or id.'),
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(3000).optional().describe('SHORT essence; depth goes in spec.'),
+  spec: locationSpecSchema.optional().describe('REPLACES the stored spec; supply it complete.'),
   environment: z.string().max(2000).optional(),
   population: z.string().max(500).optional(),
   dangerLevel: z.number().min(1).max(10).optional(),
@@ -34,11 +30,9 @@ const inputSchema = z.object({
 export const updateLocationTool: JewlTool = {
   name: 'update_location',
   description:
-    'Revise an existing Location (by name or id): rename, rewrite the short ' +
-    'description, and set/replace the standardized environment spec ' +
-    '(structure, surfaces, focalPoint, lighting, zones, environmentalSystems, ' +
-    'sensory, palette, generation). Use this to bring an unstructured location ' +
-    'up to standard — move the depth out of the prose blob into spec fields.',
+    'Revise a Location (name or id): rename, short description, or replace ' +
+    'its standard spec. Bring prose-blob places up to standard by moving ' +
+    'the depth into spec fields.',
   inputSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const parsed = inputSchema.parse(input);

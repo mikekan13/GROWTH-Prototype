@@ -28,7 +28,8 @@ import {
   profileAllows,
   requestToolSpec,
   REQUEST_TOOL,
-  TABLE_CHAT_TOOLS,
+  isTickSource,
+  lightToolsFor,
   type DispatchKind,
   type ToolProfile,
 } from './tool-profiles';
@@ -211,9 +212,9 @@ export function buildToolSpecs(
   }
   // TABLE_CHAT: the light set, then request_tool, then this round's grants —
   // base first so the cached prefix stays identical round to round.
-  const base: ToolProfile = { kind: 'TABLE_CHAT' };
+  const base: ToolProfile = { kind: 'TABLE_CHAT', tick: profile.tick };
   const light = all.filter(t => toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools, base));
-  const requestable = requestableTools(allowedTools, isWorkCycle, excludedTools, stageTools);
+  const requestable = requestableTools(allowedTools, isWorkCycle, excludedTools, stageTools, profile.tick);
   const granted = all.filter(t =>
     profile.granted?.includes(t.name) && requestable.includes(t.name));
   return [...light.map(toolSpec), requestToolSpec(requestable), ...granted.map(toolSpec)];
@@ -221,9 +222,10 @@ export function buildToolSpecs(
 
 /** Tools a TABLE_CHAT dispatch may pull with request_tool: everything the
  *  dispatch could offer without a profile, minus the light set. */
-export function requestableTools(allowedTools?: string[], isWorkCycle = false, excludedTools?: string[], stageTools?: string[]): string[] {
+export function requestableTools(allowedTools?: string[], isWorkCycle = false, excludedTools?: string[], stageTools?: string[], tick = false): string[] {
+  const light = lightToolsFor({ kind: 'TABLE_CHAT', tick });
   return listJewlTools()
-    .filter(t => !TABLE_CHAT_TOOLS.includes(t.name) && toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools))
+    .filter(t => !light.includes(t.name) && toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools))
     .map(t => t.name);
 }
 
@@ -539,11 +541,13 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // a heavier tool gets it granted up front (the GM already chose it).
   let grants: string[] = [];
   const proposed = prompt.canvasAction?.proposedTool?.name;
-  if (isTableChat && proposed && !profileAllows(proposed, { kind })
-    && requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools).includes(proposed)) {
+  // System wakes + canvas gestures carry the TICK set (light + place/arrange/read-forge).
+  const tick = isTableChat && isTickSource(prompt.source);
+  if (isTableChat && proposed && !profileAllows(proposed, { kind, tick })
+    && requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, tick).includes(proposed)) {
     grants = [proposed];
   }
-  const profileFor = (g: string[]): ToolProfile => ({ kind, granted: g });
+  const profileFor = (g: string[]): ToolProfile => ({ kind, granted: g, tick });
   let tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, profileFor(grants));
 
   // Budget (2026-10-12): log the dispatch's size by part and hold it to the
@@ -713,7 +717,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       const offered = toolOffered(tu.name, prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, profileFor(grants));
       // The escape hatch (TABLE_CHAT): grant a heavier tool for the NEXT round.
       if (offered && tu.name === REQUEST_TOOL) {
-        const r = handleRequestTool(tu.input, requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools));
+        const r = handleRequestTool(tu.input, requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, tick));
         if (r.granted) requestedThisRound.push(r.granted);
         toolCallsMade.push({ name: tu.name, input: tu.input, ...(r.error ? { error: r.error } : { output: r.output }) });
         userToolResults.push({
