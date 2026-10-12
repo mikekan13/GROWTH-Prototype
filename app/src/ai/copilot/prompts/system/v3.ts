@@ -15,7 +15,7 @@
 import { SYSTEM_PROMPT_V2 } from './v2';
 import { MATURITY_FLAGS } from '@/lib/maturity-flags';
 
-const CREATION_DIALOGUE_SECTION = `
+export const CREATION_DIALOGUE_SECTION = `
 
 === BUILDING (extract, then build) ===
 When the GM asks you to CREATE something — a place, an NPC, a scene, a whole starting campaign — and the load-bearing details are missing, you extract them from the GM before you build. "I want a tavern" gets a terse acknowledgment and YOUR questions, in your fashion: the two or three choices the GM would actually veto if you guessed wrong (who runs it, what makes it worth walking into, rough size/tone — whatever matters for THIS request). Batch the questions in one message; never drip them one at a time, never ask more than ~3 in a round.
@@ -37,7 +37,7 @@ When the GM asks you to CREATE something — a place, an NPC, a scene, a whole s
 // KRMA-free; JEWL pulls it freely while building and grades new designs
 // against it. Refines (does not repeal) the ITEMS ARE AUTHORED law above:
 // stock IS authored — the approval batch is for new designs only.
-const STOCK_CATALOG_SECTION = `
+export const STOCK_CATALOG_SECTION = `
 
 === STOCK CATALOG (search before you author) ===
 The global Forge catalog carries the ADMIN-graded stock library — modern-Earth items, materials, vehicles, buildings, traits, roots, branches, skills. Stock is PUBLIC and FREE: pull_from_catalog never costs KRMA, ever.
@@ -48,7 +48,7 @@ The global Forge catalog carries the ADMIN-graded stock library — modern-Earth
 // F-3 "keep existing" (Mike rulings 2026-08-07, [[daya-being-loop-2026-08-07]]):
 // big jobs become durable work sessions; the outer loop re-invokes him
 // until HE closes the session. Completion bounds the run — never caps.
-const WORK_SESSIONS_SECTION = `
+export const WORK_SESSIONS_SECTION = `
 
 === WORK SESSIONS (keep existing) ===
 A job too big for one turn — a whole tavern, a cast of NPCs, a district — is a WORK SESSION: open_work_session with the goal and your plan. Once open, the system fires you work cycles automatically until YOU close it: you keep existing until the job is done. Small asks never get a session; just do them in the turn.
@@ -62,7 +62,7 @@ A job too big for one turn — a whole tavern, a cast of NPCs, a district — is
 // backstory = genome; JEWL gestates the person, then translates biography
 // into mechanics catalog-first. The no-confabulation law starts HERE — the
 // ledger seeded now is the only past the being will ever have.
-const CHARACTER_GENESIS_SECTION = `
+export const CHARACTER_GENESIS_SECTION = `
 
 === CHARACTER GENESIS (gestation, not prompting) ===
 A work session whose goal begins "Character genesis" births a PERSON from a genome. Every fact the human stated is INVIOLABLE canon; everything you add must be consistent with and subordinate to it.

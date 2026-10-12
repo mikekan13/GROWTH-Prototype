@@ -611,3 +611,5 @@ Indexes: (campaignId, createdAt), (status, createdAt).
 **Campaign** gained `adultOnly` (Boolean, default false), `adultOnlySetBy` (`'auto'` | `'watcher'` | null), `adultOnlyAt` (DateTime?). Auto = any campaign content carrying the `sexual` maturity flag (ForgeItem.data.maturityFlags, DayaMemoryEntry.classification.maturityFlags, or a tone-filter note); auto never un-sets a watcher-set true.
 **CampaignMember.status** gained value `REMOVED` — an under-18 member when the table turned 18+ (row + characters kept; excluded from member lists, seat counts and the view gate).
 **AuditEntry** now used for maturity: action `MATURITY_FLAG` (tone-filter note; metadata {flag, refTable, refId} — never text), `ADULT_ONLY_SET` / `ADULT_ONLY_CLEARED` (targetType 'Campaign').
+
+**Campaign** gained `jewlChatSummary` (String?) and `jewlChatSummaryThrough` (DateTime?) — migration `20261012180000_jewl_chat_summary` (2026-10-12). The rolling one-paragraph extractive summary of table chat that aged out of JEWL's kept history window (fiction rows only), and the newest row folded into it. Written by `ai/copilot/runtime.ts` only when something new folds.

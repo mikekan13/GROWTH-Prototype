@@ -83,6 +83,10 @@ export interface JewlPrompt {
    *  raise_prod in a genesis BUILDING cycle: a question is a prod at any
    *  genesis stage (2026-10-12). */
   stageTools?: string[];
+  /** The dispatch kind (tool set + persona addendum + history policy). Derived
+   *  from the source when omitted: work cycles → WORK_CYCLE (GENESIS when the
+   *  reply goes to '[genesis]'), everything else → TABLE_CHAT. */
+  kind?: 'TABLE_CHAT' | 'WORK_CYCLE' | 'GENESIS';
 }
 
 /** Outcome of executing one tool call. */

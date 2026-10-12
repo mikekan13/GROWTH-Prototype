@@ -22,6 +22,25 @@ import { loadJewlMemoryForCampaign, formatJewlMemoryBlock } from './tools/memory
 import { transcribeAudio } from '@/ai/providers/stt';
 import { loadTimeAwareness, formatTimeAwarenessBlock } from './time-awareness';
 import { getJewlTool, listJewlTools } from './tools';
+import {
+  dispatchKindOf,
+  nextGrants,
+  profileAllows,
+  requestToolSpec,
+  REQUEST_TOOL,
+  TABLE_CHAT_TOOLS,
+  type DispatchKind,
+  type ToolProfile,
+} from './tool-profiles';
+import {
+  tableChatHistory,
+  rollSummary,
+  rowsToFold,
+  formatSummaryBlock,
+  TABLE_HISTORY_FETCH,
+  type ChatRow,
+} from './table-history';
+import { laneBudget, measureCtx, formatCtxLine, trimHistoryToBudget } from './dispatch-budget';
 import { coerceToolInput, describeLimits } from './tools/coerce';
 import type { JewlToolContext } from './tools/types';
 import type { JewlPrompt, JewlResponse, JewlToolCallResult } from './prompts/types';
@@ -140,16 +159,21 @@ const STAGE_ONLY_TOOLS = new Set(['raise_prod', 'end_prod_round']);
  *  Watcher says "give me a grumpy innkeeper" mid-session). */
 const TABLE_ONLY_TOOLS = new Set(['sketch_npc']);
 
-/** May this dispatch offer / execute this tool? */
+/** May this dispatch offer / execute this tool? `profile` is the per-lane
+ *  tool set (tool-profiles.ts): TABLE_CHAT narrows to the light set +
+ *  whatever request_tool granted for this round. */
 export function toolOffered(
   name: string,
   allowedTools?: string[],
   isWorkCycle = false,
   excludedTools?: string[],
   stageTools?: string[],
+  profile?: ToolProfile,
 ): boolean {
   if (isWorkCycle && TABLE_ONLY_TOOLS.has(name)) return false;
   if (excludedTools?.includes(name)) return false;
+  if (!profileAllows(name, profile)) return false;
+  if (name === REQUEST_TOOL) return true;
   if (allowedTools) return allowedTools.includes(name);
   // A stage-only tool this dispatch unlocks on top of the normal set (a
   // genesis BUILDING cycle may still raise_prod, 2026-10-12).
@@ -174,8 +198,72 @@ function toolSpec(t: { name: string; description: string; inputSchema: z.ZodType
 /** Prepare the tools list for the Claude call. Each description carries its
  *  exact length limits (perf pass 2026-10-12: rejected calls were ~⅓ of
  *  genesis output tokens). */
-export function buildToolSpecs(allowedTools?: string[], isWorkCycle = false, excludedTools?: string[], stageTools?: string[]): ClaudeToolSpec[] {
-  return listJewlTools().filter(t => toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools)).map(toolSpec);
+export function buildToolSpecs(
+  allowedTools?: string[],
+  isWorkCycle = false,
+  excludedTools?: string[],
+  stageTools?: string[],
+  profile?: ToolProfile,
+): ClaudeToolSpec[] {
+  const all = listJewlTools();
+  if (!profile || profile.kind !== 'TABLE_CHAT') {
+    return all.filter(t => toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools, profile)).map(toolSpec);
+  }
+  // TABLE_CHAT: the light set, then request_tool, then this round's grants —
+  // base first so the cached prefix stays identical round to round.
+  const base: ToolProfile = { kind: 'TABLE_CHAT' };
+  const light = all.filter(t => toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools, base));
+  const requestable = requestableTools(allowedTools, isWorkCycle, excludedTools, stageTools);
+  const granted = all.filter(t =>
+    profile.granted?.includes(t.name) && requestable.includes(t.name));
+  return [...light.map(toolSpec), requestToolSpec(requestable), ...granted.map(toolSpec)];
+}
+
+/** Tools a TABLE_CHAT dispatch may pull with request_tool: everything the
+ *  dispatch could offer without a profile, minus the light set. */
+export function requestableTools(allowedTools?: string[], isWorkCycle = false, excludedTools?: string[], stageTools?: string[]): string[] {
+  return listJewlTools()
+    .filter(t => !TABLE_CHAT_TOOLS.includes(t.name) && toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools))
+    .map(t => t.name);
+}
+
+/** Validate a request_tool call against what this dispatch may pull. */
+export function handleRequestTool(
+  input: Record<string, unknown>,
+  requestable: string[],
+): { granted?: string; output?: Record<string, unknown>; error?: string } {
+  const name = typeof input?.name === 'string' ? input.name.trim() : '';
+  if (!name || !requestable.includes(name)) {
+    return { error: `request_tool: "${name || '(none)'}" is not requestable here. Requestable: ${requestable.join(', ')}.` };
+  }
+  return { granted: name, output: { ok: true, granted: name, note: `${name} is offered on your NEXT round — call it then.` } };
+}
+
+/**
+ * Fold table-chat rows that aged out of the kept window into the campaign's
+ * rolling summary; write it only when it changed. Best-effort: a failure
+ * (e.g. the column not migrated yet) leaves the dispatch without a summary.
+ */
+async function rollTableChatSummary(campaignId: string, older: ChatRow[]): Promise<string | null> {
+  try {
+    const row = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { jewlChatSummary: true, jewlChatSummaryThrough: true },
+    });
+    const prev = row?.jewlChatSummary ?? null;
+    const fold = rowsToFold(older, row?.jewlChatSummaryThrough ?? null);
+    if (fold.length === 0) return prev;
+    const next = rollSummary(prev, fold);
+    const through = fold.reduce((d, r) => (r.createdAt > d ? r.createdAt : d), fold[0].createdAt);
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { jewlChatSummaryThrough: through, ...(next !== prev ? { jewlChatSummary: next } : {}) },
+    });
+    return next || null;
+  } catch (err) {
+    console.warn('[jewl-dispatch] table-chat summary unavailable:', err instanceof Error ? err.message : String(err));
+    return null;
+  }
 }
 
 /** Serialize a JewlPrompt into the user-side text Claude receives. */
@@ -365,6 +453,9 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   // route through tableLane(): 'judgment' by default, 'local' under the
   // privacy-wall play configuration (JEWL_TABLE_LANE=local).
   const isWorkCycle = prompt.source === 'JEWL_WORK_CYCLE';
+  // Per-lane tool set + persona addendum + history policy (2026-10-12).
+  const kind: DispatchKind = dispatchKindOf(prompt);
+  const isTableChat = kind === 'TABLE_CHAT';
   // THE WALL (Mike 2026-10-12): route() decides by the prompt's content
   // class — a table/real prompt runs local or not at all; never cloud.
   const promptClass = promptClassOf(prompt);
@@ -391,11 +482,21 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   const history = await prisma.copilotMessage.findMany({
     where: { campaignId: prompt.campaignId },
     orderBy: { createdAt: 'desc' },
-    take: (isWorkCycle ? MAX_HISTORY_WORK_CYCLE : MAX_HISTORY) + 1,
-    select: { role: true, content: true, username: true, createdAt: true, contentClass: true, icText: true, actions: true },
+    take: (isWorkCycle ? MAX_HISTORY_WORK_CYCLE : isTableChat ? TABLE_HISTORY_FETCH : MAX_HISTORY) + 1,
+    select: { role: true, content: true, username: true, createdAt: true, contentClass: true, icText: true, actions: true, metadata: true },
   });
   // Withheld rows (lawfulness) never reach any model, local or cloud.
-  const pastMessages = withoutWithheld(history.reverse().slice(0, -1)); // exclude the prompt we just saved
+  const recent: ChatRow[] = withoutWithheld(history.reverse().slice(0, -1)); // exclude the prompt we just saved
+  // Table chat (2026-10-12): conversation only — genesis/work-cycle rows out,
+  // long rows clipped, the newest rows by budget; older rows roll into a
+  // stored one-paragraph summary.
+  let pastMessages: ChatRow[] = recent;
+  let summaryBlock = '';
+  if (isTableChat) {
+    const split = tableChatHistory(recent);
+    pastMessages = split.kept;
+    summaryBlock = formatSummaryBlock(await rollTableChatSummary(prompt.campaignId, split.older));
+  }
   const toneCtx = { caller: 'jewl-dispatch', campaignId: prompt.campaignId };
   const tally = newToneTally();
   const laneHistory = await historyForLane(pastMessages, toCloud, toneCtx, tally);
@@ -420,16 +521,47 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     context.retrievedData ? `\n=== RELEVANT DETAILS ===\n${context.retrievedData}` : '',
     context.rulesContext ? `\n=== RULES REFERENCE ===\n${context.rulesContext}` : '',
     `\n${memoryBlock}`,
+    summaryBlock ? `\n${summaryBlock}` : '',
   ].filter(Boolean).join('\n');
   const contextBlock = await contextForLane(rawContextBlock, toCloud, toneCtx, tally);
 
-  const systemPrompt = buildJewlSystemPrompt(DEFAULT_REGISTER);
+  // Persona = core + this kind's addendum: identical across rounds of a kind.
+  const systemPrompt = buildJewlSystemPrompt(DEFAULT_REGISTER, kind);
   const isProvingGround = prompt.campaignId === INCUBATOR_CAMPAIGN_ID;
-  const fullSystemPrompt = isPrime
-    ? `${systemPrompt}\n\n${PRIME_BUILD_STATE_PREAMBLE}\n\n${contextBlock}`
+  const stableSystem = isPrime
+    ? `${systemPrompt}\n\n${PRIME_BUILD_STATE_PREAMBLE}`
     : isProvingGround
-      ? `${systemPrompt}\n\n${PROVING_GROUND_PREAMBLE}\n\n${contextBlock}`
-      : `${systemPrompt}\n\n${contextBlock}`;
+      ? `${systemPrompt}\n\n${PROVING_GROUND_PREAMBLE}`
+      : systemPrompt;
+  const fullSystemPrompt = `${stableSystem}\n\n${contextBlock}`;
+
+  // Tool set for round one: the kind's profile; a canvas gesture that names
+  // a heavier tool gets it granted up front (the GM already chose it).
+  let grants: string[] = [];
+  const proposed = prompt.canvasAction?.proposedTool?.name;
+  if (isTableChat && proposed && !profileAllows(proposed, { kind })
+    && requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools).includes(proposed)) {
+    grants = [proposed];
+  }
+  const profileFor = (g: string[]): ToolProfile => ({ kind, granted: g });
+  let tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, profileFor(grants));
+
+  // Budget (2026-10-12): log the dispatch's size by part and hold it to the
+  // lane's budget — over → drop the oldest history lines first.
+  const budget = laneBudget(resolvedLane.provider);
+  const fitted = trimHistoryToBudget({
+    system: stableSystem,
+    tools: JSON.stringify(tools),
+    history: laneHistory.lines.map(l => l.text),
+    ctx: contextBlock,
+    prompt: formatPromptText(prompt),
+  }, budget);
+  if (fitted.drop) {
+    laneHistory.lines.splice(0, fitted.drop);
+    console.warn(`[ctx] over budget: dropped the oldest ${fitted.drop} history lines`);
+  }
+  console.log(formatCtxLine(kind, fitted.measure, budget));
+  if (!fitted.fits) console.error(`[ctx] kind=${kind} total still over budget after trimming history — system/tools/ctx alone exceed it`);
 
   // 3. Build the messages array. History is text-only; the new prompt
   //    is formatted via formatPromptText.
@@ -458,7 +590,6 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ];
 
   // 4. Tool-use loop.
-  const tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools);
   const toolCtx: JewlToolContext = {
     campaignId: prompt.campaignId,
     actorId: prompt.actorId,
@@ -577,8 +708,22 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       announceWorking({ phase: 'started' });
     }
     const userToolResults: ClaudeContentBlock[] = [];
+    const requestedThisRound: string[] = [];
     for (const tu of toolUseBlocks) {
-      const offered = toolOffered(tu.name, prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools);
+      const offered = toolOffered(tu.name, prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, profileFor(grants));
+      // The escape hatch (TABLE_CHAT): grant a heavier tool for the NEXT round.
+      if (offered && tu.name === REQUEST_TOOL) {
+        const r = handleRequestTool(tu.input, requestableTools(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools));
+        if (r.granted) requestedThisRound.push(r.granted);
+        toolCallsMade.push({ name: tu.name, input: tu.input, ...(r.error ? { error: r.error } : { output: r.output }) });
+        userToolResults.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: r.error ?? JSON.stringify(r.output),
+          ...(r.error ? { is_error: true } : {}),
+        });
+        continue;
+      }
       const tool = offered ? getJewlTool(tu.name) : undefined;
       let tcRecord: JewlToolCallResult;
       if (!tool) {
@@ -634,6 +779,15 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       toolCallsMade.push(tcRecord);
     }
 
+    // Next round's tool set: this round's requests, plus grants still in use.
+    if (isTableChat) {
+      const nextG = nextGrants(grants, requestedThisRound, toolUseBlocks.map(t => t.name));
+      if (nextG.join() !== grants.join()) {
+        grants = nextG;
+        tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools, profileFor(grants));
+      }
+    }
+
     // Add the tool results as a user turn so the model can reason about
     // them. THE choke point where DB text re-enters the model's context: on
     // a cloud lane every result is scrubbed (table/real rows dropped, split
@@ -653,6 +807,8 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     toolCalls: toolCallsMade,
     metadata: {
       model,
+      // Table-chat history keys on this to leave work-cycle replies out.
+      dispatchKind: kind,
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
       cacheReadTokens: totalCacheReadTokens,
