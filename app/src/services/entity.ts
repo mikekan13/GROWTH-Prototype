@@ -13,6 +13,7 @@ import { crystallizeEntity as crystallizeKrma } from './krma/crystallization';
 import { calculateTKV } from './krma/evaluator';
 import { assignGoalCustodian } from './goal-custodian';
 import { emit as emitGodHeadEvent } from './godhead-dispatcher';
+import { getCampaignCompletions, isAwaitingImage } from './character-completion';
 
 /**
  * Entity service — campaign entity listing and management.
@@ -31,6 +32,8 @@ export interface EntityListItem {
   stewardName: string | null;
   activeGoals: number;
   createdAt: string;
+  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
+  awaitingImage: boolean;
 }
 
 export async function listCampaignEntities(
@@ -82,6 +85,7 @@ export async function listCampaignEntities(
     },
     orderBy: { createdAt: 'asc' },
   });
+  const completions = await getCampaignCompletions(campaignId);
 
   return characters.map(c => {
     // Parse seed name and TKV from character JSON data
@@ -108,6 +112,7 @@ export async function listCampaignEntities(
       stewardName: stewarding ? c.user.username : null,
       activeGoals: c.goals.length,
       createdAt: c.createdAt.toISOString(),
+      awaitingImage: isAwaitingImage(completions.get(c.id)),
     };
   });
 }

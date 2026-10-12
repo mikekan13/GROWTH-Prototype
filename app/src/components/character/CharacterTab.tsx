@@ -122,9 +122,12 @@ interface CharacterTabProps {
   // the active tab to 'character' and passes the entity id here so we never have to
   // navigate away to /character/[id]. Falls back to userCharacter if fetch fails.
   selectedCharacterId?: string | null;
+  /** BORN ≠ DONE (2026-10-12): a Portrait Needs-you item asked to open this
+   *  character's Appearance ↗ (nonce = a fresh request). */
+  openAppearanceFor?: { id: string; nonce: number } | null;
 }
 
-export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit, selectedCharacterId }: CharacterTabProps) {
+export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit, selectedCharacterId, openAppearanceFor }: CharacterTabProps) {
   const [overrideCharacter, setOverrideCharacter] = useState<{ id: string; name: string; data: string; entityType?: string } | null>(null);
   const [physicalDescription, setPhysicalDescription] = useState<PhysicalDescription>({});
   const [backstoryText, setBackstoryText] = useState('');
@@ -430,18 +433,24 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   // Watcher steps (JEWL's drafts awaiting consent) keep the screen up after
   // the build finishes, until every one is submitted (Mike 2026-10-11).
   const genesisNeedsGm = (genesis?.gmSteps?.length ?? 0) > 0;
+  // BORN ≠ DONE (Mike 2026-10-12): born but no official portrait yet — the
+  // screen holds (no auto-close) and the badge stays "awaiting image". Not a
+  // gate: the character is ACTIVE and voiceable meanwhile.
+  const genesisAwaitingImage = genesis?.state === 'done' && !!genesis.completion && genesis.completion.image !== 'done';
+  const [genesisOpenedFor, setGenesisOpenedFor] = useState<string | null>(null);
   const showGenesisOverlay = !!genesisCharId && genesisDismissedFor !== genesisCharId
-    && (submittingGenesis || !!genesisSubmitError || genesisRunning || genesisBornNow || genesisNeedsGm);
-  const showGenesisBadge = !!genesisCharId && !showGenesisOverlay && (genesisRunning || genesisBornNow || genesisNeedsGm);
+    && (submittingGenesis || !!genesisSubmitError || genesisRunning || genesisBornNow || genesisNeedsGm
+      || (genesisAwaitingImage && genesisOpenedFor === genesisCharId));
+  const showGenesisBadge = !!genesisCharId && !showGenesisOverlay && (genesisRunning || genesisBornNow || genesisNeedsGm || genesisAwaitingImage);
   const finishGenesis = useCallback(() => {
     if (genesisCharId) setGenesisBornSeenFor(genesisCharId);
     void fetchGenome();
   }, [genesisCharId, fetchGenome]);
   useEffect(() => {
-    if (!genesisBornNow || !showGenesisOverlay || genesisNeedsGm) return;
+    if (!genesisBornNow || !showGenesisOverlay || genesisNeedsGm || genesisAwaitingImage) return;
     const t = setTimeout(finishGenesis, 8000); // the born moment, then the sheet
     return () => clearTimeout(t);
-  }, [genesisBornNow, showGenesisOverlay, finishGenesis]);
+  }, [genesisBornNow, showGenesisOverlay, genesisNeedsGm, genesisAwaitingImage, finishGenesis]);
   const dismissGenesis = () => {
     if (genesisSubmitError) { setGenesisSubmitError(null); return; }
     if (genesis?.state === 'done') finishGenesis();
@@ -459,6 +468,14 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     if (genesisCharId) setGenesisDismissedFor(genesisCharId);
     setTimeout(() => appearanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   }, [genesisCharId]);
+  // A Portrait Needs-you item from JEWL's work screen (canvas event) lands here.
+  const appearanceNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!openAppearanceFor || openAppearanceFor.id !== genesisCharId) return;
+    if (appearanceNonceRef.current === openAppearanceFor.nonce) return;
+    appearanceNonceRef.current = openAppearanceFor.nonce;
+    openAppearance();
+  }, [openAppearanceFor, genesisCharId, openAppearance]);
   const appearanceUnlocked = genomeInfo?.stage === 'ready' || genomeInfo?.stage === 'gestating'
     || genesisRunning || appearanceOpen;
 
@@ -614,6 +631,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   }, [physicalDescription, characterName, desiredAge, selectedSeed, campaignId, effectiveCharacter?.id]);
 
   const handleWizardComplete = useCallback(async (bust: string, fullBody: string) => {
+    // BORN ≠ DONE: the official bust lands → completion flips to DONE.
+    const flipCompletion = () => { void refetchGenesis(); };
     setGeneratedBust(bust);
     setGeneratedFullBody(fullBody);
     setWizardOpen(false);
@@ -646,7 +665,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     } catch (err) {
       console.error('Failed to persist portraits:', err);
     }
-  }, [effectiveCharacter?.id, campaignId]);
+    flipCompletion();
+  }, [effectiveCharacter?.id, campaignId, refetchGenesis]);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -767,6 +787,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           onStepsChanged={() => { void refetchGenesis(); }}
           onOpenForge={() => { if (genesisCharId) setGenesisDismissedFor(genesisCharId); }}
           onOpenAppearance={openAppearance}
+          characterId={genesisCharId}
         />
       )}
       {seedFindings && (
@@ -780,7 +801,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           onSubmitAnyway={() => { void submitToJewl(true); }}
         />
       )}
-      {showGenesisBadge && <GenesisBadge progress={genesis} onOpen={() => setGenesisDismissedFor(null)} />}
+      {showGenesisBadge && <GenesisBadge progress={genesis} onOpen={() => { setGenesisDismissedFor(null); setGenesisOpenedFor(genesisCharId); }} />}
       <div className="max-w-4xl mx-auto p-6 space-y-5">
 
         {/* TOP ROW — Name centered */}

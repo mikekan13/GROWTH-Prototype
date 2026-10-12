@@ -14,6 +14,7 @@ import type { CanvasFolder } from '@/types/canvas';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
 import { JewlStatusButton } from '@/components/jewl/JewlWorkPopup';
+import { CHARACTER_APPEARANCE_OPEN_EVENT } from '@/lib/jewl-work';
 import { TABLE_FEED_EVENT } from '@/components/copilot/JewlChip';
 import type { FeedEntity } from '@/components/terminal/table-feed/TableFeedRows';
 import type { CampaignStreamEvent, EffortWagerPromptEvent } from '@/types/campaign-events';
@@ -38,6 +39,8 @@ interface CanvasNode {
   status?: string;
   color?: string;
   portrait?: string | null;
+  /** BORN ≠ DONE (2026-10-12): born, official portrait still to come. */
+  awaitingImage?: boolean;
   characterData?: Record<string, unknown> | null;
   /** Character has a GodHead row (AI persona exists). */
   hasAIPersona?: boolean;
@@ -361,6 +364,20 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     window.addEventListener('growth:open-forge', handler);
     return () => window.removeEventListener('growth:open-forge', handler);
   }, []);
+
+  // BORN ≠ DONE (2026-10-12): a Portrait Needs-you item opens that character's
+  // Appearance ↗ — switch to its Character tab and open the look editor.
+  const [appearanceFor, setAppearanceFor] = useState<{ id: string; nonce: number } | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ characterId?: string }>).detail?.characterId;
+      if (!id) return;
+      setAppearanceFor({ id, nonce: Date.now() });
+      handleSelectCharacter(id);
+    };
+    window.addEventListener(CHARACTER_APPEARANCE_OPEN_EVENT, handler);
+    return () => window.removeEventListener(CHARACTER_APPEARANCE_OPEN_EVENT, handler);
+  }, [handleSelectCharacter]);
 
   // ── Contested check line (ref-based for smooth animation) ──
   const [defenderPickerTarget, setDefenderPickerTarget] = useState<{ id: string; name: string } | null>(null);
@@ -1826,6 +1843,7 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
             isGM={isGM}
             userCharacter={userCharacter}
             selectedCharacterId={selectedCharacterId}
+            openAppearanceFor={appearanceFor}
             // The canvas IS the Watcher Console — the GM's explicit edit
             // surface. Without this the entities→edit path opened PLAYER_
             // CHARACTER sheets read-only (B: pair-session 2026-08-07).

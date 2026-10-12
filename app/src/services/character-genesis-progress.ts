@@ -30,6 +30,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { getJewlGodHead } from '@/ai/copilot/jewl-identity';
 import { requireCampaignGM } from './campaign-access';
 import { readSeedPick } from '@/lib/seed-state';
+import { deriveCharacterCompletion, type CharacterCompletion } from './character-completion';
 import { isProdsBlocked } from '@/lib/genesis-question';
 
 export const GENESIS_STAGES = [
@@ -167,6 +168,9 @@ export interface GenesisProgress {
   /** Seed first (2026-10-12): the character's seed once JEWL (or the GM) set
    *  it — Appearance ↗ and portraits wait for it. Null = still choosing. */
   seed?: { name: string; pickedBy: 'jewl' | 'default' | 'gm' | null } | null;
+  /** BORN ≠ DONE (2026-10-12): genesis born AND the official portrait — see
+   *  services/character-completion. Absent = this source doesn't carry it. */
+  completion?: CharacterCompletion;
 }
 
 const BLOCK_TYPES = new Set(['seed', 'root', 'branch']);
@@ -428,7 +432,10 @@ export async function getGenesisProgress(opts: {
 }): Promise<GenesisProgress> {
   const character = await prisma.character.findUnique({
     where: { id: opts.characterId },
-    select: { id: true, campaignId: true, data: true },
+    select: {
+      id: true, campaignId: true, data: true, portrait: true, genesisTier: true,
+      personaLock: { select: { id: true } },
+    },
   });
   if (!character) throw new NotFoundError('Character not found');
   if (!character.campaignId) {
@@ -437,7 +444,13 @@ export async function getGenesisProgress(opts: {
   await requireCampaignGM(character.campaignId, opts.user);
   const progress = deriveGenesisProgress(await loadGenesisFacts(character.id, character.campaignId));
   const pick = readSeedPick(character.data);
-  return { ...progress, seed: pick ? { name: pick.name, pickedBy: pick.pickedBy } : null };
+  const completion = deriveCharacterCompletion({
+    genesisBorn: progress.state === 'done' || character.genesisTier === 'SKETCH',
+    portrait: character.portrait ?? null,
+    data: character.data ?? null,
+    personaLocked: !!character.personaLock,
+  });
+  return { ...progress, seed: pick ? { name: pick.name, pickedBy: pick.pickedBy } : null, completion };
 }
 
 /** JEWL's one-line, in-voice chat status for a genesis transition. Null =

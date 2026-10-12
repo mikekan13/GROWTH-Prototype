@@ -7,6 +7,7 @@ import { recomputeAugments } from '@/lib/character-actions';
 import { warmLocalLane } from '@/lib/local-warm';
 import { canEnterAdultCampaign } from '@/lib/permissions';
 import { REMOVED_STATUS } from '@/services/maturity';
+import { getCampaignCompletions, isAwaitingImage } from '@/services/character-completion';
 import AdultOnlyNotice from '@/components/maturity/AdultOnlyNotice';
 
 export default async function CampaignCanvasPage({ params }: { params: Promise<{ id: string }> }) {
@@ -96,6 +97,9 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     return typeof parsed?.canvasX === 'number' && typeof parsed?.canvasY === 'number';
   });
 
+  // BORN ≠ DONE (2026-10-12): the card's "awaiting image" badge.
+  const completions = await getCampaignCompletions(campaign.id);
+
   // Transform characters to CanvasNode format with full data
   const characterNodes = canvasCharacters.map((char, index) => {
     let charData: (Record<string, unknown> & { canvasX?: number; canvasY?: number }) | null = null;
@@ -119,6 +123,7 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
       ...(typeof charData?.canvasPlacedAt === 'number' ? { placedAt: charData.canvasPlacedAt as number } : {}),
       status: char.status,
       portrait: char.portrait,
+      awaitingImage: isAwaitingImage(completions.get(char.id)),
       characterData: charData,
       hasAIPersona: char.godHead !== null,
       aiActionMode: char.godHead?.aiActionMode ?? false,

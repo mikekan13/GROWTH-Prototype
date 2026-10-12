@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifySessionType, defaultSessionView, draftingSessionView, genesisSessionView, jewlStateLine,
-  mergeNeedsYou, needsYouCount, orderSessions, reconciliationSessionView,
+  mergeNeedsYou, needsYouCount, orderSessions, reconciliationSessionView, portraitNeedsYou, genesisAwaitingImage,
   type JewlWorkPayload, type WorkSessionFacts,
 } from './jewl-work';
 import type { GenesisProgress, GenesisGmStep } from '@/services/character-genesis-progress';
@@ -121,5 +121,42 @@ describe('campaign level', () => {
     expect(jewlStateLine({ sessions: [a], needsYou: a.needsYou, recentLog: [], cycling: false })).toBe('waiting on you · Tidy the tavern');
     expect(jewlStateLine({ sessions: [], needsYou: [{ id: 'r', kind: 'reconciliation', sessionId: null, title: 't' }], recentLog: [], cycling: false })).toBe('1 thing needs you');
     expect(jewlStateLine({ sessions: [], needsYou: [], recentLog: [], cycling: false })).toBe('idle — watching');
+  });
+});
+
+// BORN ≠ DONE (Mike 2026-10-12): after Born the Portrait step needs the user.
+describe('Portrait step (born ≠ done)', () => {
+  const born = (image: 'pending' | 'locked' | 'done') => genesis({
+    state: 'done', current: 'born', step: 7, endedAt: '2026-10-12T11:00:00.000Z',
+    completion: { genesis: 'born', image, done: image === 'done' },
+  });
+
+  it('born + no image → a Portrait item in Needs-you; the finished session stays listed', () => {
+    const v = genesisSessionView({ id: 'g1', characterId: 'c1', name: 'Violet', progress: born('pending') });
+    expect(genesisAwaitingImage(born('pending'))).toBe(true);
+    expect(v.needsYou).toEqual([expect.objectContaining({ kind: 'portrait', id: 'c1', characterId: 'c1', sessionId: 'g1', title: 'Portrait · Violet' })]);
+  });
+
+  it('a locked identity without the official portrait still needs you', () => {
+    const v = genesisSessionView({ id: 'g1', characterId: 'c1', name: 'Violet', progress: born('locked') });
+    expect(v.needsYou.map(i => i.kind)).toEqual(['portrait']);
+  });
+
+  it('official portrait accepted → the item disappears', () => {
+    const v = genesisSessionView({ id: 'g1', characterId: 'c1', name: 'Violet', progress: born('done') });
+    expect(genesisAwaitingImage(born('done'))).toBe(false);
+    expect(v.needsYou).toEqual([]);
+  });
+
+  it('no completion carried / still running → no portrait item', () => {
+    expect(genesisSessionView({ id: 'g1', characterId: 'c1', name: 'V', progress: genesis({ state: 'done' }) }).needsYou).toEqual([]);
+    expect(genesisSessionView({ id: 'g1', characterId: 'c1', name: 'V', progress: genesis({ completion: { genesis: 'pending', image: 'pending', done: false } }) }).needsYou).toEqual([]);
+  });
+
+  it('the campaign copy dedupes against the session copy; the count includes pending portraits', () => {
+    const v = genesisSessionView({ id: 'g1', characterId: 'c1', name: 'Violet', progress: born('pending') });
+    const merged = mergeNeedsYou([v], [portraitNeedsYou('c1', 'Violet', null), portraitNeedsYou('k1', 'Kai', null)]);
+    expect(merged.map(i => `${i.kind}:${i.id}:${i.sessionId}`)).toEqual(['portrait:c1:g1', 'portrait:k1:null']);
+    expect(needsYouCount({ needsYou: merged })).toBe(2);
   });
 });

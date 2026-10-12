@@ -18,7 +18,9 @@ import {
   deriveGenesisProgress, loadGenesisFacts, parseGenesisGoal, toGmStep,
   GENESIS_REPORT_EVENT, type ForgedRow,
 } from './character-genesis-progress';
+import { getCampaignCompletions, isAwaitingImage, type CampaignCompletionRow } from './character-completion';
 import {
+  portraitNeedsYou,
   classifySessionType, defaultSessionView, draftingSessionView, genesisSessionView,
   goalTitle, mergeNeedsYou, orderSessions, reconciliationSessionView,
   type JewlWorkPayload, type NeedsYouItem, type WorkSessionFacts, type WorkSessionView,
@@ -76,12 +78,17 @@ async function genesisLog(s: SessionRow, characterId: string): Promise<string[]>
   });
 }
 
-async function toView(s: SessionRow): Promise<WorkSessionView | null> {
+type Completions = Map<string, CampaignCompletionRow>;
+
+async function toView(s: SessionRow, completions: Completions): Promise<WorkSessionView | null> {
   const type = classifySessionType(s.goal);
   if (type === 'genesis') {
     const parsed = parseGenesisGoal(s.goal);
     if (!parsed) return defaultSessionView(facts(s), { toolCalls: 0, itemsWritten: 0 });
-    const progress = deriveGenesisProgress(await loadGenesisFacts(parsed.characterId, s.campaignId, s.id));
+    const derived = deriveGenesisProgress(await loadGenesisFacts(parsed.characterId, s.campaignId, s.id));
+    const c = completions.get(parsed.characterId);
+    // BORN ≠ DONE: the screen shows "awaiting image" off the same completion.
+    const progress = c ? { ...derived, completion: { genesis: c.genesis, image: c.image, done: c.done } } : derived;
     return genesisSessionView({
       id: s.id, characterId: parsed.characterId, name: parsed.name, progress,
       log: await genesisLog(s, parsed.characterId),
@@ -117,15 +124,18 @@ async function toView(s: SessionRow): Promise<WorkSessionView | null> {
   return defaultSessionView(facts(s), { toolCalls, itemsWritten: forged.length });
 }
 
-/** Pending reconciliations = JEWL's "mistake, or somewhere new?" — the GM's call. */
-async function campaignNeedsYou(campaignId: string): Promise<NeedsYouItem[]> {
+/** Pending reconciliations = JEWL's "mistake, or somewhere new?" — the GM's
+ *  call; plus every born character still awaiting its portrait (BORN ≠ DONE). */
+async function campaignNeedsYou(campaignId: string, completions: Completions): Promise<NeedsYouItem[]> {
   const rows = await prisma.reconciliation.findMany({
     where: { campaignId, status: 'PENDING' },
     orderBy: { createdAt: 'desc' },
     take: 20,
     select: { id: true, question: true, summary: true },
   });
-  return rows.map(r => ({ id: r.id, kind: 'reconciliation' as const, sessionId: null, title: r.question || 'Mistake, or somewhere new?', detail: r.summary || null }));
+  const recon = rows.map(r => ({ id: r.id, kind: 'reconciliation' as const, sessionId: null, title: r.question || 'Mistake, or somewhere new?', detail: r.summary || null }));
+  const portraits = [...completions.values()].filter(isAwaitingImage).map(c => portraitNeedsYou(c.id, c.name, null));
+  return [...recon, ...portraits];
 }
 
 /** JEWL's last ~8 log lines across his most recent sessions, oldest first. */
@@ -161,11 +171,12 @@ export async function getJewlWork(opts: {
     || (s.status === 'done' && classifySessionType(s.goal) === 'genesis'
       && now - (s.endedAt?.getTime() ?? 0) < DONE_GENESIS_WINDOW_MS));
 
-  const built = (await Promise.all(candidates.map(toView))).filter((v): v is WorkSessionView => v !== null)
-    // A finished genesis stays only while drafts still need the Watcher.
+  const completions = await getCampaignCompletions(opts.campaignId);
+  const built = (await Promise.all(candidates.map(s => toView(s, completions)))).filter((v): v is WorkSessionView => v !== null)
+    // A finished genesis stays only while drafts (or its portrait) still need the Watcher.
     .filter(v => v.state !== 'done' || v.needsYou.length > 0);
   const sessions = orderSessions(built);
-  const extra = await campaignNeedsYou(opts.campaignId);
+  const extra = await campaignNeedsYou(opts.campaignId, completions);
   return {
     sessions,
     needsYou: mergeNeedsYou(sessions, extra),

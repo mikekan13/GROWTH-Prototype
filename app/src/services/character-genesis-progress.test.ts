@@ -10,13 +10,14 @@ const db = vi.hoisted(() => ({
   chat: [] as Array<Record<string, unknown>>,
   events: [] as Array<Record<string, unknown>>,
   prods: [] as Array<Record<string, unknown>>,
+  charExtra: {} as Record<string, unknown>,
 }));
 
 vi.mock('@/lib/db', () => ({
   prisma: {
     character: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
-        where.id === 'ch1' ? { id: 'ch1', campaignId: 'c1' } : null),
+        where.id === 'ch1' ? { id: 'ch1', campaignId: 'c1', ...db.charExtra } : null),
     },
     campaign: {
       findUnique: vi.fn(async () => ({ id: 'c1', gmUserId: 'gm' })),
@@ -164,6 +165,25 @@ describe('getGenesisProgress', () => {
       .rejects.toBeInstanceOf(ForbiddenError);
     await expect(getGenesisProgress({ characterId: 'nope', user: { id: 'gm', role: 'WATCHER' } }))
       .rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  // BORN ≠ DONE (2026-10-12): the progress route carries the completion.
+  it('carries completion: running → genesis pending', async () => {
+    db.charExtra = {};
+    const p = await getGenesisProgress({ characterId: 'ch1', user: { id: 'gm', role: 'WATCHER' } });
+    expect(p.completion).toEqual({ genesis: 'pending', image: 'pending', done: false });
+  });
+
+  it('carries completion: born + no portrait → awaiting image; born + official bust → done', async () => {
+    db.session = session({ status: 'done', endedAt: t0 });
+    db.charExtra = { portrait: null, data: '{}', personaLock: null };
+    let p = await getGenesisProgress({ characterId: 'ch1', user: { id: 'gm', role: 'WATCHER' } });
+    expect(p.state).toBe('done');
+    expect(p.completion).toEqual({ genesis: 'born', image: 'pending', done: false });
+    db.charExtra = { portrait: null, data: JSON.stringify({ identity: { generatedBust: 'portraits/ch1/b.png' } }), personaLock: { id: 'pl' } };
+    p = await getGenesisProgress({ characterId: 'ch1', user: { id: 'gm', role: 'WATCHER' } });
+    expect(p.completion).toEqual({ genesis: 'born', image: 'done', done: true });
+    db.charExtra = {};
   });
 
   it('no session → none without touching the forge', async () => {

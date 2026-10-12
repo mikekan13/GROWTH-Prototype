@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import {
-  jewlStateLine, needsYouCount, TYPE_TITLE_KEY, JEWL_WORK_OPEN_EVENT,
+  jewlStateLine, needsYouCount, TYPE_TITLE_KEY, JEWL_WORK_OPEN_EVENT, openCharacterAppearance,
   type JewlWorkPayload, type WorkSessionView,
 } from '@/lib/jewl-work';
 import { GenesisLoadingOverlay, toolVerb } from '@/components/character/GenesisLoading';
@@ -120,7 +120,7 @@ function SessionScreen({ view, liveTool, campaignId, onClose, onChanged, tabs, f
   const others = view.needsYou.filter(i => i.kind !== 'draft');
   return (
     <JewlWorkScreen model={model} log={view.log.map((text, i) => ({ id: `${view.id}:${i}`, text }))} onClose={onClose} tabs={tabs}>
-      <NeedsYouList items={others} />
+      <NeedsYouList items={others} onOpenPortrait={id => { openCharacterAppearance(id); onClose(); }} />
       {/* mounted at 0 too: a row sent back with feedback stays "revising…" until its redraft lands */}
       <GenesisGmSteps steps={view.gmSteps} campaignId={campaignId} onChanged={onChanged} onOpenForge={onClose} />
     </JewlWorkScreen>
@@ -158,7 +158,7 @@ function IdleScreen({ payload, live, onClose, tabs, campaignOnly }: {
   return (
     <JewlWorkScreen model={idleScreenModel(payload, live)} log={lines.map((text, i) => ({ id: `idle:${i}`, text }))} onClose={onClose} tabs={tabs}>
       {items.length > 0
-        ? <NeedsYouList items={items} />
+        ? <NeedsYouList items={items} onOpenPortrait={id => { openCharacterAppearance(id); onClose(); }} />
         : <div className="jw-note">Nothing is waiting on you. JEWL is watching the table; right-click anywhere to ask him.</div>}
       {lines.length === 0 && <div className="jw-note">No work logged yet in this campaign.</div>}
     </JewlWorkScreen>
@@ -208,6 +208,8 @@ export function JewlWorkPopup({ payload, campaignId, live, onClose, onChanged, f
         liveTool={live?.tool ?? null}
         campaignId={campaignId}
         characterName={view.genesis.name}
+        characterId={view.genesis.characterId}
+        onOpenAppearance={() => { openCharacterAppearance(view.genesis!.characterId); onClose(); }}
         onDismiss={onClose}
         onViewSheet={onClose}
         onStepsChanged={onChanged}
