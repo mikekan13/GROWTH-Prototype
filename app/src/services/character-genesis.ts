@@ -20,6 +20,7 @@ import { kickWorkLoop } from '@/ai/copilot/work-loop';
 import { openWorkSession } from './daya-work-session';
 import { buildGenesisPlan } from './character-genesis-plan';
 import { screenGenesisPlan, type SeedScreenResult } from './genesis-seed-screen';
+import { pickSeedForCharacter } from './seed-pick';
 
 const genesisInputSchema = z.object({
   backstory: z.string().min(40, 'Backstory is too short to gestate — the genome needs at least a few sentences.'),
@@ -51,6 +52,21 @@ export async function submitCharacterGenesis(opts: {
     throw new ValidationError('Character has no campaign — genesis runs inside a campaign world.');
   }
   const campaignId = character.campaignId;
+
+  // SEED FIRST (Mike 2026-10-12): JEWL sets the seed before anything else so
+  // Appearance + portraits unlock within seconds. Awaited; never fails the
+  // submit (a dead local lane falls back to the stock Human).
+  const seedPick = await pickSeedForCharacter(character.id, { id: opts.actorId, role: opts.actorRole }, {
+    backstory: input.backstory,
+    name: input.characterName,
+    preferred: input.selectedSeed,
+  }).catch((e: unknown) => {
+    console.warn(`[genesis] seed pick failed for ${character.id}: ${e instanceof Error ? e.message : 'error'}`);
+    return null;
+  });
+  if (seedPick?.changed && seedPick.seed) {
+    console.log(`[genesis] seed picked ${seedPick.seed.name} by ${seedPick.seed.pickedBy} in ${seedPick.ms}ms`);
+  }
 
   // One gestation at a time per character — a second submit is refused
   // (409) instead of silently answering 200 (Mike 2026-10-11). The loop is
@@ -95,7 +111,7 @@ export async function submitCharacterGenesis(opts: {
   });
   kickWorkLoop();
 
-  return { sessionId: session.id, status: session.status, alreadyRunning: false };
+  return { sessionId: session.id, status: session.status, alreadyRunning: false, seed: seedPick?.seed ?? null };
 }
 
 /**

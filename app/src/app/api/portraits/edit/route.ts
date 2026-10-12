@@ -4,6 +4,7 @@ import { getLocalProvider } from '@/ai/portraits/providers';
 import { assertLawfulImageJob } from '@/ai/portraits/portrait-service';
 import { WithheldContentError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
+import { assertSeedSetForPortrait } from '@/services/seed-pick';
 
 export const maxDuration = 600;
 
@@ -45,6 +46,12 @@ export async function POST(request: NextRequest) {
     }
     if (!editPrompt || typeof editPrompt !== 'string') {
       return NextResponse.json({ error: 'editPrompt is required' }, { status: 400 });
+    }
+
+    // SEED FIRST (Mike 2026-10-12): a character's renders wait for its seed.
+    // (An edit with no characterId is of an existing render — already gated.)
+    if (typeof characterId === 'string' && characterId) {
+      await assertSeedSetForPortrait({ characterId });
     }
 
     // LAWFULNESS (unit 8b): the source is a character portrait (an identity

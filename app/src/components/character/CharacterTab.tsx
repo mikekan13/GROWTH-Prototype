@@ -13,6 +13,7 @@ import Paperdoll from './Paperdoll';
 import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
 import { GenesisOpenThreads } from './GenesisProds';
 import { GenesisSeedScreenDialog, type SeedScreenFindingView } from './GenesisSeedScreen';
+import { seedGate } from '@/lib/seed-state';
 
 // Body-part section re-enabled (Mike 2026-08-17 body-spawn ruling): it now
 // reads the SPAWNED body-part items (character.bodyAnatomy) — per-part
@@ -136,6 +137,14 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [submittingGenesis, setSubmittingGenesis] = useState(false);
   const [genesisSubmitError, setGenesisSubmitError] = useState<string | null>(null);
   const [campaignSeeds, setCampaignSeeds] = useState<CampaignSeedItem[]>([]);
+  // Seed first (2026-10-12): the stored seed + catalog (stock + campaign) for the GM's picker.
+  const [seedPanel, setSeedPanel] = useState<{
+    seed: { name: string; pickedBy: 'jewl' | 'default' | 'gm' | null } | null;
+    options: CampaignSeedItem[];
+    genesisStarted: boolean;
+  } | null>(null);
+  const [seedWarning, setSeedWarning] = useState<string | null>(null);
+  const [seedSaving, setSeedSaving] = useState(false);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [describing, setDescribing] = useState(false);
@@ -156,9 +165,16 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [backstorySubmitted, setBackstorySubmitted] = useState(false);
   const [submittingBackstory, setSubmittingBackstory] = useState(false);
 
+  // Campaign seeds + the stock catalog seeds the seed panel lists (dedupe by name).
+  const seedOptions = useMemo(() => {
+    const out = [...campaignSeeds];
+    const names = new Set(out.map(s => s.name.toLowerCase()));
+    for (const o of seedPanel?.options ?? []) if (!names.has(o.name.toLowerCase())) out.push(o);
+    return out;
+  }, [campaignSeeds, seedPanel]);
   const selectedSeed = useMemo(
-    () => campaignSeeds.find(s => s.name === selectedSeedName),
-    [selectedSeedName, campaignSeeds],
+    () => seedOptions.find(s => s.name === selectedSeedName),
+    [selectedSeedName, seedOptions],
   );
 
   // Flattened regions of the spawned body-part tree (null before mechanics land).
@@ -369,6 +385,42 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     characterId: genesisCharId, campaignId, enabled: isGM && !!genesisCharId,
   });
   const genesisRunning = genesisInFlight(genesis);
+
+  // Seed panel (GM): fetched per character; refreshed when JEWL's pick lands.
+  const seedPanelCharId = isGM ? genesisCharId : null;
+  const fetchSeedPanel = useCallback(async () => {
+    if (!seedPanelCharId) { setSeedPanel(null); return; }
+    try {
+      const res = await fetch(`/api/characters/${seedPanelCharId}/seed`);
+      if (res.ok) setSeedPanel(await res.json());
+    } catch { /* keep last known */ }
+  }, [seedPanelCharId]);
+  useEffect(() => { setSeedWarning(null); void fetchSeedPanel(); }, [fetchSeedPanel]);
+  const liveSeedName = genesis?.seed?.name ?? null;
+  useEffect(() => {
+    if (!liveSeedName) return;
+    setSelectedSeedName(prev => prev || liveSeedName);
+    void fetchSeedPanel();
+  }, [liveSeedName, fetchSeedPanel]);
+  // GM override (writes seedPickedBy 'gm'; never rebuilds the sheet).
+  const chooseSeedAsGm = useCallback(async (seedId: string) => {
+    if (!seedPanelCharId || !seedId) return;
+    setSeedSaving(true);
+    try {
+      const res = await fetch(`/api/characters/${seedPanelCharId}/seed`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seedId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSeedWarning(data.error || 'Could not set the seed'); return; }
+      setSeedPanel({ seed: data.seed, options: data.options, genesisStarted: data.genesisStarted });
+      if (data.seed?.name) setSelectedSeedName(data.seed.name);
+      setSeedWarning(data.rebuildWarning ?? null);
+    } catch {
+      setSeedWarning('Could not set the seed');
+    } finally {
+      setSeedSaving(false);
+    }
+  }, [seedPanelCharId]);
   const [genesisDismissedFor, setGenesisDismissedFor] = useState<string | null>(null);
   const [genesisSawLiveFor, setGenesisSawLiveFor] = useState<string | null>(null);
   const [genesisBornSeenFor, setGenesisBornSeenFor] = useState<string | null>(null);
@@ -806,24 +858,40 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           </div>
         )}
 
-        {/* Post-genome only: seed, photos, physical identity, portraits.
-            Pre-genome the creator is STORY-FIRST (ruling 2026-08-08) —
-            the player writes, submits to the GM, the GM sends to JEWL,
-            and the physical-look tooling unlocks when gestation completes. */}
-        {genomeInfo?.stage === 'ready' && (<>
-        {/* SEED SELECTOR */}
-        <div className="max-w-lg mx-auto">
+        {/* APPEARANCE — separate from genesis and editable DURING it (Mike
+            2026-10-12; supersedes the 08-08 "look unlocks after gestation"
+            gate for these sections). The seed selector now leads it (seed first). */}
+        {appearanceUnlocked && (<>
+        <div ref={appearanceRef} id="character-appearance" style={{ scrollMarginTop: 12 }} />
+
+        {/* SEED — appearance requires one (Mike 2026-10-12). JEWL picks it the
+            moment genesis is submitted; the GM can override here (no rebuild). */}
+        <div className="max-w-lg mx-auto" data-testid="seed-picker">
           <label className="text-xs uppercase block mb-1 tracking-wider" style={{ color: '#D0A030', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
             Seed
+            {seedPanel?.seed?.pickedBy && (
+              <span className="ml-2 normal-case" style={{ color: '#666' }}>
+                {seedPanel.seed.pickedBy === 'jewl' ? '· JEWL chose' : seedPanel.seed.pickedBy === 'gm' ? '· you chose' : '· default'}
+              </span>
+            )}
           </label>
-          {isEditable ? (
+          {(seedPanelCharId || isEditable) ? (
             <div className="space-y-2">
               <select
-                value={selectedSeedName}
+                value={seedPanelCharId
+                  ? (seedOptions.find(s => s.name === selectedSeedName)?.id ?? '')
+                  : selectedSeedName}
+                disabled={seedSaving}
                 onChange={e => {
+                  if (seedPanelCharId) {
+                    const pick = seedOptions.find(s => s.id === e.target.value);
+                    if (pick?.data.fatedAge && desiredAge > pick.data.fatedAge) setDesiredAge(pick.data.fatedAge);
+                    void chooseSeedAsGm(e.target.value);
+                    return;
+                  }
                   const newSeedName = e.target.value;
                   setSelectedSeedName(newSeedName);
-                  const newSeed = campaignSeeds.find(s => s.name === newSeedName);
+                  const newSeed = seedOptions.find(s => s.name === newSeedName);
                   if (newSeed?.data.fatedAge && desiredAge > newSeed.data.fatedAge) {
                     setDesiredAge(newSeed.data.fatedAge);
                   }
@@ -832,14 +900,21 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 className="w-full text-sm p-2"
                 style={{ backgroundColor: '#2a2a3e', color: '#ccc', border: '1px solid var(--pillar-spirit)', borderRadius: '2px', colorScheme: 'dark' }}
               >
-                <option value="" style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>— Select a Seed —</option>
-                {campaignSeeds.map(s => (
-                  <option key={s.id} value={s.name} style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>
+                <option value="" style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>
+                  {genesisRunning && !selectedSeedName ? 'Choosing a seed…' : '— Select a Seed —'}
+                </option>
+                {seedOptions.map(s => (
+                  <option key={s.id} value={seedPanelCharId ? s.id : s.name} style={{ backgroundColor: '#2a2a3e', color: '#ccc' }}>
                     {s.name}{s.data.baseFateDie ? ` — ${s.data.baseFateDie}` : ''}{s.data.seedKV ? ` · KV ${s.data.seedKV}` : ''}
                   </option>
                 ))}
               </select>
-              {campaignSeeds.length === 0 && (
+              {seedWarning && (
+                <div className="text-xs" role="status" style={{ color: '#D07818', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+                  ⚠ {seedWarning}
+                </div>
+              )}
+              {seedOptions.length === 0 && (
                 <div className="text-xs" style={{ color: '#555', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
                   {campaignId
                     ? 'No seeds published in this campaign yet. Ask your Watcher to add seeds via the Forge.'
@@ -875,17 +950,10 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             </div>
           ) : (
             <div className="text-sm p-2" style={{ color: '#ccc', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-              {selectedSeedName || '—'}
+              {selectedSeedName || (genesisRunning ? 'Choosing a seed…' : '—')}
             </div>
           )}
         </div>
-        </>)}
-
-        {/* APPEARANCE — separate from genesis and editable DURING it (Mike
-            2026-10-12; supersedes the 08-08 "look unlocks after gestation"
-            gate for these sections). The seed selector above stays post-genome. */}
-        {appearanceUnlocked && (<>
-        <div ref={appearanceRef} id="character-appearance" style={{ scrollMarginTop: 12 }} />
 
         {/* ── SECTION: Reference Photos ── */}
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
@@ -1328,6 +1396,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               <button
                 onClick={() => setWizardOpen(true)}
                 disabled={!selectedSeed}
+                title={seedGate(selectedSeed?.name).message ?? undefined}
                 className="px-5 py-2 text-xs uppercase tracking-[0.12em] transition-colors"
                 style={{
                   fontFamily: 'var(--font-terminal), Consolas, monospace',

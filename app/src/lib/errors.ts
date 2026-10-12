@@ -47,6 +47,17 @@ export class ConflictError extends AppError {
   }
 }
 
+/**
+ * Seed first (Mike 2026-10-12): portrait creation waits for the character's
+ * seed. 409 — the request is fine, the character isn't ready for it yet.
+ */
+export class SeedRequiredError extends ConflictError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SeedRequiredError';
+  }
+}
+
 export class InsufficientBalanceError extends AppError {
   constructor(message: string = 'Insufficient KRMA balance') {
     super(message, 422);

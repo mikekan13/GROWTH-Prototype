@@ -29,6 +29,7 @@ import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { getJewlGodHead } from '@/ai/copilot/jewl-identity';
 import { requireCampaignGM } from './campaign-access';
+import { readSeedPick } from '@/lib/seed-state';
 
 export const GENESIS_STAGES = [
   { key: 'open', label: 'Genesis session opened' },
@@ -162,6 +163,9 @@ export interface GenesisProgress {
   /** The tone filter withheld/toned part of the SEED from JEWL (2026-10-12) —
    *  fixed vocabulary only (categories + outcome), never text. */
   seedWarnings: Array<{ categories: string[]; outcome: 'blocked' | 'withheld' | 'softened' }>;
+  /** Seed first (2026-10-12): the character's seed once JEWL (or the GM) set
+   *  it — Appearance ↗ and portraits wait for it. Null = still choosing. */
+  seed?: { name: string; pickedBy: 'jewl' | 'default' | 'gm' | null } | null;
 }
 
 const BLOCK_TYPES = new Set(['seed', 'root', 'branch']);
@@ -421,14 +425,16 @@ export async function getGenesisProgress(opts: {
 }): Promise<GenesisProgress> {
   const character = await prisma.character.findUnique({
     where: { id: opts.characterId },
-    select: { id: true, campaignId: true },
+    select: { id: true, campaignId: true, data: true },
   });
   if (!character) throw new NotFoundError('Character not found');
   if (!character.campaignId) {
     throw new ValidationError('Character has no campaign — genesis runs inside a campaign world.');
   }
   await requireCampaignGM(character.campaignId, opts.user);
-  return deriveGenesisProgress(await loadGenesisFacts(character.id, character.campaignId));
+  const progress = deriveGenesisProgress(await loadGenesisFacts(character.id, character.campaignId));
+  const pick = readSeedPick(character.data);
+  return { ...progress, seed: pick ? { name: pick.name, pickedBy: pick.pickedBy } : null };
 }
 
 /** JEWL's one-line, in-voice chat status for a genesis transition. Null =
