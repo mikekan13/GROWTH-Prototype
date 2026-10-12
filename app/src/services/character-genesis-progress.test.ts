@@ -40,6 +40,7 @@ vi.mock('@/ai/copilot/jewl-identity', () => ({
 const {
   deriveGenesisProgress, classifyWait, getGenesisProgress, GENESIS_STAGES,
   parseGenesisGoal, isGenesisGoal, genesisStatusLine, announceGenesisStatus, logGenesisReport,
+  announceGenesisProd, genesisProdLine,
 } =
   await import('./character-genesis-progress');
 
@@ -295,7 +296,8 @@ describe('genesis is a dialogue — the prod stage (2026-10-12)', () => {
     });
     expect(p.state).toBe('waiting');
     expect(p.wait).toBe('prods');
-    expect(genesisStatusLine('Violet', p)).toBe("I've got 4 questions before I build — they're on Violet's page. Answer, leave open, or tell me to decide; press Build when you're ready.");
+    // The chat carries the question itself — never "see the Log" (2026-10-12).
+    expect(genesisStatusLine('Violet', p)).toBe("4 questions before I build Violet. First: “question p1?” — answer on Violet's page. Answer, leave open, or tell me to decide; press Build when you're ready.");
   });
 
   it('after Build the left-open prods are the open threads', () => {
@@ -304,5 +306,50 @@ describe('genesis is a dialogue — the prod stage (2026-10-12)', () => {
       prods: [prod('p1', 'ANSWERED', { answer: 'a' }), prod('p2', 'LEFT_OPEN'), prod('p3', 'DELEGATED', { jewlFill: 'f' })],
     });
     expect(p.openThreads).toEqual([{ id: 'p2', anchorQuote: 'anchor p2', question: 'question p2?' }]);
+  });
+});
+
+describe('JEWL asks in the chat, never "see the Log" (2026-10-12)', () => {
+  const prod = (id: string, status: string) => ({
+    id, round: 2, order: 1, anchorQuote: 'Written Self', question: 'Is it a fugue or a bleed?',
+    why: 'w', kind: 'MECHANICAL_CHECK', status, answer: null, jewlFill: null, decidedAt: null,
+  });
+
+  it('blocked-on-prod after Build waits on prods; the status line defers to the prod line', () => {
+    const p = deriveGenesisProgress({
+      ...base, session: session({ stage: 'BUILDING', status: 'blocked', blockedReason: 'waiting on the GM — prods [p1]' }),
+      prods: [prod('p1', 'OPEN')], forged: [{ type: 'thorn', status: 'draft' }],
+    });
+    expect(p.wait).toBe('prods');
+    expect(p.prodding).toBe(false);
+    expect(genesisStatusLine('Violet', p)).toBeNull();
+  });
+
+  it('a mid-build prod posts its question to the GM chat, tappable to the work screen', async () => {
+    const before = db.chat.length;
+    const line = await announceGenesisProd(
+      { id: 's1', campaignId: 'c1', goal: 'Character genesis: Violet [ch1] — x' },
+      { id: 'p9', question: 'Is it a fugue or a bleed?' },
+    );
+    expect(line).toBe(genesisProdLine('Violet', 'Is it a fugue or a bleed?'));
+    expect(line).toContain('“Is it a fugue or a bleed?”');
+    expect(line).toContain("answer on Violet's page");
+    expect(line).not.toMatch(/Log/);
+    const row = db.chat[before] as { content: string; userId: string; actions: string };
+    expect(row.userId).toBe('gm');
+    expect(JSON.parse(row.actions)).toEqual({ source: 'GENESIS_PROD', sessionId: 's1', characterId: 'ch1', prodId: 'p9' });
+  });
+
+  it('clips a long question to ~200 chars', () => {
+    const line = genesisProdLine('Violet', 'why '.repeat(120));
+    expect(line.length).toBeLessThan(280);
+  });
+
+  it('a free-text wait carries JEWL words, never a Log pointer', () => {
+    const p = deriveGenesisProgress({ ...base, session: session({ stage: 'BUILDING', status: 'blocked', blockedReason: 'Is she gone during the episode?' }) });
+    expect(p.wait).toBe('question');
+    const line = genesisStatusLine('Violet', p, 'Is she gone during the episode?')!;
+    expect(line).toContain('“Is she gone during the episode?”');
+    expect(line).not.toMatch(/Log/);
   });
 });

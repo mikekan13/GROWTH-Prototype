@@ -135,7 +135,7 @@ export function genesisNeedsYou(sessionId: string, name: string, p: GenesisProgr
   for (const s of p.gmSteps ?? []) {
     out.push({ id: s.id, kind: 'draft', sessionId, title: `Submit ${s.type} · ${s.name}`, detail: s.purpose });
   }
-  if (p.state === 'waiting' && p.wait === 'question') out.push({ id: `${sessionId}:q`, kind: 'question', sessionId, title: `JEWL needs a word about ${name}`, detail: 'His question is in the Log under Genesis.' });
+  if (p.state === 'waiting' && p.wait === 'question') out.push({ id: `${sessionId}:q`, kind: 'question', sessionId, title: `JEWL needs a word about ${name}`, detail: 'Answer him in the chat.' });
   if (p.state === 'waiting' && p.wait === 'stalled') out.push({ id: `${sessionId}:stall`, kind: 'stalled', sessionId, title: `${name}'s genesis has gone quiet`, detail: 'Tell JEWL to continue.' });
   return out;
 }
@@ -325,4 +325,14 @@ export function jewlStateLine(payload: JewlWorkPayload | null, live?: string | n
   const n = needsYouCount(payload);
   if (n > 0) return `${n} thing${n === 1 ? '' : 's'} need${n === 1 ? 's' : ''} you`;
   return 'idle — watching';
+}
+
+/** Window event that opens JEWL's work screen on one session — a tappable
+ *  genesis chat line dispatches it (2026-10-12: answer JEWL's question where
+ *  it is asked, never in the Log). detail: { sessionId }. */
+export const JEWL_WORK_OPEN_EVENT = 'jewl:work-open';
+
+export function openJewlWork(sessionId: string): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(JEWL_WORK_OPEN_EVENT, { detail: { sessionId } }));
 }

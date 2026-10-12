@@ -2,8 +2,9 @@
  * Genesis prod tools (Mike 2026-10-12 — genesis is a dialogue,
  * [[ruling-genesis-is-a-dialogue-jewl-prods-gm-2026-10-12]]).
  *
- * raise_prod / end_prod_round are offered ONLY in a PRODDING work cycle
- * (runtime STAGE_ONLY_TOOLS + allowedTools). record_delegated_choice is
+ * end_prod_round is offered ONLY in a PRODDING work cycle (runtime
+ * STAGE_ONLY_TOOLS + allowedTools). raise_prod is offered in EVERY genesis
+ * work cycle (2026-10-12: a question is a prod at any stage; stageTools). record_delegated_choice is
  * offered in the build: when the GM said "you decide", JEWL writes back what
  * he chose. Logic lives in services/genesis-prods.ts.
  */
@@ -22,12 +23,12 @@ import type { JewlTool, JewlToolHandlerResult } from './types';
 export const raiseProdTool: JewlTool = {
   name: 'raise_prod',
   description:
-    'Genesis prod stage only. Ask the GM ONE question about a creative/authorial gap in the seed ' +
+    'Any genesis stage. The ONLY way to ask the GM something — never write a question into a report or note. Ask ONE question about a creative/authorial gap in the seed ' +
     '(who, why, what happened, what it means) that is load-bearing for the mechanics or the first ' +
     'sessions. anchorQuote = the exact seed passage that raised it (≤300 chars); why = one line on ' +
     'what hinges on it; kind = CREATIVE, or MECHANICAL_CHECK when a mechanic hinges on a creative ' +
     'fact only the GM can settle. Never stats/KV/catalog questions; never propose an answer in the ' +
-    'question. At most 5 per round, most load-bearing first.',
+    'question. At most 5 per round, most load-bearing first. After Build the session waits on the GM and resumes by itself once he decides.',
   inputSchema: raiseProdSchema,
   handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
     const prod = await raiseProd(input, ctx.campaignId);

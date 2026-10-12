@@ -30,6 +30,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { getJewlGodHead } from '@/ai/copilot/jewl-identity';
 import { requireCampaignGM } from './campaign-access';
 import { readSeedPick } from '@/lib/seed-state';
+import { isProdsBlocked } from '@/lib/genesis-question';
 
 export const GENESIS_STAGES = [
   { key: 'open', label: 'Genesis session opened' },
@@ -176,6 +177,8 @@ const TRAIT_TYPES = new Set(['nectar', 'thorn', 'blossom']);
 export function classifyWait(reason: string | null, pendingApproval: number): GenesisWaitKind {
   const r = (reason ?? '').toLowerCase();
   if (r.startsWith('ai provider failing')) return 'provider';
+  // Blocked-on-prod at any stage (2026-10-12): the wait is the GM's prods.
+  if (isProdsBlocked(reason)) return 'prods';
   if (r.startsWith('no actionable work')) return 'stalled';
   return pendingApproval > 0 ? 'approval' : 'question';
 }
@@ -439,7 +442,7 @@ export async function getGenesisProgress(opts: {
 
 /** JEWL's one-line, in-voice chat status for a genesis transition. Null =
  *  stay quiet (in-flight progress belongs to the overlay, not the chat). */
-export function genesisStatusLine(name: string, p: GenesisProgress): string | null {
+export function genesisStatusLine(name: string, p: GenesisProgress, reason?: string | null): string | null {
   const c = p.counts;
   const log = 'The full report is in my Log under Genesis.';
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -454,9 +457,16 @@ export function genesisStatusLine(name: string, p: GenesisProgress): string | nu
   }
   if (p.state === 'waiting') {
     if (p.wait === 'prods') {
-      const open = p.prods.filter(x => x.status === 'OPEN').length;
+      // Mid-build prods post their own line, question included (announceGenesisProd).
+      if (!p.prodding) return null;
+      const openProds = p.prods.filter(x => x.status === 'OPEN');
+      const open = openProds.length;
       if (open > 0) {
-        return `I've got ${plural(open, 'question', 'questions')} before I build — ${open === 1 ? "it's" : "they're"} on ${name}'s page. Answer, leave open, or tell me to decide; press Build when you're ready.`;
+        // The chat carries the question itself — never "see the Log" (2026-10-12).
+        const first = `“${clipQuestion(openProds[0].question)}”`;
+        return open === 1
+          ? `One question before I build ${name}: ${first} — answer on ${name}'s page. Answer, leave open, or tell me to decide; press Build when you're ready.`
+          : `${open} questions before I build ${name}. First: ${first} — answer on ${name}'s page. Answer, leave open, or tell me to decide; press Build when you're ready.`;
       }
       return `Nothing more to ask about ${name}. Press Build on ${name}'s page when you're ready.`;
     }
@@ -464,7 +474,9 @@ export function genesisStatusLine(name: string, p: GenesisProgress): string | nu
       return `${name}'s mechanics are drafted — ${plural(c.pendingApproval, 'piece waits', 'pieces wait')} for you in the Forge. Approve and I'll write the sheet. ${log}`;
     }
     if (p.wait === 'stalled') return `${name}'s genesis has gone quiet on my side — tell me to continue when you're ready.`;
-    return `I need a word from you before ${name}'s genesis can go on. My question is in the Log under Genesis.`;
+    return reason
+      ? `I need a word from you before ${name}'s genesis can go on: “${clipQuestion(reason)}” — answer me here.`
+      : `I need a word from you before ${name}'s genesis can go on — tell me here how to proceed.`;
   }
   return null;
 }
@@ -474,7 +486,11 @@ export async function announceGenesisStatus(session: { id: string; campaignId: s
   const parsed = parseGenesisGoal(session.goal);
   if (!parsed) return null;
   const progress = deriveGenesisProgress(await loadGenesisFacts(parsed.characterId, session.campaignId, session.id));
-  const line = genesisStatusLine(parsed.name, progress);
+  // A free-text wait (not a prod) still carries JEWL's words — never a Log pointer.
+  const reason = progress.wait === 'question'
+    ? (await prisma.dayaWorkSession.findUnique({ where: { id: session.id }, select: { blockedReason: true } }))?.blockedReason ?? null
+    : null;
+  const line = genesisStatusLine(parsed.name, progress, reason);
   if (!line) return null;
   const campaign = await prisma.campaign.findUnique({ where: { id: session.campaignId }, select: { gmUserId: true } });
   await prisma.copilotMessage.create({
@@ -483,7 +499,7 @@ export async function announceGenesisStatus(session: { id: string; campaignId: s
       role: 'assistant',
       content: line,
       userId: campaign?.gmUserId ?? null,
-      actions: JSON.stringify({ source: 'GENESIS_STATUS', sessionId: session.id, state: progress.state }),
+      actions: genesisChatActions('GENESIS_STATUS', session, { state: progress.state }),
     },
   });
   return line;
@@ -519,4 +535,48 @@ ${text}`,
     },
   });
   return event.id;
+}
+
+/** A question as the chat shows it: one line, first ~200 chars. */
+export function clipQuestion(text: string, max = 200): string {
+  const t = text.trim().replace(/\s+/g, ' ');
+  return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
+}
+
+/** The chat line for one prod raised after Build: the question itself and
+ *  where to answer it — never "see the Log" (2026-10-12). Pure. */
+export function genesisProdLine(name: string, question: string): string {
+  return `A question before I go on with ${name}: “${clipQuestion(question)}” — answer on ${name}'s page.`;
+}
+
+/** Copilot `actions` JSON for a genesis chat line — the Watcher's tap target
+ *  (copilot history → workLink → JEWL work screen). */
+export function genesisChatActions(
+  source: 'GENESIS_STATUS' | 'GENESIS_PROD',
+  session: { id: string; goal: string },
+  extra: Record<string, unknown> = {},
+): string {
+  const parsed = parseGenesisGoal(session.goal);
+  return JSON.stringify({ source, sessionId: session.id, characterId: parsed?.characterId ?? null, ...extra });
+}
+
+/** Post one mid-build prod's question to the GM's JEWL chat. */
+export async function announceGenesisProd(
+  session: { id: string; campaignId: string; goal: string },
+  prod: { id: string; question: string },
+): Promise<string | null> {
+  const parsed = parseGenesisGoal(session.goal);
+  if (!parsed) return null;
+  const line = genesisProdLine(parsed.name, prod.question);
+  const campaign = await prisma.campaign.findUnique({ where: { id: session.campaignId }, select: { gmUserId: true } });
+  await prisma.copilotMessage.create({
+    data: {
+      campaignId: session.campaignId,
+      role: 'assistant',
+      content: line,
+      userId: campaign?.gmUserId ?? null,
+      actions: genesisChatActions('GENESIS_PROD', session, { prodId: prod.id }),
+    },
+  });
+  return line;
 }

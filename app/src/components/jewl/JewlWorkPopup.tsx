@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import {
-  jewlStateLine, needsYouCount, TYPE_TITLE_KEY,
+  jewlStateLine, needsYouCount, TYPE_TITLE_KEY, JEWL_WORK_OPEN_EVENT,
   type JewlWorkPayload, type WorkSessionView,
 } from '@/lib/jewl-work';
 import { GenesisLoadingOverlay, toolVerb } from '@/components/character/GenesisLoading';
@@ -241,10 +241,13 @@ export function JewlStatusLine({ line, count, cycling, waiting, onOpen }: {
 
 export function JewlStatusButton({ campaignId }: { campaignId: string }) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<string | undefined>(undefined);
   const { payload, forbidden, live, refetch } = useJewlWork({ campaignId, enabled: true, open });
   const pushedRef = useRef(false);
 
-  const openScreen = useCallback(() => {
+  const openScreen = useCallback((sessionId?: string) => {
+    setTab(sessionId);
+    if (open) return; // already up — the tab switch is enough
     setOpen(true);
     void refetch();
     // Phone back closes the popup: one history entry while it is up.
@@ -252,7 +255,17 @@ export function JewlStatusButton({ campaignId }: { campaignId: string }) {
       window.history.pushState({ ...(window.history.state ?? {}), jewlWork: true }, '');
       pushedRef.current = true;
     } catch { /* no history — Esc / buttons still close */ }
-  }, [refetch]);
+  }, [refetch, open]);
+
+  // A tappable genesis chat line opens the screen on its session (2026-10-12).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const sessionId = (e as CustomEvent<{ sessionId?: string }>).detail?.sessionId;
+      openScreen(typeof sessionId === 'string' ? sessionId : undefined);
+    };
+    window.addEventListener(JEWL_WORK_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(JEWL_WORK_OPEN_EVENT, onOpen);
+  }, [openScreen]);
 
   const closeScreen = useCallback(() => {
     setOpen(false);
@@ -284,10 +297,10 @@ export function JewlStatusButton({ campaignId }: { campaignId: string }) {
         count={needsYouCount(payload)}
         cycling={!!live || !!payload?.cycling}
         waiting={sessions.some(s => s.state === 'waiting')}
-        onOpen={openScreen}
+        onOpen={() => openScreen()}
       />
       {open && (
-        <JewlWorkPopup payload={payload} campaignId={campaignId} live={live}
+        <JewlWorkPopup key={tab ?? 'auto'} initialTab={tab} payload={payload} campaignId={campaignId} live={live}
           onClose={closeScreen} onChanged={() => { void refetch(); }} />
       )}
     </>

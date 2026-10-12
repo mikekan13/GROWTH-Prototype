@@ -9,6 +9,7 @@ const db = vi.hoisted(() => ({
   seq: 0,
   kicks: 0,
   logs: [] as Array<Record<string, unknown>>,
+  chat: [] as Array<{ sessionId: string; prodId: string; question: string }>,
 }));
 
 function match(row: Row, where: Record<string, unknown> = {}): boolean {
@@ -64,6 +65,10 @@ vi.mock('./character-genesis-progress', () => ({
     return m ? { name: m[1], characterId: m[2] } : null;
   },
   announceGenesisStatus: vi.fn(async () => null),
+  announceGenesisProd: vi.fn(async (s: { id: string }, p: { id: string; question: string }) => {
+    db.chat.push({ sessionId: s.id, prodId: p.id, question: p.question });
+    return 'line';
+  }),
   logGenesisReport: vi.fn(async (o: Record<string, unknown>) => { db.logs.push(o); return 'ev'; }),
 }));
 
@@ -89,6 +94,7 @@ beforeEach(() => {
   db.seq = 0;
   db.kicks = 0;
   db.logs = [];
+  db.chat = [];
 });
 
 describe('raise_prod', () => {
@@ -114,9 +120,9 @@ describe('raise_prod', () => {
     expect((db.prods[0].anchorQuote as string).length).toBeLessThanOrEqual(svc.ANCHOR_MAX);
   });
 
-  it('is refused once the session left PRODDING', async () => {
-    session().stage = 'BUILDING';
-    await expect(raise(1)).rejects.toThrow(/prod stage/);
+  it('is refused once the session is done or cancelled', async () => {
+    session().status = 'done';
+    await expect(raise(1)).rejects.toThrow(/already done/);
   });
 });
 
@@ -188,8 +194,8 @@ describe('Build', () => {
     expect(r).toMatchObject({ stage: 'BUILDING', leftOpen: 1 });
     expect(db.prods.map(p => p.status)).toEqual(['ANSWERED', 'LEFT_OPEN']);
     expect(session()).toMatchObject({ stage: 'BUILDING', status: 'active' });
-    // After Build the prod stage is closed for good.
-    await expect(raise(3)).rejects.toThrow(/prod stage/);
+    // After Build, end_prod_round is closed for good (raise_prod is not — a mid-build question).
+    await expect(svc.endProdRound({ sessionId: 's1' }, 'c1')).rejects.toThrow(/prod stage/);
   });
 
   it('with nothing open builds without a confirm', async () => {
@@ -271,5 +277,66 @@ describe('the PRODDING prompt', () => {
     ]);
     expect(text).toContain('LEFT OPEN by the GM');
     expect(text).toContain('never ask it again');
+  });
+});
+
+describe('a question is a prod at ANY stage (2026-10-12)', () => {
+  const building = () => { session().stage = 'BUILDING'; session().status = 'active'; };
+
+  it('a mid-build prod keeps the stage, blocks on the prod ids and posts the question to the chat', async () => {
+    building();
+    await raise(1);
+    expect(session()).toMatchObject({ stage: 'BUILDING', status: 'blocked' });
+    expect(session().blockedReason).toBe('waiting on the GM — prods [p1]');
+    expect(db.chat).toEqual([{ sessionId: 's1', prodId: 'p1', question: 'Who set the fire? (1)' }]);
+    await raise(2);
+    expect(session().blockedReason).toBe('waiting on the GM — prods [p1,p2]');
+    expect(db.chat).toHaveLength(2);
+    expect(db.logs.some(l => String(l.heading).startsWith('prod · mid-build'))).toBe(true);
+  });
+
+  it('caps a mid-build wait at 5', async () => {
+    building();
+    for (let i = 1; i <= 5; i++) await raise(i);
+    await expect(raise(6)).rejects.toThrow(/already wait on the GM/);
+  });
+
+  it('JEWL cannot wake or close a blocked-on-prod session himself', async () => {
+    building();
+    await raise(1);
+    await updateWorkSession({ sessionId: 's1', status: 'active', progressNote: 'pressing on' });
+    expect(session().status).toBe('blocked');
+    await expect(updateWorkSession({ sessionId: 's1', status: 'done' })).rejects.toThrow(/still wait on the GM/);
+  });
+
+  it('resumes on decide — no Build — once every open prod is decided', async () => {
+    building();
+    await raise(1);
+    await raise(2);
+    const a = await svc.decideProd({ campaignId: 'c1', prodId: 'p1', user: GM, body: { decision: 'ANSWER', answer: 'Fugue.' } });
+    expect(a.resumed).toBe(false);
+    expect(session()).toMatchObject({ status: 'blocked', blockedReason: 'waiting on the GM — prods [p2]' });
+    const b = await svc.decideProd({ campaignId: 'c1', prodId: 'p2', user: GM, body: { decision: 'YOU_DECIDE' } });
+    expect(b.resumed).toBe(true);
+    expect(session()).toMatchObject({ stage: 'BUILDING', status: 'active', blockedReason: null, prodRound: 0 });
+    expect(db.kicks).toBe(1);
+  });
+
+  it('the decided answer reaches the next build cycle; raise_prod stays offered', () => {
+    const plan = planWorkCycle(
+      { id: 's1', goal: 'Character genesis: Violet [ch1] — x', plan: 'BRIEF', cycleCount: 4, stage: 'BUILDING' },
+      [{ id: 'p1', round: 2, order: 1, anchorQuote: 'Written Self', question: 'Fugue or bleed?', why: 'w', kind: 'MECHANICAL_CHECK', status: 'ANSWERED', answer: 'Fugue.', jewlFill: null }],
+      '', [],
+    );
+    expect(plan.stageTools).toEqual(['raise_prod']);
+    expect(plan.allowedTools).toBeUndefined();
+    expect(plan.text).toContain('Fugue or bleed? → Fugue.');
+    expect(plan.text).toContain('QUESTIONS FOR THE GM');
+    expect(plan.text).toMatch(/NEVER write a question to the GM into your report/);
+  });
+
+  it('a non-genesis work cycle gets no raise_prod', () => {
+    const plan = planWorkCycle({ id: 'w', goal: 'Build the tavern', plan: null, cycleCount: 0 }, [], '', []);
+    expect(plan.stageTools).toBeUndefined();
   });
 });

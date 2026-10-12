@@ -41,6 +41,7 @@ import {
   logGenesisReport,
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
+import { warnQuestionOutsideProd } from '@/lib/genesis-question';
 import { planWorkCycle, type CycleProd, type CycleCatalog, type CycleDrafting } from './work-cycle-text';
 import { rejectedShapes } from '@/services/block-archetype';
 import { prisma } from '@/lib/db';
@@ -245,7 +246,7 @@ async function runCycle(session: {
       drafting.feedback = await loadPendingFeedback(session.campaignId, session.id, jewl.characterUserId);
     } catch { /* feedback also rides in the progress notes */ }
   }
-  const { text, allowedTools, excludedTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting);
+  const { text, allowedTools, excludedTools, stageTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
@@ -268,11 +269,14 @@ async function runCycle(session: {
       text,
       ...(allowedTools ? { allowedTools } : {}),
       ...(excludedTools ? { excludedTools } : {}),
+      ...(stageTools ? { stageTools } : {}),
       ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME, toneRef: { table: 'DayaWorkSession', id: session.id } } : {}),
     });
     await flushSeedWithheld(seedWatch, session);
     state.dispatchFailures.delete(session.id);
     if (genesis) {
+      // A question belongs in raise_prod, never in the report (2026-10-12).
+      warnQuestionOutsideProd(session.id, response.message, `cycle ${session.cycleCount + 1}`);
       try {
         await logGenesisReport({
           campaignId: session.campaignId,

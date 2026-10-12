@@ -20,6 +20,7 @@ import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from '
 import { usePathname, useRouter } from 'next/navigation';
 import { JEWL_CHAT_CSS, fs, MONO, BEBAS, READ } from '@/components/terminal/jewlChatCss';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
+import { openJewlWork } from '@/lib/jewl-work';
 
 /**
  * JEWL's name is private canon ([[jewl-identity-and-wallet-private]]). All
@@ -47,6 +48,9 @@ interface CopilotMessage {
   /** JSON of either { toolCalls, reasoning } (assistant) or
    *  { source, canvasAction } (user, when prompt came from a canvas gesture). */
   actions?: string | null;
+  /** A genesis line (status / mid-build prod): tap opens JEWL's work screen
+   *  on that session — where his question is answered (2026-10-12). */
+  workLink?: { sessionId: string; characterId: string | null; prodId: string | null } | null;
   createdAt: string;
 }
 
@@ -1298,7 +1302,17 @@ export function JewlChip() {
                 const failed = toolCalls ? toolCalls.filter(tc => tc.error).length : 0;
                 return (
                   <div key={m.id} className="jc-turn jc-jewl" data-jewl-msg={m.id}>
-                    <p className="jc-msg"><span className="jc-aside"><b>[{JEWL_TAG}]:</b> {m.content}</span></p>
+                    {m.workLink ? (
+                      <button type="button" className="jc-msg jc-worklink" data-no-hold
+                        style={{ all: 'unset', boxSizing: 'border-box', display: 'block', width: '100%', cursor: 'pointer', textAlign: 'left', borderLeft: '3px solid #D07818', paddingLeft: 6 }}
+                        data-jewl-worklink={m.workLink.sessionId}
+                        onClick={() => openJewlWork(m.workLink!.sessionId)}
+                        aria-label={`${m.content} — open JEWL's work screen to answer`}>
+                        <span className="jc-aside"><b>[{JEWL_TAG}]:</b> {m.content} <span className="jc-worklink-go" aria-hidden style={{ color: "#D07818", whiteSpace: "nowrap" }}>▸ answer</span></span>
+                      </button>
+                    ) : (
+                      <p className="jc-msg"><span className="jc-aside"><b>[{JEWL_TAG}]:</b> {m.content}</span></p>
+                    )}
                     {/* Collapsed by default (Mike 2026-08-21): the action log
                         is a click away, never a wall in the chat. Errors are
                         flagged in the summary so failures stay visible. */}

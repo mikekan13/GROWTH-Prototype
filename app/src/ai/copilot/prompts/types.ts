@@ -79,6 +79,10 @@ export interface JewlPrompt {
    *  executable) — e.g. search_catalog in a genesis build cycle whose
    *  campaign-visible catalog is empty (perf pass 2026-10-12). */
   excludedTools?: string[];
+  /** Stage-only tools this dispatch unlocks ON TOP of the normal set — e.g.
+   *  raise_prod in a genesis BUILDING cycle: a question is a prod at any
+   *  genesis stage (2026-10-12). */
+  stageTools?: string[];
 }
 
 /** Outcome of executing one tool call. */

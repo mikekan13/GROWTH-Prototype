@@ -342,6 +342,14 @@ export function GenesisLoadingOverlay({
           onChanged={() => onStepsChanged?.()} onOpenAppearance={seedName ? onOpenAppearance : undefined}
           initialOpenId={prodAnswerOpenId} initialDraft={prodAnswerDraft} />
       )}
+      {/* A question is a prod at ANY stage (2026-10-12): mid-build prods are
+          answered here, never in the Log. */}
+      {campaignId && progress && !progress.prodding && progress.sessionId && state !== 'done'
+        && (progress.prods ?? []).some(p => p.status === 'OPEN') && (
+        <GenesisProds prods={progress.prods ?? []} campaignId={campaignId} sessionId={progress.sessionId}
+          characterName={characterName} waiting={state === 'waiting'} midBuild
+          onChanged={() => onStepsChanged?.()} />
+      )}
       {state === 'done' && (progress?.openThreads?.length ?? 0) > 0 && (
         <GenesisOpenThreads threads={progress?.openThreads ?? []} />
       )}

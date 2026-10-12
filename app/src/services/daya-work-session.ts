@@ -14,6 +14,7 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { isProdsBlocked, warnQuestionOutsideProd } from '@/lib/genesis-question';
 
 export type WorkSessionStatus = 'active' | 'blocked' | 'done' | 'cancelled';
 
@@ -84,6 +85,23 @@ export async function updateWorkSession(opts: {
   // asking the GM — only the GM's Build moves it past PRODDING.
   if (session.stage === 'PRODDING' && opts.status === 'done') {
     throw new ValidationError('Genesis is still in the prod stage — the GM has not pressed Build. Raise prods or end the round; never close it.');
+  }
+  // Blocked-on-prod (2026-10-12): a genesis waiting on the GM's prods stays
+  // waiting until he has decided every OPEN prod — nobody but the decide
+  // path wakes it, and nothing closes it.
+  if (session.status === 'blocked' && isProdsBlocked(session.blockedReason)
+    && (opts.status === 'active' || opts.status === 'done')) {
+    const open = await prisma.genesisProd.count({ where: { sessionId: session.id, status: 'OPEN' } });
+    if (open > 0) {
+      if (opts.status === 'done') {
+        throw new ValidationError(`${open} prod${open === 1 ? '' : 's'} still wait on the GM — the session resumes when he decides; never close it.`);
+      }
+      opts = { ...opts, status: undefined };
+    }
+  }
+  // A question to the GM belongs in raise_prod, never a blocked reason.
+  if (opts.status === 'blocked' && session.goal.startsWith('Character genesis') && !isProdsBlocked(opts.blockedReason)) {
+    warnQuestionOutsideProd(session.id, opts.blockedReason, 'blocked reason');
   }
 
   const data: Record<string, unknown> = {};
@@ -175,7 +193,8 @@ export async function listWorkSessions(campaignId: string, includeClosed = false
 export async function resumeBlockedWorkSessions(campaignId: string): Promise<number> {
   const blocked = (await prisma.dayaWorkSession.findMany({
     where: { campaignId, status: 'blocked' },
-  })).filter(s => s.stage !== 'PRODDING'); // prods wait on the GM's answers / Build, not the Forge
+  })).filter(s => s.stage !== 'PRODDING' // prods wait on the GM's answers / Build, not the Forge
+    && !isProdsBlocked(s.blockedReason)); // blocked-on-prod resumes on the GM's decisions
   for (const session of blocked) {
     await updateWorkSession({
       sessionId: session.id,

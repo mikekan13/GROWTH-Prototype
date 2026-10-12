@@ -20,6 +20,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { requireCampaignGM } from './campaign-access';
 import { updateWorkSession } from './daya-work-session';
 import { parseGenesisGoal } from './character-genesis-progress';
+import { PRODS_BLOCKED_REASON, isProdsBlocked, prodsBlockedReason } from '@/lib/genesis-question';
 
 export const PRODDING_STAGE = 'PRODDING';
 export const BUILDING_STAGE = 'BUILDING';
@@ -31,7 +32,7 @@ export type ProdKind = (typeof PROD_KINDS)[number];
 export type ProdStatus = 'OPEN' | 'ANSWERED' | 'LEFT_OPEN' | 'DELEGATED';
 
 /** Fixed prefix of the blocked reason while the GM holds the prods. */
-export const PRODS_BLOCKED_REASON = 'waiting on the GM — prods';
+export { PRODS_BLOCKED_REASON };
 
 export interface GenesisProdRow {
   id: string;
@@ -63,6 +64,12 @@ async function loadSession(sessionId: string, campaignId: string) {
   return session;
 }
 
+function requireOpenSession(session: { status: string }) {
+  if (session.status === 'done' || session.status === 'cancelled') {
+    throw new ValidationError(`Work session is already ${session.status}`);
+  }
+}
+
 function requireProdding(session: { stage: string | null; status: string }) {
   if (session.stage !== PRODDING_STAGE) {
     throw new ValidationError('This session is not in the prod stage — the GM already pressed Build (or it is not a genesis).');
@@ -90,12 +97,17 @@ export const raiseProdSchema = z.object({
   kind: z.enum(PROD_KINDS),
 });
 
-/** JEWL raises one prod. Opens a new round on the first prod after a closed
- *  one; refuses a sixth in the same round. */
+/** JEWL raises one prod — at ANY genesis stage (2026-10-12: "Never should I
+ *  have to go to the logs to answer a question jewl has"). Opens a new round
+ *  on the first prod after a closed one; refuses a sixth in the same round.
+ *  Outside PRODDING the session stays in its stage and is marked
+ *  blocked-on-prod (open prod ids in the blocked reason); it resumes when the
+ *  GM has decided every open prod — no Build. Each mid-build prod posts its
+ *  question to the GM's chat. */
 export async function raiseProd(input: unknown, campaignId: string): Promise<GenesisProdRow> {
   const p = raiseProdSchema.parse(input);
   const session = await loadSession(p.sessionId, campaignId);
-  requireProdding(session);
+  requireOpenSession(session);
   const parsed = parseGenesisGoal(session.goal);
   if (!parsed) throw new ValidationError('Prods belong to a character genesis session.');
 
@@ -110,10 +122,13 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
     await prisma.dayaWorkSession.update({ where: { id: session.id }, data: { prodRound: round } });
   }
   const inRound = await prisma.genesisProd.count({ where: { sessionId: session.id, round } });
+  const prodding = session.stage === PRODDING_STAGE;
   if (inRound >= PRODS_PER_ROUND) {
-    throw new ValidationError(`Round ${round} already holds ${PRODS_PER_ROUND} prods — the most load-bearing ones. Call end_prod_round.`);
+    throw new ValidationError(prodding
+      ? `Round ${round} already holds ${PRODS_PER_ROUND} prods — the most load-bearing ones. Call end_prod_round.`
+      : `${PRODS_PER_ROUND} prods already wait on the GM — no more until he answers. Assume what you can and note it.`);
   }
-  return prisma.genesisProd.create({
+  const prod = await prisma.genesisProd.create({
     data: {
       sessionId: session.id,
       campaignId,
@@ -126,6 +141,44 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
       kind: p.kind,
     },
   });
+  if (!prodding) await markBlockedOnProds(session, prod);
+  return prod;
+}
+
+/** Mid-build prod: hold the session (its stage unchanged) until the GM has
+ *  decided every OPEN prod, and put the question in his chat. A wait for
+ *  something else (Forge approvals) is superseded — JEWL re-blocks on it
+ *  after he resumes if it still holds. */
+async function markBlockedOnProds(
+  session: { id: string; campaignId: string; goal: string; status: string; blockedReason: string | null },
+  prod: GenesisProdRow,
+) {
+  const openIds = (await prisma.genesisProd.findMany({
+    where: { sessionId: session.id, status: 'OPEN' },
+    orderBy: [{ round: 'asc' }, { order: 'asc' }],
+    select: { id: true },
+  })).map(r => r.id);
+  const reason = prodsBlockedReason(openIds);
+  if (session.status === 'blocked') {
+    // Already waiting (on prods, or on something prods now supersede).
+    await prisma.dayaWorkSession.update({ where: { id: session.id }, data: { blockedReason: reason } });
+  } else {
+    await updateWorkSession({
+      sessionId: session.id,
+      status: 'blocked',
+      blockedReason: reason,
+      progressNote: `[prods] mid-build question raised — waiting on the GM (${openIds.length} open)`,
+    });
+  }
+  await logProdNote(session, `prod · mid-build r${prod.round}.${prod.order}`,
+    `[${prod.kind}] ${prod.question}\n   ↳ "${prod.anchorQuote}"\n   hinges on: ${prod.why}`);
+  try {
+    const { announceGenesisProd } = await import('./character-genesis-progress');
+    await announceGenesisProd(session, prod);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[genesis-prods] chat line not posted:', err);
+  }
 }
 
 export const endProdRoundSchema = z.object({
@@ -219,7 +272,7 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
   if (!prod || prod.campaignId !== opts.campaignId) throw new NotFoundError('Prod not found');
   const session = await prisma.dayaWorkSession.findUnique({ where: { id: prod.sessionId } });
   if (!session) throw new NotFoundError('Work session not found');
-  requireProdding(session);
+  requireOpenSession(session);
 
   const wasOpen = prod.status === 'OPEN';
   const updated = await prisma.genesisProd.update({
@@ -236,7 +289,30 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
     d.decision === 'ANSWER' ? `answered: ${d.answer}` : d.decision === 'LEAVE_OPEN' ? 'left open (discovered in play)' : 'you decide (JEWL fills it)'}`);
 
   let resumed = false;
-  if (wasOpen) {
+  if (wasOpen && session.stage !== PRODDING_STAGE) {
+    // Mid-build prod: the session resumes the moment every OPEN prod is
+    // decided — no Build. Until then the reason keeps the open ids current.
+    const openIds = (await prisma.genesisProd.findMany({
+      where: { sessionId: session.id, status: 'OPEN' },
+      orderBy: [{ round: 'asc' }, { order: 'asc' }],
+      select: { id: true },
+    })).map(r => r.id);
+    if (session.status === 'blocked' && isProdsBlocked(session.blockedReason)) {
+      if (openIds.length === 0) {
+        await prisma.dayaWorkSession.update({ where: { id: session.id }, data: { prodRound: 0 } });
+        await updateWorkSession({
+          sessionId: session.id,
+          status: 'active',
+          progressNote: '[prods] the GM decided every mid-build prod — resuming',
+        });
+        const { kickWorkLoop } = await import('@/ai/copilot/work-loop');
+        kickWorkLoop();
+        resumed = true;
+      } else {
+        await prisma.dayaWorkSession.update({ where: { id: session.id }, data: { blockedReason: prodsBlockedReason(openIds) } });
+      }
+    }
+  } else if (wasOpen) {
     const open = await prisma.genesisProd.count({ where: { sessionId: session.id, status: 'OPEN' } });
     // Round answered and JEWL is waiting (not mid-round) → one follow-up cycle.
     if (open === 0 && session.status === 'blocked' && session.prodRound === 0) {

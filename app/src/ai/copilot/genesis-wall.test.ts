@@ -153,6 +153,15 @@ describe('prod stage tool gate (genesis is a dialogue, 2026-10-12)', () => {
     expect(toolOffered('record_delegated_choice')).toBe(true);
     expect(toolOffered('daya_seed_memory')).toBe(true);
   });
+
+  it('a genesis BUILDING cycle still offers raise_prod (a question is a prod at any stage), never end_prod_round', () => {
+    const stage = ['raise_prod'];
+    expect(toolOffered('raise_prod', undefined, true, undefined, stage)).toBe(true);
+    expect(toolOffered('end_prod_round', undefined, true, undefined, stage)).toBe(false);
+    expect(toolOffered('daya_seed_memory', undefined, true, undefined, stage)).toBe(true);
+    // excludedTools still wins.
+    expect(toolOffered('raise_prod', undefined, true, ['raise_prod'], stage)).toBe(false);
+  });
 });
 
 describe('table-lane-only tools (SKETCH genesis, 2026-10-12)', () => {

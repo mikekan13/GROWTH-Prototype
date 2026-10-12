@@ -166,12 +166,31 @@ export function draftingGuidance(d: CycleDrafting): string {
   ].join('\n');
 }
 
+// ── A question is a prod at ANY genesis stage (Mike 2026-10-12) ─────────
+// "Never should I have to go to the logs to answer a question jewl has."
+
+/** Stage-only tools a genesis build cycle still offers. */
+export const BUILD_STAGE_TOOLS = ['raise_prod'] as const;
+
+/** The question law every genesis build cycle carries. */
+export function genesisQuestionLaw(sessionId: string): string {
+  return [
+    'QUESTIONS FOR THE GM (law at every genesis stage):',
+    `- If you need the GM's word, call raise_prod({sessionId: "${sessionId}", anchorQuote, question, why, kind}) — anchor it to the seed or draft text that raised it. ` +
+      'The session waits on his answer and resumes on its own the moment he decides; you need not block it yourself.',
+    '- NEVER write a question to the GM into your report, a progress note, a blocked reason or free text — he would have to dig through the Log for it.',
+    '- If a ruling is not strictly needed, do not block: make the YOU-DECIDE-style assumption, build on it, and state it in your progress note as "assumed: …" so the GM can overturn it.',
+    '- At most 5 prods while one wait is open; only creative/authorial facts the GM alone can settle.',
+  ].join('\n');
+}
+
 /**
  * What one cycle sends (work-loop.ts). Pure. PRODDING → the prod text and
  * ONLY the prod tools; otherwise the normal cycle, with the GM's prod
  * decisions appended to a genesis plan (SETTLED / OPEN THREADS / DELEGATED).
  * A genesis build cycle given a catalog snapshot carries the CATALOG line
- * (and withholds search_catalog when the catalog is near-empty).
+ * (and withholds search_catalog when the catalog is near-empty). A genesis
+ * build cycle also keeps raise_prod and carries the question law.
  */
 export function planWorkCycle(
   session: WorkCycleSession & { stage?: string | null },
@@ -180,18 +199,21 @@ export function planWorkCycle(
   recentNotes: string[],
   catalog?: CycleCatalog | null,
   drafting?: CycleDrafting | null,
-): { text: string; allowedTools?: string[]; excludedTools?: string[] } {
+): { text: string; allowedTools?: string[]; excludedTools?: string[]; stageTools?: string[] } {
   if (session.stage === 'PRODDING') {
     return { text: buildProdCycleText(session, prods), allowedTools: [...PROD_STAGE_TOOLS] };
   }
+  const genesis = session.goal.startsWith('Character genesis');
   const plan = prods.length && session.plan
     ? `${session.plan}\n\n${buildProdSections(prods)}`
     : session.plan;
   const guide = catalog ? catalogGuidance(catalog) : null;
-  const treasury = [treasuryLine, guide?.line, drafting ? draftingGuidance(drafting) : null]
+  const treasury = [treasuryLine, guide?.line, drafting ? draftingGuidance(drafting) : null,
+    genesis ? genesisQuestionLaw(session.id) : null]
     .filter(Boolean).join('\n');
   return {
     text: buildWorkCycleText({ ...session, plan }, treasury, recentNotes),
     ...(guide?.excludedTools ? { excludedTools: guide.excludedTools } : {}),
+    ...(genesis ? { stageTools: [...BUILD_STAGE_TOOLS] } : {}),
   };
 }

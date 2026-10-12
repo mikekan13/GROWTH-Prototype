@@ -33,7 +33,7 @@ export function prodChatLine(open: number, name?: string | null): string {
 }
 
 export function GenesisProds({
-  prods, campaignId, sessionId, characterName, waiting, onChanged, initialOpenId, initialDraft, onOpenAppearance,
+  prods: allProds, campaignId, sessionId, characterName, waiting, onChanged, initialOpenId, initialDraft, onOpenAppearance, midBuild,
 }: {
   prods: GenesisProdView[];
   campaignId: string;
@@ -47,6 +47,9 @@ export function GenesisProds({
   initialDraft?: string;
   /** Appearance is separate from genesis (2026-10-12) — edit it alongside. */
   onOpenAppearance?: () => void;
+  /** After Build: JEWL's mid-build questions. No Build button — the session
+   *  resumes on its own once every open one is decided (2026-10-12). */
+  midBuild?: boolean;
 }) {
   const [answering, setAnswering] = useState<string | null>(initialOpenId ?? null);
   const [draft, setDraft] = useState(initialDraft ?? '');
@@ -57,8 +60,11 @@ export function GenesisProds({
   const [confirming, setConfirming] = useState(false);
   const [built, setBuilt] = useState(false);
 
+  // Mid-build: only the round(s) still holding an open question.
+  const openRounds = new Set(allProds.filter(p => p.status === 'OPEN').map(p => p.round));
+  const prods = midBuild ? allProds.filter(p => openRounds.has(p.round)) : allProds;
   const open = prods.filter(p => p.status === 'OPEN');
-  const showBuild = prods.length > 0 || waiting;
+  const showBuild = midBuild ? prods.length > 0 : (prods.length > 0 || waiting);
   if (!showBuild) return null;
 
   const decide = async (prod: GenesisProdView, decision: Decision, answer?: string) => {
@@ -120,9 +126,13 @@ export function GenesisProds({
           {prods.length} prod{prods.length === 1 ? '' : 's'}
         </span>
       </div>
-      <div className="gp-jewl"><span className="gp-jewl-k">JEWL ›</span> {waiting || prods.length > 0
-        ? prodChatLine(open.length, characterName)
-        : 'Reading the seed…'}</div>
+      <div className="gp-jewl"><span className="gp-jewl-k">JEWL ›</span> {midBuild
+        ? (open.length > 0
+          ? `I stopped building ${characterName ?? 'this character'} to ask — I pick up the moment you decide.`
+          : 'Thanks — picking the build back up.')
+        : waiting || prods.length > 0
+          ? prodChatLine(open.length, characterName)
+          : 'Reading the seed…'}</div>
       <p className="gp-sub">The story is yours. Answer what you know, leave open what should be found in play, or hand it to JEWL.</p>
 
       <ul className="gp-list">
@@ -184,7 +194,7 @@ export function GenesisProds({
 
       {error && <div className="gp-err" role="alert">{error}</div>}
 
-      {confirming ? (
+      {midBuild ? null : confirming ? (
         <div className="gp-confirm" role="alertdialog" aria-label="Confirm build">
           <div>{open.length} unanswered will be left open — mysteries for play. JEWL won&apos;t fill them.</div>
           <div className="gp-actions gp-actions-l">

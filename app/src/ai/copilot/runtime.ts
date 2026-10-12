@@ -141,10 +141,19 @@ const STAGE_ONLY_TOOLS = new Set(['raise_prod', 'end_prod_round']);
 const TABLE_ONLY_TOOLS = new Set(['sketch_npc']);
 
 /** May this dispatch offer / execute this tool? */
-export function toolOffered(name: string, allowedTools?: string[], isWorkCycle = false, excludedTools?: string[]): boolean {
+export function toolOffered(
+  name: string,
+  allowedTools?: string[],
+  isWorkCycle = false,
+  excludedTools?: string[],
+  stageTools?: string[],
+): boolean {
   if (isWorkCycle && TABLE_ONLY_TOOLS.has(name)) return false;
   if (excludedTools?.includes(name)) return false;
-  return allowedTools ? allowedTools.includes(name) : !STAGE_ONLY_TOOLS.has(name);
+  if (allowedTools) return allowedTools.includes(name);
+  // A stage-only tool this dispatch unlocks on top of the normal set (a
+  // genesis BUILDING cycle may still raise_prod, 2026-10-12).
+  return !STAGE_ONLY_TOOLS.has(name) || !!stageTools?.includes(name);
 }
 
 /** Tool specs are pure functions of the registered tools — memoised so the
@@ -165,8 +174,8 @@ function toolSpec(t: { name: string; description: string; inputSchema: z.ZodType
 /** Prepare the tools list for the Claude call. Each description carries its
  *  exact length limits (perf pass 2026-10-12: rejected calls were ~⅓ of
  *  genesis output tokens). */
-export function buildToolSpecs(allowedTools?: string[], isWorkCycle = false, excludedTools?: string[]): ClaudeToolSpec[] {
-  return listJewlTools().filter(t => toolOffered(t.name, allowedTools, isWorkCycle, excludedTools)).map(toolSpec);
+export function buildToolSpecs(allowedTools?: string[], isWorkCycle = false, excludedTools?: string[], stageTools?: string[]): ClaudeToolSpec[] {
+  return listJewlTools().filter(t => toolOffered(t.name, allowedTools, isWorkCycle, excludedTools, stageTools)).map(toolSpec);
 }
 
 /** Serialize a JewlPrompt into the user-side text Claude receives. */
@@ -449,7 +458,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
   ];
 
   // 4. Tool-use loop.
-  const tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools);
+  const tools = buildToolSpecs(prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools);
   const toolCtx: JewlToolContext = {
     campaignId: prompt.campaignId,
     actorId: prompt.actorId,
@@ -569,7 +578,7 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
     }
     const userToolResults: ClaudeContentBlock[] = [];
     for (const tu of toolUseBlocks) {
-      const offered = toolOffered(tu.name, prompt.allowedTools, isWorkCycle, prompt.excludedTools);
+      const offered = toolOffered(tu.name, prompt.allowedTools, isWorkCycle, prompt.excludedTools, prompt.stageTools);
       const tool = offered ? getJewlTool(tu.name) : undefined;
       let tcRecord: JewlToolCallResult;
       if (!tool) {

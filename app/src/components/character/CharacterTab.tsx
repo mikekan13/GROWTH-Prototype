@@ -1544,7 +1544,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 }}
                 title="JEWL is building this character — open the genesis progress screen."
               >
-                ◆ {genesis?.prodding ? `JEWL has questions · ${(genesis.prods ?? []).filter(p => p.status === 'OPEN').length} open` : `Genesis running · ${genesis?.step ?? '…'}/${genesis?.total ?? 7}`} — view
+                ◆ {(genesis?.prodding || (genesis?.prods ?? []).some(p => p.status === 'OPEN')) ? `JEWL has questions · ${(genesis?.prods ?? []).filter(p => p.status === 'OPEN').length} open` : `Genesis running · ${genesis?.step ?? '…'}/${genesis?.total ?? 7}`} — view
               </button>
             )}
             {isGM && effectiveCharacter?.id && !genesisRunning && (

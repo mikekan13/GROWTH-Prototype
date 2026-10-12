@@ -51,7 +51,29 @@ export async function getCopilotHistory(
     ...m,
     content: isWithheldRow(m) ? WITHHELD_STRING : m.content,
     actions: parseCopilotActions(m.actions),
+    workLink: parseGenesisWorkLink(m.actions),
   }));
+}
+
+/**
+ * A genesis chat line (status / mid-build prod) is tappable for the Watcher:
+ * it opens JEWL's work screen on that session (2026-10-12 — the question is
+ * answered there, never "in the Log"). Null for every other row.
+ */
+export function parseGenesisWorkLink(raw: string | null | undefined): { sessionId: string; characterId: string | null; prodId: string | null } | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!v || Array.isArray(v) || typeof v !== 'object') return null;
+    if ((v.source !== 'GENESIS_STATUS' && v.source !== 'GENESIS_PROD') || typeof v.sessionId !== 'string') return null;
+    return {
+      sessionId: v.sessionId,
+      characterId: typeof v.characterId === 'string' ? v.characterId : null,
+      prodId: typeof v.prodId === 'string' ? v.prodId : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
