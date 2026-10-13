@@ -83,7 +83,8 @@ export const GROWTH_MEDIUM =
   // rev 4 (Mike, sheet 4: seed 10 best but "a touch too anime and just the slightest touch too realistic at the
   // same time") — natural eye size, only the slightest polish, and VISIBLE paint, which is neither anime nor photo.
   'A painted character illustration in the manner of Western concept art, like a finished oil-painted portrait: so refined it almost passes for a photograph of a real person, yet on close inspection the visible painterly brushwork in the shading of the face and hair gives it away, with a matte finish. ' +
-  'Realistic proportions and natural eye size with only the slightest idealized polish, luminous expressive eyes, matte porcelain skin with subtle texture, clean painted shading on the planes of the face, and crisp defined edges on the features and hair. ' +
+  // rev 5 (Mike): "slightly exagerated pen lines. subtle but noticible"
+  'Realistic proportions and natural eye size with only the slightest idealized polish, luminous expressive eyes, matte porcelain skin with subtle texture, clean painted shading on the planes of the face, and crisp edges drawn with slightly exaggerated ink pen lines, subtle but noticeable, along the contours of the features, hair and silhouette, like an inked drawing beneath the paint. ' +
   // rev 2 (Mike, sheet 2: "too dull. Colors should be more vibrant"; seed 10's character = contrast + alive eyes)
   'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
   'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
