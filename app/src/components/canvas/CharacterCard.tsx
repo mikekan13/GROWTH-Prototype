@@ -19,6 +19,7 @@ import type { GrowthCharacter, AugmentSource } from '@/types/growth';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
 import type { PossessionRow } from './PossessionsCard';
 import { AwaitingImageBadge } from '@/components/character/AwaitingImageBadge';
+import { requestComplete } from '@/lib/genesis-complete-ui';
 import { useCharacterInventory, useCharacterSheetFacts } from '@/components/character/useCharacterSheetFacts';
 import { resolveBlocks, type LegacySheetLike } from '@/components/character/CharacterGenesisSections';
 import { blocksOfKind, blockTooltip, formatAge, type CharacterBlockView } from '@/lib/character-sheet-facts';
@@ -440,6 +441,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   // (pool past 0 spills into Frequency) and auto depletion conditions; the
   // mutation persists through the normal onCharacterUpdate → changelog rails.
   const [showDamageMenu, setShowDamageMenu] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeLine, setCompleteLine] = useState<{ text: string; error: boolean } | null>(null);
   const [damageAmount, setDamageAmount] = useState('5');
   const [damageType, setDamageType] = useState<'piercing' | 'slashing' | 'heat' | 'decay' | 'cold' | 'bashing' | 'energy'>('slashing');
   const [damageResult, setDamageResult] = useState<string[] | null>(null);
@@ -679,6 +682,34 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
                 </svg>
                 aPPLY dAMAGE
               </button>
+            )}
+            {node.status === 'ACTIVE' && (
+              <button
+                disabled={completing}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCompleting(true);
+                  setCompleteLine(null);
+                  void requestComplete(node.id).then(out => {
+                    setCompleteLine({ text: out.line, error: !out.ok });
+                    setCompleting(false);
+                  });
+                }}
+                title="Finish this born character: JEWL runs only the stages she still lacks."
+                className="w-full px-3 py-1.5 text-left text-sm text-[#D07818] hover:bg-white/10 font-[Consolas,monospace] flex items-center gap-2 disabled:opacity-60"
+              >
+                {completing ? 'cOMPLETING…' : 'cOMPLETE'}
+              </button>
+            )}
+            {completeLine && (
+              <div
+                role={completeLine.error ? 'alert' : 'status'}
+                className="px-3 py-1 text-[11px] font-[Consolas,monospace]"
+                style={{ maxWidth: 260, color: completeLine.error ? '#E8585A' : '#D07818', background: '#000', borderLeft: `2px solid ${completeLine.error ? '#E8585A' : '#D07818'}`, wordBreak: 'break-word' }}
+                onClick={e => e.stopPropagation()}
+              >
+                {completeLine.text}
+              </div>
             )}
           </>
         )}

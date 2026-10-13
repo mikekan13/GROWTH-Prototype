@@ -13,6 +13,7 @@ import Paperdoll from './Paperdoll';
 import CharacterGenesisSections from './CharacterGenesisSections';
 import { GenesisLoadingOverlay, GenesisBadge, useGenesisProgress, genesisInFlight } from './GenesisLoading';
 import { GenesisOpenThreads } from './GenesisProds';
+import { shouldShowComplete, requestComplete } from '@/lib/genesis-complete-ui';
 import { GenesisSeedScreenDialog, type SeedScreenFindingView } from './GenesisSeedScreen';
 import { seedGate } from '@/lib/seed-state';
 
@@ -438,6 +439,29 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   // screen holds (no auto-close) and the badge stays "awaiting image". Not a
   // gate: the character is ACTIVE and voiceable meanwhile.
   const genesisAwaitingImage = genesis?.state === 'done' && !!genesis.completion && genesis.completion.image !== 'done';
+  // Complete (2026-10-12): finish an already-BORN character's missing stages.
+  // The session it opens has the same "[characterId]" goal, so the genesis
+  // status route finds it as the latest session and the badge/overlay track it.
+  const [completing, setCompleting] = useState(false);
+  const [completeLine, setCompleteLine] = useState<{ text: string; error: boolean } | null>(null);
+  const showComplete = shouldShowComplete({
+    isGM, genesisRunning, hasCharacter: !!genesisCharId,
+    genesisState: genesis?.state === 'done' || genesis?.completion ? 'done' : genesis?.state,
+  });
+  const completeCharacterNow = async () => {
+    if (!genesisCharId || completing) return;
+    setCompleting(true);
+    setCompleteLine(null);
+    const out = await requestComplete(genesisCharId);
+    setCompleteLine({ text: out.line, error: !out.ok });
+    if (out.ok && out.opened) {
+      setGenesisDismissedFor(null);
+      await refetchGenesis();
+    } else if (!out.ok) {
+      await refetchGenesis(); // a 409 means one is running: pick it up
+    }
+    setCompleting(false);
+  };
   const [genesisOpenedFor, setGenesisOpenedFor] = useState<string | null>(null);
   const showGenesisOverlay = !!genesisCharId && genesisDismissedFor !== genesisCharId
     && (submittingGenesis || !!genesisSubmitError || genesisRunning || genesisBornNow || genesisNeedsGm
@@ -1543,6 +1567,38 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         {/* Open threads the GM left at genesis — mysteries for play (2026-10-12) */}
         {isGM && genesis && !genesis.prodding && (genesis.openThreads?.length ?? 0) > 0 && (
           <GenesisOpenThreads threads={genesis.openThreads ?? []} />
+        )}
+
+        {/* Complete — Watcher/ADMIN, born character, genesis not running */}
+        {showComplete && (
+          <div className="flex flex-col gap-2" data-complete-character>
+            <button
+              onClick={() => { void completeCharacterNow(); }}
+              disabled={completing}
+              className="self-start px-4 py-2 text-xs uppercase tracking-wider"
+              style={{
+                fontFamily: 'var(--font-terminal), Consolas, monospace', background: '#000', color: '#D07818',
+                border: 'none', borderLeft: '4px solid #D07818', cursor: completing ? 'default' : 'pointer',
+                opacity: completing ? 0.6 : 1, minHeight: 40,
+              }}
+              title="Finish this born character: JEWL runs only the stages she still lacks (age, possessions, seeds, world facts, vines)."
+            >
+              {completing ? 'Completing…' : 'Complete'}
+            </button>
+            {completeLine && (
+              <div
+                role={completeLine.error ? 'alert' : 'status'}
+                className="text-xs px-2 py-1"
+                style={{
+                  background: '#000', color: completeLine.error ? '#E8585A' : '#D07818',
+                  borderLeft: `2px solid ${completeLine.error ? '#E8585A' : '#D07818'}`,
+                  fontFamily: 'var(--font-terminal), Consolas, monospace', wordBreak: 'break-word',
+                }}
+              >
+                {completeLine.text}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Action buttons */}
