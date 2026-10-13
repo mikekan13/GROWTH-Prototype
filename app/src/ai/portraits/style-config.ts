@@ -78,7 +78,8 @@ const FLUX2_STYLE_PROSE =
   'Sharp focus throughout the entire image with finely rendered high-detail painting: tight, precise brushwork, crisp defined edges on the face, eyes, lips and hair, hard edges where the planes of the face meet, individual hair strands crisply drawn, and no blur or softness anywhere. ' +
   'The skin is smooth but has subtle texture and natural tone variation, with a soft matte sheen rather than gloss. ' +
   'The backdrop is a uniform mid-grey mottled plaster studio wall that fills the entire frame edge to edge, with no paper margin and no white border, and nothing else in the scene. ' +
-  'Soft diffuse frontal light with a gentle top key and clear form shadows that define the nose, cheekbones and jaw; shadows are cool grey, never black; no rim light, no lens effects. ' +
+  'Soft diffuse key light from the front with a gentle top key, low-key moody falloff into shadow at the sides, and clear form shadows that define the nose, cheekbones and jaw; shadows are cool grey, never black; no rim light, no lens effects. ' +
+  'The mood is a blend of old-school dark fantasy and modern science fiction: the grim, somber, slightly ominous atmosphere of a 1980s dark fantasy book-cover painting, finished with the cool, clean, faintly synthetic sheen of modern sci-fi concept art, with a subtle cold teal undertone in the shadows and a faint haze of grime and age on the wall behind. ' +
   'The palette is desaturated and cool-neutral with one saturated accent color, pale skin against dark hair.';
 
 /** The GROWTH look as one prose paragraph for FLUX.2 prompts. */
