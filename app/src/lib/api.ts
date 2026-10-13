@@ -1,7 +1,7 @@
 // API route utility — converts service/validation errors to HTTP responses
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
-import { AppError, LocalLaneError } from './errors';
+import { AppError, LocalLaneError, PortraitEndpointError } from './errors';
 
 export function errorResponse(error: unknown): NextResponse {
   if (error instanceof ZodError) {
@@ -11,6 +11,10 @@ export function errorResponse(error: unknown): NextResponse {
   if (error instanceof LocalLaneError) {
     console.error(error.message);
     return NextResponse.json({ error: error.userMessage }, { status: error.status });
+  }
+  if (error instanceof PortraitEndpointError) {
+    console.error(`[portraits] ${error.code}: ${error.message}`);
+    return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof AppError) {
     return NextResponse.json({ error: error.message }, { status: error.status });

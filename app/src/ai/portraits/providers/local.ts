@@ -28,6 +28,7 @@ import type {
   ComfyUIWorkflowParams,
 } from '../types';
 import { buildPortraitPrompt } from '../prompt-builder';
+import { PortraitEndpointError } from '@/lib/errors';
 import { composeStylePrompt } from '../growth-style-prompts';
 import { markUsed } from '../pod-keepalive';
 import { stripBackground } from '../rmbg';
@@ -249,6 +250,7 @@ export class LocalProvider implements ImageGenerationProvider {
         error: `flux2-${isFullBody ? 'body' : 'face'} pipeline returned null — see server logs`,
       };
     } catch (e) {
+      if (e instanceof PortraitEndpointError) throw e; // route -> errorResponse -> 409/502/503 with a code
       return {
         success: false,
         metadata: {
@@ -1212,6 +1214,7 @@ export class LocalProvider implements ImageGenerationProvider {
         } as PortraitMetadata & { workflowUsed: string; debugRefs: string; pass2Prompt: string | null },
       };
     } catch (e) {
+      if (e instanceof PortraitEndpointError) throw e; // paused/unreachable: surface, don't hide behind null
       console.error('[Flux2Face] failed:', e);
       return null;
     }
@@ -1362,6 +1365,7 @@ export class LocalProvider implements ImageGenerationProvider {
         } as PortraitMetadata & { workflowUsed: string; debugRefs: string },
       };
     } catch (e) {
+      if (e instanceof PortraitEndpointError) throw e;
       console.error('[Flux2Body] failed:', e);
       return null;
     }
