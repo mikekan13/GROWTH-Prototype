@@ -69,12 +69,14 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
       LOCK_BACKDROP
     );
   }
-  // Order (sheet 8): identity → MEDIUM (the look, early where it weighs most) → composition → mood → backdrop → closer.
+  // Order: identity → composition → MEDIUM → mood → backdrop → closer. Sheet 9 proved that putting the
+  // medium first makes the style win outright (all seeds dressed, seated, off-pose): the look words
+  // carry period costume and pose. Composition stays first; the ink LINES come from the finish layer.
   return [
     `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders.`,
     'Match their exact facial identity from the photos.',
-    medium.trim(),
     LOCK_COMPOSITION,
+    medium.trim(),
     getCampaignMood(mood),
     LOCK_BACKDROP,
     LOCK_CLOSER,
