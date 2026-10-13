@@ -9,7 +9,7 @@
  * badge and a small pillar-bar activity indicator while a session cycles.
  * Tap → the work screen as an overlay over the current page (no navigation;
  * the canvas stays mounted underneath). Esc or the phone's back gesture
- * closes it; Keep working minimises back to the line.
+ * closes it; Keep watching minimises back to the line.
  *
  * Data: GET /api/campaigns/[id]/jewl/work, refreshed on the campaign stream's
  * daya_work_session / jewl_working events (the shared EventSource — no second
@@ -106,7 +106,7 @@ export function sessionScreenModel(v: WorkSessionView, opts: { liveTool: string 
     liveVerb: running ? toolVerb(opts.liveTool) : null,
     nowLine: running ? toolVerb(opts.liveTool) : null,
     footMeta: `${v.cycles} cycle${v.cycles === 1 ? '' : 's'}`,
-    closeLabel: v.state === 'running' || v.state === 'waiting' ? 'KEEP WORKING ▾' : 'CLOSE',
+    closeLabel: v.state === 'running' || v.state === 'waiting' ? 'KEEP WATCHING ▾' : 'CLOSE',
     hint: v.state === 'running' || v.state === 'waiting' ? 'It keeps running if you close this — the status line tracks it.' : null,
   };
 }

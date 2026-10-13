@@ -292,7 +292,7 @@ export function GenesisLoadingOverlay({
     placeholderStage: !progress && !submitError ? 'Handing the genome to JEWL' : null,
     nowLine: state === 'running' ? (currentStage ? toolVerb(liveTool) : 'listening') : null,
     footMeta: `${c ? `${c.cycles} cycle${c.cycles === 1 ? '' : 's'}` : '—'}${c && c.pendingApproval > 0 ? ` · ${c.pendingApproval} awaiting approval` : ''}`,
-    closeLabel: state === 'done' || state === 'error' ? 'CLOSE' : 'KEEP WORKING ▾',
+    closeLabel: state === 'done' || state === 'error' ? 'CLOSE' : 'KEEP WATCHING ▾',
     hint: running ? 'It keeps running if you close this — the badge tracks it.' : null,
   };
 

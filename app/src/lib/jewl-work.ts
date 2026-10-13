@@ -363,3 +363,38 @@ export function openCharacterAppearance(characterId: string): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(CHARACTER_APPEARANCE_OPEN_EVENT, { detail: { characterId } }));
 }
+
+/** One view per character (2026-10-12): a finished genesis kept for its
+ *  portrait step and a running completion session are the same person — keep
+ *  the newest non-done view (else newest), carry the others' needsYou over
+ *  (deduped by kind+title). Non-genesis views are never collapsed. Order of
+ *  first appearance is preserved. */
+export function collapseByCharacter(views: WorkSessionView[]): WorkSessionView[] {
+  const groups = new Map<string, WorkSessionView[]>();
+  const out: Array<WorkSessionView | string> = [];
+  for (const v of views) {
+    const cid = v.genesis?.characterId;
+    if (!cid) { out.push(v); continue; }
+    if (!groups.has(cid)) { groups.set(cid, []); out.push(cid); }
+    groups.get(cid)!.push(v);
+  }
+  const t = (v: WorkSessionView) => (v.startedAt ? Date.parse(v.startedAt) || 0 : 0);
+  return out.map(o => {
+    if (typeof o !== 'string') return o;
+    const g = groups.get(o)!;
+    const newest = (a: WorkSessionView, b: WorkSessionView) => (t(b) > t(a) ? b : a);
+    const live = g.filter(v => v.state !== 'done');
+    const kept = (live.length ? live : g).reduce(newest);
+    if (g.length === 1) return kept;
+    const seen = new Set(kept.needsYou.map(n => `${n.kind}|${n.title}`));
+    const carried: NeedsYouItem[] = [];
+    for (const v of g) {
+      if (v === kept) continue;
+      for (const n of v.needsYou) {
+        const k = `${n.kind}|${n.title}`;
+        if (!seen.has(k)) { seen.add(k); carried.push({ ...n, sessionId: kept.id }); }
+      }
+    }
+    return { ...kept, needsYou: [...kept.needsYou, ...carried] };
+  });
+}

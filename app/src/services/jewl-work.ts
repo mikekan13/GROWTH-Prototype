@@ -22,7 +22,7 @@ import { getCampaignCompletions, isAwaitingImage, type CampaignCompletionRow } f
 import {
   portraitNeedsYou,
   classifySessionType, defaultSessionView, draftingSessionView, genesisSessionView,
-  goalTitle, mergeNeedsYou, orderSessions, reconciliationSessionView,
+  collapseByCharacter, goalTitle, mergeNeedsYou, orderSessions, reconciliationSessionView,
   type JewlWorkPayload, type NeedsYouItem, type WorkSessionFacts, type WorkSessionView,
 } from '@/lib/jewl-work';
 
@@ -89,10 +89,12 @@ async function toView(s: SessionRow, completions: Completions): Promise<WorkSess
     const c = completions.get(parsed.characterId);
     // BORN ≠ DONE: the screen shows "awaiting image" off the same completion.
     const progress = c ? { ...derived, completion: { genesis: c.genesis, image: c.image, done: c.done } } : derived;
-    return genesisSessionView({
+    const view = genesisSessionView({
       id: s.id, characterId: parsed.characterId, name: parsed.name, progress,
       log: await genesisLog(s, parsed.characterId),
     });
+    // completeCharacter's session reads as what it is.
+    return s.goal.includes('— complete the born character') ? { ...view, title: `Completing ${parsed.name}` } : view;
   }
   if (type === 'drafting') {
     const forged = await jewlDrafts(s);
@@ -175,7 +177,7 @@ export async function getJewlWork(opts: {
   const built = (await Promise.all(candidates.map(s => toView(s, completions)))).filter((v): v is WorkSessionView => v !== null)
     // A finished genesis stays only while drafts (or its portrait) still need the Watcher.
     .filter(v => v.state !== 'done' || v.needsYou.length > 0);
-  const sessions = orderSessions(built);
+  const sessions = orderSessions(collapseByCharacter(built));
   const extra = await campaignNeedsYou(opts.campaignId, completions);
   return {
     sessions,
