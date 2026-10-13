@@ -133,34 +133,44 @@ const CAMPAIGN_THEME_MODIFIERS: Record<string, string> = {
 // we get headwraps. 9445b459's aggressive bald stack (with "smooth scalp with no
 // hair" + t5xxl reinforcement sentences) is what overpowers ControlNet's silhouette
 // cues. Keep "head and face only" from bf706666 — it's a clean crop hint.
+// 2026-10-13 (Mike: "style from the beginning"): the lock used to ask for a
+// photograph — "natural skin with fine pore detail, crisp sharp focus, high
+// resolution" — so the locked face was photographic and the body inherited that
+// through the reference latent. The bald stack and framing lines are kept
+// verbatim (proven); the photographic descriptors are replaced with the
+// painterly vocabulary from style-refs/STYLE-VOCABULARY.md. The dead FLUX.1
+// LoRA triggers are gone (nothing loads them on FLUX.2). Negatives are never
+// sent on the FLUX.2 path, so the positive stack is the only style lever.
 const IDENTITY_LOCK_TAGS = [
   'completely bald',
   'shaved head',
   'bare scalp',
   'no hair at all',
-  'in the style of ckpf',               // painterly LoRA trigger
-  'aidmafluxpro1.1',                    // detail LoRA trigger — activates extreme detailer more strongly
+  'painterly digital character illustration',
+  'semi-realistic concept art portrait',
+  'painted rather than photographed',
+  'matte finish',
   'close-up face portrait centered in frame',
   'face centered vertically and horizontally',
   'chin and forehead both fully visible',
   'forehead fully exposed',
   'ears fully visible',
   'smooth scalp with no hair',
-  'natural skin with fine pore detail',
-  'highly detailed facial features',
-  'luminous vivid eyes with rich color',
-  'crisp sharp focus',
-  'soft lighting',
-  'high resolution',
+  'porcelain-smooth skin with a soft matte sheen',
+  'idealized symmetrical features',
+  'large glassy eyes with smoky dark lids',
+  'soft diffuse frontal light',
+  'cool grey shadows',
+  'flat mottled grey studio backdrop like toned paper',
   'no clothing visible',
   'bare skin only',
   'head and face only',
 ].join(', ');
 
 // Reinforcement sentences appended to t5xxl (after the clip_l mirror).
-// Required when ControlNet is active — the silhouette conditioning needs extra
-// bald signal to counter. Without ControlNet, bf706666 showed these aren't needed.
-const IDENTITY_LOCK_REINFORCEMENT = 'The character is completely bald with a smooth clean-shaven scalp. There is absolutely no hair on the head whatsoever. The scalp is fully bare and exposed.';
+// Bald sentence proven; painterly sentence added 2026-10-13 so T5 gets the
+// style in prose as well as tags.
+const IDENTITY_LOCK_REINFORCEMENT = 'The character is completely bald with a smooth clean-shaven scalp. There is absolutely no hair on the head whatsoever. The scalp is fully bare and exposed. This is a painted character illustration, not a photograph: semi-realistic concept art with a matte finish, porcelain-smooth skin with a soft matte sheen and almost no pore texture, large glassy eyes with smoky dark lids, soft diffuse frontal light with cool grey shadows, on a flat mottled grey studio backdrop like toned paper.';
 
 // Legacy export for any residual callers.
 const IDENTITY_LOCK_SENTENCES = IDENTITY_LOCK_TAGS + '. ' + IDENTITY_LOCK_REINFORCEMENT;
@@ -200,11 +210,11 @@ const NEGATIVE_FACE_ONLY = [
 ].join(', ');
 
 const ANGLE_PRESETS: Record<string, string> = {
-  front: 'plain grey background, even lighting',
-  three_quarter_left: 'plain grey background, soft lighting',
-  three_quarter_right: 'plain grey background, soft lighting',
-  profile_left: 'plain grey background, soft lighting',
-  profile_right: 'plain grey background, soft lighting',
+  front: 'flat mottled grey studio backdrop, soft diffuse frontal light',
+  three_quarter_left: 'flat mottled grey studio backdrop, soft diffuse light',
+  three_quarter_right: 'flat mottled grey studio backdrop, soft diffuse light',
+  profile_left: 'flat mottled grey studio backdrop, soft diffuse light',
+  profile_right: 'flat mottled grey studio backdrop, soft diffuse light',
 };
 
 // ============================================================
@@ -236,9 +246,13 @@ export function getStyleTags(creationMode = false): string {
     return [
       'painterly digital character illustration',
       'semi-realistic concept art',
+      'painted rather than photographed',
       'matte finish',
+      'visible brushwork',
       'porcelain-smooth skin with a soft matte sheen',
+      'edges of the figure dissolve into loose brush strokes',
       'flat mottled grey studio backdrop like toned paper',
+      'faint paint smudges on the backdrop',
       'soft ground shadow under the feet',
       'soft diffuse frontal light',
       'cool grey shadows',
@@ -251,8 +265,9 @@ export function getStyleTags(creationMode = false): string {
 export function getStyleSentences(creationMode = false): string {
   if (creationMode) {
     return [
-      'A painterly digital character illustration in a semi-realistic concept-art style with a matte finish, painted rather than photographed.',
-      'The skin is porcelain-smooth with a soft matte sheen; the backdrop is a flat mottled grey studio wall like toned paper with a soft ground shadow under the feet and nothing else in the scene.',
+      'A painterly digital character illustration in a semi-realistic concept-art style with a matte finish, painted rather than photographed, with visible brushwork.',
+      'The skin is porcelain-smooth with a soft matte sheen and almost no pore texture; the outer edges of the figure dissolve into loose brush strokes.',
+      'The backdrop is a flat mottled grey studio wall like toned paper with faint paint smudges and a soft ground shadow under the feet, and nothing else in the scene.',
       'Soft diffuse frontal light with cool grey shadows and no hard shadows.',
     ].join(' ');
   }
