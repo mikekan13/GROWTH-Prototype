@@ -105,7 +105,7 @@ export function buildQwen21DescribePrompt(
     // Optional <image2> = a headless/greyscale style reference (proven not to bleed its subject).
     const goldMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_GOLD : medium;
     return [
-      `A painted character illustration of exactly the subject in <image1>${d ? ` (${d})` : ''}: keep the same person or subject, face, pose, expression, clothing, framing and setting as <image1>.`,
+      customLead ?? `A painted character illustration of exactly the subject in <image1>${d ? ` (${d})` : ''}: keep the same person or subject, face, pose, expression, clothing, framing and setting as <image1>.`,
       opts.styleRef ? '<image2> is only a style reference: use its art style, ink linework, painted shading, finish, palette and lighting, and nothing else from it.' : '',
       goldMedium.trim(),
       getCampaignMood(mood),

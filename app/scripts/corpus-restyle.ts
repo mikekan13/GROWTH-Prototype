@@ -46,6 +46,15 @@ async function main() {
     : styleArg === 'gold'
       ? path.resolve(process.cwd(), '..', 'style-refs', 'STYLE-ANCHOR-2026-10-13-sheet6-seed8.png')
       : styleArg ? path.resolve(styleArg) : undefined;
+  // --medium gold|training|none | --medium-text "<paragraph>" ; --lead "<sentence>" ("{d}" = description) — lab overrides
+  const { GROWTH_MEDIUM_GOLD, GROWTH_MEDIUM_TRAINING } = await import('../src/ai/portraits/style-config');
+  const mediumArg = arg('medium');
+  const mediumText = arg('medium-text');
+  const medium = mediumText ? mediumText : mediumArg === 'gold' ? GROWTH_MEDIUM_GOLD : mediumArg === 'training' ? GROWTH_MEDIUM_TRAINING : mediumArg === 'none' ? ' ' : undefined;
+  const lead = arg('lead');
+  // --ref-max N: hand the model a downscaled copy of the content image (longest side N px) so it must
+  // repaint detail instead of copying it — the img2img-strength analogue on an edit model.
+  const refMax = Number(arg('ref-max', '0'));
   const limit = Number(arg('limit', '0'));
   const resume = process.argv.includes('--resume');
 
@@ -71,7 +80,7 @@ async function main() {
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
   const provider = new Qwen21Provider();
   provider.setLoras(loras);
-  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, loras=${loraSpec || 'none'} → ${outDir}`);
+  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, medium=${mediumText ? 'custom' : (mediumArg ?? 'default')}, lead=${lead ? 'custom' : 'default'}, loras=${loraSpec || 'none'} → ${outDir}`);
 
   const results: Record<string, unknown>[] = [];
   const byGroup = new Map<string, { image: Buffer; label: string }[][]>();
@@ -82,7 +91,13 @@ async function main() {
     try { await fs.access(contentPath); } catch { console.log(`  skip ${it.id}: no content png`); continue; }
     const t = Date.now();
     try {
-      const r = await provider.describeBase('corpus-restyle', '', seed, mood, { training: true, contentRefPath: contentPath, styleRefPath });
+      let refPath = contentPath;
+      if (refMax > 0) {
+        const sharp = (await import('sharp')).default;
+        refPath = path.join(outDir, 'raw', `${it.id}.ref${refMax}.png`);
+        await sharp(contentPath).resize({ width: refMax, height: refMax, fit: 'inside' }).png().toFile(refPath);
+      }
+      const r = await provider.describeBase('corpus-restyle', '', seed, mood, { training: true, contentRefPath: refPath, styleRefPath, medium, lead });
       await fs.writeFile(path.join(outDir, `${it.id}.png`), r.imageData);
       await fs.writeFile(path.join(outDir, 'raw', `${it.id}.png`), r.rawData);
       const rows = byGroup.get(it.group) ?? [[], []];
@@ -102,7 +117,12 @@ async function main() {
     await fs.writeFile(path.join(outDir, `sheet-${group}.jpg`), sheet);
     console.log(`sheet → ${path.join(outDir, `sheet-${group}.jpg`)} (${rows[1].length})`);
   }
-  await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ mood, seed, loras: loraSpec || null, loraLabel: qwen21LoraLabel(loras) || null, items: results }, null, 2));
+  await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ mood, seed, refMax: refMax || null, medium: mediumText ?? mediumArg ?? null, lead: lead ?? null, loras: loraSpec || null, loraLabel: qwen21LoraLabel(loras) || null, items: results }, null, 2));
+  if (results.length && 'imagePath' in results[0]) {
+    // record the exact prompt of the first item for the sheet's provenance
+    const firstPrompt = await fs.readFile(String(results[0].imagePath).replace(/\.png$/, '.json'), 'utf8').catch(() => '');
+    if (firstPrompt) await fs.writeFile(path.join(outDir, 'first-prompt.json'), firstPrompt);
+  }
   console.log(`done: ${results.filter(r => !('error' in r)).length} restyled, ${results.filter(r => 'error' in r).length} failed, ${((Date.now() - t0) / 60000).toFixed(1)} min`);
 }
 
