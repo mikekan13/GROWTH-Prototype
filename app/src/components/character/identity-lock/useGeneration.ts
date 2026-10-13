@@ -315,18 +315,26 @@ export function useGeneration(args: {
       });
       if (body) dispatch({ type: 'FINAL_BODY_DONE', imagePath: body.imagePath });
 
-      // Call persona lock API if character exists in DB
-      if (characterId) {
+      // Lock the bust onto Character.portrait so the canvas card shows it.
+      // Designer runs do not write PortraitGeneration rows, so always send
+      // imagePath; attach generationId only when a history row exists.
+      if (characterId && bust) {
         try {
-          const histRes = await fetch(`/api/portraits/history?characterId=${characterId}`);
-          const histData = await histRes.json();
-          const latest = histData.portraits?.[0];
-          if (latest) {
-            await fetch('/api/portraits/lock', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ generationId: latest.id, characterId }),
-            });
+          let generationId: string | undefined;
+          try {
+            const histRes = await fetch(`/api/portraits/history?characterId=${characterId}`);
+            const histData = await histRes.json();
+            generationId = histData.portraits?.[0]?.id;
+          } catch {
+            // no history — imagePath path handles it
+          }
+          const lockRes = await fetch('/api/portraits/lock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ characterId, imagePath: bust.imagePath, ...(generationId ? { generationId } : {}) }),
+          });
+          if (!lockRes.ok) {
+            console.warn('[IdentityLock] Persona lock API failed — portraits still saved', await lockRes.text());
           }
         } catch {
           console.warn('[IdentityLock] Persona lock API failed — portraits still saved');
