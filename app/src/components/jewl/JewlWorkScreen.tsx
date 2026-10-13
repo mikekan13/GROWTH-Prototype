@@ -5,7 +5,7 @@
  * completely"). The genesis loading screen, generalised: RAW FEED pole of the
  * rulebook (black void, Consolas, teal/amber Terminal type, glitch on stage
  * turns) with a Terminal header, the three pillar tubes, the stage ladder,
- * elapsed time, a rolling log, a Needs-you list and Keep working / Close.
+ * elapsed time, a rolling log, a Needs-you list and Keep watching / Close.
  *
  * This file is the SHELL — it knows nothing about genesis. A session-type
  * adapter builds a WorkScreenModel and passes its own blocks as slots:
