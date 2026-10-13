@@ -27,12 +27,6 @@ export HF_HUB_ENABLE_HF_TRANSFER=1 PIP_ROOT_USER_ACTION=ignore PIP_DISABLE_PIP_V
 python3 -m pip install -q "huggingface_hub[hf_transfer]" hf_transfer || export HF_HUB_ENABLE_HF_TRANSFER=0
 python3 -m pip install -q fastapi "uvicorn[standard]" python-multipart pillow
 
-# ---- token-guarded server (restart loop); pipeline load waits for /workspace/READY
-( cd "$QS"; while true; do
-    python3 server.py >> "$LOGS/server.log" 2>&1
-    echo "server exited rc=$? $(date -u +%T), restarting in 5s" >> "$LOGS/server.log"; sleep 5
-  done ) &
-
 # ---- weights (background, in parallel with the DiffSynth install) -> $MODELS/<repo id>/...
 cat > /workspace/dl.py <<'PY'
 import os, sys, time
@@ -76,6 +70,13 @@ cd DiffSynth-Studio && git checkout -q 11315d7 && python3 -m pip install -q -e .
 python3 -m pip install -q "transformers==4.57.3"
 python3 -c "import torch;print('torch after deps',torch.__version__)"
 python3 -c "from diffsynth.pipelines.qwen_image import QwenImagePipeline, ModelConfig; import inspect; print('ModelConfig', inspect.signature(ModelConfig))" || echo "DIFFSYNTH IMPORT FAILED"
+
+# ---- token-guarded server (restart loop). Started AFTER the DiffSynth editable install: a Python that is
+# already running never sees a .pth added later (first pod: "No module named 'diffsynth'").
+( cd "$QS"; while true; do
+    python3 server.py >> "$LOGS/server.log" 2>&1
+    echo "server exited rc=$? $(date -u +%T), restarting in 5s" >> "$LOGS/server.log"; sleep 5
+  done ) &
 
 echo "== waiting for downloads"; wait $DL; RC=$?
 cat "$LOGS/download.log"; du -sh "$MODELS"/*/* 2>/dev/null; df -h /workspace | tail -1
