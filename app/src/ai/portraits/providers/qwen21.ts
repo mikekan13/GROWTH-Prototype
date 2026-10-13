@@ -46,6 +46,10 @@ import {
 import { compositeEditWithMask } from '../mask-composite';
 import { finishEnabled, finishImage, rawSiblingPath } from '../finish';
 import { resolveMoodKey } from '../style-config';
+import { checkBaseLock, lockGateEnabled, type LockGateMeta, type LockGateVerdict } from '../lock-gate';
+
+/** Re-rolls after a failed base-lock gate (seed S → S+1 → S+2). */
+export const LOCK_GATE_MAX_RETRIES = 2;
 
 const WORKFLOW_NAME = 'qwen21-edit';
 const MODEL_NAME = 'qwen-image-2.1-int8';
@@ -112,6 +116,8 @@ export interface Qwen21StepResult {
   width: number;
   height: number;
   generationTimeMs: number;
+  /** Base-lock gate result (painted lock only). */
+  gate?: LockGateMeta;
 }
 
 /** A source image: a web path under public/ or an in-memory buffer (previous step's output). */
@@ -150,7 +156,14 @@ export class Qwen21Provider extends ServerlessProvider {
     return { raw: await this.runWorkflow(prompt, names, seed), prompt };
   }
 
-  /** Step 1 — identity lock from reference photos (web paths under public/). */
+  /**
+   * Step 1 — identity lock from reference photos (web paths under public/).
+   *
+   * BASE-LOCK GATE (single/painted mode): each render is judged on the LOCAL vision
+   * model (lock-gate.ts) against the fixed base composition. Fail → re-roll with
+   * seed S+1, then S+2 (deterministic). First pass wins; all fail → the best-scoring
+   * attempt, flagged. Only the chosen attempt is saved. QWEN21_LOCK_GATE=off bypasses.
+   */
   async lockIdentity(
     characterId: string,
     photos: string[],
@@ -158,8 +171,39 @@ export class Qwen21Provider extends ServerlessProvider {
     opts?: { painted?: boolean; mood?: string },
   ): Promise<Qwen21StepResult> {
     const t0 = Date.now();
-    const { raw, prompt } = await this.renderLock(photos, seed, opts);
-    return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
+    const painted = opts?.painted ?? qwen21StyleMode() === 'single';
+    if (!painted) {
+      const { raw, prompt } = await this.renderLock(photos, seed, opts);
+      return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
+    }
+    if (!lockGateEnabled()) {
+      const { raw, prompt } = await this.renderLock(photos, seed, { ...opts, painted });
+      const r = await this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
+      return { ...r, gate: { pass: true, reasons: ['gate off'], attempts: 1, seed, score: 1, bypassed: true } };
+    }
+
+    let best: { raw: Buffer; prompt: string; seed: number; verdict: LockGateVerdict } | null = null;
+    let attempts = 0;
+    for (let i = 0; i <= LOCK_GATE_MAX_RETRIES; i++) {
+      const s = seed + i;
+      const { raw, prompt } = await this.renderLock(photos, s, { ...opts, painted });
+      attempts++;
+      const verdict = await this.checkLock(raw);
+      console.log(`[Qwen21] lock gate seed=${s}: ${verdict.pass ? 'PASS' : 'FAIL'} ${verdict.reasons.join('; ')}`);
+      if (!best || verdict.score > best.verdict.score) best = { raw, prompt, seed: s, verdict };
+      if (verdict.pass) { best = { raw, prompt, seed: s, verdict }; break; }
+    }
+    const chosen = best!;
+    const r = await this.saveStep(characterId, 'faces', 'identity-lock', chosen.prompt, chosen.raw, chosen.seed, Date.now() - t0, opts?.mood);
+    return {
+      ...r,
+      gate: { pass: chosen.verdict.pass, reasons: chosen.verdict.reasons, attempts, seed: chosen.seed, score: chosen.verdict.score },
+    };
+  }
+
+  /** The base-lock check (local vision only). Overridable for tests. */
+  protected checkLock(raw: Buffer): Promise<LockGateVerdict> {
+    return checkBaseLock(raw);
   }
 
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */
@@ -249,7 +293,12 @@ export class Qwen21Provider extends ServerlessProvider {
         hasLock
           ? `qwen21 style pass on existing lock ${refs[0]}`
           : `qwen21 two-step: ${refs.length} photo(s) → lock ${lock!.imagePath} → styled`,
-        { mood, rawPath: styled.rawPath, ...(lock ? { lockPrompt: lock.prompt, lockImagePath: lock.imagePath } : {}) },
+        {
+          mood,
+          rawPath: styled.rawPath,
+          ...(lock ? { lockPrompt: lock.prompt, lockImagePath: lock.imagePath } : {}),
+          ...(lock?.gate ? { gate: lock.gate } : {}),
+        },
       );
     } catch (e) {
       if (e instanceof PortraitEndpointError) throw e;

@@ -178,7 +178,41 @@ export interface DesignerLevers {
   guidance: number | null;
   steps: number | null;
   refs: number;
+  /** Base-lock gate verdict on a lock call (metadata.gate); absent on edits/body. */
+  gate?: DesignerGate | null;
 }
+
+/** metadata.gate from qwen21 lockIdentity (ai/portraits/lock-gate.ts LockGateMeta). */
+export interface DesignerGate {
+  pass: boolean;
+  reasons: string[];
+  attempts: number;
+  bypassed?: boolean;
+}
+
+/** Read metadata.gate defensively (null when absent or malformed). Pure. */
+export function readDesignerGate(v: unknown): DesignerGate | null {
+  if (!v || typeof v !== 'object') return null;
+  const g = v as Record<string, unknown>;
+  if (typeof g.pass !== 'boolean') return null;
+  return {
+    pass: g.pass,
+    reasons: Array.isArray(g.reasons) ? g.reasons.filter((r): r is string => typeof r === 'string') : [],
+    attempts: typeof g.attempts === 'number' && g.attempts > 0 ? Math.floor(g.attempts) : 1,
+    ...(g.bypassed === true ? { bypassed: true } : {}),
+  };
+}
+
+/** Tiny caption text: "gate: pass" / "re-rolled ×N" / "flagged: <reason>". Pure. */
+export function gateLine(g: DesignerGate | null | undefined): string | null {
+  if (!g) return null;
+  if (g.bypassed) return 'gate: off';
+  if (!g.pass) return `flagged: ${(g.reasons[0] ?? 'off-composition').replace(/\s*\(.*\)$/, '')}`;
+  if (g.reasons.some(r => r.startsWith('gate unavailable'))) return 'gate: unavailable';
+  return g.attempts > 1 ? `re-rolled ×${g.attempts - 1}` : 'gate: pass';
+}
+
+export const GATE_FLAGGED_NOTE = 'The base came back dressed or off-pose; tap regenerate.';
 
 export interface DesignerState {
   /** The styled bust from LOCK IDENTITY (= layers[0].imagePath). */

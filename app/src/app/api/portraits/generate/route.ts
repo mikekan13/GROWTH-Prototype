@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
         workflowUsed: (result.metadata as unknown as Record<string, unknown>).workflowUsed || 'unknown',
         failedWorkflows: (result.metadata as unknown as Record<string, unknown>).failedWorkflows || [],
         debugRefs: (result.metadata as unknown as Record<string, unknown>).debugRefs || '',
+        // Base-lock gate (qwen21 lockIdentity): { pass, reasons, attempts, seed, score, bypassed? }
+        gate: (result.metadata as unknown as Record<string, unknown>).gate ?? null,
       },
     });
   } catch (error) {

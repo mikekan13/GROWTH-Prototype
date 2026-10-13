@@ -8,6 +8,10 @@ import sharp from 'sharp';
 export interface SheetTile {
   image: Buffer;
   label: string;
+  /** Optional second line under the label (style lab --gate: "PASS" / "FAIL: reasons"). */
+  note?: string;
+  /** Draw the note in warning gold instead of teal. */
+  noteWarn?: boolean;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -21,7 +25,9 @@ export async function buildContactSheet(
   opts: { tile?: number; label?: number; gap?: number; background?: string; quality?: number } = {},
 ): Promise<Buffer> {
   const tileW = opts.tile ?? 384;
-  const labelH = opts.label ?? 28;
+  const lineH = opts.label ?? 28;
+  const hasNotes = rows.flat().some(t => !!t.note);
+  const labelH = hasNotes ? Math.round(lineH * 1.8) : lineH;
   const gap = opts.gap ?? 8;
   const bg = opts.background ?? '#141414';
   const first = rows.flat()[0];
@@ -46,7 +52,11 @@ export async function buildContactSheet(
       layers.push({ input: img, left, top });
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${tileW}" height="${labelH}">` +
         `<rect width="100%" height="100%" fill="#000"/>` +
-        `<text x="8" y="${Math.round(labelH * 0.68)}" font-family="Consolas, monospace" font-size="${Math.round(labelH * 0.5)}" fill="#22ab94">${esc(t.label)}</text></svg>`;
+        `<text x="8" y="${Math.round(lineH * 0.68)}" font-family="Consolas, monospace" font-size="${Math.round(lineH * 0.5)}" fill="#22ab94">${esc(t.label)}</text>` +
+        (t.note
+          ? `<text x="8" y="${Math.round(lineH * 1.5)}" font-family="Consolas, monospace" font-size="${Math.round(lineH * 0.4)}" fill="${t.noteWarn ? '#ffcc78' : '#22ab94'}">${esc(t.note)}</text>`
+          : '') +
+        `</svg>`;
       layers.push({ input: Buffer.from(svg), left, top: top + tileH });
     }
   }

@@ -4,7 +4,7 @@
  */
 
 import { portraitErrorLine } from '@/lib/entity-view';
-import { designerErrorLine, type DesignerLevers, type DesignerState } from '@/lib/appearance-designer';
+import { designerErrorLine, readDesignerGate, type DesignerLevers, type DesignerState } from '@/lib/appearance-designer';
 
 export type CallResult =
   | { ok: true; imagePath: string; seed: number | null; levers: DesignerLevers }
@@ -30,7 +30,7 @@ async function post(url: string, payload: unknown, refs: number): Promise<CallRe
   const meta = (body.metadata ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   const seed = n(meta.seed);
-  return { ok: true, imagePath: body.imagePath, seed, levers: { seed, guidance: n(meta.cfg), steps: n(meta.steps), refs } };
+  return { ok: true, imagePath: body.imagePath, seed, levers: { seed, guidance: n(meta.cfg), steps: n(meta.steps), refs, gate: readDesignerGate(meta.gate) } };
 }
 
 const randomSeed = () => Math.floor(Math.random() * 2147483647);
