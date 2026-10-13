@@ -19,6 +19,8 @@ interface TapestryTabProps {
   // character/entity id so the parent can switch to the Character tab loaded with
   // that entity (no /character/[id] navigation).
   onSelectCharacter?: (characterId: string) => void;
+  /** Open on this sub-tab (the entity view's back button returns to Entities). */
+  initialSubTab?: 'applications' | 'entities';
 }
 
 // --- Member types ---
@@ -347,8 +349,8 @@ function GrovinesPanel({ nodes }: { nodes: CanvasNode[] }) {
 }
 
 // --- Main TapestryTab ---
-export default function TapestryTab({ campaignId, isGM, nodes, onSelectCharacter }: TapestryTabProps) {
-  const [subTab, setSubTab] = useState<SubTab>(isGM ? 'applications' : 'entities');
+export default function TapestryTab({ campaignId, isGM, nodes, onSelectCharacter, initialSubTab }: TapestryTabProps) {
+  const [subTab, setSubTab] = useState<SubTab>(initialSubTab ?? (isGM ? 'applications' : 'entities'));
 
   const subTabs: { key: SubTab; label: string; gmOnly?: boolean }[] = [
     ...(isGM ? [{ key: 'applications' as SubTab, label: 'Trailblazers', gmOnly: true }] : []),

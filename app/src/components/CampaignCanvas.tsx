@@ -24,7 +24,7 @@ const RelationsCanvas = dynamic(() => import('@/components/canvas/RelationsCanva
 const CampaignTerminal = dynamic(() => import('@/components/terminal/CampaignTerminal'), { ssr: false });
 const ForgeWorkshop = dynamic(() => import('@/components/forge/ForgeWorkshop'), { ssr: false });
 const TapestryTab = dynamic(() => import('@/components/tapestry/TapestryTab'), { ssr: false });
-const CharacterTab = dynamic(() => import('@/components/character/CharacterTab'), { ssr: false });
+const EntityView = dynamic(() => import('@/components/tapestry/EntityView'), { ssr: false });
 const EffortWagerModal = dynamic(() => import('@/components/campaign/EffortWagerModal'), { ssr: false });
 const ContractsDock = dynamic(() => import('@/components/canvas/ContractsDock'), { ssr: false });
 const DeathSaveDialog = dynamic(() => import('@/components/character/DeathSaveDialog'), { ssr: false });
@@ -147,6 +147,11 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
     setSelectedCharacterId(id);
     setActiveTab('character');
   }, []);
+  // Entity view's back button returns to Tapestry on its Entities sub-tab.
+  const [tapestryBackToEntities, setTapestryBackToEntities] = useState(false);
+  useEffect(() => {
+    if (activeTab !== 'tapestry' && activeTab !== 'character') setTapestryBackToEntities(false);
+  }, [activeTab]);
   useEffect(() => {
     if (activeTab !== 'character') {
       setSelectedCharacterId(null);
@@ -1832,11 +1837,15 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
 
 
         {activeTab === 'tapestry' && (
-          <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} onSelectCharacter={handleSelectCharacter} />
+          <TapestryTab campaignId={campaign.id} isGM={isGM} nodes={nodes} onSelectCharacter={handleSelectCharacter}
+            initialSubTab={tapestryBackToEntities ? 'entities' : undefined} />
         )}
 
+        {/* Entity view (2026-10-12): Appearance / Sheet / Persona for the
+            selected entity, with a back affordance to the Entities list. */}
         {activeTab === 'character' && (
-          <CharacterTab
+          <EntityView
+            onBack={selectedCharacterId ? () => { setTapestryBackToEntities(true); setActiveTab('tapestry'); } : undefined}
             campaignId={campaign.id}
             userId={userId}
             userRole={userRole}

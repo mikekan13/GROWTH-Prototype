@@ -13,6 +13,7 @@ import { FrontDiscoveryStep } from './identity-lock/steps/FrontDiscoveryStep';
 import { AngleSteps } from './identity-lock/steps/AngleSteps';
 import { BodyDiscoveryStep } from './identity-lock/steps/BodyDiscoveryStep';
 import { PersonaLockStep } from './identity-lock/steps/PersonaLockStep';
+import { portraitErrorLine } from '@/lib/entity-view';
 
 // ============================================================
 // Props
@@ -25,6 +26,9 @@ interface IdentityLockWizardProps {
   characterId?: string;
   onComplete: (bust: string, fullBody: string) => void;
   onCancel: () => void;
+  /** Entity view (2026-10-12): keep the Finetune panel on screen whenever there
+   *  is an image to finetune, not only on its own step. */
+  finetuneAlwaysVisible?: boolean;
 }
 
 // ============================================================
@@ -38,6 +42,7 @@ export default function IdentityLockWizard({
   characterId,
   onComplete,
   onCancel,
+  finetuneAlwaysVisible = false,
 }: IdentityLockWizardProps) {
   // Persist wizard state to localStorage so a page refresh restores the user to
   // wherever they were (locked face, angles, body) instead of Step 1.
@@ -206,17 +211,20 @@ export default function IdentityLockWizard({
   ];
   const stepOrder: WizardStep[] = ['front_discovery', 'body_discovery', 'finetune', 'persona_lock', 'generating_final', 'complete'];
   const currentStepIndex = stepOrder.indexOf(state.step);
+  const finetuneSource = bodyDisplayImage || state.bodyImage || state.lockedFace;
+  const showFinetune = state.step === 'finetune'
+    || (finetuneAlwaysVisible && !!finetuneSource && state.step !== 'generating_final' && state.step !== 'complete');
 
   return (
     <div className="border p-4" style={{ borderColor: '#D0A030', borderRadius: '3px', backgroundColor: '#0d0d1f' }}>
-      <div className="flex gap-4">
+      <div className="flex flex-col md:flex-row gap-4">
       {/* Custom Prompt Panel — LoRA sliders removed (no FLUX.2-compatible LoRAs loaded) */}
       {true && (
         <CustomPromptPanel state={state} dispatch={dispatch} tuning={tuning} gen={generation} allRefs={allRefs} referencePhotos={referencePhotos} />
       )}
 
       {/* Wizard Content */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-base uppercase" style={{ color: '#D0A030', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.12em' }}>
@@ -299,7 +307,7 @@ export default function IdentityLockWizard({
       {/* ══════════════════════════════════════════════════════════
           STEP 4.5: Finetune (Kontext Edit)
           ══════════════════════════════════════════════════════════ */}
-      {state.step === 'finetune' && (
+      {showFinetune && (
         <FinetunePanel
           sourceImage={bodyDisplayImage || state.bodyImage || state.lockedFace}
           finetuneHistory={state.finetuneHistory}
@@ -367,7 +375,7 @@ export default function IdentityLockWizard({
           color: '#E8585A', fontFamily: 'var(--font-terminal), Consolas, monospace',
           backgroundColor: '#1a0a0a', border: '1px solid #E8585A40', borderRadius: '3px',
         }}>
-          {state.error}
+          {portraitErrorLine(state.error)}
         </div>
       )}
 

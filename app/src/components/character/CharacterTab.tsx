@@ -16,6 +16,7 @@ import { GenesisOpenThreads } from './GenesisProds';
 import { shouldShowComplete, requestComplete } from '@/lib/genesis-complete-ui';
 import { GenesisSeedScreenDialog, type SeedScreenFindingView } from './GenesisSeedScreen';
 import { seedGate } from '@/lib/seed-state';
+import { portraitErrorLine, type EntitySection, type EntityStateReport } from '@/lib/entity-view';
 
 // Body-part section re-enabled (Mike 2026-08-17 body-spawn ruling): it now
 // reads the SPAWNED body-part items (character.bodyAnatomy) — per-part
@@ -114,7 +115,7 @@ interface CharacterTabProps {
   userId?: string;
   userRole?: string;
   isGM: boolean;
-  userCharacter?: { id: string; name: string; data: string; entityType?: string } | null;
+  userCharacter?: { id: string; name: string; data: string; entityType?: string; status?: string } | null;
   // Explicit override for edit permissions. When set to true, forces editable mode
   // regardless of isGM/entityType gating. Used by Tapestry where GM always owns the
   // entity they're editing — bypasses the entityType round-trip from the API.
@@ -127,10 +128,22 @@ interface CharacterTabProps {
   /** BORN ≠ DONE (2026-10-12): a Portrait Needs-you item asked to open this
    *  character's Appearance ↗ (nonce = a fresh request). */
   openAppearanceFor?: { id: string; nonce: number } | null;
+  /** Entity view (2026-10-12): render ONE section (Appearance / Sheet /
+   *  Persona). Omitted = the legacy full stack. All state stays here, so
+   *  Save / Submit work across sections. */
+  section?: EntitySection;
+  /** Reports lifecycle facts up so EntityView can pick the default section. */
+  onEntityState?: (r: EntityStateReport) => void;
+  /** Asks EntityView to switch section (Appearance ↗ from the genesis screen). */
+  onRequestSection?: (s: EntitySection) => void;
+  /** Persona section body, composed by EntityView. */
+  personaSlot?: React.ReactNode;
 }
 
-export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit, selectedCharacterId, openAppearanceFor }: CharacterTabProps) {
-  const [overrideCharacter, setOverrideCharacter] = useState<{ id: string; name: string; data: string; entityType?: string } | null>(null);
+export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit, selectedCharacterId, openAppearanceFor, section, onEntityState, onRequestSection, personaSlot }: CharacterTabProps) {
+  const [overrideCharacter, setOverrideCharacter] = useState<{ id: string; name: string; data: string; entityType?: string; status?: string } | null>(null);
+  // One section on screen at a time in the entity view; legacy = everything.
+  const show = (s: EntitySection) => !section || section === s;
   const [physicalDescription, setPhysicalDescription] = useState<PhysicalDescription>({});
   const [backstoryText, setBackstoryText] = useState('');
   const [characterName, setCharacterName] = useState('');
@@ -159,6 +172,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [generatedFullBody, setGeneratedFullBody] = useState<string | null>(null);
   const [generationError, _setGenerationError] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  // Entity view: the identity wizard (and its Finetune panel) is open by
+  // default in Appearance — no toggle — until the user closes it.
+  const [wizardClosed, setWizardClosed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -214,6 +230,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           name: character.name,
           data: dataStr,
           entityType: character.entityType,
+          status: character.status,
         });
         // Force re-hydration of local state by clearing the hydrated marker.
         hydratedIdRef.current = null;
@@ -307,6 +324,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     setLastSaved(null);
     setGenesisSubmitError(null);
     setDescribeError(null);
+    setWizardClosed(false);
 
     if (effectiveCharacter?.data) {
       try {
@@ -488,11 +506,15 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   // overlay aside (the badge keeps tracking JEWL) and opens the look editor.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceRef = useRef<HTMLDivElement>(null);
+  // Entity view: a section switch starts at the top of the new section.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [section]);
   const openAppearance = useCallback(() => {
     setAppearanceOpen(true);
     if (genesisCharId) setGenesisDismissedFor(genesisCharId);
+    onRequestSection?.('appearance');
     setTimeout(() => appearanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-  }, [genesisCharId]);
+  }, [genesisCharId, onRequestSection]);
   // A Portrait Needs-you item from JEWL's work screen (canvas event) lands here.
   const appearanceNonceRef = useRef<number | null>(null);
   useEffect(() => {
@@ -503,6 +525,28 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   }, [openAppearanceFor, genesisCharId, openAppearance]);
   const appearanceUnlocked = genomeInfo?.stage === 'ready' || genomeInfo?.stage === 'gestating'
     || genesisRunning || appearanceOpen;
+
+  // Entity view: report what decides the default section (creation vs born,
+  // awaiting image). Primitive deps so the report fires only on real change.
+  const reportName = characterName || effectiveCharacter?.name || '';
+  const reportCompletion = genesis?.completion ?? null;
+  const reportCompletionKey = reportCompletion ? `${reportCompletion.genesis}:${reportCompletion.image}` : '';
+  useEffect(() => {
+    if (!onEntityState || loading) return;
+    onEntityState({
+      characterId: effectiveCharacter?.id ?? null,
+      name: reportName,
+      entityType: effectiveCharacter?.entityType ?? null,
+      status: effectiveCharacter?.status ?? null,
+      genesisState: genesis?.state ?? null,
+      genesisRunning,
+      completion: reportCompletion,
+      genomeStage: genomeInfo?.stage ?? null,
+      hasBust: !!generatedBust,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onEntityState, loading, effectiveCharacter?.id, effectiveCharacter?.entityType, effectiveCharacter?.status, reportName,
+    genesis?.state, genesisRunning, reportCompletionKey, genomeInfo?.stage, generatedBust]);
 
   // Pre-submit seed screen (2026-10-12): findings that would be withheld.
   const [seedFindings, setSeedFindings] = useState<SeedScreenFindingView[] | null>(null);
@@ -661,6 +705,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     setGeneratedBust(bust);
     setGeneratedFullBody(fullBody);
     setWizardOpen(false);
+    setWizardClosed(true);
 
     // Persist portrait paths
     const portraitData = { generatedBust: bust, generatedFullBody: fullBody };
@@ -790,6 +835,30 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
     }
   };
 
+  const wizardVisible = wizardOpen || (!!section && isEditable && !!selectedSeed && !wizardClosed);
+  const saveButton = (
+    <button
+      onClick={save}
+      disabled={saving || !dirty}
+      className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
+      style={{
+        fontFamily: 'var(--font-terminal), Consolas, monospace',
+        backgroundColor: dirty ? 'var(--terminal-prime)' : '#333',
+        color: dirty ? '#000' : '#666',
+        border: '1px solid rgba(34, 171, 148, 0.4)',
+        borderRadius: '2px', cursor: dirty ? 'pointer' : 'default',
+        minHeight: section ? 44 : undefined,
+      }}
+    >
+      {saving ? 'Saving...' : dirty ? 'Save Draft' : 'Saved'}
+    </button>
+  );
+  const lastSavedLine = lastSaved && !dirty && (
+    <span className="text-xs" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+      Last saved {lastSaved}
+    </span>
+  );
+
   if (loading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#0a0a1a' }}>
@@ -799,7 +868,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   }
 
   return (
-    <div className="absolute inset-0 overflow-y-auto" style={{ backgroundColor: '#0a0a1a' }}>
+    <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden" style={{ backgroundColor: '#0a0a1a' }}>
       {showGenesisOverlay && (
         <GenesisLoadingOverlay
           progress={submittingGenesis ? null : genesis}
@@ -827,8 +896,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         />
       )}
       {showGenesisBadge && <GenesisBadge progress={genesis} onOpen={() => { setGenesisDismissedFor(null); setGenesisOpenedFor(genesisCharId); }} />}
-      <div className="max-w-4xl mx-auto p-6 space-y-5">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
 
+        {show('sheet') && (<>
         {/* TOP ROW — Name centered */}
         <div className="text-center">
           {isEditable ? (
@@ -855,7 +925,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         {/* GENOME PIPELINE STATUS — story → gestation → ready */}
         {effectiveCharacter?.id && (
           <div className="border p-3" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wider" style={{ fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
               {(['story', 'gestating', 'ready'] as const).map((s, i) => (
                 <span key={s} className="flex items-center gap-2">
                   {i > 0 && <span style={{ color: '#555' }}>→</span>}
@@ -910,11 +980,19 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         {effectiveCharacter?.id && (genomeInfo?.stage ?? 'story') !== 'story' && (
           <CharacterGenesisSections characterId={effectiveCharacter.id} />
         )}
+        </>)}
 
         {/* APPEARANCE — separate from genesis and editable DURING it (Mike
             2026-10-12; supersedes the 08-08 "look unlocks after gestation"
             gate for these sections). The seed selector now leads it (seed first). */}
-        {appearanceUnlocked && (<>
+        {show('appearance') && section && !appearanceUnlocked && (
+          <div className="border p-6 text-center" style={{ borderColor: '#582a7240', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
+            <div className="text-sm" style={{ color: '#8e7cc3', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
+              Appearance opens once the story is handed to JEWL (Sheet, then Submit to JEWL).
+            </div>
+          </div>
+        )}
+        {show('appearance') && appearanceUnlocked && (<>
         <div ref={appearanceRef} id="character-appearance" style={{ scrollMarginTop: 12 }} />
 
         {/* SEED — appearance requires one (Mike 2026-10-12). JEWL picks it the
@@ -1010,7 +1088,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
         {/* ── SECTION: Reference Photos ── */}
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
               <div className="text-base uppercase" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
                 Reference Photos
@@ -1113,7 +1191,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
             {/* Overall body traits */}
             <SectionLabel text="Overall" />
-            <div className="grid grid-cols-5 gap-2 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
               {/* Gender */}
               <FieldSelect label="Gender" value={pd.gender} options={GENDER_OPTIONS} editable={isEditable} onChange={v => updateField('gender', v)} />
               {/* Age */}
@@ -1201,7 +1279,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
               return (
                 <div className="mb-4">
                   <SectionLabel text="Likeness" />
-                  <div className="grid grid-cols-4 gap-2 mb-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
                     <FieldSelect label="Face Shape" value={head.faceShape} options={FACE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart('HEAD', 'faceShape', v)} />
                     <FieldInput label="Facial Hair" value={head.facialHair} placeholder="clean-shaven, full beard" editable={isEditable} onChange={v => updateBodyPart('HEAD', 'facialHair', v)} />
                     <FieldSelect label="Eye Shape" value={head.eyeShape} options={EYE_SHAPE_OPTIONS} editable={isEditable} onChange={v => updateBodyPart('HEAD', 'eyeShape', v)} />
@@ -1436,7 +1514,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
         {/* ── SECTION: Visual Identity ── */}
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
               <div className="text-base uppercase" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
                 Visual Identity
@@ -1445,9 +1523,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                 Lock your character&apos;s appearance. This defines how they look across all portraits, tokens, and 3D renders.
               </div>
             </div>
-            {!wizardOpen && isEditable && (
+            {!wizardVisible && isEditable && (
               <button
-                onClick={() => setWizardOpen(true)}
+                onClick={() => { setWizardOpen(true); setWizardClosed(false); }}
                 disabled={!selectedSeed}
                 title={seedGate(selectedSeed?.name).message ?? undefined}
                 className="px-5 py-2 text-xs uppercase tracking-[0.12em] transition-colors"
@@ -1464,17 +1542,17 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             )}
           </div>
 
-          {wizardOpen ? (
+          {wizardVisible && !section ? (
             <IdentityLockWizard
               characterData={buildCharacterData()}
               campaignId={campaignId}
               referencePhotos={referencePhotos}
               characterId={effectiveCharacter?.id}
               onComplete={handleWizardComplete}
-              onCancel={() => setWizardOpen(false)}
+              onCancel={() => { setWizardOpen(false); setWizardClosed(true); }}
             />
           ) : (
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-wrap gap-4 justify-center">
               {/* Dynamic Portrait — changes with equipment, wounds, mood */}
               <PortraitFrame label="Portrait" portrait={generatedBust} loading={generating} />
               {/* Battle Token — for maps and combat */}
@@ -1496,18 +1574,43 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             </div>
           )}
 
+          {/* Entity view: frames stay up AND the wizard (Finetune panel always
+              visible) sits below them; no toggle. */}
+          {wizardVisible && !!section && (
+            <div className="mt-4">
+              <IdentityLockWizard
+                characterData={buildCharacterData()}
+                campaignId={campaignId}
+                referencePhotos={referencePhotos}
+                characterId={effectiveCharacter?.id}
+                onComplete={handleWizardComplete}
+                onCancel={() => { setWizardOpen(false); setWizardClosed(true); }}
+                finetuneAlwaysVisible
+              />
+            </div>
+          )}
+
           {generationError && (
             <div className="text-xs mt-2" style={{ color: '#E8585A', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-              {generationError}
+              {portraitErrorLine(generationError)}
             </div>
           )}
         </div>
 
+        {/* Entity view: Appearance edits save from here too (same draft). */}
+        {section && isEditable && (
+          <div className="flex flex-wrap items-center gap-3">
+            {saveButton}
+            {lastSavedLine}
+          </div>
+        )}
+
         </>)}
 
-        {genomeInfo?.stage === 'ready' && (<>
-        {/* INVENTORY */}
-        {SHOW_INVENTORY && (
+        {show('sheet') && genomeInfo?.stage === 'ready' && (<>
+        {/* INVENTORY: hidden in the legacy creation stack; the entity view's
+            Sheet is the exhaustive place, so it shows there. */}
+        {(SHOW_INVENTORY || !!section) && (
         <div className="border p-4" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -1532,6 +1635,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
         </>)}
 
+        {show('sheet') && (<>
         {/* BACKSTORY */}
         <div className="border p-4 flex flex-col" style={{ borderColor: 'var(--pillar-spirit)', borderRadius: '3px', backgroundColor: '#1a1a2e' }}>
           <div className="text-base uppercase mb-2" style={{ color: 'var(--krma-gold)', fontFamily: 'var(--font-bebas-neue), Bebas Neue, sans-serif', letterSpacing: '0.08em' }}>
@@ -1603,21 +1707,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
 
         {/* Action buttons */}
         {isEditable && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={save}
-              disabled={saving || !dirty}
-              className="px-6 py-2 text-xs uppercase tracking-wider transition-colors"
-              style={{
-                fontFamily: 'var(--font-terminal), Consolas, monospace',
-                backgroundColor: dirty ? 'var(--terminal-prime)' : '#333',
-                color: dirty ? '#000' : '#666',
-                border: '1px solid rgba(34, 171, 148, 0.4)',
-                borderRadius: '2px', cursor: dirty ? 'pointer' : 'default',
-              }}
-            >
-              {saving ? 'Saving...' : dirty ? 'Save Draft' : 'Saved'}
-            </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {saveButton}
             {isGM && effectiveCharacter?.id && genesisRunning && (
               <button
                 onClick={() => setGenesisDismissedFor(null)}
@@ -1702,11 +1793,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             >
               {submittingBackstory ? 'Submitting...' : backstorySubmitted ? 'Re-submit to Watcher' : 'Submit to Watcher'}
             </button>}
-            {lastSaved && !dirty && (
-              <span className="text-xs" style={{ color: 'var(--terminal-prime)', fontFamily: 'var(--font-terminal), Consolas, monospace' }}>
-                Last saved {lastSaved}
-              </span>
-            )}
+            {lastSavedLine}
           </div>
         )}
         {isEditable && !effectiveCharacter?.id && backstorySubmitted && (
@@ -1714,6 +1801,9 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
             Submitted to your Watcher for approval. Keep refining your portrait and identity while you wait — your Watcher will build your character with you once approved.
           </div>
         )}
+        </>)}
+
+        {section === 'persona' && personaSlot}
       </div>
     </div>
   );

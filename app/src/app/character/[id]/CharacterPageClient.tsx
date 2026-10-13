@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import CharacterTab from '@/components/character/CharacterTab';
+import EntityView from '@/components/tapestry/EntityView';
 import CharacterSheet from '@/components/character/CharacterSheet';
 import DeathSplitModal from '@/components/character/DeathSplitModal';
 import GodheadPersonaPanel from '@/components/character/GodheadPersonaPanel';
@@ -89,17 +89,19 @@ export default function CharacterPageClient({
           </button>
         </div>
       )}
-      <CharacterTab
+      {/* One exhaustive place (2026-10-12): the same Appearance / Sheet /
+          Persona view the Tapestry Entities list opens. Persona carries the
+          AI persona editor when AI drives this character. */}
+      <EntityView
         campaignId={campaignId}
         userId={userId}
         userRole={userRole}
         isGM={isGM}
         userCharacter={characterData}
         canEdit={canEdit}
+        aiActionMode={showAIPersona}
+        layout="page"
       />
-      {showAIPersona && (
-        <GodheadPersonaPanel godheadName={characterData.name} />
-      )}
       {deathModalOpen && (
         <DeathSplitModal
           characterId={characterData.id}
