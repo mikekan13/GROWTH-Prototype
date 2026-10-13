@@ -1,0 +1,67 @@
+{
+  "_comment": "Qwen-Image-2.1 instruction-edit workflow (API format). Wiring copied from the A/B run that worked on ComfyUI 0.39.0 (2026-10-13): UNET -> CACHE (QwenImage21Cache) -> SAMPLE; TEXT_ENCODE (TextEncodeQwenImage21) gives positive/negative/latent and SAMPLE uses ITS latent (output follows image_1's aspect at a `resolution` pixel budget, INT, official default 1024). Reference images: buildQwen21Workflow() clones LOAD_REF1 into LOAD_REF1..N and wires TEXT_ENCODE.inputs['images.image_N'] = [LOAD_REFN, 0]; the prompt calls them <image1>, <image2>... Body renders swap SAMPLE.latent_image to an EMPTY_LATENT (EmptyLatentImage) the builder adds. cfg 1 -> negative_prompt is unused. Needs ComfyUI >= 0.37 (worker-comfyui 5.11.0 pins 0.34.0 -> custom image).",
+
+  "UNET": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "qwen_image_2.1_int8_convrot.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Load Qwen-Image-2.1 DiT (INT8)" }
+  },
+  "CLIP": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "qwen3vl_8b_int8_convrot.safetensors", "type": "qwen_image", "device": "default" },
+    "_meta": { "title": "Load Qwen3-VL 8B text encoder (INT8)" }
+  },
+  "VAE": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "qwen_image_2.1_vae_bf16.safetensors" },
+    "_meta": { "title": "Load Qwen-Image-2.1 VAE" }
+  },
+  "CACHE": {
+    "class_type": "QwenImage21Cache",
+    "inputs": { "model": ["UNET", 0], "device": "auto", "dtype": "default" },
+    "_meta": { "title": "QwenImage21Cache (between loader and sampler)" }
+  },
+  "LOAD_REF1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "PLACEHOLDER.png" },
+    "_meta": { "title": "Reference image 1 (<image1> = edit target)" }
+  },
+  "TEXT_ENCODE": {
+    "class_type": "TextEncodeQwenImage21",
+    "inputs": {
+      "clip": ["CLIP", 0],
+      "vae": ["VAE", 0],
+      "prompt": "",
+      "negative_prompt": "",
+      "resolution": 1024,
+      "images.image_1": ["LOAD_REF1", 0]
+    },
+    "_meta": { "title": "TextEncodeQwenImage21 (positive / negative / latent)" }
+  },
+  "SAMPLE": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["CACHE", 0],
+      "positive": ["TEXT_ENCODE", 0],
+      "negative": ["TEXT_ENCODE", 1],
+      "latent_image": ["TEXT_ENCODE", 2],
+      "seed": 0,
+      "steps": 25,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0
+    },
+    "_meta": { "title": "KSampler 25 steps cfg 1 euler/simple" }
+  },
+  "DECODE": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["SAMPLE", 0], "vae": ["VAE", 0] },
+    "_meta": { "title": "VAE Decode" }
+  },
+  "SAVE": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["DECODE", 0], "filename_prefix": "qwen21" },
+    "_meta": { "title": "Save" }
+  }
+}

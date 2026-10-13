@@ -11,6 +11,8 @@ import type { ImageGenerationProvider } from '../types';
 import { LocalProvider } from './local';
 import { CloudProvider } from './cloud';
 import { ServerlessProvider } from './serverless';
+import { Qwen21Provider } from './qwen21';
+import { resolvePortraitProviderKind } from '../provider-flag';
 
 let cachedLocal: LocalProvider | null = null;
 let cachedCloud: CloudProvider | null = null;
@@ -72,10 +74,15 @@ export function getLocalProvider(): LocalProvider {
   // RUNPOD_ENDPOINT_ID set → RunPod Serverless (scale-to-zero, no pod to
   // manage). ServerlessProvider IS a LocalProvider — same templating,
   // saving, and edit paths; only the ComfyUI transport differs.
+  // PORTRAIT_PROVIDER=qwen21 (+ RUNPOD_QWEN_ENDPOINT_ID) → Qwen-Image-2.1
+  // two-step lock → style (ruling 2026-10-13); FLUX.2 stays the default/rollback.
   if (!cachedLocal) {
-    cachedLocal = process.env.RUNPOD_ENDPOINT_ID
-      ? new ServerlessProvider()
-      : new LocalProvider();
+    const kind = resolvePortraitProviderKind();
+    cachedLocal = kind === 'qwen21'
+      ? new Qwen21Provider()
+      : kind === 'flux2-serverless'
+        ? new ServerlessProvider()
+        : new LocalProvider();
   }
   return cachedLocal;
 }

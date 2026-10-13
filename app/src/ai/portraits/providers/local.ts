@@ -403,7 +403,7 @@ export class LocalProvider implements ImageGenerationProvider {
   // Workflow Management
   // ============================================================
 
-  private async loadWorkflow(name: string): Promise<Record<string, unknown>> {
+  protected async loadWorkflow(name: string): Promise<Record<string, unknown>> {
     const workflowPath = path.join(process.cwd(), 'src', 'ai', 'portraits', 'workflows', `${name}.json`);
 
     try {
@@ -421,7 +421,7 @@ export class LocalProvider implements ImageGenerationProvider {
   // Image Storage
   // ============================================================
 
-  private async savePortrait(
+  protected async savePortrait(
     characterId: string,
     imageData: Buffer,
     step?: string,

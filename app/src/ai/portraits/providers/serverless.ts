@@ -27,10 +27,6 @@ const MAX_POLL_ATTEMPTS = 450; // 30 min — covers cold starts + generation
 /** /run payload cap is 10MB; refs ride base64 inside it, so bound them. */
 const MAX_REF_DIM = 1024;
 
-function endpointBase(): string {
-  return `https://api.runpod.ai/v2/${process.env.RUNPOD_ENDPOINT_ID}`;
-}
-
 function authHeaders(): Record<string, string> {
   return { authorization: `Bearer ${process.env.RUNPOD_API_KEY}` };
 }
@@ -43,10 +39,19 @@ export class ServerlessProvider extends LocalProvider {
   /** Completed job outputs, keyed by job id, until downloadImage collects. */
   private jobOutputs = new Map<string, Buffer[]>();
 
+  /** RunPod endpoint id this provider talks to (Qwen21Provider overrides). */
+  protected endpointId(): string | undefined {
+    return process.env.RUNPOD_ENDPOINT_ID;
+  }
+
+  private endpointBase(): string {
+    return `https://api.runpod.ai/v2/${this.endpointId()}`;
+  }
+
   override async isAvailable(): Promise<boolean> {
-    if (!process.env.RUNPOD_ENDPOINT_ID || !process.env.RUNPOD_API_KEY) return false;
+    if (!this.endpointId() || !process.env.RUNPOD_API_KEY) return false;
     try {
-      const res = await fetch(`${endpointBase()}/health`, {
+      const res = await fetch(`${this.endpointBase()}/health`, {
         headers: authHeaders(),
         signal: AbortSignal.timeout(8000),
       });
@@ -58,7 +63,7 @@ export class ServerlessProvider extends LocalProvider {
 
   override async getStatus(): Promise<ProviderStatus> {
     try {
-      const res = await fetch(`${endpointBase()}/health`, {
+      const res = await fetch(`${this.endpointBase()}/health`, {
         headers: authHeaders(),
         signal: AbortSignal.timeout(8000),
       });
@@ -109,7 +114,7 @@ export class ServerlessProvider extends LocalProvider {
 
     let res: Response;
     try {
-      res = await fetch(`${endpointBase()}/run`, {
+      res = await fetch(`${this.endpointBase()}/run`, {
         method: 'POST',
         headers: { ...authHeaders(), 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -142,7 +147,7 @@ export class ServerlessProvider extends LocalProvider {
 
       let status: { status?: string; output?: { images?: Array<{ data?: string }>; errors?: string[] }; error?: unknown };
       try {
-        const res = await fetch(`${endpointBase()}/status/${promptId}`, {
+        const res = await fetch(`${this.endpointBase()}/status/${promptId}`, {
           headers: authHeaders(),
           signal: AbortSignal.timeout(15000),
         });

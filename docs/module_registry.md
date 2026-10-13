@@ -311,7 +311,11 @@ Last updated: 2026-07-12 (T09 doc pass — 54 services, 80+ routes, all componen
 | PortraitService | `ai/portraits/portrait-service.ts` | Main orchestrator: generate, accept, lock persona, check visual changes, portrait history | Prisma, providers, prompt-builder, character-adapter, state-diff |
 | LocalProvider | `ai/portraits/providers/local.ts` | ComfyUI REST client: queue prompts, poll history, download images, upload references, VRAM management (Ollama unload) | types, prompt-builder, style-config |
 | CloudProvider | `ai/portraits/providers/cloud.ts` | Stub for future cloud-based generation | types |
-| ProviderFactory | `ai/portraits/providers/index.ts` | getPortraitProvider() factory with local/cloud fallback | local, cloud |
+| ProviderFactory | `ai/portraits/providers/index.ts` | getPortraitProvider() factory with local/cloud fallback; getLocalProvider() picks Qwen21 / FLUX.2 serverless / local via `resolvePortraitProviderKind()` | local, cloud, serverless, qwen21, provider-flag |
+| ProviderFlag (2026-10-13) | `ai/portraits/provider-flag.ts` | `resolvePortraitProviderKind(env)`: `PORTRAIT_PROVIDER=qwen21` + `RUNPOD_QWEN_ENDPOINT_ID` → `qwen21`; else `flux2-serverless` (RUNPOD_ENDPOINT_ID) or `flux2-local`. Default flux2; qwen21 without its endpoint warns and falls back | — |
+| Qwen21Provider (2026-10-13, behind flag) | `ai/portraits/providers/qwen21.ts` | `extends ServerlessProvider` (endpoint = RUNPOD_QWEN_ENDPOINT_ID). Two-step: `lockIdentity(characterId, photos, seed)` → faces/; `applyStyle(characterId, lock, seed, styleRefs?)` → faces/ (style refs = style-refs/approved/* else 3 A/B old gens, `resolveQwen21StyleRefs`); `generateBody` → bodies/ (832×1216); `edit` (+ mask post-composite) → finetune/. `generatePortrait` override: photos → lock→style; stored /portraits/ lock → style only; full_body → body. `editImage` override (object-ref edits refused) | serverless, qwen21-workflow, mask-composite |
+| Qwen21Workflow | `ai/portraits/qwen21-workflow.ts` + `workflows/qwen21-edit.json` | Pure: short prompt builders (lock / style / body / edit, `<imageN>` tags; style line = 2 sentences of getFlux2StyleProse) + `buildQwen21Workflow(template, opts)` (LOAD_REF1..N → TEXT_ENCODE `images.image_N`, sampler on the encoder latent or EMPTY_LATENT) | style-config |
+| MaskComposite | `ai/portraits/mask-composite.ts` | `compositeEditWithMask(base, edited, maskPng, feather)` — keeps a whole-frame edit local via the painted mask (Qwen has no mask input) | sharp |
 
 ## AI — DAYA Persona Harness (src/daya/)
 
