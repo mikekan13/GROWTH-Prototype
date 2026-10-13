@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import sharp from 'sharp';
 import { Qwen21Provider, isStoredPortraitPath } from './qwen21';
 import type { ComfyUIQueueResponse, PortraitInput } from '../types';
+import type { LockGateVerdict } from '../lock-gate';
 import { getCampaignMood } from '../style-config';
 
 type Wf = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
@@ -35,7 +36,85 @@ class TestQwen extends Qwen21Provider {
     this.raws.push({ path: p, raw });
     return p;
   }
+  /** Gate stubbed: verdicts handed out in order (default pass); never reaches Ollama. */
+  verdicts: LockGateVerdict[] = [];
+  gateCalls = 0;
+  protected override async checkLock() {
+    this.gateCalls++;
+    return this.verdicts.shift() ?? { pass: true, reasons: [], score: 1 };
+  }
 }
+
+const fail = (score: number, reason: string): LockGateVerdict => ({ pass: false, reasons: [reason], score });
+
+describe('Qwen21Provider.lockIdentity — BASE-LOCK GATE (gate stubbed)', () => {
+  const seedOf = (wf: Wf) => {
+    const node = Object.values(wf).find(n => n.inputs && typeof n.inputs.seed === 'number');
+    return node?.inputs.seed;
+  };
+
+  it('pass first time → 1 render, gate { pass, attempts: 1 }', async () => {
+    delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_GATE;
+    const p = new TestQwen();
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7);
+    expect(p.queued).toHaveLength(1);
+    expect(r.gate).toEqual({ pass: true, reasons: [], attempts: 1, seed: 7, score: 1 });
+  });
+
+  it('fail, fail, pass → 3 renders on seeds S, S+1, S+2; returns the third; only it is saved', async () => {
+    delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_GATE;
+    const p = new TestQwen();
+    p.verdicts = [fail(0.5, 'clothed'), fail(0.75, 'off-pose'), { pass: true, reasons: [], score: 1 }];
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7);
+    expect(p.queued).toHaveLength(3);
+    expect(p.queued.map(seedOf)).toEqual([7, 8, 9]);
+    expect(p.gateCalls).toBe(3);
+    expect(r.seed).toBe(9);
+    expect(r.gate).toEqual({ pass: true, reasons: [], attempts: 3, seed: 9, score: 1 });
+    expect(p.saved).toHaveLength(1);
+  });
+
+  it('all fail → max 2 retries; returns the best-scoring attempt, flagged', async () => {
+    delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_GATE;
+    const p = new TestQwen();
+    p.verdicts = [fail(0.25, 'clothed'), fail(0.75, 'off-pose'), fail(0.5, 'framing'), fail(1, 'never reached')];
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 100);
+    expect(p.queued).toHaveLength(3);
+    expect(p.gateCalls).toBe(3);
+    expect(r.seed).toBe(101);
+    expect(r.gate).toEqual({ pass: false, reasons: ['off-pose'], attempts: 3, seed: 101, score: 0.75 });
+    expect(p.saved).toHaveLength(1);
+  });
+
+  it('QWEN21_LOCK_GATE=off → one render, no check, gate { bypassed }', async () => {
+    delete process.env.QWEN21_STYLE_MODE;
+    process.env.QWEN21_LOCK_GATE = 'off';
+    const p = new TestQwen();
+    p.verdicts = [fail(0, 'would fail')];
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7);
+    delete process.env.QWEN21_LOCK_GATE;
+    expect(p.queued).toHaveLength(1);
+    expect(p.gateCalls).toBe(0);
+    expect(r.gate).toMatchObject({ pass: true, attempts: 1, bypassed: true });
+  });
+
+  it('unpainted (two-step) lock is not gated', async () => {
+    const p = new TestQwen();
+    p.verdicts = [fail(0, 'would fail')];
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7, { painted: false });
+    expect(p.gateCalls).toBe(0);
+    expect(r.gate).toBeUndefined();
+  });
+
+  it('generatePortrait carries the gate into metadata.gate', async () => {
+    delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_GATE;
+    const p = new TestQwen();
+    p.verdicts = [fail(0.5, 'clothed')];
+    const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg'] }));
+    expect((r.metadata as unknown as Record<string, unknown>).gate).toEqual({ pass: true, reasons: [], attempts: 2, seed: 8, score: 1 });
+    expect(r.metadata.seed).toBe(8);
+  });
+});
 
 function input(over: Partial<PortraitInput> & { refs: string[] }): PortraitInput {
   return {

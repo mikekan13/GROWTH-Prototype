@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CLOTHING_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer, isClothingOrGear,
-  possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER,
+  possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, gateLine,
   type DesignerAction, type DesignerState, type LayerKind,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, GhostButton, Readout, SigilBorder } from './parts';
@@ -153,6 +153,7 @@ export default function AppearanceDesigner({
       kind: 'base' as const, seed: r.seed, at: new Date().toISOString(),
     };
     commit(mode === 'lock' ? { type: 'lock', layer } : { type: 'replaceTop', layer }, { type: 'levers', levers: r.levers });
+    if (r.levers.gate && !r.levers.gate.pass) setNote(GATE_FLAGGED_NOTE);
     setStartOpen(false);
     setView('face');
     newLayerLanded();
@@ -304,10 +305,15 @@ export default function AppearanceDesigner({
 
               <div>
                 <GhostButton label={showLevers ? 'hide levers' : 'levers'} onClick={() => setShowLevers(s => !s)} testId="designer-levers" />
+                {gateLine(lv?.gate) && (
+                  <span className="ml-2" data-testid="designer-gate" style={{ fontFamily: F.mono, fontSize: 10, color: lv?.gate?.pass === false ? C.gold : C.soul }}>
+                    {gateLine(lv?.gate)}
+                  </span>
+                )}
                 {showLevers && (
                   <Readout testId="designer-levers-line">
                     {lv
-                      ? `seed ${lv.seed ?? '—'} · guidance ${lv.guidance ?? '—'} · steps ${lv.steps ?? '—'} · refs ${lv.refs}`
+                      ? `seed ${lv.seed ?? '—'} · guidance ${lv.guidance ?? '—'} · steps ${lv.steps ?? '—'} · refs ${lv.refs}${gateLine(lv.gate) ? ` · ${gateLine(lv.gate)}` : ''}`
                       : 'no call yet'}
                   </Readout>
                 )}

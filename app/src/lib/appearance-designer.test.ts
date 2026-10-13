@@ -2,9 +2,25 @@ import { describe, it, expect } from 'vitest';
 import {
   CLOTHING_NOTE, EMPTY_DESIGNER, composeMarkText, composeShapeText, composeTellText, currentLayer,
   deriveDesignerStatus, designerErrorLine, designerReducer, isClothingOrGear, layersDroppedBy,
-  possessiveFor, restoreDesigner, withNothingElse,
+  possessiveFor, restoreDesigner, withNothingElse, gateLine, readDesignerGate,
   type DesignerLayer, type DesignerState,
 } from './appearance-designer';
+
+describe('base-lock gate caption', () => {
+  it('readDesignerGate reads metadata.gate defensively', () => {
+    expect(readDesignerGate(null)).toBeNull();
+    expect(readDesignerGate({ reasons: [] })).toBeNull();
+    expect(readDesignerGate({ pass: false, reasons: ['clothed (x)', 3], attempts: 3, seed: 9, score: 0.5 })).toEqual({ pass: false, reasons: ['clothed (x)'], attempts: 3 });
+  });
+  it('gateLine: pass / re-rolled ×N / flagged / off / unavailable', () => {
+    expect(gateLine(null)).toBeNull();
+    expect(gateLine({ pass: true, reasons: [], attempts: 1 })).toBe('gate: pass');
+    expect(gateLine({ pass: true, reasons: [], attempts: 3 })).toBe('re-rolled ×2');
+    expect(gateLine({ pass: false, reasons: ['clothed (garment, strap or jewellery visible)'], attempts: 3 })).toBe('flagged: clothed');
+    expect(gateLine({ pass: true, reasons: ['gate off'], attempts: 1, bypassed: true })).toBe('gate: off');
+    expect(gateLine({ pass: true, reasons: ['gate unavailable: timeout after 20000ms'], attempts: 1 })).toBe('gate: unavailable');
+  });
+});
 
 const L = (imagePath: string, kind: DesignerLayer['kind'] = 'jewl', text = imagePath): DesignerLayer =>
   ({ imagePath, text, kind, seed: 7, at: '2026-10-13T00:00:00.000Z' });

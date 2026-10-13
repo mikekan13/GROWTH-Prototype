@@ -16,6 +16,8 @@
  *   --out DIR            default <repo>/style-refs/lab/<timestamp>-<mood>/
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
+ *   --gate               run the BASE-LOCK GATE (local vision, lock-gate.ts) on each raw
+ *                        seed; PASS/FAIL + reasons printed under each tile (default off)
  *
  * Output: seed-<s>.png (finished), raw/seed-<s>.png, sheet.jpg (row 1 raw, row 2
  * finished), prompts.txt, lab.json (seed list + mood, read by approve-image.ts).
@@ -49,6 +51,7 @@ async function main() {
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
   const { FINISH, finishImage } = await import('../src/ai/portraits/finish');
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
+  const { checkBaseLock } = await import('../src/ai/portraits/lock-gate');
   const { GROWTH_MEDIUM, getCampaignMood, resolveMoodKey } = await import('../src/ai/portraits/style-config');
 
   const n = Math.max(1, Number(arg('seeds') ?? 4));
@@ -56,6 +59,7 @@ async function main() {
   const moodArg = arg('mood') ?? 'growth';
   const mood = resolveMoodKey(moodArg);
   const noFinish = process.argv.includes('--no-finish');
+  const gate = process.argv.includes('--gate');
   const mediumFile = arg('medium-file');
   const medium = mediumFile ? (await fs.readFile(path.resolve(mediumFile), 'utf-8')).trim() : GROWTH_MEDIUM;
 
@@ -73,8 +77,9 @@ async function main() {
   console.log(`style lab: ${n} seed(s) from ${seedStart}, mood=${mood}, finish=${noFinish ? 'off' : 'on'}, ${photos.length} photo(s) → ${outDir}`);
 
   const provider = new Qwen21Provider();
-  const rawRow: { image: Buffer; label: string }[] = [];
-  const finRow: { image: Buffer; label: string }[] = [];
+  const rawRow: { image: Buffer; label: string; note?: string; noteWarn?: boolean }[] = [];
+  const finRow: { image: Buffer; label: string; note?: string; noteWarn?: boolean }[] = [];
+  const gates: Record<number, { pass: boolean; reasons: string[]; score: number }> = {};
   const seeds: number[] = [];
   let prompt = '';
   for (let k = 0; k < n; k++) {
@@ -83,11 +88,21 @@ async function main() {
     const r = await provider.renderLock(photos, seed, { painted: true, mood, medium });
     prompt = r.prompt;
     await fs.writeFile(path.join(outDir, 'raw', `seed-${seed}.png`), r.raw);
-    rawRow.push({ image: r.raw, label: `seed ${seed} · ${mood} · raw` });
+    // Gate the RAW (what lockIdentity judges) — local vision only (privacy wall).
+    let note: string | undefined;
+    let noteWarn = false;
+    if (gate) {
+      const v = await checkBaseLock(r.raw);
+      gates[seed] = { pass: v.pass, reasons: v.reasons, score: v.score };
+      note = v.pass ? `PASS${v.reasons.length ? ` (${v.reasons.join('; ')})` : ''}` : `FAIL: ${v.reasons.join('; ')}`;
+      noteWarn = !v.pass;
+      console.log(`    gate: ${note}`);
+    }
+    rawRow.push({ image: r.raw, label: `seed ${seed} · ${mood} · raw`, note, noteWarn });
     if (!noFinish) {
       const fin = await finishImage(r.raw, seed);
       await fs.writeFile(path.join(outDir, `seed-${seed}.png`), fin);
-      finRow.push({ image: fin, label: `seed ${seed} · ${mood} · finished` });
+      finRow.push({ image: fin, label: `seed ${seed} · ${mood} · finished`, note, noteWarn });
     }
     seeds.push(seed);
     console.log(`  seed ${seed}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
@@ -110,7 +125,7 @@ async function main() {
   );
   await fs.writeFile(
     path.join(outDir, 'lab.json'),
-    JSON.stringify({ mood, seeds, medium, mediumFile: mediumFile ?? null, finish: noFinish ? null : FINISH, photos: photoPaths, date: new Date().toISOString() }, null, 2),
+    JSON.stringify({ mood, seeds, ...(gate ? { gate: gates } : {}), medium, mediumFile: mediumFile ?? null, finish: noFinish ? null : FINISH, photos: photoPaths, date: new Date().toISOString() }, null, 2),
   );
   console.log(`sheet → ${path.join(outDir, 'sheet.jpg')}`);
   console.log(`approve one: npx tsx scripts/approve-image.ts "${path.join(outDir, `seed-${seeds[0]}.png`)}"`);
