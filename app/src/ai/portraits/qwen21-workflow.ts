@@ -185,8 +185,67 @@ export function buildQwen21EditPrompt(instruction: string, mood?: string): strin
   return `${ended} ${reminder}. ${getCampaignMood(mood)} Change nothing else.`;
 }
 
+// ============================================================
+// Community style-LoRA stack (2026-10-13)
+// ============================================================
+
+/** One LoRA in the blend. `file` = name under ComfyUI models/loras (/runpod-volume/models/loras). */
+export interface Qwen21Lora {
+  file: string;
+  strength: number;
+  /** Trigger word the LoRA was trained on (cine1p, Inklingv2) — prepended to the prompt. */
+  trigger?: string;
+}
+
+/**
+ * Parse a LoRA spec: `file:strength[:trigger],file:strength[:trigger]`, e.g.
+ * `cine1p_c1-st4000.safetensors:0.7:cine1p,Inklingv2-qwen21_c1-st6000.safetensors:0.25:Inklingv2`.
+ * Empty / undefined → []. Throws on a malformed entry (strength 0–2, *.safetensors, bare file name).
+ */
+export function parseQwen21Loras(spec: string | undefined | null): Qwen21Lora[] {
+  if (!spec || !spec.trim()) return [];
+  return spec.split(',').map(s => s.trim()).filter(Boolean).map(entry => {
+    const parts = entry.split(':').map(p => p.trim());
+    if (parts.length < 2 || parts.length > 3) throw new Error(`LoRA spec "${entry}": expected file:strength[:trigger]`);
+    const [file, strengthStr, trigger] = parts;
+    if (!/\.safetensors$/i.test(file)) throw new Error(`LoRA spec "${entry}": file must end with .safetensors`);
+    if (/[\\/]/.test(file)) throw new Error(`LoRA spec "${entry}": file must be a bare name (no path separators)`);
+    if (!/^\d+(\.\d+)?$|^\.\d+$/.test(strengthStr)) throw new Error(`LoRA spec "${entry}": strength must be a number`);
+    const strength = Number(strengthStr);
+    if (!(strength >= 0 && strength <= 2)) throw new Error(`LoRA spec "${entry}": strength must be between 0 and 2`);
+    if (parts.length === 3 && !trigger) throw new Error(`LoRA spec "${entry}": empty trigger`);
+    return trigger ? { file, strength, trigger } : { file, strength };
+  });
+}
+
+/** Back to the spec string (round-trips parseQwen21Loras). '' for none. */
+export function formatQwen21Loras(loras: readonly Qwen21Lora[] | undefined): string {
+  return (loras ?? []).map(l => `${l.file}:${l.strength}${l.trigger ? `:${l.trigger}` : ''}`).join(',');
+}
+
+/** Short human label for sheets: "cine1p 0.7 + Inklingv2 0.25" (trigger, else file stem). '' for none. */
+export function qwen21LoraLabel(loras: readonly Qwen21Lora[] | undefined): string {
+  return (loras ?? []).map(l => `${l.trigger ?? l.file.replace(/\.safetensors$/i, '')} ${l.strength}`).join(' + ');
+}
+
+/** The env default (QWEN21_LORAS). Empty/unset → []. */
+export function qwen21LorasFromEnv(): Qwen21Lora[] {
+  return parseQwen21Loras(process.env.QWEN21_LORAS);
+}
+
+/** Prepend each LoRA trigger once, in order, as "<t1>, <t2>, <prompt>". Triggers already leading the prompt are not repeated. */
+export function applyQwen21LoraTriggers(prompt: string, loras: readonly Qwen21Lora[] | undefined): string {
+  const triggers: string[] = [];
+  for (const l of loras ?? []) if (l.trigger && !triggers.includes(l.trigger)) triggers.push(l.trigger);
+  if (triggers.length === 0) return prompt;
+  const prefix = triggers.map(t => `${t}, `).join('');
+  return prompt.startsWith(prefix) ? prompt : prefix + prompt;
+}
+
 export interface Qwen21WorkflowOptions {
   prompt: string;
+  /** Community style LoRAs, chained UNET → LORA_1 → … → (old UNET consumers). Omitted/[] = unchanged workflow. */
+  loras?: Qwen21Lora[];
   /** Uploaded ComfyUI image names → images.image_1..N (in order). */
   images: string[];
   seed: number;
@@ -226,7 +285,7 @@ export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwe
     enc[`images.image_${idx + 1}`] = [id, 0];
   });
 
-  enc.prompt = opts.prompt;
+  enc.prompt = applyQwen21LoraTriggers(opts.prompt, opts.loras);
   enc.negative_prompt = ''; // cfg 1 → unused (template note)
   enc.resolution = opts.resolution ?? QWEN21_RESOLUTION;
 
@@ -240,6 +299,25 @@ export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwe
       inputs: { width: opts.size.width, height: opts.size.height, batch_size: 1 },
     };
     sample.latent_image = ['EMPTY_LATENT', 0];
+  }
+
+  if (opts.loras && opts.loras.length > 0) {
+    if (!wf.UNET) throw new Error('qwen21 workflow template is missing node UNET (needed for LoRAs)');
+    // Rewire every consumer of the DiT (CACHE.model today) to the end of the LoRA chain.
+    const last = `LORA_${opts.loras.length}`;
+    for (const node of Object.values(wf)) {
+      const inputs = node.inputs as Record<string, unknown> | undefined;
+      if (!inputs) continue;
+      for (const [k, v] of Object.entries(inputs)) {
+        if (Array.isArray(v) && v.length === 2 && v[0] === 'UNET' && v[1] === 0) inputs[k] = [last, 0];
+      }
+    }
+    opts.loras.forEach((l, i) => {
+      wf[`LORA_${i + 1}`] = {
+        class_type: 'LoraLoaderModelOnly',
+        inputs: { lora_name: l.file, strength_model: l.strength, model: [i === 0 ? 'UNET' : `LORA_${i}`, 0] },
+      };
+    });
   }
 
   if (opts.filenamePrefix) (wf.SAVE.inputs as Record<string, unknown>).filename_prefix = opts.filenamePrefix;

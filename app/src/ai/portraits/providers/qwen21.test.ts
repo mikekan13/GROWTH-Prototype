@@ -24,9 +24,11 @@ class TestQwen extends Qwen21Provider {
   }
   protected override async waitForCompletion(id: string) { return { filename: '0', subfolder: id, type: 'serverless' }; }
   protected override async downloadImage() { return png; }
-  protected override async savePortrait(characterId: string, _d: Buffer, step?: string) {
+  metas: Array<Record<string, unknown> | undefined> = [];
+  protected override async savePortrait(characterId: string, _d: Buffer, step?: string, _seed?: number, meta?: Record<string, unknown>) {
     const p = `/portraits/${characterId}/${step}/.thumbs/g${this.saved.length}.webp`;
     this.saved.push(p);
+    this.metas.push(meta);
     return { imagePath: p, thumbnailPath: p };
   }
   protected override async defaultStyleRefs() { return ['/abs/s1.png', '/abs/s2.png']; }
@@ -249,5 +251,44 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     const r = await p.editImage('/portraits/c/x.png', 'add a sword', { objectRefImagePath: '/uploads/sword.png' });
     expect(r.success).toBe(false);
     expect(p.queued).toHaveLength(0);
+  });
+});
+
+describe('Qwen21Provider — community LoRA blend (QWEN21_LORAS)', () => {
+  const SPEC = 'cine1p_c1-st4000.safetensors:0.7:cine1p,Inklingv2-qwen21_c1-st6000.safetensors:0.25:Inklingv2';
+  const loraNodes = (wf: Wf) => Object.keys(wf).filter(k => k.startsWith('LORA_')).sort();
+
+  it('env default reaches every generation (lock) and the saved metadata', async () => {
+    process.env.QWEN21_LORAS = SPEC; process.env.QWEN21_LOCK_GATE = 'off'; delete process.env.QWEN21_STYLE_MODE;
+    try {
+      const p = new TestQwen();
+      await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7);
+      const wf = p.queued[0];
+      expect(loraNodes(wf)).toEqual(['LORA_1', 'LORA_2']);
+      expect(wf.CACHE.inputs.model).toEqual(['LORA_2', 0]);
+      expect(String(wf.TEXT_ENCODE.inputs.prompt).startsWith('cine1p, Inklingv2, ')).toBe(true);
+      expect(p.metas[0]?.loras).toBe(SPEC);
+    } finally { delete process.env.QWEN21_LORAS; delete process.env.QWEN21_LOCK_GATE; }
+  });
+
+  it('setLoras overrides the env; [] disables; content generation never takes LoRAs', async () => {
+    process.env.QWEN21_LORAS = SPEC;
+    try {
+      const p = new TestQwen();
+      p.setLoras([{ file: 'x.safetensors', strength: 1 }]);
+      await p.describeBase('c', 'a dwarf', 1);
+      expect(loraNodes(p.queued[0])).toEqual(['LORA_1']);
+      expect(p.queued[0].LORA_1.inputs.lora_name).toBe('x.safetensors');
+      expect(p.metas[0]?.loras).toBe('x.safetensors:1');
+
+      p.setLoras([]);
+      await p.describeBase('c', 'a dwarf', 1);
+      expect(loraNodes(p.queued[1])).toEqual([]);
+      expect(p.metas[1]?.loras).toBeNull();
+
+      const q = new TestQwen();
+      await q.generateContent('c', 'a lamp', 1, { width: 64, height: 64 });
+      expect(loraNodes(q.queued[0])).toEqual([]);
+    } finally { delete process.env.QWEN21_LORAS; }
   });
 });

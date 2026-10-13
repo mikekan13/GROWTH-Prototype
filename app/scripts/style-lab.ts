@@ -16,6 +16,7 @@
  *   --out DIR            default <repo>/style-refs/lab/<timestamp>-<mood>/
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
+ *   --loras SPEC         community LoRA blend, file:strength[:trigger],... (overrides QWEN21_LORAS; "" = none)
  *   --gate               run the BASE-LOCK GATE (local vision, lock-gate.ts) on each raw
  *                        seed; PASS/FAIL + reasons printed under each tile (default off)
  *
@@ -53,6 +54,7 @@ async function main() {
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
   const { checkBaseLock } = await import('../src/ai/portraits/lock-gate');
   const { GROWTH_MEDIUM, getCampaignMood, resolveMoodKey } = await import('../src/ai/portraits/style-config');
+  const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel } = await import('../src/ai/portraits/qwen21-workflow');
 
   const n = Math.max(1, Number(arg('seeds') ?? 4));
   const seedStart = Number(arg('seed-start') ?? 7);
@@ -62,6 +64,10 @@ async function main() {
   const gate = process.argv.includes('--gate');
   const mediumFile = arg('medium-file');
   const medium = mediumFile ? (await fs.readFile(path.resolve(mediumFile), 'utf-8')).trim() : GROWTH_MEDIUM;
+  const lorasArg = arg('loras');
+  const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
+  const loraSpec = formatQwen21Loras(loras);
+  const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
 
   const photosDir = arg('photos');
   const photoPaths = photosDir
@@ -74,9 +80,10 @@ async function main() {
   const outDir = path.resolve(arg('out') ?? path.join('..', 'style-refs', 'lab', `${stamp}-${mood.replace(/\s+/g, '-')}`));
   await fs.mkdir(path.join(outDir, 'raw'), { recursive: true });
   if (moodArg.toLowerCase() !== mood) console.log(`mood "${moodArg}" → ${mood}`);
-  console.log(`style lab: ${n} seed(s) from ${seedStart}, mood=${mood}, finish=${noFinish ? 'off' : 'on'}, ${photos.length} photo(s) → ${outDir}`);
+  console.log(`style lab: ${n} seed(s) from ${seedStart}, mood=${mood}, finish=${noFinish ? 'off' : 'on'}, loras=${loraSpec || 'none'}, ${photos.length} photo(s) → ${outDir}`);
 
   const provider = new Qwen21Provider();
+  provider.setLoras(loras);
   const rawRow: { image: Buffer; label: string; note?: string; noteWarn?: boolean }[] = [];
   const finRow: { image: Buffer; label: string; note?: string; noteWarn?: boolean }[] = [];
   const gates: Record<number, { pass: boolean; reasons: string[]; score: number }> = {};
@@ -98,11 +105,11 @@ async function main() {
       noteWarn = !v.pass;
       console.log(`    gate: ${note}`);
     }
-    rawRow.push({ image: r.raw, label: `seed ${seed} · ${mood} · raw`, note, noteWarn });
+    rawRow.push({ image: r.raw, label: `seed ${seed} · ${mood}${loraTag} · raw`, note, noteWarn });
     if (!noFinish) {
       const fin = await finishImage(r.raw, seed);
       await fs.writeFile(path.join(outDir, `seed-${seed}.png`), fin);
-      finRow.push({ image: fin, label: `seed ${seed} · ${mood} · finished`, note, noteWarn });
+      finRow.push({ image: fin, label: `seed ${seed} · ${mood}${loraTag} · finished`, note, noteWarn });
     }
     seeds.push(seed);
     console.log(`  seed ${seed}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
@@ -117,6 +124,7 @@ async function main() {
       `photos: ${photoPaths.join(' | ')}`,
       `medium: ${mediumFile ? `file ${path.resolve(mediumFile)}` : 'GROWTH_MEDIUM (style-config.ts)'}`,
       `finish: ${noFinish ? 'off' : JSON.stringify(FINISH)}`,
+      `loras: ${loraSpec || 'none'}${loras.length ? ` (${qwen21LoraLabel(loras)}; triggers prepended to the prompt)` : ''}`,
       '',
       'MEDIUM:', medium, '',
       'MOOD:', getCampaignMood(mood), '',
@@ -125,7 +133,7 @@ async function main() {
   );
   await fs.writeFile(
     path.join(outDir, 'lab.json'),
-    JSON.stringify({ mood, seeds, ...(gate ? { gate: gates } : {}), medium, mediumFile: mediumFile ?? null, finish: noFinish ? null : FINISH, photos: photoPaths, date: new Date().toISOString() }, null, 2),
+    JSON.stringify({ mood, seeds, ...(gate ? { gate: gates } : {}), medium, mediumFile: mediumFile ?? null, loras: loraSpec || null, finish: noFinish ? null : FINISH, photos: photoPaths, date: new Date().toISOString() }, null, 2),
   );
   console.log(`sheet → ${path.join(outDir, 'sheet.jpg')}`);
   console.log(`approve one: npx tsx scripts/approve-image.ts "${path.join(outDir, `seed-${seeds[0]}.png`)}"`);

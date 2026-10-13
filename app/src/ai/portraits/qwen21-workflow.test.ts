@@ -9,6 +9,10 @@ import {
   buildQwen21Workflow,
   getQwen21StyleLine,
   imageTagList,
+  parseQwen21Loras,
+  formatQwen21Loras,
+  qwen21LoraLabel,
+  applyQwen21LoraTriggers,
 } from './qwen21-workflow';
 import { GROWTH_MEDIUM, getCampaignMood, getFlux2Backdrop, getFlux2StyleProse } from './style-config';
 
@@ -140,5 +144,82 @@ describe('buildQwen21Workflow', () => {
     expect(JSON.stringify(template)).toBe(before);
     expect(() => buildQwen21Workflow(template, { prompt: 'P', images: [], seed: 1 })).toThrow();
     expect(() => buildQwen21Workflow(template, { prompt: 'P', images: Array(17).fill('x'), seed: 1 })).toThrow();
+  });
+});
+
+describe('community LoRA blend', () => {
+  type Node = { class_type: string; inputs: Record<string, unknown> };
+  const SPEC = 'cine1p_c1-st4000.safetensors:0.7:cine1p,Inklingv2-qwen21_c1-st6000.safetensors:0.25:Inklingv2';
+  const LORAS = parseQwen21Loras(SPEC);
+
+  it('parses good specs (and round-trips them)', () => {
+    expect(LORAS).toEqual([
+      { file: 'cine1p_c1-st4000.safetensors', strength: 0.7, trigger: 'cine1p' },
+      { file: 'Inklingv2-qwen21_c1-st6000.safetensors', strength: 0.25, trigger: 'Inklingv2' },
+    ]);
+    expect(formatQwen21Loras(LORAS)).toBe(SPEC);
+    expect(qwen21LoraLabel(LORAS)).toBe('cine1p 0.7 + Inklingv2 0.25');
+    expect(parseQwen21Loras(' a.safetensors : 1 ')).toEqual([{ file: 'a.safetensors', strength: 1 }]);
+    expect(parseQwen21Loras('a.safetensors:0,b.safetensors:2')).toHaveLength(2);
+    expect(parseQwen21Loras('')).toEqual([]);
+    expect(parseQwen21Loras(undefined)).toEqual([]);
+    expect(qwen21LoraLabel([{ file: 'x.safetensors', strength: 1 }])).toBe('x 1');
+  });
+
+  it('rejects bad specs', () => {
+    for (const bad of [
+      'a.safetensors', // no strength
+      'a.ckpt:1', // wrong extension
+      'loras/a.safetensors:1', // path separator
+      'loras\\a.safetensors:1', // path separator (windows)
+      'a.safetensors:2.5', // > 2
+      'a.safetensors:-0.1', // < 0
+      'a.safetensors:abc', // not a number
+      'a.safetensors:1:t:extra', // too many parts
+      'a.safetensors:1:', // empty trigger
+    ]) expect(() => parseQwen21Loras(bad), bad).toThrow();
+  });
+
+  it('no LoRAs = byte-identical workflow', () => {
+    const base = { prompt: 'P', images: ['a.png'], seed: 3 };
+    const plain = JSON.stringify(buildQwen21Workflow(template, base));
+    expect(JSON.stringify(buildQwen21Workflow(template, { ...base, loras: [] }))).toBe(plain);
+    expect(JSON.stringify(buildQwen21Workflow(template, { ...base, loras: undefined }))).toBe(plain);
+  });
+
+  it('chains UNET → LORA_1 → LORA_2 → CACHE and rewires every UNET consumer', () => {
+    const wf = buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS }) as Record<string, Node>;
+    expect(wf.LORA_1).toEqual({
+      class_type: 'LoraLoaderModelOnly',
+      inputs: { lora_name: 'cine1p_c1-st4000.safetensors', strength_model: 0.7, model: ['UNET', 0] },
+    });
+    expect(wf.LORA_2).toEqual({
+      class_type: 'LoraLoaderModelOnly',
+      inputs: { lora_name: 'Inklingv2-qwen21_c1-st6000.safetensors', strength_model: 0.25, model: ['LORA_1', 0] },
+    });
+    expect(wf.LORA_3).toBeUndefined();
+    expect(wf.CACHE.inputs.model).toEqual(['LORA_2', 0]);
+    expect(wf.SAMPLE.inputs.model).toEqual(['CACHE', 0]);
+    const unetConsumers = Object.entries(wf)
+      .filter(([, n]) => Object.values(n.inputs ?? {}).some(v => Array.isArray(v) && v[0] === 'UNET'))
+      .map(([k]) => k);
+    expect(unetConsumers).toEqual(['LORA_1']);
+
+    // A template with a second UNET consumer gets rewired too.
+    const t2 = JSON.parse(JSON.stringify(template));
+    t2.EXTRA = { class_type: 'X', inputs: { model: ['UNET', 0] } };
+    const wf2 = buildQwen21Workflow(t2, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS.slice(0, 1) }) as Record<string, Node>;
+    expect(wf2.EXTRA.inputs.model).toEqual(['LORA_1', 0]);
+    expect(wf2.CACHE.inputs.model).toEqual(['LORA_1', 0]);
+  });
+
+  it('prepends triggers once, in order, deduped', () => {
+    expect(applyQwen21LoraTriggers('A dwarf.', LORAS)).toBe('cine1p, Inklingv2, A dwarf.');
+    expect(applyQwen21LoraTriggers('A dwarf.', [...LORAS, { file: 'c.safetensors', strength: 1, trigger: 'cine1p' }])).toBe('cine1p, Inklingv2, A dwarf.');
+    expect(applyQwen21LoraTriggers('cine1p, Inklingv2, A dwarf.', LORAS)).toBe('cine1p, Inklingv2, A dwarf.');
+    expect(applyQwen21LoraTriggers('A dwarf.', [{ file: 'a.safetensors', strength: 1 }])).toBe('A dwarf.');
+    expect(applyQwen21LoraTriggers('A dwarf.', [])).toBe('A dwarf.');
+    const wf = buildQwen21Workflow(template, { prompt: 'A dwarf.', images: ['a.png'], seed: 3, loras: LORAS }) as Record<string, Node>;
+    expect(wf.TEXT_ENCODE.inputs.prompt).toBe('cine1p, Inklingv2, A dwarf.');
   });
 });

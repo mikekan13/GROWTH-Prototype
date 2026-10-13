@@ -6,6 +6,7 @@
  *   cd app
  *   npx tsx scripts/corpus-restyle.ts [--ids a b c] [--limit N] [--resume] [--mood growth] [--seed 7]
  *
+ * --loras "file:strength[:trigger],..." overrides QWEN21_LORAS for this run ("" = none).
  * Output: style-refs/corpus/restyled/<id>.png (finished), raw/<id>.png, sheet-<group>.jpg, manifest.json.
  */
 import './_server-only-shim';
@@ -61,8 +62,15 @@ async function main() {
 
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
+  const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel } = await import('../src/ai/portraits/qwen21-workflow');
+  const lorasIdx = process.argv.indexOf('--loras');
+  const lorasArg = lorasIdx > 0 ? (process.argv[lorasIdx + 1] ?? '') : undefined; // "" = none
+  const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
+  const loraSpec = formatQwen21Loras(loras);
+  const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
   const provider = new Qwen21Provider();
-  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed} → ${outDir}`);
+  provider.setLoras(loras);
+  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, loras=${loraSpec || 'none'} → ${outDir}`);
 
   const results: Record<string, unknown>[] = [];
   const byGroup = new Map<string, { image: Buffer; label: string }[][]>();
@@ -78,9 +86,9 @@ async function main() {
       await fs.writeFile(path.join(outDir, 'raw', `${it.id}.png`), r.rawData);
       const rows = byGroup.get(it.group) ?? [[], []];
       rows[0].push({ image: await fs.readFile(contentPath), label: `${it.id} · content` });
-      rows[1].push({ image: r.imageData, label: `${it.id} · restyled` });
+      rows[1].push({ image: r.imageData, label: `${it.id} · restyled${loraTag}` });
       byGroup.set(it.group, rows);
-      results.push({ id: it.id, group: it.group, seed, mood, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t });
+      results.push({ id: it.id, group: it.group, seed, mood, loras: loraSpec || null, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t });
       const avg = (Date.now() - t0) / (n + 1);
       console.log(`  [${n + 1}/${items.length}] ${it.id}  ${((Date.now() - t) / 1000).toFixed(1)}s  · ETA ${Math.round(avg * (items.length - n - 1) / 60000)} min`);
     } catch (e) {
@@ -93,7 +101,7 @@ async function main() {
     await fs.writeFile(path.join(outDir, `sheet-${group}.jpg`), sheet);
     console.log(`sheet → ${path.join(outDir, `sheet-${group}.jpg`)} (${rows[1].length})`);
   }
-  await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ mood, seed, items: results }, null, 2));
+  await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ mood, seed, loras: loraSpec || null, loraLabel: qwen21LoraLabel(loras) || null, items: results }, null, 2));
   console.log(`done: ${results.filter(r => !('error' in r)).length} restyled, ${results.filter(r => 'error' in r).length} failed, ${((Date.now() - t0) / 60000).toFixed(1)} min`);
 }
 

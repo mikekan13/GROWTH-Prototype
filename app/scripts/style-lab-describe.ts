@@ -5,6 +5,7 @@
  *   cd app
  *   npx tsx scripts/style-lab-describe.ts --subjects "an elderly dwarf smith|a young Et'herling scout" --seeds 1 [--mood growth] [--out DIR]
  *
+ * --loras "file:strength[:trigger],..." overrides QWEN21_LORAS for this run ("" = none).
  * Writes <out>/<slug>-seed-N.png (finished), <out>/raw/<slug>-seed-N.png (raw), sheet.jpg, lab.json, prompts.txt.
  */
 import './_server-only-shim';
@@ -47,9 +48,15 @@ async function main() {
 
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
+  const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel } = await import('../src/ai/portraits/qwen21-workflow');
+  const lorasArg = arg('loras');
+  const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
+  const loraSpec = formatQwen21Loras(loras);
+  const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
   const provider = new Qwen21Provider();
+  provider.setLoras(loras);
 
-  console.log(`describe lab: ${subjects.length} subject(s) × ${seeds} seed(s) from ${seed0}, mood=${mood} → ${outDir}`);
+  console.log(`describe lab: ${subjects.length} subject(s) × ${seeds} seed(s) from ${seed0}, mood=${mood}, loras=${loraSpec || 'none'} → ${outDir}`);
   const anchorBuf = await fs.readFile(ANCHOR).catch(() => null);
   const rows: { image: Buffer; label: string }[][] = [[], []];
   if (anchorBuf) {
@@ -71,18 +78,19 @@ async function main() {
         const base = `${slug}-${tag}-seed-${seed}`;
         await fs.writeFile(path.join(outDir, `${base}.png`), r.imageData);
         await fs.writeFile(path.join(outDir, 'raw', `${base}.png`), r.rawData);
-        rows[0].push({ image: r.rawData, label: `${slug.slice(0, 24)} · ${tag} · s${seed} · raw` });
-        rows[1].push({ image: r.imageData, label: `${slug.slice(0, 24)} · ${tag} · s${seed} · finished` });
+        rows[0].push({ image: r.rawData, label: `${slug.slice(0, 24)} · ${tag} · s${seed}${loraTag} · raw` });
+        rows[1].push({ image: r.imageData, label: `${slug.slice(0, 24)} · ${tag} · s${seed}${loraTag} · finished` });
         prompts.push(`--- ${base}\n${r.prompt}\n`);
-        manifest.push({ subject, slug, seed, mood, styleRef: !!ref, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t0 });
+        manifest.push({ subject, slug, seed, mood, styleRef: !!ref, loras: loraSpec || null, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t0 });
         console.log(`  ${slug}  ${tag}  seed ${seed}  ${secs}s`);
       }
     }
   }
   const sheet = await buildContactSheet(rows, { tile: 384 });
   await fs.writeFile(path.join(outDir, 'sheet.jpg'), sheet);
-  await fs.writeFile(path.join(outDir, 'prompts.txt'), prompts.join('\n'));
-  await fs.writeFile(path.join(outDir, 'lab.json'), JSON.stringify({ mode: training ? 'describe-training' : 'describe', mood, seeds, seed0, subjects, items: manifest }, null, 2));
+  const loraLine = `loras: ${loraSpec || 'none'}${loras.length ? ` (${qwen21LoraLabel(loras)}; triggers prepended to each prompt)` : ''}\n`;
+  await fs.writeFile(path.join(outDir, 'prompts.txt'), [loraLine, ...prompts].join('\n'));
+  await fs.writeFile(path.join(outDir, 'lab.json'), JSON.stringify({ mode: training ? 'describe-training' : 'describe', mood, seeds, seed0, loras: loraSpec || null, subjects, items: manifest }, null, 2));
   console.log(`sheet → ${path.join(outDir, 'sheet.jpg')}`);
 }
 

@@ -42,7 +42,10 @@ import {
   buildQwen21DescribePrompt,
   buildQwen21StylePrompt,
   buildQwen21Workflow,
+  formatQwen21Loras,
   getQwen21StyleLine,
+  qwen21LorasFromEnv,
+  type Qwen21Lora,
 } from '../qwen21-workflow';
 import { buildCorpusContentPrompt } from '../corpus-prompts';
 import { compositeEditWithMask } from '../mask-composite';
@@ -132,6 +135,19 @@ export class Qwen21Provider extends ServerlessProvider {
     return process.env.RUNPOD_QWEN_ENDPOINT_ID;
   }
 
+  /** Instance-wide LoRA blend (scripts' --loras); undefined → QWEN21_LORAS env. */
+  private loraOverride?: Qwen21Lora[];
+
+  /** Override the env LoRA blend for every later call on this instance ([] = no LoRAs, undefined = env). */
+  setLoras(loras: Qwen21Lora[] | undefined): void {
+    this.loraOverride = loras;
+  }
+
+  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env. */
+  activeLoras(explicit?: Qwen21Lora[]): Qwen21Lora[] {
+    return explicit ?? this.loraOverride ?? qwen21LorasFromEnv();
+  }
+
   // ============================================================
   // The four steps
   // ============================================================
@@ -143,7 +159,7 @@ export class Qwen21Provider extends ServerlessProvider {
   async renderLock(
     photos: Qwen21Image[],
     seed: number,
-    opts?: { painted?: boolean; mood?: string; medium?: string },
+    opts?: { painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[] },
   ): Promise<{ raw: Buffer; prompt: string }> {
     const used = photos.slice(0, QWEN21_MAX_IMAGES);
     if (used.length === 0) throw new Error('lockIdentity needs at least one reference photo');
@@ -155,7 +171,7 @@ export class Qwen21Provider extends ServerlessProvider {
     // QWEN21_STYLE_MODE=single → the lock pass carries the painted look itself (no second pass).
     const painted = opts?.painted ?? qwen21StyleMode() === 'single';
     const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, opts?.medium);
-    return { raw: await this.runWorkflow(prompt, names, seed), prompt };
+    return { raw: await this.runWorkflow(prompt, names, seed, undefined, opts?.loras), prompt };
   }
 
   /**
@@ -217,7 +233,7 @@ export class Qwen21Provider extends ServerlessProvider {
     description: string,
     seed: number,
     mood?: string,
-    opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string } = {},
+    opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string; loras?: Qwen21Lora[] } = {},
   ): Promise<Qwen21StepResult> {
     const images: string[] = [];
     if (opts.contentRefPath) {
@@ -231,7 +247,7 @@ export class Qwen21Provider extends ServerlessProvider {
       contentRef: !!opts.contentRefPath,
       styleRef: !!opts.styleRefPath,
     });
-    return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood);
+    return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood, { loras: opts.loras });
   }
 
   /**
@@ -246,7 +262,8 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     size: { width: number; height: number },
   ): Promise<Qwen21StepResult> {
-    return this.runStep(characterId, 'corpus', 'content', buildCorpusContentPrompt(prompt), [], seed, size, undefined, { finish: false });
+    // Plain content by design: no style LoRAs either (the env blend would leak the look into the corpus).
+    return this.runStep(characterId, 'corpus', 'content', buildCorpusContentPrompt(prompt), [], seed, size, undefined, { finish: false, loras: [] });
   }
 
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */
@@ -408,10 +425,18 @@ export class Qwen21Provider extends ServerlessProvider {
     try { await fs.access(this.publicAbs(rawWeb)); return rawWeb; } catch { return webPath; }
   }
 
-  private async runWorkflow(prompt: string, images: string[], seed: number, size?: { width: number; height: number }): Promise<Buffer> {
+  private async runWorkflow(
+    prompt: string,
+    images: string[],
+    seed: number,
+    size?: { width: number; height: number },
+    loras?: Qwen21Lora[],
+  ): Promise<Buffer> {
     const template = await this.loadWorkflow(WORKFLOW_NAME);
-    const wf = buildQwen21Workflow(template, { prompt, images, seed, size, filenamePrefix: 'qwen21' });
-    console.log(`[Qwen21] queueing — ${images.length} image(s), seed=${seed}${size ? `, ${size.width}x${size.height}` : ''}, prompt="${prompt.slice(0, 100)}…"`);
+    const used = this.activeLoras(loras);
+    const wf = buildQwen21Workflow(template, { prompt, images, seed, size, loras: used, filenamePrefix: 'qwen21' });
+    const loraNote = used.length ? `, loras=${formatQwen21Loras(used)}` : '';
+    console.log(`[Qwen21] queueing — ${images.length} image(s), seed=${seed}${size ? `, ${size.width}x${size.height}` : ''}${loraNote}, prompt="${prompt.slice(0, 100)}…"`);
     const queued = await this.queuePrompt(wf, crypto.randomUUID());
     const out = await this.waitForCompletion(queued.prompt_id);
     return this.downloadImage(out.filename, out.subfolder, out.type);
@@ -426,10 +451,10 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     size?: { width: number; height: number },
     mood?: string,
-    opts?: { finish?: boolean },
+    opts?: { finish?: boolean; loras?: Qwen21Lora[] },
   ): Promise<Qwen21StepResult> {
     const t0 = Date.now();
-    const data = await this.runWorkflow(prompt, images, seed, size);
+    const data = await this.runWorkflow(prompt, images, seed, size, opts?.loras);
     return this.saveStep(characterId, folder, stage, prompt, data, seed, Date.now() - t0, mood, opts);
   }
 
@@ -446,12 +471,13 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     ms: number,
     mood?: string,
-    opts?: { finish?: boolean },
+    opts?: { finish?: boolean; loras?: Qwen21Lora[] },
   ): Promise<Qwen21StepResult> {
     const finished = opts?.finish !== false && finishEnabled();
     const imageData = finished ? await finishImage(rawData, seed) : rawData;
     const { imagePath, thumbnailPath } = await this.savePortrait(characterId, imageData, folder, seed, {
       provider: 'qwen21', stage, prompt, model: MODEL_NAME, mood: mood ?? null, finish: finished ? 'on' : 'off',
+      loras: formatQwen21Loras(this.activeLoras(opts?.loras)) || null,
     });
     const rawPath = await this.saveRaw(imagePath, rawData);
     const m = await sharp(imageData).metadata();
