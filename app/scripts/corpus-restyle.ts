@@ -62,6 +62,16 @@ async function main() {
   // --ref-max N: hand the model a downscaled copy of the content image (longest side N px) so it must
   // repaint detail instead of copying it — the img2img-strength analogue on an edit model.
   const refMax = Number(arg('ref-max', '0'));
+  // --size match (default) | portrait : output follows the content image's aspect (same ~1.04 MP area, multiples of 16),
+  // or the fixed 832x1248 base-lock portrait. Mike (13 Oct): the portrait crop "really messed with" animals and objects.
+  const sizeMode = arg('size', 'match');
+  const AREA = 832 * 1248;
+  function matchSize(w: number, h: number): { width: number; height: number } {
+    const ar = w / h;
+    const W = Math.round(Math.sqrt(AREA * ar) / 16) * 16;
+    const H = Math.round(Math.sqrt(AREA / ar) / 16) * 16;
+    return { width: Math.max(512, W), height: Math.max(512, H) };
+  }
   const limit = Number(arg('limit', '0'));
   const resume = process.argv.includes('--resume');
 
@@ -87,7 +97,7 @@ async function main() {
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
   const provider = new Qwen21Provider();
   provider.setLoras(loras);
-  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, medium=${mediumText ? 'custom' : (mediumArg ?? 'recipe (gold-restyle)')}, lead=${leadArg ?? 'recipe'}, loras=${loraSpec || 'none'} → ${outDir}`);
+  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, size=${sizeMode}, medium=${mediumText ? 'custom' : (mediumArg ?? 'recipe (gold-restyle)')}, lead=${leadArg ?? 'recipe'}, loras=${loraSpec || 'none'} → ${outDir}`);
 
   const results: Record<string, unknown>[] = [];
   const byGroup = new Map<string, { image: Buffer; label: string }[][]>();
@@ -99,19 +109,24 @@ async function main() {
     const t = Date.now();
     try {
       let refPath = contentPath;
+      const sharp = (await import('sharp')).default;
       if (refMax > 0) {
-        const sharp = (await import('sharp')).default;
         refPath = path.join(outDir, 'raw', `${it.id}.ref${refMax}.png`);
         await sharp(contentPath).resize({ width: refMax, height: refMax, fit: 'inside' }).png().toFile(refPath);
       }
-      const r = await provider.describeBase('corpus-restyle', '', seed, mood, { training: true, contentRefPath: refPath, styleRefPath, medium, lead });
+      let size: { width: number; height: number } | undefined;
+      if (sizeMode === 'match') {
+        const m = await sharp(contentPath).metadata();
+        if (m.width && m.height) size = matchSize(m.width, m.height);
+      }
+      const r = await provider.describeBase('corpus-restyle', '', seed, mood, { training: true, contentRefPath: refPath, styleRefPath, medium, lead, size });
       await fs.writeFile(path.join(outDir, `${it.id}.png`), r.imageData);
       await fs.writeFile(path.join(outDir, 'raw', `${it.id}.png`), r.rawData);
       const rows = byGroup.get(it.group) ?? [[], []];
       rows[0].push({ image: await fs.readFile(contentPath), label: `${it.id} · content` });
       rows[1].push({ image: r.imageData, label: `${it.id} · restyled${loraTag}` });
       byGroup.set(it.group, rows);
-      results.push({ id: it.id, group: it.group, seed, mood, loras: loraSpec || null, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t });
+      results.push({ id: it.id, group: it.group, seed, mood, size: size ?? 'portrait', loras: loraSpec || null, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t });
       const avg = (Date.now() - t0) / (n + 1);
       console.log(`  [${n + 1}/${items.length}] ${it.id}  ${((Date.now() - t) / 1000).toFixed(1)}s  · ETA ${Math.round(avg * (items.length - n - 1) / 60000)} min`);
     } catch (e) {

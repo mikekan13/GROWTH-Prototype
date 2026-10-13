@@ -233,7 +233,7 @@ export class Qwen21Provider extends ServerlessProvider {
     description: string,
     seed: number,
     mood?: string,
-    opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string; loras?: Qwen21Lora[]; medium?: string; lead?: string } = {},
+    opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string; loras?: Qwen21Lora[]; medium?: string; lead?: string; size?: { width: number; height: number } } = {},
   ): Promise<Qwen21StepResult> {
     const images: string[] = [];
     if (opts.contentRefPath) {
@@ -249,7 +249,8 @@ export class Qwen21Provider extends ServerlessProvider {
       styleRef: !!opts.styleRefPath,
       lead: opts.lead,
     });
-    return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood, { loras: opts.loras });
+    // opts.size: output dims (e.g. matched to the content image's aspect); default = the base-lock portrait.
+    return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, opts.size ?? { width: 832, height: 1248 }, mood, { loras: opts.loras });
   }
 
   /**
