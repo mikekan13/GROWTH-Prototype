@@ -45,19 +45,31 @@ const LOCK_BACKDROP = 'Blank flat uniform mid-grey backdrop, nothing else.';
  * `mood` = a mood key or genre (style-config resolveMoodKey; unset → 'growth').
  * `medium` overrides GROWTH_MEDIUM (style lab --medium-file only).
  */
+/**
+ * COMPOSITION layer for the BASE lock (Mike ruled 2026-10-13: "for the base I want to
+ * keep the framing and pose exact regardless of character"; angles come later as
+ * derived views). Fixed for every character and species. Passport-photo wording is
+ * what Qwen obeys most reliably.
+ */
+export const LOCK_COMPOSITION =
+  'Composed exactly like a passport photo: the subject faces the camera squarely and directly, head upright and centred, ' +
+  'both ears equally visible, shoulders level and square to the camera, eyes on the upper third line, ' +
+  'head and shoulders only with a little space above the head, neutral expression, closed mouth, eyes open and looking straight into the camera. ' +
+  'No turn of the head, no tilt, no three-quarter view, no profile. Bare shoulders, no clothing, no accessories.';
+
 export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?: string, medium: string = GROWTH_MEDIUM): string {
   const n = Math.max(1, Math.min(photoCount, QWEN21_MAX_IMAGES));
   if (!painted) {
     return (
       `A head-and-shoulders portrait of the person in ${imageTagList(1, n)}. ` +
-      'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing. ' +
+      LOCK_COMPOSITION + ' ' +
       LOCK_BACKDROP
     );
   }
   return [
     `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders.`,
     'Match their exact facial identity from the photos.',
-    'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing.',
+    LOCK_COMPOSITION,
     medium.trim(),
     getCampaignMood(mood),
     LOCK_BACKDROP,

@@ -20,11 +20,11 @@ describe('qwen21 prompt builders', () => {
   });
 
   it('lock prompt is the short ruled prompt with no style words', () => {
-    expect(buildQwen21LockPrompt(2)).toBe(
-      'A head-and-shoulders portrait of the person in <image1> and <image2>. ' +
-      'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing. ' +
-      'Blank flat uniform mid-grey backdrop, nothing else.',
-    );
+    const p = buildQwen21LockPrompt(2);
+    expect(p.startsWith('A head-and-shoulders portrait of the person in <image1> and <image2>. ')).toBe(true);
+    expect(p).toContain('Composed exactly like a passport photo'); // fixed COMPOSITION layer (ruled 2026-10-13)
+    expect(p).toContain('No turn of the head, no tilt, no three-quarter view, no profile.');
+    expect(p.endsWith('Blank flat uniform mid-grey backdrop, nothing else.')).toBe(true);
     expect(buildQwen21LockPrompt(1)).toContain('the person in <image1>.');
     expect(buildQwen21LockPrompt(1)).not.toMatch(/paint|style|fantasy/i);
   });
