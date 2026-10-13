@@ -52,3 +52,23 @@ Contact sheets in `style-refs/sheets/`.
 ## Retired
 - FLUX.1 LoRA triggers `ckpf`, `aidmafluxpro1.1`, `drkfnts style` — the LoRAs are not loaded on
   FLUX.2; the tokens are noise. Stripped from the standard style block 2026-10-13.
+
+## The layer model (Mike ruled 2026-10-13, "Lets do it")
+Consistency across campaigns = three layers, each with ONE job. Code: `app/src/ai/portraits/style-config.ts`
+(MEDIUM, MOODS) and `app/src/ai/portraits/finish.ts` (FINISH).
+1. **MEDIUM** (fixed forever, subject-agnostic) — the rendering technique only: semi-realistic painted
+   character illustration, matte porcelain skin with subtle texture, clean soft shading, crisp defined edges,
+   soft diffuse key with low-key falloff, desaturated cool-neutral base with at most one saturated accent;
+   no grain/noise/HDR; not anime/cartoon/airbrushed/photographic. No mood words, no subject words. ≤ 4 sentences.
+2. **MOOD** (per campaign, small) — palette temperature, shadow hardness/depth, accent colour family, one
+   atmosphere word. Max 2 sentences. Default `growth` = the old "old-school dark fantasy × modern sci-fi"
+   line: grim, somber, cool clean sci-fi sheen, cold teal undertone in the shadows. Others: horror, dark
+   fantasy, high fantasy, sci-fi, romance, mystery, western, gothic, nautical, steampunk. Picked from the
+   campaign's genre unless `styleMood` is set.
+3. **FINISH** (deterministic post-process, not prompt) — grade (slight desaturation, lifted blacks, cool
+   teal shadow tint, warm-neutral mids), seeded monochrome grain, soft vignette; tokens get a circular mask
+   + 2-px Terminal teal ring. The prompt says "no grain" — the grain we want is added here, identically.
+- Raw model outputs are kept beside the finished ones (`raw/`) — they, not the finished images, go into
+  `approved/` (via `app/scripts/approve-image.ts`) and become the LoRA training set.
+- Iterate with `app/scripts/style-lab.ts` (`--medium-file` to try MEDIUM wording without a code edit,
+  `--mood`, `--no-finish`); Mike picks from `sheet.jpg`.

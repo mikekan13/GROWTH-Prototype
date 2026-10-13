@@ -4,12 +4,14 @@
  * Ruling 2026-10-13 (ruling-switch-to-qwen-image-2-1): TWO steps, never mixed.
  *   1. identity lock = photos + a SHORT prompt (no style paragraph)
  *   2. style pass    = lock as <image1> + style refs as <image2>.. "keep the face of <image1>"
- * Qwen follows a few sentences better than a paragraph, so every prompt here is
- * at most three sentences; only the style pass carries a style line, and that
- * line is trimmed to two sentences of getFlux2StyleProse() (subject-agnostic).
+ * LIVE 13 Oct: single pass (photos + painted prompt) is the default; the two-step
+ * second pass degrades. Style = three layers (style-config.ts): MEDIUM (fixed,
+ * subject-agnostic) + MOOD (per campaign) here in the prompt, FINISH (finish.ts)
+ * after the model. Qwen follows short prose, so MEDIUM is <= 4 sentences and a
+ * mood is 2.
  */
 
-import { getFlux2StyleProse, getFlux2Backdrop } from './style-config';
+import { GROWTH_MEDIUM, GROWTH_MEDIUM_REMINDER, getCampaignMood, getFlux2Backdrop } from './style-config';
 
 /** TextEncodeQwenImage21 exposes images.image_1..image_16. */
 export const QWEN21_MAX_IMAGES = 16;
@@ -32,39 +34,39 @@ export function imageTagList(from: number, to: number): string {
   return `${tags.slice(0, -1).join(', ')} and ${tags[tags.length - 1]}`;
 }
 
-/** Step 1 — identity lock. Photos are <image1>..<imageN>. No style words. */
-export function buildQwen21LockPrompt(photoCount: number, painted = false): string {
+const LOCK_BACKDROP = 'Blank flat uniform mid-grey backdrop, nothing else.';
+
+/**
+ * Step 1 — identity lock. Photos are <image1>..<imageN>.
+ * painted=false: photo-real reference, no style words (two-step modes).
+ * painted=true (single-pass, the DEFAULT look since 2026-10-13): identity/framing
+ * sentences + MEDIUM + MOOD + backdrop in ONE pass. A second pass over a generated
+ * image added HDR grain and freckles every time (iterative-edit degradation).
+ * `mood` = a mood key or genre (style-config resolveMoodKey; unset → 'growth').
+ * `medium` overrides GROWTH_MEDIUM (style lab --medium-file only).
+ */
+export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?: string, medium: string = GROWTH_MEDIUM): string {
   const n = Math.max(1, Math.min(photoCount, QWEN21_MAX_IMAGES));
   if (!painted) {
     return (
       `A head-and-shoulders portrait of the person in ${imageTagList(1, n)}. ` +
       'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing. ' +
-      'Blank flat uniform mid-grey backdrop, nothing else.'
+      LOCK_BACKDROP
     );
   }
-  // Single-pass mode (2026-10-13): style in the SAME pass as the lock. A second
-  // pass over a generated image added HDR grain and freckles every time
-  // (iterative-edit degradation); the A/B's cleanest result was one pass on the photos.
-  return (
-    `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders. ` +
-    'Match their exact facial identity from the photos. ' +
-    'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing. ' +
-    'Smooth painted skin with a matte porcelain finish, clean soft shading, soft diffuse light, desaturated palette; no grain, no noise, no added freckles or skin texture. ' +
-    'Blank flat uniform mid-grey backdrop, nothing else.' +
-    (getQwen21StyleLine() ? ` ${getQwen21StyleLine()}` : '')
-  );
+  return [
+    `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders.`,
+    'Match their exact facial identity from the photos.',
+    'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing.',
+    medium.trim(),
+    getCampaignMood(mood),
+    LOCK_BACKDROP,
+  ].filter(Boolean).join(' ');
 }
 
-/**
- * Two sentences of the shared FLUX.2 style paragraph: the medium (first
- * sentence) and the mood line. Read live so style edits flow through.
- */
-export function getQwen21StyleLine(prose: string = getFlux2StyleProse()): string {
-  const sentences = prose.match(/[^.]+\./g)?.map(s => s.trim()).filter(Boolean) ?? [];
-  if (sentences.length === 0) return '';
-  const mood = sentences.find(s => /^The mood is/i.test(s));
-  const picked = mood && mood !== sentences[0] ? [sentences[0], mood] : sentences.slice(0, 2);
-  return picked.join(' ');
+/** MEDIUM + MOOD as one line (two-step style pass / body). Subject-agnostic. */
+export function getQwen21StyleLine(mood?: string, medium: string = GROWTH_MEDIUM): string {
+  return [medium.trim(), getCampaignMood(mood)].filter(Boolean).join(' ');
 }
 
 /** Step 2 — style pass. Lock = <image1>, style refs = <image2>..<image(1+refCount)>. */
@@ -85,22 +87,24 @@ export function buildQwen21StylePrompt(styleRefCount: number, styleLine: string 
 
 const DEFAULT_UNDERCLOTHING = 'simple neutral underclothing with a clean minimal cut';
 
-/** Full body from the styled bust (<image1>). Underclothing = character data. */
-export function buildQwen21BodyPrompt(underclothing?: string): string {
+/** Full body from the styled bust (<image1>). Underclothing = character data. MEDIUM + MOOD + studio wall. */
+export function buildQwen21BodyPrompt(underclothing?: string, mood?: string): string {
   const under = (underclothing?.trim() || DEFAULT_UNDERCLOTHING).replace(/[.\s]+$/, '');
   return (
     'A full-length front view of the person in <image1> standing in a relaxed A-pose, arms at the sides, feet visible, ' +
     'with clear margin above the head and below the feet. ' +
     `Wearing ${under}; keep the face and hair of <image1> exactly. ` +
+    `${getQwen21StyleLine(mood)} ` +
     getFlux2Backdrop('studio')
   );
 }
 
-/** Instruction edit on <image1>. */
-export function buildQwen21EditPrompt(instruction: string): string {
+/** Instruction edit on <image1>: the instruction, a ONE-clause medium reminder, the mood, "Change nothing else." */
+export function buildQwen21EditPrompt(instruction: string, mood?: string): string {
   const t = instruction.trim();
   const ended = /[.!?]$/.test(t) ? t : `${t}.`;
-  return `${ended} Change nothing else.`;
+  const reminder = GROWTH_MEDIUM_REMINDER.charAt(0).toUpperCase() + GROWTH_MEDIUM_REMINDER.slice(1);
+  return `${ended} ${reminder}. ${getCampaignMood(mood)} Change nothing else.`;
 }
 
 export interface Qwen21WorkflowOptions {

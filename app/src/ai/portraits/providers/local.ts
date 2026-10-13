@@ -625,6 +625,8 @@ export class LocalProvider implements ImageGenerationProvider {
        *  augmented with a restyle instruction so the item adopts the
        *  character's GROWTH aesthetic regardless of the ref's source style. */
       objectRefImagePath?: string;
+      /** Campaign MOOD key (style-config CAMPAIGN_MOODS). Used by the Qwen-Image-2.1 provider; ignored here. */
+      mood?: string;
     },
   ): Promise<PortraitResult> {
     await this.ensureRunning();

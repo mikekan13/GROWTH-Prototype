@@ -266,7 +266,10 @@ export interface StyleConfig {
 export interface CampaignStyleConfig {
   campaignLora?: string;                   // Campaign-specific genre LoRA
   campaignLoraStrength?: number;
-  themeModifiers?: string;                 // Additional style words for this campaign
+  themeModifiers?: string;                 // Additional style words for this campaign (legacy FLUX.1 path)
+  /** MOOD layer key (style-config CAMPAIGN_MOODS, e.g. 'growth', 'horror'). Unset →
+   *  portrait-service fills it from Campaign.genre; unknown/none → 'growth'. */
+  styleMood?: string;
   compositionOverride?: string;            // Campaign-specific framing
   allowNudity?: boolean;                   // Enable NSFW unlock LoRA for nude base body (Watcher toggle)
 }

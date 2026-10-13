@@ -16,6 +16,12 @@ import 'server-only';
  *                 post-compositing (TextEncodeQwenImage21 has no mask input)
  *
  * Selected by getLocalProvider() when PORTRAIT_PROVIDER=qwen21 (provider-flag.ts).
+ *
+ * Style = three layers (style-config.ts / finish.ts): MEDIUM + MOOD in the prompt
+ * (mood = input.campaignStyle.styleMood, filled from Campaign.genre by
+ * portrait-service; default 'growth'), FINISH applied to every saved output.
+ * The raw model output is saved beside it at <dir>/raw/<name>.png and is what
+ * chained steps (style pass, body, edits) consume — never finish twice.
  */
 
 import crypto from 'crypto';
@@ -35,8 +41,11 @@ import {
   buildQwen21LockPrompt,
   buildQwen21StylePrompt,
   buildQwen21Workflow,
+  getQwen21StyleLine,
 } from '../qwen21-workflow';
 import { compositeEditWithMask } from '../mask-composite';
+import { finishEnabled, finishImage, rawSiblingPath } from '../finish';
+import { resolveMoodKey } from '../style-config';
 
 const WORKFLOW_NAME = 'qwen21-edit';
 const MODEL_NAME = 'qwen-image-2.1-int8';
@@ -92,7 +101,12 @@ export function isStoredPortraitPath(webPath: string): boolean {
 export interface Qwen21StepResult {
   imagePath: string;
   thumbnailPath: string;
+  /** FINISHED image (what the app shows). Equals rawData when GROWTH_FINISH=off. */
   imageData: Buffer;
+  /** RAW model output — chained into later steps (never finish twice) and saved under raw/. */
+  rawData: Buffer;
+  /** Web path of the raw copy: <dir>/raw/<name>.png. */
+  rawPath: string;
   seed: number;
   prompt: string;
   width: number;
@@ -114,20 +128,42 @@ export class Qwen21Provider extends ServerlessProvider {
   // The four steps
   // ============================================================
 
-  /** Step 1 — identity lock from reference photos (web paths under public/). */
-  async lockIdentity(characterId: string, photos: string[], seed: number, opts?: { painted?: boolean }): Promise<Qwen21StepResult> {
+  /**
+   * The lock pass WITHOUT saving: photos (web paths under public/ or buffers) → raw model
+   * output + the prompt used. The style lab calls this directly.
+   */
+  async renderLock(
+    photos: Qwen21Image[],
+    seed: number,
+    opts?: { painted?: boolean; mood?: string; medium?: string },
+  ): Promise<{ raw: Buffer; prompt: string }> {
     const used = photos.slice(0, QWEN21_MAX_IMAGES);
     if (used.length === 0) throw new Error('lockIdentity needs at least one reference photo');
     const names: string[] = [];
-    for (const p of used) names.push(await this.uploadReferenceImage(p));
+    for (let i = 0; i < used.length; i++) {
+      const p = used[i];
+      names.push(Buffer.isBuffer(p) ? await this.uploadImage(p, `qwen21-photo-${i + 1}`) : await this.uploadReferenceImage(p));
+    }
     // QWEN21_STYLE_MODE=single → the lock pass carries the painted look itself (no second pass).
     const painted = opts?.painted ?? qwen21StyleMode() === 'single';
-    const prompt = buildQwen21LockPrompt(names.length, painted);
-    return this.runStep(characterId, 'faces', 'identity-lock', prompt, names, seed);
+    const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, opts?.medium);
+    return { raw: await this.runWorkflow(prompt, names, seed), prompt };
+  }
+
+  /** Step 1 — identity lock from reference photos (web paths under public/). */
+  async lockIdentity(
+    characterId: string,
+    photos: string[],
+    seed: number,
+    opts?: { painted?: boolean; mood?: string },
+  ): Promise<Qwen21StepResult> {
+    const t0 = Date.now();
+    const { raw, prompt } = await this.renderLock(photos, seed, opts);
+    return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
   }
 
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */
-  async applyStyle(characterId: string, lockImage: Qwen21Image, seed: number, styleRefs?: string[]): Promise<Qwen21StepResult> {
+  async applyStyle(characterId: string, lockImage: Qwen21Image, seed: number, styleRefs?: string[], mood?: string): Promise<Qwen21StepResult> {
     // QWEN21_STYLE_MODE=prose → no style refs; the look comes from the prompt alone.
     // 2026-10-13 smoke: with refs attached, Qwen copies their surface texture (grain,
     // freckles, mottled wall) onto the skin regardless of the prompt.
@@ -139,15 +175,15 @@ export class Qwen21Provider extends ServerlessProvider {
     const lockName = await this.uploadImage(lockImage, `qwen21-lock-${seed}`);
     const refNames: string[] = [];
     for (let i = 0; i < refs.length; i++) refNames.push(await this.uploadStyleRef(refs[i], i));
-    const prompt = buildQwen21StylePrompt(refNames.length);
-    return this.runStep(characterId, 'faces', 'styled-bust', prompt, [lockName, ...refNames], seed);
+    const prompt = buildQwen21StylePrompt(refNames.length, getQwen21StyleLine(mood));
+    return this.runStep(characterId, 'faces', 'styled-bust', prompt, [lockName, ...refNames], seed, undefined, mood);
   }
 
-  /** Full body from the styled bust (portrait canvas via EmptyLatentImage). */
-  async generateBody(characterId: string, styledBust: Qwen21Image, seed: number, underclothing?: string): Promise<Qwen21StepResult> {
+  /** Full body from the styled bust (portrait canvas via EmptyLatentImage). Pass the RAW bust buffer or a stored path. */
+  async generateBody(characterId: string, styledBust: Qwen21Image, seed: number, underclothing?: string, mood?: string): Promise<Qwen21StepResult> {
     const bustName = await this.uploadImage(styledBust, `qwen21-bust-${seed}`);
-    const prompt = buildQwen21BodyPrompt(underclothing);
-    return this.runStep(characterId, 'bodies', 'body', prompt, [bustName], seed, { ...QWEN21_BODY_SIZE });
+    const prompt = buildQwen21BodyPrompt(underclothing, mood);
+    return this.runStep(characterId, 'bodies', 'body', prompt, [bustName], seed, { ...QWEN21_BODY_SIZE }, mood);
   }
 
   /**
@@ -161,10 +197,12 @@ export class Qwen21Provider extends ServerlessProvider {
     instruction: string,
     seed: number,
     mask?: { dataUrl: string; feather?: number },
+    mood?: string,
   ): Promise<Qwen21StepResult> {
-    const baseWeb = await this.fullResWebPath(baseImage);
+    // Edit the RAW base when one exists, so the finish is applied once, not compounded.
+    const baseWeb = await this.preferRaw(await this.fullResWebPath(baseImage));
     const baseName = await this.uploadReferenceImage(baseWeb);
-    const prompt = buildQwen21EditPrompt(instruction);
+    const prompt = buildQwen21EditPrompt(instruction, mood);
     const t0 = Date.now();
     let out = await this.runWorkflow(prompt, [baseName], seed);
     if (mask?.dataUrl) {
@@ -172,7 +210,7 @@ export class Qwen21Provider extends ServerlessProvider {
       const maskBuf = Buffer.from(mask.dataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64');
       out = await compositeEditWithMask(baseBuf, out, maskBuf, mask.feather ?? 20);
     }
-    return this.saveStep(characterId, 'finetune', mask ? 'masked-edit' : 'edit', prompt, out, seed, Date.now() - t0);
+    return this.saveStep(characterId, 'finetune', mask ? 'masked-edit' : 'edit', prompt, out, seed, Date.now() - t0, mood);
   }
 
   // ============================================================
@@ -192,24 +230,26 @@ export class Qwen21Provider extends ServerlessProvider {
       const refs = [input.personaLock?.referenceImagePath, ...(input.personaLock?.referenceImagePaths ?? [])]
         .filter((r): r is string => !!r && !seen.has(r) && !!seen.add(r));
       if (refs.length === 0) throw new Error('Portrait generation requires at least one reference image');
+      // MOOD layer: portrait-service fills styleMood from Campaign.genre; unset → 'growth'.
+      const mood = resolveMoodKey({ styleMood: input.campaignStyle?.styleMood });
 
       if (input.overrides?.composition === 'full_body') {
-        const body = await this.generateBody(input.characterId, refs[0], seed, input.characterData?.identity?.underclothing);
-        return this.toResult(body, Date.now() - startTime, `qwen21 body: bust=${refs[0]}`);
+        const body = await this.generateBody(input.characterId, refs[0], seed, input.characterData?.identity?.underclothing, mood);
+        return this.toResult(body, Date.now() - startTime, `qwen21 body: bust=${refs[0]} mood=${mood}`);
       }
 
       const hasLock = isStoredPortraitPath(refs[0]);
-      const lock = hasLock ? null : await this.lockIdentity(input.characterId, refs, seed);
+      const lock = hasLock ? null : await this.lockIdentity(input.characterId, refs, seed, { mood });
       // single mode: the painted lock IS the styled bust (second pass over a generated image degrades it)
       const single = qwen21StyleMode() === 'single';
-      const styled = single && lock ? lock : await this.applyStyle(input.characterId, lock ? lock.imageData : refs[0], seed);
+      const styled = single && lock ? lock : await this.applyStyle(input.characterId, lock ? lock.rawData : refs[0], seed, undefined, mood);
       return this.toResult(
         styled,
         Date.now() - startTime,
         hasLock
           ? `qwen21 style pass on existing lock ${refs[0]}`
           : `qwen21 two-step: ${refs.length} photo(s) → lock ${lock!.imagePath} → styled`,
-        lock ? { lockPrompt: lock.prompt, lockImagePath: lock.imagePath } : {},
+        { mood, rawPath: styled.rawPath, ...(lock ? { lockPrompt: lock.prompt, lockImagePath: lock.imagePath } : {}) },
       );
     } catch (e) {
       if (e instanceof PortraitEndpointError) throw e;
@@ -232,6 +272,7 @@ export class Qwen21Provider extends ServerlessProvider {
       characterId?: string;
       paintData?: { mode: string; dataUrl: string; feather?: number };
       objectRefImagePath?: string;
+      mood?: string;
     },
   ): Promise<PortraitResult> {
     const seed = options?.seed ?? Math.floor(Math.random() * 2147483647);
@@ -245,7 +286,7 @@ export class Qwen21Provider extends ServerlessProvider {
     const mask = options?.paintData?.mode === 'mask' && options.paintData.dataUrl
       ? { dataUrl: options.paintData.dataUrl, feather: options.paintData.feather }
       : undefined;
-    const r = await this.edit(options?.characterId ?? 'anonymous', sourceImagePath, editPrompt, seed, mask);
+    const r = await this.edit(options?.characterId ?? 'anonymous', sourceImagePath, editPrompt, seed, mask, resolveMoodKey(options?.mood));
     return this.toResult(r, r.generationTimeMs, mask ? 'qwen21 masked edit (post-composite)' : 'qwen21 edit');
   }
 
@@ -256,6 +297,23 @@ export class Qwen21Provider extends ServerlessProvider {
   /** Style refs used when the caller passes none. */
   protected defaultStyleRefs(): Promise<string[]> {
     return resolveQwen21StyleRefs();
+  }
+
+  /** Write the RAW model output beside the finished one: public/<dir>/raw/<name>.png. */
+  protected async saveRaw(imageWebPath: string, raw: Buffer): Promise<string> {
+    const rawWeb = rawSiblingPath(imageWebPath);
+    const abs = this.publicAbs(rawWeb);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, raw);
+    return rawWeb;
+  }
+
+  /** A stored portrait's raw/ copy when it exists (so chained steps never finish twice). */
+  private async preferRaw(webPath: string): Promise<string> {
+    if (!isStoredPortraitPath(webPath)) return webPath;
+    let rawWeb: string;
+    try { rawWeb = rawSiblingPath(webPath); } catch { return webPath; }
+    try { await fs.access(this.publicAbs(rawWeb)); return rawWeb; } catch { return webPath; }
   }
 
   private async runWorkflow(prompt: string, images: string[], seed: number, size?: { width: number; height: number }): Promise<Buffer> {
@@ -275,26 +333,32 @@ export class Qwen21Provider extends ServerlessProvider {
     images: string[],
     seed: number,
     size?: { width: number; height: number },
+    mood?: string,
   ): Promise<Qwen21StepResult> {
     const t0 = Date.now();
     const data = await this.runWorkflow(prompt, images, seed, size);
-    return this.saveStep(characterId, folder, stage, prompt, data, seed, Date.now() - t0);
+    return this.saveStep(characterId, folder, stage, prompt, data, seed, Date.now() - t0, mood);
   }
 
+  /** FINISH the raw output (unless GROWTH_FINISH=off), save the finished image, save the raw beside it. */
   private async saveStep(
     characterId: string,
     folder: string,
     stage: string,
     prompt: string,
-    imageData: Buffer,
+    rawData: Buffer,
     seed: number,
     ms: number,
+    mood?: string,
   ): Promise<Qwen21StepResult> {
+    const finished = finishEnabled();
+    const imageData = finished ? await finishImage(rawData, seed) : rawData;
     const { imagePath, thumbnailPath } = await this.savePortrait(characterId, imageData, folder, seed, {
-      provider: 'qwen21', stage, prompt, model: MODEL_NAME,
+      provider: 'qwen21', stage, prompt, model: MODEL_NAME, mood: mood ?? null, finish: finished ? 'on' : 'off',
     });
+    const rawPath = await this.saveRaw(imagePath, rawData);
     const m = await sharp(imageData).metadata();
-    return { imagePath, thumbnailPath, imageData, seed, prompt, width: m.width ?? 0, height: m.height ?? 0, generationTimeMs: ms };
+    return { imagePath, thumbnailPath, imageData, rawData, rawPath, seed, prompt, width: m.width ?? 0, height: m.height ?? 0, generationTimeMs: ms };
   }
 
   private async uploadImage(img: Qwen21Image, stem: string): Promise<string> {
@@ -302,7 +366,7 @@ export class Qwen21Provider extends ServerlessProvider {
       const png = await sharp(img).png().toBuffer();
       return this.uploadBuffer(png, `${stem}-${png.length.toString(36)}.png`);
     }
-    return this.uploadReferenceImage(await this.fullResWebPath(img));
+    return this.uploadReferenceImage(await this.preferRaw(await this.fullResWebPath(img)));
   }
 
   private async uploadStyleRef(absPath: string, index: number): Promise<string> {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getLocalProvider } from '@/ai/portraits/providers';
-import { assertLawfulImageJob } from '@/ai/portraits/portrait-service';
+import { assertLawfulImageJob, resolvePortraitMood } from '@/ai/portraits/portrait-service';
 import { WithheldContentError, PortraitEndpointError, ClothingFromInventoryError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
 import { assertSeedSetForPortrait } from '@/services/seed-pick';
@@ -76,6 +76,8 @@ export async function POST(request: NextRequest) {
       characterId: typeof characterId === 'string' ? characterId : undefined,
       paintData: paintData as { mode: string; dataUrl: string; feather?: number } | undefined,
       objectRefImagePath: typeof objectRefImagePath === 'string' ? objectRefImagePath : undefined,
+      // MOOD layer (Qwen provider only): the character's campaign genre → mood; default 'growth'.
+      mood: await resolvePortraitMood({ characterId: typeof characterId === 'string' ? characterId : null }),
     });
 
     if (!result.success) {

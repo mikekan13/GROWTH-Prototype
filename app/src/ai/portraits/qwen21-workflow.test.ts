@@ -10,9 +10,7 @@ import {
   getQwen21StyleLine,
   imageTagList,
 } from './qwen21-workflow';
-import { getFlux2Backdrop, getFlux2StyleProse } from './style-config';
-
-const sentences = (s: string): string[] => s.match(/[^.]+\./g) ?? [];
+import { GROWTH_MEDIUM, getCampaignMood, getFlux2Backdrop, getFlux2StyleProse } from './style-config';
 
 describe('qwen21 prompt builders', () => {
   it('names refs as <imageN>', () => {
@@ -31,14 +29,26 @@ describe('qwen21 prompt builders', () => {
     expect(buildQwen21LockPrompt(1)).not.toMatch(/paint|style|fantasy/i);
   });
 
-  it('style line = two sentences of the FLUX.2 prose (medium + mood), subject-agnostic', () => {
+  it('style line = MEDIUM + MOOD (default growth), subject-agnostic', () => {
     const line = getQwen21StyleLine();
-    expect(sentences(line)).toHaveLength(2);
-    const first = sentences(getFlux2StyleProse())[0] ?? '';
-    expect(first.length).toBeGreaterThan(0);
-    expect(line.startsWith(first.trim())).toBe(true);
-    expect(line).toMatch(/The mood is/);
-    expect(line).not.toMatch(/skin tone|hair/i);
+    expect(line).toBe(`${GROWTH_MEDIUM} ${getCampaignMood('growth')}`);
+    expect(getQwen21StyleLine('horror')).toContain(getCampaignMood('horror'));
+    expect(getFlux2StyleProse()).toBe(line); // legacy paragraph = medium + growth mood
+    expect(line).not.toMatch(/skin tone|freckle|make-?up|blonde|brunette/i);
+  });
+
+  it('painted lock = identity/framing + MEDIUM + MOOD + backdrop', () => {
+    const p = buildQwen21LockPrompt(2, true, 'horror');
+    expect(p.startsWith('A painted character illustration of the person in <image1> and <image2>, head and shoulders. Match their exact facial identity from the photos.')).toBe(true);
+    const iMedium = p.indexOf(GROWTH_MEDIUM);
+    const iMood = p.indexOf(getCampaignMood('horror'));
+    expect(iMedium).toBeGreaterThan(0);
+    expect(iMood).toBeGreaterThan(iMedium);
+    expect(p.endsWith('Blank flat uniform mid-grey backdrop, nothing else.')).toBe(true);
+    expect(buildQwen21LockPrompt(1, true)).toContain(getCampaignMood('growth'));
+    expect(buildQwen21LockPrompt(1, true, 'gothic horror')).toContain(getCampaignMood('gothic'));
+    expect(buildQwen21LockPrompt(1, true, undefined, 'CUSTOM MEDIUM.')).toContain(' CUSTOM MEDIUM. ');
+    expect(buildQwen21LockPrompt(1, true, undefined, 'CUSTOM MEDIUM.')).not.toContain(GROWTH_MEDIUM);
   });
 
   it('style prompt: lock is <image1>, refs <image2>..<imageN>, 3 sentences + style line', () => {
@@ -48,7 +58,7 @@ describe('qwen21 prompt builders', () => {
       'Keep the face, head shape, skin tone, hair and framing of <image1> exactly. ' +
       'No grain, no noise, no added freckles or skin texture, no weathering. Blank flat mid-grey backdrop.',
     );
-    expect(sentences(buildQwen21StylePrompt(5))).toHaveLength(6);
+    expect(buildQwen21StylePrompt(5).endsWith(getQwen21StyleLine())).toBe(true);
     expect(buildQwen21StylePrompt(9, '')).toContain('<image6>');
     expect(buildQwen21StylePrompt(9, '')).not.toContain('<image7>');
   });
@@ -59,12 +69,20 @@ describe('qwen21 prompt builders', () => {
     expect(p).toContain('feet visible');
     expect(p).toContain('Wearing a grey linen shift; keep the face and hair of <image1> exactly.');
     expect(p.endsWith(getFlux2Backdrop('studio'))).toBe(true);
+    expect(p).toContain(GROWTH_MEDIUM);
+    expect(p).toContain(getCampaignMood('growth'));
+    expect(buildQwen21BodyPrompt(undefined, 'western')).toContain(getCampaignMood('western'));
     expect(buildQwen21BodyPrompt()).toContain('simple neutral underclothing');
   });
 
-  it('edit prompt appends "Change nothing else."', () => {
-    expect(buildQwen21EditPrompt('Add a scar over the left eye')).toBe('Add a scar over the left eye. Change nothing else.');
-    expect(buildQwen21EditPrompt('Make her smile! ')).toBe('Make her smile! Change nothing else.');
+  it('edit prompt: instruction + one-clause medium reminder + mood + "Change nothing else."', () => {
+    const growth = getCampaignMood('growth');
+    expect(buildQwen21EditPrompt('Add a scar over the left eye')).toBe(
+      `Add a scar over the left eye. Keep it the same semi-realistic painted illustration with a matte finish, no grain or noise. ${growth} Change nothing else.`,
+    );
+    expect(buildQwen21EditPrompt('Make her smile! ').startsWith('Make her smile! Keep it')).toBe(true);
+    expect(buildQwen21EditPrompt('x', 'horror')).toContain(getCampaignMood('horror'));
+    expect(buildQwen21EditPrompt('x')).not.toContain(GROWTH_MEDIUM); // short reminder, not the paragraph
   });
 });
 

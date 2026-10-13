@@ -23,6 +23,46 @@ import type {
   PortraitCharacterData,
   PersonaLockData,
 } from './types';
+import { resolveMoodKey } from './style-config';
+
+// ============================================================
+// Campaign MOOD (style layer 2)
+// ============================================================
+
+/**
+ * The MOOD key for a portrait job: explicit `styleMood` wins; else the campaign's
+ * `genre` (Campaign.genre, free text) — campaign found directly or via the
+ * character; else 'growth'. Never throws (a lookup failure → 'growth').
+ */
+export async function resolvePortraitMood(ctx: {
+  styleMood?: string | null;
+  campaignId?: string | null;
+  characterId?: string | null;
+}): Promise<string> {
+  if (ctx.styleMood?.trim()) return resolveMoodKey({ styleMood: ctx.styleMood });
+  let genre: string | null = null;
+  try {
+    let campaignId = ctx.campaignId ?? null;
+    if (!campaignId && ctx.characterId && ctx.characterId !== 'creation-preview') {
+      const ch = await prisma.character.findUnique({ where: { id: ctx.characterId }, select: { campaignId: true } });
+      campaignId = ch?.campaignId ?? null;
+    }
+    if (campaignId) {
+      const c = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { genre: true } });
+      genre = c?.genre ?? null;
+    }
+  } catch (e) {
+    console.warn('[portraits] mood lookup failed, using default:', e instanceof Error ? e.message : e);
+  }
+  return resolveMoodKey({ genre });
+}
+
+async function withMood(
+  style: CampaignStyleConfig | undefined,
+  ctx: { campaignId?: string | null; characterId?: string | null },
+): Promise<CampaignStyleConfig> {
+  return { ...(style ?? {}), styleMood: await resolvePortraitMood({ styleMood: style?.styleMood, ...ctx }) };
+}
 
 // ============================================================
 // Portrait Generation
@@ -92,7 +132,7 @@ export async function generatePortrait(
     characterData,
     personaLock: personaLockData,
     pipelineType: 'character_portrait',
-    campaignStyle: options?.campaignStyle,
+    campaignStyle: await withMood(options?.campaignStyle, { campaignId: character.campaignId }),
     overrides: options?.overrides,
   };
 
@@ -191,7 +231,7 @@ export async function generateFromDescription(
     characterData,
     personaLock,
     pipelineType: 'character_portrait',
-    campaignStyle: options?.campaignStyle,
+    campaignStyle: await withMood(options?.campaignStyle, { campaignId: options?.campaignId, characterId: dbCharacterId }),
     overrides: options?.overrides,
     creationMode: options?.creationMode,  // previously dropped here — caused body gen to render clothed despite creationMode=true
   };
