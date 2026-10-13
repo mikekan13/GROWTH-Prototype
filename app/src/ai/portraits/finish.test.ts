@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import sharp from 'sharp';
-import { FINISH, finishEnabled, finishImage, finishToken, rawSiblingPath } from './finish';
+import { FINISH, finishEnabled, finishImage, finishToken, inkEnabled, rawSiblingPath } from './finish';
 import { buildContactSheet } from './contact-sheet';
 
 let img: Buffer;
@@ -52,6 +52,69 @@ describe('finishImage', () => {
     const rgba = await sharp({ create: { width: 6, height: 6, channels: 4, background: { r: 10, g: 200, b: 30, alpha: 0.5 } } }).png().toBuffer();
     const m = await sharp(await finishImage(rgba, 3)).metadata();
     expect(m.channels).toBe(4);
+  });
+});
+
+describe('finishImage — ink pass', () => {
+  const W = 64, H = 32, EDGE = 32; // x < EDGE dark grey, x >= EDGE light grey
+  const plain = { ...FINISH, grain: { amount: 0 }, vignette: { strength: 0, inner: 1 } };
+  const noInk = { ...plain, ink: { ...FINISH.ink, amount: 0 } };
+  let edgeImg: Buffer;
+  beforeAll(async () => {
+    const raw = Buffer.alloc(W * H * 3);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) raw.fill(x < EDGE ? 70 : 200, (y * W + x) * 3, (y * W + x) * 3 + 3);
+    edgeImg = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
+  });
+  const pixels = async (b: Buffer) => (await sharp(b).raw().toBuffer({ resolveWithObject: true }));
+  const lumAt = (p: { data: Buffer; info: sharp.OutputInfo }, x: number, y: number) => {
+    const i = (y * p.info.width + x) * p.info.channels;
+    return 0.2126 * p.data[i] + 0.7152 * p.data[i + 1] + 0.0722 * p.data[i + 2];
+  };
+
+  it('is deterministic with the ink on (same input → identical bytes)', async () => {
+    const a = await finishImage(edgeImg, 5, FINISH, {});
+    const b = await finishImage(edgeImg, 5, FINISH, {});
+    expect(a.equals(b)).toBe(true);
+  });
+
+  it('a hard vertical edge gets darker along its column and nowhere else', async () => {
+    const on = await pixels(await finishImage(edgeImg, 1, plain, {}));
+    const off = await pixels(await finishImage(edgeImg, 1, noInk, {}));
+    const y = H / 2;
+    // Some column at the edge is clearly darker with the ink.
+    const drop = Math.max(...[EDGE - 2, EDGE - 1, EDGE, EDGE + 1].map(x => lumAt(off, x, y) - lumAt(on, x, y)));
+    expect(drop).toBeGreaterThan(10);
+    // Away from the edge, every pixel is untouched.
+    for (let yy = 0; yy < H; yy++) for (let x = 0; x < W; x++) {
+      if (Math.abs(x - EDGE) <= 6) continue;
+      const i = (yy * W + x) * 3;
+      expect([on.data[i], on.data[i + 1], on.data[i + 2]]).toEqual([off.data[i], off.data[i + 1], off.data[i + 2]]);
+    }
+  });
+
+  it('a flat grey image is unchanged by the ink (no lines from nothing)', async () => {
+    const grey = await sharp({ create: { width: 40, height: 30, channels: 3, background: { r: 128, g: 128, b: 128 } } }).png().toBuffer();
+    const on = await finishImage(grey, 9, FINISH, {});
+    const off = await finishImage(grey, 9, { ...FINISH, ink: { ...FINISH.ink, amount: 0 } }, {});
+    expect(on.equals(off)).toBe(true);
+  });
+
+  it('GROWTH_FINISH_INK=off and amount 0 both bypass; dimensions preserved', async () => {
+    expect(inkEnabled({})).toBe(true);
+    expect(inkEnabled({ GROWTH_FINISH_INK: ' OFF' })).toBe(false);
+    const envOff = await finishImage(edgeImg, 3, FINISH, { GROWTH_FINISH_INK: 'off' });
+    const zero = await finishImage(edgeImg, 3, { ...FINISH, ink: { ...FINISH.ink, amount: 0 } }, {});
+    const on = await finishImage(edgeImg, 3, FINISH, {});
+    expect(envOff.equals(zero)).toBe(true);
+    expect(on.equals(zero)).toBe(false);
+    const m = await sharp(on).metadata();
+    expect([m.width, m.height]).toEqual([W, H]);
+  });
+
+  it('token from an inked image is still RGBA', async () => {
+    const tok = await finishToken(await finishImage(edgeImg, 2, FINISH, {}), { size: 24 });
+    const m = await sharp(tok).metadata();
+    expect([m.width, m.height, m.channels]).toEqual([24, 24, 4]);
   });
 });
 

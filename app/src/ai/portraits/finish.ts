@@ -7,10 +7,13 @@
  *   (a) colour grade — slight desaturation, lifted blacks, cool teal shadow tint, warm-neutral mids
  *   (b) monochrome grain — seeded noise (same input + seed → byte-identical output)
  *   (c) soft vignette
+ *   (a') ink — deterministic pen lines along contours (Sobel on blurred luminance,
+ *        coarse-scale gated so skin texture never inks), faint teal on the lit side
  *   (d) finishToken() — circular mask + Terminal-teal ring on a transparent RGBA canvas
  *
+ * Order: grade → ink → vignette → grain (grain sits on top of the lines).
  * All parameters live in FINISH (iterate there). GROWTH_FINISH=off bypasses
- * finishing. The RAW model output is always saved alongside (<dir>/raw/<name>.png)
+ * finishing; GROWTH_FINISH_INK=off (or ink.amount 0) bypasses only the ink. The RAW model output is always saved alongside (<dir>/raw/<name>.png)
  * — the raw copies are the future LoRA training set. Pure: no file I/O here.
  */
 
@@ -31,6 +34,20 @@ export interface FinishParams {
   grain: { amount: number };
   /** Radial darkening: `strength` at the corners, starting at `inner` (0 = centre, 1 = corner). */
   vignette: { strength: number; inner: number };
+  /**
+   * Ink pass (Mike 13 Oct: "slightly exaggerated pen lines. subtle but noticible").
+   * Resolution-independent: lengths are in px at 832 wide and scale with the image.
+   */
+  ink: {
+    /** Max darkening toward the ink colour along a full-strength line, 0..1. 0 = off. */
+    amount: number;
+    /** Line width in px at 832 wide (≥2 dilates the mask by ~1 px). */
+    width: number;
+    /** Edge contrast (luminance step, 0..1) where a line starts; full ink at ~2.2×. */
+    threshold: number;
+    /** Faint cool edge on the lit side of a line (shadowTint hue), 0..1. 0 = none. */
+    teal: number;
+  };
   token: { ring: string; ringWidth: number };
 }
 
@@ -44,12 +61,18 @@ export const FINISH: FinishParams = {
   },
   grain: { amount: 0.008 }, // rev 2: a third of the original — it read as dust
   vignette: { strength: 0.22, inner: 0.45 },
+  ink: { amount: 0.55, width: 1.5, threshold: 0.06, teal: 0.2 },
   token: { ring: '#22ab94', ringWidth: 2 }, // Terminal teal
 };
 
 /** False when GROWTH_FINISH=off. */
 export function finishEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.GROWTH_FINISH ?? '').trim().toLowerCase() !== 'off';
+}
+
+/** False when GROWTH_FINISH_INK=off. */
+export function inkEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return (env.GROWTH_FINISH_INK ?? '').trim().toLowerCase() !== 'off';
 }
 
 /** mulberry32 — tiny deterministic PRNG. */
@@ -70,11 +93,169 @@ const smoothstep = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+/** Separable Gaussian blur of a single-channel float field (edges clamped). */
+function gaussianBlur(src: Float32Array, w: number, h: number, sigma: number): Float32Array {
+  if (sigma < 0.3) return Float32Array.from(src);
+  const rad = Math.max(1, Math.ceil(sigma * 3));
+  const k = new Float32Array(rad * 2 + 1);
+  let sum = 0;
+  for (let i = -rad; i <= rad; i++) sum += (k[i + rad] = Math.exp(-(i * i) / (2 * sigma * sigma)));
+  for (let i = 0; i < k.length; i++) k[i] /= sum;
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let j = -rad; j <= rad; j++) {
+        const xx = x + j < 0 ? 0 : x + j >= w ? w - 1 : x + j;
+        acc += src[row + xx] * k[j + rad];
+      }
+      tmp[row + x] = acc;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let j = -rad; j <= rad; j++) {
+        const yy = y + j < 0 ? 0 : y + j >= h ? h - 1 : y + j;
+        acc += tmp[yy * w + x] * k[j + rad];
+      }
+      out[y * w + x] = acc;
+    }
+  }
+  return out;
+}
+
 /**
- * Grade + grain + vignette. Dimensions and alpha (if any) are preserved; output is PNG.
- * Deterministic: identical input + seed + params → identical bytes.
+ * Sobel on a blurred field → edge strength in luminance-step units (a hard step of
+ * height c blurred by `sigma` reads ≈ c whatever the resolution), plus the gradient.
  */
-export async function finishImage(input: Buffer, seed: number, params: FinishParams = FINISH): Promise<Buffer> {
+function edgeStrength(b: Float32Array, w: number, h: number, sigma: number) {
+  const e = new Float32Array(w * h);
+  const gx = new Float32Array(w * h);
+  const gy = new Float32Array(w * h);
+  const norm = (Math.max(sigma, 0.4) * Math.sqrt(2 * Math.PI)) / 8;
+  const at = (x: number, y: number) => b[(y < 0 ? 0 : y >= h ? h - 1 : y) * w + (x < 0 ? 0 : x >= w ? w - 1 : x)];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const tl = at(x - 1, y - 1), t = at(x, y - 1), tr = at(x + 1, y - 1);
+      const l = at(x - 1, y), r = at(x + 1, y);
+      const bl = at(x - 1, y + 1), bo = at(x, y + 1), br = at(x + 1, y + 1);
+      const sx = (tr + 2 * r + br - tl - 2 * l - bl) * norm;
+      const sy = (bl + 2 * bo + br - tl - 2 * t - tr) * norm;
+      const i = y * w + x;
+      gx[i] = sx;
+      gy[i] = sy;
+      e[i] = Math.hypot(sx, sy);
+    }
+  }
+  return { e, gx, gy };
+}
+
+/** #141413 — near-black ink, never pure black. */
+const INK_RGB = [20 / 255, 20 / 255, 19 / 255];
+
+/**
+ * The ink pass, in place on graded float RGB planes. A line = a fine-scale edge that
+ * is ALSO an edge at a coarser scale (contours of features, hair, silhouette), so
+ * pores/freckles/flat skin stay clean; smooth mid-tones need a stronger coarse edge.
+ * Darken toward INK_RGB by amount × mask; faint shadowTint-hued chroma on the lit side.
+ */
+function applyInk(
+  r: Float32Array, g: Float32Array, b: Float32Array, w: number, h: number,
+  ink: FinishParams['ink'], tint: number[],
+): void {
+  const n = w * h;
+  const scale = w / 832;
+  const lum = new Float32Array(n);
+  for (let i = 0; i < n; i++) lum[i] = 0.2126 * r[i] + 0.7152 * g[i] + 0.0722 * b[i];
+  const s1 = Math.max(0.5, 0.7 * ink.width * scale);
+  const s2 = Math.max(1.2, 2.5 * scale);
+  const b1 = gaussianBlur(lum, w, h, s1);
+  const fine = edgeStrength(b1, w, h, s1);
+  const b2 = gaussianBlur(lum, w, h, s2);
+  const coarse = edgeStrength(b2, w, h, s2);
+  const t = ink.threshold;
+
+  let mask = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const ce = coarse.e[i];
+    let m = smoothstep(t, t * 2.2, fine.e[i]) * smoothstep(t * 0.5, t * 1.5, ce);
+    // Smooth mid-tones (skin) need a stronger coarse edge before they ink.
+    const midBand = smoothstep(0.3, 0.45, b2[i]) * (1 - smoothstep(0.75, 0.9, b2[i]));
+    m *= 1 - midBand * (1 - smoothstep(t, t * 3, ce));
+    // The pen sits on the DARK side of the edge: a thin line, not a halo band.
+    m *= smoothstep(0, t * 0.2, b2[i] - b1[i]);
+    // Already-dark marks (lashes, brows, deep hair) are lines already — don't thicken them.
+    m *= smoothstep(0.08, 0.3, b1[i]);
+    mask[i] = m;
+  }
+  const rd = ink.width >= 2 ? Math.max(1, Math.round((ink.width - 1) * scale * 0.5)) : 0;
+  if (rd > 0) {
+    const d = new Float32Array(n);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let mx = 0;
+      for (let dy = -rd; dy <= rd; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -rd; dx <= rd; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          const v = mask[yy * w + xx];
+          if (v > mx) mx = v;
+        }
+      }
+      d[y * w + x] = mx;
+    }
+    mask = d;
+  }
+
+  // Teal chroma direction (luminance-free), normalised to unit max.
+  const tl = 0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2];
+  const c = [tint[0] - tl, tint[1] - tl, tint[2] - tl];
+  const cm = Math.max(Math.abs(c[0]), Math.abs(c[1]), Math.abs(c[2])) || 1;
+  const chroma = c.map(v => (v / cm) * 0.3);
+  const reach = 1.5 * s1 + rd;
+  const a = ink.amount;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const m = mask[i];
+      let tm = 0;
+      if (ink.teal > 0) {
+        const gx = coarse.gx[i], gy = coarse.gy[i];
+        const gl = Math.hypot(gx, gy);
+        if (gl > 1e-4) {
+          // Step toward the darker side; a line there makes this pixel its lit edge.
+          const sx = Math.round(x - (gx / gl) * reach);
+          const sy = Math.round(y - (gy / gl) * reach);
+          // Strong (silhouette-grade) edges only — on soft facial creases it reads as a pale halo.
+          if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
+            tm = mask[sy * w + sx] * (1 - m) * smoothstep(t * 2.5, t * 5, coarse.e[i]) * ink.teal;
+          }
+        }
+      }
+      const k = a * m;
+      r[i] = r[i] * (1 - k) + INK_RGB[0] * k + chroma[0] * tm;
+      g[i] = g[i] * (1 - k) + INK_RGB[1] * k + chroma[1] * tm;
+      b[i] = b[i] * (1 - k) + INK_RGB[2] * k + chroma[2] * tm;
+    }
+  }
+}
+
+/**
+ * Grade → ink → vignette → grain. Dimensions and alpha (if any) are preserved; output is PNG.
+ * Deterministic: identical input + seed + params → identical bytes.
+ * `env` is consulted for GROWTH_FINISH_INK=off (defaults to process.env).
+ */
+export async function finishImage(
+  input: Buffer,
+  seed: number,
+  params: FinishParams = FINISH,
+  env: Record<string, string | undefined> = process.env,
+): Promise<Buffer> {
   const meta = await sharp(input).metadata();
   const base = sharp(input).toColourspace('srgb');
   const { data, info } = await (meta.hasAlpha ? base.ensureAlpha() : base.removeAlpha())
@@ -84,44 +265,54 @@ export async function finishImage(input: Buffer, seed: number, params: FinishPar
   const out = Buffer.from(data);
   const { saturation, liftBlacks, shadowTint, midWarmth } = params.grade;
   const tint = [shadowTint.r / 255, shadowTint.g / 255, shadowTint.b / 255];
+  const n = width * height;
+  const R = new Float32Array(n);
+  const G = new Float32Array(n);
+  const B = new Float32Array(n);
+
+  // (a) grade
+  for (let p = 0; p < n; p++) {
+    const i = p * channels;
+    let r = data[i] / 255;
+    let g = data[i + 1] / 255;
+    let b = data[i + 2] / 255;
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    r = lum + (r - lum) * saturation;
+    g = lum + (g - lum) * saturation;
+    b = lum + (b - lum) * saturation;
+    const w = (1 - lum) * (1 - lum) * shadowTint.opacity;
+    r = r * (1 - w) + tint[0] * w;
+    g = g * (1 - w) + tint[1] * w;
+    b = b * (1 - w) + tint[2] * w;
+    const mid = 4 * lum * (1 - lum);
+    r += midWarmth * mid;
+    b -= midWarmth * mid;
+    R[p] = liftBlacks + r * (1 - liftBlacks);
+    G[p] = liftBlacks + g * (1 - liftBlacks);
+    B[p] = liftBlacks + b * (1 - liftBlacks);
+  }
+
+  // (a') ink — after the grade, before vignette + grain (grain sits on the lines)
+  if (params.ink && params.ink.amount > 0 && inkEnabled(env)) {
+    applyInk(R, G, B, width, height, params.ink, tint);
+  }
+
   const rand = prng(seed);
   const cx = (width - 1) / 2;
   const cy = (height - 1) / 2;
   const maxD = Math.hypot(cx, cy) || 1;
-
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * channels;
-      let r = data[i] / 255;
-      let g = data[i + 1] / 255;
-      let b = data[i + 2] / 255;
-
-      // (a) grade
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      r = lum + (r - lum) * saturation;
-      g = lum + (g - lum) * saturation;
-      b = lum + (b - lum) * saturation;
-      const w = (1 - lum) * (1 - lum) * shadowTint.opacity;
-      r = r * (1 - w) + tint[0] * w;
-      g = g * (1 - w) + tint[1] * w;
-      b = b * (1 - w) + tint[2] * w;
-      const mid = 4 * lum * (1 - lum);
-      r += midWarmth * mid;
-      b -= midWarmth * mid;
-      r = liftBlacks + r * (1 - liftBlacks);
-      g = liftBlacks + g * (1 - liftBlacks);
-      b = liftBlacks + b * (1 - liftBlacks);
-
+      const p = y * width + x;
+      const i = p * channels;
       // (c) vignette
       const d = Math.hypot(x - cx, y - cy) / maxD;
       const v = 1 - params.vignette.strength * smoothstep(params.vignette.inner, 1, d);
-
       // (b) monochrome grain (one value for all three channels)
-      const n = params.grain.amount > 0 ? (rand() + rand() + rand() - 1.5) * 2 * params.grain.amount : 0;
-
-      out[i] = Math.round(clamp01(r * v + n) * 255);
-      out[i + 1] = Math.round(clamp01(g * v + n) * 255);
-      out[i + 2] = Math.round(clamp01(b * v + n) * 255);
+      const gr = params.grain.amount > 0 ? (rand() + rand() + rand() - 1.5) * 2 * params.grain.amount : 0;
+      out[i] = Math.round(clamp01(R[p] * v + gr) * 255);
+      out[i + 1] = Math.round(clamp01(G[p] * v + gr) * 255);
+      out[i + 2] = Math.round(clamp01(B[p] * v + gr) * 255);
     }
   }
   return sharp(out, { raw: { width, height, channels } }).png().toBuffer();
