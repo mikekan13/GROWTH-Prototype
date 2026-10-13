@@ -67,7 +67,7 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     expect(lock.LOAD_REF2.inputs.image).toBe('ref:/uploads/references/c/b.jpg');
     expect(lock.LOAD_REF3).toBeUndefined();
 
-    expect(style.TEXT_ENCODE.inputs.prompt).toMatch(/^Repaint <image1> in the exact art style of <image2> and <image3>:/);
+    expect(style.TEXT_ENCODE.inputs.prompt).toMatch(/^Repaint <image1> as a painted character illustration in the style of <image2> and <image3>:/);
     expect(String(style.LOAD_REF1.inputs.image)).toMatch(/^buf:qwen21-lock-7-/); // the lock output, not a photo
     expect(style.LOAD_REF2.inputs.image).toBe('style1:/abs/s1.png');
     expect(style.LOAD_REF3.inputs.image).toBe('style2:/abs/s2.png');

@@ -46,8 +46,10 @@ const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 /** The three old gens used for the 2026-10-13 A/B (style-refs/inbox/Old Gens). */
 export const QWEN21_FALLBACK_STYLE_REFS = [
   '22f7507e-988d-4023-912f-db48613a11b0.png',
+  '5f154145-fe3c-4184-8f05-f46f354cfefb.png',
   '078408e2-a87a-4c94-8e32-dfdc68901a35.png',
-  'ed7cdb10-6a1e-4bc4-841d-542c4b5193f2.png',
+  // 2026-10-13 smoke: the horned/grime bust (ed7cdb10) pulled grain, freckles and a
+  // weathered wall into the style pass → swapped for a clean bust. Keep refs clean-skinned.
 ];
 
 /**
@@ -113,9 +115,13 @@ export class Qwen21Provider extends ServerlessProvider {
 
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */
   async applyStyle(characterId: string, lockImage: Qwen21Image, seed: number, styleRefs?: string[]): Promise<Qwen21StepResult> {
-    const refs = (styleRefs ?? (await this.defaultStyleRefs())).slice(0, QWEN21_MAX_STYLE_REFS);
-    if (refs.length === 0) {
-      throw new Error('No style refs found (style-refs/approved/ or style-refs/inbox/Old Gens/) — the style pass needs at least one');
+    // QWEN21_STYLE_MODE=prose → no style refs; the look comes from the prompt alone.
+    // 2026-10-13 smoke: with refs attached, Qwen copies their surface texture (grain,
+    // freckles, mottled wall) onto the skin regardless of the prompt.
+    const proseOnly = process.env.QWEN21_STYLE_MODE === 'prose';
+    const refs = proseOnly ? [] : (styleRefs ?? (await this.defaultStyleRefs())).slice(0, QWEN21_MAX_STYLE_REFS);
+    if (!proseOnly && refs.length === 0) {
+      throw new Error('No style refs found (style-refs/approved/ or style-refs/inbox/Old Gens/) — the style pass needs at least one (or set QWEN21_STYLE_MODE=prose)');
     }
     const lockName = await this.uploadImage(lockImage, `qwen21-lock-${seed}`);
     const refNames: string[] = [];

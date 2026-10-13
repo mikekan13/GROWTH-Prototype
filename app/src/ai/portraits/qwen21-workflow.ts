@@ -56,11 +56,16 @@ export function getQwen21StyleLine(prose: string = getFlux2StyleProse()): string
 
 /** Step 2 — style pass. Lock = <image1>, style refs = <image2>..<image(1+refCount)>. */
 export function buildQwen21StylePrompt(styleRefCount: number, styleLine: string = getQwen21StyleLine()): string {
-  const k = Math.max(1, Math.min(styleRefCount, QWEN21_MAX_STYLE_REFS));
+  const k = Math.max(0, Math.min(styleRefCount, QWEN21_MAX_STYLE_REFS));
+  // 2026-10-13 smoke rev 2: "exact art style … brushwork, finish" read as a texture
+  // overlay (HDR grain, blown-up freckles, weathered wall). Name the painted look
+  // directly and forbid the texture. k = 0 → prose-only style pass (no style refs):
+  // with refs attached Qwen copies their surface texture onto the skin.
+  const inStyleOf = k > 0 ? ` in the style of ${imageTagList(2, k + 1)}` : '';
   return (
-    `Repaint <image1> in the exact art style of ${imageTagList(2, k + 1)}: brushwork, finish, palette and lighting only. ` +
+    `Repaint <image1> as a painted character illustration${inStyleOf}: smooth painted skin with a matte porcelain finish, clean soft shading, crisp edges, soft diffuse light, desaturated palette. ` +
     'Keep the face, head shape, skin tone, hair and framing of <image1> exactly. ' +
-    'Blank flat mid-grey backdrop.' +
+    'No grain, no noise, no added freckles or skin texture, no weathering. Blank flat mid-grey backdrop.' +
     (styleLine ? ` ${styleLine}` : '')
   );
 }

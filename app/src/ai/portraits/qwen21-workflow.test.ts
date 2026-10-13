@@ -44,11 +44,11 @@ describe('qwen21 prompt builders', () => {
   it('style prompt: lock is <image1>, refs <image2>..<imageN>, 3 sentences + style line', () => {
     const p = buildQwen21StylePrompt(3, '');
     expect(p).toBe(
-      'Repaint <image1> in the exact art style of <image2>, <image3> and <image4>: brushwork, finish, palette and lighting only. ' +
+      'Repaint <image1> as a painted character illustration in the style of <image2>, <image3> and <image4>: smooth painted skin with a matte porcelain finish, clean soft shading, crisp edges, soft diffuse light, desaturated palette. ' +
       'Keep the face, head shape, skin tone, hair and framing of <image1> exactly. ' +
-      'Blank flat mid-grey backdrop.',
+      'No grain, no noise, no added freckles or skin texture, no weathering. Blank flat mid-grey backdrop.',
     );
-    expect(sentences(buildQwen21StylePrompt(5))).toHaveLength(5);
+    expect(sentences(buildQwen21StylePrompt(5))).toHaveLength(6);
     expect(buildQwen21StylePrompt(9, '')).toContain('<image6>');
     expect(buildQwen21StylePrompt(9, '')).not.toContain('<image7>');
   });
