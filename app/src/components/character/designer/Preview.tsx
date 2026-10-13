@@ -29,6 +29,8 @@ export function Preview({
   glitchKey: number;
 }) {
   const src = view === 'body' ? bodyImagePath : layer?.imagePath ?? null;
+  // The preview shows the web-sized copy under .thumbs/; the full-res PNG sits one level up.
+  const fullRes = src ? src.replace('/.thumbs/', '/').replace(/\.webp$/i, '.png') : null;
   const aspect = view === 'body' ? '2 / 3' : '1 / 1';
   const caption = view === 'body'
     ? (bodyImagePath ? 'body · from the approved base' : 'body · made when you approve the base')
@@ -61,13 +63,22 @@ export function Preview({
               />
             </div>
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={`${src}-${glitchKey}`}
-              src={src}
-              alt={view === 'body' ? 'Full body' : 'Current portrait layer'}
-              className="gd-glitch absolute inset-0 w-full h-full object-contain"
-            />
+            <a
+              href={fullRes ?? src}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open full-size image in a new tab"
+              className="absolute inset-0"
+              data-testid="designer-fullsize-link"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={`${src}-${glitchKey}`}
+                src={src}
+                alt={view === 'body' ? 'Full body' : 'Current portrait layer'}
+                className="gd-glitch absolute inset-0 w-full h-full object-contain"
+              />
+            </a>
           )
         ) : (
           <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
@@ -87,7 +98,20 @@ export function Preview({
         <span className="min-w-0 truncate" style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }} data-testid="designer-caption">
           [{caption}]{editCount > 0 ? ` · ${editCount} edit${editCount === 1 ? '' : 's'}` : ''}
         </span>
-        <GhostButton label="regenerate" onClick={onRegenerate} disabled={!canRegenerate} testId="designer-regenerate" />
+        <span className="flex items-center gap-3">
+          {fullRes && (
+            <a
+              href={fullRes}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontFamily: F.mono, fontSize: 11, color: C.soul, textDecoration: 'underline', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+              data-testid="designer-fullsize"
+            >
+              full size
+            </a>
+          )}
+          <GhostButton label="regenerate" onClick={onRegenerate} disabled={!canRegenerate} testId="designer-regenerate" />
+        </span>
       </div>
       {error && <div className="mt-1"><Readout tone="error" testId="designer-error">{error}</Readout></div>}
       {note && <div className="mt-1"><Readout tone="note" testId="designer-note">{note}</Readout></div>}
