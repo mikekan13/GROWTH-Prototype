@@ -28,7 +28,7 @@ import type {
   ComfyUIWorkflowParams,
 } from '../types';
 import { buildPortraitPrompt } from '../prompt-builder';
-import { getFlux2StyleProse } from '../style-config';
+import { getFlux2StyleProse, getFlux2Backdrop } from '../style-config';
 import { PortraitEndpointError } from '@/lib/errors';
 import { composeStylePrompt } from '../growth-style-prompts';
 import { markUsed } from '../pod-keepalive';
@@ -1013,7 +1013,7 @@ export class LocalProvider implements ImageGenerationProvider {
         let base =
           `A painted character illustration of ${subjectPhrase} in ${idRefsPhrase}. Match their exact facial identity — ${matchList} — from the references with high fidelity. Do not invent, average, or embellish features; only the rendering style changes, not the person.\n` +
           `Head-and-shoulders portrait, shoulders-up, straight-on front view, eye-level, looking directly at the viewer, neutral expression with closed mouth. Nude, bare shoulders. No clothing.\n\n` +
-          getFlux2StyleProse();
+          `${getFlux2StyleProse()} ${getFlux2Backdrop('lock')}`;
         if (anglePoseActive) {
           base += ` Posed as shown in image reference ${poseSlotIdx}.`;
         }
@@ -1116,7 +1116,7 @@ export class LocalProvider implements ImageGenerationProvider {
         return (
           `Render the person from image reference 1 in the visual style of ${styleRange}. ` +
           `Do not use the face, hair, skin, clothing, pose, framing, or background from ${styleRange} — only the art style and rendering.\n\n` +
-          `${getFlux2StyleProse()}\n\n` +
+          `${getFlux2StyleProse()} ${getFlux2Backdrop('lock')}\n\n` +
           `Head-and-shoulders portrait, shoulders-up, straight-on front view, nude, bare shoulders, no clothing.`
         );
       };
@@ -1424,7 +1424,7 @@ export class LocalProvider implements ImageGenerationProvider {
     return (
       `A full-length painted illustration of the ${subject} from image reference 1${physClause}. Match the exact facial identity, hair, and skin from image reference 1 with high fidelity.${measurementSentence} Full body visible head to toe with natural realistic proportions, standing straight in a relaxed A-pose facing the camera, arms at the sides, neutral expression, with clear backdrop margin above the head and below the feet.\n\n` +
       `${underwearPhrase}\n\n` +
-      `${getFlux2StyleProse()} A soft ground shadow sits under the feet. The painterly style applies to the rendering only — it does not change what the person wears or how objects are designed.${styleSentence}`
+      `${getFlux2StyleProse()} ${getFlux2Backdrop('studio')} A soft ground shadow sits under the feet. The painterly style applies to the rendering only — it does not change what the person wears or how objects are designed.${styleSentence}`
     );
   }
 

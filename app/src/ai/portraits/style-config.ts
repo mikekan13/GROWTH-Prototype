@@ -72,19 +72,34 @@ const STYLE_PREFIX = STYLE_TAGS;
 // Revision 2 (Mike: "too anime and a bit too soft lines"): realistic adult
 // proportions and bone structure, crisp defined edges, controlled brushwork,
 // subtle skin texture, wall fills the frame.
+// Revision 5 (Mike): the paragraph must be SUBJECT-AGNOSTIC — it is applied
+// to every race, sex and eventually species — so it describes rendering and
+// mood only, never the subject (no skin tone, hair colour, make-up, age). The
+// backdrop is a separate line chosen per use: the identity lock is a reference
+// shot and gets a blank backdrop; the body / final gets the studio wall.
 const FLUX2_STYLE_PROSE =
   'Rendered as a Western semi-realistic digital painting in the manner of a professional concept-art character portrait, painted rather than photographed, with a matte finish. Not anime, not cartoon, not airbrushed. ' +
-  'Realistic adult facial proportions and bone structure: natural eye size, a defined nose bridge, visible cheekbones and jawline, lips in proportion to the face. The eyes have smoky dark lids. ' +
-  'Sharp focus throughout the entire image with finely rendered high-detail painting: tight, precise brushwork, crisp defined edges on the face, eyes, lips and hair, hard edges where the planes of the face meet, individual hair strands crisply drawn, and no blur or softness anywhere. ' +
+  'The subject\'s own anatomy, skin tone, features and species are rendered faithfully with realistic proportions and bone structure: natural eye size, a defined nose bridge, visible cheekbones and jawline, every feature in proportion to the face. ' +
+  'Sharp focus throughout the entire image with finely rendered high-detail painting: tight, precise brushwork, crisp defined edges on the face, eyes, mouth and hair, hard edges where the planes of the face meet, individual hair strands crisply drawn, and no blur or softness anywhere. ' +
   'The skin is smooth but has subtle texture and natural tone variation, with a soft matte sheen rather than gloss. ' +
-  'The backdrop is a uniform mid-grey mottled plaster studio wall that fills the entire frame edge to edge, with no paper margin and no white border, and nothing else in the scene. ' +
   'Soft diffuse key light from the front with a gentle top key, low-key moody falloff into shadow at the sides, and clear form shadows that define the nose, cheekbones and jaw; shadows are cool grey, never black; no rim light, no lens effects. ' +
-  'The mood is a blend of old-school dark fantasy and modern science fiction: the grim, somber, slightly ominous atmosphere of a 1980s dark fantasy book-cover painting, finished with the cool, clean, faintly synthetic sheen of modern sci-fi concept art, with a subtle cold teal undertone in the shadows and a faint haze of grime and age on the wall behind. ' +
-  'The palette is desaturated and cool-neutral with one saturated accent color, pale skin against dark hair.';
+  'The mood is a blend of old-school dark fantasy and modern science fiction: the grim, somber, slightly ominous atmosphere of a 1980s dark fantasy book-cover painting, finished with the cool, clean, faintly synthetic sheen of modern sci-fi concept art, with a subtle cold teal undertone in the shadows. ' +
+  'The palette is desaturated and cool-neutral with at most one saturated accent color.';
 
-/** The GROWTH look as one prose paragraph for FLUX.2 prompts. */
+const FLUX2_BACKDROP_LOCK =
+  'The backdrop is a completely blank, flat, uniform mid-grey with no texture, no detail and nothing else in the scene; at most the outermost edges of the figure may loosen into a few stylized brush strokes against the blank backdrop.';
+
+const FLUX2_BACKDROP_STUDIO =
+  'The backdrop is a uniform mid-grey mottled plaster studio wall with a faint haze of grime and age, filling the entire frame edge to edge, with no paper margin and no white border, and nothing else in the scene.';
+
+/** The GROWTH look as one prose paragraph for FLUX.2 prompts (subject-agnostic; no backdrop). */
 export function getFlux2StyleProse(): string {
   return FLUX2_STYLE_PROSE;
+}
+
+/** Backdrop line for FLUX.2 prompts: 'lock' = blank identity reference, 'studio' = mottled wall for body/final. */
+export function getFlux2Backdrop(kind: 'lock' | 'studio'): string {
+  return kind === 'lock' ? FLUX2_BACKDROP_LOCK : FLUX2_BACKDROP_STUDIO;
 }
 
 // ============================================================
