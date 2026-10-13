@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getLocalProvider } from '@/ai/portraits/providers';
 import { assertLawfulImageJob } from '@/ai/portraits/portrait-service';
-import { WithheldContentError, PortraitEndpointError } from '@/lib/errors';
+import { WithheldContentError, PortraitEndpointError, ClothingFromInventoryError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
 import { assertSeedSetForPortrait } from '@/services/seed-pick';
+import { assertEditAllowed } from '@/services/portrait-edit-guard';
+import { resolvePortraitProviderKind } from '@/ai/portraits/provider-flag';
 
 export const maxDuration = 600;
 
@@ -48,6 +50,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'editPrompt is required' }, { status: 400 });
     }
 
+    // Clothing and gear come from inventory (designer ruling 2026-10-13) — qwen21 only.
+    assertEditAllowed(resolvePortraitProviderKind(), editPrompt);
+
     // SEED FIRST (Mike 2026-10-12): a character's renders wait for its seed.
     // (An edit with no characterId is of an existing render — already gated.)
     if (typeof characterId === 'string' && characterId) {
@@ -86,10 +91,13 @@ export async function POST(request: NextRequest) {
         generationTimeMs: result.metadata.generationTimeMs,
         model: result.metadata.model,
         prompt: result.metadata.prompt,
+        steps: result.metadata.steps ?? null,
+        cfg: result.metadata.cfg ?? null,
       },
     });
   } catch (error) {
-    if (error instanceof WithheldContentError || error instanceof PortraitEndpointError) return errorResponse(error);
+    if (error instanceof WithheldContentError || error instanceof PortraitEndpointError
+      || error instanceof ClothingFromInventoryError) return errorResponse(error);
     console.error('[portraits/edit] Error:', error);
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: msg, stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined }, { status: 500 });

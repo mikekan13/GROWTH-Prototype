@@ -114,3 +114,16 @@ export class PortraitEndpointError extends AppError {
     this.name = 'PortraitEndpointError';
   }
 }
+
+/**
+ * Image designer (ruling 2026-10-13): clothing and gear come from the
+ * character's inventory, never from an image edit. 422 with a stable code the
+ * client switches on: `{ error: 'CLOTHING_FROM_INVENTORY', message }`.
+ */
+export class ClothingFromInventoryError extends AppError {
+  readonly code = 'CLOTHING_FROM_INVENTORY' as const;
+  constructor(message: string) {
+    super(message, 422);
+    this.name = 'ClothingFromInventoryError';
+  }
+}

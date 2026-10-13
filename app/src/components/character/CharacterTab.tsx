@@ -8,6 +8,7 @@ import { deriveRegions } from '@/lib/body-tree';
 import { partTokenFromName } from '@/services/body-spawn';
 import { safeJsonParse } from '@/lib/safe-json';
 import IdentityLockWizard from './IdentityLockWizard';
+import AppearanceDesigner from './designer/AppearanceDesigner';
 import InventorySection from './InventorySection';
 import Paperdoll from './Paperdoll';
 import CharacterGenesisSections from './CharacterGenesisSections';
@@ -995,6 +996,35 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         {show('appearance') && appearanceUnlocked && (<>
         <div ref={appearanceRef} id="character-appearance" style={{ scrollMarginTop: 12 }} />
 
+        {/* ENTITY VIEW (ruling 2026-10-13): the image designer replaces the
+            stacked form (seed picker, Physical Identity, Style Preferences,
+            IdentityLockWizard). Those stay below for the legacy (no-section)
+            path only. The sheet owns facts; the designer owns the image. */}
+        {section && (
+          <div className="-mx-4 sm:mx-0">
+            <AppearanceDesigner
+              characterId={effectiveCharacter?.id ?? null}
+              characterName={characterName || effectiveCharacter?.name || ''}
+              editable={isEditable}
+              seedName={selectedSeedName || null}
+              referencePhotos={referencePhotos}
+              uploading={uploading}
+              onUploadPhoto={handlePhotoUpload}
+              onRemovePhoto={handleRemovePhoto}
+              getCharacterData={buildCharacterData}
+              onApproved={(bust, body) => {
+                // The designer already wrote generatedBust/FullBody with its stack
+                // (one writer, no read-modify-write race); mirror it + flip completion.
+                setGeneratedBust(bust);
+                if (body) setGeneratedFullBody(body);
+                void refetchGenesis();
+              }}
+            />
+          </div>
+        )}
+
+        {!section && (<>
+
         {/* SEED — appearance requires one (Mike 2026-10-12). JEWL picks it the
             moment genesis is submitted; the GM can override here (no rebuild). */}
         <div className="max-w-lg mx-auto" data-testid="seed-picker">
@@ -1597,13 +1627,7 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
           )}
         </div>
 
-        {/* Entity view: Appearance edits save from here too (same draft). */}
-        {section && isEditable && (
-          <div className="flex flex-wrap items-center gap-3">
-            {saveButton}
-            {lastSavedLine}
-          </div>
-        )}
+        </>)}
 
         </>)}
 

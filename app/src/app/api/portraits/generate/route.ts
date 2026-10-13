@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
         prompt: result.metadata.prompt,
         pass2Prompt: (result.metadata as unknown as Record<string, unknown>).pass2Prompt ?? null,
         negativePrompt: result.metadata.negativePrompt,
+        steps: result.metadata.steps ?? null,
+        cfg: result.metadata.cfg ?? null,
         workflowUsed: (result.metadata as unknown as Record<string, unknown>).workflowUsed || 'unknown',
         failedWorkflows: (result.metadata as unknown as Record<string, unknown>).failedWorkflows || [],
         debugRefs: (result.metadata as unknown as Record<string, unknown>).debugRefs || '',
