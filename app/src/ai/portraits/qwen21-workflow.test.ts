@@ -23,7 +23,8 @@ describe('qwen21 prompt builders', () => {
     const p = buildQwen21LockPrompt(2);
     expect(p.startsWith('A head-and-shoulders portrait of the person in <image1> and <image2>. ')).toBe(true);
     expect(p).toContain('Composed exactly like a passport photo'); // fixed COMPOSITION layer (ruled 2026-10-13)
-    expect(p).toContain('No turn of the head, no tilt, no three-quarter view, no profile.');
+    expect(p).toContain('No turn of the head, no tilt, no lean, no three-quarter view, no profile.');
+    expect(p).toContain('Nothing is worn: bare skin from the collarbones up');
     expect(p.endsWith('Blank flat uniform mid-grey backdrop, nothing else.')).toBe(true);
     expect(buildQwen21LockPrompt(1)).toContain('the person in <image1>.');
     expect(buildQwen21LockPrompt(1)).not.toMatch(/paint|style|fantasy/i);
@@ -44,7 +45,8 @@ describe('qwen21 prompt builders', () => {
     const iMood = p.indexOf(getCampaignMood('horror'));
     expect(iMedium).toBeGreaterThan(0);
     expect(iMood).toBeGreaterThan(iMedium);
-    expect(p.endsWith('Blank flat uniform mid-grey backdrop, nothing else.')).toBe(true);
+    expect(p).toContain('Blank flat uniform mid-grey backdrop, nothing else.');
+    expect(p.endsWith('Unclothed with bare shoulders, facing the camera squarely, head level.')).toBe(true); // LOCK_CLOSER
     expect(buildQwen21LockPrompt(1, true)).toContain(getCampaignMood('growth'));
     expect(buildQwen21LockPrompt(1, true, 'gothic horror')).toContain(getCampaignMood('gothic'));
     expect(buildQwen21LockPrompt(1, true, undefined, 'CUSTOM MEDIUM.')).toContain(' CUSTOM MEDIUM. ');

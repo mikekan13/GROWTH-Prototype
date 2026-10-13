@@ -55,7 +55,12 @@ export const LOCK_COMPOSITION =
   'Composed exactly like a passport photo: the subject faces the camera squarely and directly, head upright and centred, ' +
   'both ears equally visible, shoulders level and square to the camera, eyes on the upper third line, ' +
   'head and shoulders only with a little space above the head, neutral expression, closed mouth, eyes open and looking straight into the camera. ' +
-  'No turn of the head, no tilt, no three-quarter view, no profile. Bare shoulders, no clothing, no accessories.';
+  'No turn of the head, no tilt, no lean, no three-quarter view, no profile. ' +
+  // sheet 6: style words pulled blouses/corsets/chokers onto 3 of 4 seeds — bind the bareness positively and hard.
+  'Nothing is worn: bare skin from the collarbones up, bare shoulders, no clothing of any kind, no straps, no collar, no choker, no necklace, no jewellery, no accessories.';
+
+/** Short restatement appended at the very END of the lock prompt (recency wins against style words). */
+export const LOCK_CLOSER = 'Unclothed with bare shoulders, facing the camera squarely, head level.';
 
 export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?: string, medium: string = GROWTH_MEDIUM): string {
   const n = Math.max(1, Math.min(photoCount, QWEN21_MAX_IMAGES));
@@ -73,6 +78,7 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
     medium.trim(),
     getCampaignMood(mood),
     LOCK_BACKDROP,
+    LOCK_CLOSER,
   ].filter(Boolean).join(' ');
 }
 
