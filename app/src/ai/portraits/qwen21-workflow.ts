@@ -92,9 +92,20 @@ export function buildQwen21DescribePrompt(
   description: string,
   mood?: string,
   medium: string = GROWTH_MEDIUM,
-  opts: { training?: boolean; styleRef?: boolean } = {},
+  opts: { training?: boolean; styleRef?: boolean; contentRef?: boolean } = {},
 ): string {
   const d = description.trim().replace(/[.\s]+$/, '');
+  if (opts.training && opts.contentRef) {
+    // CONTENT-REF training mode (Mike, 13 Oct: "none of these match the style or fidelity of our golden image"):
+    // the gold came from a real photo in the reference slot + the look-first medium on OUR lane. So: a plain
+    // photo-real content image is <image1>, the model keeps its subject/pose/clothing/setting and repaints it.
+    const trainingMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_TRAINING : medium;
+    return [
+      `A painted character illustration of exactly the subject in <image1>${d ? ` (${d})` : ''}: keep the same person or subject, face, pose, expression, clothing, framing and setting as <image1>.`,
+      trainingMedium.trim(),
+      getCampaignMood(mood),
+    ].filter(Boolean).join(' ');
+  }
   if (opts.training) {
     // TRAINING-SET mode (Mike, 13 Oct: a style LoRA "needs fabric and scenes"): the LOOK words lead
     // (that is what produces the gold-standard linework), free pose, clothing and setting come from
