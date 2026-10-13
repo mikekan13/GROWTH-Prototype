@@ -28,27 +28,33 @@ export const TRIGGER_NSFW = 'aidmaNSFWunlock';
 // Global Style Bible — Split for Dual CLIP Encoding
 // ============================================================
 
+// 2026-10-13: rewritten from Mike's reference set (style-refs/STYLE-VOCABULARY.md).
+// FLUX.1 LoRA triggers (ckpf / aidmafluxpro1.1 / drkfnts) are NOT loaded on the
+// FLUX.2 serverless path — they were noise tokens. Style is prose-driven now.
+//
 // clip_l: concise tags (CLIP-L is keyword-oriented, ≤77 tokens)
 const STYLE_TAGS = [
-  `in the style of ${TRIGGER_PAINTERLY}`,
-  TRIGGER_DETAIL,
-  TRIGGER_DARK_FANTASY,
-  'hyperrealistic fantasy portrait',
-  'art nouveau influence',
-  'extremely detailed',
-  'subtle painterly quality',
-  'dramatic chiaroscuro lighting',
-  'luminous detailed eyes',
-  'rich deep colors',
+  'painterly digital character illustration',
+  'semi-realistic concept art',
+  'matte finish',
+  'porcelain-smooth skin with a soft matte sheen',
+  'large glassy eyes with smoky dark lids',
+  'idealized symmetrical features',
+  'hair and fabric edges dissolve into loose brushwork',
+  'flat mottled grey studio backdrop like toned paper',
+  'soft diffuse frontal light',
+  'cool grey shadows',
+  'desaturated neutral palette with one saturated accent color',
 ].join(', ');
 
 // t5xxl: natural language sentences (T5-XXL excels at descriptive prose)
 const STYLE_SENTENCES = [
-  `A hyperrealistic fantasy portrait in the style of ${TRIGGER_PAINTERLY} and ${TRIGGER_DARK_FANTASY}.`,
-  'Extremely detailed rendering that borders on photorealistic with a subtle art nouveau elegance.',
-  'Dramatic chiaroscuro lighting with warm and cool color contrast.',
-  'Luminous, almost impossibly detailed eyes and skin with fine pore texture.',
-  'Rich deep color palette with dark atmospheric depth.',
+  'A painterly digital character illustration in a semi-realistic concept-art style with a matte finish, painted rather than photographed.',
+  'The skin is porcelain-smooth with a soft matte sheen and almost no pore texture; the eyes are large and glassy with smoky dark lids and the features are idealized and symmetrical.',
+  'The face and eyes are the sharpest point of the image, while the tips of the hair and the edges of fabric dissolve into loose visible brushwork.',
+  'The backdrop is a flat mottled grey studio wall like toned paper, with faint paint smudges and a soft ground shadow, and nothing else in the scene.',
+  'Soft diffuse frontal light with a gentle top key; shadows are cool grey, never black, with no hard shadows and no rim light.',
+  'The palette is desaturated and cool-neutral, carrying one saturated accent color, with pale skin set against dark hair.',
 ].join(' ');
 
 // Legacy combined prefix — kept for backward compatibility
@@ -80,11 +86,11 @@ const CREATION_MODE_NEGATIVE = CREATION_MODE_NEGATIVE_BASE;
 // Default Composition
 // ============================================================
 
-const DEFAULT_COMPOSITION = 'bust portrait, three-quarter view, dark atmospheric background, warm key light from upper left';
+const DEFAULT_COMPOSITION = 'bust portrait, head and shoulders centered in frame, facing the viewer, flat mottled grey studio backdrop, soft vignette, soft diffuse frontal light';
 
 const COMPOSITION_PRESETS: Record<string, string> = {
-  bust: 'bust portrait, three-quarter view, dark atmospheric background, warm key light from upper left',
-  half_body: 'half body portrait, three-quarter view, atmospheric background, dramatic side lighting',
+  bust: 'bust portrait, head and shoulders centered in frame, facing the viewer, flat mottled grey studio backdrop, soft vignette, soft diffuse frontal light',
+  half_body: 'half body portrait, figure centered, facing the viewer, flat mottled grey studio backdrop, soft diffuse frontal light',
   full_body: 'full body reference shot, standing figure centered in frame, head at top of frame feet at bottom of frame, long shot framing, subject occupies full vertical height, arms hands and feet all visible, wide angle, neutral grey background, balanced even lighting',
   action: 'dynamic action pose, motion blur on periphery, dramatic lighting, environment interaction',
 };
@@ -224,16 +230,18 @@ export function getStyleTags(creationMode = false): string {
   // weights (0) for body reference so including their triggers just pollutes.
   // Target output is photo-real anatomical reference, not illustrated art.
   if (creationMode) {
-    // Exact match for the Tara test script style prefix — the only body gen
-    // recipe we know works.
+    // Body reference: same painterly look as the reference set (the old gens
+    // were full-length studio sheets in exactly this style), minus the accent
+    // colour line so nothing competes with the plain underwear instruction.
     return [
-      `in the style of ${TRIGGER_PAINTERLY}`,
-      TRIGGER_DETAIL,
-      TRIGGER_DARK_FANTASY,
-      'hyperrealistic fantasy portrait',
-      'art nouveau influence',
-      'extremely detailed',
-      'subtle painterly quality',
+      'painterly digital character illustration',
+      'semi-realistic concept art',
+      'matte finish',
+      'porcelain-smooth skin with a soft matte sheen',
+      'flat mottled grey studio backdrop like toned paper',
+      'soft ground shadow under the feet',
+      'soft diffuse frontal light',
+      'cool grey shadows',
     ].join(', ');
   }
   return STYLE_TAGS;
@@ -242,10 +250,10 @@ export function getStyleTags(creationMode = false): string {
 /** Get style sentences for t5xxl encoder */
 export function getStyleSentences(creationMode = false): string {
   if (creationMode) {
-    // Match Tara test script t5xxl preamble exactly.
     return [
-      `A hyperrealistic fantasy portrait in the style of ${TRIGGER_PAINTERLY} and ${TRIGGER_DARK_FANTASY}.`,
-      'Extremely detailed rendering that borders on photorealistic with a subtle art nouveau elegance.',
+      'A painterly digital character illustration in a semi-realistic concept-art style with a matte finish, painted rather than photographed.',
+      'The skin is porcelain-smooth with a soft matte sheen; the backdrop is a flat mottled grey studio wall like toned paper with a soft ground shadow under the feet and nothing else in the scene.',
+      'Soft diffuse frontal light with cool grey shadows and no hard shadows.',
     ].join(' ');
   }
   return STYLE_SENTENCES;

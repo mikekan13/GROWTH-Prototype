@@ -41,3 +41,8 @@ dev.db-shm
 
 # Playwright MCP session logs
 .playwright-mcp/
+
+# style reference images (local only)
+style-refs/inbox/
+style-refs/sheets/
+
