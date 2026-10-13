@@ -52,7 +52,9 @@ async function main() {
   const date = new Date().toISOString();
   const approvedDir = path.resolve(process.cwd(), '..', 'style-refs', 'approved');
   await fs.mkdir(approvedDir, { recursive: true });
-  const destName = `${date.slice(0, 10)}-${mood ? `${mood.replace(/\s+/g, '-')}-` : ''}${name}`;
+  // Include the lab run id (its folder name) so the same seed from two sheets never overwrites.
+  const labId = Object.keys(lab).length > 0 ? path.basename(dir).replace(/[^A-Za-z0-9-]/g, '') : '';
+  const destName = `${date.slice(0, 10)}-${mood ? `${mood.replace(/\s+/g, '-')}-` : ''}${labId ? `${labId}-` : ''}${name}`;
   const dest = path.join(approvedDir, `${destName}.png`);
   await fs.copyFile(raw, dest);
   await fs.writeFile(

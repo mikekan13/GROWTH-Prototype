@@ -80,8 +80,10 @@ const STYLE_PREFIX = STYLE_TAGS;
 export const GROWTH_MEDIUM =
   // rev 3 (Mike, sheet 3): "illustration but so good you almost have to take a double take to tell if it is
   // real people or not"; seed 10 "a bit too anime but I want to pull that direction a little".
-  'A painted character illustration in the manner of Western concept art, so refined it almost passes for a photograph of a real person, yet unmistakably painted on close inspection, with a matte finish. ' +
-  'Realistic proportions with a slight idealized polish, refined features and large, luminous, expressive eyes short of anime, matte porcelain skin with subtle texture, clean soft painted shading on the planes of the face, and crisp defined edges on the features and hair. ' +
+  // rev 4 (Mike, sheet 4: seed 10 best but "a touch too anime and just the slightest touch too realistic at the
+  // same time") — natural eye size, only the slightest polish, and VISIBLE paint, which is neither anime nor photo.
+  'A painted character illustration in the manner of Western concept art, like a finished oil-painted portrait: so refined it almost passes for a photograph of a real person, yet on close inspection the visible painterly brushwork in the shading of the face and hair gives it away, with a matte finish. ' +
+  'Realistic proportions and natural eye size with only the slightest idealized polish, luminous expressive eyes, matte porcelain skin with subtle texture, clean painted shading on the planes of the face, and crisp defined edges on the features and hair. ' +
   // rev 2 (Mike, sheet 2: "too dull. Colors should be more vibrant"; seed 10's character = contrast + alive eyes)
   'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
   'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
@@ -110,7 +112,8 @@ export const CAMPAIGN_MOODS: Record<string, CampaignMood> = {
   growth: {
     atmosphere: 'Old-school dark-fantasy gravity met by bright, clean science-fiction light',
     palette: 'Cool, luminous palette: a bright clear key light with a clean synthetic sheen on the highlights, rich saturated colour',
-    shadows: 'deep, somber shadows with a cold teal undertone',
+    // rev 3 (sheet 4 "lost some of the dark fantasy vibes"): the gravity lives in a real shadow side.
+    shadows: 'low-key lighting with one side falling into deep, somber shadow, a dark moody ground behind, and a cold teal undertone in the shadows',
     accent: 'cold teal and violet',
   },
   horror: {
