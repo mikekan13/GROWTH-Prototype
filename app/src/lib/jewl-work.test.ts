@@ -160,3 +160,28 @@ describe('Portrait step (born ≠ done)', () => {
     expect(needsYouCount({ needsYou: merged })).toBe(2);
   });
 });
+
+import { collapseByCharacter, type WorkSessionView, type NeedsYouItem } from './jewl-work';
+
+describe('collapseByCharacter', () => {
+  const mk = (id: string, cid: string | null, state: WorkSessionView['state'], startedAt: string, needsYou: NeedsYouItem[] = []): WorkSessionView => ({
+    id, type: cid ? 'genesis' : 'default', title: id, state, stages: [], current: null, step: 0, total: 0, pillars: [], cycles: 0,
+    needsYou, log: [], blockedReason: null, startedAt, endedAt: null, lastCycleAt: null, gmSteps: [],
+    ...(cid ? { genesis: { characterId: cid, name: 'Violet', progress: {} as never } } : {}),
+  });
+  const portrait: NeedsYouItem = { id: 'v', kind: 'portrait', sessionId: 'old', characterId: 'v', title: 'Portrait · Violet' };
+  it('two sessions for one character -> running kept, portrait carried', () => {
+    const out = collapseByCharacter([mk('new', 'v', 'running', '2026-10-12T12:00:00Z'), mk('old', 'v', 'done', '2026-10-12T10:00:00Z', [portrait])]);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('new');
+    expect(out[0].needsYou).toEqual([{ ...portrait, sessionId: 'new' }]);
+  });
+  it('dedupes carried items', () => {
+    const out = collapseByCharacter([mk('new', 'v', 'running', '2026-10-12T12:00:00Z', [portrait]), mk('old', 'v', 'done', '2026-10-12T10:00:00Z', [portrait])]);
+    expect(out[0].needsYou).toHaveLength(1);
+  });
+  it('different characters both kept; non-genesis untouched', () => {
+    const out = collapseByCharacter([mk('a', 'v', 'running', '2026-10-12T12:00:00Z'), mk('b', 'w', 'done', '2026-10-12T11:00:00Z'), mk('c', null, 'running', '2026-10-12T09:00:00Z'), mk('d', null, 'running', '2026-10-12T08:00:00Z')]);
+    expect(out.map(v => v.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
