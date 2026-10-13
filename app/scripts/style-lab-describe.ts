@@ -38,7 +38,8 @@ async function main() {
   const training = process.argv.includes('--training'); // look-first, free pose, clothing + setting from the description
   // Mike (13 Oct): every sheet carries the gold standard as its first tile for side-by-side comparison.
   const ANCHOR = path.resolve(process.cwd(), '..', 'style-refs', 'STYLE-ANCHOR-2026-10-13-sheet6-seed8.png');
-  const styleRef = process.argv.includes('--style-ref') ? ANCHOR : undefined; // hand the anchor to the model as <image1>
+  const refFile = arg('style-ref-file'); // a specific reference image (e.g. a desaturated / headless anchor variant)
+  const styleRef = refFile ? path.resolve(refFile) : process.argv.includes('--style-ref') ? ANCHOR : undefined; // hand it to the model as <image1>
   const bothVariants = process.argv.includes('--both'); // each subject twice: without and with the style ref
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const outDir = path.resolve(arg('out') ?? path.join(process.cwd(), '..', 'style-refs', 'lab', `${stamp}-describe${training ? '-training' : ''}-${mood}`));

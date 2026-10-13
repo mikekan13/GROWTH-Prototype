@@ -101,11 +101,17 @@ export function buildQwen21DescribePrompt(
     // the description, no passport binding. These images train the LoRA; they are never base locks.
     // styleRef: the gold-standard image is <image1>; copy its art style only.
     const trainingMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_TRAINING : medium;
-    const refClause = opts.styleRef
+    // Style-ref phrasing variants (QWEN21_STYLEREF_PHRASING): 'instyle' = the InStyle-LoRA idiom
+    // "Make an image in this style of …" (reference first, subject after); default = explicit role clause.
+    const instyle = process.env.QWEN21_STYLEREF_PHRASING === 'instyle';
+    const lead = opts.styleRef && instyle
+      ? `Make an image in this style of ${d}. <image1> is only a style reference: use its art style, ink linework, painted shading, palette and lighting, and nothing else from it.`
+      : `A painted character illustration of ${d}.`;
+    const refClause = opts.styleRef && !instyle
       ? 'Painted in exactly the art style of <image1>: the same ink linework, painted shading, finish, palette and lighting. Do not copy the person, face, hair, clothing, pose or framing of <image1>.'
       : '';
     return [
-      `A painted character illustration of ${d}.`,
+      lead,
       refClause,
       trainingMedium.trim(),
       getCampaignMood(mood),
