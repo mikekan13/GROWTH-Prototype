@@ -1,7 +1,7 @@
 /**
- * Corpus RESTYLE — the gold recipe at scale: each plain content image (style-refs/corpus/content/<id>.png)
- * goes into <image1> as the subject reference; the look-first training medium repaints it on OUR Qwen 2.1
- * lane (no transfer model, no pod). BILLABLE (one serverless job per image, ~25 s).
+ * Corpus RESTYLE — the REFRAME RECIPE at scale (13 Oct): each plain content image (style-refs/corpus/content/<id>.png)
+ * goes into <image1> as the subject reference; the lead asks for a tighter reframe (so the model paints instead of
+ * copying) and the restyle gold medium repaints it on OUR Qwen 2.1 lane. BILLABLE (one serverless job per image, ~40 s).
  *
  *   cd app
  *   npx tsx scripts/corpus-restyle.ts [--ids a b c] [--limit N] [--resume] [--mood growth] [--seed 7]
@@ -46,12 +46,19 @@ async function main() {
     : styleArg === 'gold'
       ? path.resolve(process.cwd(), '..', 'style-refs', 'STYLE-ANCHOR-2026-10-13-sheet6-seed8.png')
       : styleArg ? path.resolve(styleArg) : undefined;
-  // --medium gold|training|none | --medium-text "<paragraph>" ; --lead "<sentence>" ("{d}" = description) — lab overrides
-  const { GROWTH_MEDIUM_GOLD, GROWTH_MEDIUM_TRAINING } = await import('../src/ai/portraits/style-config');
+  // DEFAULT = the reframe recipe (13 Oct): RESTYLE_RECIPE_LEAD + GROWTH_MEDIUM_GOLD_RESTYLE + growth mood, seed 8, no LoRA.
+  // Lab overrides: --medium gold|restyle|training|none | --medium-text "<paragraph>" ; --lead "<sentence>" | --lead default
+  const { GROWTH_MEDIUM_GOLD, GROWTH_MEDIUM_GOLD_RESTYLE, GROWTH_MEDIUM_TRAINING, RESTYLE_RECIPE_LEAD } = await import('../src/ai/portraits/style-config');
   const mediumArg = arg('medium');
   const mediumText = arg('medium-text');
-  const medium = mediumText ? mediumText : mediumArg === 'gold' ? GROWTH_MEDIUM_GOLD : mediumArg === 'training' ? GROWTH_MEDIUM_TRAINING : mediumArg === 'none' ? ' ' : undefined;
-  const lead = arg('lead');
+  const medium = mediumText ? mediumText
+    : mediumArg === 'gold' ? GROWTH_MEDIUM_GOLD
+    : mediumArg === 'training' ? GROWTH_MEDIUM_TRAINING
+    : mediumArg === 'none' ? ' '
+    : mediumArg === 'old-default' ? undefined
+    : GROWTH_MEDIUM_GOLD_RESTYLE; // recipe default (also for --medium restyle)
+  const leadArg = arg('lead');
+  const lead = leadArg === 'old-default' ? undefined : (leadArg ?? RESTYLE_RECIPE_LEAD);
   // --ref-max N: hand the model a downscaled copy of the content image (longest side N px) so it must
   // repaint detail instead of copying it — the img2img-strength analogue on an edit model.
   const refMax = Number(arg('ref-max', '0'));
@@ -80,7 +87,7 @@ async function main() {
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
   const provider = new Qwen21Provider();
   provider.setLoras(loras);
-  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, medium=${mediumText ? 'custom' : (mediumArg ?? 'default')}, lead=${lead ? 'custom' : 'default'}, loras=${loraSpec || 'none'} → ${outDir}`);
+  console.log(`corpus restyle: ${items.length} image(s), mood=${mood}, seed=${seed}, medium=${mediumText ? 'custom' : (mediumArg ?? 'recipe (gold-restyle)')}, lead=${leadArg ?? 'recipe'}, loras=${loraSpec || 'none'} → ${outDir}`);
 
   const results: Record<string, unknown>[] = [];
   const byGroup = new Map<string, { image: Buffer; label: string }[][]>();
@@ -117,7 +124,7 @@ async function main() {
     await fs.writeFile(path.join(outDir, `sheet-${group}.jpg`), sheet);
     console.log(`sheet → ${path.join(outDir, `sheet-${group}.jpg`)} (${rows[1].length})`);
   }
-  await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ mood, seed, refMax: refMax || null, medium: mediumText ?? mediumArg ?? null, lead: lead ?? null, loras: loraSpec || null, loraLabel: qwen21LoraLabel(loras) || null, items: results }, null, 2));
+  await fs.writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ mood, seed, refMax: refMax || null, medium: mediumText ?? mediumArg ?? 'recipe (gold-restyle)', mediumText: medium ?? null, lead: lead ?? null, loras: loraSpec || null, loraLabel: qwen21LoraLabel(loras) || null, items: results }, null, 2));
   if (results.length && 'imagePath' in results[0]) {
     // record the exact prompt of the first item for the sheet's provenance
     const firstPrompt = await fs.readFile(String(results[0].imagePath).replace(/\.png$/, '.json'), 'utf8').catch(() => '');

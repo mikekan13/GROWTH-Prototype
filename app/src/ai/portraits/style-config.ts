@@ -116,6 +116,22 @@ export const GROWTH_MEDIUM_GOLD =
   'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
   'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
 
+/**
+ * RESTYLE variant of the gold medium (Mike, 13 Oct): "character illustration" is an anime-adjacent phrase and
+ * demands a character even in a throne room or on a phone screen; the restyle path says "illustration".
+ * The GOLD text above stays frozen for locks.
+ */
+export const GROWTH_MEDIUM_GOLD_RESTYLE = GROWTH_MEDIUM_GOLD.replace('A painted character illustration', 'A painted illustration');
+
+/**
+ * The REFRAME RECIPE lead (13 Oct, proven on 10 subjects across every corpus group): Qwen 2.1 copies a reference
+ * whose framing matches the output and paints one it must re-compose, so the lead always asks for a tighter reframe.
+ * "subject", never "character" (see GROWTH_MEDIUM_GOLD_RESTYLE).
+ */
+export const RESTYLE_RECIPE_LEAD =
+  'A painted illustration of the subject in <image1>, reframed closer than the photo: a tighter view of the main subject. ' +
+  'Match its exact identity, form, materials, clothing and setting from the image.';
+
 /** One-clause medium reminder for instruction edits (the full paragraph would repaint the image). */
 export const GROWTH_MEDIUM_REMINDER =
   'keep it the same semi-realistic painted illustration with a matte finish, no grain or noise';
