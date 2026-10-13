@@ -36,6 +36,10 @@ async function main() {
   const seed0 = Number(arg('seed', '7'));
   const mood = arg('mood', 'growth');
   const training = process.argv.includes('--training'); // look-first, free pose, clothing + setting from the description
+  // Mike (13 Oct): every sheet carries the gold standard as its first tile for side-by-side comparison.
+  const ANCHOR = path.resolve(process.cwd(), '..', 'style-refs', 'STYLE-ANCHOR-2026-10-13-sheet6-seed8.png');
+  const styleRef = process.argv.includes('--style-ref') ? ANCHOR : undefined; // hand the anchor to the model as <image1>
+  const bothVariants = process.argv.includes('--both'); // each subject twice: without and with the style ref
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const outDir = path.resolve(arg('out') ?? path.join(process.cwd(), '..', 'style-refs', 'lab', `${stamp}-describe${training ? '-training' : ''}-${mood}`));
   await fs.mkdir(path.join(outDir, 'raw'), { recursive: true });
@@ -45,23 +49,33 @@ async function main() {
   const provider = new Qwen21Provider();
 
   console.log(`describe lab: ${subjects.length} subject(s) × ${seeds} seed(s) from ${seed0}, mood=${mood} → ${outDir}`);
+  const anchorBuf = await fs.readFile(ANCHOR).catch(() => null);
   const rows: { image: Buffer; label: string }[][] = [[], []];
+  if (anchorBuf) {
+    rows[0].push({ image: anchorBuf, label: 'GOLD STANDARD · sheet 6 seed 8' });
+    rows[1].push({ image: anchorBuf, label: 'GOLD STANDARD · sheet 6 seed 8' });
+  }
   const prompts: string[] = [];
   const manifest: Record<string, unknown>[] = [];
+  const variants: (string | undefined)[] = bothVariants ? [undefined, ANCHOR] : [styleRef];
   for (const subject of subjects) {
     const slug = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
     for (let i = 0; i < seeds; i++) {
       const seed = seed0 + i;
-      const t0 = Date.now();
-      const r = await provider.describeBase('style-lab-describe', subject, seed, mood, { training });
-      const secs = ((Date.now() - t0) / 1000).toFixed(1);
-      await fs.writeFile(path.join(outDir, `${slug}-seed-${seed}.png`), r.imageData);
-      await fs.writeFile(path.join(outDir, 'raw', `${slug}-seed-${seed}.png`), r.rawData);
-      rows[0].push({ image: r.rawData, label: `${slug} · seed ${seed} · raw` });
-      rows[1].push({ image: r.imageData, label: `${slug} · seed ${seed} · finished` });
-      prompts.push(`--- ${slug} seed ${seed}\n${r.prompt}\n`);
-      manifest.push({ subject, slug, seed, mood, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t0 });
-      console.log(`  ${slug}  seed ${seed}  ${secs}s`);
+      for (const ref of variants) {
+        const tag = ref ? 'styleref' : 'noref';
+        const t0 = Date.now();
+        const r = await provider.describeBase('style-lab-describe', subject, seed, mood, { training, styleRefPath: ref });
+        const secs = ((Date.now() - t0) / 1000).toFixed(1);
+        const base = `${slug}-${tag}-seed-${seed}`;
+        await fs.writeFile(path.join(outDir, `${base}.png`), r.imageData);
+        await fs.writeFile(path.join(outDir, 'raw', `${base}.png`), r.rawData);
+        rows[0].push({ image: r.rawData, label: `${slug.slice(0, 24)} · ${tag} · s${seed} · raw` });
+        rows[1].push({ image: r.imageData, label: `${slug.slice(0, 24)} · ${tag} · s${seed} · finished` });
+        prompts.push(`--- ${base}\n${r.prompt}\n`);
+        manifest.push({ subject, slug, seed, mood, styleRef: !!ref, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t0 });
+        console.log(`  ${slug}  ${tag}  seed ${seed}  ${secs}s`);
+      }
     }
   }
   const sheet = await buildContactSheet(rows, { tile: 384 });

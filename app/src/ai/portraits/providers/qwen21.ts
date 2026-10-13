@@ -211,9 +211,17 @@ export class Qwen21Provider extends ServerlessProvider {
    * Text-only base from a description (no photos) in the fixed base composition — for the
    * style lab's diverse LoRA training set. Same stack as the painted lock minus the identity refs.
    */
-  async describeBase(characterId: string, description: string, seed: number, mood?: string, opts: { training?: boolean } = {}): Promise<Qwen21StepResult> {
-    const prompt = buildQwen21DescribePrompt(description, mood, undefined, opts);
-    return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, [], seed, { width: 832, height: 1248 }, mood);
+  async describeBase(
+    characterId: string,
+    description: string,
+    seed: number,
+    mood?: string,
+    opts: { training?: boolean; styleRefPath?: string } = {},
+  ): Promise<Qwen21StepResult> {
+    const images: string[] = [];
+    if (opts.styleRefPath) images.push(await this.uploadStyleRef(opts.styleRefPath, 0));
+    const prompt = buildQwen21DescribePrompt(description, mood, undefined, { training: opts.training, styleRef: images.length > 0 });
+    return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood);
   }
 
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */

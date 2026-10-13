@@ -92,16 +92,21 @@ export function buildQwen21DescribePrompt(
   description: string,
   mood?: string,
   medium: string = GROWTH_MEDIUM,
-  opts: { training?: boolean } = {},
+  opts: { training?: boolean; styleRef?: boolean } = {},
 ): string {
   const d = description.trim().replace(/[.\s]+$/, '');
   if (opts.training) {
     // TRAINING-SET mode (Mike, 13 Oct: a style LoRA "needs fabric and scenes"): the LOOK words lead
     // (that is what produces the gold-standard linework), free pose, clothing and setting come from
     // the description, no passport binding. These images train the LoRA; they are never base locks.
+    // styleRef: the gold-standard image is <image1>; copy its art style only.
     const trainingMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_TRAINING : medium;
+    const refClause = opts.styleRef
+      ? 'Painted in exactly the art style of <image1>: the same ink linework, painted shading, finish, palette and lighting. Do not copy the person, face, hair, clothing, pose or framing of <image1>.'
+      : '';
     return [
       `A painted character illustration of ${d}.`,
+      refClause,
       trainingMedium.trim(),
       getCampaignMood(mood),
       'Half-length or head-and-shoulders portrait with a natural pose and expression.',
