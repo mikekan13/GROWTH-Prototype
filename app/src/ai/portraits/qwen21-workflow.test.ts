@@ -23,7 +23,7 @@ describe('qwen21 prompt builders', () => {
     const p = buildQwen21LockPrompt(2);
     expect(p.startsWith('A head-and-shoulders portrait of the person in <image1> and <image2>. ')).toBe(true);
     expect(p).toContain('Composed exactly like a passport photo'); // fixed COMPOSITION layer (ruled 2026-10-13)
-    expect(p).toContain('No turn of the head, no tilt, no lean, no three-quarter view, no profile.');
+    expect(p).toContain('no tilt, no lean, no three-quarter view.');
     expect(p).toContain('Nothing is worn: bare skin from the collarbones up');
     expect(p.endsWith('Blank flat uniform mid-grey backdrop, nothing else.')).toBe(true);
     expect(buildQwen21LockPrompt(1)).toContain('the person in <image1>.');

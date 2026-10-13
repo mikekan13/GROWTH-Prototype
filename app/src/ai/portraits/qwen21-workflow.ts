@@ -51,13 +51,11 @@ const LOCK_BACKDROP = 'Blank flat uniform mid-grey backdrop, nothing else.';
  * derived views). Fixed for every character and species. Passport-photo wording is
  * what Qwen obeys most reliably.
  */
+// Trimmed (sheet 8): the binding text had grown long enough to drown the style words.
 export const LOCK_COMPOSITION =
-  'Composed exactly like a passport photo: the subject faces the camera squarely and directly, head upright and centred, ' +
-  'both ears equally visible, shoulders level and square to the camera, eyes on the upper third line, ' +
-  'head and shoulders only with a little space above the head, neutral expression, closed mouth, eyes open and looking straight into the camera. ' +
-  'No turn of the head, no tilt, no lean, no three-quarter view, no profile. ' +
-  // sheet 6: style words pulled blouses/corsets/chokers onto 3 of 4 seeds — bind the bareness positively and hard.
-  'Nothing is worn: bare skin from the collarbones up, bare shoulders, no clothing of any kind, no straps, no collar, no choker, no necklace, no jewellery, no accessories.';
+  'Composed exactly like a passport photo: facing the camera squarely, head upright and centred, both ears visible, shoulders level, ' +
+  'head and shoulders with a little space above the head, neutral expression, closed mouth, eyes straight into the camera; no tilt, no lean, no three-quarter view. ' +
+  'Nothing is worn: bare skin from the collarbones up, no clothing, no choker, no jewellery.';
 
 /** Short restatement appended at the very END of the lock prompt (recency wins against style words). */
 export const LOCK_CLOSER = 'Unclothed with bare shoulders, facing the camera squarely, head level.';
@@ -71,11 +69,12 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
       LOCK_BACKDROP
     );
   }
+  // Order (sheet 8): identity → MEDIUM (the look, early where it weighs most) → composition → mood → backdrop → closer.
   return [
     `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders.`,
     'Match their exact facial identity from the photos.',
-    LOCK_COMPOSITION,
     medium.trim(),
+    LOCK_COMPOSITION,
     getCampaignMood(mood),
     LOCK_BACKDROP,
     LOCK_CLOSER,
