@@ -35,8 +35,9 @@ async function main() {
   const seeds = Number(arg('seeds', '1'));
   const seed0 = Number(arg('seed', '7'));
   const mood = arg('mood', 'growth');
+  const training = process.argv.includes('--training'); // look-first, free pose, clothing + setting from the description
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const outDir = path.resolve(arg('out') ?? path.join(process.cwd(), '..', 'style-refs', 'lab', `${stamp}-describe-${mood}`));
+  const outDir = path.resolve(arg('out') ?? path.join(process.cwd(), '..', 'style-refs', 'lab', `${stamp}-describe${training ? '-training' : ''}-${mood}`));
   await fs.mkdir(path.join(outDir, 'raw'), { recursive: true });
 
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
@@ -52,7 +53,7 @@ async function main() {
     for (let i = 0; i < seeds; i++) {
       const seed = seed0 + i;
       const t0 = Date.now();
-      const r = await provider.describeBase('style-lab-describe', subject, seed, mood);
+      const r = await provider.describeBase('style-lab-describe', subject, seed, mood, { training });
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
       await fs.writeFile(path.join(outDir, `${slug}-seed-${seed}.png`), r.imageData);
       await fs.writeFile(path.join(outDir, 'raw', `${slug}-seed-${seed}.png`), r.rawData);
@@ -66,7 +67,7 @@ async function main() {
   const sheet = await buildContactSheet(rows, { tile: 384 });
   await fs.writeFile(path.join(outDir, 'sheet.jpg'), sheet);
   await fs.writeFile(path.join(outDir, 'prompts.txt'), prompts.join('\n'));
-  await fs.writeFile(path.join(outDir, 'lab.json'), JSON.stringify({ mode: 'describe', mood, seeds, seed0, subjects, items: manifest }, null, 2));
+  await fs.writeFile(path.join(outDir, 'lab.json'), JSON.stringify({ mode: training ? 'describe-training' : 'describe', mood, seeds, seed0, subjects, items: manifest }, null, 2));
   console.log(`sheet → ${path.join(outDir, 'sheet.jpg')}`);
 }
 

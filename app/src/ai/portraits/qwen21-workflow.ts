@@ -88,8 +88,24 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
  * style lab to build a DIVERSE training set for the style LoRA (Mike, 13 Oct: "generate").
  * The description is the only subject-specific text; everything else is the fixed stack.
  */
-export function buildQwen21DescribePrompt(description: string, mood?: string, medium: string = GROWTH_MEDIUM): string {
+export function buildQwen21DescribePrompt(
+  description: string,
+  mood?: string,
+  medium: string = GROWTH_MEDIUM,
+  opts: { training?: boolean } = {},
+): string {
   const d = description.trim().replace(/[.\s]+$/, '');
+  if (opts.training) {
+    // TRAINING-SET mode (Mike, 13 Oct: a style LoRA "needs fabric and scenes"): the LOOK words lead
+    // (that is what produces the gold-standard linework), free pose, clothing and setting come from
+    // the description, no passport binding. These images train the LoRA; they are never base locks.
+    return [
+      `A painted character illustration of ${d}.`,
+      medium.trim(),
+      getCampaignMood(mood),
+      'Half-length or head-and-shoulders portrait with a natural pose and expression.',
+    ].filter(Boolean).join(' ');
+  }
   return [
     `A painted character illustration of ${d}, head and shoulders.`,
     LOCK_COMPOSITION,
