@@ -17,13 +17,17 @@ import {
   LOCAL_LANE_USER_MESSAGE,
   planLocalRequest,
   upstreamErrorMessage,
+  type LocalContentPart,
 } from '../local-window';
+
+export type OpenAiCompatContentPart = LocalContentPart;
 
 export interface OpenAiCompatChatOptions {
   baseUrl: string;              // e.g. https://api.runpod.ai/v2/<id>/openai/v1
   model: string;                // served-model-name
   apiKey?: string;
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  /** Text turns, or content parts (text + `image_url` data URLs) for a vision turn. */
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string | OpenAiCompatContentPart[] }>;
   maxTokens?: number;
   temperature?: number;
   stopSequences?: string[];

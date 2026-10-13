@@ -41,16 +41,28 @@ export function estimateTokens(text: string): number {
   return Math.ceil((text.length / CHARS_PER_TOKEN) * SAFETY);
 }
 
+/** OpenAI-dialect content parts (vision turns on the local lane). */
+export type LocalContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 /** The OpenAI-dialect message shape both local transports send. */
 export interface LocalMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | null | LocalContentPart[];
   tool_calls?: Array<{ function: { name: string; arguments: string } }>;
   tool_call_id?: string;
 }
 
+/** Char-equivalent charged per image part (≈1.5k tokens at 768 px on Qwen VL). */
+const IMAGE_PART_CHARS = 5_400;
+
 function messageChars(m: LocalMessage): number {
-  let n = m.content?.length ?? 0;
+  let n = 0;
+  if (typeof m.content === 'string') n = m.content.length;
+  else if (Array.isArray(m.content)) {
+    for (const p of m.content) n += p.type === 'text' ? p.text.length : IMAGE_PART_CHARS;
+  }
   for (const tc of m.tool_calls ?? []) n += tc.function.name.length + tc.function.arguments.length;
   return n;
 }
@@ -120,7 +132,7 @@ export function fitToLocalWindow<M extends LocalMessage>(
     if (est() <= budgetTokens) break;
     for (let i = 0; i < msgs.length && est() > budgetTokens; i++) {
       const m = msgs[i];
-      if (m.role !== 'tool' || !m.content || m.content.length <= cap) continue;
+      if (m.role !== 'tool' || typeof m.content !== 'string' || !m.content || m.content.length <= cap) continue;
       const cut = m.content.length - cap;
       msgs[i] = { ...m, content: `${m.content.slice(0, cap)}… [trimmed ${cut} chars to fit the local window]` };
     }

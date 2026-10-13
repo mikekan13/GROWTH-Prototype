@@ -17,8 +17,9 @@
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
  *   --loras SPEC         community LoRA blend, file:strength[:trigger],... (overrides QWEN21_LORAS; "" = none)
- *   --gate               run the BASE-LOCK GATE (local vision, lock-gate.ts) on each raw
- *                        seed; PASS/FAIL + reasons printed under each tile (default off)
+ *   --gate               run the BASE-LOCK GATE (lock-gate.ts; vision = VISION_PROVIDER, pod
+ *                        default — never localhost) on each raw seed; PASS/FAIL + reasons
+ *                        printed under each tile (default off)
  *
  * Output: seed-<s>.png (finished), raw/seed-<s>.png, sheet.jpg (row 1 raw, row 2
  * finished), prompts.txt, lab.json (seed list + mood, read by approve-image.ts).
@@ -62,6 +63,10 @@ async function main() {
   const mood = resolveMoodKey(moodArg);
   const noFinish = process.argv.includes('--no-finish');
   const gate = process.argv.includes('--gate');
+  if (gate) {
+    const { resolveVisionProvider } = await import('../src/ai/network/vision');
+    console.log(`gate vision provider: ${resolveVisionProvider()} (VISION_PROVIDER)`);
+  }
   const mediumFile = arg('medium-file');
   const medium = mediumFile ? (await fs.readFile(path.resolve(mediumFile), 'utf-8')).trim() : GROWTH_MEDIUM;
   // --loras "" is dropped by PowerShell; a bare --loras (end of line or followed by another flag) also means none.

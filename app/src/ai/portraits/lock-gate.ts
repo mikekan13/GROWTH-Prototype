@@ -12,16 +12,22 @@ import 'server-only';
  * provider re-rolls (qwen21.ts lockIdentity).
  *
  * THE WALL (ruling-cloud-soul-local-spirit-privacy-wall): a lock is derived from
- * photos of a REAL person, so it is judged by the LOCAL vision model only —
- * Ollama on this machine (OLLAMA_URL, default 127.0.0.1:11434), model
- * LOCK_GATE_VISION_MODEL (default qwen2.5vl:7b). Never a cloud model. A
- * vision host that is not loopback / private / tailnet is refused.
+ * photos of a REAL person, so it is judged INSIDE the wall by default. Since
+ * Christophoros/Ollama was shut down (2026-10-13) the judge is the pod — the
+ * serverless text lane's Qwen3.8 VL model (ai/vision.ts, VISION_PROVIDER=pod,
+ * company compute). VISION_PROVIDER=ollama keeps a local Ollama (loopback /
+ * private / tailnet hosts only, LOCK_GATE_VISION_MODEL default qwen2.5vl:7b);
+ * VISION_PROVIDER=claude is refused for this `real` image (wall, fail-closed →
+ * the gate fails open). Nothing here ever defaults to localhost.
  *
- * FAIL-OPEN: any error (Ollama down, timeout, junk reply) → pass with reason
+ * FAIL-OPEN: any error (lane down, timeout, junk reply) → pass with reason
  * 'gate unavailable'. The checker being down never blocks a lock.
  */
 
 import sharp from 'sharp';
+import { describeImage, isLocalVisionHost, resolveVisionProvider, type VisionProvider } from '@/ai/network/vision';
+
+export { isLocalVisionHost };
 
 export interface LockGateVerdict {
   pass: boolean;
@@ -45,7 +51,8 @@ export interface LockGateMeta {
   bypassed?: boolean;
 }
 
-export const LOCK_GATE_TIMEOUT_MS = 45_000; // verified ~20 s warm, 33 s cold on qwen2.5vl:7b at 768 px — 20 s fail-opened too easily
+export const LOCK_GATE_TIMEOUT_MS = 45_000; // verified ~20 s warm, 33 s cold on qwen2.5vl:7b at 768 px — 20 s fail-opened too easily; a cold pod (~100 s) fails open
+/** Ollama model tag (VISION_PROVIDER=ollama only); pod/claude use their lane model. */
 export const LOCK_GATE_DEFAULT_MODEL = 'qwen2.5vl:7b';
 /** Longest side sent to the VL model. 768 = the size verified 2026-10-13 (~20 s warm on qwen2.5vl:7b); LOCK_GATE_DIM lowers it for speed. */
 const GATE_IMAGE_DIM = 768;
@@ -119,56 +126,39 @@ export function parseGateVerdict(text: string): LockGateVerdict {
   return { pass: reasons.length === 0, reasons, score: passed / CHECKS.length };
 }
 
-/** Loopback, RFC1918, CGNAT/tailnet (100.64/10), *.local, *.ts.net, localhost. */
-export function isLocalVisionHost(url: string): boolean {
-  let host: string;
-  try { host = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, ''); } catch { return false; }
-  if (host === 'localhost' || host === '::1' || host.endsWith('.local') || host.endsWith('.ts.net')) return true;
-  const ip = host.split('.').map(Number);
-  if (ip.length !== 4 || ip.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return false;
-  const [a, b] = ip;
-  return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 100 && b >= 64 && b <= 127);
-}
-
 /**
- * Judge a lock image against the fixed base composition on the LOCAL vision model.
+ * Judge a lock image against the fixed base composition on the configured
+ * vision provider (VISION_PROVIDER: pod default | claude | ollama).
  * Never throws; errors fail open (pass: true, 'gate unavailable').
  */
 export async function checkBaseLock(
   imageBuffer: Buffer,
-  opts?: { timeoutMs?: number; model?: string; ollamaUrl?: string },
+  opts?: { timeoutMs?: number; model?: string; ollamaUrl?: string; provider?: VisionProvider },
 ): Promise<LockGateVerdict> {
-  const url = opts?.ollamaUrl ?? process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
-  const model = opts?.model ?? process.env.LOCK_GATE_VISION_MODEL ?? LOCK_GATE_DEFAULT_MODEL;
+  const provider = resolveVisionProvider(opts?.provider);
+  const model = opts?.model ?? (provider === 'ollama' ? process.env.LOCK_GATE_VISION_MODEL ?? LOCK_GATE_DEFAULT_MODEL : undefined);
   const timeoutMs = Math.min(opts?.timeoutMs ?? LOCK_GATE_TIMEOUT_MS, 120_000);
   try {
-    if (!isLocalVisionHost(url)) {
-      const v = gateUnavailable('vision host is not local (privacy wall)');
-      console.warn(`[LockGate] ${v.reasons[0]} — ${url}`);
-      return v;
-    }
     const jpeg = await sharp(imageBuffer)
       .resize(gateImageDim(), gateImageDim(), { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
-    const res = await fetch(`${url.replace(/\/$/, '')}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt: LOCK_GATE_PROMPT,
-        images: [jpeg.toString('base64')],
-        stream: false,
-        format: 'json',
-        keep_alive: '15m', // stay warm across the S → S+1 → S+2 re-rolls
-        options: { temperature: 0, num_predict: 80 },
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
+    const res = await describeImage({
+      caller: 'lock-gate',
+      contentClass: 'real',
+      prompt: LOCK_GATE_PROMPT,
+      image: jpeg,
+      mediaType: 'image/jpeg',
+      json: true,
+      temperature: 0,
+      maxTokens: 80,
+      timeoutMs,
+      provider,
+      model,
+      ollamaUrl: opts?.ollamaUrl,
     });
-    if (!res.ok) throw new Error(`ollama ${res.status}`);
-    const data = (await res.json()) as { response?: unknown };
-    const v = parseGateVerdict(String(data.response ?? ''));
-    if (v.unavailable) console.warn(`[LockGate] ${v.reasons[0]} — raw: ${String(data.response ?? '').slice(0, 200)}`);
+    const v = parseGateVerdict(res.text);
+    if (v.unavailable) console.warn(`[LockGate] ${v.reasons[0]} — raw: ${res.text.slice(0, 200)}`);
     return v;
   } catch (e) {
     const why = e instanceof Error ? (e.name === 'TimeoutError' || e.name === 'AbortError' ? `timeout after ${timeoutMs}ms` : e.message) : String(e);

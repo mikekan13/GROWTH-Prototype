@@ -3,11 +3,10 @@ import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
 import { getCampaignAISettings, resolveProvider } from '@/ai/campaign-ai';
 import { auditRefusal } from '@/ai/network/audit';
+import { describeImage, resolveVisionProvider } from '@/ai/network/vision';
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
-
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
 /**
  * POST /api/references/describe
@@ -16,8 +15,12 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
  * THE WALL (Mike 2026-10-12): these are the character's identity-lock
  * reference photos — the same uploads PuLID locks the face from, i.e. photos
  * of a REAL person. Real-life content never reaches a cloud model, so this
- * route runs on the local vision model only; a campaign set to 'cloud' is
- * refused, not silently downgraded or sent.
+ * route runs on the inside-the-wall vision model only; a campaign set to
+ * 'cloud' is refused, not silently downgraded or sent. Since Christophoros/
+ * Ollama was shut down (2026-10-13) "local" means the pod — the serverless
+ * text lane's VL model (ai/network/vision.ts, VISION_PROVIDER=pod default);
+ * VISION_PROVIDER=ollama keeps a local Ollama (campaign localVisionModel tag);
+ * VISION_PROVIDER=claude is refused for these `real` photos (wall, 500).
  * [QUESTION] Mike: when a reference is clearly not a real person (concept
  * art, an AI render), may it be described by Claude as fiction? Until then
  * every reference is treated as real.
@@ -81,8 +84,21 @@ export async function POST(request: NextRequest) {
         { status: 422 },
       );
     }
-    // Local only supports single image
-    const textContent = await describeWithOllama(images[0].base64, prompt, localVisionModel);
+    // Single image only (the first). The campaign's localVisionModel is an
+    // Ollama tag — it only applies when VISION_PROVIDER=ollama.
+    const visionProvider = resolveVisionProvider();
+    const { text: textContent } = await describeImage({
+      caller: 'references-describe',
+      contentClass: 'real',
+      prompt,
+      image: images[0].base64,
+      mediaType: images[0].mediaType,
+      temperature: 0.3,
+      maxTokens: 2048,
+      timeoutMs: 120_000, // the pod's cold start (~100 s) fits; Ollama was slow too
+      model: visionProvider === 'ollama' ? localVisionModel : undefined,
+      campaignId: campaignId || undefined,
+    });
 
     // Parse the JSON response
     let parsed: Record<string, unknown>;
@@ -165,29 +181,4 @@ STYLE PREFERENCES — infer from the photos:
 }
 
 Return ONLY valid JSON, no markdown. Keys: UPPERCASE body part names (HEAD, TORSO, LEFT_UPPER_ARM, etc.) plus "overall" plus "style".`;
-}
-
-// ── Ollama (Local) ───────────────────────────────────────────────────────
-
-async function describeWithOllama(base64: string, prompt: string, model: string): Promise<string> {
-  const response = await fetch(`${OLLAMA_URL}/api/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      prompt,
-      images: [base64],
-      stream: false,
-      options: { temperature: 0.3 },
-    }),
-    signal: AbortSignal.timeout(120_000), // Local models can be slower
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Ollama error (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json() as { response: string };
-  return data.response;
 }

@@ -17,6 +17,16 @@
  *                        Legacy fallback: DAYA_L1_URL)
  *   AI_LOCAL_MODEL      (served-model-name; legacy DAYA_L1_MODEL)
  *   AI_LOCAL_API_KEY    (RunPod api key for serverless; legacy DAYA_L1_API_KEY / RUNPOD_API_KEY)
+ *   AI_PROVIDER         ('pod' default | 'claude' | 'ollama') — the QoL text provider
+ *                        (ai/providers/index.ts). 'ollama' is opt-in only: local Ollama
+ *                        is never a default since Christophoros was shut down (2026-10-13).
+ *   VISION_PROVIDER     ('pod' default | 'claude' | 'ollama') — every image-understanding
+ *                        call (ai/network/vision.ts: lock gate, reference describe). The
+ *                        pod's Qwen3.8-27B is a VL model (visual.* weights served), so
+ *                        images stay inside the wall by default; 'claude' is fiction-only.
+ *   AI_VISION_MODEL     (Claude model for VISION_PROVIDER=claude; default = judgment model)
+ *   OLLAMA_URL          (only read when a provider is explicitly 'ollama'; legacy OLLAMA_BASE_URL)
+ *   OLLAMA_MODEL        (text model for AI_PROVIDER=ollama)
  */
 
 import type { LaneName, ResolvedLane } from './types';
@@ -48,6 +58,40 @@ export function gruntModel(): string {
 
 export function godheadModel(): string {
   return env('AI_GODHEAD_MODEL') ?? judgmentModel();
+}
+
+/** Claude model used when VISION_PROVIDER=claude. */
+export function visionModel(): string {
+  return env('AI_VISION_MODEL') ?? judgmentModel();
+}
+
+/** 'pod' = the serverless text lane (local, inside the wall) · 'claude' · 'ollama' (opt-in). */
+export type ModelProviderChoice = 'pod' | 'claude' | 'ollama';
+
+function providerChoice(name: string): ModelProviderChoice {
+  const v = env(name)?.toLowerCase();
+  if (v === 'claude' || v === 'ollama') return v;
+  if (v === 'local') return 'pod'; // alias
+  return 'pod';
+}
+
+/** QoL text provider (ai/providers). Never Ollama unless AI_PROVIDER=ollama. */
+export function textProvider(): ModelProviderChoice {
+  return providerChoice('AI_PROVIDER');
+}
+
+/** Image-understanding provider (ai/vision). Never Ollama unless VISION_PROVIDER=ollama. */
+export function visionProvider(): ModelProviderChoice {
+  return providerChoice('VISION_PROVIDER');
+}
+
+/** Ollama host — only consulted once a provider is explicitly 'ollama'. */
+export function ollamaUrl(): string {
+  return (env('OLLAMA_URL') ?? env('OLLAMA_BASE_URL') ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
+}
+
+export function ollamaTextModel(): string {
+  return env('OLLAMA_MODEL') ?? 'gemma2:9b';
 }
 
 /** Which lane JEWL_WORK_CYCLE dispatches run on. Default stays 'judgment'

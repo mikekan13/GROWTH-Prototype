@@ -4,13 +4,13 @@ Last updated: 2026-04-04
 
 ## Current Status
 
-Two AI systems are now active, both running via Ollama (gemma2:9b, local).
+Two AI systems are now active. **2026-10-13: local Ollama is no longer a default anywhere** (Christophoros/OpenClaw shut down) — QoL text runs on the pod (the serverless text lane, `AI_PROVIDER=pod` default) and every image-understanding call goes through `src/ai/network/vision.ts` (`VISION_PROVIDER=pod` default: the lane's Qwen3.8 VL model; `claude` = fiction only; `ollama` = explicit opt-in). The lock gate (`ai/portraits/lock-gate.ts`) and `/api/references/describe` both use it.
 
 ### Active: Application AI (QoL)
 
 **Purpose**: Help GMs design application prompts and help players expand backstory responses.
 
-**Architecture**: `src/ai/application-ai.ts` → `src/ai/providers/ollama.ts` → Ollama REST API
+**Architecture**: `src/ai/application-ai.ts` → `src/ai/providers/index.ts` (`getAIProvider`: `PodProvider` default, `ClaudeProvider` / `OllamaProvider` via `AI_PROVIDER`) → `routedChatText` on the local lane
 
 **Functions**:
 - `suggestApplicationPrompts(campaign)` — AI generates 5 tailored backstory prompts from campaign context
@@ -191,8 +191,11 @@ src/ai/portraits/
 src/ai/
   types.ts              — AIProvider interface (text generation), ChatMessage, GenerateOptions
   providers/
-    ollama.ts           — Ollama HTTP client (generateText + chat), server-only
-    index.ts            — getAIProvider() factory (AI_PROVIDER env var)
+    routed.ts           — RoutedProvider: AIProvider face over routedChatText (the wall decides)
+    pod.ts              — PodProvider = RoutedProvider on the 'local' lane (the DEFAULT text provider)
+    claude.ts           — ClaudeProvider = RoutedProvider on 'godhead' (or a given Claude lane)
+    ollama.ts           — Ollama HTTP client (generateText + chat), OPT-IN only (AI_PROVIDER=ollama)
+    index.ts            — getAIProvider() factory (AI_PROVIDER: pod default | claude | ollama)
   prompts/
     application.ts      — Prompt templates for application suggest + expand
   application-ai.ts     — Public API for application features

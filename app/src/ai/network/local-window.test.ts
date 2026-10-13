@@ -64,7 +64,7 @@ describe('trim order', () => {
     expect(fit.messages[0]).toEqual(msgs[0]);
     expect(fit.messages.find(m => m.role === 'user')?.content).toBe(msgs[5].content);
     // History went before any tool result was shortened.
-    expect(fit.messages.every(m => !m.content?.includes('[trimmed'))).toBe(true);
+    expect(fit.messages.every(m => typeof m.content !== 'string' || !m.content.includes('[trimmed'))).toBe(true);
     // No orphan tool message left at the head of the history.
     expect(fit.messages[1].role).not.toBe('tool');
   });
