@@ -75,7 +75,7 @@ const STYLE_PREFIX = STYLE_TAGS;
 const FLUX2_STYLE_PROSE =
   'Rendered as a Western semi-realistic digital painting in the manner of a professional concept-art character portrait, painted rather than photographed, with a matte finish. Not anime, not cartoon, not airbrushed. ' +
   'Realistic adult facial proportions and bone structure: natural eye size, a defined nose bridge, visible cheekbones and jawline, lips in proportion to the face. The eyes have smoky dark lids. ' +
-  'Confident, controlled brushwork with crisp defined edges on the face, eyes and hair, hard edges where the planes of the face meet, and hair painted in distinct strands; only the outermost edges of the figure loosen into visible brush strokes. ' +
+  'Sharp focus throughout the entire image with finely rendered high-detail painting: tight, precise brushwork, crisp defined edges on the face, eyes, lips and hair, hard edges where the planes of the face meet, individual hair strands crisply drawn, and no blur or softness anywhere. ' +
   'The skin is smooth but has subtle texture and natural tone variation, with a soft matte sheen rather than gloss. ' +
   'The backdrop is a uniform mid-grey mottled plaster studio wall that fills the entire frame edge to edge, with no paper margin and no white border, and nothing else in the scene. ' +
   'Soft diffuse frontal light with a gentle top key and clear form shadows that define the nose, cheekbones and jaw; shadows are cool grey, never black; no rim light, no lens effects. ' +
