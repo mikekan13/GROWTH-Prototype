@@ -39,6 +39,7 @@ import {
   buildQwen21BodyPrompt,
   buildQwen21EditPrompt,
   buildQwen21LockPrompt,
+  buildQwen21DescribePrompt,
   buildQwen21StylePrompt,
   buildQwen21Workflow,
   getQwen21StyleLine,
@@ -160,6 +161,15 @@ export class Qwen21Provider extends ServerlessProvider {
     const t0 = Date.now();
     const { raw, prompt } = await this.renderLock(photos, seed, opts);
     return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
+  }
+
+  /**
+   * Text-only base from a description (no photos) in the fixed base composition — for the
+   * style lab's diverse LoRA training set. Same stack as the painted lock minus the identity refs.
+   */
+  async describeBase(characterId: string, description: string, seed: number, mood?: string): Promise<Qwen21StepResult> {
+    const prompt = buildQwen21DescribePrompt(description, mood);
+    return this.runStep(characterId, 'faces', 'describe-base', prompt, [], seed, { width: 832, height: 1248 }, mood);
   }
 
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */

@@ -83,6 +83,23 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
   ].filter(Boolean).join(' ');
 }
 
+/**
+ * Text-only base (no photos): a described subject in the fixed base composition. Used by the
+ * style lab to build a DIVERSE training set for the style LoRA (Mike, 13 Oct: "generate").
+ * The description is the only subject-specific text; everything else is the fixed stack.
+ */
+export function buildQwen21DescribePrompt(description: string, mood?: string, medium: string = GROWTH_MEDIUM): string {
+  const d = description.trim().replace(/[.\s]+$/, '');
+  return [
+    `A painted character illustration of ${d}, head and shoulders.`,
+    LOCK_COMPOSITION,
+    medium.trim(),
+    getCampaignMood(mood),
+    LOCK_BACKDROP,
+    LOCK_CLOSER,
+  ].filter(Boolean).join(' ');
+}
+
 /** MEDIUM + MOOD as one line (two-step style pass / body). Subject-agnostic. */
 export function getQwen21StyleLine(mood?: string, medium: string = GROWTH_MEDIUM): string {
   return [medium.trim(), getCampaignMood(mood)].filter(Boolean).join(' ');
@@ -144,7 +161,8 @@ export interface Qwen21WorkflowOptions {
  * TEXT_ENCODE.inputs['images.image_N'].
  */
 export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwen21WorkflowOptions): Workflow {
-  if (opts.images.length < 1) throw new Error('Qwen-Image-2.1 workflow needs at least one image (image_1)');
+  // Zero images = pure text-to-image; it then needs an explicit canvas (EmptyLatentImage).
+  if (opts.images.length < 1 && !opts.size) throw new Error('Qwen-Image-2.1 workflow needs at least one image (image_1) or an explicit size');
   if (opts.images.length > QWEN21_MAX_IMAGES) {
     throw new Error(`Qwen-Image-2.1 takes at most ${QWEN21_MAX_IMAGES} images (got ${opts.images.length})`);
   }
@@ -157,6 +175,7 @@ export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwe
   const refTemplate = JSON.parse(JSON.stringify(wf.LOAD_REF1)) as Record<string, unknown>;
   const enc = wf.TEXT_ENCODE.inputs as Record<string, unknown>;
   for (const k of Object.keys(enc)) if (k.startsWith('images.')) delete enc[k];
+  if (opts.images.length === 0) delete wf.LOAD_REF1; // text-to-image: no reference slot at all
   opts.images.forEach((name, idx) => {
     const id = `LOAD_REF${idx + 1}`;
     const node = JSON.parse(JSON.stringify(refTemplate)) as Record<string, unknown>;

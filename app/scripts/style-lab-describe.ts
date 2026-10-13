@@ -1,0 +1,73 @@
+/**
+ * Style lab — DESCRIBE mode: text-only bases (no photos) in the fixed base composition,
+ * for building a diverse style-LoRA training set. BILLABLE (one serverless job per image).
+ *
+ *   cd app
+ *   npx tsx scripts/style-lab-describe.ts --subjects "an elderly dwarf smith|a young Et'herling scout" --seeds 1 [--mood growth] [--out DIR]
+ *
+ * Writes <out>/<slug>-seed-N.png (finished), <out>/raw/<slug>-seed-N.png (raw), sheet.jpg, lab.json, prompts.txt.
+ */
+import './_server-only-shim';
+import { config } from 'dotenv';
+import fs from 'fs/promises';
+import path from 'path';
+
+config({ path: '.env.local' });
+config({ path: '.env' });
+
+function arg(name: string, def?: string): string | undefined {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > 0 ? process.argv[i + 1] : def;
+}
+
+const DEFAULT_SUBJECTS = [
+  'a weathered elderly dwarf smith with a braided grey beard',
+  'a young woman scout with close-cropped black hair and dark brown skin',
+];
+
+async function main() {
+  if (!process.env.RUNPOD_QWEN_ENDPOINT_ID || !process.env.RUNPOD_API_KEY) {
+    console.error('Set RUNPOD_QWEN_ENDPOINT_ID and RUNPOD_API_KEY.');
+    process.exitCode = 1;
+    return;
+  }
+  const subjects = (arg('subjects') ?? DEFAULT_SUBJECTS.join('|')).split('|').map(s => s.trim()).filter(Boolean);
+  const seeds = Number(arg('seeds', '1'));
+  const seed0 = Number(arg('seed', '7'));
+  const mood = arg('mood', 'growth');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const outDir = path.resolve(arg('out') ?? path.join(process.cwd(), '..', 'style-refs', 'lab', `${stamp}-describe-${mood}`));
+  await fs.mkdir(path.join(outDir, 'raw'), { recursive: true });
+
+  const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
+  const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
+  const provider = new Qwen21Provider();
+
+  console.log(`describe lab: ${subjects.length} subject(s) × ${seeds} seed(s) from ${seed0}, mood=${mood} → ${outDir}`);
+  const rows: { image: Buffer; label: string }[][] = [[], []];
+  const prompts: string[] = [];
+  const manifest: Record<string, unknown>[] = [];
+  for (const subject of subjects) {
+    const slug = subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    for (let i = 0; i < seeds; i++) {
+      const seed = seed0 + i;
+      const t0 = Date.now();
+      const r = await provider.describeBase('style-lab-describe', subject, seed, mood);
+      const secs = ((Date.now() - t0) / 1000).toFixed(1);
+      await fs.writeFile(path.join(outDir, `${slug}-seed-${seed}.png`), r.imageData);
+      await fs.writeFile(path.join(outDir, 'raw', `${slug}-seed-${seed}.png`), r.rawData);
+      rows[0].push({ image: r.rawData, label: `${slug} · seed ${seed} · raw` });
+      rows[1].push({ image: r.imageData, label: `${slug} · seed ${seed} · finished` });
+      prompts.push(`--- ${slug} seed ${seed}\n${r.prompt}\n`);
+      manifest.push({ subject, slug, seed, mood, imagePath: r.imagePath, rawPath: r.rawPath, ms: Date.now() - t0 });
+      console.log(`  ${slug}  seed ${seed}  ${secs}s`);
+    }
+  }
+  const sheet = await buildContactSheet(rows, { tile: 384 });
+  await fs.writeFile(path.join(outDir, 'sheet.jpg'), sheet);
+  await fs.writeFile(path.join(outDir, 'prompts.txt'), prompts.join('\n'));
+  await fs.writeFile(path.join(outDir, 'lab.json'), JSON.stringify({ mode: 'describe', mood, seeds, seed0, subjects, items: manifest }, null, 2));
+  console.log(`sheet → ${path.join(outDir, 'sheet.jpg')}`);
+}
+
+main().catch(e => { console.error(e); process.exitCode = 1; });
