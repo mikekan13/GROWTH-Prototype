@@ -46,7 +46,9 @@ async function main() {
   console.log(`lock    ${(tLock / 1000).toFixed(1)}s  ${lock.width}x${lock.height}  ${lock.imagePath}`);
 
   const t1 = Date.now();
-  const styled = await provider.applyStyle('qwen21-smoke', lock.imageData, seed, styleRefs);
+  const single = (process.env.QWEN21_STYLE_MODE || 'single') === 'single';
+  if (single) console.log('single mode: the painted lock is the styled bust (no second pass)');
+  const styled = single ? lock : await provider.applyStyle('qwen21-smoke', lock.imageData, seed, styleRefs);
   const tStyle = Date.now() - t1;
   await fs.writeFile(path.join(outDir, 'styled.png'), styled.imageData);
   console.log(`styled  ${(tStyle / 1000).toFixed(1)}s  ${styled.width}x${styled.height}  ${styled.imagePath}`);

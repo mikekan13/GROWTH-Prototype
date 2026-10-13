@@ -55,9 +55,22 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     return p;
   };
 
-  it('photos (no lock yet) → lockIdentity then applyStyle; never mixes photos and style refs', async () => {
+  it('default (single mode): photos → one painted lock pass, no second pass', async () => {
+    delete process.env.QWEN21_STYLE_MODE;
     const p = patch(new TestQwen());
     const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg', '/uploads/references/c/b.jpg'] }));
+    expect(r.success).toBe(true);
+    expect(p.queued).toHaveLength(1);
+    expect(p.queued[0].TEXT_ENCODE.inputs.prompt).toMatch(/^A painted character illustration of the person in <image1> and <image2>, head and shoulders\./);
+    expect(p.queued[0].TEXT_ENCODE.inputs.prompt).toMatch(/no grain, no noise/);
+    expect(r.imagePath).toBe(p.saved[0]);
+  });
+
+  it('refs mode: photos (no lock yet) → lockIdentity then applyStyle; never mixes photos and style refs', async () => {
+    process.env.QWEN21_STYLE_MODE = 'refs';
+    const p = patch(new TestQwen());
+    const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg', '/uploads/references/c/b.jpg'] }));
+    delete process.env.QWEN21_STYLE_MODE;
     expect(r.success).toBe(true);
     expect(p.queued).toHaveLength(2);
 

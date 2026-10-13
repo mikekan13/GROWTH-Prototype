@@ -33,12 +33,25 @@ export function imageTagList(from: number, to: number): string {
 }
 
 /** Step 1 — identity lock. Photos are <image1>..<imageN>. No style words. */
-export function buildQwen21LockPrompt(photoCount: number): string {
+export function buildQwen21LockPrompt(photoCount: number, painted = false): string {
   const n = Math.max(1, Math.min(photoCount, QWEN21_MAX_IMAGES));
+  if (!painted) {
+    return (
+      `A head-and-shoulders portrait of the person in ${imageTagList(1, n)}. ` +
+      'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing. ' +
+      'Blank flat uniform mid-grey backdrop, nothing else.'
+    );
+  }
+  // Single-pass mode (2026-10-13): style in the SAME pass as the lock. A second
+  // pass over a generated image added HDR grain and freckles every time
+  // (iterative-edit degradation); the A/B's cleanest result was one pass on the photos.
   return (
-    `A head-and-shoulders portrait of the person in ${imageTagList(1, n)}. ` +
+    `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders. ` +
+    'Match their exact facial identity from the photos. ' +
     'Straight-on front view, eye-level, neutral expression, closed mouth, bare shoulders, no clothing. ' +
-    'Blank flat uniform mid-grey backdrop, nothing else.'
+    'Smooth painted skin with a matte porcelain finish, clean soft shading, soft diffuse light, desaturated palette; no grain, no noise, no added freckles or skin texture. ' +
+    'Blank flat uniform mid-grey backdrop, nothing else.' +
+    (getQwen21StyleLine() ? ` ${getQwen21StyleLine()}` : '')
   );
 }
 

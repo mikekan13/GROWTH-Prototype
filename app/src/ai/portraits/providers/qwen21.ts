@@ -43,6 +43,17 @@ const MODEL_NAME = 'qwen-image-2.1-int8';
 const STYLE_REF_DIM = 1024;
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 
+/**
+ * Style mode. 'single' (DEFAULT since 2026-10-13): the lock pass carries the painted
+ * look; no second pass. 'refs': two-step with style reference images. 'prose':
+ * two-step, prompt-only second pass. Both two-step modes added HDR grain and
+ * freckles on every run (a second pass over a generated image degrades it).
+ */
+export function qwen21StyleMode(): 'single' | 'refs' | 'prose' {
+  const m = (process.env.QWEN21_STYLE_MODE || 'single').toLowerCase();
+  return m === 'refs' || m === 'prose' ? m : 'single';
+}
+
 /** The three old gens used for the 2026-10-13 A/B (style-refs/inbox/Old Gens). */
 export const QWEN21_FALLBACK_STYLE_REFS = [
   '22f7507e-988d-4023-912f-db48613a11b0.png',
@@ -104,12 +115,14 @@ export class Qwen21Provider extends ServerlessProvider {
   // ============================================================
 
   /** Step 1 — identity lock from reference photos (web paths under public/). */
-  async lockIdentity(characterId: string, photos: string[], seed: number): Promise<Qwen21StepResult> {
+  async lockIdentity(characterId: string, photos: string[], seed: number, opts?: { painted?: boolean }): Promise<Qwen21StepResult> {
     const used = photos.slice(0, QWEN21_MAX_IMAGES);
     if (used.length === 0) throw new Error('lockIdentity needs at least one reference photo');
     const names: string[] = [];
     for (const p of used) names.push(await this.uploadReferenceImage(p));
-    const prompt = buildQwen21LockPrompt(names.length);
+    // QWEN21_STYLE_MODE=single → the lock pass carries the painted look itself (no second pass).
+    const painted = opts?.painted ?? qwen21StyleMode() === 'single';
+    const prompt = buildQwen21LockPrompt(names.length, painted);
     return this.runStep(characterId, 'faces', 'identity-lock', prompt, names, seed);
   }
 
@@ -118,7 +131,7 @@ export class Qwen21Provider extends ServerlessProvider {
     // QWEN21_STYLE_MODE=prose → no style refs; the look comes from the prompt alone.
     // 2026-10-13 smoke: with refs attached, Qwen copies their surface texture (grain,
     // freckles, mottled wall) onto the skin regardless of the prompt.
-    const proseOnly = process.env.QWEN21_STYLE_MODE === 'prose';
+    const proseOnly = qwen21StyleMode() === 'prose';
     const refs = proseOnly ? [] : (styleRefs ?? (await this.defaultStyleRefs())).slice(0, QWEN21_MAX_STYLE_REFS);
     if (!proseOnly && refs.length === 0) {
       throw new Error('No style refs found (style-refs/approved/ or style-refs/inbox/Old Gens/) — the style pass needs at least one (or set QWEN21_STYLE_MODE=prose)');
@@ -187,7 +200,9 @@ export class Qwen21Provider extends ServerlessProvider {
 
       const hasLock = isStoredPortraitPath(refs[0]);
       const lock = hasLock ? null : await this.lockIdentity(input.characterId, refs, seed);
-      const styled = await this.applyStyle(input.characterId, lock ? lock.imageData : refs[0], seed);
+      // single mode: the painted lock IS the styled bust (second pass over a generated image degrades it)
+      const single = qwen21StyleMode() === 'single';
+      const styled = single && lock ? lock : await this.applyStyle(input.characterId, lock ? lock.imageData : refs[0], seed);
       return this.toResult(
         styled,
         Date.now() - startTime,
