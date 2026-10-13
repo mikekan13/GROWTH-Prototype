@@ -24,7 +24,10 @@ async function main() {
   const out = path.resolve(arg('out') ?? '.');
   await fs.mkdir(out, { recursive: true });
   const manifest: { name: string; width: number; height: number; file: string; bytes: number }[] = [];
-  for (const spec of argList('in')) {
+  // --list FILE: one "name=path" per line (the Windows command line caps out around 8k chars)
+  const listFile = arg('list');
+  const specs = [...argList('in'), ...(listFile ? (await fs.readFile(listFile, 'utf8')).split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [])];
+  for (const spec of specs) {
     const [name, ...rest] = spec.split('=');
     const src = path.resolve(rest.join('='));
     const file = `${name}.jpg`;
