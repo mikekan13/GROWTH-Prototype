@@ -68,6 +68,16 @@ async function main() {
   const resume = flag('resume');
 
   let list: CorpusPrompt[] = buildCorpusPrompts().filter(p => groups.includes(p.group));
+  // --ids a b c : only these ids. --seed-offset N : a different take of the same prompt (seed + N) — Mike (13 Oct):
+  // "I thought you were going to try a different reference", so a reject can get a fresh content photo.
+  const idsIdx = process.argv.indexOf('--ids');
+  if (idsIdx > 0) {
+    const only: string[] = [];
+    for (let k = idsIdx + 1; k < process.argv.length && !process.argv[k].startsWith('--'); k++) only.push(process.argv[k]);
+    list = list.filter(p => only.includes(p.id));
+  }
+  const seedOffset = Number(arg('seed-offset', '0'));
+  if (seedOffset) list = list.map(p => ({ ...p, seed: p.seed + seedOffset }));
   if (Number.isFinite(limit)) list = list.slice(0, limit);
 
   if (dryRun) {
