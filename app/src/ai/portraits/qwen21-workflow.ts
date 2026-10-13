@@ -11,7 +11,7 @@
  * mood is 2.
  */
 
-import { GROWTH_MEDIUM, GROWTH_MEDIUM_REMINDER, getCampaignMood, getFlux2Backdrop } from './style-config';
+import { GROWTH_MEDIUM, GROWTH_MEDIUM_TRAINING, GROWTH_MEDIUM_REMINDER, getCampaignMood, getFlux2Backdrop } from './style-config';
 
 /** TextEncodeQwenImage21 exposes images.image_1..image_16. */
 export const QWEN21_MAX_IMAGES = 16;
@@ -99,9 +99,10 @@ export function buildQwen21DescribePrompt(
     // TRAINING-SET mode (Mike, 13 Oct: a style LoRA "needs fabric and scenes"): the LOOK words lead
     // (that is what produces the gold-standard linework), free pose, clothing and setting come from
     // the description, no passport binding. These images train the LoRA; they are never base locks.
+    const trainingMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_TRAINING : medium;
     return [
       `A painted character illustration of ${d}.`,
-      medium.trim(),
+      trainingMedium.trim(),
       getCampaignMood(mood),
       'Half-length or head-and-shoulders portrait with a natural pose and expression.',
     ].filter(Boolean).join(' ');

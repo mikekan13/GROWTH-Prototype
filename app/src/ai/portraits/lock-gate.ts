@@ -45,7 +45,7 @@ export interface LockGateMeta {
   bypassed?: boolean;
 }
 
-export const LOCK_GATE_TIMEOUT_MS = 20_000;
+export const LOCK_GATE_TIMEOUT_MS = 45_000; // verified ~20 s warm, 33 s cold on qwen2.5vl:7b at 768 px — 20 s fail-opened too easily
 export const LOCK_GATE_DEFAULT_MODEL = 'qwen2.5vl:7b';
 /** Longest side sent to the VL model. 768 = the size verified 2026-10-13 (~20 s warm on qwen2.5vl:7b); LOCK_GATE_DIM lowers it for speed. */
 const GATE_IMAGE_DIM = 768;

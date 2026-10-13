@@ -93,6 +93,18 @@ export const GROWTH_MEDIUM =
   'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
   'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
 
+/**
+ * MEDIUM for TRAINING-SET images only (style-lab --training): the strong line words from sheet 9
+ * ("confident, clearly visible dark ink pen lines") that produce the gold-standard linework but
+ * pull costume/pose — irrelevant here, since these images are never base locks.
+ */
+export const GROWTH_MEDIUM_TRAINING = GROWTH_MEDIUM
+  .replace(
+    'crisp edges drawn with slightly exaggerated ink pen lines, subtle but noticeable, along the contours of the features, hair and silhouette',
+    'crisp edges drawn with confident, clearly visible dark ink pen lines, slightly exaggerated, along every contour of the features, hair, clothing folds and silhouette',
+  )
+  .replace('with a matte finish.', 'with a matte finish and a cool, clean, faintly synthetic sheen on the lit edges.');
+
 /** One-clause medium reminder for instruction edits (the full paragraph would repaint the image). */
 export const GROWTH_MEDIUM_REMINDER =
   'keep it the same semi-realistic painted illustration with a matte finish, no grain or noise';
