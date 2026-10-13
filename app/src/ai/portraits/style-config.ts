@@ -69,12 +69,16 @@ const STYLE_PREFIX = STYLE_TAGS;
 // the style is identical from the first lock image onward. FLUX.2's text
 // encoder is Mistral (one encoder, prose only) — there is no clip_l/t5 split.
 // Vocabulary: style-refs/STYLE-VOCABULARY.md (from Mike's reference set).
+// Revision 2 (Mike: "too anime and a bit too soft lines"): realistic adult
+// proportions and bone structure, crisp defined edges, controlled brushwork,
+// subtle skin texture, wall fills the frame.
 const FLUX2_STYLE_PROSE =
-  'Rendered as a painterly digital character illustration in a semi-realistic concept-art style, painted rather than photographed, with a matte finish and no photographic texture. ' +
-  'The skin is porcelain-smooth with a soft matte sheen and almost no pore detail; the eyes are large and glassy with smoky dark lids; the features are idealized and symmetrical. ' +
-  'The face and eyes are the sharpest point of the image, while the tips of the hair and the outer edges of the figure dissolve into loose visible brushwork. ' +
-  'The backdrop is a flat mottled grey studio wall like toned paper with faint paint smudges, and nothing else is in the scene. ' +
-  'Soft diffuse frontal light with a gentle top key; shadows are cool grey, never black; no hard shadows, no rim light, no lens effects. ' +
+  'Rendered as a Western semi-realistic digital painting in the manner of a professional concept-art character portrait, painted rather than photographed, with a matte finish. Not anime, not cartoon, not airbrushed. ' +
+  'Realistic adult facial proportions and bone structure: natural eye size, a defined nose bridge, visible cheekbones and jawline, lips in proportion to the face. The eyes have smoky dark lids. ' +
+  'Confident, controlled brushwork with crisp defined edges on the face, eyes and hair, hard edges where the planes of the face meet, and hair painted in distinct strands; only the outermost edges of the figure loosen into visible brush strokes. ' +
+  'The skin is smooth but has subtle texture and natural tone variation, with a soft matte sheen rather than gloss. ' +
+  'The backdrop is a uniform mid-grey mottled plaster studio wall that fills the entire frame edge to edge, with no paper margin and no white border, and nothing else in the scene. ' +
+  'Soft diffuse frontal light with a gentle top key and clear form shadows that define the nose, cheekbones and jaw; shadows are cool grey, never black; no rim light, no lens effects. ' +
   'The palette is desaturated and cool-neutral with one saturated accent color, pale skin against dark hair.';
 
 /** The GROWTH look as one prose paragraph for FLUX.2 prompts. */
