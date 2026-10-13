@@ -217,6 +217,24 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     expect(p.raws).toHaveLength(1);
   });
 
+  it('CORPUS generateContent → zero-image workflow on EMPTY_LATENT, plain prompt, finish skipped', async () => {
+    delete process.env.GROWTH_FINISH;
+    const p = patch(new TestQwen());
+    const r = await p.generateContent('corpus-content', 'A lamp on a table, lit by a candle.', 42, { width: 1248, height: 832 });
+    expect(p.queued).toHaveLength(1);
+    const wf = p.queued[0];
+    expect(wf.LOAD_REF1).toBeUndefined();
+    expect(Object.keys(wf.TEXT_ENCODE.inputs).some(k => k.startsWith('images.'))).toBe(false);
+    expect(wf.EMPTY_LATENT.inputs).toMatchObject({ width: 1248, height: 832 });
+    expect(wf.SAMPLE.inputs.latent_image).toEqual(['EMPTY_LATENT', 0]);
+    expect(wf.SAMPLE.inputs.seed).toBe(42);
+    expect(wf.TEXT_ENCODE.inputs.prompt).toBe('A lamp on a table, lit by a candle. Sharp, well-lit, clear subject.');
+    // finish skipped even though GROWTH_FINISH is on: saved image IS the raw output
+    expect(r.imageData.equals(png)).toBe(true);
+    expect(r.rawData.equals(png)).toBe(true);
+    expect(p.saved[0]).toContain('/corpus/');
+  });
+
   it('MOOD: campaignStyle.styleMood reaches the lock prompt; default is growth', async () => {
     delete process.env.QWEN21_STYLE_MODE;
     const p = patch(new TestQwen());

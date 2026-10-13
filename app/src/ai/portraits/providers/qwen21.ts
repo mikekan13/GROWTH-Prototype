@@ -44,6 +44,7 @@ import {
   buildQwen21Workflow,
   getQwen21StyleLine,
 } from '../qwen21-workflow';
+import { buildCorpusContentPrompt } from '../corpus-prompts';
 import { compositeEditWithMask } from '../mask-composite';
 import { finishEnabled, finishImage, rawSiblingPath } from '../finish';
 import { resolveMoodKey } from '../style-config';
@@ -224,6 +225,21 @@ export class Qwen21Provider extends ServerlessProvider {
     return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood);
   }
 
+  /**
+   * CORPUS CONTENT (style-LoRA corpus, content half): plain text-to-image with NO style stack —
+   * no medium, no mood, no refs, no finish. The prompt is the corpus entry plus a neutral clarity
+   * line; the size is explicit (EmptyLatentImage). The RAW output is the deliverable — a separate
+   * style-transfer pass (QwenStyle on a pod) re-renders it in the GROWTH style later.
+   */
+  async generateContent(
+    characterId: string,
+    prompt: string,
+    seed: number,
+    size: { width: number; height: number },
+  ): Promise<Qwen21StepResult> {
+    return this.runStep(characterId, 'corpus', 'content', buildCorpusContentPrompt(prompt), [], seed, size, undefined, { finish: false });
+  }
+
   /** Step 2 — paint the lock in the GROWTH style from style refs (absolute paths; default = resolveQwen21StyleRefs()). */
   async applyStyle(characterId: string, lockImage: Qwen21Image, seed: number, styleRefs?: string[], mood?: string): Promise<Qwen21StepResult> {
     // QWEN21_STYLE_MODE=prose → no style refs; the look comes from the prompt alone.
@@ -401,13 +417,17 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     size?: { width: number; height: number },
     mood?: string,
+    opts?: { finish?: boolean },
   ): Promise<Qwen21StepResult> {
     const t0 = Date.now();
     const data = await this.runWorkflow(prompt, images, seed, size);
-    return this.saveStep(characterId, folder, stage, prompt, data, seed, Date.now() - t0, mood);
+    return this.saveStep(characterId, folder, stage, prompt, data, seed, Date.now() - t0, mood, opts);
   }
 
-  /** FINISH the raw output (unless GROWTH_FINISH=off), save the finished image, save the raw beside it. */
+  /**
+   * FINISH the raw output (unless GROWTH_FINISH=off or opts.finish === false), save the finished
+   * image, save the raw beside it.
+   */
   private async saveStep(
     characterId: string,
     folder: string,
@@ -417,8 +437,9 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     ms: number,
     mood?: string,
+    opts?: { finish?: boolean },
   ): Promise<Qwen21StepResult> {
-    const finished = finishEnabled();
+    const finished = opts?.finish !== false && finishEnabled();
     const imageData = finished ? await finishImage(rawData, seed) : rawData;
     const { imagePath, thumbnailPath } = await this.savePortrait(characterId, imageData, folder, seed, {
       provider: 'qwen21', stage, prompt, model: MODEL_NAME, mood: mood ?? null, finish: finished ? 'on' : 'off',
