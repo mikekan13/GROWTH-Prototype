@@ -37,7 +37,14 @@ async function main() {
   const outDir = path.resolve(arg('out') ?? path.join(root, 'restyled'));
   await fs.mkdir(path.join(outDir, 'raw'), { recursive: true });
   const mood = arg('mood', 'growth');
-  const seed = Number(arg('seed', '7'));
+  const seed = Number(arg('seed', '8')); // 8 = the gold standard's seed
+  // --style-ref headless|gold|<file>: optional <image2> style reference (headless greyscale anchor proven safe)
+  const styleArg = arg('style-ref');
+  const styleRefPath = styleArg === 'headless'
+    ? path.resolve(process.cwd(), '..', 'style-refs', 'anchor-variants', 'anchor-headless-desaturated.png')
+    : styleArg === 'gold'
+      ? path.resolve(process.cwd(), '..', 'style-refs', 'STYLE-ANCHOR-2026-10-13-sheet6-seed8.png')
+      : styleArg ? path.resolve(styleArg) : undefined;
   const limit = Number(arg('limit', '0'));
   const resume = process.argv.includes('--resume');
 
@@ -66,7 +73,7 @@ async function main() {
     try { await fs.access(contentPath); } catch { console.log(`  skip ${it.id}: no content png`); continue; }
     const t = Date.now();
     try {
-      const r = await provider.describeBase('corpus-restyle', '', seed, mood, { training: true, contentRefPath: contentPath });
+      const r = await provider.describeBase('corpus-restyle', '', seed, mood, { training: true, contentRefPath: contentPath, styleRefPath });
       await fs.writeFile(path.join(outDir, `${it.id}.png`), r.imageData);
       await fs.writeFile(path.join(outDir, 'raw', `${it.id}.png`), r.rawData);
       const rows = byGroup.get(it.group) ?? [[], []];

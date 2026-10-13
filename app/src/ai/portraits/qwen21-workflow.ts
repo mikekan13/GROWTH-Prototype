@@ -11,7 +11,7 @@
  * mood is 2.
  */
 
-import { GROWTH_MEDIUM, GROWTH_MEDIUM_TRAINING, GROWTH_MEDIUM_REMINDER, getCampaignMood, getFlux2Backdrop } from './style-config';
+import { GROWTH_MEDIUM, GROWTH_MEDIUM_TRAINING, GROWTH_MEDIUM_GOLD, GROWTH_MEDIUM_REMINDER, getCampaignMood, getFlux2Backdrop } from './style-config';
 
 /** TextEncodeQwenImage21 exposes images.image_1..image_16. */
 export const QWEN21_MAX_IMAGES = 16;
@@ -99,10 +99,13 @@ export function buildQwen21DescribePrompt(
     // CONTENT-REF training mode (Mike, 13 Oct: "none of these match the style or fidelity of our golden image"):
     // the gold came from a real photo in the reference slot + the look-first medium on OUR lane. So: a plain
     // photo-real content image is <image1>, the model keeps its subject/pose/clothing/setting and repaints it.
-    const trainingMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_TRAINING : medium;
+    // The medium is the GOLD paragraph verbatim (Mike: "same seed, prompt and also some style reference").
+    // Optional <image2> = a headless/greyscale style reference (proven not to bleed its subject).
+    const goldMedium = medium === GROWTH_MEDIUM ? GROWTH_MEDIUM_GOLD : medium;
     return [
       `A painted character illustration of exactly the subject in <image1>${d ? ` (${d})` : ''}: keep the same person or subject, face, pose, expression, clothing, framing and setting as <image1>.`,
-      trainingMedium.trim(),
+      opts.styleRef ? '<image2> is only a style reference: use its art style, ink linework, painted shading, finish, palette and lighting, and nothing else from it.' : '',
+      goldMedium.trim(),
       getCampaignMood(mood),
     ].filter(Boolean).join(' ');
   }

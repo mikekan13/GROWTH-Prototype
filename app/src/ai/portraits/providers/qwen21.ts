@@ -220,12 +220,16 @@ export class Qwen21Provider extends ServerlessProvider {
     opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string } = {},
   ): Promise<Qwen21StepResult> {
     const images: string[] = [];
-    if (opts.contentRefPath) images.push(await this.uploadStyleRef(opts.contentRefPath, 0));
-    else if (opts.styleRefPath) images.push(await this.uploadStyleRef(opts.styleRefPath, 0));
+    if (opts.contentRefPath) {
+      images.push(await this.uploadStyleRef(opts.contentRefPath, 0));
+      if (opts.styleRefPath) images.push(await this.uploadStyleRef(opts.styleRefPath, 1)); // <image2> style ref
+    } else if (opts.styleRefPath) {
+      images.push(await this.uploadStyleRef(opts.styleRefPath, 0));
+    }
     const prompt = buildQwen21DescribePrompt(description, mood, undefined, {
       training: opts.training,
       contentRef: !!opts.contentRefPath,
-      styleRef: !opts.contentRefPath && images.length > 0,
+      styleRef: !!opts.styleRefPath,
     });
     return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood);
   }

@@ -105,6 +105,17 @@ export const GROWTH_MEDIUM_TRAINING = GROWTH_MEDIUM
   )
   .replace('with a matte finish.', 'with a matte finish and a cool, clean, faintly synthetic sheen on the lit edges.');
 
+/**
+ * THE GOLD MEDIUM — the exact rev-5 paragraph that produced the gold standard
+ * (style-refs/lab/2026-10-13T04-44-18-growth, seed 8, Violet's two photos). Frozen verbatim;
+ * used by the corpus restyle so training images come from the same words as the anchor.
+ */
+export const GROWTH_MEDIUM_GOLD =
+  'A painted character illustration in the manner of Western concept art, like a finished oil-painted portrait: so refined it almost passes for a photograph of a real person, yet on close inspection the visible painterly brushwork in the shading of the face and hair gives it away, with a matte finish. ' +
+  'Realistic proportions and natural eye size with only the slightest idealized polish, luminous expressive eyes, matte porcelain skin with subtle texture, clean painted shading on the planes of the face, and crisp edges drawn with slightly exaggerated ink pen lines, subtle but noticeable, along the contours of the features, hair and silhouette, like an inked drawing beneath the paint. ' +
+  'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
+  'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
+
 /** One-clause medium reminder for instruction edits (the full paragraph would repaint the image). */
 export const GROWTH_MEDIUM_REMINDER =
   'keep it the same semi-realistic painted illustration with a matte finish, no grain or noise';
