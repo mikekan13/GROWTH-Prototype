@@ -37,12 +37,12 @@ export interface FinishParams {
 /** THE finish. Edit these numbers to iterate (style lab: --no-finish to compare). */
 export const FINISH: FinishParams = {
   grade: {
-    saturation: 0.88,
-    liftBlacks: 0.045,
-    shadowTint: { r: 15, g: 42, b: 58, opacity: 0.18 }, // #0f2a3a
-    midWarmth: 0.02,
+    saturation: 1.12, // rev 2: Mike "too dull" — the finish now boosts, never mutes
+    liftBlacks: 0.03, // rev 2: keep more contrast (seed 10's punch)
+    shadowTint: { r: 15, g: 42, b: 58, opacity: 0.2 }, // #0f2a3a — the universe's cold undertone
+    midWarmth: 0, // rev 2: the warm shift read as a sepia wash
   },
-  grain: { amount: 0.025 },
+  grain: { amount: 0.008 }, // rev 2: a third of the original — it read as dust
   vignette: { strength: 0.22, inner: 0.45 },
   token: { ring: '#22ab94', ringWidth: 2 }, // Terminal teal
 };

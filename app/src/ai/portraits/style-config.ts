@@ -80,8 +80,9 @@ const STYLE_PREFIX = STYLE_TAGS;
 export const GROWTH_MEDIUM =
   'A semi-realistic painted character illustration in the manner of Western concept art, painted rather than photographed, with realistic proportions and a matte finish. ' +
   'Matte porcelain skin with subtle texture, clean soft shading, and crisp defined edges on the features and hair. ' +
-  'Soft diffuse key light with a low-key falloff into shadow. ' +
-  'A desaturated cool-neutral base palette with at most one saturated accent colour; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
+  // rev 2 (Mike, sheet 2: "too dull. Colors should be more vibrant"; seed 10's character = contrast + alive eyes)
+  'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
+  'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
 
 /** One-clause medium reminder for instruction edits (the full paragraph would repaint the image). */
 export const GROWTH_MEDIUM_REMINDER =
