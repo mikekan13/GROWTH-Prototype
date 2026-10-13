@@ -96,3 +96,21 @@ export class WithheldContentError extends AppError {
     this.name = 'WithheldContentError';
   }
 }
+
+/**
+ * The RunPod portrait endpoint refused or could not be reached. `code` is the
+ * stable machine string the client switches on; `message` is the honest line
+ * the admin sees instead of "pipeline returned null".
+ */
+export type PortraitEndpointCode =
+  | 'ENDPOINT_PAUSED'
+  | 'ENDPOINT_UNREACHABLE'
+  | 'ENDPOINT_AUTH'
+  | 'ENDPOINT_ERROR';
+
+export class PortraitEndpointError extends AppError {
+  constructor(public code: PortraitEndpointCode, message: string, status: number) {
+    super(message, status);
+    this.name = 'PortraitEndpointError';
+  }
+}

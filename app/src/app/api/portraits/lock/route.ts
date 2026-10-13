@@ -1,30 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import { lockPersona } from '@/ai/portraits/portrait-service';
+import { lockPortrait, lockPortraitSchema } from '@/services/portrait-lock';
 
 /**
  * POST /api/portraits/lock
  *
- * Lock a portrait as the character's permanent identity anchor (Persona Lock).
- * All future generations will use PuLID to maintain the same face.
- * Body: { generationId, characterId }
+ * Lock a portrait as the character's permanent identity anchor and set
+ * Character.portrait (what canvas cards read).
+ * Body: { characterId, generationId?, imagePath? } - at least one of
+ * generationId / imagePath. imagePath is a stored path such as
+ * "/portraits/<characterId>/faces/<id>.png" (designer generations have no
+ * PortraitGeneration row).
  */
 export async function POST(request: NextRequest) {
   try {
     await requireAuth();
-    const body = await request.json();
-    const { generationId, characterId } = body;
-
-    if (!generationId || !characterId) {
-      return NextResponse.json(
-        { error: 'generationId and characterId are required' },
-        { status: 400 },
-      );
-    }
-
-    await lockPersona(generationId, characterId);
-    return NextResponse.json({ success: true });
+    const input = lockPortraitSchema.parse(await request.json());
+    const result = await lockPortrait(input);
+    return NextResponse.json({ success: true, ...result });
   } catch (error) {
     return errorResponse(error);
   }

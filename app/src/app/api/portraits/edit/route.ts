@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getLocalProvider } from '@/ai/portraits/providers';
 import { assertLawfulImageJob } from '@/ai/portraits/portrait-service';
-import { WithheldContentError } from '@/lib/errors';
+import { WithheldContentError, PortraitEndpointError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
 import { assertSeedSetForPortrait } from '@/services/seed-pick';
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    if (error instanceof WithheldContentError) return errorResponse(error);
+    if (error instanceof WithheldContentError || error instanceof PortraitEndpointError) return errorResponse(error);
     console.error('[portraits/edit] Error:', error);
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: msg, stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined }, { status: 500 });

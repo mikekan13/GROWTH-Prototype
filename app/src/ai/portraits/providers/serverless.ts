@@ -20,6 +20,7 @@ import path from 'path';
 import sharp from 'sharp';
 import type { ComfyUIQueueResponse, ProviderStatus } from '../types';
 import { LocalProvider } from './local';
+import { endpointErrorFromStatus, endpointUnreachable } from '../endpoint-errors';
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLL_ATTEMPTS = 450; // 30 min — covers cold starts + generation
@@ -106,15 +107,23 @@ export class ServerlessProvider extends LocalProvider {
     const images = [...this.pendingImages].map(([name, image]) => ({ name, image }));
     this.pendingImages.clear();
 
-    const res = await fetch(`${endpointBase()}/run`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'content-type': 'application/json' },
-      body: JSON.stringify({
-        input: { workflow, ...(images.length ? { images } : {}) },
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${endpointBase()}/run`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'content-type': 'application/json' },
+        body: JSON.stringify({
+          input: { workflow, ...(images.length ? { images } : {}) },
+        }),
+      });
+    } catch (e) {
+      throw endpointUnreachable(e);
+    }
     if (!res.ok) {
-      throw new Error(`Serverless queue failed (${res.status}): ${(await res.text()).slice(0, 600)}`);
+      const body = await res.text().catch(() => '');
+      const typed = endpointErrorFromStatus(res.status, body);
+      if (typed) throw typed;
+      throw new Error(`Serverless queue failed (${res.status}): ${body.slice(0, 600)}`);
     }
     const job = await res.json();
     if (!job?.id) {
