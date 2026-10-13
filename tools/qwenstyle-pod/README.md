@@ -20,7 +20,7 @@ Style refs: `gold` = `style-refs/STYLE-ANCHOR-2026-10-13-sheet6-seed8.png` (prim
 - `server.py`: the FastAPI server on `:8001`, the pod's **only** exposed port. Every endpoint needs the per-pod random token: `/upload`, `/transfer`, `/job/<id>`, `/status`, `/list`, `/download/<name>`, `/log/<name>`. Nothing is served without auth.
 - `transfer_core.py`: the pipeline itself, i.e. model loading, the resize rules and the transfer call.
 
-`run.py up` packs the three pod files into the `dockerArgs` start command (about 10.2 KB). The pod needs no SSH, no network volume and no public URL for your images. Uploads go through the HTTPS proxy.
+`run.py up` packs the three pod files into the `dockerArgs` start command (about 11.3 KB). The pod needs no SSH, no network volume and no public URL for your images. Uploads go through the HTTPS proxy.
 
 ## Commands (in order)
 ```
@@ -32,13 +32,16 @@ python run.py transfer --style gold # 3. run every content image; downloads + co
 python run.py down                  # ALWAYS: terminate + verify gone
 ```
 Optional extras:
-- `transfer --model qwenstyle-v1 --style headless --ids a b c --min-edge 832`
+- `transfer --model qwenstyle-v1 --style headless --ids a b c --min-edge 832 --seed 7`
+- `transfer --lora-scale 0.6`: sets the style LoRA strength. The Lightning LoRA stays at 1.0. DiffSynth fuses LoRAs at load, so a new (model, scale) pair fully unloads the pipeline and reloads it, which takes about 2–4 min.
+- `transfer --style-file path	ony.png`: uses any local PNG as the style ref. It is uploaded under its basename. `push --style-file a.png b.png` pre-uploads refs.
+- `restart`: hard-restarts the pod server, which frees all VRAM. Use it after an out-of-memory error.
 - `status`
 - `logs [setup.log|download.log|server.log]`
 - `list`
 - `watch`: run this in a second terminal. It terminates the pod when the cap is reached.
 
-Outputs go to `style-refs/corpus/styled/<model>/<style>/<id>.png`, together with `_contact_NN.png` (before/after pairs) and `_run.json`.
+Outputs go to `style-refs/corpus/styled/<model>/<style>[__ls<scale>][__seed<n>][__me<edge>]/<id>.png`, together with `_contact_NN.png` (before/after pairs) and `_run.json`.
 
 ## Cost guards
 - `--max-minutes 90` (the default) is enforced three ways:
@@ -63,4 +66,4 @@ Outputs go to `style-refs/corpus/styled/<model>/<style>/<id>.png`, together with
 - The V2 Lightning file is not DiffSynth-prefixed. By default this tool uses the V1 repo's DiffSynth-format copy of the same Lightning-4steps-V1.0 weights. Set `QS_V2_LIGHTNING=native` on the pod to try the V2 file.
 - The tool loads models with `ModelConfig(path=...)`. If DiffSynth @ 11315d7 rejects that form, set `QS_LOAD_MODE=modelid` (`local_model_path` + `skip_download`). `setup.log` prints the `ModelConfig` signature to help with this.
 - The tool pins `transformers==4.57.3`, because the V2 authors say the version changes the output. Torch stays at the image's 2.8 (the authors tested 2.9.1).
-- RunPod's maximum `dockerArgs` length has not been verified. Earlier pods used about 1.5 KB and this one uses about 10.2 KB.
+- RunPod's maximum `dockerArgs` length has not been verified. Earlier pods used about 1.5 KB and this one uses about 11.3 KB.

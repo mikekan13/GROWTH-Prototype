@@ -70,7 +70,8 @@ def _local(repo, pattern):
     return hits if len(hits) > 1 else hits[0]
 
 
-def load_pipeline(model=DEFAULT_MODEL):
+def load_pipeline(model=DEFAULT_MODEL, lora_scale=1.0):
+    """DiffSynth fuses LoRAs into the DiT at load, so a different model or scale needs a full reload."""
     from diffsynth.pipelines.qwen_image import QwenImagePipeline, ModelConfig
 
     spec = MODELS[model]
@@ -97,15 +98,16 @@ def load_pipeline(model=DEFAULT_MODEL):
     lightning = spec["lightning"]
     if model == "telestyle-v2" and os.environ.get("QS_V2_LIGHTNING") == "native":
         lightning = spec["lightning_native"]
-    pipe.load_lora(pipe.dit, _local(*spec["style_lora"]))
+    pipe.load_lora(pipe.dit, _local(*spec["style_lora"]), alpha=lora_scale)  # style LoRA only
     pipe.load_lora(pipe.dit, _local(*lightning))
     return pipe
 
 
-def unload(pipe):
-    del pipe
+def free_cuda():
+    """Call AFTER the caller has dropped every reference to the pipeline."""
     gc.collect()
     torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
 
 
 def resize_v1_min_edge(img, min_edge=1024):

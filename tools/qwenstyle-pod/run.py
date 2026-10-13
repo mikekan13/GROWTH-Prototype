@@ -3,7 +3,8 @@
   python run.py up [--gpu h100|pro6000] [--max-minutes 90] [--dry-run]
   python run.py push [--content-dir DIR] [--force]
   python run.py transfer [--model telestyle-v2|qwenstyle-v1] --style gold|headless [--ids a b ...]
-                         [--min-edge 1024] [--seed 123]
+                         [--style-file X.png] [--lora-scale 1.0] [--min-edge 1024] [--seed 123]
+  python run.py restart        # hard-restart the pod server (frees VRAM)
   python run.py status | logs [setup.log|download.log|server.log] | list
   python run.py down
   python run.py watch          # blocks; terminates the pod at the --max-minutes deadline
@@ -196,6 +197,22 @@ def _upload(st, kind, paths, names=None):
     return r.json()["saved"]
 
 
+def style_file_name(path):
+    """Pod-side name for an arbitrary local style ref: its basename, made filename-safe."""
+    stem, ext = os.path.splitext(os.path.basename(path))
+    return re.sub(r"[^A-Za-z0-9._-]", "_", stem)[:100] + (ext.lower() or ".png")
+
+
+def resolve_style(a):
+    """(pod filename, local path) for --style-file (wins) or the --style shortcut."""
+    if getattr(a, "style_file", None):
+        p = os.path.abspath(a.style_file)
+        if not os.path.isfile(p):
+            sys.exit(f"--style-file not found: {p}")
+        return style_file_name(p), p
+    return f"{a.style}.png", STYLES[a.style]
+
+
 def cmd_push(a):
     st = load_state()
     enforce_deadline(st)
@@ -206,6 +223,10 @@ def cmd_push(a):
             print(f"!! missing style ref {p}")
             continue
         print("style", tag, _upload(st, "style", [p], [f"{tag}.png"]))
+    for sf in a.style_file or []:
+        if not os.path.isfile(sf):
+            sys.exit(f"--style-file not found: {sf}")
+        print("style", _upload(st, "style", [sf], [style_file_name(sf)]))
     content = sorted(f for f in os.listdir(a.content_dir) if f.lower().endswith(".png"))
     todo = [f for f in content if a.force or f not in have]
     print(f"content: {len(content)} local, {len(content) - len(todo)} already on pod, uploading {len(todo)}")
@@ -252,15 +273,20 @@ def cmd_transfer(a):
     st = load_state()
     enforce_deadline(st)
     ids = a.ids or sorted(os.path.splitext(f)[0] for f in os.listdir(a.content_dir) if f.lower().endswith(".png"))
-    body = {"model": a.model, "style": f"{a.style}.png", "ids": ids, "min_edge": a.min_edge,
-            "seed": a.seed, "steps": 4, "overwrite": a.overwrite}
+    style_name, style_local = resolve_style(a)
+    if a.style_file:  # always (re)upload an ad-hoc style ref so the pod copy matches the local file
+        _upload(st, "style", [style_local], [style_name])
+    body = {"model": a.model, "style": style_name, "ids": ids, "min_edge": a.min_edge,
+            "seed": a.seed, "steps": 4, "lora_scale": a.lora_scale, "overwrite": a.overwrite}
     r = requests.post(url(st, 8001, "/transfer"), headers=H(st), json=body, timeout=60)
     if r.status_code != 200:
         sys.exit(f"transfer rejected {r.status_code}: {r.text[:800]}")
-    job_id = r.json()["job_id"]
-    out_dir = os.path.join(STYLED_DIR, a.model, a.style)
+    job_id, sub = r.json()["job_id"], r.json()["out_subdir"]
+    out_dir = os.path.join(STYLED_DIR, *sub.split("/"))   # mirrors the pod: <model>/<style>[__ls..][__seed..]
     os.makedirs(out_dir, exist_ok=True)
-    print(f"job {job_id}: {len(ids)} images, {a.model}, style={a.style}, min_edge={a.min_edge} -> {out_dir}")
+    print(f"job {job_id}: {len(ids)} images, {a.model}, style={style_name}, lora_scale={a.lora_scale}, "
+          f"seed={a.seed}, min_edge={a.min_edge} -> {out_dir}")
+    print("  (a new model or lora scale reloads the pipeline first: ~2-4 min)")
     got = set()
     while True:
         enforce_deadline(st)
@@ -292,7 +318,8 @@ def cmd_transfer(a):
         if os.path.exists(dst) and os.path.exists(src):
             pairs.append((stem, src, dst))
     if pairs:
-        for p in contact_sheets(out_dir, pairs, STYLES[a.style], f"{a.model} / {a.style} / min_edge {a.min_edge}"):
+        label = f"{a.model} / {style_name} / lora {a.lora_scale:g} / seed {a.seed} / min_edge {a.min_edge}"
+        for p in contact_sheets(out_dir, pairs, style_local, label):
             print("contact sheet:", p)
     json.dump({"job": job_id, "request": body, "errors": j["errors"], "seconds": j.get("seconds")},
               open(os.path.join(out_dir, "_run.json"), "w"), indent=2)
@@ -328,6 +355,14 @@ def cmd_list(a):
     r = requests.get(url(st, 8001, "/list"), headers=H(st), params={"prefix": a.prefix}, timeout=30)
     print("\n".join(r.json()["files"]) if r.ok else f"{r.status_code} {r.text[:300]}")
     enforce_deadline(st)
+
+
+def cmd_restart(a):
+    st = load_state()
+    enforce_deadline(st)
+    r = requests.post(url(st, 8001, "/restart"), headers=H(st), timeout=30)
+    print(r.status_code, r.text[:300])
+    print("server restarts in ~5 s and reloads the default model; watch with `python run.py status`")
 
 
 def do_down(st):
@@ -384,6 +419,7 @@ def main():
     pu = sub.add_parser("push")
     pu.add_argument("--content-dir", default=CONTENT_DIR)
     pu.add_argument("--force", action="store_true")
+    pu.add_argument("--style-file", nargs="*", help="extra local style refs (uploaded under their basename)")
     pu.set_defaults(fn=cmd_push)
     t = sub.add_parser("transfer")
     t.add_argument("--model", choices=MODEL_CHOICES, default="telestyle-v2")
@@ -391,10 +427,14 @@ def main():
     t.add_argument("--ids", nargs="*")
     t.add_argument("--min-edge", type=int, default=1024)
     t.add_argument("--seed", type=int, default=123)
+    t.add_argument("--style-file", help="any local PNG as the style ref (overrides --style; auto-uploaded)")
+    t.add_argument("--lora-scale", type=float, default=1.0,
+                   help="style LoRA strength (Lightning stays 1.0); a change reloads the pipeline")
     t.add_argument("--overwrite", action="store_true")
     t.add_argument("--content-dir", default=CONTENT_DIR)
     t.set_defaults(fn=cmd_transfer)
     sub.add_parser("status").set_defaults(fn=cmd_status)
+    sub.add_parser("restart").set_defaults(fn=cmd_restart)
     lg = sub.add_parser("logs")
     lg.add_argument("name", nargs="?", default="setup.log", choices=["setup.log", "download.log", "server.log"])
     lg.add_argument("--lines", type=int, default=60)

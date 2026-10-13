@@ -49,18 +49,31 @@ def auth(x_token: str = Header(default="")):
         raise HTTPException(401, "bad token")
 
 
-def _load(model):
+def _unload():
+    """Drop the ONLY reference to the pipeline, then free VRAM (no local aliases may survive)."""
     global _pipe
-    state.update(pipeline="loading", model=model, error=None)
+    if _pipe is not None:
+        _pipe = None
+        state.update(pipeline="unloaded", model=None, lora_scale=None)
+    tc.free_cuda()
+
+
+def _load(model, lora_scale=1.0):
+    """Pipeline cache key = (model, lora_scale). Same key -> no-op; else full unload + reload."""
+    global _pipe
+    if _pipe is not None and state.get("model") == model and state.get("lora_scale") == lora_scale:
+        return
+    _unload()
+    state.update(pipeline="loading", model=model, lora_scale=lora_scale, error=None)
     try:
-        if _pipe is not None:
-            p, _pipe = _pipe, None
-            tc.unload(p)
         t = time.time()
-        _pipe = tc.load_pipeline(model)
+        _pipe = tc.load_pipeline(model, lora_scale=lora_scale)
         state.update(pipeline="ready", loaded_at=time.time(), load_seconds=round(time.time() - t, 1))
     except Exception as e:  # noqa: BLE001
-        state.update(pipeline="error", error=f"{e}\n{traceback.format_exc()[-3000:]}")
+        state.update(pipeline="error", model=None, lora_scale=None,
+                     error=f"{e}\n{traceback.format_exc()[-3000:]}")
+        _pipe = None
+        tc.free_cuda()
         raise
 
 
@@ -119,20 +132,32 @@ class TransferReq(BaseModel):
     min_edge: int = 1024
     seed: int = 123
     steps: int = 4
+    lora_scale: float = 1.0          # style LoRA alpha (Lightning stays 1.0)
     overwrite: bool = False
+
+
+def out_subdir(req):
+    """<model>/<style>[__ls<scale>][__seed<n>] -- defaults keep the plain <model>/<style> path."""
+    tag = os.path.splitext(req.style)[0]
+    if req.lora_scale != 1.0:
+        tag += f"__ls{req.lora_scale:g}"
+    if req.seed != 123:
+        tag += f"__seed{req.seed}"
+    if req.min_edge != 1024:
+        tag += f"__me{req.min_edge}"
+    return f"{req.model}/{tag}"
 
 
 def _run(job_id, req: TransferReq, items):
     job = jobs[job_id]
     with _lock:
         try:
-            if state["model"] != req.model or _pipe is None:
-                job["status"] = f"loading {req.model}"
-                _load(req.model)
+            if _pipe is None or state.get("model") != req.model or state.get("lora_scale") != req.lora_scale:
+                job["status"] = f"loading {req.model} @ lora_scale {req.lora_scale}"
+                _load(req.model, req.lora_scale)
             job["status"] = "running"
             style_path = os.path.join(INPUTS, "style", req.style)
-            style_tag = os.path.splitext(req.style)[0]
-            out_dir = os.path.join(OUT, req.model, style_tag)
+            out_dir = os.path.join(OUT, *out_subdir(req).split("/"))
             os.makedirs(out_dir, exist_ok=True)
             for stem, src in items:
                 dst = os.path.join(out_dir, stem + ".png")
@@ -169,6 +194,8 @@ def transfer(req: TransferReq):
         raise HTTPException(400, f"style {req.style!r} not uploaded")
     if req.min_edge % 16:
         raise HTTPException(400, "min_edge must be a multiple of 16")
+    if not 0.0 <= req.lora_scale <= 2.0:
+        raise HTTPException(400, "lora_scale must be within 0..2")
     cdir = os.path.join(INPUTS, "content")
     avail = {os.path.splitext(n)[0]: os.path.join(cdir, n) for n in sorted(os.listdir(cdir))}
     stems = req.ids or sorted(avail)
@@ -179,7 +206,7 @@ def transfer(req: TransferReq):
     jobs[job_id] = {"status": "queued", "done": 0, "total": len(stems), "outputs": [], "errors": [],
                     "seconds": [], "model": req.model, "style": req.style, "created": time.time()}
     threading.Thread(target=_run, args=(job_id, req, [(s, avail[s]) for s in stems]), daemon=True).start()
-    return {"job_id": job_id, "total": len(stems)}
+    return {"job_id": job_id, "total": len(stems), "out_subdir": out_subdir(req)}
 
 
 @app.get("/job/{job_id}", dependencies=[Depends(auth)])
@@ -187,6 +214,15 @@ def job(job_id: str):
     if job_id not in jobs:
         raise HTTPException(404, "no such job")
     return jobs[job_id]
+
+
+@app.post("/restart", dependencies=[Depends(auth)])
+def restart():
+    """Hard-exit this process (frees all VRAM); pod_setup.sh's loop restarts it in ~5 s and the
+    new process reloads QS_DEFAULT_MODEL @ 1.0. Running jobs are lost; finished outputs stay on disk."""
+    threading.Thread(target=lambda: (time.sleep(1), os._exit(3)), daemon=True).start()
+    return {"restarting": True, "running_jobs": [j for j, v in jobs.items()
+                                                 if v["status"] not in ("done", "error")]}
 
 
 def _safe_out_path(name):

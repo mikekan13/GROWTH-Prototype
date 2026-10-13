@@ -71,7 +71,9 @@ python3 -m pip install -q "transformers==4.57.3"
 python3 -c "import torch;print('torch after deps',torch.__version__)"
 python3 -c "from diffsynth.pipelines.qwen_image import QwenImagePipeline, ModelConfig; import inspect; print('ModelConfig', inspect.signature(ModelConfig))" || echo "DIFFSYNTH IMPORT FAILED"
 
-# ---- token-guarded server (restart loop). Started AFTER the DiffSynth editable install: a Python that is
+# Reduce fragmentation across model/LoRA-scale reloads (unload -> reload in one process).
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# ---- token-guarded server (restart loop); POST /restart exits it and this loop brings it back. Started AFTER the DiffSynth editable install: a Python that is
 # already running never sees a .pth added later (first pod: "No module named 'diffsynth'").
 ( cd "$QS"; while true; do
     python3 server.py >> "$LOGS/server.log" 2>&1
