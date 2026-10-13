@@ -78,8 +78,10 @@ const STYLE_PREFIX = STYLE_TAGS;
 // Qwen follows short prose: MEDIUM stays <= 4 sentences.
 // Vocabulary: style-refs/STYLE-VOCABULARY.md.
 export const GROWTH_MEDIUM =
-  'A semi-realistic painted character illustration in the manner of Western concept art, painted rather than photographed, with realistic proportions and a matte finish. ' +
-  'Matte porcelain skin with subtle texture, clean soft shading, and crisp defined edges on the features and hair. ' +
+  // rev 3 (Mike, sheet 3): "illustration but so good you almost have to take a double take to tell if it is
+  // real people or not"; seed 10 "a bit too anime but I want to pull that direction a little".
+  'A painted character illustration in the manner of Western concept art, so refined it almost passes for a photograph of a real person, yet unmistakably painted on close inspection, with a matte finish. ' +
+  'Realistic proportions with a slight idealized polish, refined features and large, luminous, expressive eyes short of anime, matte porcelain skin with subtle texture, clean soft painted shading on the planes of the face, and crisp defined edges on the features and hair. ' +
   // rev 2 (Mike, sheet 2: "too dull. Colors should be more vibrant"; seed 10's character = contrast + alive eyes)
   'Soft diffuse key light with a low-key falloff into shadow and strong value contrast between light and shadow. ' +
   'Rich, vibrant, clean colour: a cool-neutral ground with saturated, luminous colour in the hair, eyes and complexion, and bright clear catchlights in the eyes; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
@@ -103,11 +105,13 @@ export const DEFAULT_MOOD = 'growth';
 
 /** Per-campaign moods keyed by genre (lower-case). Rendered by renderMood() as 2 sentences. */
 export const CAMPAIGN_MOODS: Record<string, CampaignMood> = {
+  // rev 2 (Mike, sheet 3): "trying to capture both Dark fantasy and bright scifi" — the weight lives in the
+  // shadows, the brightness in the light.
   growth: {
-    atmosphere: 'Grim, somber old-school dark-fantasy',
-    palette: 'Cool palette with a clean, faintly synthetic sci-fi sheen',
-    shadows: 'deep soft shadows with a cold teal undertone',
-    accent: 'cold teal',
+    atmosphere: 'Old-school dark-fantasy gravity met by bright, clean science-fiction light',
+    palette: 'Cool, luminous palette: a bright clear key light with a clean synthetic sheen on the highlights, rich saturated colour',
+    shadows: 'deep, somber shadows with a cold teal undertone',
+    accent: 'cold teal and violet',
   },
   horror: {
     atmosphere: 'Dread-soaked',
