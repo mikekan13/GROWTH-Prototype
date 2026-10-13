@@ -89,6 +89,7 @@ export interface ProdFact {
 export interface GenesisFacts {
   session: {
     id: string;
+    goal?: string | null;
     status: string;
     cycleCount: number;
     startedAt: Date;
@@ -142,6 +143,8 @@ export interface GenesisGmStep {
 
 export interface GenesisProgress {
   state: 'none' | 'running' | 'waiting' | 'done' | 'error';
+  /** 'completion' = a session opened by completeCharacter on an already-born character. */
+  kind?: 'genesis' | 'completion';
   sessionId: string | null;
   stages: Array<{ key: GenesisStageKey; label: string; status: 'done' | 'current' | 'pending' }>;
   current: GenesisStageKey | null;
@@ -257,6 +260,14 @@ export function toProdView(p: ProdFact): GenesisProdView {
   };
 }
 
+/** Goal marker completeCharacter (genesis-complete.ts) writes into its session goal. */
+export const COMPLETION_GOAL_MARKER = '— complete the born character';
+
+/** True when a session goal belongs to a completion run, not a fresh genesis. */
+export function isCompletionGoal(goal: string | null | undefined): boolean {
+  return !!goal && goal.includes(COMPLETION_GOAL_MARKER);
+}
+
 /** Pure derivation — every stage below the highest one with evidence is done. */
 export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
   const total = GENESIS_STAGES.length;
@@ -326,6 +337,7 @@ export function deriveGenesisProgress(facts: GenesisFacts): GenesisProgress {
 
   return {
     state,
+    kind: isCompletionGoal(s.goal) ? 'completion' : 'genesis',
     sessionId: s.id,
     stages,
     current: GENESIS_STAGES[reached].key,
@@ -374,7 +386,7 @@ export function parseGenesisGoal(goal: string): { name: string; characterId: str
 
 type SessionRow = NonNullable<GenesisFacts['session']>;
 const SESSION_SELECT = {
-  id: true, status: true, cycleCount: true, startedAt: true,
+  id: true, goal: true, status: true, cycleCount: true, startedAt: true,
   endedAt: true, lastCycleAt: true, blockedReason: true, stage: true, progress: true,
 } as const;
 
@@ -466,8 +478,11 @@ export async function getGenesisProgress(opts: {
  *  stay quiet (in-flight progress belongs to the overlay, not the chat). */
 export function genesisStatusLine(name: string, p: GenesisProgress, reason?: string | null): string | null {
   const c = p.counts;
-  const log = 'The full report is in my Log under Genesis.';
+  const log = 'Tap my work line for the full report.';
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (p.state === 'done' && p.kind === 'completion') {
+    return `${name} is complete — age, possessions, seeds, world facts and vines stand. Sheet awaits your review.`;
+  }
   if (p.state === 'done') {
     return `${name} is born — ${plural(c.memories, 'memory', 'memories')}, ${plural(c.blocksForged, 'block', 'blocks')}, ${plural(c.traitsForged, 'trait', 'traits')}. Sheet and dossier await your review. ${log}`;
   }

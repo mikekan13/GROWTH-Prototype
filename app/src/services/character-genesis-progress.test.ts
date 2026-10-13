@@ -40,7 +40,7 @@ vi.mock('@/ai/copilot/jewl-identity', () => ({
 
 const {
   deriveGenesisProgress, classifyWait, getGenesisProgress, GENESIS_STAGES,
-  parseGenesisGoal, isGenesisGoal, genesisStatusLine, announceGenesisStatus, logGenesisReport,
+  parseGenesisGoal, isGenesisGoal, genesisStatusLine, isCompletionGoal, announceGenesisStatus, logGenesisReport,
   announceGenesisProd, genesisProdMessage, prodDecisionAck,
 } =
   await import('./character-genesis-progress');
@@ -221,14 +221,26 @@ describe('genesisStatusLine (chat stays short)', () => {
   it('quiet while running', () => {
     expect(genesisStatusLine('Violet', p({}))).toBeNull();
   });
-  it('one line for approval, done, provider, cancel — pointing at the Log', () => {
+  it('one line for approval, done, provider, cancel — pointing at the work line', () => {
     const approval = genesisStatusLine('Violet', p({ status: 'blocked', blockedReason: 'batch' }, { pending: 5 }))!;
     expect(approval).toMatch(/5 pieces wait/);
-    expect(approval).toMatch(/Log under Genesis/);
+    expect(approval).toMatch(/Tap my work line/);
+    expect(approval).not.toMatch(/Log/);
     expect(genesisStatusLine('Violet', p({ status: 'done', endedAt: t0 }, { memories: 34 }))).toMatch(/^Violet is born — 34 memories/);
     expect(genesisStatusLine('Violet', p({ status: 'blocked', blockedReason: 'AI provider failing — x' }))).toMatch(/resume/);
     expect(genesisStatusLine('Violet', p({ status: 'cancelled' }))).toMatch(/closed/);
     for (const line of [approval]) expect(line.length).toBeLessThan(200);
+  });
+  it('a completion run says complete, not the zero-count Born line', () => {
+    const goal = 'Character genesis: Violet [c1] — complete the born character: age → vines.';
+    const line = genesisStatusLine('Violet', p({ status: 'done', endedAt: t0, goal }, { memories: 57 }))!;
+    expect(line).toMatch(/^Violet is complete — age, possessions, seeds, world facts and vines stand\. Sheet awaits your review\.$/);
+    expect(line).not.toMatch(/0 blocks/);
+  });
+  it('isCompletionGoal reads the goal marker', () => {
+    expect(isCompletionGoal('Character genesis: Violet [c1] — complete the born character: age.')).toBe(true);
+    expect(isCompletionGoal('Character genesis: Violet [c1] — gestate')).toBe(false);
+    expect(isCompletionGoal(null)).toBe(false);
   });
 });
 
