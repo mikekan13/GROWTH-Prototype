@@ -37,6 +37,8 @@ async function main() {
   const seed0 = Number(arg('seed', '7'));
   const mood = arg('mood', 'growth');
   const training = process.argv.includes('--training'); // look-first, free pose, clothing + setting from the description
+  const mediumArg = arg('medium'); // gold | training | (default for the mode)
+  const lead = arg('lead'); // lab only: replaces the lead sentence; "{d}" = the subject description
   // Mike (13 Oct): every sheet carries the gold standard as its first tile for side-by-side comparison.
   const ANCHOR = path.resolve(process.cwd(), '..', 'style-refs', 'STYLE-ANCHOR-2026-10-13-sheet6-seed8.png');
   const refFile = arg('style-ref-file'); // a specific reference image (e.g. a desaturated / headless anchor variant)
@@ -49,14 +51,22 @@ async function main() {
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
   const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel } = await import('../src/ai/portraits/qwen21-workflow');
-  const lorasArg = arg('loras');
+  const { GROWTH_MEDIUM_GOLD, GROWTH_MEDIUM_TRAINING } = await import('../src/ai/portraits/style-config');
+  // 'none' = no medium paragraph at all (subject + mood only; a LoRA blend carries the style)
+  // --medium-text "<paragraph>" = a custom medium paragraph for this run (wins over --medium)
+  const mediumText = arg('medium-text');
+  const medium = mediumText ? mediumText : mediumArg === 'gold' ? GROWTH_MEDIUM_GOLD : mediumArg === 'training' ? GROWTH_MEDIUM_TRAINING : mediumArg === 'none' ? ' ' : undefined;
+  // --loras "" is dropped by PowerShell; a bare --loras (end of line or followed by another flag) also means none.
+  const lorasIdx = process.argv.indexOf('--loras');
+  const lorasNext = lorasIdx > 0 ? process.argv[lorasIdx + 1] : undefined;
+  const lorasArg = lorasIdx < 0 ? undefined : (lorasNext === undefined || lorasNext.startsWith('--')) ? '' : lorasNext;
   const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
   const loraSpec = formatQwen21Loras(loras);
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
   const provider = new Qwen21Provider();
   provider.setLoras(loras);
 
-  console.log(`describe lab: ${subjects.length} subject(s) × ${seeds} seed(s) from ${seed0}, mood=${mood}, loras=${loraSpec || 'none'} → ${outDir}`);
+  console.log(`describe lab: ${subjects.length} subject(s) × ${seeds} seed(s) from ${seed0}, mood=${mood}, medium=${mediumArg ?? 'default'}, loras=${loraSpec || 'none'} → ${outDir}`);
   const anchorBuf = await fs.readFile(ANCHOR).catch(() => null);
   const rows: { image: Buffer; label: string }[][] = [[], []];
   if (anchorBuf) {
@@ -73,7 +83,7 @@ async function main() {
       for (const ref of variants) {
         const tag = ref ? 'styleref' : 'noref';
         const t0 = Date.now();
-        const r = await provider.describeBase('style-lab-describe', subject, seed, mood, { training, styleRefPath: ref });
+        const r = await provider.describeBase('style-lab-describe', subject, seed, mood, { training, styleRefPath: ref, medium, lead });
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         const base = `${slug}-${tag}-seed-${seed}`;
         await fs.writeFile(path.join(outDir, `${base}.png`), r.imageData);

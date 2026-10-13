@@ -233,7 +233,7 @@ export class Qwen21Provider extends ServerlessProvider {
     description: string,
     seed: number,
     mood?: string,
-    opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string; loras?: Qwen21Lora[] } = {},
+    opts: { training?: boolean; styleRefPath?: string; contentRefPath?: string; loras?: Qwen21Lora[]; medium?: string; lead?: string } = {},
   ): Promise<Qwen21StepResult> {
     const images: string[] = [];
     if (opts.contentRefPath) {
@@ -242,10 +242,12 @@ export class Qwen21Provider extends ServerlessProvider {
     } else if (opts.styleRefPath) {
       images.push(await this.uploadStyleRef(opts.styleRefPath, 0));
     }
-    const prompt = buildQwen21DescribePrompt(description, mood, undefined, {
+    // opts.medium: an explicit medium paragraph (e.g. the frozen GOLD text) instead of the mode's default.
+    const prompt = buildQwen21DescribePrompt(description, mood, opts.medium, {
       training: opts.training,
       contentRef: !!opts.contentRefPath,
       styleRef: !!opts.styleRefPath,
+      lead: opts.lead,
     });
     return this.runStep(characterId, 'faces', opts.training ? 'describe-training' : 'describe-base', prompt, images, seed, { width: 832, height: 1248 }, mood, { loras: opts.loras });
   }

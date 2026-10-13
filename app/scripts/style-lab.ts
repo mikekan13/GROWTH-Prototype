@@ -64,7 +64,10 @@ async function main() {
   const gate = process.argv.includes('--gate');
   const mediumFile = arg('medium-file');
   const medium = mediumFile ? (await fs.readFile(path.resolve(mediumFile), 'utf-8')).trim() : GROWTH_MEDIUM;
-  const lorasArg = arg('loras');
+  // --loras "" is dropped by PowerShell; a bare --loras (end of line or followed by another flag) also means none.
+  const lorasIdx = process.argv.indexOf('--loras');
+  const lorasNext = lorasIdx > 0 ? process.argv[lorasIdx + 1] : undefined;
+  const lorasArg = lorasIdx < 0 ? undefined : (lorasNext === undefined || lorasNext.startsWith('--')) ? '' : lorasNext;
   const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
   const loraSpec = formatQwen21Loras(loras);
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';

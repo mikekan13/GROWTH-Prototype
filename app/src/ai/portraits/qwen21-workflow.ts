@@ -92,9 +92,11 @@ export function buildQwen21DescribePrompt(
   description: string,
   mood?: string,
   medium: string = GROWTH_MEDIUM,
-  opts: { training?: boolean; styleRef?: boolean; contentRef?: boolean } = {},
+  opts: { training?: boolean; styleRef?: boolean; contentRef?: boolean; lead?: string } = {},
 ): string {
   const d = description.trim().replace(/[.\s]+$/, '');
+  // opts.lead (lab only): replaces the default lead sentence; "{d}" is substituted with the description.
+  const customLead = opts.lead ? opts.lead.replace('{d}', d) : undefined;
   if (opts.training && opts.contentRef) {
     // CONTENT-REF training mode (Mike, 13 Oct: "none of these match the style or fidelity of our golden image"):
     // the gold came from a real photo in the reference slot + the look-first medium on OUR lane. So: a plain
@@ -118,9 +120,9 @@ export function buildQwen21DescribePrompt(
     // Style-ref phrasing variants (QWEN21_STYLEREF_PHRASING): 'instyle' = the InStyle-LoRA idiom
     // "Make an image in this style of …" (reference first, subject after); default = explicit role clause.
     const instyle = process.env.QWEN21_STYLEREF_PHRASING === 'instyle';
-    const lead = opts.styleRef && instyle
+    const lead = customLead ?? (opts.styleRef && instyle
       ? `Make an image in this style of ${d}. <image1> is only a style reference: use its art style, ink linework, painted shading, palette and lighting, and nothing else from it.`
-      : `A painted character illustration of ${d}.`;
+      : `A painted character illustration of ${d}.`);
     const refClause = opts.styleRef && !instyle
       ? 'Painted in exactly the art style of <image1>: the same ink linework, painted shading, finish, palette and lighting. Do not copy the person, face, hair, clothing, pose or framing of <image1>.'
       : '';

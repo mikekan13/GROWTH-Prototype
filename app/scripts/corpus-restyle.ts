@@ -64,7 +64,8 @@ async function main() {
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
   const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel } = await import('../src/ai/portraits/qwen21-workflow');
   const lorasIdx = process.argv.indexOf('--loras');
-  const lorasArg = lorasIdx > 0 ? (process.argv[lorasIdx + 1] ?? '') : undefined; // "" = none
+  const lorasNext = lorasIdx > 0 ? process.argv[lorasIdx + 1] : undefined;
+  const lorasArg = lorasIdx < 0 ? undefined : (lorasNext === undefined || lorasNext.startsWith('--')) ? '' : lorasNext; // bare --loras = none (PowerShell drops "")
   const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
   const loraSpec = formatQwen21Loras(loras);
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
