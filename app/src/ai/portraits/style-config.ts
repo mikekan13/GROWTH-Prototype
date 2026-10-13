@@ -61,30 +61,168 @@ const STYLE_SENTENCES = [
 const STYLE_PREFIX = STYLE_TAGS;
 
 // ============================================================
-// FLUX.2 style paragraph — THE single source of the GROWTH look
+// THE GROWTH LOOK — three layers, each with ONE job
+// (Mike, 13 Oct 2026: "Lets do it")
 // ============================================================
-// The FLUX.2 serverless path (providers/local.ts: face lock, pass 2, body)
-// builds its own prose prompts and does NOT go through getStyleTags /
-// getStyleSentences. Every one of those prompts must embed this paragraph so
-// the style is identical from the first lock image onward. FLUX.2's text
-// encoder is Mistral (one encoder, prose only) — there is no clip_l/t5 split.
-// Vocabulary: style-refs/STYLE-VOCABULARY.md (from Mike's reference set).
-// Revision 2 (Mike: "too anime and a bit too soft lines"): realistic adult
-// proportions and bone structure, crisp defined edges, controlled brushwork,
-// subtle skin texture, wall fills the frame.
-// Revision 5 (Mike): the paragraph must be SUBJECT-AGNOSTIC — it is applied
-// to every race, sex and eventually species — so it describes rendering and
-// mood only, never the subject (no skin tone, hair colour, make-up, age). The
-// backdrop is a separate line chosen per use: the identity lock is a reference
-// shot and gets a blank backdrop; the body / final gets the studio wall.
-const FLUX2_STYLE_PROSE =
-  'Rendered as a Western semi-realistic digital painting in the manner of a professional concept-art character portrait, painted rather than photographed, with a matte finish. Not anime, not cartoon, not airbrushed. ' +
-  'The subject\'s own anatomy, skin tone, features and species are rendered faithfully with realistic proportions and bone structure: natural eye size, a defined nose bridge, visible cheekbones and jawline, every feature in proportion to the face. ' +
-  'Sharp focus throughout the entire image with finely rendered high-detail painting: tight, precise brushwork, crisp defined edges on the face, eyes, mouth and hair, hard edges where the planes of the face meet, individual hair strands crisply drawn, and no blur or softness anywhere. ' +
-  'The skin is smooth but has subtle texture and natural tone variation, with a soft matte sheen rather than gloss. ' +
-  'Soft diffuse key light from the front with a gentle top key, low-key moody falloff into shadow at the sides, and clear form shadows that define the nose, cheekbones and jaw; shadows are cool grey, never black; no rim light, no lens effects. ' +
-  'The mood is a blend of old-school dark fantasy and modern science fiction: the grim, somber, slightly ominous atmosphere of a 1980s dark fantasy book-cover painting, finished with the cool, clean, faintly synthetic sheen of modern sci-fi concept art, with a subtle cold teal undertone in the shadows. ' +
-  'The palette is desaturated and cool-neutral with at most one saturated accent color.';
+//   1. MEDIUM  (fixed forever, subject-agnostic): the rendering technique only.
+//   2. MOOD    (per campaign, small): palette temperature, shadow hardness/depth,
+//              accent colour family, one atmosphere word. Never medium words,
+//              never subject words. Default = 'growth'.
+//   3. FINISH  (deterministic in-app post-process, ai/portraits/finish.ts):
+//              grade + seeded grain + vignette on every saved Qwen output.
+// History: revs 1-5 of the FLUX.2 paragraph (Mike: not photographic -> not
+// anime, realistic adult proportions -> sharper lines -> "old school dark
+// fantasy and modern scifi"; rev 5 = SUBJECT-AGNOSTIC — it runs on every race,
+// sex and eventually species: no skin tone, hair colour, make-up, age). The
+// mood sentence moved out of the medium into CAMPAIGN_MOODS.growth.
+// Qwen follows short prose: MEDIUM stays <= 4 sentences.
+// Vocabulary: style-refs/STYLE-VOCABULARY.md.
+export const GROWTH_MEDIUM =
+  'A semi-realistic painted character illustration in the manner of Western concept art, painted rather than photographed, with realistic proportions and a matte finish. ' +
+  'Matte porcelain skin with subtle texture, clean soft shading, and crisp defined edges on the features and hair. ' +
+  'Soft diffuse key light with a low-key falloff into shadow. ' +
+  'A desaturated cool-neutral base palette with at most one saturated accent colour; no grain, no noise, no HDR; not anime, not cartoon, not airbrushed, not photographic.';
+
+/** One-clause medium reminder for instruction edits (the full paragraph would repaint the image). */
+export const GROWTH_MEDIUM_REMINDER =
+  'keep it the same semi-realistic painted illustration with a matte finish, no grain or noise';
+
+/**
+ * A campaign mood. Structured so a mood can ONLY carry what its layer is for:
+ * palette temperature, shadow hardness/depth, accent colour family, one atmosphere word.
+ */
+export interface CampaignMood {
+  atmosphere: string;
+  palette: string;
+  shadows: string;
+  accent: string;
+}
+
+export const DEFAULT_MOOD = 'growth';
+
+/** Per-campaign moods keyed by genre (lower-case). Rendered by renderMood() as 2 sentences. */
+export const CAMPAIGN_MOODS: Record<string, CampaignMood> = {
+  growth: {
+    atmosphere: 'Grim, somber old-school dark-fantasy',
+    palette: 'Cool palette with a clean, faintly synthetic sci-fi sheen',
+    shadows: 'deep soft shadows with a cold teal undertone',
+    accent: 'cold teal',
+  },
+  horror: {
+    atmosphere: 'Dread-soaked',
+    palette: 'Cold, sickly pale palette',
+    shadows: 'deep hard-edged shadows',
+    accent: 'bruised red',
+  },
+  'dark fantasy': {
+    atmosphere: 'Ominous',
+    palette: 'Cool, muted earthen palette',
+    shadows: 'deep soft shadows',
+    accent: 'ember orange',
+  },
+  'high fantasy': {
+    atmosphere: 'Luminous',
+    palette: 'Warm, bright palette',
+    shadows: 'shallow soft shadows',
+    accent: 'gold',
+  },
+  'sci-fi': {
+    atmosphere: 'Sterile',
+    palette: 'Cold blue-neutral palette',
+    shadows: 'crisp mid-depth shadows',
+    accent: 'electric cyan',
+  },
+  romance: {
+    atmosphere: 'Tender',
+    palette: 'Warm, rosy palette',
+    shadows: 'gentle shallow shadows',
+    accent: 'rose',
+  },
+  mystery: {
+    atmosphere: 'Brooding',
+    palette: 'Cool grey palette',
+    shadows: 'deep hard-edged noir shadows',
+    accent: 'amber',
+  },
+  western: {
+    atmosphere: 'Weathered',
+    palette: 'Warm, dusty palette',
+    shadows: 'hard sunlit shadows',
+    accent: 'rust',
+  },
+  gothic: {
+    atmosphere: 'Melancholy',
+    palette: 'Cold palette',
+    shadows: 'deep velvety shadows',
+    accent: 'deep crimson',
+  },
+  nautical: {
+    atmosphere: 'Stormy',
+    palette: 'Cool sea-grey palette',
+    shadows: 'soft deep shadows',
+    accent: 'teal-green',
+  },
+  steampunk: {
+    atmosphere: 'Industrious',
+    palette: 'Warm sepia palette',
+    shadows: 'medium-depth soft shadows',
+    accent: 'brass',
+  },
+};
+
+/** "<Atmosphere> atmosphere. <Palette>, <shadows>, accent colour from the <accent> family." */
+export function renderMood(m: CampaignMood): string {
+  return `${m.atmosphere} atmosphere. ${m.palette}, ${m.shadows}, accent colour from the ${m.accent} family.`;
+}
+
+/** Free-text genre words → mood key. */
+const MOOD_ALIASES: Record<string, string> = {
+  'scifi': 'sci-fi',
+  'science fiction': 'sci-fi',
+  'space opera': 'sci-fi',
+  'cyberpunk': 'sci-fi',
+  'grimdark': 'dark fantasy',
+  'fantasy': 'high fantasy',
+  'noir': 'mystery',
+  'detective': 'mystery',
+  'pirate': 'nautical',
+  'pirates': 'nautical',
+  'gothic horror': 'gothic',
+  'cosmic horror': 'horror',
+};
+
+const normGenre = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Keys + aliases, normalised, longest first (so "dark fantasy" beats "fantasy"). */
+const MOOD_TERMS: Array<[string, string]> = [
+  ...Object.keys(CAMPAIGN_MOODS).map((k): [string, string] => [normGenre(k), k]),
+  ...Object.entries(MOOD_ALIASES).map(([a, k]): [string, string] => [normGenre(a), k]),
+].sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * Resolve a campaign's mood KEY. Order: explicit `styleMood` (campaign style JSON)
+ * → campaign `genre` (free text: a key or alias appearing in it, longest first)
+ * → 'growth'. Unknown values never become prose — a mood may not smuggle in
+ * medium or subject words.
+ */
+export function resolveMoodKey(src?: { styleMood?: string | null; genre?: string | null } | string | null): string {
+  const candidates = typeof src === 'string' || src == null ? [src] : [src.styleMood, src.genre];
+  for (const raw of candidates) {
+    const g = normGenre(raw ?? '');
+    if (!g) continue;
+    const hit = MOOD_TERMS.find(([term]) => ` ${g} `.includes(` ${term} `));
+    if (hit) return hit[1];
+  }
+  return DEFAULT_MOOD;
+}
+
+/** The mood prose (2 sentences) for a key / genre / campaign style; unknown → growth. */
+export function getCampaignMood(src?: Parameters<typeof resolveMoodKey>[0]): string {
+  return renderMood(CAMPAIGN_MOODS[resolveMoodKey(src)]);
+}
+
+/** Legacy: the old single FLUX.2 paragraph = MEDIUM + the default (growth) mood. */
+const FLUX2_STYLE_PROSE = `${GROWTH_MEDIUM} ${renderMood(CAMPAIGN_MOODS[DEFAULT_MOOD])}`;
 
 const FLUX2_BACKDROP_LOCK =
   'The backdrop is a completely blank, flat, uniform mid-grey with no texture, no detail and nothing else in the scene; at most the outermost edges of the figure may loosen into a few stylized brush strokes against the blank backdrop.';
@@ -92,7 +230,7 @@ const FLUX2_BACKDROP_LOCK =
 const FLUX2_BACKDROP_STUDIO =
   'The backdrop is a uniform mid-grey mottled plaster studio wall with a faint haze of grime and age, filling the entire frame edge to edge, with no paper margin and no white border, and nothing else in the scene.';
 
-/** The GROWTH look as one prose paragraph for FLUX.2 prompts (subject-agnostic; no backdrop). */
+/** The GROWTH look as one paragraph (MEDIUM + growth mood; subject-agnostic; no backdrop). Legacy FLUX.2 callers. */
 export function getFlux2StyleProse(): string {
   return FLUX2_STYLE_PROSE;
 }
@@ -137,22 +275,10 @@ const COMPOSITION_PRESETS: Record<string, string> = {
   action: 'dynamic action pose, motion blur on periphery, dramatic lighting, environment interaction',
 };
 
-// ============================================================
-// Campaign Theme Modifiers
-// ============================================================
-
-const CAMPAIGN_THEME_MODIFIERS: Record<string, string> = {
-  'dark fantasy': 'dark moody atmosphere, muted earth tones, grim shadows, ominous undertones',
-  'high fantasy': 'vibrant magical glow, ethereal light, majestic, epic scale',
-  'steampunk': 'brass and copper accents, steam wisps, mechanical elements, Victorian aesthetic',
-  'horror': 'unsettling atmosphere, eerie shadows, pale sickly lighting, dread',
-  'mystery': 'noir lighting, deep shadows, fog, muted cool tones',
-  'romance': 'soft warm lighting, gentle bokeh, intimate framing, warm color palette',
-  'sci-fi': 'holographic accents, cool blue lighting, sleek materials, futuristic',
-  'western': 'dusty warm tones, golden hour light, rugged textures, vast sky',
-  'gothic': 'ornate dark architecture, candlelight, deep reds and purples, dramatic shadows',
-  'nautical': 'ocean spray, stormy skies, weathered textures, teal and grey palette',
-};
+// Campaign Theme Modifiers: REPLACED by CAMPAIGN_MOODS (13 Oct 2026). The old
+// genre table mixed scene/subject words ("steam wisps", "ornate dark
+// architecture", "gentle bokeh") into the style. getThemeModifier() now
+// returns the mood prose for a genre.
 
 // ============================================================
 // Identity Lock — Face-Only Style & Angles
@@ -373,9 +499,11 @@ export function applyCampaignStyle(
   return config;
 }
 
-/** Look up built-in theme modifier string by genre name */
+/** Mood prose for a genre name; undefined when the genre maps to no mood. */
 export function getThemeModifier(genre: string): string | undefined {
-  return CAMPAIGN_THEME_MODIFIERS[genre.toLowerCase()];
+  const key = resolveMoodKey(genre);
+  if (key === DEFAULT_MOOD && normGenre(genre) !== DEFAULT_MOOD) return undefined;
+  return renderMood(CAMPAIGN_MOODS[key]);
 }
 
 /** Get the creation-mode negative prompt (includes anti-clothing/accessories) */

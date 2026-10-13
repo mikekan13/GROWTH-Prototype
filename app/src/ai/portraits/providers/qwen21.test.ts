@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import sharp from 'sharp';
 import { Qwen21Provider, isStoredPortraitPath } from './qwen21';
 import type { ComfyUIQueueResponse, PortraitInput } from '../types';
+import { getCampaignMood } from '../style-config';
 
 type Wf = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
@@ -28,6 +29,12 @@ class TestQwen extends Qwen21Provider {
     return { imagePath: p, thumbnailPath: p };
   }
   protected override async defaultStyleRefs() { return ['/abs/s1.png', '/abs/s2.png']; }
+  raws: Array<{ path: string; raw: Buffer }> = [];
+  protected override async saveRaw(imageWebPath: string, raw: Buffer) {
+    const p = imageWebPath.replace('/.thumbs/', '/raw/').replace(/\.webp$/, '.png');
+    this.raws.push({ path: p, raw });
+    return p;
+  }
 }
 
 function input(over: Partial<PortraitInput> & { refs: string[] }): PortraitInput {
@@ -109,6 +116,35 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     expect(wf.SAMPLE.inputs.latent_image).toEqual(['EMPTY_LATENT', 0]);
     expect(wf.TEXT_ENCODE.inputs.prompt).toContain('Wearing a grey shift');
     expect(p.saved[0]).toContain('/bodies/');
+  });
+
+  it('FINISH: saved image is finished, the raw model output is saved beside it under raw/', async () => {
+    delete process.env.GROWTH_FINISH;
+    const p = patch(new TestQwen());
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7);
+    expect(r.rawData.equals(png)).toBe(true);
+    expect(r.imageData.equals(png)).toBe(false);
+    expect(p.raws).toHaveLength(1);
+    expect(p.raws[0].raw.equals(png)).toBe(true);
+    expect(r.rawPath).toBe('/portraits/char1/faces/raw/g0.png');
+  });
+
+  it('GROWTH_FINISH=off → saved image is the raw output (raw still saved)', async () => {
+    process.env.GROWTH_FINISH = 'off';
+    const p = patch(new TestQwen());
+    const r = await p.lockIdentity('char1', ['/uploads/references/c/a.jpg'], 7);
+    delete process.env.GROWTH_FINISH;
+    expect(r.imageData.equals(png)).toBe(true);
+    expect(p.raws).toHaveLength(1);
+  });
+
+  it('MOOD: campaignStyle.styleMood reaches the lock prompt; default is growth', async () => {
+    delete process.env.QWEN21_STYLE_MODE;
+    const p = patch(new TestQwen());
+    await p.generatePortrait({ ...input({ refs: ['/uploads/references/c/a.jpg'] }), campaignStyle: { styleMood: 'horror' } });
+    await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg'] }));
+    expect(p.queued[0].TEXT_ENCODE.inputs.prompt).toContain(getCampaignMood('horror'));
+    expect(p.queued[1].TEXT_ENCODE.inputs.prompt).toContain(getCampaignMood('growth'));
   });
 
   it('object-ref edits are refused, not silently ignored', async () => {
