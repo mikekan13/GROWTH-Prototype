@@ -61,6 +61,28 @@ const STYLE_SENTENCES = [
 const STYLE_PREFIX = STYLE_TAGS;
 
 // ============================================================
+// FLUX.2 style paragraph — THE single source of the GROWTH look
+// ============================================================
+// The FLUX.2 serverless path (providers/local.ts: face lock, pass 2, body)
+// builds its own prose prompts and does NOT go through getStyleTags /
+// getStyleSentences. Every one of those prompts must embed this paragraph so
+// the style is identical from the first lock image onward. FLUX.2's text
+// encoder is Mistral (one encoder, prose only) — there is no clip_l/t5 split.
+// Vocabulary: style-refs/STYLE-VOCABULARY.md (from Mike's reference set).
+const FLUX2_STYLE_PROSE =
+  'Rendered as a painterly digital character illustration in a semi-realistic concept-art style, painted rather than photographed, with a matte finish and no photographic texture. ' +
+  'The skin is porcelain-smooth with a soft matte sheen and almost no pore detail; the eyes are large and glassy with smoky dark lids; the features are idealized and symmetrical. ' +
+  'The face and eyes are the sharpest point of the image, while the tips of the hair and the outer edges of the figure dissolve into loose visible brushwork. ' +
+  'The backdrop is a flat mottled grey studio wall like toned paper with faint paint smudges, and nothing else is in the scene. ' +
+  'Soft diffuse frontal light with a gentle top key; shadows are cool grey, never black; no hard shadows, no rim light, no lens effects. ' +
+  'The palette is desaturated and cool-neutral with one saturated accent color, pale skin against dark hair.';
+
+/** The GROWTH look as one prose paragraph for FLUX.2 prompts. */
+export function getFlux2StyleProse(): string {
+  return FLUX2_STYLE_PROSE;
+}
+
+// ============================================================
 // Negative Prompts — Minimal for FLUX
 // ============================================================
 // FLUX at CFG 1.0 is guidance-distilled and largely ignores negative prompts.

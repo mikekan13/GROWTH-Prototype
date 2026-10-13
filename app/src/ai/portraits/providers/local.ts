@@ -28,6 +28,7 @@ import type {
   ComfyUIWorkflowParams,
 } from '../types';
 import { buildPortraitPrompt } from '../prompt-builder';
+import { getFlux2StyleProse } from '../style-config';
 import { PortraitEndpointError } from '@/lib/errors';
 import { composeStylePrompt } from '../growth-style-prompts';
 import { markUsed } from '../pod-keepalive';
@@ -1006,10 +1007,13 @@ export class LocalProvider implements ImageGenerationProvider {
         const matchList = `${matchParts.slice(0, -1).join(', ')}, and ${matchParts[matchParts.length - 1]}`;
         const subjectPhrase = detailed ? `a ${subject}${physClause}` : 'the person';
 
+        // 2026-10-13: was "A photograph of ..." + plain grey/even light — the
+        // lock came out as a photo and the body inherited it. Style now comes
+        // from the shared FLUX.2 paragraph (style-config getFlux2StyleProse).
         let base =
-          `A photograph of ${subjectPhrase} in ${idRefsPhrase}. Match their exact facial identity — ${matchList} — from the references with high fidelity. Do not invent, average, or embellish features.\n` +
-          `Head-and-shoulders portrait, shoulders-up, straight-on front view, eye-level, looking directly at the camera, neutral expression with closed mouth. Nude, bare shoulders. No clothing.\n\n` +
-          `Plain mid-grey studio backdrop, completely flat and minimal. Soft, even, diffused studio lighting. No dramatic shadows.`;
+          `A painted character illustration of ${subjectPhrase} in ${idRefsPhrase}. Match their exact facial identity — ${matchList} — from the references with high fidelity. Do not invent, average, or embellish features; only the rendering style changes, not the person.\n` +
+          `Head-and-shoulders portrait, shoulders-up, straight-on front view, eye-level, looking directly at the viewer, neutral expression with closed mouth. Nude, bare shoulders. No clothing.\n\n` +
+          getFlux2StyleProse();
         if (anglePoseActive) {
           base += ` Posed as shown in image reference ${poseSlotIdx}.`;
         }
@@ -1112,8 +1116,8 @@ export class LocalProvider implements ImageGenerationProvider {
         return (
           `Render the person from image reference 1 in the visual style of ${styleRange}. ` +
           `Do not use the face, hair, skin, clothing, pose, framing, or background from ${styleRange} — only the art style and rendering.\n\n` +
-          `Painterly semi-realistic rendering with a slight CGI sheen and dark-fantasy mood. Highly detailed face, sharp features, fine skin texture with subtle subsurface scattering, soft specular highlights. Rembrandt lighting — a soft key light from the upper side casting a gentle triangle of light on the shadowed cheek, smooth falloff, no harsh shadows.\n\n` +
-          `Head-and-shoulders portrait, shoulders-up, straight-on front view, nude, bare shoulders, no clothing. Plain mid-grey studio backdrop, completely flat and minimal.`
+          `${getFlux2StyleProse()}\n\n` +
+          `Head-and-shoulders portrait, shoulders-up, straight-on front view, nude, bare shoulders, no clothing.`
         );
       };
       const cleanupPrompt: string | null = params.runPass2
@@ -1420,8 +1424,7 @@ export class LocalProvider implements ImageGenerationProvider {
     return (
       `A full-length painted illustration of the ${subject} from image reference 1${physClause}. Match the exact facial identity, hair, and skin from image reference 1 with high fidelity.${measurementSentence} Full body visible head to toe with natural realistic proportions, standing straight in a relaxed A-pose facing the camera, arms at the sides, neutral expression, with clear backdrop margin above the head and below the feet.\n\n` +
       `${underwearPhrase}\n\n` +
-      `Plain mid-grey studio backdrop. Soft Rembrandt lighting.\n\n` +
-      `Painterly semi-realistic digital illustration with visible brushwork and a glossy CGI sheen — subtle subsurface scattering, polished highlights. Muted desaturated color palette, moody atmospheric lighting. The painterly style applies to the rendering only — it does not change what the person wears or how objects are designed.${styleSentence}`
+      `${getFlux2StyleProse()} A soft ground shadow sits under the feet. The painterly style applies to the rendering only — it does not change what the person wears or how objects are designed.${styleSentence}`
     );
   }
 
