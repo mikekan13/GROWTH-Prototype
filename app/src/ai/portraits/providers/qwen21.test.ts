@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import sharp from 'sharp';
 import { Qwen21Provider, isStoredPortraitPath } from './qwen21';
 import type { ComfyUIQueueResponse, PortraitInput } from '../types';
 import type { LockGateVerdict } from '../lock-gate';
-import { getCampaignMood } from '../style-config';
+import { GROWTH_MEDIUM, getCampaignMood } from '../style-config';
 
 type Wf = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
@@ -142,6 +142,25 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     (p as unknown as { uploadStyleRef: (a: string, i: number) => Promise<string> }).uploadStyleRef = async (a, i) => `style${i + 1}:${a}`;
     return p;
   };
+  // These cases exercise the prompt stack WITHOUT the GROWTH style LoRA (env unset = grwthpaint 0.6 since 14 Oct).
+  beforeEach(() => { process.env.QWEN21_LORAS = 'none'; });
+  afterEach(() => { delete process.env.QWEN21_LORAS; });
+
+  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.6, trigger first, MEDIUM paragraph stripped', async () => {
+    delete process.env.QWEN21_LORAS; delete process.env.QWEN21_STYLE_MODE;
+    const p = patch(new TestQwen());
+    const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg'] }));
+    expect(r.success).toBe(true);
+    const wf = p.queued[0];
+    expect(wf.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
+    expect(wf.LORA_1.inputs.strength_model).toBe(0.6);
+    const prompt = String(wf.TEXT_ENCODE.inputs.prompt);
+    expect(prompt).toMatch(/^grwthpaint, A painted character illustration of the person in <image1>, head and shoulders\./);
+    expect(prompt).not.toContain(GROWTH_MEDIUM);
+    expect(prompt).not.toMatch(/no grain, no noise/);
+    expect(prompt).toContain(getCampaignMood('growth'));
+    expect(p.metas[0]?.loras).toBe('grwthpaint_v1.safetensors:0.6:grwthpaint');
+  });
 
   it('default (single mode): photos → one painted lock pass, no second pass', async () => {
     delete process.env.QWEN21_STYLE_MODE;

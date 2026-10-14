@@ -16,7 +16,9 @@
  *   --out DIR            default <repo>/style-refs/lab/<timestamp>-<mood>/
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
- *   --loras SPEC         community LoRA blend, file:strength[:trigger],... (overrides QWEN21_LORAS; "" = none)
+ *   --loras SPEC         LoRA blend, file:strength[:trigger],... (overrides QWEN21_LORAS; "" = none). Default
+ *                        (env unset) = the GROWTH style LoRA grwthpaint_v1 at 0.6, which also strips the MEDIUM
+ *                        paragraph from the prompt (Mike, 14 Oct: "sit at 60% lora with stripped prompt")
  *   --gate               run the BASE-LOCK GATE (lock-gate.ts; vision = VISION_PROVIDER, pod
  *                        default — never localhost) on each raw seed; PASS/FAIL + reasons
  *                        printed under each tile (default off)
@@ -55,7 +57,7 @@ async function main() {
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
   const { checkBaseLock } = await import('../src/ai/portraits/lock-gate');
   const { GROWTH_MEDIUM, getCampaignMood, resolveMoodKey } = await import('../src/ai/portraits/style-config');
-  const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel } = await import('../src/ai/portraits/qwen21-workflow');
+  const { parseQwen21Loras, qwen21LorasFromEnv, formatQwen21Loras, qwen21LoraLabel, hasGrowthStyleLora } = await import('../src/ai/portraits/qwen21-workflow');
 
   const n = Math.max(1, Number(arg('seeds') ?? 4));
   const seedStart = Number(arg('seed-start') ?? 7);
@@ -67,8 +69,6 @@ async function main() {
     const { resolveVisionProvider } = await import('../src/ai/network/vision');
     console.log(`gate vision provider: ${resolveVisionProvider()} (VISION_PROVIDER)`);
   }
-  const mediumFile = arg('medium-file');
-  const medium = mediumFile ? (await fs.readFile(path.resolve(mediumFile), 'utf-8')).trim() : GROWTH_MEDIUM;
   // --loras "" is dropped by PowerShell; a bare --loras (end of line or followed by another flag) also means none.
   const lorasIdx = process.argv.indexOf('--loras');
   const lorasNext = lorasIdx > 0 ? process.argv[lorasIdx + 1] : undefined;
@@ -76,6 +76,9 @@ async function main() {
   const loras = lorasArg !== undefined ? parseQwen21Loras(lorasArg) : qwen21LorasFromEnv();
   const loraSpec = formatQwen21Loras(loras);
   const loraTag = loras.length ? ` · ${qwen21LoraLabel(loras)}` : '';
+  // Mike (14 Oct): with the GROWTH style LoRA active the medium paragraph is stripped (same rule as the live lock).
+  const mediumFile = arg('medium-file');
+  const medium = mediumFile ? (await fs.readFile(path.resolve(mediumFile), 'utf-8')).trim() : hasGrowthStyleLora(loras) ? '' : GROWTH_MEDIUM;
 
   const photosDir = arg('photos');
   const photoPaths = photosDir
@@ -130,7 +133,7 @@ async function main() {
       `mood: ${mood}${moodArg.toLowerCase() !== mood ? ` (from "${moodArg}")` : ''}`,
       `seeds: ${seeds.join(', ')}`,
       `photos: ${photoPaths.join(' | ')}`,
-      `medium: ${mediumFile ? `file ${path.resolve(mediumFile)}` : 'GROWTH_MEDIUM (style-config.ts)'}`,
+      `medium: ${mediumFile ? `file ${path.resolve(mediumFile)}` : medium ? 'GROWTH_MEDIUM (style-config.ts)' : 'none (stripped — GROWTH style LoRA active)'}`,
       `finish: ${noFinish ? 'off' : JSON.stringify(FINISH)}`,
       `loras: ${loraSpec || 'none'}${loras.length ? ` (${qwen21LoraLabel(loras)}; triggers prepended to the prompt)` : ''}`,
       '',

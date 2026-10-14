@@ -44,6 +44,7 @@ import {
   buildQwen21Workflow,
   formatQwen21Loras,
   getQwen21StyleLine,
+  hasGrowthStyleLora,
   qwen21LorasFromEnv,
   type Qwen21Lora,
 } from '../qwen21-workflow';
@@ -170,7 +171,10 @@ export class Qwen21Provider extends ServerlessProvider {
     }
     // QWEN21_STYLE_MODE=single → the lock pass carries the painted look itself (no second pass).
     const painted = opts?.painted ?? qwen21StyleMode() === 'single';
-    const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, opts?.medium);
+    // Mike (14 Oct): with the GROWTH style LoRA active the MEDIUM paragraph is stripped — the trigger word
+    // carries the look, and the medium words only pull costume/pose at low strengths (Violet seed-8 sheet).
+    const medium = opts?.medium ?? (hasGrowthStyleLora(this.activeLoras(opts?.loras)) ? '' : undefined);
+    const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, medium);
     return { raw: await this.runWorkflow(prompt, names, seed, undefined, opts?.loras), prompt };
   }
 

@@ -13,6 +13,9 @@ import {
   formatQwen21Loras,
   qwen21LoraLabel,
   applyQwen21LoraTriggers,
+  qwen21LorasFromEnv,
+  hasGrowthStyleLora,
+  GROWTH_STYLE_LORA,
 } from './qwen21-workflow';
 import { GROWTH_MEDIUM, getCampaignMood, getFlux2Backdrop, getFlux2StyleProse } from './style-config';
 
@@ -162,6 +165,28 @@ describe('community LoRA blend', () => {
     expect(parseQwen21Loras(' a.safetensors : 1 ')).toEqual([{ file: 'a.safetensors', strength: 1 }]);
     expect(parseQwen21Loras('a.safetensors:0,b.safetensors:2')).toHaveLength(2);
     expect(parseQwen21Loras('')).toEqual([]);
+  });
+
+  it('QWEN21_LORAS unset → the GROWTH style LoRA at 0.6 (Mike, 14 Oct); "none"/"" → []; a spec → that blend', () => {
+    const saved = process.env.QWEN21_LORAS;
+    try {
+      delete process.env.QWEN21_LORAS;
+      expect(qwen21LorasFromEnv()).toEqual([GROWTH_STYLE_LORA]);
+      expect(GROWTH_STYLE_LORA).toEqual({ file: 'grwthpaint_v1.safetensors', strength: 0.6, trigger: 'grwthpaint' });
+      process.env.QWEN21_LORAS = 'none';
+      expect(qwen21LorasFromEnv()).toEqual([]);
+      process.env.QWEN21_LORAS = '';
+      expect(qwen21LorasFromEnv()).toEqual([]);
+      process.env.QWEN21_LORAS = 'a.safetensors:1';
+      expect(qwen21LorasFromEnv()).toEqual([{ file: 'a.safetensors', strength: 1 }]);
+    } finally {
+      if (saved === undefined) delete process.env.QWEN21_LORAS; else process.env.QWEN21_LORAS = saved;
+    }
+    expect(hasGrowthStyleLora([GROWTH_STYLE_LORA])).toBe(true);
+    expect(hasGrowthStyleLora([{ file: 'grwthpaint_v1.safetensors', strength: 0.3 }])).toBe(true);
+    expect(hasGrowthStyleLora([{ file: 'a.safetensors', strength: 1, trigger: 'cine1p' }])).toBe(false);
+    expect(hasGrowthStyleLora([])).toBe(false);
+    expect(hasGrowthStyleLora(undefined)).toBe(false);
     expect(parseQwen21Loras(undefined)).toEqual([]);
     expect(qwen21LoraLabel([{ file: 'x.safetensors', strength: 1 }])).toBe('x 1');
   });

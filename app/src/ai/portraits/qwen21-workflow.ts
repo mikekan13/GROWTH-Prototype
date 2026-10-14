@@ -230,9 +230,29 @@ export function qwen21LoraLabel(loras: readonly Qwen21Lora[] | undefined): strin
   return (loras ?? []).map(l => `${l.trigger ?? l.file.replace(/\.safetensors$/i, '')} ${l.strength}`).join(' + ');
 }
 
-/** The env default (QWEN21_LORAS). Empty/unset → []. */
+/**
+ * THE GROWTH STYLE LoRA (grwthpaint v1, trained 13 Oct on the 130-image approved corpus).
+ * Mike (14 Oct, Violet seed-8 strength sheet): "we will sit at 60% lora with stripped prompt" — the
+ * medium paragraph comes OUT of the lock prompt when this LoRA is active (see buildQwen21LockPrompt
+ * callers); the trigger word carries the look. Lives on the volume at models/loras.
+ */
+export const GROWTH_STYLE_LORA_TRIGGER = 'grwthpaint';
+export const GROWTH_STYLE_LORA: Qwen21Lora = { file: 'grwthpaint_v1.safetensors', strength: 0.6, trigger: GROWTH_STYLE_LORA_TRIGGER };
+
+/** True when the blend carries the GROWTH style LoRA (any strength). */
+export function hasGrowthStyleLora(loras: readonly Qwen21Lora[] | undefined): boolean {
+  return (loras ?? []).some(l => l.trigger === GROWTH_STYLE_LORA_TRIGGER || l.file === GROWTH_STYLE_LORA.file);
+}
+
+/**
+ * The env default (QWEN21_LORAS). UNSET → [GROWTH_STYLE_LORA] (the 14 Oct baseline);
+ * set to "" / "none" → no LoRAs; any other value → that blend.
+ */
 export function qwen21LorasFromEnv(): Qwen21Lora[] {
-  return parseQwen21Loras(process.env.QWEN21_LORAS);
+  const env = process.env.QWEN21_LORAS;
+  if (env === undefined) return [GROWTH_STYLE_LORA];
+  if (env.trim().toLowerCase() === 'none') return [];
+  return parseQwen21Loras(env);
 }
 
 /** Prepend each LoRA trigger once, in order, as "<t1>, <t2>, <prompt>". Triggers already leading the prompt are not repeated. */
