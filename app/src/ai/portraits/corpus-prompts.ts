@@ -181,7 +181,9 @@ const SHOTS: Array<{ key: string; fn: ShotFn }> = [
   { key: 'swing', fn: (s, o, g) => `Action shot of ${s}, swinging ${g.weapon} in a wide arc${o}, weight thrown forward` },
   { key: 'cast', fn: (s, o) => `Action shot of ${s}, casting a spell${o}, both hands raised with a bright glow of light between the palms` },
   { key: 'seated', fn: (s, o) => `${cap(s)} seated on a wooden chair${o}, leaning forward with elbows on the knees` },
-  { key: 'lying', fn: (s, o) => `${cap(s)} lying on their back on the ground${o}, seen from directly above` },
+  // Mike (13 Oct): top-down in a tall frame never reads as lying down, and a ground-level side view is a weird angle;
+  // shoot it the way a person would: standing over them, looking down at an angle, landscape frame.
+  { key: 'lying', fn: (s, o) => `${cap(s)} lying flat on their back on the ground${o}, asleep with eyes closed and arms resting at the sides, photographed from standing height looking down at them at an angle, the body stretched out diagonally across the frame with the feet nearer the camera` },
 ];
 
 function cap(s: string): string {
@@ -337,7 +339,7 @@ export function buildCorpusPrompts(): CorpusPrompt[] {
       const shot = SHOTS[(i * 2 + j) % SHOTS.length];
       const g = genreAt(k);
       const text = `${shot.fn(person, `, wearing ${outfitAt(k)}`, g)}, ${settingAt(k)}`;
-      out.push(entry(`people-${pad(i + 1)}-${shot.key}`, 'people', g.key, text, CORPUS_PORTRAIT));
+      out.push(entry(`people-${pad(i + 1)}-${shot.key}`, 'people', g.key, text, shot.key === 'lying' ? CORPUS_LANDSCAPE : CORPUS_PORTRAIT));
     }
   });
 
@@ -348,7 +350,7 @@ export function buildCorpusPrompts(): CorpusPrompt[] {
       const shot = SHOTS[(i * 3 + j + 5) % SHOTS.length];
       const g = genreAt(k);
       const o = b.clothed ? `, wearing ${outfitAt(k)}` : '';
-      out.push(entry(`beings-${pad(i + 1)}-${b.key}-${shot.key}`, 'beings', g.key, `${shot.fn(b.text, o, g)}, ${settingAt(k)}`, CORPUS_PORTRAIT));
+      out.push(entry(`beings-${pad(i + 1)}-${b.key}-${shot.key}`, 'beings', g.key, `${shot.fn(b.text, o, g)}, ${settingAt(k)}`, shot.key === 'lying' ? CORPUS_LANDSCAPE : CORPUS_PORTRAIT));
     }
   });
 
