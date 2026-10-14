@@ -39,12 +39,14 @@ describe('buildCorpusPrompts', () => {
     for (const p of list) expect(p.prompt, p.id).toMatch(/\blit\b/);
   });
 
-  it('sizes: figures portrait, items square, scenes/groups/creatures landscape; all /16', () => {
+  it('sizes: figures portrait (lying = landscape), items square, scenes/groups/creatures landscape; all /16', () => {
     const size = (p: { width: number; height: number }) => ({ width: p.width, height: p.height });
     for (const p of list) {
       expect(p.width % 16, p.id).toBe(0);
       expect(p.height % 16, p.id).toBe(0);
-      if (p.group === 'people' || p.group === 'beings') expect(size(p)).toEqual(CORPUS_PORTRAIT);
+      // Mike (13 Oct): a lying figure is shot from standing height, body diagonal across a landscape frame.
+      if (p.id.endsWith('-lying')) expect(size(p), p.id).toEqual(CORPUS_LANDSCAPE);
+      else if (p.group === 'people' || p.group === 'beings') expect(size(p)).toEqual(CORPUS_PORTRAIT);
       else if (p.group === 'items') expect(size(p)).toEqual(CORPUS_SQUARE);
       else expect(size(p)).toEqual(CORPUS_LANDSCAPE);
     }
