@@ -4,6 +4,7 @@ import {
   deriveDesignerStatus, designerErrorLine, designerReducer, isClothingOrGear, layersDroppedBy,
   possessiveFor, restoreDesigner, withNothingElse, gateLine, readDesignerGate,
   editScope, markLayerKind, shapeCategoriesFor, markPlacesFor, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE,
+  partsFor, composeStub, isUnfinishedStub, layerKindFor,
   type DesignerLayer, type DesignerState,
 } from './appearance-designer';
 
@@ -69,6 +70,24 @@ describe('instruction composition', () => {
     expect(markPlacesFor('body')).toEqual(['Neck', 'Arms', 'Hands', 'Torso', 'Back', 'Legs']);
     expect(composeShapeText('Build', 'Heavy', '', 'her')).toBe('Change her build to heavy-set.');
     expect(composeShapeText('Build', null, 'heavier, thick through the middle', 'his')).toBe('Change his build: heavier, thick through the middle.');
+  });
+
+  it('one sentence box: part chips write a stub or a whole sentence; the tag follows the part', () => {
+    expect(partsFor('face')).toEqual(['Hair', 'Scar', 'Tattoo', 'Piercing', 'Makeup', 'Birthmark', 'Body mod']);
+    expect(partsFor('body')).toEqual(['Build', 'Scar', 'Tattoo', 'Piercing', 'Makeup', 'Birthmark', 'Body mod', 'Underwear']);
+    expect(composeStub('Scar', 'Face', 'her')).toBe('Add a scar to her face: ');
+    expect(composeStub('Makeup', 'Face', 'their')).toBe('Add makeup to their face: ');
+    expect(composeStub('Body mod', 'Neck', 'his')).toBe('Add a body modification to his neck: ');
+    expect(composeStub('Underwear', 'Torso', 'her')).toBe('Change her underwear: ');
+    expect(isUnfinishedStub('Add a scar to her face: ')).toBe(true);
+    expect(isUnfinishedStub('   ')).toBe(true);
+    expect(isUnfinishedStub('Add a scar to her face: through the brow')).toBe(false);
+    expect(layerKindFor('Add a scar to her face: through the brow', 'Scar')).toBe('scar');
+    expect(layerKindFor('Add a body modification to his neck: gauges', 'Body mod')).toBe('bodymod');
+    expect(layerKindFor('Change her hair to a short crop.', 'Hair')).toBe('hair');
+    expect(layerKindFor('A tattoo down the left forearm', 'Hair')).toBe('tattoo');
+    expect(layerKindFor('Heavier, broad through the shoulders', null)).toBe('build');
+    expect(layerKindFor('Something else entirely', null)).toBe('jewl');
   });
 
   it('edit scope (Mike 2026-10-15): hair, marks; body build + underwear; nothing else', () => {

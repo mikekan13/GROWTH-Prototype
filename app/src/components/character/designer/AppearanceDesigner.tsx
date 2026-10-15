@@ -3,9 +3,10 @@
 /**
  * AppearanceDesigner (ruling 2026-10-13, image-designer redesign) — the
  * Appearance section of the Tapestry entity view. One big preview; 1 Start
- * from (photos → LOCK IDENTITY, Qwen two-step lock → style); 2 Shape (chips +
- * presets + own words); 3 Tell JEWL (one-sentence in-place edits); the edit
- * stack; APPROVE AS BASE (Character.portrait + body render); levers hidden.
+ * from (photos → LOCK IDENTITY, Qwen two-step lock → style); 2 Shape (part
+ * chips write into one sentence box; EDIT sends it in place — Shape and Tell
+ * JEWL merged 2026-10-15); the edit stack; APPROVE AS BASE (Character.portrait
+ * + body render); seeds and levers hidden.
  *
  * The sheet owns the character's facts; the designer owns the image. The
  * stack persists in identity.designer (see lib/appearance-designer.ts).
@@ -25,7 +26,7 @@ const SCOPE_LINES: ReadonlySet<string> = new Set([CLOTHING_NOTE, RESTRICTED_NOTE
 const BODY_NOT_YET = 'The body is made when you approve the base. Approve the face first, then shape the body here.';
 import { Preview, type PreviewView } from './Preview';
 import { EditStack } from './EditStack';
-import { Shape, StartFrom, TellJewl } from './Sections';
+import { Shape, StartFrom } from './Sections';
 import { approveBase, editLayer, generateBody, loadIdentity, lockIdentity, persistDesigner } from './api';
 
 export interface AppearanceDesignerProps {
@@ -327,8 +328,7 @@ export default function AppearanceDesigner({
                   {locked && target === 'body' && !bodyPath && (
                     <Readout tone="note" testId="designer-body-not-yet">{BODY_NOT_YET}</Readout>
                   )}
-                  <Shape target={target} possessive={possessive} onApply={applyEdit} disabled={editDisabled} busy={busy === 'edit'} />
-                  <TellJewl target={target} onTell={text => applyEdit(text, 'jewl')} disabled={editDisabled} busy={busy === 'edit'} />
+                  <Shape key={target} target={target} possessive={possessive} onApply={applyEdit} disabled={editDisabled} busy={busy === 'edit'} />
                 </>
               )}
 

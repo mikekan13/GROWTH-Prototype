@@ -141,10 +141,59 @@ export function composeMarkText(kind: MarkKind, place: MarkPlace, description: s
   return sentence(`Add ${noun} to ${p} ${place.toLowerCase()}${desc ? `: ${desc}` : ''}`);
 }
 
-/** TELL JEWL: the user's sentence, tidied. */
+/** The typed sentence, tidied (the suffix is added later, never doubled). */
 export function composeTellText(text: string): string | null {
   const t = sentence(text.replace(/\s*change nothing else\.?\s*$/i, ''));
   return t || null;
+}
+
+/**
+ * One section, one sentence (Mike 2026-10-15: Shape and Tell JEWL were the
+ * same action twice). A part chip writes into the sentence box: a preset
+ * writes the whole sentence; a mark or an own-words part writes an open stub
+ * ("Add a scar to her face: ") for the user to finish. The box is what is sent.
+ */
+export type Part = 'Hair' | 'Build' | 'Underwear' | MarkKind;
+export const MARK_PART_SET: ReadonlySet<string> = new Set<MarkKind>(MARK_KINDS);
+export function isMarkPart(part: Part): part is MarkKind {
+  return MARK_PART_SET.has(part);
+}
+
+/** The part chips per tab, flat: FACE = hair + the marks; BODY = build + the marks + underwear. */
+export function partsFor(target: EditTarget): Part[] {
+  return target === 'body' ? ['Build', ...MARK_KINDS, 'Underwear'] : ['Hair', ...MARK_KINDS];
+}
+
+/** Open stub for a part (no full stop; the user finishes it). */
+export function composeStub(part: Part, place: MarkPlace, p: Possessive): string {
+  if (isMarkPart(part)) {
+    const noun = part === 'Body mod' ? 'a body modification' : part === 'Makeup' ? 'makeup' : `a ${part.toLowerCase()}`;
+    return `Add ${noun} to ${p} ${place.toLowerCase()}: `;
+  }
+  return `Change ${p} ${SHAPE_PART[part]}: `;
+}
+
+/** A stub left unfinished ("…: ") is nothing to send. */
+export function isUnfinishedStub(text: string): boolean {
+  return /:\s*$/.test(text.trim()) || !text.trim();
+}
+
+/** The stack tag for what the sentence is about, by the part named in it (else JEWL's). */
+export function layerKindFor(text: string, part: Part | null): LayerKind {
+  const t = text.toLowerCase();
+  if (part) {
+    const word = part === 'Body mod' ? 'body modification' : part.toLowerCase();
+    if (t.includes(word)) return isMarkPart(part) ? markLayerKind(part) : (part.toLowerCase() as LayerKind);
+  }
+  if (/\btattoo/.test(t)) return 'tattoo';
+  if (/\bscar/.test(t)) return 'scar';
+  if (/\bpierc/.test(t)) return 'piercing';
+  if (/\bmake-?up/.test(t)) return 'makeup';
+  if (/\bbirthmark/.test(t)) return 'birthmark';
+  if (/\bhair|\bbeard|\bbraid/.test(t)) return 'hair';
+  if (/\bbuild|\bheavier|\bthinner|\bmuscular/.test(t)) return 'build';
+  if (/\bunderwear/.test(t)) return 'underwear';
+  return 'jewl';
 }
 
 /** Quick tells per tab, all inside the allowed scope. */

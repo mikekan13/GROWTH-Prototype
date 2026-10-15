@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { C, F, ActionBar, Chip, GhostButton, Readout, SectionBar, TextInput } from './parts';
 import {
-  MARK_KINDS, QUICK_TELLS, SHAPE_PRESETS, SHAPE_WORDS_PLACEHOLDER,
-  composeMarkText, composeShapeText, composeTellText, markLayerKind, markPlacesFor, shapeCategoriesFor,
-  type EditTarget, type LayerKind, type MarkKind, type MarkPlace, type Possessive, type ShapeCategory,
+  QUICK_TELLS, SHAPE_PRESETS,
+  composeShapeText, composeStub, composeTellText, isMarkPart, isUnfinishedStub, layerKindFor, markPlacesFor, partsFor,
+  type EditTarget, type LayerKind, type MarkKind, type MarkPlace, type Part, type Possessive,
 } from '@/lib/appearance-designer';
 
 // ── 1 · START FROM ──────────────────────────────────────────────────────
@@ -84,157 +84,142 @@ export function StartFrom({
   );
 }
 
-// ── 2 · SHAPE ───────────────────────────────────────────────────────────
+// ── 2 · SHAPE (one section, one sentence) ───────────────────────────────
 
 const SHAPE_HINT: Record<EditTarget, string> = {
-  face: 'FACE · hair and marks · the face itself is the locked identity',
-  body: 'BODY · build, marks and the underwear design',
+  face: 'FACE · hair and marks · pick a part and finish the sentence, or just say it',
+  body: 'BODY · build, marks, underwear · pick a part and finish the sentence, or just say it',
 };
 
 /**
- * The parts follow the tab (Mike 2026-10-15): FACE = hair + marks on the
- * face/neck; BODY = build + marks anywhere + underwear. Switching tabs resets
- * the chips so nothing from the other tab lingers.
+ * Shape and Tell JEWL were the same action twice (Mike 2026-10-15), so this
+ * is the one place to change the image: the part chips write into ONE
+ * sentence box (a preset writes the whole sentence, a mark or own-words part
+ * an open stub to finish), the box can also just be typed in, and EDIT sends
+ * what the box says. The parts follow the tab: FACE = hair + marks on the
+ * face/neck; BODY = build + marks anywhere + underwear.
  */
 export function Shape({ target, possessive, onApply, disabled, busy }: {
   target: EditTarget;
   possessive: Possessive;
-  /** text = the visible sentence (no suffix). Returns true when it went through (clears inputs). */
+  /** text = the visible sentence (no suffix). Returns true when it went through (clears the box). */
   onApply: (text: string, kind: LayerKind) => Promise<boolean>;
   disabled: boolean;
   busy: boolean;
 }) {
-  const categories = shapeCategoriesFor(target);
+  const parts = partsFor(target);
   const places = markPlacesFor(target);
-  const [cat, setCat] = useState<ShapeCategory>(categories[0]);
-  const [preset, setPreset] = useState<string | null>(null);
-  const [words, setWords] = useState('');
-  const [mark, setMark] = useState<MarkKind>('Scar');
+  const [part, setPart] = useState<Part | null>(null);
   const [place, setPlace] = useState<MarkPlace>(places[0]);
+  const [say, setSay] = useState('');
+  // The container keys this section on the tab, so a switch remounts it clean.
 
-  useEffect(() => {
-    setCat(shapeCategoriesFor(target)[0]);
-    setPlace(markPlacesFor(target)[0]);
-    setPreset(null);
-    setWords('');
-  }, [target]);
+  const presets = part && !isMarkPart(part) ? SHAPE_PRESETS[part] : [];
+  const ready = !isUnfinishedStub(say);
 
-  const isMarks = cat === 'Marks';
-  const text = isMarks
-    ? composeMarkText(mark, place, words, possessive)
-    : composeShapeText(cat, preset, words, possessive);
-  const kind: LayerKind = isMarks ? markLayerKind(mark) : (cat.toLowerCase() as LayerKind);
-
-  const apply = async () => {
-    if (!text) return;
-    const ok = await onApply(text, kind);
-    if (ok) { setWords(''); setPreset(null); }
+  const pickPart = (p: Part) => {
+    if (part === p) { setPart(null); setSay(''); return; }
+    setPart(p);
+    setSay(composeStub(p, place, possessive));
   };
+  /** A new place keeps whatever was typed after the old stub. */
+  const pickPlace = (pl: MarkPlace) => {
+    setPlace(pl);
+    if (!part || !isMarkPart(part)) return;
+    const prev = composeStub(part, place, possessive);
+    const tail = say.startsWith(prev) ? say.slice(prev.length) : '';
+    setSay(composeStub(part, pl, possessive) + tail);
+  };
+  const pickPreset = (label: string) => {
+    if (!part || isMarkPart(part)) return;
+    setSay(composeShapeText(part, label, '', possessive) ?? '');
+  };
+
+  const send = async (raw: string) => {
+    const t = composeTellText(raw);
+    if (!t || isUnfinishedStub(raw)) return;
+    setSay(raw);
+    const ok = await onApply(t, layerKindFor(t, part));
+    if (ok) { setSay(''); setPart(null); }
+  };
+
+  const stubPlaceholder = target === 'body'
+    ? 'What should change on the body? e.g. a tattoo down the left forearm'
+    : 'What should change on the face? e.g. a thin pale scar through the left eyebrow';
 
   return (
     <section className="space-y-2" data-testid="designer-shape" data-target={target} style={{ opacity: disabled ? 0.55 : 1 }}>
       <SectionBar n={2} title="Shape" hint={SHAPE_HINT[target]} />
       <div className="flex flex-wrap gap-1">
-        {categories.map(c => (
-          <Chip key={c} label={c.toUpperCase()} on={cat === c} onClick={() => { setCat(c); setPreset(null); setWords(''); }} disabled={disabled} testId={`designer-cat-${c.toLowerCase()}`} />
+        {parts.map(p => (
+          <Chip
+            key={p}
+            label={p.toUpperCase()}
+            tone={isMarkPart(p) ? 'spirit' : 'ink'}
+            on={part === p}
+            onClick={() => pickPart(p)}
+            disabled={disabled}
+            testId={`designer-part-${p.toLowerCase().replace(/\s+/g, '-')}`}
+          />
         ))}
       </div>
 
-      {isMarks ? (
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-1">
-            {MARK_KINDS.map(m => (
-              <Chip key={m} label={m} tone="spirit" on={mark === m} onClick={() => setMark(m)} disabled={disabled} testId={`designer-mark-${m.toLowerCase().replace(/\s+/g, '-')}`} />
-            ))}
-          </div>
+      {part && isMarkPart(part) && (
+        <div className="space-y-1">
           <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>WHERE</div>
           <div className="flex flex-wrap gap-1">
             {places.map(p => (
-              <Chip key={p} label={p} on={place === p} onClick={() => setPlace(p)} disabled={disabled} testId={`designer-place-${p.toLowerCase()}`} />
+              <Chip key={p} label={p} on={place === p} onClick={() => pickPlace(p)} disabled={disabled} testId={`designer-place-${p.toLowerCase()}`} />
             ))}
           </div>
-          <TextInput
-            value={words}
-            onChange={setWords}
-            placeholder={mark === 'Body mod' ? 'Describe it: stretched ear gauges, a brand on the shoulder…' : 'Describe it: a thin pale scar through the left eyebrow'}
-            testId="designer-mark-words"
-            disabled={disabled}
-            onEnter={apply}
-          />
-          {/* The Qwen provider refuses object-reference edits today, so the design
-              photo is parked behind a disabled tile rather than silently ignored. */}
-          <div
-            className="flex items-center gap-2 px-2"
-            aria-disabled="true"
-            data-testid="designer-mark-ref-soon"
-            style={{ minHeight: 44, border: `1px dashed rgba(20,20,19,0.4)`, color: 'rgba(20,20,19,0.55)', fontFamily: F.mono, fontSize: 11 }}
-          >
-            <span style={{ fontSize: 18 }}>+</span>
-            <span>reference photo of the {mark.toLowerCase()} (soon) · the design is copied, the skin stays theirs</span>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {SHAPE_PRESETS[cat].length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {SHAPE_PRESETS[cat].map(p => (
-                <Chip key={p.label} label={p.label} on={preset === p.label} onClick={() => setPreset(preset === p.label ? null : p.label)} disabled={disabled} testId={`designer-preset-${p.label}`} />
-              ))}
-            </div>
-          )}
-          <TextInput value={words} onChange={setWords} placeholder={SHAPE_WORDS_PLACEHOLDER[cat]} testId="designer-shape-words" disabled={disabled} onEnter={apply} />
         </div>
       )}
-      {text && !disabled && (
-        <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }} data-testid="designer-shape-sentence">&gt; {text}</div>
+      {presets.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {presets.map(p => (
+            <Chip key={p.label} label={p.label} on={say === composeShapeText(part as Exclude<Part, MarkKind>, p.label, '', possessive)} onClick={() => pickPreset(p.label)} disabled={disabled} testId={`designer-preset-${p.label}`} />
+          ))}
+        </div>
       )}
-      <ActionBar label="APPLY" onClick={apply} disabled={disabled || !text} busy={busy} testId="designer-apply" />
-    </section>
-  );
-}
 
-// ── 3 · TELL JEWL ───────────────────────────────────────────────────────
-
-export function TellJewl({ target, onTell, disabled, busy }: {
-  target: EditTarget;
-  onTell: (text: string) => Promise<boolean>;
-  disabled: boolean;
-  busy: boolean;
-}) {
-  const [say, setSay] = useState('');
-  const send = async (raw: string) => {
-    const t = composeTellText(raw);
-    if (!t) return;
-    setSay(raw);
-    const ok = await onTell(t);
-    if (ok) setSay('');
-  };
-  return (
-    <section className="space-y-2" data-testid="designer-tell" data-target={target} style={{ opacity: disabled ? 0.55 : 1 }}>
-      <SectionBar n={3} title="Tell JEWL" hint={`${target.toUpperCase()} · say what to change; it edits in place`} />
       <div className="flex gap-1">
         <div className="flex-1 min-w-0">
-          <TextInput value={say} onChange={setSay} placeholder={`One sentence: what should change on the ${target}?`} testId="designer-tell-input" disabled={disabled} onEnter={() => send(say)} />
+          <TextInput value={say} onChange={setSay} placeholder={stubPlaceholder} testId="designer-say" disabled={disabled} onEnter={() => send(say)} />
         </div>
         <button
           type="button"
           onClick={() => send(say)}
-          disabled={disabled || busy || !say.trim()}
-          data-testid="designer-tell-edit"
+          disabled={disabled || busy || !ready}
+          data-testid="designer-apply"
           className="gd-btn shrink-0 px-4"
           style={{
-            minHeight: 44, minWidth: 64, background: disabled || !say.trim() ? '#5b6470' : C.spirit, color: '#fff', border: 'none',
-            fontFamily: F.bebas, fontSize: 18, letterSpacing: '0.12em', cursor: disabled || busy || !say.trim() ? 'default' : 'pointer',
+            minHeight: 44, minWidth: 72, background: disabled || !ready ? '#5b6470' : C.spirit, color: '#fff', border: 'none',
+            fontFamily: F.bebas, fontSize: 18, letterSpacing: '0.12em', cursor: disabled || busy || !ready ? 'default' : 'pointer',
           }}
         >
           {busy ? '…' : 'EDIT'}
         </button>
       </div>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap items-center gap-1">
+        <span style={{ fontFamily: F.mono, fontSize: 11, color: C.soul, marginRight: 4 }}>try:</span>
         {QUICK_TELLS[target].map(q => (
           <Chip key={q} label={q} tone="spirit" onClick={() => send(q)} disabled={disabled || busy} testId={`designer-quick-${q}`} />
         ))}
       </div>
+
+      {part && isMarkPart(part) && (
+        /* The Qwen provider refuses object-reference edits today, so the design
+           photo is parked behind a disabled tile rather than silently ignored. */
+        <div
+          className="flex items-center gap-2 px-2"
+          aria-disabled="true"
+          data-testid="designer-mark-ref-soon"
+          style={{ minHeight: 44, border: `1px dashed rgba(20,20,19,0.4)`, color: 'rgba(20,20,19,0.55)', fontFamily: F.mono, fontSize: 11 }}
+        >
+          <span style={{ fontSize: 18 }}>+</span>
+          <span>reference photo of the {part.toLowerCase()} (soon) · the design is copied, the skin stays theirs</span>
+        </div>
+      )}
     </section>
   );
 }
