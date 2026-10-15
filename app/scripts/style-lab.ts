@@ -72,7 +72,8 @@ async function main() {
   const inkLoraB = arg('ink-lora-b') !== undefined ? Number(arg('ink-lora-b')) : undefined;
   const inkLight = arg('ink-light'); // hex for a LIGHT pen (lit side of edges), e.g. ffcc78 GROWTH gold; --ink-auto switches by scene brightness
   const inkAuto = process.argv.includes('--ink-auto');
-  const inkParams = { ...FINISH.ink, amount: inkAmount, threshold: inkThreshold, width: inkWidth, ...(inkColor ? { color: inkColor } : {}), ...(inkLight ? { lightColor: inkLight, auto: inkAuto } : {}) };
+  // --ink-light without --ink-auto forces that pen (as `color`); with --ink-auto it is the bright-scene pen. No flags = FINISH defaults (auto gold).
+  const inkParams = { ...FINISH.ink, amount: inkAmount, threshold: inkThreshold, width: inkWidth, ...(inkColor ? { color: inkColor } : {}), ...(inkLight ? (inkAuto ? { lightColor: inkLight, auto: true } : { color: inkLight, auto: false }) : {}) };
   if (inkMid.length) console.log(`ink-mid: ${inkMid.join(', ')} — amount ${inkAmount}, threshold ${inkThreshold}, width ${inkWidth}, color ${inkColor ?? 'default'}`);
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
   const { checkBaseLock } = await import('../src/ai/portraits/lock-gate');

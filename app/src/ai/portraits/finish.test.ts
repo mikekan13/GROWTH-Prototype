@@ -55,6 +55,48 @@ describe('finishImage', () => {
   });
 });
 
+describe('inkImage — pen choice (Mike 14 Oct: gold on bright scenes, dark pen on dark ones)', () => {
+  /** A 200×200 field with a sharp-edged square in the middle; `bg`/`fg` set the scene's brightness. */
+  const scene = async (bg: number, fg: number) => sharp({ create: { width: 200, height: 200, channels: 3, background: { r: bg, g: bg, b: bg } } })
+    .composite([{ input: await sharp({ create: { width: 80, height: 80, channels: 3, background: { r: fg, g: fg, b: fg } } }).png().toBuffer(), left: 60, top: 60 }])
+    .png().toBuffer();
+  const px = async (buf: Buffer, x: number, y: number) => {
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
+    const i = (y * info.width + x) * info.channels;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+
+  it('hex parsing', () => {
+    expect(inkColorRgb('ffcc78').map(v => Math.round(v * 255))).toEqual([255, 204, 120]);
+    expect(inkColorRgb('#582A72').map(v => Math.round(v * 255))).toEqual([88, 42, 114]);
+    expect(inkColorRgb('nope')).toEqual(inkColorRgb(undefined));
+  });
+
+  // The pen is ~1 px wide at this 200-px test size (line widths scale with image width), so sample 1 px off the edge.
+  it('bright scene + auto → the GOLD pen on the lit side of the edge; dark scene → the dark pen on the dark side', async () => {
+    // Bright: light field (180 — below the "already bright" cut-off) with a dark-grey square (90). Lit side = the field by the edge.
+    const bright = await inkImage(await scene(180, 90), FINISH.ink);
+    const litSide = await px(bright, 59, 100); // 1 px outside the square's left edge
+    const darkSide = await px(bright, 61, 100); // 1 px inside
+    expect(litSide[0]).toBeGreaterThan(litSide[2] + 20); // warm (gold) tint on the lit side: R well above B
+    expect(darkSide[0] - darkSide[2]).toBeLessThan(12); // the dark side stays neutral
+    // Dark: dark field (40) with a lighter square (120): the dark pen darkens the dark side (the field by the edge).
+    const dark = await inkImage(await scene(40, 120), FINISH.ink);
+    const edgeDark = await px(dark, 59, 100);
+    expect(edgeDark[0]).toBeLessThanOrEqual(40);
+    expect(Math.abs(edgeDark[0] - edgeDark[2])).toBeLessThan(8); // neutral, not gold
+  });
+
+  it('auto off → ink.color always: the dark pen even on a bright scene; a light hex as `color` → light pen on a dark scene', async () => {
+    const forcedDark = await inkImage(await scene(180, 90), { ...FINISH.ink, auto: false });
+    const a = await px(forcedDark, 59, 100);
+    expect(a[0] - a[2]).toBeLessThan(12);
+    const forcedLight = await inkImage(await scene(40, 120), { ...FINISH.ink, auto: false, color: 'ffcc78' });
+    const b = await px(forcedLight, 60, 100); // lit side of a dark scene = the first pixel inside the lighter square
+    expect(b[0]).toBeGreaterThan(b[2] + 20);
+  });
+});
+
 describe('finishImage — ink pass', () => {
   const W = 64, H = 32, EDGE = 32; // x < EDGE dark grey, x >= EDGE light grey
   const plain = { ...FINISH, grain: { amount: 0 }, vignette: { strength: 0, inner: 1 } };
@@ -78,7 +120,8 @@ describe('finishImage — ink pass', () => {
   });
 
   it('a hard vertical edge gets darker along its column and nowhere else', async () => {
-    const on = await pixels(await finishImage(edgeImg, 1, plain, {}));
+    // The DARK pen (auto would pick the gold pen on this bright test image and lighten the lit side instead).
+    const on = await pixels(await finishImage(edgeImg, 1, { ...plain, ink: { ...plain.ink, auto: false } }, {}));
     const off = await pixels(await finishImage(edgeImg, 1, noInk, {}));
     const y = H / 2;
     // Some column at the edge is clearly darker with the ink.

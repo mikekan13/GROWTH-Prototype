@@ -68,7 +68,9 @@ export const FINISH: FinishParams = {
   },
   grain: { amount: 0.008 }, // rev 2: a third of the original — it read as dust
   vignette: { strength: 0.22, inner: 0.45 },
-  ink: { amount: 0.55, width: 1.5, threshold: 0.06, teal: 0.2 },
+  // Mike (14 Oct): "I like the gold" — bright scenes get GROWTH gold on the lit side of edges, dark scenes the dark pen.
+  // (measured midpoints: Violet lock 0.26 → dark; noon market 0.47, snow fox 0.55 → gold; threshold sits below the market)
+  ink: { amount: 0.55, width: 1.5, threshold: 0.06, teal: 0.2, lightColor: 'ffcc78', auto: true, autoThreshold: 0.42 },
   token: { ring: '#22ab94', ringWidth: 2 }, // Terminal teal
 };
 
@@ -188,9 +190,10 @@ function applyInk(
   for (let i = 0; i < n; i++) { lum[i] = 0.2126 * r[i] + 0.7152 * g[i] + 0.0722 * b[i]; meanLum += lum[i]; }
   meanLum /= n;
   // PEN CHOICE (Mike, 14 Oct: "switch the lines to actually be bright" in bright scenes): `ink.lightColor` is a second,
-  // light pen; `ink.auto` picks it when the image's mean luminance passes `ink.autoThreshold` (default 0.45). A pen
-  // lighter than mid-grey is drawn on the LIT side of edges (see the mask below), a dark pen on the dark side.
-  const useLight = !!ink.lightColor && (ink.auto ? meanLum >= (ink.autoThreshold ?? 0.45) : !ink.color);
+  // light pen that `ink.auto` picks when the image's mean luminance passes `ink.autoThreshold` (default 0.42);
+  // auto off → `ink.color` always (set it to a light hex to force a light pen). Any pen lighter than mid-grey is
+  // drawn on the LIT side of edges (see the mask below), a dark pen on the dark side.
+  const useLight = !!ink.auto && !!ink.lightColor && meanLum >= (ink.autoThreshold ?? 0.42);
   const pen = useLight ? inkColorRgb(ink.lightColor) : inkColorRgb(ink.color);
   const lightPen = 0.2126 * pen[0] + 0.7152 * pen[1] + 0.0722 * pen[2] > 0.5;
   const s1 = Math.max(0.5, 0.7 * ink.width * scale);
@@ -210,9 +213,11 @@ function applyInk(
     m *= 1 - midBand * (1 - smoothstep(t, t * 3, ce));
     if (lightPen) {
       // LIGHT PEN (bright scenes): the line sits on the LIT side of the edge, like a bright gouache line over a
-      // bright ground; already-bright marks (specular, sky) are not pushed further.
+      // bright ground; already-bright marks (specular, sky) are not pushed further. A bright midpoint image is full
+      // of faint fine-scale noise, so the light pen demands a REAL coarse edge (no stipple on sky and walls).
       m *= smoothstep(0, t * 0.2, b1[i] - b2[i]);
       m *= 1 - smoothstep(0.78, 0.95, b1[i]);
+      m *= smoothstep(t * 1.5, t * 3.5, ce);
     } else {
       // The pen sits on the DARK side of the edge: a thin line, not a halo band.
       m *= smoothstep(0, t * 0.2, b2[i] - b1[i]);
