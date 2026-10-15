@@ -147,6 +147,36 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
   beforeEach(() => { process.env.QWEN21_LORAS = 'none'; process.env.QWEN21_LOCK_POSE_REF = 'off'; });
   afterEach(() => { delete process.env.QWEN21_LORAS; delete process.env.QWEN21_LOCK_POSE_REF; });
 
+  it('stored uploads go through the photo preparer: the .prep.jpg sibling is sent when it exists; off → original', async () => {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const dir = path.join(process.cwd(), 'public', 'uploads', 'references', '_vitest-prep');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'a.jpg'), png);
+    await fs.writeFile(path.join(dir, 'a.prep.jpg'), png);
+    await fs.writeFile(path.join(dir, 'b.jpg'), png); // no sibling → would prepare on the fly; stubbed below
+    try {
+      delete process.env.QWEN21_PHOTO_PREP; delete process.env.QWEN21_STYLE_MODE;
+      const p = patch(new TestQwen());
+      await p.generatePortrait(input({ refs: ['/uploads/references/_vitest-prep/a.jpg'] }));
+      expect(p.queued[0].LOAD_REF1.inputs.image).toBe('ref:/uploads/references/_vitest-prep/a.prep.jpg');
+
+      process.env.QWEN21_PHOTO_PREP = 'off';
+      const q = patch(new TestQwen());
+      await q.generatePortrait(input({ refs: ['/uploads/references/_vitest-prep/a.jpg'] }));
+      expect(q.queued[0].LOAD_REF1.inputs.image).toBe('ref:/uploads/references/_vitest-prep/a.jpg');
+      delete process.env.QWEN21_PHOTO_PREP;
+
+      // Not an upload path → never touched.
+      const r = patch(new TestQwen());
+      await r.generatePortrait(input({ refs: ['/portraits/c/faces/x.png'] }));
+      expect(r.queued[0].LOAD_REF1.inputs.image).toBe('ref:/portraits/c/faces/x.png');
+    } finally {
+      process.env.QWEN21_PHOTO_PREP = 'off';
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('QWEN21_LOCK_POSE_REF=off → photos only, no skeleton clause', async () => {
     delete process.env.QWEN21_STYLE_MODE;
     const p = patch(new TestQwen());

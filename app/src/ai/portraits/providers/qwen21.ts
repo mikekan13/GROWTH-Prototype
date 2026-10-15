@@ -55,6 +55,7 @@ import { compositeEditWithMask } from '../mask-composite';
 import { finishEnabled, finishImage, rawSiblingPath } from '../finish';
 import { resolveMoodKey } from '../style-config';
 import { checkBaseLock, lockGateEnabled, type LockGateMeta, type LockGateVerdict } from '../lock-gate';
+import { photoPrepEnabled, prepSiblingPath } from '../photo-prep';
 
 /** Re-rolls after a failed base-lock gate (seed S → S+1 → S+2). */
 export const LOCK_GATE_MAX_RETRIES = 2;
@@ -194,7 +195,9 @@ export class Qwen21Provider extends ServerlessProvider {
     const names: string[] = [];
     for (let i = 0; i < used.length; i++) {
       const p = used[i];
-      names.push(Buffer.isBuffer(p) ? await this.uploadImage(p, `qwen21-photo-${i + 1}`) : await this.uploadReferenceImage(p));
+      // Stored uploads go through the PHOTO PREPARER (face-tight passport crop, photo-prep.ts) — the `.prep.jpg`
+      // sibling written at upload, or prepared now for older uploads. Buffers (lab) are the caller's business.
+      names.push(Buffer.isBuffer(p) ? await this.uploadImage(p, `qwen21-photo-${i + 1}`) : await this.uploadReferenceImage(await this.preferPrepared(p)));
     }
     if (frameRef) {
       names.push(Buffer.isBuffer(frameRef) ? await this.uploadImage(frameRef, 'qwen21-lock-pose') : await this.uploadReferenceImage(frameRef));
@@ -457,6 +460,26 @@ export class Qwen21Provider extends ServerlessProvider {
   }
 
   /** A stored portrait's raw/ copy when it exists (so chained steps never finish twice). */
+  /**
+   * A stored reference photo's PREPARED sibling (`<stem>.prep.jpg`, the face-tight passport crop) when it exists;
+   * for older uploads without one, prepare it now and write the sibling (one vision call, then cached on disk).
+   * QWEN21_PHOTO_PREP=off, a non-upload path, or any failure → the original. Overridable for tests.
+   */
+  protected async preferPrepared(webPath: string): Promise<string> {
+    if (!photoPrepEnabled() || !webPath.startsWith('/uploads/references/')) return webPath;
+    const prepWeb = prepSiblingPath(webPath);
+    try { await fs.access(this.publicAbs(prepWeb)); return prepWeb; } catch { /* not prepared yet */ }
+    try {
+      const { prepareStoredReference } = await import('@/services/reference-photo');
+      const prep = await prepareStoredReference(webPath);
+      if (prep.cropped && prep.path) { console.log(`[Qwen21] prepared reference on the fly: ${webPath}`); return prep.path; }
+      console.log(`[Qwen21] reference used unprepared (${prep.check.unavailable ?? prep.check.warnings.join('; ') ?? 'no face'}): ${webPath}`);
+    } catch (e) {
+      console.warn(`[Qwen21] photo prep failed for ${webPath}: ${(e as Error).message}`);
+    }
+    return webPath;
+  }
+
   private async preferRaw(webPath: string): Promise<string> {
     if (!isStoredPortraitPath(webPath)) return webPath;
     let rawWeb: string;

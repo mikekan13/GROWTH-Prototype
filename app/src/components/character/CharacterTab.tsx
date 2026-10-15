@@ -165,6 +165,8 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
   const [seedWarning, setSeedWarning] = useState<string | null>(null);
   const [seedSaving, setSeedSaving] = useState(false);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
+  /** Photo preparer notes per just-uploaded reference path (warnings from the face check). */
+  const [photoNotes, setPhotoNotes] = useState<Record<string, string[]>>({});
   const [uploading, setUploading] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [describeError, setDescribeError] = useState<string | null>(null);
@@ -586,9 +588,12 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
         alert(`Upload failed (HTTP ${res.status})\n${parsed?.error || bodyText.slice(0, 400)}`);
         return;
       }
-      const { path: photoPath } = JSON.parse(bodyText) as { path: string };
-      console.log('[refUpload] stored at', photoPath);
+      const { path: photoPath, prep } = JSON.parse(bodyText) as { path: string; prep?: { cropped: boolean; check: { warnings: string[]; unavailable?: string } } };
+      console.log('[refUpload] stored at', photoPath, prep ? `(prep: ${prep.cropped ? 'cropped' : 'unchanged'})` : '');
       setReferencePhotos(prev => [...prev, photoPath]);
+      // The photo preparer's check (face found? turned? covered? blurry?) — shown under the thumbnail.
+      const notes = prep ? [...prep.check.warnings, ...(prep.check.unavailable && !prep.cropped ? [`not prepared: ${prep.check.unavailable}`] : [])] : [];
+      if (notes.length) setPhotoNotes(prev => ({ ...prev, [photoPath]: notes }));
       setDirty(true);
     } catch (err) {
       console.error('[refUpload] network/client error', err);
@@ -1180,6 +1185,12 @@ export default function CharacterTab({ campaignId, isGM, userCharacter, canEdit,
                     fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '8px',
                   }}>PRIMARY</div>
                 )}
+                {photoNotes[photo]?.length ? (
+                  <div title={photoNotes[photo].join('\n')} className="absolute bottom-1 left-1 right-1 px-1 py-0.5 truncate" style={{
+                    backgroundColor: 'rgba(0,0,0,0.75)', color: '#ffcc78', borderRadius: '2px',
+                    fontFamily: 'var(--font-terminal), Consolas, monospace', fontSize: '8px',
+                  }}>⚠ {photoNotes[photo][0]}</div>
+                ) : null}
                 {isEditable && (
                   <button
                     onClick={() => handleRemovePhoto(photo)}

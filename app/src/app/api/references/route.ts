@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api';
-import fs from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import sharp from 'sharp';
+import { REFERENCE_UPLOAD_DIR, deleteReferencePhoto, storeReferencePhoto } from '@/services/reference-photo';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB raw upload limit (we resize)
-const MAX_STORED_DIMENSION = 2048; // Resize to max 2048px on longest side
-const UPLOAD_DIR = 'uploads/references';
+const UPLOAD_DIR = REFERENCE_UPLOAD_DIR;
 
 /**
  * POST /api/references
- * Upload a reference photo for character identity.
+ * Upload a reference photo for character identity. Stores the normalised original and (services/reference-photo)
+ * PREPARES it: a face-tight passport crop beside it for the base lock, plus a quality check returned as `prep`.
  * Body: multipart/form-data with 'file' field
  */
 export async function POST(request: NextRequest) {
@@ -34,31 +31,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File must be under 50MB' }, { status: 400 });
     }
 
-    // Create user-specific directory
-    const userDir = path.join('public', UPLOAD_DIR, session.user.id);
-    await fs.mkdir(userDir, { recursive: true });
-
-    // Resize and convert to JPEG for consistency and size
-    const rawBuffer = Buffer.from(await file.arrayBuffer());
-    const buffer = Buffer.from(await sharp(rawBuffer)
-      .resize(MAX_STORED_DIMENSION, MAX_STORED_DIMENSION, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 90 })
-      .toBuffer());
-
-    const filename = `${crypto.randomUUID()}.jpg`;
-    const filePath = path.join(userDir, filename);
-
-    await fs.writeFile(filePath, buffer);
-
-    // Return the public URL path
-    const publicPath = `/${UPLOAD_DIR}/${session.user.id}/${filename}`;
-
-    return NextResponse.json({
-      path: publicPath,
-      filename,
-      size: buffer.length,
-      type: 'image/jpeg',
-    });
+    const stored = await storeReferencePhoto(session.user.id, Buffer.from(await file.arrayBuffer()));
+    return NextResponse.json(stored);
   } catch (error) {
     return errorResponse(error);
   }
@@ -83,8 +57,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const fullPath = path.join('public', refPath.slice(1)); // remove leading /
-    await fs.unlink(fullPath).catch(() => {}); // silent if already gone
+    await deleteReferencePhoto(refPath); // original + prepared siblings; silent if already gone
 
     return NextResponse.json({ deleted: true });
   } catch (error) {

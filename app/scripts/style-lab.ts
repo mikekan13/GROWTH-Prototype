@@ -14,6 +14,7 @@
  *   --mood KEY|GENRE     mood key or free-text genre (default growth)
  *   --photos DIR         identity photos (jpg/png/webp, first 16); default = Violet's two
  *   --frame-ref PATH     pose skeleton fed as the last image (default: the shipped lock-pose-grey.png); --no-frame-ref = none
+ *   --prep               run the photo preparer (vision check + face-tight passport crop) on the photos first, like the live lock
  *   --out DIR            default <repo>/style-refs/lab/<timestamp>-<mood>/
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
@@ -86,7 +87,10 @@ async function main() {
     ? (await fs.readdir(path.resolve(photosDir))).filter(f => IMAGE_EXT.test(f)).sort().slice(0, 16).map(f => path.join(path.resolve(photosDir), f))
     : VIOLET_PHOTOS.map(p => path.resolve(p));
   if (photoPaths.length === 0) throw new Error(`no photos in ${photosDir}`);
-  const photos = await Promise.all(photoPaths.map(p => fs.readFile(p)));
+  let photos: Buffer[] = await Promise.all(photoPaths.map(p => fs.readFile(p)));
+  // --prep: run the PHOTO PREPARER (photo-prep.ts: vision check + face-tight passport crop) on each photo first, the
+  // way the live lock does for stored uploads; the crops and checks are saved under <out>/prep/ for inspection.
+  const prep = process.argv.includes('--prep');
   // --frame-ref PATH: a pose skeleton (OpenPose keypoint map) fed as the LAST image; default = the shipped
   // src/ai/portraits/refs/lock-pose-grey.png (same as the live lock); --no-frame-ref = none.
   const frameRefPath = arg('frame-ref');
@@ -96,6 +100,21 @@ async function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const outDir = path.resolve(arg('out') ?? path.join('..', 'style-refs', 'lab', `${stamp}-${mood.replace(/\s+/g, '-')}`));
   await fs.mkdir(path.join(outDir, 'raw'), { recursive: true });
+  if (prep) {
+    const { preparePhoto } = await import('../src/ai/portraits/photo-prep');
+    await fs.mkdir(path.join(outDir, 'prep'), { recursive: true });
+    const prepared: Buffer[] = [];
+    for (let i = 0; i < photos.length; i++) {
+      const t0 = Date.now();
+      const r = await preparePhoto(photos[i], { meter: false });
+      const tag = `photo-${i + 1}`;
+      await fs.writeFile(path.join(outDir, 'prep', `${tag}.json`), JSON.stringify({ source: photoPaths[i], cropped: r.cropped, rect: r.rect ?? null, check: r.check }, null, 2));
+      if (r.cropped && r.image) await fs.writeFile(path.join(outDir, 'prep', `${tag}.prep.jpg`), r.image);
+      console.log(`  prep ${tag}: ${r.cropped ? 'cropped' : 'UNCHANGED'} (${((Date.now() - t0) / 1000).toFixed(1)}s)${r.check.warnings.length ? ` — ${r.check.warnings.join('; ')}` : ''}${r.check.unavailable ? ` — ${r.check.unavailable}` : ''}`);
+      prepared.push(r.cropped && r.image ? r.image : photos[i]);
+    }
+    photos = prepared;
+  }
   if (moodArg.toLowerCase() !== mood) console.log(`mood "${moodArg}" → ${mood}`);
   console.log(`style lab: ${n} seed(s) from ${seedStart}, mood=${mood}, finish=${noFinish ? 'off' : 'on'}, loras=${loraSpec || 'none'}, ${photos.length} photo(s) → ${outDir}`);
 
