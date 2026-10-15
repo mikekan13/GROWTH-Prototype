@@ -246,6 +246,27 @@ export class Qwen21Provider extends ServerlessProvider {
   }
 
   /**
+   * V1 GROWTH STYLE, text-to-image (Mike, 14 Oct: "Calling this v1 growth style… generating 7 diverse images… the first
+   * 7 into our running training data"): no photos, no skeleton — a described subject on an explicit canvas, the style
+   * LoRA at its default strength and the same MID-GENERATION INK as the lock (stop at inkAt, ink the clean midpoint,
+   * resume). Nothing is saved; the caller owns the files (scripts/style-v1-set.ts).
+   */
+  async renderStyled(
+    prompt: string,
+    seed: number,
+    size: { width: number; height: number },
+    opts?: { inkAt?: number; loras?: Qwen21Lora[] },
+  ): Promise<{ raw: Buffer; soft?: Buffer; inked?: Buffer; inkAt: number }> {
+    const inkAt = opts?.inkAt ?? qwen21LockInkAtFromEnv();
+    if (!(inkAt > 0)) return { raw: await this.runWorkflow(prompt, [], seed, size, opts?.loras), inkAt: 0 };
+    const soft = await this.runWorkflow(prompt, [], seed, size, opts?.loras, { stopAt: inkAt });
+    const inked = await inkImage(soft);
+    const name = await this.uploadImage(inked, 'qwen21-ink-mid');
+    const raw = await this.runWorkflow(prompt, [], seed, size, opts?.loras, { resumeFrom: { image: name, at: inkAt } });
+    return { raw, soft, inked, inkAt };
+  }
+
+  /**
    * Step 1 — identity lock from reference photos (web paths under public/).
    *
    * BASE-LOCK GATE (single/painted mode): each render is judged on the LOCAL vision
