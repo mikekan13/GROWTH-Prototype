@@ -244,11 +244,12 @@ export function buildQwen21PolishPrompt(mood?: string): string {
 
 /**
  * How far through the generation the polish resumes (fraction of steps kept from the image; the rest is re-run).
- * Violet lab, 15 Oct: 0.7 left a faint remnant of a composite patch, 0.55 cleaned it fully with identity intact → 0.6.
+ * Violet lab, 15 Oct: 0.7 and 0.6 left a faint remnant of a composite patch on the wall, 0.55 cleaned it fully with
+ * identity and marks intact → 0.55.
  */
 export function qwen21PolishAtFromEnv(): number {
   const n = Number(process.env.QWEN21_POLISH_AT);
-  return Number.isFinite(n) && n > 0.2 && n < 0.95 ? n : 0.6;
+  return Number.isFinite(n) && n > 0.2 && n < 0.95 ? n : 0.55;
 }
 
 // ============================================================
