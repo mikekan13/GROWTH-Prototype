@@ -167,12 +167,12 @@ describe('community LoRA blend', () => {
     expect(parseQwen21Loras('')).toEqual([]);
   });
 
-  it('QWEN21_LORAS unset → the GROWTH style LoRA at 0.7 (Mike, 14 Oct); "none"/"" → []; a spec → that blend', () => {
+  it('QWEN21_LORAS unset → the GROWTH style LoRA at 0.65 (Mike, 14 Oct); "none"/"" → []; a spec → that blend', () => {
     const saved = process.env.QWEN21_LORAS;
     try {
       delete process.env.QWEN21_LORAS;
       expect(qwen21LorasFromEnv()).toEqual([GROWTH_STYLE_LORA]);
-      expect(GROWTH_STYLE_LORA).toEqual({ file: 'grwthpaint_v1.safetensors', strength: 0.7, trigger: 'grwthpaint' });
+      expect(GROWTH_STYLE_LORA).toEqual({ file: 'grwthpaint_v1.safetensors', strength: 0.65, trigger: 'grwthpaint' });
       process.env.QWEN21_LORAS = 'none';
       expect(qwen21LorasFromEnv()).toEqual([]);
       process.env.QWEN21_LORAS = '';
