@@ -17,7 +17,7 @@
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
  *   --loras SPEC         LoRA blend, file:strength[:trigger],... (overrides QWEN21_LORAS; "" = none). Default
- *                        (env unset) = the GROWTH style LoRA grwthpaint_v1 at 0.9 (every gen), which also strips
+ *                        (env unset) = the GROWTH style LoRA grwthpaint_v1 at 0.7 (every gen), which also strips
  *                        the MEDIUM paragraph from the prompt (Mike, 14 Oct)
  *   --gate               run the BASE-LOCK GATE (lock-gate.ts; vision = VISION_PROVIDER, pod
  *                        default — never localhost) on each raw seed; PASS/FAIL + reasons

@@ -238,8 +238,8 @@ export function qwen21LoraLabel(loras: readonly Qwen21Lora[] | undefined): strin
  */
 export const GROWTH_STYLE_LORA_TRIGGER = 'grwthpaint';
 export const GROWTH_STYLE_LORA_FILE = 'grwthpaint_v1.safetensors';
-/** Mike (14 Oct, after the seed-21499 check): "just set the lora to 90% for every gen" — one strength, every step. */
-export const GROWTH_STYLE_LORA: Qwen21Lora = { file: GROWTH_STYLE_LORA_FILE, strength: 0.9, trigger: GROWTH_STYLE_LORA_TRIGGER };
+/** Mike (14 Oct, after the seed-21499 check): "just set the lora to 90% for every gen", then "90 was too much. Lets try 70%" — one strength, every step. */
+export const GROWTH_STYLE_LORA: Qwen21Lora = { file: GROWTH_STYLE_LORA_FILE, strength: 0.7, trigger: GROWTH_STYLE_LORA_TRIGGER };
 
 /** True when the blend carries the GROWTH style LoRA (any strength). */
 export function hasGrowthStyleLora(loras: readonly Qwen21Lora[] | undefined): boolean {
@@ -247,7 +247,7 @@ export function hasGrowthStyleLora(loras: readonly Qwen21Lora[] | undefined): bo
 }
 
 /**
- * The env default (QWEN21_LORAS). UNSET → [GROWTH_STYLE_LORA] (grwthpaint_v1 at 0.9, the 14 Oct
+ * The env default (QWEN21_LORAS). UNSET → [GROWTH_STYLE_LORA] (grwthpaint_v1 at 0.7, the 14 Oct
  * baseline, for every generation); set to "" / "none" → no LoRAs; any other value → that blend.
  */
 export function qwen21LorasFromEnv(): Qwen21Lora[] {
