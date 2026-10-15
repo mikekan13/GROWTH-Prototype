@@ -15,7 +15,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
-  editScope, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE,
+  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE,
   type DesignerAction, type DesignerState, type EditTarget, type LayerKind,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
@@ -131,7 +131,6 @@ export default function AppearanceDesigner({
   // ── derived ──
   const status = deriveDesignerStatus(designer);
   const top = currentLayer(designer);
-  const topIndex = designer.layers.length - 1;
   const locked = !!top;
   const possessive = possessiveFor(getCharacterData().identity?.sex);
   const working = busy !== null;
@@ -143,7 +142,17 @@ export default function AppearanceDesigner({
         : 'Add one to three clear photos of the face.')
       : null;
 
-  const newLayerLanded = () => setGlitchKey(k => k + 1);
+  /** The tab decides what an edit lands on: BODY edits the body stack, everything else the face. */
+  const target: EditTarget = view === 'body' ? 'body' : 'face';
+  const bodyPath = designer.bodyImagePath ?? null;
+  const stack = layersOf(designer, target);
+  const stackTop = stack.length - 1;
+  /** An older stack layer being looked at (null = the newest). */
+  const [peek, setPeek] = useState<number | null>(null);
+  const peeking = peek !== null && peek >= 0 && peek < stackTop ? peek : null;
+  const changeView = (v: PreviewView) => { setView(v); setPeek(null); };
+
+  const newLayerLanded = () => { setGlitchKey(k => k + 1); setPeek(null); };
 
   // ── actions ──
   const runLock = async (mode: 'lock' | 'regen') => {
@@ -165,9 +174,8 @@ export default function AppearanceDesigner({
   };
 
   /**
-   * One edit on `source`. FACE: append to the stack (or replace the top when
-   * regenerating). BODY: the edit replaces the body render (no stack; REGENERATE
-   * re-renders the body from the approved base).
+   * One edit on `source`, onto the tab's stack: append, or replace the top
+   * when regenerating. The face and the body each keep their own stack.
    */
   const runEdit = async (text: string, kind: LayerKind, mode: 'edit' | 'regen', source: string, target: EditTarget): Promise<boolean> => {
     if (!characterId || working) return false;
@@ -182,22 +190,14 @@ export default function AppearanceDesigner({
       if (SCOPE_LINES.has(r.line)) setNote(r.line); else setError(r.line);
       return false;
     }
-    if (target === 'body') {
-      commit({ type: 'body', imagePath: r.imagePath }, { type: 'levers', levers: r.levers });
-      setView('body');
-    } else {
-      const layer = { imagePath: r.imagePath, text, kind, seed: r.seed, at: new Date().toISOString() };
-      commit({ type: mode === 'edit' ? 'append' : 'replaceTop', layer }, { type: 'levers', levers: r.levers });
-      setView('face');
-    }
+    const layer = { imagePath: r.imagePath, text, kind, seed: r.seed, at: new Date().toISOString() };
+    commit({ type: mode === 'edit' ? 'append' : 'replaceTop', layer, target }, { type: 'levers', levers: r.levers });
+    setView(target);
     newLayerLanded();
     return true;
   };
 
-  /** The tab decides what an edit lands on: BODY edits the body render, everything else the face. */
-  const target: EditTarget = view === 'body' ? 'body' : 'face';
-  const bodyPath = designer.bodyImagePath ?? null;
-
+  /** Edits always go on the newest layer of the tab's stack (peeking is only looking). */
   const applyEdit = (text: string, kind: LayerKind) => {
     if (target === 'body') {
       if (!bodyPath) { setNote(BODY_NOT_YET); return Promise.resolve(false); }
@@ -206,30 +206,40 @@ export default function AppearanceDesigner({
     return top ? runEdit(text, kind, 'edit', top.imagePath, 'face') : Promise.resolve(false);
   };
 
-  /** BODY tab: a fresh body from the approved base (drops any body edits). */
+  /** BODY base re-roll: a fresh body from the approved base (the body stack restarts from it). */
   const regenBody = async () => {
     if (!characterId || working || !designer.approvedImagePath) return;
     setBusy('body'); setError(null); setNote(null);
     const b = await generateBody(getCharacterData(), designer.approvedImagePath);
     setBusy(null);
     if (!b.ok) { setError(b.line); return; }
-    commit({ type: 'body', imagePath: b.imagePath }, { type: 'levers', levers: b.levers });
+    commit({ type: 'body', imagePath: b.imagePath, seed: b.levers.seed, at: new Date().toISOString() }, { type: 'levers', levers: b.levers });
     onApproved(designer.approvedImagePath, b.imagePath);
     newLayerLanded();
   };
 
+  /** REGENERATE re-rolls the newest layer of the tab's stack: the base from its source, an edit on the layer under it. */
   const regenerate = () => {
-    if (view === 'body') { void regenBody(); return; }
-    if (view === 'portrait' || !top) return;
-    if (topIndex === 0) { void runLock('regen'); return; }
-    const prev = designer.layers[topIndex - 1];
-    void runEdit(top.text, top.kind, 'regen', prev.imagePath, 'face');
+    if (view === 'portrait' || stackTop < 0) return;
+    if (stackTop === 0) { void (target === 'body' ? regenBody() : runLock('regen')); return; }
+    const newest = stack[stackTop];
+    const prev = stack[stackTop - 1];
+    void runEdit(newest.text, newest.kind, 'regen', prev.imagePath, target);
   };
-  const canRegenerate = editable && !working && (
-    view === 'body'
-      ? !!designer.approvedImagePath
-      : view === 'face' && !!top && (topIndex > 0 || (!!seedName && referencePhotos.length > 0))
+  const canRegenerate = editable && !working && view !== 'portrait' && stackTop >= 0 && (
+    stackTop > 0 || (target === 'body' ? !!designer.approvedImagePath : (!!seedName && referencePhotos.length > 0))
   );
+
+  const showLayer = (index: number) => setPeek(index >= stackTop ? null : index);
+  const deleteLayer = (index: number) => {
+    commit({ type: 'dropFrom', index, target });
+    newLayerLanded();
+  };
+  const peekLine = peeking !== null
+    ? `[ viewing ${peeking === 0 ? 'the base' : `layer ${peeking}`} · ${stackTop - peeking} newer · edits and REGENERATE go on the newest ]`
+    : null;
+  const shownFace = target === 'face' && peeking !== null ? designer.layers[peeking] : top;
+  const shownBody = target === 'body' && peeking !== null ? (designer.bodyLayers?.[peeking]?.imagePath ?? bodyPath) : bodyPath;
 
   /** Shape / Tell follow the tab; the body waits for its render. */
   const editDisabled = !locked || working || (target === 'body' && !bodyPath);
@@ -245,18 +255,13 @@ export default function AppearanceDesigner({
     const b = await generateBody(getCharacterData(), bust);
     setBusy(null);
     if (b.ok) {
-      commit({ type: 'body', imagePath: b.imagePath }, { type: 'levers', levers: b.levers });
+      commit({ type: 'body', imagePath: b.imagePath, seed: b.levers.seed, at: new Date().toISOString() }, { type: 'levers', levers: b.levers });
       setView('body');
       newLayerLanded();
     } else {
       setError(`Base approved. The body render failed: ${b.line}`);
     }
     onApproved(bust, b.ok ? b.imagePath : null);
-  };
-
-  const revertTo = (index: number) => {
-    commit({ type: 'revertTo', index });
-    newLayerLanded();
   };
 
   // ── render ──
@@ -292,13 +297,14 @@ export default function AppearanceDesigner({
             <div className="md:sticky md:top-2">
               <Preview
                 view={view}
-                onView={setView}
-                layer={top}
-                bodyImagePath={designer.bodyImagePath ?? null}
+                onView={changeView}
+                layer={shownFace}
+                bodyImagePath={shownBody}
                 portraitImagePath={designer.approvedImagePath ?? null}
                 busyLine={busy ? BUSY_LINE[busy] : null}
                 error={error}
                 note={note}
+                peekLine={peekLine}
                 onRegenerate={regenerate}
                 canRegenerate={canRegenerate}
                 glitchKey={glitchKey}
@@ -332,7 +338,15 @@ export default function AppearanceDesigner({
                 </>
               )}
 
-              <EditStack layers={designer.layers} onRevert={revertTo} editable={editable && !working} />
+              <EditStack
+                key={target}
+                layers={stack}
+                target={target}
+                selected={peeking ?? stackTop}
+                onSelect={showLayer}
+                onDelete={deleteLayer}
+                editable={editable && !working}
+              />
 
               {editable && locked && (
                 <div className="space-y-1">

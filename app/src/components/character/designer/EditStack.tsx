@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { C, F, SectionBar } from './parts';
-import type { DesignerLayer, LayerKind } from '@/lib/appearance-designer';
+import type { DesignerLayer, EditTarget, LayerKind } from '@/lib/appearance-designer';
 
 const MARK_KINDS: ReadonlySet<LayerKind> = new Set(['scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod']);
 
@@ -13,14 +13,21 @@ function kindTone(kind: LayerKind): string {
   if (MARK_KINDS.has(kind)) return C.body;
   return C.ink;
 }
+const kindLabel = (kind: LayerKind) => (kind === 'bodymod' ? 'body mod' : kind);
 
 /**
- * Linear history, newest first. Tapping an older row asks once, then makes it
- * the current layer and drops everything after it.
+ * Linear history, newest first, one stack per tab (Mike 2026-10-15). Tapping
+ * a row SHOWS that layer in the preview; the ⊗ asks once, then deletes the
+ * layer — and the layers painted on it, since each was made from the one
+ * before. The base (row 0) has no ⊗; REGENERATE re-rolls it.
  */
-export function EditStack({ layers, onRevert, editable }: {
+export function EditStack({ layers, target, selected, onSelect, onDelete, editable }: {
   layers: DesignerLayer[];
-  onRevert: (index: number) => void;
+  target: EditTarget;
+  /** The layer the preview shows (the top when nothing is being peeked at). */
+  selected: number;
+  onSelect: (index: number) => void;
+  onDelete: (index: number) => void;
   editable: boolean;
 }) {
   const [confirm, setConfirm] = useState<number | null>(null);
@@ -29,27 +36,33 @@ export function EditStack({ layers, onRevert, editable }: {
   const rows = layers.map((l, i) => ({ l, i })).reverse();
 
   return (
-    <div className="space-y-2" data-testid="designer-stack">
-      <SectionBar title="Edit stack" hint="newest first · tap an older layer to go back to it" />
+    <div className="space-y-2" data-testid="designer-stack" data-target={target}>
+      <SectionBar title={`Edit stack · ${target.toUpperCase()}`} hint="newest first · tap a layer to see it · ⊗ deletes it" />
       <div className="space-y-1">
         {rows.map(({ l, i }) => {
-          const current = i === top;
+          const current = i === selected;
+          const asking = confirm === i;
+          const later = top - i;
           return (
-            <div key={`${l.imagePath}-${i}`}>
+            <div
+              key={`${l.imagePath}-${i}`}
+              className="flex items-center gap-2"
+              style={{
+                minHeight: 56, padding: 4,
+                background: current ? C.ink : 'transparent',
+                color: current ? C.powder : C.ink,
+                borderBottom: current ? 'none' : `1px solid rgba(20,20,19,0.25)`,
+              }}
+              data-testid={`designer-layer-${i}`}
+              aria-current={current ? 'true' : undefined}
+            >
               <button
                 type="button"
-                onClick={() => { if (editable && !current) setConfirm(confirm === i ? null : i); }}
-                disabled={!editable || current}
-                data-testid={`designer-layer-${i}`}
-                aria-current={current ? 'true' : undefined}
-                className="gd-btn w-full flex items-center gap-2 text-left"
-                style={{
-                  minHeight: 56, padding: 4, border: 'none',
-                  background: current ? C.ink : 'transparent',
-                  color: current ? C.powder : C.ink,
-                  borderBottom: current ? 'none' : `1px solid rgba(20,20,19,0.25)`,
-                  cursor: editable && !current ? 'pointer' : 'default',
-                }}
+                onClick={() => { setConfirm(null); onSelect(i); }}
+                className="gd-btn flex items-center gap-2 text-left flex-1 min-w-0"
+                style={{ background: 'transparent', border: 'none', color: 'inherit', padding: 0, cursor: 'pointer', minHeight: 48 }}
+                aria-label={`Show ${i === 0 ? 'the base' : `layer ${i}`}`}
+                data-testid={`designer-layer-show-${i}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={l.imagePath} alt="" className="shrink-0 object-cover" style={{ width: 48, height: 48, background: '#b9c9da' }} />
@@ -60,32 +73,36 @@ export function EditStack({ layers, onRevert, editable }: {
                   className="shrink-0 px-1.5"
                   style={{ background: kindTone(l.kind), color: '#fff', fontFamily: F.mono, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: '18px' }}
                 >
-                  {l.kind}
+                  {kindLabel(l.kind)}
                 </span>
               </button>
-              {confirm === i && (
-                <div className="flex flex-wrap items-center gap-2 p-2" style={{ background: C.ink }} role="alertdialog" aria-label="Go back to this layer">
-                  <span className="flex-1 min-w-0" style={{ color: C.gold, fontFamily: F.mono, fontSize: 12 }}>
-                    Go back to this layer? {top - i} later layer{top - i === 1 ? '' : 's'} will be dropped.
-                  </span>
+              {i > 0 && editable && (
+                asking ? (
                   <button
                     type="button"
-                    className="gd-btn px-3"
-                    data-testid="designer-revert-confirm"
-                    onClick={() => { setConfirm(null); onRevert(i); }}
-                    style={{ minHeight: 44, background: C.gold, color: C.ink, border: 'none', fontFamily: F.bebas, fontSize: 16, letterSpacing: '0.1em', cursor: 'pointer' }}
+                    onClick={() => { setConfirm(null); onDelete(i); }}
+                    className="gd-btn shrink-0 px-3"
+                    data-testid="designer-delete-confirm"
+                    aria-label={`Delete this layer${later ? ` and the ${later} after it` : ''}`}
+                    style={{ minHeight: 36, background: C.body, color: '#fff', border: 'none', fontFamily: F.bebas, fontSize: 15, letterSpacing: '0.1em', cursor: 'pointer', borderRadius: 18 }}
                   >
-                    DROP &amp; GO BACK
+                    DELETE{later ? ` +${later}` : ''}?
                   </button>
+                ) : (
                   <button
                     type="button"
-                    className="gd-btn px-3"
-                    onClick={() => setConfirm(null)}
-                    style={{ minHeight: 44, background: 'transparent', color: C.powder, border: `1px solid ${C.powder}`, fontFamily: F.mono, fontSize: 12, cursor: 'pointer' }}
+                    onClick={() => setConfirm(i)}
+                    className="gd-btn shrink-0 flex items-center justify-center"
+                    data-testid={`designer-layer-delete-${i}`}
+                    aria-label={`Delete layer ${i}`}
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%', lineHeight: 1, fontSize: 18, cursor: 'pointer',
+                      background: `${C.body}22`, border: `1px solid ${C.body}55`, color: current ? '#F5F4EF' : C.body,
+                    }}
                   >
-                    keep
+                    {'⊗'}
                   </button>
-                </div>
+                )
               )}
             </div>
           );

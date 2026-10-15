@@ -331,12 +331,14 @@ export const GATE_FLAGGED_NOTE = 'The base came back dressed or off-pose; tap re
 export interface DesignerState {
   /** The styled bust from LOCK IDENTITY (= layers[0].imagePath). */
   baseImagePath: string | null;
-  /** Oldest first: base → edit 1 → edit 2…; the last one is the current layer. */
+  /** FACE, oldest first: base → edit 1 → edit 2…; the last one is the current layer. */
   layers: DesignerLayer[];
   /** "Or describe them" text (kept with the image, not the sheet). */
   description?: string;
-  /** Full-body render made from the approved base. */
+  /** The current body render (= the top of bodyLayers; mirrored to generatedFullBody). */
   bodyImagePath?: string | null;
+  /** BODY, oldest first: the render from the approved base → body edit 1 → …  (Mike 2026-10-15). */
+  bodyLayers?: DesignerLayer[];
   /** The layer approved as the base (Character.portrait). */
   approvedImagePath?: string | null;
   approvedAt?: string | null;
@@ -346,38 +348,75 @@ export interface DesignerState {
 
 export const EMPTY_DESIGNER: DesignerState = { baseImagePath: null, layers: [] };
 
+export const BODY_BASE_TEXT = 'Rendered from the approved base';
+
 export type DesignerAction =
   | { type: 'lock'; layer: DesignerLayer }
-  | { type: 'append'; layer: DesignerLayer }
-  | { type: 'replaceTop'; layer: DesignerLayer }
-  | { type: 'revertTo'; index: number }
+  | { type: 'append'; layer: DesignerLayer; target?: EditTarget }
+  | { type: 'replaceTop'; layer: DesignerLayer; target?: EditTarget }
+  | { type: 'revertTo'; index: number; target?: EditTarget }
+  /** Delete layer `index` and every layer painted on it (never the base, index 0). */
+  | { type: 'dropFrom'; index: number; target?: EditTarget }
   | { type: 'approved'; imagePath: string; at: string }
-  | { type: 'body'; imagePath: string | null }
+  /** A fresh body render from the approved base: the body stack restarts from it. */
+  | { type: 'body'; imagePath: string | null; seed?: number | null; at?: string }
   | { type: 'levers'; levers: DesignerLevers }
   | { type: 'describe'; text: string };
+
+/** The stack for a target. */
+export function layersOf(s: DesignerState, target: EditTarget): DesignerLayer[] {
+  return target === 'body' ? (s.bodyLayers ?? []) : s.layers;
+}
+
+function withLayers(s: DesignerState, target: EditTarget, layers: DesignerLayer[]): DesignerState {
+  if (target === 'body') {
+    return { ...s, bodyLayers: layers, bodyImagePath: layers.length ? layers[layers.length - 1].imagePath : null };
+  }
+  return { ...s, layers };
+}
 
 export function designerReducer(state: DesignerState, action: DesignerAction): DesignerState {
   switch (action.type) {
     case 'lock':
-      // A new identity: the old stack and body no longer describe her.
-      return { ...state, baseImagePath: action.layer.imagePath, layers: [{ ...action.layer, kind: 'base' }], bodyImagePath: null };
-    case 'append':
-      if (state.layers.length === 0) return state; // edits need a base
-      return { ...state, layers: [...state.layers, action.layer] };
+      // A new identity: the old stacks and body no longer describe her.
+      return { ...state, baseImagePath: action.layer.imagePath, layers: [{ ...action.layer, kind: 'base' }], bodyImagePath: null, bodyLayers: [] };
+    case 'append': {
+      const target = action.target ?? 'face';
+      const layers = layersOf(state, target);
+      if (layers.length === 0) return state; // edits need a base
+      return withLayers(state, target, [...layers, action.layer]);
+    }
     case 'replaceTop': {
-      if (state.layers.length === 0) return state;
-      const layers = [...state.layers.slice(0, -1), action.layer];
-      const baseImagePath = layers.length === 1 ? layers[0].imagePath : state.baseImagePath;
-      return { ...state, layers, baseImagePath, ...(layers.length === 1 ? { bodyImagePath: null } : {}) };
+      const target = action.target ?? 'face';
+      const prev = layersOf(state, target);
+      if (prev.length === 0) return state;
+      const layers = [...prev.slice(0, -1), action.layer];
+      const next = withLayers(state, target, layers);
+      if (target === 'body' || layers.length > 1) return next;
+      // A re-rolled face base: the body was made from the old one.
+      return { ...next, baseImagePath: layers[0].imagePath, bodyImagePath: null, bodyLayers: [] };
     }
     case 'revertTo': {
-      if (action.index < 0 || action.index >= state.layers.length) return state;
-      return { ...state, layers: state.layers.slice(0, action.index + 1) };
+      const target = action.target ?? 'face';
+      const layers = layersOf(state, target);
+      if (action.index < 0 || action.index >= layers.length) return state;
+      return withLayers(state, target, layers.slice(0, action.index + 1));
+    }
+    case 'dropFrom': {
+      const target = action.target ?? 'face';
+      const layers = layersOf(state, target);
+      if (action.index < 1 || action.index >= layers.length) return state;
+      return withLayers(state, target, layers.slice(0, action.index));
     }
     case 'approved':
       return { ...state, approvedImagePath: action.imagePath, approvedAt: action.at };
     case 'body':
-      return { ...state, bodyImagePath: action.imagePath };
+      if (!action.imagePath) return { ...state, bodyImagePath: null, bodyLayers: [] };
+      return {
+        ...state,
+        bodyImagePath: action.imagePath,
+        bodyLayers: [{ imagePath: action.imagePath, text: BODY_BASE_TEXT, kind: 'base', seed: action.seed ?? null, at: action.at ?? '' }],
+      };
     case 'levers':
       return { ...state, levers: action.levers };
     case 'describe':
@@ -387,13 +426,20 @@ export function designerReducer(state: DesignerState, action: DesignerAction): D
   }
 }
 
-export function currentLayer(s: DesignerState): DesignerLayer | null {
-  return s.layers.length ? s.layers[s.layers.length - 1] : null;
+export function currentLayer(s: DesignerState, target: EditTarget = 'face'): DesignerLayer | null {
+  const layers = layersOf(s, target);
+  return layers.length ? layers[layers.length - 1] : null;
 }
 
 /** How many layers a revert to `index` drops (for the confirm line). */
-export function layersDroppedBy(s: DesignerState, index: number): number {
-  return Math.max(0, s.layers.length - 1 - index);
+export function layersDroppedBy(s: DesignerState, index: number, target: EditTarget = 'face'): number {
+  return Math.max(0, layersOf(s, target).length - 1 - index);
+}
+
+/** How many layers go when layer `index` is deleted: it and every one painted on it. */
+export function layersDeletedBy(s: DesignerState, index: number, target: EditTarget = 'face'): number {
+  const n = layersOf(s, target).length;
+  return index < 1 || index >= n ? 0 : n - index;
 }
 
 const LAYER_KINDS: ReadonlySet<string> = new Set<LayerKind>([
@@ -419,8 +465,8 @@ export function restoreDesigner(identity: unknown): DesignerState {
   const legacyBust = str(id.generatedBust);
   const legacyBody = str(id.generatedFullBody);
 
-  if (raw) {
-    const layers: DesignerLayer[] = (Array.isArray(raw.layers) ? raw.layers : [])
+  const readLayers = (v: unknown): DesignerLayer[] => {
+    const layers = (Array.isArray(v) ? v : [])
       .map((l): DesignerLayer | null => {
         if (!l || typeof l !== 'object') return null;
         const o = l as Record<string, unknown>;
@@ -431,12 +477,25 @@ export function restoreDesigner(identity: unknown): DesignerState {
       })
       .filter((l): l is DesignerLayer => !!l);
     if (layers.length) layers[0] = { ...layers[0], kind: 'base' };
+    return layers;
+  };
+  const bodyStackFor = (bodyImagePath: string | null, saved: DesignerLayer[]): DesignerLayer[] => {
+    if (saved.length) return saved;
+    // A body saved before the body stack existed starts as its own base.
+    return bodyImagePath ? [{ imagePath: bodyImagePath, text: BODY_BASE_TEXT, kind: 'base', seed: null, at: '' }] : [];
+  };
+
+  if (raw) {
+    const layers = readLayers(raw.layers);
+    const bodyLayers = readLayers(raw.bodyLayers);
+    const bodyImagePath = bodyLayers.length ? bodyLayers[bodyLayers.length - 1].imagePath : (str(raw.bodyImagePath) ?? legacyBody);
     const lv = raw.levers && typeof raw.levers === 'object' ? raw.levers as Record<string, unknown> : null;
     return {
       baseImagePath: layers[0]?.imagePath ?? str(raw.baseImagePath),
       layers,
       description: typeof raw.description === 'string' ? raw.description : undefined,
-      bodyImagePath: str(raw.bodyImagePath) ?? legacyBody,
+      bodyImagePath,
+      bodyLayers: bodyStackFor(bodyImagePath, bodyLayers),
       approvedImagePath: str(raw.approvedImagePath),
       approvedAt: str(raw.approvedAt),
       levers: lv ? { seed: num(lv.seed), guidance: num(lv.guidance), steps: num(lv.steps), refs: num(lv.refs) ?? 0 } : null,
@@ -448,6 +507,7 @@ export function restoreDesigner(identity: unknown): DesignerState {
       baseImagePath: legacyBust,
       layers: [{ imagePath: legacyBust, text: 'Existing portrait', kind: 'base', seed: null, at: '' }],
       bodyImagePath: legacyBody,
+      bodyLayers: bodyStackFor(legacyBody, []),
       approvedImagePath: legacyBust,
       approvedAt: null,
     };

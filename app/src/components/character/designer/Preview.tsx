@@ -16,8 +16,10 @@ const VIEWS: PreviewView[] = ['face', 'body', 'portrait'];
  * edit stack tells the history.
  */
 export function Preview({
-  view, onView, layer, bodyImagePath, portraitImagePath, busyLine, error, note, onRegenerate, canRegenerate, glitchKey,
+  view, onView, layer, bodyImagePath, portraitImagePath, busyLine, error, note, peekLine, onRegenerate, canRegenerate, glitchKey,
 }: {
+  /** Set while an older stack layer is being looked at. */
+  peekLine: string | null;
   view: PreviewView;
   onView: (v: PreviewView) => void;
   layer: DesignerLayer | null;
@@ -86,6 +88,7 @@ export function Preview({
         <FrameButton label="FULL SIZE" href={fullRes ?? undefined} tone="ink" disabled={!fullRes} testId="designer-fullsize" />
         <FrameButton label="REGENERATE" onClick={onRegenerate} tone="gold" disabled={!canRegenerate} testId="designer-regenerate" />
       </div>
+      {peekLine && <div className="mt-1"><Readout testId="designer-peek">{peekLine}</Readout></div>}
       {error && <div className="mt-1"><Readout tone="error" testId="designer-error">{error}</Readout></div>}
       {note && <div className="mt-1"><Readout tone="note" testId="designer-note">{note}</Readout></div>}
     </div>

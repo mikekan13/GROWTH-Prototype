@@ -4,7 +4,7 @@ import {
   deriveDesignerStatus, designerErrorLine, designerReducer, isClothingOrGear, layersDroppedBy,
   possessiveFor, restoreDesigner, withNothingElse, gateLine, readDesignerGate,
   editScope, markLayerKind, shapeCategoriesFor, markPlacesFor, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE,
-  partsFor, composeStub, isUnfinishedStub, layerKindFor,
+  partsFor, composeStub, isUnfinishedStub, layerKindFor, layersDeletedBy, BODY_BASE_TEXT,
   type DesignerLayer, type DesignerState,
 } from './appearance-designer';
 
@@ -181,11 +181,42 @@ describe('edit stack reducer', () => {
     s = designerReducer(s, { type: 'levers', levers: { seed: 7, guidance: 1, steps: 25, refs: 1 } });
     s = designerReducer(s, { type: 'approved', imagePath: '/e1.png', at: 'now' });
     const json = JSON.parse(JSON.stringify({ designer: s, generatedBust: '/old.png' }));
-    expect(restoreDesigner(json)).toEqual({ ...s, description: undefined, bodyImagePath: null });
+    expect(restoreDesigner(json)).toEqual({ ...s, description: undefined, bodyImagePath: null, bodyLayers: [] });
 
     const messy = restoreDesigner({ designer: { layers: [{ imagePath: '/a.png', kind: 'hair' }, null, { text: 'no path' }, { imagePath: '/b.png', kind: 'weird' }] } });
     expect(messy.layers.map(l => [l.imagePath, l.kind])).toEqual([['/a.png', 'base'], ['/b.png', 'jewl']]);
     expect(messy.baseImagePath).toBe('/a.png');
+  });
+
+  it('the body has its own stack: body starts it, edits append, dropFrom deletes a layer and those after it', () => {
+    let s = designerReducer(locked, { type: 'body', imagePath: '/body0.png', seed: 3, at: 't0' });
+    expect(s.bodyLayers).toEqual([{ imagePath: '/body0.png', text: BODY_BASE_TEXT, kind: 'base', seed: 3, at: 't0' }]);
+    expect(s.bodyImagePath).toBe('/body0.png');
+    s = designerReducer(s, { type: 'append', target: 'body', layer: L('/body1.png', 'tattoo') });
+    s = designerReducer(s, { type: 'append', target: 'body', layer: L('/body2.png', 'underwear') });
+    expect(currentLayer(s, 'body')?.imagePath).toBe('/body2.png');
+    expect(s.bodyImagePath).toBe('/body2.png');
+    expect(s.layers).toHaveLength(1); // the face stack is untouched
+    expect(layersDeletedBy(s, 1, 'body')).toBe(2);
+    expect(layersDeletedBy(s, 0, 'body')).toBe(0);
+    const dropped = designerReducer(s, { type: 'dropFrom', index: 1, target: 'body' });
+    expect(dropped.bodyLayers?.map(l => l.imagePath)).toEqual(['/body0.png']);
+    expect(dropped.bodyImagePath).toBe('/body0.png');
+    expect(designerReducer(s, { type: 'dropFrom', index: 0, target: 'body' })).toBe(s); // never the base
+    // a body edit is re-rolled in place; a fresh body restarts the stack
+    const rerolled = designerReducer(s, { type: 'replaceTop', target: 'body', layer: L('/body2b.png', 'underwear') });
+    expect(rerolled.bodyLayers?.map(l => l.imagePath)).toEqual(['/body0.png', '/body1.png', '/body2b.png']);
+    expect(designerReducer(s, { type: 'body', imagePath: '/fresh.png' }).bodyLayers).toHaveLength(1);
+    // the face stack deletes the same way
+    let f = designerReducer(locked, { type: 'append', layer: L('/e1.png') });
+    f = designerReducer(f, { type: 'append', layer: L('/e2.png') });
+    expect(designerReducer(f, { type: 'dropFrom', index: 2 }).layers.map(l => l.imagePath)).toEqual(['/portraits/v/faces/base.png', '/e1.png']);
+    // restore: a body saved before the stack existed becomes its own base
+    const old = restoreDesigner({ designer: { layers: [{ imagePath: '/a.png' }], bodyImagePath: '/oldbody.png' } });
+    expect(old.bodyLayers).toEqual([{ imagePath: '/oldbody.png', text: BODY_BASE_TEXT, kind: 'base', seed: null, at: '' }]);
+    const round = restoreDesigner(JSON.parse(JSON.stringify({ designer: s })));
+    expect(round.bodyLayers?.map(l => l.imagePath)).toEqual(['/body0.png', '/body1.png', '/body2.png']);
+    expect(round.bodyImagePath).toBe('/body2.png');
   });
 
   it('legacy bust (no designer yet) starts as an approved base; nothing → empty', () => {
