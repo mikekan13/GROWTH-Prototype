@@ -20,6 +20,8 @@ describe('portrait edit clothing guard (server)', () => {
     expect(() => assertEditAllowed('qwen21', 'Older by ten years. Change nothing else.', 'face')).toThrow(EditOutOfScopeError);
     expect(() => assertEditAllowed('qwen21', 'Change her underwear: a dark wrap.', 'face')).toThrow(EditOutOfScopeError);
     expect(() => assertEditAllowed('qwen21', 'Change her underwear: a dark wrap.', 'body')).not.toThrow();
+    expect(() => assertEditAllowed('qwen21', 'Change her build to heavy-set.', 'body')).not.toThrow();
+    expect(() => assertEditAllowed('qwen21', 'Change her build to heavy-set.', 'face')).toThrow(EditOutOfScopeError);
     expect(() => assertEditAllowed('qwen21', 'Older by ten years.')).not.toThrow();
     expect(readEditTarget('body')).toBe('body');
     expect(readEditTarget('x')).toBeNull();

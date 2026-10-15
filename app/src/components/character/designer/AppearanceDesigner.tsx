@@ -13,14 +13,16 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, UNDERWEAR_BODY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
+  CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
   editScope, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE,
-  type DesignerAction, type DesignerState, type LayerKind,
+  type DesignerAction, type DesignerState, type EditTarget, type LayerKind,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
 
 /** Guard lines are notes (nothing was sent), not engine errors. */
-const SCOPE_LINES: ReadonlySet<string> = new Set([CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, UNDERWEAR_BODY_NOTE]);
+const SCOPE_LINES: ReadonlySet<string> = new Set([CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE]);
+
+const BODY_NOT_YET = 'The body is made when you approve the base. Approve the face first, then shape the body here.';
 import { Preview, type PreviewView } from './Preview';
 import { EditStack } from './EditStack';
 import { Shape, StartFrom, TellJewl } from './Sections';
@@ -161,36 +163,75 @@ export default function AppearanceDesigner({
     newLayerLanded();
   };
 
-  /** One edit on `source` → append (or replace the top when regenerating). */
-  const runEdit = async (text: string, kind: LayerKind, mode: 'edit' | 'regen', source: string): Promise<boolean> => {
+  /**
+   * One edit on `source`. FACE: append to the stack (or replace the top when
+   * regenerating). BODY: the edit replaces the body render (no stack; REGENERATE
+   * re-renders the body from the approved base).
+   */
+  const runEdit = async (text: string, kind: LayerKind, mode: 'edit' | 'regen', source: string, target: EditTarget): Promise<boolean> => {
     if (!characterId || working) return false;
     const instruction = withNothingElse(text);
-    // Allowed scope (Mike 2026-10-15): hair, scars, tattoos, body mods; face edits only today.
-    const scope = editScope(instruction, 'face');
+    // Allowed scope (Mike 2026-10-15), per tab; the route checks the same.
+    const scope = editScope(instruction, target);
     if (!scope.ok) { setNote(scope.line); setError(null); return false; }
     setBusy(mode); setError(null); setNote(null);
-    const r = await editLayer(characterId, source, instruction, 'face');
+    const r = await editLayer(characterId, source, instruction, target);
     setBusy(null);
     if (!r.ok) {
       if (SCOPE_LINES.has(r.line)) setNote(r.line); else setError(r.line);
       return false;
     }
-    const layer = { imagePath: r.imagePath, text, kind, seed: r.seed, at: new Date().toISOString() };
-    commit({ type: mode === 'edit' ? 'append' : 'replaceTop', layer }, { type: 'levers', levers: r.levers });
-    setView('face');
+    if (target === 'body') {
+      commit({ type: 'body', imagePath: r.imagePath }, { type: 'levers', levers: r.levers });
+      setView('body');
+    } else {
+      const layer = { imagePath: r.imagePath, text, kind, seed: r.seed, at: new Date().toISOString() };
+      commit({ type: mode === 'edit' ? 'append' : 'replaceTop', layer }, { type: 'levers', levers: r.levers });
+      setView('face');
+    }
     newLayerLanded();
     return true;
   };
 
-  const applyEdit = (text: string, kind: LayerKind) => (top ? runEdit(text, kind, 'edit', top.imagePath) : Promise.resolve(false));
+  /** The tab decides what an edit lands on: BODY edits the body render, everything else the face. */
+  const target: EditTarget = view === 'body' ? 'body' : 'face';
+  const bodyPath = designer.bodyImagePath ?? null;
+
+  const applyEdit = (text: string, kind: LayerKind) => {
+    if (target === 'body') {
+      if (!bodyPath) { setNote(BODY_NOT_YET); return Promise.resolve(false); }
+      return runEdit(text, kind, 'edit', bodyPath, 'body');
+    }
+    return top ? runEdit(text, kind, 'edit', top.imagePath, 'face') : Promise.resolve(false);
+  };
+
+  /** BODY tab: a fresh body from the approved base (drops any body edits). */
+  const regenBody = async () => {
+    if (!characterId || working || !designer.approvedImagePath) return;
+    setBusy('body'); setError(null); setNote(null);
+    const b = await generateBody(getCharacterData(), designer.approvedImagePath);
+    setBusy(null);
+    if (!b.ok) { setError(b.line); return; }
+    commit({ type: 'body', imagePath: b.imagePath }, { type: 'levers', levers: b.levers });
+    onApproved(designer.approvedImagePath, b.imagePath);
+    newLayerLanded();
+  };
 
   const regenerate = () => {
-    if (!top) return;
+    if (view === 'body') { void regenBody(); return; }
+    if (view === 'portrait' || !top) return;
     if (topIndex === 0) { void runLock('regen'); return; }
     const prev = designer.layers[topIndex - 1];
-    void runEdit(top.text, top.kind, 'regen', prev.imagePath);
+    void runEdit(top.text, top.kind, 'regen', prev.imagePath, 'face');
   };
-  const canRegenerate = editable && !working && !!top && (topIndex > 0 || (!!seedName && referencePhotos.length > 0));
+  const canRegenerate = editable && !working && (
+    view === 'body'
+      ? !!designer.approvedImagePath
+      : view === 'face' && !!top && (topIndex > 0 || (!!seedName && referencePhotos.length > 0))
+  );
+
+  /** Shape / Tell follow the tab; the body waits for its render. */
+  const editDisabled = !locked || working || (target === 'body' && !bodyPath);
 
   const approve = async () => {
     if (!characterId || !top || working) return;
@@ -283,8 +324,11 @@ export default function AppearanceDesigner({
                   {locked && startIsOpen && (
                     <Readout tone="note">Locking again starts a new base; the edit stack below is replaced.</Readout>
                   )}
-                  <Shape possessive={possessive} onApply={applyEdit} disabled={!locked || working} busy={busy === 'edit'} />
-                  <TellJewl onTell={text => applyEdit(text, 'jewl')} disabled={!locked || working} busy={busy === 'edit'} />
+                  {locked && target === 'body' && !bodyPath && (
+                    <Readout tone="note" testId="designer-body-not-yet">{BODY_NOT_YET}</Readout>
+                  )}
+                  <Shape target={target} possessive={possessive} onApply={applyEdit} disabled={editDisabled} busy={busy === 'edit'} />
+                  <TellJewl target={target} onTell={text => applyEdit(text, 'jewl')} disabled={editDisabled} busy={busy === 'edit'} />
                 </>
               )}
 

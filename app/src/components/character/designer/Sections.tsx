@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { C, F, ActionBar, Chip, GhostButton, Readout, SectionBar, TextInput } from './parts';
 import {
-  MARK_KINDS, MARK_PLACES, QUICK_TELLS, SHAPE_CATEGORIES, SHAPE_PRESETS, SHAPE_WORDS_PLACEHOLDER,
-  composeMarkText, composeShapeText, composeTellText, markLayerKind,
-  type LayerKind, type MarkKind, type MarkPlace, type Possessive, type ShapeCategory,
+  MARK_KINDS, QUICK_TELLS, SHAPE_PRESETS, SHAPE_WORDS_PLACEHOLDER,
+  composeMarkText, composeShapeText, composeTellText, markLayerKind, markPlacesFor, shapeCategoriesFor,
+  type EditTarget, type LayerKind, type MarkKind, type MarkPlace, type Possessive, type ShapeCategory,
 } from '@/lib/appearance-designer';
 
 // ── 1 · START FROM ──────────────────────────────────────────────────────
@@ -86,18 +86,38 @@ export function StartFrom({
 
 // ── 2 · SHAPE ───────────────────────────────────────────────────────────
 
-export function Shape({ possessive, onApply, disabled, busy }: {
+const SHAPE_HINT: Record<EditTarget, string> = {
+  face: 'FACE · hair and marks · the face itself is the locked identity',
+  body: 'BODY · build, marks and the underwear design',
+};
+
+/**
+ * The parts follow the tab (Mike 2026-10-15): FACE = hair + marks on the
+ * face/neck; BODY = build + marks anywhere + underwear. Switching tabs resets
+ * the chips so nothing from the other tab lingers.
+ */
+export function Shape({ target, possessive, onApply, disabled, busy }: {
+  target: EditTarget;
   possessive: Possessive;
   /** text = the visible sentence (no suffix). Returns true when it went through (clears inputs). */
   onApply: (text: string, kind: LayerKind) => Promise<boolean>;
   disabled: boolean;
   busy: boolean;
 }) {
-  const [cat, setCat] = useState<ShapeCategory>('Hair');
+  const categories = shapeCategoriesFor(target);
+  const places = markPlacesFor(target);
+  const [cat, setCat] = useState<ShapeCategory>(categories[0]);
   const [preset, setPreset] = useState<string | null>(null);
   const [words, setWords] = useState('');
   const [mark, setMark] = useState<MarkKind>('Scar');
-  const [place, setPlace] = useState<MarkPlace>('Face');
+  const [place, setPlace] = useState<MarkPlace>(places[0]);
+
+  useEffect(() => {
+    setCat(shapeCategoriesFor(target)[0]);
+    setPlace(markPlacesFor(target)[0]);
+    setPreset(null);
+    setWords('');
+  }, [target]);
 
   const isMarks = cat === 'Marks';
   const text = isMarks
@@ -112,10 +132,10 @@ export function Shape({ possessive, onApply, disabled, busy }: {
   };
 
   return (
-    <section className="space-y-2" data-testid="designer-shape" style={{ opacity: disabled ? 0.55 : 1 }}>
-      <SectionBar n={2} title="Shape" hint="hair, scars, tattoos, body mods · the face itself is the locked identity" />
+    <section className="space-y-2" data-testid="designer-shape" data-target={target} style={{ opacity: disabled ? 0.55 : 1 }}>
+      <SectionBar n={2} title="Shape" hint={SHAPE_HINT[target]} />
       <div className="flex flex-wrap gap-1">
-        {SHAPE_CATEGORIES.map(c => (
+        {categories.map(c => (
           <Chip key={c} label={c.toUpperCase()} on={cat === c} onClick={() => { setCat(c); setPreset(null); setWords(''); }} disabled={disabled} testId={`designer-cat-${c.toLowerCase()}`} />
         ))}
       </div>
@@ -124,19 +144,19 @@ export function Shape({ possessive, onApply, disabled, busy }: {
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1">
             {MARK_KINDS.map(m => (
-              <Chip key={m} label={m} tone="spirit" on={mark === m} onClick={() => setMark(m)} disabled={disabled} testId={`designer-mark-${m.toLowerCase()}`} />
+              <Chip key={m} label={m} tone="spirit" on={mark === m} onClick={() => setMark(m)} disabled={disabled} testId={`designer-mark-${m.toLowerCase().replace(/\s+/g, '-')}`} />
             ))}
           </div>
           <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>WHERE</div>
           <div className="flex flex-wrap gap-1">
-            {MARK_PLACES.map(p => (
+            {places.map(p => (
               <Chip key={p} label={p} on={place === p} onClick={() => setPlace(p)} disabled={disabled} testId={`designer-place-${p.toLowerCase()}`} />
             ))}
           </div>
           <TextInput
             value={words}
             onChange={setWords}
-            placeholder="Describe it: a thin pale scar through the left eyebrow"
+            placeholder={mark === 'Body mod' ? 'Describe it: stretched ear gauges, a brand on the shoulder…' : 'Describe it: a thin pale scar through the left eyebrow'}
             testId="designer-mark-words"
             disabled={disabled}
             onEnter={apply}
@@ -155,11 +175,13 @@ export function Shape({ possessive, onApply, disabled, busy }: {
         </div>
       ) : (
         <div className="space-y-2">
-          <div className="flex flex-wrap gap-1">
-            {SHAPE_PRESETS[cat].map(p => (
-              <Chip key={p.label} label={p.label} on={preset === p.label} onClick={() => setPreset(preset === p.label ? null : p.label)} disabled={disabled} testId={`designer-preset-${p.label}`} />
-            ))}
-          </div>
+          {SHAPE_PRESETS[cat].length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {SHAPE_PRESETS[cat].map(p => (
+                <Chip key={p.label} label={p.label} on={preset === p.label} onClick={() => setPreset(preset === p.label ? null : p.label)} disabled={disabled} testId={`designer-preset-${p.label}`} />
+              ))}
+            </div>
+          )}
           <TextInput value={words} onChange={setWords} placeholder={SHAPE_WORDS_PLACEHOLDER[cat]} testId="designer-shape-words" disabled={disabled} onEnter={apply} />
         </div>
       )}
@@ -173,7 +195,8 @@ export function Shape({ possessive, onApply, disabled, busy }: {
 
 // ── 3 · TELL JEWL ───────────────────────────────────────────────────────
 
-export function TellJewl({ onTell, disabled, busy }: {
+export function TellJewl({ target, onTell, disabled, busy }: {
+  target: EditTarget;
   onTell: (text: string) => Promise<boolean>;
   disabled: boolean;
   busy: boolean;
@@ -187,11 +210,11 @@ export function TellJewl({ onTell, disabled, busy }: {
     if (ok) setSay('');
   };
   return (
-    <section className="space-y-2" data-testid="designer-tell" style={{ opacity: disabled ? 0.55 : 1 }}>
-      <SectionBar n={3} title="Tell JEWL" hint="say what to change; it edits in place" />
+    <section className="space-y-2" data-testid="designer-tell" data-target={target} style={{ opacity: disabled ? 0.55 : 1 }}>
+      <SectionBar n={3} title="Tell JEWL" hint={`${target.toUpperCase()} · say what to change; it edits in place`} />
       <div className="flex gap-1">
         <div className="flex-1 min-w-0">
-          <TextInput value={say} onChange={setSay} placeholder="One sentence: what should change?" testId="designer-tell-input" disabled={disabled} onEnter={() => send(say)} />
+          <TextInput value={say} onChange={setSay} placeholder={`One sentence: what should change on the ${target}?`} testId="designer-tell-input" disabled={disabled} onEnter={() => send(say)} />
         </div>
         <button
           type="button"
@@ -208,7 +231,7 @@ export function TellJewl({ onTell, disabled, busy }: {
         </button>
       </div>
       <div className="flex flex-wrap gap-1">
-        {QUICK_TELLS.map(q => (
+        {QUICK_TELLS[target].map(q => (
           <Chip key={q} label={q} tone="spirit" onClick={() => send(q)} disabled={disabled || busy} testId={`designer-quick-${q}`} />
         ))}
       </div>
