@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { boxMaskPng, diffMaskPng, locatePrompt, maskCoverage, matchColorInRegion, padEditBox, parseEditBox, unionMasks } from './edit-localize';
+import {
+  boxMaskPng, locatePrompt, mapBoxFromCrop, maskCoverage, matchColorInRegion, padEditBox, parseEditBox, refinePrompt, zoomWindow,
+} from './edit-localize';
 import { compositeEditWithMask } from './mask-composite';
 
 describe('parseEditBox', () => {
@@ -17,12 +19,14 @@ describe('parseEditBox', () => {
     expect(parseEditBox('{"bbox": [100, 100, 105, 400]}')).toBeNull();
     expect(parseEditBox('{"bbox": [0, 0, 1000, 1000]}')).toBeNull();
   });
-  it('the prompt carries the instruction without the suffix', () => {
+  it('the prompts carry the instruction without the suffix', () => {
     expect(locatePrompt('Add a piercing to her torso: a navel ring. Change nothing else.')).toContain('"Add a piercing to her torso: a navel ring."');
+    expect(refinePrompt('Add a scar. Change nothing else.')).toContain('"Add a scar."');
+    expect(refinePrompt('x')).toContain('THIS crop');
   });
 });
 
-describe('masks', () => {
+describe('box maths', () => {
   it('padEditBox grows the box and clamps to the frame', () => {
     const p = padEditBox({ x0: 0.4, y0: 0.5, x1: 0.48, y1: 0.56 }, 0.5, 0.01);
     expect(p.x0).toBeCloseTo(0.35, 5);
@@ -31,6 +35,27 @@ describe('masks', () => {
     expect(padEditBox({ x0: 0.95, y0: 0.95, x1: 1, y1: 1 }).x1).toBe(1);
   });
 
+  it('zoomWindow: a tiny box grows to the minimum crop, centred, kept inside the frame', () => {
+    const w = zoomWindow({ x0: 0.49, y0: 0.37, x1: 0.51, y1: 0.395 }, 832 / 1216, 0.22);
+    // long side = height: min height 0.22, min width 0.22 / (832/1216) ≈ 0.3215
+    expect(w.x1 - w.x0).toBeCloseTo(0.3215, 3);
+    expect(w.y1 - w.y0).toBeCloseTo(0.22, 3);
+    expect((w.x0 + w.x1) / 2).toBeCloseTo(0.5, 3);
+    const edge = zoomWindow({ x0: 0.97, y0: 0.01, x1: 0.99, y1: 0.03 }, 1, 0.3);
+    expect(edge.x1).toBe(1); expect(edge.y0).toBe(0);
+    expect(edge.x1 - edge.x0).toBeCloseTo(0.3, 3);
+    // a big box is just padded
+    const big = zoomWindow({ x0: 0.2, y0: 0.2, x1: 0.8, y1: 0.8 }, 1, 0.22);
+    expect(big.x0).toBe(0); expect(big.x1).toBe(1);
+  });
+
+  it('mapBoxFromCrop puts a crop-relative box back into the frame', () => {
+    const crop = { x0: 0.4, y0: 0.3, x1: 0.6, y1: 0.5 };
+    expect(mapBoxFromCrop({ x0: 0.5, y0: 0.5, x1: 0.75, y1: 1 }, crop)).toEqual({ x0: 0.5, y0: 0.4, x1: 0.55, y1: 0.5 });
+  });
+});
+
+describe('masks', () => {
   it('boxMaskPng covers the box only; the composite keeps the base outside it', async () => {
     const W = 200; const H = 300;
     const mask = await boxMaskPng({ x0: 0.25, y0: 0.5, x1: 0.75, y1: 0.75 }, W, H);
@@ -54,28 +79,5 @@ describe('masks', () => {
     expect([info.width, info.height]).toEqual([W, H]);
     expect(Array.from(data.subarray(0, 3))).toEqual([120, 100, 80]);
     expect(await matchColorInRegion(base, base, { x0: 0, y0: 0, x1: 1, y1: 1 }, W, H)).toBe(base); // no shift needed → untouched
-  });
-
-  it('diffMaskPng finds a strong local change and ignores a global drift; noise and whole-frame → null', async () => {
-    const W = 240; const H = 320;
-    const base = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 120, g: 120, b: 120 } } }).png().toBuffer();
-    const spot = await sharp({ create: { width: 30, height: 30, channels: 3, background: { r: 250, g: 250, b: 250 } } }).png().toBuffer();
-    // drift: the whole frame a shade lighter; change: one bright spot
-    const edited = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 132, g: 132, b: 132 } } })
-      .composite([{ input: spot, left: 100, top: 150 }]).png().toBuffer();
-    const mask = await diffMaskPng(base, edited, W, H);
-    expect(mask).not.toBeNull();
-    const cover = await maskCoverage(mask!);
-    expect(cover).toBeGreaterThan(0.005);
-    expect(cover).toBeLessThan(0.08);
-    expect(await diffMaskPng(base, base, W, H)).toBeNull();
-    // within a window: the spot is found inside it, nothing outside it counts
-    const inWin = await diffMaskPng(base, edited, W, H, 40, { x0: 0.3, y0: 0.35, x1: 0.7, y1: 0.7 });
-    expect(inWin).not.toBeNull();
-    expect(await diffMaskPng(base, edited, W, H, 40, { x0: 0, y0: 0, x1: 0.3, y1: 0.3 })).toBeNull();
-    const u = await unionMasks(inWin!, await boxMaskPng({ x0: 0, y0: 0, x1: 0.1, y1: 0.1 }, W, H));
-    expect(await maskCoverage(u)).toBeGreaterThan(await maskCoverage(inWin!));
-    const inverted = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 250, g: 250, b: 250 } } }).png().toBuffer();
-    expect(await diffMaskPng(base, inverted, W, H)).toBeNull();
   });
 });
