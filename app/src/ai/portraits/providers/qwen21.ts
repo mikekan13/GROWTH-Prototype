@@ -144,7 +144,7 @@ export class Qwen21Provider extends ServerlessProvider {
     this.loraOverride = loras;
   }
 
-  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env (unset = grwthpaint_v1 at 0.65). */
+  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env (unset = grwthpaint_v1 at 0.9). */
   activeLoras(explicit?: Qwen21Lora[]): Qwen21Lora[] {
     return explicit ?? this.loraOverride ?? qwen21LorasFromEnv();
   }

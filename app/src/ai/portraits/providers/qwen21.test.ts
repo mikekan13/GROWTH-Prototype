@@ -146,28 +146,28 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
   beforeEach(() => { process.env.QWEN21_LORAS = 'none'; });
   afterEach(() => { delete process.env.QWEN21_LORAS; });
 
-  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.65 on every gen, trigger first, lock MEDIUM stripped', async () => {
+  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.9 on every gen, trigger first, lock MEDIUM stripped', async () => {
     delete process.env.QWEN21_LORAS; delete process.env.QWEN21_STYLE_MODE;
     const p = patch(new TestQwen());
     const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg'] }));
     expect(r.success).toBe(true);
     const wf = p.queued[0];
     expect(wf.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
-    expect(wf.LORA_1.inputs.strength_model).toBe(0.65);
+    expect(wf.LORA_1.inputs.strength_model).toBe(0.9);
     const prompt = String(wf.TEXT_ENCODE.inputs.prompt);
     expect(prompt).toMatch(/^grwthpaint, A painted character illustration of the person in <image1>, head and shoulders\./);
     expect(prompt).not.toContain(GROWTH_MEDIUM);
     expect(prompt).not.toMatch(/no grain, no noise/);
     expect(prompt).toContain(getCampaignMood('growth'));
-    expect(p.metas[0]?.loras).toBe('grwthpaint_v1.safetensors:0.65:grwthpaint');
+    expect(p.metas[0]?.loras).toBe('grwthpaint_v1.safetensors:0.9:grwthpaint');
 
     // A later alteration (body from the bust) carries the same LoRA at the same strength.
     await p.generateBody('c', p.saved[0], 3);
     const body = p.queued[1];
     expect(body.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
-    expect(body.LORA_1.inputs.strength_model).toBe(0.65);
+    expect(body.LORA_1.inputs.strength_model).toBe(0.9);
     expect(String(body.TEXT_ENCODE.inputs.prompt).startsWith('grwthpaint, ')).toBe(true);
-    expect(p.metas[1]?.loras).toBe('grwthpaint_v1.safetensors:0.65:grwthpaint');
+    expect(p.metas[1]?.loras).toBe('grwthpaint_v1.safetensors:0.9:grwthpaint');
   });
 
   it('default (single mode): photos → one painted lock pass, no second pass', async () => {
