@@ -217,7 +217,7 @@ export class Qwen21Provider extends ServerlessProvider {
     let stage: { stopAt?: number; resumeFrom?: { image: string; at: number } } | undefined;
     if (opts?.stage?.resumeFrom) {
       const init = opts.stage.resumeFrom.image;
-      const name = Buffer.isBuffer(init) ? await this.uploadImage(init, 'qwen21-ink-mid') : await this.uploadReferenceImage(init);
+      const name = Buffer.isBuffer(init) ? await this.uploadImage(init, 'qwen21-ink-mid', { jpeg: true }) : await this.uploadReferenceImage(init);
       stage = { resumeFrom: { image: name, at: opts.stage.resumeFrom.at } };
     } else if (opts?.stage?.stopAt) {
       stage = { stopAt: opts.stage.stopAt };
@@ -255,27 +255,39 @@ export class Qwen21Provider extends ServerlessProvider {
     prompt: string,
     seed: number,
     size: { width: number; height: number },
-    opts?: { inkAt?: number; loras?: Qwen21Lora[] },
+    opts?: { inkAt?: number; loras?: Qwen21Lora[]; images?: Qwen21Image[] },
   ): Promise<{ raw: Buffer; soft?: Buffer; inked?: Buffer; inkAt: number }> {
     const inkAt = opts?.inkAt ?? qwen21LockInkAtFromEnv();
-    if (!(inkAt > 0)) return { raw: await this.runWorkflow(prompt, [], seed, size, opts?.loras), inkAt: 0 };
-    const soft = await this.runStyledStage(prompt, seed, size, { stopAt: inkAt }, opts?.loras);
+    const refs = opts?.images ?? [];
+    if (!(inkAt > 0)) return { raw: await this.runWorkflow(prompt, await this.uploadRefs(refs), seed, size, opts?.loras), inkAt: 0 };
+    const soft = await this.runStyledStage(prompt, seed, size, { stopAt: inkAt }, opts?.loras, refs);
     const inked = await inkImage(soft);
-    const raw = await this.runStyledStage(prompt, seed, size, { resumeFrom: { image: inked, at: inkAt } }, opts?.loras);
+    const raw = await this.runStyledStage(prompt, seed, size, { resumeFrom: { image: inked, at: inkAt } }, opts?.loras, refs);
     return { raw, soft, inked, inkAt };
   }
 
-  /** One stage of a text-to-image styled render (lab): stop at a fraction, or resume from an (inked) image at it. */
+  /** One stage of a styled render (lab): stop at a fraction, or resume from an (inked) image at it. `refs` = <image1..N>. */
   async runStyledStage(
     prompt: string,
     seed: number,
     size: { width: number; height: number },
     stage: { stopAt: number } | { resumeFrom: { image: Buffer; at: number } },
     loras?: Qwen21Lora[],
+    refs: Qwen21Image[] = [],
   ): Promise<Buffer> {
-    if ('stopAt' in stage) return this.runWorkflow(prompt, [], seed, size, loras, { stopAt: stage.stopAt });
-    const name = await this.uploadImage(stage.resumeFrom.image, 'qwen21-ink-mid');
-    return this.runWorkflow(prompt, [], seed, size, loras, { resumeFrom: { image: name, at: stage.resumeFrom.at } });
+    const names = await this.uploadRefs(refs);
+    if ('stopAt' in stage) return this.runWorkflow(prompt, names, seed, size, loras, { stopAt: stage.stopAt });
+    const name = await this.uploadImage(stage.resumeFrom.image, 'qwen21-ink-mid', { jpeg: true });
+    return this.runWorkflow(prompt, names, seed, size, loras, { resumeFrom: { image: name, at: stage.resumeFrom.at } });
+  }
+
+  private async uploadRefs(refs: Qwen21Image[]): Promise<string[]> {
+    const names: string[] = [];
+    for (let i = 0; i < refs.length; i++) {
+      const r = refs[i];
+      names.push(Buffer.isBuffer(r) ? await this.uploadImage(r, `qwen21-ref-${i + 1}`, { maxDim: 1024 }) : await this.uploadReferenceImage(r));
+    }
+    return names;
   }
 
   /**
@@ -617,9 +629,20 @@ export class Qwen21Provider extends ServerlessProvider {
     return { imagePath, thumbnailPath, imageData, rawData, rawPath, seed, prompt, width: m.width ?? 0, height: m.height ?? 0, generationTimeMs: ms };
   }
 
-  private async uploadImage(img: Qwen21Image, stem: string): Promise<string> {
+  /**
+   * Upload a buffer (or a stored web path). `maxDim` downsizes a REFERENCE the way stored uploads are (the serverless
+   * body is capped at 10 MiB — four full-size PNG refs plus an init image blew it, 14 Oct); `jpeg` sends a full-size
+   * init image (the inked midpoint) as a q95 JPEG, a fifth of the PNG bytes, latent still matching the canvas.
+   */
+  private async uploadImage(img: Qwen21Image, stem: string, opts: { maxDim?: number; jpeg?: boolean } = {}): Promise<string> {
     if (Buffer.isBuffer(img)) {
-      const png = await sharp(img).png().toBuffer();
+      let s = sharp(img);
+      if (opts.maxDim) s = s.resize(opts.maxDim, opts.maxDim, { fit: 'inside', withoutEnlargement: true });
+      if (opts.jpeg) {
+        const jpg = await s.jpeg({ quality: 95 }).toBuffer();
+        return this.uploadBuffer(jpg, `${stem}-${jpg.length.toString(36)}.jpg`);
+      }
+      const png = await s.png().toBuffer();
       return this.uploadBuffer(png, `${stem}-${png.length.toString(36)}.png`);
     }
     return this.uploadReferenceImage(await this.preferRaw(await this.fullResWebPath(img)));
