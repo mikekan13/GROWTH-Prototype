@@ -156,7 +156,9 @@ The sheet is what's consulted/edited every session. Must work without GM interve
 
 Cloud H100 + FLUX.2 Dev FP16 + PuLID-Flux. Just merged from fork.
 
-- ✅ Stage 1 face-lock (front)
+**2026-10-14 — GROWTH STYLE v1 shipped (Qwen-Image-2.1 serverless lane; see docs/ai_systems.md):** base lock = prepared photo (face-check + crop) → grey OpenPose skeleton + fixed 4:5 canvas → style LoRA grwthpaint_v1 @ 0.7 → mid-generation ink at 80% (dark pen on dark scenes, GROWTH gold on bright) → vision gate with re-roll. Finish layer off. First 14 training images culled by Mike in `style-refs/training/v1/` (seed of LoRA v2). Multi-reference composites proven. Open: worker spin-down on leaving the appearance tab; bright scenes drift anime (cull for v2); Qwen 2.1 licence check.
+
+- ✅ Stage 1 face-lock (front) — rebuilt on Qwen 2.1 as the v1 base lock (above)
 - 🟡 5-angle face lock (Kai mission plateau at 7/10 identity per memory)
 - 🔴 Body lock (full character with body type + age)
 - 🔴 Equipment overlay (visible gear)
