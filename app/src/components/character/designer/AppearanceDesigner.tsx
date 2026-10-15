@@ -85,6 +85,11 @@ export default function AppearanceDesigner({
     if (!characterId) return;
     void loadIdentity(characterId).then(identity => {
       if (cancelled) return;
+      if (identity === null) {
+        // Never sit on "reading the edit stack…" (15 Oct: a recompiling dev server left it there).
+        setError('Could not read the character record. Reload the page to try again.');
+        return;
+      }
       const s = restoreDesigner(identity);
       ref.current = s;
       setDesigner(s);
@@ -338,7 +343,7 @@ export default function AppearanceDesigner({
         {!characterId ? (
           <Readout tone="note">Appearance needs a saved character record. Save the sheet first.</Readout>
         ) : !loaded ? (
-          <Readout>[ reading the edit stack… ]</Readout>
+          error ? <Readout tone="error" testId="designer-error">{error}</Readout> : <Readout>[ reading the edit stack… ]</Readout>
         ) : (
           <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
             <div className="md:sticky md:top-2">
