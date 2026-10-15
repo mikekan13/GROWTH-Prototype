@@ -605,6 +605,26 @@ export class LocalProvider implements ImageGenerationProvider {
   }
 
   /**
+   * POLISH — APPROVE's clean re-render (Mike, 15 Oct 2026). Qwen-Image-2.1
+   * implements it (resume-from the image itself); the FLUX path has no
+   * equivalent and reports so.
+   */
+  async polishImage(
+    imagePath: string,
+    options: { characterId: string; target: 'face' | 'body'; seed?: number; mood?: string; at?: number },
+  ): Promise<PortraitResult> {
+    void imagePath;
+    return {
+      success: false,
+      metadata: {
+        prompt: '', negativePrompt: '', seed: options.seed ?? 0, model: 'flux2-dev-fp8mixed',
+        steps: 0, cfg: 0, width: 0, height: 0, generationTimeMs: 0,
+      },
+      error: 'The clean re-render (polish) is only available on the Qwen-Image-2.1 provider',
+    };
+  }
+
+  /**
    * Edit an image using FLUX.2 Dev. Picks the right sub-workflow based on
    * the caller's options: flux2-edit-with-refpull when an object-pull
    * reference is supplied, flux2-edit-masked when a paint mask is present,

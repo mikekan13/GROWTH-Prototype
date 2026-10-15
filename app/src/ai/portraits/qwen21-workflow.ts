@@ -227,6 +227,30 @@ export function buildQwen21EditPrompt(instruction: string, mood?: string): strin
   return `${ended} ${reminder}. ${getCampaignMood(mood)} Change nothing else.`;
 }
 
+/**
+ * POLISH (Mike, 15 Oct: "once the user is happy with the face and body they should hit approve and it should
+ * re-render the face and body to fix any errors… a clean re-render to fix any artifacts or weird things because
+ * of the compositing"). The approved image is <image1> AND the init latent (resumeFrom at QWEN21_POLISH_AT):
+ * the model finishes the last stretch of the generation from the picture itself, in one consistent hand.
+ * No medium paragraph — the style LoRA carries the look.
+ */
+export function buildQwen21PolishPrompt(mood?: string): string {
+  return [
+    'A painted character illustration of exactly the subject in <image1>: keep the same person, face, hair, marks, pose, expression, clothing, framing, backdrop and lighting as <image1>.',
+    'Finished and consistent everywhere: one continuous brushwork and finish across the whole picture, every edge and transition clean; no seams, patches, smudges, blur, doubled lines or artifacts.',
+    getCampaignMood(mood),
+  ].filter(Boolean).join(' ');
+}
+
+/**
+ * How far through the generation the polish resumes (fraction of steps kept from the image; the rest is re-run).
+ * Violet lab, 15 Oct: 0.7 left a faint remnant of a composite patch, 0.55 cleaned it fully with identity intact → 0.6.
+ */
+export function qwen21PolishAtFromEnv(): number {
+  const n = Number(process.env.QWEN21_POLISH_AT);
+  return Number.isFinite(n) && n > 0.2 && n < 0.95 ? n : 0.6;
+}
+
 // ============================================================
 // Community style-LoRA stack (2026-10-13)
 // ============================================================

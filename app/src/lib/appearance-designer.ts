@@ -275,7 +275,9 @@ export type LayerKind =
   | 'skin' | 'hair' | 'eyes' | 'face' | 'build' | 'age'
   | 'scar' | 'tattoo' | 'makeup' | 'piercing' | 'birthmark' | 'bodymod'
   | 'underwear'
-  | 'jewl';
+  | 'jewl'
+  /** The clean re-render made by APPROVE (15 Oct): the approved image itself. */
+  | 'polish';
 
 export interface DesignerLayer {
   imagePath: string;
@@ -445,8 +447,10 @@ export function layersDeletedBy(s: DesignerState, index: number, target: EditTar
 
 const LAYER_KINDS: ReadonlySet<string> = new Set<LayerKind>([
   'base', 'skin', 'hair', 'eyes', 'face', 'build', 'age',
-  'scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod', 'underwear', 'jewl',
+  'scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod', 'underwear', 'jewl', 'polish',
 ]);
+
+export const POLISH_TEXT = 'Clean render (approved)';
 
 function str(v: unknown): string | null {
   return typeof v === 'string' && v.trim() ? v : null;

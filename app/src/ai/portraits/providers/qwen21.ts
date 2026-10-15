@@ -39,6 +39,8 @@ import {
   QWEN21_STEPS,
   buildQwen21BodyPrompt,
   buildQwen21EditPrompt,
+  buildQwen21PolishPrompt,
+  qwen21PolishAtFromEnv,
   buildQwen21LockPrompt,
   buildQwen21DescribePrompt,
   buildQwen21StylePrompt,
@@ -462,9 +464,49 @@ export class Qwen21Provider extends ServerlessProvider {
     return localized ? { ...r, localized } : r;
   }
 
+  /**
+   * POLISH (APPROVE, Mike 15 Oct): a clean re-render of an approved face or
+   * body image. The image is <image1> AND the init latent: the generation
+   * resumes from it at `at` (default QWEN21_POLISH_AT = 0.7) with the active
+   * LoRA blend, so the last stretch is repainted in one consistent hand —
+   * compositing seams and artifacts go, identity, pose and marks stay.
+   */
+  async polish(characterId: string, imagePath: string, seed: number, folder: 'faces' | 'bodies', mood?: string, at?: number): Promise<Qwen21StepResult> {
+    const web = await this.preferRaw(await this.fullResWebPath(imagePath));
+    const buf = await fs.readFile(this.publicAbs(web));
+    const meta = await sharp(buf).metadata();
+    const size = meta.width && meta.height ? { width: meta.width, height: meta.height } : undefined;
+    // Reference = the normal (≤1024 px) upload; INIT = a full-size copy, because the serverless transport
+    // downsizes references and the output takes the init latent's size (a 1024-px init shrank the body).
+    const name = await this.uploadReferenceImage(web);
+    const init = await this.uploadImage(buf, 'qwen21-polish-init', { jpeg: true });
+    const prompt = buildQwen21PolishPrompt(mood);
+    const resumeAt = at ?? qwen21PolishAtFromEnv();
+    const t0 = Date.now();
+    const raw = await this.runWorkflow(prompt, [name], seed, size, undefined, { resumeFrom: { image: init, at: resumeAt } });
+    console.log(`[Qwen21] polish ${folder} resume@${resumeAt} in ${Date.now() - t0} ms`);
+    return this.saveStep(characterId, folder, 'polish', prompt, raw, seed, Date.now() - t0, mood);
+  }
+
   // ============================================================
   // Route entry points (same signatures as LocalProvider)
   // ============================================================
+
+  /** /api/portraits/polish entry point. */
+  override async polishImage(
+    imagePath: string,
+    options: { characterId: string; target: 'face' | 'body'; seed?: number; mood?: string; at?: number },
+  ): Promise<PortraitResult> {
+    const seed = options.seed ?? Math.floor(Math.random() * 2147483647);
+    try {
+      const r = await this.polish(options.characterId, imagePath, seed, options.target === 'body' ? 'bodies' : 'faces', resolveMoodKey(options.mood), options.at);
+      return this.toResult(r, r.generationTimeMs, `qwen21 polish (${options.target})`, { polish: true });
+    } catch (e) {
+      if (e instanceof PortraitEndpointError) throw e;
+      console.error('[Qwen21] polish failed:', e);
+      return { success: false, metadata: this.meta('', seed, 0, 0, 0), error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 
   /**
    * Bust: no lock yet (refs are uploaded photos) → lockIdentity → applyStyle;

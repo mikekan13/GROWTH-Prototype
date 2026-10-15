@@ -15,7 +15,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
-  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE,
+  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE, POLISH_TEXT,
   type DesignerAction, type DesignerState, type EditTarget, type LayerKind,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
@@ -27,7 +27,7 @@ const BODY_NOT_YET = 'The body is made when you approve the base. Approve the fa
 import { Preview, type PreviewView } from './Preview';
 import { EditStack } from './EditStack';
 import { Shape, StartFrom } from './Sections';
-import { approveBase, editLayer, generateBody, loadIdentity, lockIdentity, persistDesigner } from './api';
+import { approveBase, editLayer, generateBody, loadIdentity, lockIdentity, persistDesigner, polishImage } from './api';
 
 export interface AppearanceDesignerProps {
   characterId: string | null;
@@ -46,13 +46,14 @@ export interface AppearanceDesignerProps {
   onApproved: (bust: string, body: string | null) => void;
 }
 
-type Busy = null | 'lock' | 'edit' | 'regen' | 'approve' | 'body';
+type Busy = null | 'lock' | 'edit' | 'regen' | 'approve' | 'polishBody' | 'body';
 
 const BUSY_LINE: Record<Exclude<Busy, null>, string> = {
   lock: '[ LOCKING IDENTITY · lock, then style · the engine may take a minute to wake ]',
   edit: '[ EDITING IN PLACE ]',
   regen: '[ REGENERATING · new seed ]',
-  approve: '[ APPROVING BASE ]',
+  approve: '[ APPROVING · CLEAN RE-RENDER OF THE FACE ]',
+  polishBody: '[ CLEAN RE-RENDER OF THE BODY ]',
   body: '[ RENDERING BODY FROM THE BASE ]',
 };
 
@@ -225,7 +226,24 @@ export default function AppearanceDesigner({
     if (stackTop === 0) { void (target === 'body' ? regenBody() : runLock('regen')); return; }
     const newest = stack[stackTop];
     const prev = stack[stackTop - 1];
+    if (newest.kind === 'polish') { void rerollPolish(prev.imagePath); return; }
     void runEdit(newest.text, newest.kind, 'regen', prev.imagePath, target);
+  };
+
+  /** REGENERATE on a clean-render layer: polish the layer under it again with a new seed (replaces the top). */
+  const rerollPolish = async (source: string) => {
+    if (!characterId || working) return;
+    setBusy(target === 'body' ? 'polishBody' : 'approve'); setError(null); setNote(null);
+    const r = await polishImage(characterId, source, target);
+    setBusy(null);
+    if (!r.ok) { setError(`The clean re-render failed: ${r.line}`); return; }
+    commit({ type: 'replaceTop', target, layer: { imagePath: r.imagePath, text: POLISH_TEXT, kind: 'polish', seed: r.seed, at: new Date().toISOString() } }, { type: 'levers', levers: r.levers });
+    if (target === 'face') {
+      const a = await approveBase(characterId, r.imagePath);
+      if (a.ok) { commit({ type: 'approved', imagePath: r.imagePath, at: new Date().toISOString() }); onApproved(r.imagePath, bodyPath); }
+      else setError(a.line);
+    }
+    newLayerLanded();
   };
   const canRegenerate = editable && !working && view !== 'portrait' && stackTop >= 0 && (
     stackTop > 0 || (target === 'body' ? !!designer.approvedImagePath : (!!seedName && referencePhotos.length > 0))
@@ -245,24 +263,46 @@ export default function AppearanceDesigner({
   /** Shape / Tell follow the tab; the body waits for its render. */
   const editDisabled = !locked || working || (target === 'body' && !bodyPath);
 
+  /**
+   * APPROVE (Mike, 15 Oct): a CLEAN RE-RENDER of the face (the polish layer
+   * becomes the approved base), then the body — polished in place when one
+   * exists (its edits kept), rendered fresh from the polished face when not.
+   */
   const approve = async () => {
     if (!characterId || !top || working) return;
-    const bust = top.imagePath;
     setBusy('approve'); setError(null); setNote(null);
+    const now = () => new Date().toISOString();
+    const f = await polishImage(characterId, top.imagePath, 'face');
+    if (!f.ok) { setBusy(null); setError(`The clean re-render failed: ${f.line}`); return; }
+    const bust = f.imagePath;
+    commit({ type: 'append', layer: { imagePath: bust, text: POLISH_TEXT, kind: 'polish', seed: f.seed, at: now() } });
     const a = await approveBase(characterId, bust);
     if (!a.ok) { setBusy(null); setError(a.line); return; }
-    commit({ type: 'approved', imagePath: bust, at: new Date().toISOString() });
-    setBusy('body');
-    const b = await generateBody(getCharacterData(), bust);
-    setBusy(null);
-    if (b.ok) {
-      commit({ type: 'body', imagePath: b.imagePath, seed: b.levers.seed, at: new Date().toISOString() }, { type: 'levers', levers: b.levers });
-      setView('body');
-      newLayerLanded();
+    commit({ type: 'approved', imagePath: bust, at: now() });
+    let bodyOut: string | null = null;
+    if (bodyPath) {
+      setBusy('polishBody');
+      const b = await polishImage(characterId, bodyPath, 'body');
+      if (b.ok) {
+        commit({ type: 'append', target: 'body', layer: { imagePath: b.imagePath, text: POLISH_TEXT, kind: 'polish', seed: b.seed, at: now() } }, { type: 'levers', levers: b.levers });
+        bodyOut = b.imagePath;
+      } else {
+        setError(`Face approved. The body's clean re-render failed: ${b.line}`);
+      }
     } else {
-      setError(`Base approved. The body render failed: ${b.line}`);
+      setBusy('body');
+      const b = await generateBody(getCharacterData(), bust);
+      if (b.ok) {
+        commit({ type: 'body', imagePath: b.imagePath, seed: b.levers.seed, at: now() }, { type: 'levers', levers: b.levers });
+        bodyOut = b.imagePath;
+      } else {
+        setError(`Face approved. The body render failed: ${b.line}`);
+      }
     }
-    onApproved(bust, b.ok ? b.imagePath : null);
+    setBusy(null);
+    setView(bodyOut ? 'body' : 'face');
+    newLayerLanded();
+    onApproved(bust, bodyOut);
   };
 
   // ── render ──
@@ -356,11 +396,11 @@ export default function AppearanceDesigner({
                     label={status === 'approved' ? 'BASE APPROVED' : 'APPROVE AS BASE'}
                     onClick={() => { void approve(); }}
                     disabled={status === 'approved'}
-                    busy={busy === 'approve' || busy === 'body'}
+                    busy={busy === 'approve' || busy === 'polishBody' || busy === 'body'}
                     testId="designer-approve"
                   />
                   <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>
-                    The portrait, tokens, paperdoll and in-play wounds and expressions are all made from this face and body in the background.
+                    Approving re-renders the face and body clean (seams and artifacts from the edits go, the look stays). The portrait, tokens and paperdoll are then made from them in the background.
                   </div>
                 </div>
               )}

@@ -58,6 +58,14 @@ export function editLayer(characterId: string, sourceImagePath: string, instruct
   return post('/api/portraits/edit', { sourceImagePath, editPrompt: instruction, characterId, seed: randomSeed(), target }, 1);
 }
 
+/**
+ * POLISH (APPROVE, 15 Oct): a clean re-render of the face or body image — the picture finished again from
+ * itself so compositing seams and artifacts go, identity and marks stay.
+ */
+export function polishImage(characterId: string, imagePath: string, target: EditTarget): Promise<CallResult> {
+  return post('/api/portraits/polish', { characterId, imagePath, target, seed: randomSeed() }, 1);
+}
+
 /** BODY: full-body from the approved bust (qwen21: composition full_body → generateBody(refs[0])). */
 export function generateBody(characterData: unknown, bustPath: string): Promise<CallResult> {
   return post('/api/portraits/generate', {

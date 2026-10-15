@@ -10,10 +10,11 @@ const MARK_KINDS: ReadonlySet<LayerKind> = new Set(['scar', 'tattoo', 'makeup', 
 function kindTone(kind: LayerKind): string {
   if (kind === 'base') return C.soul;
   if (kind === 'jewl') return C.spirit;
+  if (kind === 'polish') return C.teal;
   if (MARK_KINDS.has(kind)) return C.body;
   return C.ink;
 }
-const kindLabel = (kind: LayerKind) => (kind === 'bodymod' ? 'body mod' : kind);
+const kindLabel = (kind: LayerKind) => (kind === 'bodymod' ? 'body mod' : kind === 'polish' ? 'clean' : kind);
 
 /**
  * Linear history, newest first, one stack per tab (Mike 2026-10-15). Tapping
