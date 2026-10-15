@@ -306,6 +306,12 @@ export default function AppearanceDesigner({
   };
 
   // ── render ──
+  // DEV PREVIEW of the veils without a generation: ?veil=portrait | ?veil=face (never in production).
+  const demoVeil = process.env.NODE_ENV !== 'production' && typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('veil')
+    : null;
+  const shownView: PreviewView = demoVeil === 'portrait' ? 'portrait' : view;
+  const shownBusy = busy ? BUSY_LINE[busy] : demoVeil === 'portrait' ? '[ PAINTING THE PORTRAIT · preview ]' : demoVeil === 'face' ? '[ EDITING IN PLACE · preview ]' : null;
   const statusColor = status === 'awaiting' ? C.gold : C.teal;
   const startIsOpen = !locked || startOpen;
 
@@ -337,13 +343,14 @@ export default function AppearanceDesigner({
           <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
             <div className="md:sticky md:top-2">
               <Preview
-                view={view}
+                view={shownView}
                 onView={changeView}
                 layer={shownFace}
                 bodyImagePath={shownBody}
                 portraitImagePath={designer.approvedImagePath ?? null}
                 portraitLocked={!designer.approvedImagePath || !bodyPath}
-                busyLine={busy ? BUSY_LINE[busy] : null}
+                busyLine={shownBusy}
+                busySub={demoVeil === 'portrait' ? 'JEWL reads the sheet, dresses her from inventory, places her in the scene' : null}
                 error={error}
                 note={note}
                 peekLine={peekLine}

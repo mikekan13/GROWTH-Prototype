@@ -81,6 +81,33 @@ export function DesignerStyles() {
         background: repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 5px);
       }
 
+      /* The PORTRAIT veil: the face and body drift, cross-dissolve and tear while the portrait is painted. */
+      @keyframes gd-pv-drift-a {
+        0%   { transform: scale(1.06) translate(0, 0); }
+        100% { transform: scale(1.18) translate(-2.5%, 2%); }
+      }
+      @keyframes gd-pv-drift-b {
+        0%   { transform: scale(1.12) translate(1.5%, -1%); }
+        100% { transform: scale(1.02) translate(0, 1.5%); }
+      }
+      @keyframes gd-pv-xfade {
+        0%, 38%  { opacity: 1; }
+        50%, 88% { opacity: 0; }
+        100%     { opacity: 1; }
+      }
+      @keyframes gd-pv-tear {
+        0%, 88%, 100% { clip-path: inset(0 0 0 0); transform: translate(0,0); filter: none; }
+        89%  { clip-path: inset(10% 0 55% 0); transform: translate(-9px, 0); filter: drop-shadow(-5px 0 ${C.body}) drop-shadow(5px 0 ${C.teal}); }
+        91%  { clip-path: inset(42% 0 20% 0); transform: translate(7px, 2px); filter: hue-rotate(70deg) saturate(2); }
+        93%  { clip-path: inset(66% 0 6% 0); transform: translate(-4px, -2px); filter: drop-shadow(4px 0 ${C.spirit}); }
+        95%  { clip-path: inset(0 0 0 0); transform: translate(2px, 0); filter: invert(0.15); }
+      }
+      @keyframes gd-pv-ring { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      .gd-pv-a { animation: gd-pv-drift-a 9s ease-in-out infinite alternate, gd-pv-xfade 8s steps(1, end) infinite, gd-pv-tear 4.2s steps(8, end) infinite; }
+      .gd-pv-b { animation: gd-pv-drift-b 11s ease-in-out infinite alternate, gd-pv-tear 5.3s steps(8, end) infinite 1.7s; }
+      .gd-pv-ring { animation: gd-pv-ring 14s linear infinite; }
+      @media (prefers-reduced-motion: reduce) { .gd-pv-a, .gd-pv-b, .gd-pv-ring { animation: none; } }
+
       /* Framed buttons under the preview (the canvas sheet's gold/black language). */
       .gd-frame-btn:hover:not(:disabled) { filter: drop-shadow(0 0 6px rgba(255,204,120,0.85)); }
       .gd-frame-btn:active:not(:disabled) { transform: translateY(1px); }
@@ -257,6 +284,69 @@ export function GlitchVeil({ line, src }: { line: string; src: string | null }) 
         <span className="gd-veil-flicker px-3 py-1" style={{ background: C.ink, color: C.gold, fontFamily: F.bebas, fontSize: 22, letterSpacing: '0.18em', lineHeight: 1.2, boxShadow: `0 0 0 1px ${C.gold}` }}>
           {line}
         </span>
+        <span aria-hidden className="px-2" style={{ background: 'rgba(20,20,19,0.85)', color: C.teal, fontFamily: F.mono, fontSize: 11, letterSpacing: '0.1em', whiteSpace: 'pre' }}>
+          {noise}
+        </span>
+        <span className="px-2" style={{ background: 'rgba(20,20,19,0.85)', color: C.powder, fontFamily: F.mono, fontSize: 12, letterSpacing: '0.1em' }}>
+          {mmss(secs)} <span className="gd-veil-cursor">█</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The PORTRAIT veil (Mike, 15 Oct: "flashy loading and graphics probably using
+ * the face and body with some movement and glitches while the portrait is
+ * generated"): the body drifts under a cross-dissolving face, both tear now
+ * and then, a sigil ring turns, the scan band sweeps, and the stage line on
+ * its black bar says what JEWL is doing. Still under prefers-reduced-motion.
+ */
+export function PortraitVeil({ face, body, line, sub }: { face: string | null; body: string | null; line: string; sub?: string | null }) {
+  const [noise, setNoise] = useState(() => noiseLine(34));
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const id = setInterval(() => {
+      setSecs(Math.floor((Date.now() - start) / 1000));
+      if (!still) setNoise(noiseLine(34));
+    }, still ? 1000 : 140);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="absolute inset-0 overflow-hidden gd-veil-noise" role="status" aria-live="polite" data-testid="designer-portrait-veil" style={{ background: C.ink }}>
+      {body && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={body} alt="" aria-hidden className="gd-pv-b absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.6, filter: 'grayscale(0.4) contrast(1.15)' }} />
+      )}
+      {face && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={face} alt="" aria-hidden className="gd-pv-a absolute inset-0 w-full h-full object-contain" style={{ opacity: 0.85, mixBlendMode: 'luminosity' }} />
+      )}
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(20,20,19,0) 35%, rgba(20,20,19,0.8) 100%)' }} />
+      <div
+        aria-hidden
+        className="gd-veil-sweep absolute left-0 right-0"
+        style={{ top: 0, height: '7%', background: `linear-gradient(180deg, transparent, rgba(88,42,114,0.35), rgba(255,204,120,0.5), transparent)` }}
+      />
+      <div aria-hidden className="absolute flex items-center justify-center" style={{ inset: 0 }}>
+        <div className="gd-pv-ring relative" style={{ width: '72%', aspectRatio: '1 / 1', borderRadius: '50%', border: `1px dashed rgba(255,204,120,0.45)`, color: C.gold, opacity: 0.7 }}>
+          {SIGILS.slice(0, 10).map((s, i) => (
+            // Each sigil sits in a full-size layer rotated about the ring's centre, pinned to the top edge.
+            <div key={i} className="absolute inset-0" style={{ transform: `rotate(${i * 36}deg)` }}>
+              <span className="absolute" style={{ left: '50%', top: -7, marginLeft: -5, fontSize: 12, lineHeight: 1 }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="absolute inset-0 flex flex-col items-center justify-end gap-2 px-4 pb-5 text-center">
+        <span className="gd-veil-flicker px-3 py-1" style={{ background: C.ink, color: C.gold, fontFamily: F.bebas, fontSize: 22, letterSpacing: '0.18em', lineHeight: 1.2, boxShadow: `0 0 0 1px ${C.gold}` }}>
+          {line}
+        </span>
+        {sub && (
+          <span className="px-2" style={{ background: 'rgba(20,20,19,0.85)', color: C.powder, fontFamily: F.body, fontSize: 12 }}>{sub}</span>
+        )}
         <span aria-hidden className="px-2" style={{ background: 'rgba(20,20,19,0.85)', color: C.teal, fontFamily: F.mono, fontSize: 11, letterSpacing: '0.1em', whiteSpace: 'pre' }}>
           {noise}
         </span>

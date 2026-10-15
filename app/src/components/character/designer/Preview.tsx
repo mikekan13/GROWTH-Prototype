@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { C, F, Chip, FrameButton, GlitchVeil, Readout } from './parts';
+import { C, F, Chip, FrameButton, GlitchVeil, PortraitVeil, Readout } from './parts';
 import type { DesignerLayer } from '@/lib/appearance-designer';
 
 export type PreviewView = 'face' | 'body' | 'portrait';
@@ -16,10 +16,12 @@ const VIEWS: PreviewView[] = ['face', 'body', 'portrait'];
  * edit stack tells the history.
  */
 export function Preview({
-  view, onView, layer, bodyImagePath, portraitImagePath, portraitLocked, busyLine, error, note, peekLine, onRegenerate, canRegenerate, glitchKey,
+  view, onView, layer, bodyImagePath, portraitImagePath, portraitLocked, busyLine, busySub, error, note, peekLine, onRegenerate, canRegenerate, glitchKey,
 }: {
   /** PORTRAIT waits until the face is approved AND the body exists (Mike 2026-10-15). */
   portraitLocked: boolean;
+  /** A second line under the stage line on the portrait veil (what JEWL is doing, in words). */
+  busySub?: string | null;
   /** Set while an older stack layer is being looked at. */
   peekLine: string | null;
   view: PreviewView;
@@ -90,7 +92,9 @@ export function Preview({
             <span className="px-2" style={{ background: C.ink, color: C.powder, fontFamily: F.mono, fontSize: 12 }}>{empty}</span>
           </div>
         )}
-        {busyLine && <GlitchVeil line={busyLine} src={src} />}
+        {busyLine && (view === 'portrait'
+          ? <PortraitVeil face={layer?.imagePath ?? null} body={bodyImagePath} line={busyLine} sub={busySub} />
+          : <GlitchVeil line={busyLine} src={src} />)}
       </div>
 
       <div className="flex items-stretch gap-2 mt-2" data-testid="designer-frame-actions">
