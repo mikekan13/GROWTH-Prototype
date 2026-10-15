@@ -49,6 +49,11 @@ export interface FinishParams {
     teal: number;
     /** Pen colour as hex (e.g. '582a72' Spirit purple); omitted = near-black. */
     color?: string;
+    /** A second, LIGHT pen (hex, e.g. 'ffcc78' GROWTH gold): used when `auto` says the scene is bright, or always when `color` is unset and `auto` is off. */
+    lightColor?: string;
+    /** Pick the light pen when the image's mean luminance ≥ autoThreshold (default 0.45). */
+    auto?: boolean;
+    autoThreshold?: number;
   };
   token: { ring: string; ringWidth: number };
 }
@@ -179,7 +184,15 @@ function applyInk(
   const n = w * h;
   const scale = w / 832;
   const lum = new Float32Array(n);
-  for (let i = 0; i < n; i++) lum[i] = 0.2126 * r[i] + 0.7152 * g[i] + 0.0722 * b[i];
+  let meanLum = 0;
+  for (let i = 0; i < n; i++) { lum[i] = 0.2126 * r[i] + 0.7152 * g[i] + 0.0722 * b[i]; meanLum += lum[i]; }
+  meanLum /= n;
+  // PEN CHOICE (Mike, 14 Oct: "switch the lines to actually be bright" in bright scenes): `ink.lightColor` is a second,
+  // light pen; `ink.auto` picks it when the image's mean luminance passes `ink.autoThreshold` (default 0.45). A pen
+  // lighter than mid-grey is drawn on the LIT side of edges (see the mask below), a dark pen on the dark side.
+  const useLight = !!ink.lightColor && (ink.auto ? meanLum >= (ink.autoThreshold ?? 0.45) : !ink.color);
+  const pen = useLight ? inkColorRgb(ink.lightColor) : inkColorRgb(ink.color);
+  const lightPen = 0.2126 * pen[0] + 0.7152 * pen[1] + 0.0722 * pen[2] > 0.5;
   const s1 = Math.max(0.5, 0.7 * ink.width * scale);
   const s2 = Math.max(1.2, 2.5 * scale);
   const b1 = gaussianBlur(lum, w, h, s1);
@@ -195,10 +208,17 @@ function applyInk(
     // Smooth mid-tones (skin) need a stronger coarse edge before they ink.
     const midBand = smoothstep(0.3, 0.45, b2[i]) * (1 - smoothstep(0.75, 0.9, b2[i]));
     m *= 1 - midBand * (1 - smoothstep(t, t * 3, ce));
-    // The pen sits on the DARK side of the edge: a thin line, not a halo band.
-    m *= smoothstep(0, t * 0.2, b2[i] - b1[i]);
-    // Already-dark marks (lashes, brows, deep hair) are lines already — don't thicken them.
-    m *= smoothstep(0.08, 0.3, b1[i]);
+    if (lightPen) {
+      // LIGHT PEN (bright scenes): the line sits on the LIT side of the edge, like a bright gouache line over a
+      // bright ground; already-bright marks (specular, sky) are not pushed further.
+      m *= smoothstep(0, t * 0.2, b1[i] - b2[i]);
+      m *= 1 - smoothstep(0.78, 0.95, b1[i]);
+    } else {
+      // The pen sits on the DARK side of the edge: a thin line, not a halo band.
+      m *= smoothstep(0, t * 0.2, b2[i] - b1[i]);
+      // Already-dark marks (lashes, brows, deep hair) are lines already — don't thicken them.
+      m *= smoothstep(0.08, 0.3, b1[i]);
+    }
     mask[i] = m;
   }
   const rd = ink.width >= 2 ? Math.max(1, Math.round((ink.width - 1) * scale * 0.5)) : 0;
@@ -228,7 +248,6 @@ function applyInk(
   const chroma = c.map(v => (v / cm) * 0.3);
   const reach = 1.5 * s1 + rd;
   const a = ink.amount;
-  const pen = inkColorRgb(ink.color);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {

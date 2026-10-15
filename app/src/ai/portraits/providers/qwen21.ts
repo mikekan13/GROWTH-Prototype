@@ -259,11 +259,23 @@ export class Qwen21Provider extends ServerlessProvider {
   ): Promise<{ raw: Buffer; soft?: Buffer; inked?: Buffer; inkAt: number }> {
     const inkAt = opts?.inkAt ?? qwen21LockInkAtFromEnv();
     if (!(inkAt > 0)) return { raw: await this.runWorkflow(prompt, [], seed, size, opts?.loras), inkAt: 0 };
-    const soft = await this.runWorkflow(prompt, [], seed, size, opts?.loras, { stopAt: inkAt });
+    const soft = await this.runStyledStage(prompt, seed, size, { stopAt: inkAt }, opts?.loras);
     const inked = await inkImage(soft);
-    const name = await this.uploadImage(inked, 'qwen21-ink-mid');
-    const raw = await this.runWorkflow(prompt, [], seed, size, opts?.loras, { resumeFrom: { image: name, at: inkAt } });
+    const raw = await this.runStyledStage(prompt, seed, size, { resumeFrom: { image: inked, at: inkAt } }, opts?.loras);
     return { raw, soft, inked, inkAt };
+  }
+
+  /** One stage of a text-to-image styled render (lab): stop at a fraction, or resume from an (inked) image at it. */
+  async runStyledStage(
+    prompt: string,
+    seed: number,
+    size: { width: number; height: number },
+    stage: { stopAt: number } | { resumeFrom: { image: Buffer; at: number } },
+    loras?: Qwen21Lora[],
+  ): Promise<Buffer> {
+    if ('stopAt' in stage) return this.runWorkflow(prompt, [], seed, size, loras, { stopAt: stage.stopAt });
+    const name = await this.uploadImage(stage.resumeFrom.image, 'qwen21-ink-mid');
+    return this.runWorkflow(prompt, [], seed, size, loras, { resumeFrom: { image: name, at: stage.resumeFrom.at } });
   }
 
   /**
