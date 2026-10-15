@@ -48,11 +48,12 @@ import {
   hasGrowthStyleLora,
   qwen21LorasFromEnv,
   qwen21LoraStartFromEnv,
+  qwen21LockInkAtFromEnv,
   type Qwen21Lora,
 } from '../qwen21-workflow';
 import { buildCorpusContentPrompt } from '../corpus-prompts';
 import { compositeEditWithMask } from '../mask-composite';
-import { finishEnabled, finishImage, rawSiblingPath } from '../finish';
+import { finishEnabled, finishImage, inkImage, rawSiblingPath } from '../finish';
 import { resolveMoodKey } from '../style-config';
 import { checkBaseLock, lockGateEnabled, type LockGateMeta, type LockGateVerdict } from '../lock-gate';
 import { photoPrepEnabled, prepSiblingPath } from '../photo-prep';
@@ -185,7 +186,11 @@ export class Qwen21Provider extends ServerlessProvider {
   async renderLock(
     photos: Qwen21Image[],
     seed: number,
-    opts?: { painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[]; size?: { width: number; height: number }; frameRef?: Qwen21Image | false },
+    opts?: {
+      painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[]; size?: { width: number; height: number }; frameRef?: Qwen21Image | false;
+      /** Mid-generation ink (lab): job A stops at a fraction; job B resumes from an (inked) image at that fraction. */
+      stage?: { stopAt?: number; resumeFrom?: { image: Qwen21Image; at: number } };
+    },
   ): Promise<{ raw: Buffer; prompt: string; loras: Qwen21Lora[] }> {
     // POSE REFERENCE (Mike, 14 Oct): the OpenPose skeleton of the fixed face-tight passport frame rides as the LAST
     // image by default (QWEN21_LOCK_POSE_REF=off or opts.frameRef=false disables; an explicit image replaces it).
@@ -209,8 +214,35 @@ export class Qwen21Provider extends ServerlessProvider {
     const loras = this.activeLoras(opts?.loras);
     const medium = opts?.medium ?? (hasGrowthStyleLora(loras) ? '' : undefined);
     const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, medium, { frameRef: !!frameRef });
+    let stage: { stopAt?: number; resumeFrom?: { image: string; at: number } } | undefined;
+    if (opts?.stage?.resumeFrom) {
+      const init = opts.stage.resumeFrom.image;
+      const name = Buffer.isBuffer(init) ? await this.uploadImage(init, 'qwen21-ink-mid') : await this.uploadReferenceImage(init);
+      stage = { resumeFrom: { image: name, at: opts.stage.resumeFrom.at } };
+    } else if (opts?.stage?.stopAt) {
+      stage = { stopAt: opts.stage.stopAt };
+    }
     // Fixed canvas: the lock never inherits the photo's aspect (QWEN21_LOCK_SIZE, 4:5 passport frame).
-    return { raw: await this.runWorkflow(prompt, names, seed, opts?.size ?? QWEN21_LOCK_SIZE, loras), prompt, loras };
+    return { raw: await this.runWorkflow(prompt, names, seed, opts?.size ?? QWEN21_LOCK_SIZE, loras, stage), prompt, loras };
+  }
+
+  /**
+   * The live lock render: MID-GENERATION INK when QWEN21_LOCK_INK_AT > 0 (default 0.8 — Mike, 14 Oct: "set lora to .70
+   * and ink at 80%"): stop at that fraction, draw the finish ink (lines only, FINISH.ink) on the clean midpoint, resume
+   * from the inked image to the end — two jobs, one seed, one LoRA strength throughout. 0/off → the plain single-pass
+   * renderLock. Returns the final raw (what the gate judges and lockIdentity saves).
+   */
+  async renderLockInked(
+    photos: Qwen21Image[],
+    seed: number,
+    opts?: { painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[]; frameRef?: Qwen21Image | false; inkAt?: number },
+  ): Promise<{ raw: Buffer; prompt: string; loras: Qwen21Lora[]; inkAt: number }> {
+    const inkAt = opts?.inkAt ?? qwen21LockInkAtFromEnv();
+    if (!(inkAt > 0)) return { ...(await this.renderLock(photos, seed, opts)), inkAt: 0 };
+    const soft = await this.renderLock(photos, seed, { ...opts, stage: { stopAt: inkAt } });
+    const inked = await inkImage(soft.raw);
+    const done = await this.renderLock(photos, seed, { ...opts, stage: { resumeFrom: { image: inked, at: inkAt } } });
+    return { ...done, inkAt };
   }
 
   /**
@@ -220,6 +252,7 @@ export class Qwen21Provider extends ServerlessProvider {
    * model (lock-gate.ts) against the fixed base composition. Fail → re-roll with
    * seed S+1, then S+2 (deterministic). First pass wins; all fail → the best-scoring
    * attempt, flagged. Only the chosen attempt is saved. QWEN21_LOCK_GATE=off bypasses.
+   * Painted locks render through renderLockInked (mid-generation ink, QWEN21_LOCK_INK_AT).
    */
   async lockIdentity(
     characterId: string,
@@ -234,24 +267,24 @@ export class Qwen21Provider extends ServerlessProvider {
       return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood, { loras });
     }
     if (!lockGateEnabled()) {
-      const { raw, prompt, loras } = await this.renderLock(photos, seed, { ...opts, painted });
-      const r = await this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood, { loras });
+      const { raw, prompt, loras, inkAt } = await this.renderLockInked(photos, seed, { ...opts, painted });
+      const r = await this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood, { loras, inkAt });
       return { ...r, gate: { pass: true, reasons: ['gate off'], attempts: 1, seed, score: 1, bypassed: true } };
     }
 
-    let best: { raw: Buffer; prompt: string; loras: Qwen21Lora[]; seed: number; verdict: LockGateVerdict } | null = null;
+    let best: { raw: Buffer; prompt: string; loras: Qwen21Lora[]; inkAt: number; seed: number; verdict: LockGateVerdict } | null = null;
     let attempts = 0;
     for (let i = 0; i <= LOCK_GATE_MAX_RETRIES; i++) {
       const s = seed + i;
-      const { raw, prompt, loras } = await this.renderLock(photos, s, { ...opts, painted });
+      const { raw, prompt, loras, inkAt } = await this.renderLockInked(photos, s, { ...opts, painted });
       attempts++;
       const verdict = await this.checkLock(raw);
       console.log(`[Qwen21] lock gate seed=${s}: ${verdict.pass ? 'PASS' : 'FAIL'} ${verdict.reasons.join('; ')}`);
-      if (!best || verdict.score > best.verdict.score) best = { raw, prompt, loras, seed: s, verdict };
-      if (verdict.pass) { best = { raw, prompt, loras, seed: s, verdict }; break; }
+      if (!best || verdict.score > best.verdict.score) best = { raw, prompt, loras, inkAt, seed: s, verdict };
+      if (verdict.pass) { best = { raw, prompt, loras, inkAt, seed: s, verdict }; break; }
     }
     const chosen = best!;
-    const r = await this.saveStep(characterId, 'faces', 'identity-lock', chosen.prompt, chosen.raw, chosen.seed, Date.now() - t0, opts?.mood, { loras: chosen.loras });
+    const r = await this.saveStep(characterId, 'faces', 'identity-lock', chosen.prompt, chosen.raw, chosen.seed, Date.now() - t0, opts?.mood, { loras: chosen.loras, inkAt: chosen.inkAt });
     return {
       ...r,
       gate: { pass: chosen.verdict.pass, reasons: chosen.verdict.reasons, attempts, seed: chosen.seed, score: chosen.verdict.score },
@@ -493,13 +526,15 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     size?: { width: number; height: number },
     loras?: Qwen21Lora[],
+    stage?: { stopAt?: number; resumeFrom?: { image: string; at: number } },
   ): Promise<Buffer> {
     const template = await this.loadWorkflow(WORKFLOW_NAME);
     const used = this.activeLoras(loras);
     const loraStart = used.length ? qwen21LoraStartFromEnv() : 0;
-    const wf = buildQwen21Workflow(template, { prompt, images, seed, size, loras: used, loraStart, filenamePrefix: 'qwen21' });
+    const wf = buildQwen21Workflow(template, { prompt, images, seed, size, loras: used, loraStart, filenamePrefix: 'qwen21', ...(stage ?? {}) });
     const loraNote = used.length ? `, loras=${formatQwen21Loras(used)}${loraStart ? ` start=${loraStart}` : ''}` : '';
-    console.log(`[Qwen21] queueing — ${images.length} image(s), seed=${seed}${size ? `, ${size.width}x${size.height}` : ''}${loraNote}, prompt="${prompt.slice(0, 100)}…"`);
+    const stageNote = stage?.stopAt ? `, stop@${stage.stopAt}` : stage?.resumeFrom ? `, resume@${stage.resumeFrom.at}` : '';
+    console.log(`[Qwen21] queueing — ${images.length} image(s), seed=${seed}${size ? `, ${size.width}x${size.height}` : ''}${loraNote}${stageNote}, prompt="${prompt.slice(0, 100)}…"`);
     const queued = await this.queuePrompt(wf, crypto.randomUUID());
     const out = await this.waitForCompletion(queued.prompt_id);
     return this.downloadImage(out.filename, out.subfolder, out.type);
@@ -514,7 +549,7 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     size?: { width: number; height: number },
     mood?: string,
-    opts?: { finish?: boolean; loras?: Qwen21Lora[] },
+    opts?: { finish?: boolean; loras?: Qwen21Lora[]; inkAt?: number },
   ): Promise<Qwen21StepResult> {
     const t0 = Date.now();
     const data = await this.runWorkflow(prompt, images, seed, size, opts?.loras);
@@ -534,7 +569,7 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     ms: number,
     mood?: string,
-    opts?: { finish?: boolean; loras?: Qwen21Lora[] },
+    opts?: { finish?: boolean; loras?: Qwen21Lora[]; inkAt?: number },
   ): Promise<Qwen21StepResult> {
     const finished = opts?.finish !== false && finishEnabled();
     const imageData = finished ? await finishImage(rawData, seed) : rawData;
@@ -542,6 +577,7 @@ export class Qwen21Provider extends ServerlessProvider {
       provider: 'qwen21', stage, prompt, model: MODEL_NAME, mood: mood ?? null, finish: finished ? 'on' : 'off',
       loras: formatQwen21Loras(this.activeLoras(opts?.loras)) || null,
       loraStart: this.activeLoras(opts?.loras).length ? qwen21LoraStartFromEnv() : 0,
+      inkAt: opts?.inkAt ?? 0,
     });
     const rawPath = await this.saveRaw(imagePath, rawData);
     const m = await sharp(imageData).metadata();

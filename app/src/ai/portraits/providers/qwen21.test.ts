@@ -49,6 +49,11 @@ class TestQwen extends Qwen21Provider {
 
 const fail = (score: number, reason: string): LockGateVerdict => ({ pass: false, reasons: [reason], score });
 
+// The live lock is TWO jobs (mid-generation ink, QWEN21_LOCK_INK_AT default 0.8) — these suites count jobs, so they
+// run the plain single-pass lock unless a test switches the ink back on.
+beforeEach(() => { process.env.QWEN21_LOCK_INK_AT = 'off'; });
+afterEach(() => { delete process.env.QWEN21_LOCK_INK_AT; });
+
 describe('Qwen21Provider.lockIdentity — BASE-LOCK GATE (gate stubbed)', () => {
   const seedOf = (wf: Wf) => {
     const node = Object.values(wf).find(n => n.inputs && typeof n.inputs.seed === 'number');
@@ -187,11 +192,19 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     expect(String(wf.TEXT_ENCODE.inputs.prompt)).not.toContain('pose skeleton');
   });
 
-  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.7 on every gen, trigger first, lock MEDIUM stripped, pose skeleton last', async () => {
-    delete process.env.QWEN21_LORAS; delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_POSE_REF;
+  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.7 on every gen, trigger first, lock MEDIUM stripped, pose skeleton last, ink at 80% (two jobs)', async () => {
+    delete process.env.QWEN21_LORAS; delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_POSE_REF; delete process.env.QWEN21_LOCK_INK_AT;
     const p = patch(new TestQwen());
     const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg'] }));
     expect(r.success).toBe(true);
+    // MID-GENERATION INK: job A stops at step 20 of 25 and snaps to the clean prediction; job B resumes from the inked image.
+    expect(p.queued).toHaveLength(2);
+    expect(p.queued[0].SAMPLE.class_type).toBe('KSamplerAdvanced');
+    expect(p.queued[0].SAMPLE.inputs).toMatchObject({ start_at_step: 0, end_at_step: 20, return_with_leftover_noise: 'disable' });
+    expect(String(p.queued[1].LOAD_INIT.inputs.image)).toMatch(/^buf:qwen21-ink-mid-/);
+    expect(p.queued[1].SAMPLE.inputs).toMatchObject({ latent_image: ['VAE_ENCODE', 0], start_at_step: 20, add_noise: 'enable' });
+    expect(p.queued[1].LORA_1.inputs.strength_model).toBe(0.7); // one strength throughout
+    expect(p.metas[0]?.inkAt).toBe(0.8);
     const wf = p.queued[0];
     expect(wf.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
     expect(wf.LORA_1.inputs.strength_model).toBe(0.7);
@@ -209,9 +222,10 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     expect(prompt).toContain(getCampaignMood('growth'));
     expect(p.metas[0]?.loras).toBe('grwthpaint_v1.safetensors:0.7:grwthpaint');
 
-    // A later alteration (body from the bust) carries the same LoRA at the same strength.
+    // A later alteration (body from the bust) carries the same LoRA at the same strength — and no ink stage.
     await p.generateBody('c', p.saved[0], 3);
-    const body = p.queued[1];
+    const body = p.queued[2];
+    expect(body.SAMPLE.class_type).toBe('KSampler');
     expect(body.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
     expect(body.LORA_1.inputs.strength_model).toBe(0.7);
     expect(String(body.TEXT_ENCODE.inputs.prompt).startsWith('grwthpaint, ')).toBe(true);

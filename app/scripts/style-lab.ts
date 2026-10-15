@@ -15,6 +15,9 @@
  *   --photos DIR         identity photos (jpg/png/webp, first 16); default = Violet's two
  *   --frame-ref PATH     pose skeleton fed as the last image (default: the shipped lock-pose-grey.png); --no-frame-ref = none
  *   --prep               run the photo preparer (vision check + face-tight passport crop) on the photos first, like the live lock
+ *   --ink-mid 0.4,0.5    MID-GENERATION INK per seed: stop at each fraction, ink the soft midpoint (finish.ts inkImage,
+ *                        lines only; --ink-amount / --ink-threshold / --ink-width / --ink-color HEX override FINISH.ink), resume to the end; extra sheet rows +
+ *                        sheet-ink-stages.jpg (soft/inked); files under <out>/inkmid-<f>/. Two extra jobs per fraction.
  *   --out DIR            default <repo>/style-refs/lab/<timestamp>-<mood>/
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
@@ -55,7 +58,20 @@ async function main() {
     return;
   }
   const { Qwen21Provider } = await import('../src/ai/portraits/providers/qwen21');
-  const { FINISH, finishImage } = await import('../src/ai/portraits/finish');
+  const { FINISH, finishImage, inkImage } = await import('../src/ai/portraits/finish');
+  // --ink-mid 0.4,0.5,0.75: MID-GENERATION INK — stop each lock at that fraction, draw the ink on the soft midpoint
+  // image (finish.ts inkImage, lines only), resume to the end; saves soft/inked/final under <out>/inkmid-<f>/.
+  const inkMid = (arg('ink-mid') ?? '').split(',').map(s => Number(s.trim())).filter(f => Number.isFinite(f) && f > 0 && f < 1);
+  const inkAmount = Number(arg('ink-amount') ?? FINISH.ink.amount);
+  // The midpoint image is smoother than a finished one, so its edges are weaker: --ink-threshold lowers the edge gate
+  // (FINISH default 0.06) and --ink-width thickens the pen so the lines survive the remaining denoise.
+  const inkThreshold = Number(arg('ink-threshold') ?? FINISH.ink.threshold);
+  const inkWidth = Number(arg('ink-width') ?? FINISH.ink.width);
+  const inkColor = arg('ink-color'); // hex, e.g. 582a72 (Spirit purple); default = the near-black pen
+  // --ink-lora-b S: LoRA strength for the RESUME stage only (the last steps that finish skin/eyes) — lower = more photo.
+  const inkLoraB = arg('ink-lora-b') !== undefined ? Number(arg('ink-lora-b')) : undefined;
+  const inkParams = { ...FINISH.ink, amount: inkAmount, threshold: inkThreshold, width: inkWidth, ...(inkColor ? { color: inkColor } : {}) };
+  if (inkMid.length) console.log(`ink-mid: ${inkMid.join(', ')} — amount ${inkAmount}, threshold ${inkThreshold}, width ${inkWidth}, color ${inkColor ?? 'default'}`);
   const { buildContactSheet } = await import('../src/ai/portraits/contact-sheet');
   const { checkBaseLock } = await import('../src/ai/portraits/lock-gate');
   const { GROWTH_MEDIUM, getCampaignMood, resolveMoodKey } = await import('../src/ai/portraits/style-config');
@@ -123,6 +139,8 @@ async function main() {
   const rawRow: { image: Buffer; label: string; note?: string; noteWarn?: boolean }[] = [];
   const finRow: { image: Buffer; label: string; note?: string; noteWarn?: boolean }[] = [];
   const gates: Record<number, { pass: boolean; reasons: string[]; score: number }> = {};
+  const inkRows: Record<number, { image: Buffer; label: string; note?: string; noteWarn?: boolean }[]> = {};
+  const inkStages: Record<number, { image: Buffer; label: string }[]> = {};
   const seeds: number[] = [];
   let prompt = '';
   for (let k = 0; k < n; k++) {
@@ -149,9 +167,35 @@ async function main() {
     }
     seeds.push(seed);
     console.log(`  seed ${seed}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+
+    // MID-GENERATION INK: stop at f → soft midpoint image → ink lines → resume from the inked image at f.
+    for (const f of inkMid) {
+      const dir = path.join(outDir, `inkmid-${f}`);
+      await fs.mkdir(dir, { recursive: true });
+      const t1 = Date.now();
+      const soft = await provider.renderLock(photos, seed, { painted: true, mood, medium, frameRef, stage: { stopAt: f } });
+      const inked = await inkImage(soft.raw, inkParams);
+      const lorasB = inkLoraB !== undefined ? loras.map(l => ({ ...l, strength: inkLoraB })) : undefined;
+      const done = await provider.renderLock(photos, seed, { painted: true, mood, medium, frameRef, loras: lorasB, stage: { resumeFrom: { image: inked, at: f } } });
+      await fs.writeFile(path.join(dir, `soft-seed-${seed}.png`), soft.raw);
+      await fs.writeFile(path.join(dir, `inked-seed-${seed}.png`), inked);
+      await fs.writeFile(path.join(dir, `final-seed-${seed}.png`), done.raw);
+      let fnote: string | undefined; let fwarn = false;
+      if (gate) {
+        const v = await checkBaseLock(done.raw);
+        fnote = v.pass ? 'PASS' : `FAIL: ${v.reasons.join('; ')}`; fwarn = !v.pass;
+      }
+      (inkRows[f] ??= []).push({ image: done.raw, label: `seed ${seed} · ink@${Math.round(f * 100)}%${inkLoraB !== undefined ? ` · loraB ${inkLoraB}` : ''} · final`, note: fnote, noteWarn: fwarn });
+      (inkStages[f] ??= []).push({ image: soft.raw, label: `seed ${seed} · soft@${Math.round(f * 100)}%` }, { image: inked, label: `seed ${seed} · inked@${Math.round(f * 100)}%` });
+      console.log(`  ink@${f} seed ${seed}  ${((Date.now() - t1) / 1000).toFixed(1)}s${fnote ? `  gate: ${fnote}` : ''}`);
+    }
   }
 
-  await fs.writeFile(path.join(outDir, 'sheet.jpg'), await buildContactSheet(noFinish ? [rawRow] : [rawRow, finRow]));
+  const inkSheetRows = inkMid.map(f => inkRows[f] ?? []).filter(r => r.length);
+  await fs.writeFile(path.join(outDir, 'sheet.jpg'), await buildContactSheet([...(noFinish ? [rawRow] : [rawRow, finRow]), ...inkSheetRows]));
+  if (inkSheetRows.length) {
+    await fs.writeFile(path.join(outDir, 'sheet-ink-stages.jpg'), await buildContactSheet(inkMid.map(f => inkStages[f] ?? []).filter(r => r.length)));
+  }
   await fs.writeFile(
     path.join(outDir, 'prompts.txt'),
     [

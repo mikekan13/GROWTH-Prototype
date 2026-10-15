@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import sharp from 'sharp';
-import { FINISH, finishEnabled, finishImage, finishToken, inkEnabled, rawSiblingPath } from './finish';
+import { FINISH, finishEnabled, finishImage, finishToken, inkColorRgb, inkEnabled, inkImage, rawSiblingPath } from './finish';
 import { buildContactSheet } from './contact-sheet';
 
 let img: Buffer;

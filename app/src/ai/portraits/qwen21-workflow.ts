@@ -72,6 +72,17 @@ export const LOCK_COMPOSITION =
 export const LOCK_CLOSER = 'Unclothed with bare shoulders, facing the camera squarely, head level, cropped just below the collarbones.';
 
 /**
+ * The one realism line from the GOLD medium, kept when the rest of the medium is stripped for the style LoRA
+ * (Mike, 14 Oct: "I want just a bit more photo realism"). The rest of that paragraph pulled costume and pose; this
+ * sentence is the "double-take" dial. Empty medium + LoRA → this rides right after the identity line.
+ */
+export const LOCK_REALISM = 'Lifelike and photographic in its detail — real skin texture, true proportions and natural eyes — so refined it almost passes for a photograph of a real person.';
+
+// Tried (14 Oct) and rolled back: a "lifelike portrait … painted with photographic realism" lead ("that went too far") and a
+// firmer "Photographic realism: pores, catchlights, lit like a photograph" line (also too far). THIS wording + the
+// "painted character illustration" lead + LoRA 0.75 + ink at 75% = the best so far (style-refs/lab/2026-10-14-ink-mid/lora-0.75-realism).
+
+/**
  * POSE / FRAME REFERENCE clause (Mike, 14 Oct: "We need it to be solid for the base. Do the reference"). Qwen-Image-Edit
  * 2509+ (and 2.1) natively take a ControlNet-style KEYPOINT MAP as an input image ("Make the person in Image 1 copy the
  * exact pose from Image 2"). The lock feeds an OpenPose skeleton of the passport bust as its LAST image. A photoreal
@@ -98,9 +109,11 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
   // Order: identity → composition → MEDIUM → mood → backdrop → closer. Sheet 9 proved that putting the
   // medium first makes the style win outright (all seeds dressed, seated, off-pose): the look words
   // carry period costume and pose. Composition stays first; the ink LINES come from the finish layer.
+  const loraLook = !medium.trim(); // the LoRA carries the look: the realism dial rides instead of the medium
   return [
     `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders.`,
     'Match their exact facial identity from the photos.',
+    loraLook ? LOCK_REALISM : '',
     LOCK_COMPOSITION,
     frameTag ? lockFrameRefClause(frameTag) : '',
     medium.trim(),
@@ -265,7 +278,7 @@ export function qwen21LoraLabel(loras: readonly Qwen21Lora[] | undefined): strin
  */
 export const GROWTH_STYLE_LORA_TRIGGER = 'grwthpaint';
 export const GROWTH_STYLE_LORA_FILE = 'grwthpaint_v1.safetensors';
-/** Mike (14 Oct, after the seed-21499 check): "just set the lora to 90% for every gen", then "90 was too much. Lets try 70%", then "bring the lora down to 65%", then with the finish layer OFF "crank the lora back to 90%", then with the pose skeleton in "drop our lora to 70%" — one strength, every step. */
+/** Mike (14 Oct, after the seed-21499 check): "just set the lora to 90% for every gen", then "90 was too much. Lets try 70%", then "bring the lora down to 65%", then with the finish layer OFF "crank the lora back to 90%", then with the pose skeleton in "drop our lora to 70%", then with mid-generation ink "set lora to 75%", then "set lora to .70 and ink at 80%" — one strength, every step. */
 export const GROWTH_STYLE_LORA: Qwen21Lora = { file: GROWTH_STYLE_LORA_FILE, strength: 0.7, trigger: GROWTH_STYLE_LORA_TRIGGER };
 
 /** True when the blend carries the GROWTH style LoRA (any strength). */
@@ -298,6 +311,20 @@ export function qwen21LoraStartFromEnv(): number {
   return clampLoraStart(Number(env));
 }
 
+/**
+ * MID-GENERATION INK for the live base lock (Mike, 14 Oct: "set lora to .70 and ink at 80%"): the lock stops at this
+ * fraction, the finish ink (lines only, FINISH.ink) is drawn on the clean midpoint, and the lock resumes from the inked
+ * image to the end — see Qwen21WorkflowOptions.stopAt/resumeFrom. Env QWEN21_LOCK_INK_AT (fraction; "off"/0 = plain
+ * single-pass lock). Best-so-far recipe: style-refs/lab/2026-10-14-ink-mid/lora-0.75-realism (then 0.7 / 80%).
+ */
+export const QWEN21_LOCK_INK_AT_DEFAULT = 0.8;
+export function qwen21LockInkAtFromEnv(): number {
+  const env = process.env.QWEN21_LOCK_INK_AT;
+  if (env === undefined || env.trim() === '') return QWEN21_LOCK_INK_AT_DEFAULT;
+  if (env.trim().toLowerCase() === 'off') return 0;
+  return clampLoraStart(Number(env));
+}
+
 /** Prepend each LoRA trigger once, in order, as "<t1>, <t2>, <prompt>". Triggers already leading the prompt are not repeated. */
 export function applyQwen21LoraTriggers(prompt: string, loras: readonly Qwen21Lora[] | undefined): string {
   const triggers: string[] = [];
@@ -326,6 +353,17 @@ export interface Qwen21WorkflowOptions {
   /** Explicit canvas (EmptyLatentImage); omit = use TEXT_ENCODE's latent. */
   size?: { width: number; height: number };
   filenamePrefix?: string;
+  /**
+   * MID-GENERATION INK (Mike, 14 Oct: "halfway through the generation make the lines and then just have the generation
+   * continue with the lines in place"). Two jobs share one seed/prompt/LoRA:
+   *   stopAt: fraction — job A runs steps [0, k) and SNAPS to the model's clean prediction at k (KSamplerAdvanced,
+   *           return_with_leftover_noise=disable), i.e. a soft early image to draw the ink on;
+   *   resumeFrom: {image, at} — job B VAE-encodes that inked image, RE-NOISES it to step k's level (add_noise=enable,
+   *           start_at_step=k) and runs [k, N) to the end. Composition, identity refs and the skeleton stay in the
+   *           conditioning; the ink lines are now part of the picture the model finishes.
+   */
+  stopAt?: number;
+  resumeFrom?: { image: string; at: number };
 }
 
 /**
@@ -371,6 +409,31 @@ export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwe
       inputs: { width: opts.size.width, height: opts.size.height, batch_size: 1 },
     };
     sample.latent_image = ['EMPTY_LATENT', 0];
+  }
+
+  // Mid-generation ink: job A (stopAt) or job B (resumeFrom) — a KSamplerAdvanced in place of the KSampler.
+  const stopAt = clampLoraStart(opts.stopAt);
+  const resumeAt = opts.resumeFrom ? clampLoraStart(opts.resumeFrom.at) : 0;
+  if (stopAt > 0 || (opts.resumeFrom && resumeAt > 0)) {
+    const steps = Number(sample.steps);
+    const k = Math.min(steps - 1, Math.max(1, Math.round(steps * (stopAt || resumeAt))));
+    const shared = {
+      model: sample.model, positive: sample.positive, negative: sample.negative, cfg: sample.cfg,
+      sampler_name: sample.sampler_name, scheduler: sample.scheduler, steps, noise_seed: sample.seed,
+    };
+    if (stopAt > 0) {
+      wf.SAMPLE = {
+        class_type: 'KSamplerAdvanced',
+        inputs: { ...shared, latent_image: sample.latent_image, add_noise: 'enable', start_at_step: 0, end_at_step: k, return_with_leftover_noise: 'disable' },
+      };
+    } else {
+      wf.LOAD_INIT = { class_type: 'LoadImage', inputs: { image: opts.resumeFrom!.image } };
+      wf.VAE_ENCODE = { class_type: 'VAEEncode', inputs: { pixels: ['LOAD_INIT', 0], vae: ['VAE', 0] } };
+      wf.SAMPLE = {
+        class_type: 'KSamplerAdvanced',
+        inputs: { ...shared, latent_image: ['VAE_ENCODE', 0], add_noise: 'enable', start_at_step: k, end_at_step: 10000, return_with_leftover_noise: 'disable' },
+      };
+    }
   }
 
   const loraStart = clampLoraStart(opts.loraStart);

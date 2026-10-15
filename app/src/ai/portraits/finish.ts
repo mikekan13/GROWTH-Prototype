@@ -47,6 +47,8 @@ export interface FinishParams {
     threshold: number;
     /** Faint cool edge on the lit side of a line (shadowTint hue), 0..1. 0 = none. */
     teal: number;
+    /** Pen colour as hex (e.g. '582a72' Spirit purple); omitted = near-black. */
+    color?: string;
   };
   token: { ring: string; ringWidth: number };
 }
@@ -154,7 +156,15 @@ function edgeStrength(b: Float32Array, w: number, h: number, sigma: number) {
 }
 
 /** #141413 — near-black ink, never pure black. */
+/** Default pen colour: near-black. `ink.color` overrides (e.g. Spirit purple #582a72 — Mike, 14 Oct). */
 const INK_RGB = [20 / 255, 20 / 255, 19 / 255];
+/** '#582a72' / '582a72' → [r, g, b] in 0..1; undefined/invalid → the default pen. */
+export function inkColorRgb(hex?: string): number[] {
+  const m = hex?.trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return INK_RGB;
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
 
 /**
  * The ink pass, in place on graded float RGB planes. A line = a fine-scale edge that
@@ -218,6 +228,7 @@ function applyInk(
   const chroma = c.map(v => (v / cm) * 0.3);
   const reach = 1.5 * s1 + rd;
   const a = ink.amount;
+  const pen = inkColorRgb(ink.color);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -238,11 +249,27 @@ function applyInk(
         }
       }
       const k = a * m;
-      r[i] = r[i] * (1 - k) + INK_RGB[0] * k + chroma[0] * tm;
-      g[i] = g[i] * (1 - k) + INK_RGB[1] * k + chroma[1] * tm;
-      b[i] = b[i] * (1 - k) + INK_RGB[2] * k + chroma[2] * tm;
+      r[i] = r[i] * (1 - k) + pen[0] * k + chroma[0] * tm;
+      g[i] = g[i] * (1 - k) + pen[1] * k + chroma[1] * tm;
+      b[i] = b[i] * (1 - k) + pen[2] * k + chroma[2] * tm;
     }
   }
+}
+
+/**
+ * INK ONLY — the pen lines with no grade, vignette or grain (Mike, 14 Oct: mid-generation ink — the lines are drawn
+ * on the soft midpoint image and the model paints the rest of the way over them). Output PNG, same dimensions.
+ */
+export async function inkImage(input: Buffer, ink: FinishParams['ink'] = FINISH.ink, tintRgb = FINISH.grade.shadowTint): Promise<Buffer> {
+  const { data, info } = await sharp(input).toColourspace('srgb').removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const n = width * height;
+  const R = new Float32Array(n), G = new Float32Array(n), B = new Float32Array(n);
+  for (let p = 0; p < n; p++) { R[p] = data[p * channels] / 255; G[p] = data[p * channels + 1] / 255; B[p] = data[p * channels + 2] / 255; }
+  applyInk(R, G, B, width, height, ink, [tintRgb.r / 255, tintRgb.g / 255, tintRgb.b / 255]);
+  const out = Buffer.alloc(n * 3);
+  for (let p = 0; p < n; p++) { out[p * 3] = Math.round(clamp01(R[p]) * 255); out[p * 3 + 1] = Math.round(clamp01(G[p]) * 255); out[p * 3 + 2] = Math.round(clamp01(B[p]) * 255); }
+  return sharp(out, { raw: { width, height, channels: 3 } }).png().toBuffer();
 }
 
 /**

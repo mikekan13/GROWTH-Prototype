@@ -56,6 +56,11 @@ describe('qwen21 prompt builders', () => {
     expect(p).toContain('Blank flat uniform mid-grey backdrop, nothing else.');
     expect(p.endsWith('Unclothed with bare shoulders, facing the camera squarely, head level, cropped just below the collarbones.')).toBe(true); // LOCK_CLOSER
     expect(p).toContain('cropped just below the collarbones so no chest or torso is in view'); // Mike 14 Oct: bottom edge stated
+    // Full medium present → no separate realism line; medium stripped (LoRA) → the realism line rides after identity.
+    expect(p).not.toContain('almost passes for a photograph of a real person. Composed');
+    const stripped = buildQwen21LockPrompt(2, true, undefined, '');
+    expect(stripped.startsWith('A painted character illustration of the person in <image1> and <image2>, head and shoulders. Match their exact facial identity from the photos. Lifelike and photographic in its detail')).toBe(true);
+    expect(stripped).not.toMatch(/no grain, no noise/);
     expect(buildQwen21LockPrompt(1, true)).toContain(getCampaignMood('growth'));
     expect(buildQwen21LockPrompt(1, true, 'gothic horror')).toContain(getCampaignMood('gothic'));
     expect(buildQwen21LockPrompt(1, true, undefined, 'CUSTOM MEDIUM.')).toContain(' CUSTOM MEDIUM. ');
@@ -277,6 +282,26 @@ describe('community LoRA blend', () => {
     expect(clampLoraStart(-1)).toBe(0);
     expect(clampLoraStart(2)).toBe(0.9);
     expect(clampLoraStart(0.4)).toBe(0.4);
+  });
+
+  it('mid-generation ink: stopAt → KSamplerAdvanced [0,k) snapping to the clean prediction; resumeFrom → VAE-encode the inked image, re-noise at k, run [k,N)', () => {
+    const a = buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, size: QWEN21_BODY_SIZE, stopAt: 0.4 }) as Record<string, Node>;
+    expect(a.SAMPLE.class_type).toBe('KSamplerAdvanced');
+    expect(a.SAMPLE.inputs).toMatchObject({ model: ['CACHE', 0], latent_image: ['EMPTY_LATENT', 0], add_noise: 'enable', start_at_step: 0, end_at_step: 10, return_with_leftover_noise: 'disable', noise_seed: 3, steps: 25 });
+    expect(a.LOAD_INIT).toBeUndefined();
+    expect(a.DECODE.inputs.samples).toEqual(['SAMPLE', 0]);
+
+    const b = buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, size: QWEN21_BODY_SIZE, resumeFrom: { image: 'inked.png', at: 0.4 } }) as Record<string, Node>;
+    expect(b.LOAD_INIT).toEqual({ class_type: 'LoadImage', inputs: { image: 'inked.png' } });
+    expect(b.VAE_ENCODE).toEqual({ class_type: 'VAEEncode', inputs: { pixels: ['LOAD_INIT', 0], vae: ['VAE', 0] } });
+    expect(b.SAMPLE.inputs).toMatchObject({ model: ['CACHE', 0], latent_image: ['VAE_ENCODE', 0], add_noise: 'enable', start_at_step: 10, end_at_step: 10000, return_with_leftover_noise: 'disable', noise_seed: 3 });
+    // The identity refs still condition job B; LoRAs still chain into CACHE.
+    const c = buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS, resumeFrom: { image: 'inked.png', at: 0.75 } }) as Record<string, Node>;
+    expect(c.CACHE.inputs.model).toEqual(['LORA_2', 0]);
+    expect(c.SAMPLE.inputs.start_at_step).toBe(19);
+    expect(c.TEXT_ENCODE.inputs['images.image_1']).toEqual(['LOAD_REF1', 0]);
+    // Neither → the plain KSampler.
+    expect((buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3 }) as Record<string, Node>).SAMPLE.class_type).toBe('KSampler');
   });
 
   it('prepends triggers once, in order, deduped', () => {
