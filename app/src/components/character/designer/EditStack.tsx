@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { C, F, SectionBar } from './parts';
 import type { DesignerLayer, LayerKind } from '@/lib/appearance-designer';
 
-const MARK_KINDS: ReadonlySet<LayerKind> = new Set(['scar', 'tattoo', 'makeup', 'piercing', 'birthmark']);
+const MARK_KINDS: ReadonlySet<LayerKind> = new Set(['scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod']);
 
 /** Pillar-tag style kind block: base = Soul, JEWL = Spirit, marks = Body, shape = ink. */
 function kindTone(kind: LayerKind): string {

@@ -11,8 +11,22 @@
 
 export const NOTHING_ELSE = 'Change nothing else.';
 
-export type ShapeCategory = 'Skin' | 'Hair' | 'Eyes' | 'Face' | 'Build' | 'Age' | 'Marks';
-export const SHAPE_CATEGORIES: ShapeCategory[] = ['Skin', 'Hair', 'Eyes', 'Face', 'Build', 'Age', 'Marks'];
+/**
+ * What the designer may change (Mike 2026-10-15): hair, scars, tattoos and
+ * body mods on the face or body, plus the underwear design on the body. Age
+ * is the sheet's (never picked here); skin, eyes, face shape and build are the
+ * locked identity; cuts, bruises, tiredness, expression and the like belong
+ * to the live in-play portrait, not the base.
+ */
+export type EditTarget = 'face' | 'body';
+
+export type ShapeCategory = 'Hair' | 'Marks' | 'Underwear';
+export const SHAPE_CATEGORIES: ShapeCategory[] = ['Hair', 'Marks', 'Underwear'];
+
+/** Which chips a target offers: hair is face-only (the body follows the face), underwear is body-only. */
+export function shapeCategoriesFor(target: EditTarget): ShapeCategory[] {
+  return target === 'body' ? ['Marks', 'Underwear'] : ['Hair', 'Marks'];
+}
 
 export type Possessive = 'her' | 'his' | 'their';
 
@@ -31,61 +45,33 @@ export interface ShapePreset {
 }
 
 const fixed = (s: string) => () => s;
-const subj = (p: Possessive) => (p === 'her' ? 'her' : p === 'his' ? 'his' : 'their');
 
-/** Presets per chip (the mockup's lists). Marks has none — it has kinds + where. */
+/** Presets per chip. Marks has none — it has kinds + where. Underwear is own words only (a design). */
 export const SHAPE_PRESETS: Record<Exclude<ShapeCategory, 'Marks'>, ShapePreset[]> = {
-  Skin: [
-    { label: 'Pale', phrase: fixed('pale') },
-    { label: 'Olive', phrase: fixed('olive') },
-    { label: 'Deep brown', phrase: fixed('deep brown') },
-    { label: 'Freckled', phrase: fixed('freckled') },
-  ],
   Hair: [
     { label: 'Long, tied up', phrase: fixed('long and tied up') },
     { label: 'Short crop', phrase: fixed('a short crop') },
     { label: 'Braids', phrase: fixed('braids') },
     { label: 'Shaved', phrase: fixed('shaved close to the scalp') },
   ],
-  Eyes: [
-    { label: 'Dark brown', phrase: fixed('dark brown') },
-    { label: 'Grey', phrase: fixed('grey') },
-    { label: 'Green', phrase: fixed('green') },
-    { label: 'Heterochromia', phrase: fixed('two different colours (heterochromia)') },
-  ],
-  Face: [
-    { label: 'Round', phrase: fixed('round') },
-    { label: 'Angular', phrase: fixed('angular') },
-    { label: 'Long', phrase: fixed('long') },
-    { label: 'Broad', phrase: fixed('broad') },
-  ],
-  Build: [
-    { label: 'Slight', phrase: fixed('slight') },
-    { label: 'Athletic', phrase: fixed('athletic') },
-    { label: 'Heavy', phrase: fixed('heavy-set') },
-    { label: 'Tall', phrase: fixed('tall and long-limbed') },
-  ],
-  Age: [
-    { label: 'Teen', phrase: fixed('like a teenager') },
-    { label: '20s', phrase: p => `in ${subj(p)} twenties` },
-    { label: '40s', phrase: p => `in ${subj(p)} forties` },
-    { label: 'Elder', phrase: fixed('elderly') },
-  ],
+  Underwear: [],
 };
 
 /** Sentence head per category; the preset phrase (or own words) finishes it. */
 const SHAPE_HEAD: Record<Exclude<ShapeCategory, 'Marks'>, (p: Possessive) => string> = {
-  Skin: p => `Make ${p} skin`,
   Hair: p => `Change ${p} hair to`,
-  Eyes: p => `Change ${p} eyes to`,
-  Face: p => `Change ${p} face shape to`,
-  Build: p => `Change ${p} build to`,
-  Age: p => `Make ${p === 'their' ? 'them' : p === 'her' ? 'her' : 'him'} look`,
+  Underwear: p => `Change ${p} underwear to`,
 };
 
 /** The part name used when own words replace the preset ("Change her hair: …"). */
 const SHAPE_PART: Record<Exclude<ShapeCategory, 'Marks'>, string> = {
-  Skin: 'skin', Hair: 'hair', Eyes: 'eyes', Face: 'face', Build: 'build', Age: 'apparent age',
+  Hair: 'hair', Underwear: 'underwear',
+};
+
+/** Placeholder for the own-words box per category. */
+export const SHAPE_WORDS_PLACEHOLDER: Record<Exclude<ShapeCategory, 'Marks'>, string> = {
+  Hair: 'Or your own words',
+  Underwear: 'Describe the design: plain dark wrap, cloth bindings…',
 };
 
 function sentence(s: string): string {
@@ -119,15 +105,30 @@ export function composeShapeText(
   return sentence(`${SHAPE_HEAD[category](p)} ${preset.phrase(p)}`);
 }
 
-export type MarkKind = 'Scar' | 'Tattoo' | 'Makeup' | 'Piercing' | 'Birthmark';
-export const MARK_KINDS: MarkKind[] = ['Scar', 'Tattoo', 'Makeup', 'Piercing', 'Birthmark'];
-export type MarkPlace = 'Face' | 'Neck' | 'Arms' | 'Hands' | 'Torso' | 'Back';
-export const MARK_PLACES: MarkPlace[] = ['Face', 'Neck', 'Arms', 'Hands', 'Torso', 'Back'];
+/** Permanent marks only: scars, tattoos, piercings and other body mods (gauges, implants, brands…). */
+export type MarkKind = 'Scar' | 'Tattoo' | 'Piercing' | 'Body mod';
+export const MARK_KINDS: MarkKind[] = ['Scar', 'Tattoo', 'Piercing', 'Body mod'];
+export type MarkPlace = 'Face' | 'Neck' | 'Arms' | 'Hands' | 'Torso' | 'Back' | 'Legs';
+export const MARK_PLACES: MarkPlace[] = ['Face', 'Neck', 'Arms', 'Hands', 'Torso', 'Back', 'Legs'];
 
-/** "Add a scar to her face: a thin pale line through the left eyebrow." */
+/** The places a target shows: the face image is a bust, the body is everything. */
+export function markPlacesFor(target: EditTarget): MarkPlace[] {
+  return target === 'body' ? ['Neck', 'Arms', 'Hands', 'Torso', 'Back', 'Legs'] : ['Face', 'Neck'];
+}
+
+/** The stack tag for a mark kind. */
+export function markLayerKind(kind: MarkKind): LayerKind {
+  return kind === 'Body mod' ? 'bodymod' : (kind.toLowerCase() as LayerKind);
+}
+
+/**
+ * "Add a scar to her face: a thin pale line through the left eyebrow." A body
+ * mod needs its words (there is no default body mod) → '' until described.
+ */
 export function composeMarkText(kind: MarkKind, place: MarkPlace, description: string, p: Possessive): string {
-  const noun = kind === 'Makeup' ? 'makeup' : `a ${kind.toLowerCase()}`;
   const desc = description.trim().replace(/[.!?]+$/, '');
+  if (kind === 'Body mod' && !desc) return '';
+  const noun = kind === 'Body mod' ? 'a body modification' : `a ${kind.toLowerCase()}`;
   return sentence(`Add ${noun} to ${p} ${place.toLowerCase()}${desc ? `: ${desc}` : ''}`);
 }
 
@@ -137,7 +138,8 @@ export function composeTellText(text: string): string | null {
   return t || null;
 }
 
-export const QUICK_TELLS = ['Older by ten years', 'Tired, dark circles', 'Fresh cut on the cheek'];
+/** Quick tells stay inside the allowed scope (hair, scars, tattoos, body mods). */
+export const QUICK_TELLS = ['A scar through the left eyebrow', 'A silver streak in the hair', 'A small ring in the left nostril'];
 
 // ── Clothing / gear guard ───────────────────────────────────────────────
 
@@ -155,12 +157,64 @@ export function isClothingOrGear(text: string | null | undefined): boolean {
   return CLOTHING_GEAR_RE.test(text ?? '');
 }
 
+// ── Edit scope (Mike 2026-10-15: "everything else is restricted") ───────
+
+/**
+ * Hard refusals regardless of subject: age (the sheet sets it), wounds /
+ * tiredness / expression / makeup (the live in-play portrait, not the base).
+ * "cut her hair" passes; "a cut on her cheek" and "fresh cut" do not.
+ */
+export const RESTRICTED_EDIT_RE = new RegExp([
+  // age
+  '\\b(?:ages?d?|ageing|aging|older|younger|elderly|teen(?:age[rd]?)?s?|child(?:like|ish)?|wrinkl\\w*|years\\s+old|twenties|thirties|forties|fifties|sixties|seventies|eighties)\\b',
+  // wounds and state
+  '\\b(?:wound\\w*|bruis\\w*|bleed\\w*|blood\\w*|bandag\\w*|black\\s+eye|swollen|gash\\w*|lacerat\\w*|stitch\\w*|(?:fresh|open|deep|new|small|thin)\\s+cuts?|cuts?\\s+(?:on|across|over|along|under)|dark\\s+circles|tired|exhaust\\w*|sweat\\w*|dirty|muddy|dusty|sunburn\\w*|sick(?:ly)?|feverish)\\b',
+  // expression
+  '\\b(?:expression|smil\\w*|frown\\w*|scowl\\w*|grin\\w*|crying|tears|angry|furious|sad|laugh\\w*)\\b',
+  // makeup (temporary; the live portrait's business)
+  '\\b(?:make-?up|lipstick|eyeliner|mascara|eyeshadow|blusher|rouge|war\\s*paint|face\\s*paint)\\b',
+].join('|'), 'i');
+
+/** What the designer changes: hair, scars, tattoos, piercings and other body mods, and (body) underwear. */
+export const ALLOWED_EDIT_RE = /\b(?:hair\w*|beard\w*|moustache|mustache|stubble|bald|braid\w*|fringe|bangs|ponytail|dreadlocks?|locs|cornrows|undercut|scar\w*|tattoo\w*|inked?|pierc\w*|studs?|rings?|earrings?|hoops?|gauges?|plugs?|septum|body\s*mod\w*|modification\w*|implants?|brand(?:ed|ing)?|underwear)\b/i;
+
+export const UNDERWEAR_RE = /\b(?:underwear|undergarment\w*|briefs|boxers|knickers|panties|bra|lingerie|loincloth)\b/i;
+
+export const RESTRICTED_NOTE =
+  'The base stays as they are: age comes from the sheet; cuts, tiredness, expression and makeup belong to the live portrait in play.';
+export const SCOPE_NOTE =
+  'The designer changes hair, scars, tattoos and body mods only (and the underwear design on the body). The face itself is the locked identity.';
+export const UNDERWEAR_BODY_NOTE = 'Underwear is designed on the BODY view.';
+
+export type EditScope = { ok: true } | { ok: false; line: string };
+
+/**
+ * Allow-list check for one edit sentence against a target. Clothing/gear →
+ * the inventory line; the hard refusals → RESTRICTED_NOTE; underwear on the
+ * face → UNDERWEAR_BODY_NOTE; no allowed subject at all → SCOPE_NOTE. Pure,
+ * shared by the client (nothing sent) and the edit route (422).
+ */
+export function editScope(text: string | null | undefined, target: EditTarget): EditScope {
+  const t = text ?? '';
+  if (isClothingOrGear(t)) return { ok: false, line: CLOTHING_NOTE };
+  if (RESTRICTED_EDIT_RE.test(t)) return { ok: false, line: RESTRICTED_NOTE };
+  if (UNDERWEAR_RE.test(t)) return target === 'body' ? { ok: true } : { ok: false, line: UNDERWEAR_BODY_NOTE };
+  if (ALLOWED_EDIT_RE.test(t)) return { ok: true };
+  return { ok: false, line: SCOPE_NOTE };
+}
+
 // ── Edit stack (persisted as identity.designer) ─────────────────────────
 
+/**
+ * Stack tags. skin/eyes/face/build/age/makeup/birthmark are LEGACY (read from
+ * old stacks, never made since 2026-10-15); new edits are hair, the marks,
+ * underwear or jewl.
+ */
 export type LayerKind =
   | 'base'
   | 'skin' | 'hair' | 'eyes' | 'face' | 'build' | 'age'
-  | 'scar' | 'tattoo' | 'makeup' | 'piercing' | 'birthmark'
+  | 'scar' | 'tattoo' | 'makeup' | 'piercing' | 'birthmark' | 'bodymod'
+  | 'underwear'
   | 'jewl';
 
 export interface DesignerLayer {
@@ -284,7 +338,7 @@ export function layersDroppedBy(s: DesignerState, index: number): number {
 
 const LAYER_KINDS: ReadonlySet<string> = new Set<LayerKind>([
   'base', 'skin', 'hair', 'eyes', 'face', 'build', 'age',
-  'scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'jewl',
+  'scar', 'tattoo', 'makeup', 'piercing', 'birthmark', 'bodymod', 'underwear', 'jewl',
 ]);
 
 function str(v: unknown): string | null {
@@ -380,6 +434,8 @@ export function designerErrorLine(
       return fallback(message || null);
     case 'CLOTHING_FROM_INVENTORY':
       return message || CLOTHING_NOTE;
+    case 'EDIT_OUT_OF_SCOPE':
+      return message || SCOPE_NOTE;
     default:
       return fallback(code || message || null);
   }

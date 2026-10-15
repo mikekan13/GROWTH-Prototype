@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { C, F, ActionBar, Chip, GhostButton, Readout, SectionBar, TextInput } from './parts';
 import {
-  MARK_KINDS, MARK_PLACES, QUICK_TELLS, SHAPE_CATEGORIES, SHAPE_PRESETS,
-  composeMarkText, composeShapeText, composeTellText,
+  MARK_KINDS, MARK_PLACES, QUICK_TELLS, SHAPE_CATEGORIES, SHAPE_PRESETS, SHAPE_WORDS_PLACEHOLDER,
+  composeMarkText, composeShapeText, composeTellText, markLayerKind,
   type LayerKind, type MarkKind, type MarkPlace, type Possessive, type ShapeCategory,
 } from '@/lib/appearance-designer';
 
@@ -103,7 +103,7 @@ export function Shape({ possessive, onApply, disabled, busy }: {
   const text = isMarks
     ? composeMarkText(mark, place, words, possessive)
     : composeShapeText(cat, preset, words, possessive);
-  const kind: LayerKind = isMarks ? (mark.toLowerCase() as LayerKind) : (cat.toLowerCase() as LayerKind);
+  const kind: LayerKind = isMarks ? markLayerKind(mark) : (cat.toLowerCase() as LayerKind);
 
   const apply = async () => {
     if (!text) return;
@@ -113,7 +113,7 @@ export function Shape({ possessive, onApply, disabled, busy }: {
 
   return (
     <section className="space-y-2" data-testid="designer-shape" style={{ opacity: disabled ? 0.55 : 1 }}>
-      <SectionBar n={2} title="Shape" hint="pick a part, then a preset or your own words" />
+      <SectionBar n={2} title="Shape" hint="hair, scars, tattoos, body mods · the face itself is the locked identity" />
       <div className="flex flex-wrap gap-1">
         {SHAPE_CATEGORIES.map(c => (
           <Chip key={c} label={c.toUpperCase()} on={cat === c} onClick={() => { setCat(c); setPreset(null); setWords(''); }} disabled={disabled} testId={`designer-cat-${c.toLowerCase()}`} />
@@ -160,7 +160,7 @@ export function Shape({ possessive, onApply, disabled, busy }: {
               <Chip key={p.label} label={p.label} on={preset === p.label} onClick={() => setPreset(preset === p.label ? null : p.label)} disabled={disabled} testId={`designer-preset-${p.label}`} />
             ))}
           </div>
-          <TextInput value={words} onChange={setWords} placeholder="Or your own words" testId="designer-shape-words" disabled={disabled} onEnter={apply} />
+          <TextInput value={words} onChange={setWords} placeholder={SHAPE_WORDS_PLACEHOLDER[cat]} testId="designer-shape-words" disabled={disabled} onEnter={apply} />
         </div>
       )}
       {text && !disabled && (

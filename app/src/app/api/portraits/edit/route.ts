@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getLocalProvider } from '@/ai/portraits/providers';
 import { assertLawfulImageJob, resolvePortraitMood } from '@/ai/portraits/portrait-service';
-import { WithheldContentError, PortraitEndpointError, ClothingFromInventoryError } from '@/lib/errors';
+import { WithheldContentError, PortraitEndpointError, ClothingFromInventoryError, EditOutOfScopeError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
 import { assertSeedSetForPortrait } from '@/services/seed-pick';
-import { assertEditAllowed } from '@/services/portrait-edit-guard';
+import { assertEditAllowed, readEditTarget } from '@/services/portrait-edit-guard';
 import { resolvePortraitProviderKind } from '@/ai/portraits/provider-flag';
 
 export const maxDuration = 600;
@@ -20,6 +20,7 @@ export const maxDuration = 600;
  *   seed?, guidance?, characterId?,
  *   paintData?,              // optional mask for localized inpaint/fill
  *   objectRefImagePath?,     // optional 2nd image — pull an item from this ref
+ *   target?,                 // 'face' | 'body' — a designer edit; enables the scope guard
  * }
  */
 export async function POST(request: NextRequest) {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { sourceImagePath, editPrompt, seed, guidance, characterId, paintData, objectRefImagePath } = body;
+    const { sourceImagePath, editPrompt, seed, guidance, characterId, paintData, objectRefImagePath, target } = body;
 
     if (!sourceImagePath || typeof sourceImagePath !== 'string') {
       return NextResponse.json({ error: 'sourceImagePath is required' }, { status: 400 });
@@ -50,8 +51,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'editPrompt is required' }, { status: 400 });
     }
 
-    // Clothing and gear come from inventory (designer ruling 2026-10-13) — qwen21 only.
-    assertEditAllowed(resolvePortraitProviderKind(), editPrompt);
+    // Clothing and gear come from inventory (designer ruling 2026-10-13); a
+    // designer edit (target given) must also sit inside the allowed scope — qwen21 only.
+    assertEditAllowed(resolvePortraitProviderKind(), editPrompt, readEditTarget(target));
 
     // SEED FIRST (Mike 2026-10-12): a character's renders wait for its seed.
     // (An edit with no characterId is of an existing render — already gated.)
@@ -99,7 +101,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof WithheldContentError || error instanceof PortraitEndpointError
-      || error instanceof ClothingFromInventoryError) return errorResponse(error);
+      || error instanceof ClothingFromInventoryError || error instanceof EditOutOfScopeError) return errorResponse(error);
     console.error('[portraits/edit] Error:', error);
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: msg, stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined }, { status: 500 });

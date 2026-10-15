@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { assertEditAllowed } from './portrait-edit-guard';
-import { ClothingFromInventoryError } from '@/lib/errors';
+import { assertEditAllowed, readEditTarget } from './portrait-edit-guard';
+import { ClothingFromInventoryError, EditOutOfScopeError } from '@/lib/errors';
 import { errorResponse } from '@/lib/api';
 
 describe('portrait edit clothing guard (server)', () => {
@@ -14,6 +14,15 @@ describe('portrait edit clothing guard (server)', () => {
 
   it('qwen21: body edits pass', () => {
     expect(() => assertEditAllowed('qwen21', 'Add a scar to her face. Change nothing else.')).not.toThrow();
+  });
+
+  it('qwen21 + designer target: out-of-scope edits → EditOutOfScopeError (422); legacy callers (no target) untouched', () => {
+    expect(() => assertEditAllowed('qwen21', 'Older by ten years. Change nothing else.', 'face')).toThrow(EditOutOfScopeError);
+    expect(() => assertEditAllowed('qwen21', 'Change her underwear: a dark wrap.', 'face')).toThrow(EditOutOfScopeError);
+    expect(() => assertEditAllowed('qwen21', 'Change her underwear: a dark wrap.', 'body')).not.toThrow();
+    expect(() => assertEditAllowed('qwen21', 'Older by ten years.')).not.toThrow();
+    expect(readEditTarget('body')).toBe('body');
+    expect(readEditTarget('x')).toBeNull();
   });
 
   it('FLUX paths are untouched', () => {

@@ -13,11 +13,14 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  CLOTHING_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer, isClothingOrGear,
-  possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, gateLine,
+  CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, UNDERWEAR_BODY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
+  editScope, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE,
   type DesignerAction, type DesignerState, type LayerKind,
 } from '@/lib/appearance-designer';
-import { C, F, ActionBar, DesignerStyles, GhostButton, Readout, SigilBorder } from './parts';
+import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
+
+/** Guard lines are notes (nothing was sent), not engine errors. */
+const SCOPE_LINES: ReadonlySet<string> = new Set([CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, UNDERWEAR_BODY_NOTE]);
 import { Preview, type PreviewView } from './Preview';
 import { EditStack } from './EditStack';
 import { Shape, StartFrom, TellJewl } from './Sections';
@@ -63,7 +66,6 @@ export default function AppearanceDesigner({
   const [note, setNote] = useState<string | null>(null);
   const [view, setView] = useState<PreviewView>('face');
   const [startOpen, setStartOpen] = useState(false);
-  const [showLevers, setShowLevers] = useState(false);
   const [glitchKey, setGlitchKey] = useState(0);
   const photosRef = useRef(referencePhotos);
   useEffect(() => { photosRef.current = referencePhotos; }, [referencePhotos]);
@@ -163,12 +165,14 @@ export default function AppearanceDesigner({
   const runEdit = async (text: string, kind: LayerKind, mode: 'edit' | 'regen', source: string): Promise<boolean> => {
     if (!characterId || working) return false;
     const instruction = withNothingElse(text);
-    if (isClothingOrGear(instruction)) { setNote(CLOTHING_NOTE); setError(null); return false; }
+    // Allowed scope (Mike 2026-10-15): hair, scars, tattoos, body mods; face edits only today.
+    const scope = editScope(instruction, 'face');
+    if (!scope.ok) { setNote(scope.line); setError(null); return false; }
     setBusy(mode); setError(null); setNote(null);
-    const r = await editLayer(characterId, source, instruction);
+    const r = await editLayer(characterId, source, instruction, 'face');
     setBusy(null);
     if (!r.ok) {
-      if (r.line === CLOTHING_NOTE) setNote(r.line); else setError(r.line);
+      if (SCOPE_LINES.has(r.line)) setNote(r.line); else setError(r.line);
       return false;
     }
     const layer = { imagePath: r.imagePath, text, kind, seed: r.seed, at: new Date().toISOString() };
@@ -216,7 +220,6 @@ export default function AppearanceDesigner({
   // ── render ──
   const statusColor = status === 'awaiting' ? C.gold : C.teal;
   const startIsOpen = !locked || startOpen;
-  const lv = designer.levers;
 
   return (
     <div className="relative" data-testid="appearance-designer" style={{ background: C.powder, color: C.ink, fontFamily: F.body }}>
@@ -249,9 +252,8 @@ export default function AppearanceDesigner({
                 view={view}
                 onView={setView}
                 layer={top}
-                layerIndex={Math.max(0, topIndex)}
-                editCount={Math.max(0, designer.layers.length - 1)}
                 bodyImagePath={designer.bodyImagePath ?? null}
+                portraitImagePath={designer.approvedImagePath ?? null}
                 busyLine={busy ? BUSY_LINE[busy] : null}
                 error={error}
                 note={note}
@@ -298,26 +300,10 @@ export default function AppearanceDesigner({
                     testId="designer-approve"
                   />
                   <div style={{ fontFamily: F.mono, fontSize: 11, color: C.soul }}>
-                    Token, paperdoll and future wound/expression updates all come from this base.
+                    The portrait, tokens, paperdoll and in-play wounds and expressions are all made from this face and body in the background.
                   </div>
                 </div>
               )}
-
-              <div>
-                <GhostButton label={showLevers ? 'hide levers' : 'levers'} onClick={() => setShowLevers(s => !s)} testId="designer-levers" />
-                {gateLine(lv?.gate) && (
-                  <span className="ml-2" data-testid="designer-gate" style={{ fontFamily: F.mono, fontSize: 10, color: lv?.gate?.pass === false ? C.gold : C.soul }}>
-                    {gateLine(lv?.gate)}
-                  </span>
-                )}
-                {showLevers && (
-                  <Readout testId="designer-levers-line">
-                    {lv
-                      ? `seed ${lv.seed ?? '—'} · guidance ${lv.guidance ?? '—'} · steps ${lv.steps ?? '—'} · refs ${lv.refs}${gateLine(lv.gate) ? ` · ${gateLine(lv.gate)}` : ''}`
-                      : 'no call yet'}
-                  </Readout>
-                )}
-              </div>
             </div>
           </div>
         )}

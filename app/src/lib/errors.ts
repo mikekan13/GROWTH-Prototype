@@ -127,3 +127,16 @@ export class ClothingFromInventoryError extends AppError {
     this.name = 'ClothingFromInventoryError';
   }
 }
+
+/**
+ * Image designer (Mike 2026-10-15): a designer edit outside the allowed
+ * scope (hair, scars, tattoos, body mods, body underwear) — age, wounds,
+ * expression, the locked identity. 422 `{ error: 'EDIT_OUT_OF_SCOPE', message }`.
+ */
+export class EditOutOfScopeError extends AppError {
+  readonly code = 'EDIT_OUT_OF_SCOPE' as const;
+  constructor(message: string) {
+    super(message, 422);
+    this.name = 'EditOutOfScopeError';
+  }
+}

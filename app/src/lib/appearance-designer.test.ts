@@ -3,6 +3,7 @@ import {
   CLOTHING_NOTE, EMPTY_DESIGNER, composeMarkText, composeShapeText, composeTellText, currentLayer,
   deriveDesignerStatus, designerErrorLine, designerReducer, isClothingOrGear, layersDroppedBy,
   possessiveFor, restoreDesigner, withNothingElse, gateLine, readDesignerGate,
+  editScope, markLayerKind, shapeCategoriesFor, RESTRICTED_NOTE, SCOPE_NOTE, UNDERWEAR_BODY_NOTE,
   type DesignerLayer, type DesignerState,
 } from './appearance-designer';
 
@@ -37,23 +38,44 @@ describe('instruction composition', () => {
     expect(composeShapeText('Hair', 'Short crop', '', 'her')).toBe('Change her hair to a short crop.');
     expect(withNothingElse(composeShapeText('Hair', 'Short crop', '', 'her')!))
       .toBe('Change her hair to a short crop. Change nothing else.');
-    expect(composeShapeText('Skin', 'Freckled', '', 'his')).toBe('Make his skin freckled.');
-    expect(composeShapeText('Age', '40s', '', 'her')).toBe('Make her look in her forties.');
-    expect(composeShapeText('Age', 'Elder', '', 'his')).toBe('Make him look elderly.');
+    expect(composeShapeText('Underwear', null, 'a plain dark wrap', 'his')).toBe('Change his underwear: a plain dark wrap.');
     expect(composeShapeText('Hair', 'Short crop', 'silver streak at the temple.', 'her'))
       .toBe('Change her hair: silver streak at the temple.');
   });
 
   it('shape with no preset and no words → nothing to apply', () => {
-    expect(composeShapeText('Eyes', null, '  ', 'her')).toBeNull();
-    expect(composeShapeText('Eyes', 'Not a preset', '', 'her')).toBeNull();
+    expect(composeShapeText('Hair', null, '  ', 'her')).toBeNull();
+    expect(composeShapeText('Hair', 'Not a preset', '', 'her')).toBeNull();
+    expect(composeShapeText('Underwear', null, '', 'her')).toBeNull();
   });
 
-  it('marks: kind + where + optional description', () => {
+  it('marks: kind + where + optional description; a body mod needs its words', () => {
     expect(composeMarkText('Scar', 'Face', 'a thin pale line through the left eyebrow', 'her'))
       .toBe('Add a scar to her face: a thin pale line through the left eyebrow.');
-    expect(composeMarkText('Makeup', 'Face', '', 'their')).toBe('Add makeup to their face.');
+    expect(composeMarkText('Piercing', 'Face', '', 'their')).toBe('Add a piercing to their face.');
     expect(composeMarkText('Tattoo', 'Arms', 'a coiled serpent', 'his')).toBe('Add a tattoo to his arms: a coiled serpent.');
+    expect(composeMarkText('Body mod', 'Arms', '', 'his')).toBe('');
+    expect(composeMarkText('Body mod', 'Neck', 'stretched ear gauges', 'her')).toBe('Add a body modification to her neck: stretched ear gauges.');
+    expect(markLayerKind('Body mod')).toBe('bodymod');
+    expect(shapeCategoriesFor('face')).toEqual(['Hair', 'Marks']);
+    expect(shapeCategoriesFor('body')).toEqual(['Marks', 'Underwear']);
+  });
+
+  it('edit scope (Mike 2026-10-15): hair, scars, tattoos, body mods; body underwear; nothing else', () => {
+    for (const t of ['Change her hair to a short crop. Change nothing else.', 'Add a scar to her face.', 'A silver streak in the hair',
+      'A small ring in the left nostril', 'Add a body modification to her neck: stretched ear gauges.', 'cut her hair short', 'a scar across her nose']) {
+      expect(editScope(t, 'face'), t).toEqual({ ok: true });
+    }
+    expect(editScope('Older by ten years', 'face')).toEqual({ ok: false, line: RESTRICTED_NOTE });
+    expect(editScope('Tired, dark circles', 'face')).toEqual({ ok: false, line: RESTRICTED_NOTE });
+    expect(editScope('Fresh cut on the cheek', 'face')).toEqual({ ok: false, line: RESTRICTED_NOTE });
+    expect(editScope('Add makeup to her face.', 'face')).toEqual({ ok: false, line: RESTRICTED_NOTE });
+    expect(editScope('Make her look in her forties.', 'face')).toEqual({ ok: false, line: RESTRICTED_NOTE });
+    expect(editScope('Change her eyes to green.', 'face')).toEqual({ ok: false, line: SCOPE_NOTE });
+    expect(editScope('Make his skin pale.', 'face')).toEqual({ ok: false, line: SCOPE_NOTE });
+    expect(editScope('Give her a red coat', 'face')).toEqual({ ok: false, line: CLOTHING_NOTE });
+    expect(editScope('Change her underwear: a plain dark wrap.', 'body')).toEqual({ ok: true });
+    expect(editScope('Change her underwear: a plain dark wrap.', 'face')).toEqual({ ok: false, line: UNDERWEAR_BODY_NOTE });
   });
 
   it('tell: tidied, suffix never doubled', () => {
@@ -74,8 +96,8 @@ describe('clothing / gear guard (client)', () => {
   });
   it('lets body edits through (word boundaries)', () => {
     for (const t of ['Older by ten years', 'Tired, dark circles', 'Fresh cut on the cheek', 'that look, what a scar',
-      'Change her hair to a short crop. Change nothing else.', 'Add makeup to her face.', 'Add a piercing to her face.',
-      'Make her look in her forties.', 'chattering teeth', 'a wrinkled forehead']) {
+      'Change her hair to a short crop. Change nothing else.', 'Add a piercing to her face.',
+      'chattering teeth', 'a wrinkled forehead']) {
       expect(isClothingOrGear(t), t).toBe(false);
     }
   });

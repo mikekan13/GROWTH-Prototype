@@ -4,7 +4,7 @@
  */
 
 import { portraitErrorLine } from '@/lib/entity-view';
-import { designerErrorLine, readDesignerGate, type DesignerLevers, type DesignerState } from '@/lib/appearance-designer';
+import { designerErrorLine, readDesignerGate, type DesignerLevers, type DesignerState, type EditTarget } from '@/lib/appearance-designer';
 
 export type CallResult =
   | { ok: true; imagePath: string; seed: number | null; levers: DesignerLevers }
@@ -49,9 +49,12 @@ export function lockIdentity(characterData: unknown, photos: string[]): Promise<
   }, photos.length);
 }
 
-/** Instruction edit on the current layer. `instruction` already ends "Change nothing else." */
-export function editLayer(characterId: string, sourceImagePath: string, instruction: string): Promise<CallResult> {
-  return post('/api/portraits/edit', { sourceImagePath, editPrompt: instruction, characterId, seed: randomSeed() }, 1);
+/**
+ * Instruction edit on the current face layer or the body render. `instruction`
+ * already ends "Change nothing else."; `target` turns on the server's scope guard.
+ */
+export function editLayer(characterId: string, sourceImagePath: string, instruction: string, target: EditTarget): Promise<CallResult> {
+  return post('/api/portraits/edit', { sourceImagePath, editPrompt: instruction, characterId, seed: randomSeed(), target }, 1);
 }
 
 /** BODY: full-body from the approved bust (qwen21: composition full_body → generateBody(refs[0])). */
