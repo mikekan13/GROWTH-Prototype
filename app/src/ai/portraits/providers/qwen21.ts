@@ -144,7 +144,7 @@ export class Qwen21Provider extends ServerlessProvider {
     this.loraOverride = loras;
   }
 
-  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env. */
+  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env (unset = grwthpaint_v1 at 0.9). */
   activeLoras(explicit?: Qwen21Lora[]): Qwen21Lora[] {
     return explicit ?? this.loraOverride ?? qwen21LorasFromEnv();
   }
@@ -161,7 +161,7 @@ export class Qwen21Provider extends ServerlessProvider {
     photos: Qwen21Image[],
     seed: number,
     opts?: { painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[] },
-  ): Promise<{ raw: Buffer; prompt: string }> {
+  ): Promise<{ raw: Buffer; prompt: string; loras: Qwen21Lora[] }> {
     const used = photos.slice(0, QWEN21_MAX_IMAGES);
     if (used.length === 0) throw new Error('lockIdentity needs at least one reference photo');
     const names: string[] = [];
@@ -173,9 +173,10 @@ export class Qwen21Provider extends ServerlessProvider {
     const painted = opts?.painted ?? qwen21StyleMode() === 'single';
     // Mike (14 Oct): with the GROWTH style LoRA active the MEDIUM paragraph is stripped — the trigger word
     // carries the look, and the medium words only pull costume/pose at low strengths (Violet seed-8 sheet).
-    const medium = opts?.medium ?? (hasGrowthStyleLora(this.activeLoras(opts?.loras)) ? '' : undefined);
+    const loras = this.activeLoras(opts?.loras);
+    const medium = opts?.medium ?? (hasGrowthStyleLora(loras) ? '' : undefined);
     const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, medium);
-    return { raw: await this.runWorkflow(prompt, names, seed, undefined, opts?.loras), prompt };
+    return { raw: await this.runWorkflow(prompt, names, seed, undefined, loras), prompt, loras };
   }
 
   /**
@@ -195,28 +196,28 @@ export class Qwen21Provider extends ServerlessProvider {
     const t0 = Date.now();
     const painted = opts?.painted ?? qwen21StyleMode() === 'single';
     if (!painted) {
-      const { raw, prompt } = await this.renderLock(photos, seed, opts);
-      return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
+      const { raw, prompt, loras } = await this.renderLock(photos, seed, opts);
+      return this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood, { loras });
     }
     if (!lockGateEnabled()) {
-      const { raw, prompt } = await this.renderLock(photos, seed, { ...opts, painted });
-      const r = await this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood);
+      const { raw, prompt, loras } = await this.renderLock(photos, seed, { ...opts, painted });
+      const r = await this.saveStep(characterId, 'faces', 'identity-lock', prompt, raw, seed, Date.now() - t0, opts?.mood, { loras });
       return { ...r, gate: { pass: true, reasons: ['gate off'], attempts: 1, seed, score: 1, bypassed: true } };
     }
 
-    let best: { raw: Buffer; prompt: string; seed: number; verdict: LockGateVerdict } | null = null;
+    let best: { raw: Buffer; prompt: string; loras: Qwen21Lora[]; seed: number; verdict: LockGateVerdict } | null = null;
     let attempts = 0;
     for (let i = 0; i <= LOCK_GATE_MAX_RETRIES; i++) {
       const s = seed + i;
-      const { raw, prompt } = await this.renderLock(photos, s, { ...opts, painted });
+      const { raw, prompt, loras } = await this.renderLock(photos, s, { ...opts, painted });
       attempts++;
       const verdict = await this.checkLock(raw);
       console.log(`[Qwen21] lock gate seed=${s}: ${verdict.pass ? 'PASS' : 'FAIL'} ${verdict.reasons.join('; ')}`);
-      if (!best || verdict.score > best.verdict.score) best = { raw, prompt, seed: s, verdict };
-      if (verdict.pass) { best = { raw, prompt, seed: s, verdict }; break; }
+      if (!best || verdict.score > best.verdict.score) best = { raw, prompt, loras, seed: s, verdict };
+      if (verdict.pass) { best = { raw, prompt, loras, seed: s, verdict }; break; }
     }
     const chosen = best!;
-    const r = await this.saveStep(characterId, 'faces', 'identity-lock', chosen.prompt, chosen.raw, chosen.seed, Date.now() - t0, opts?.mood);
+    const r = await this.saveStep(characterId, 'faces', 'identity-lock', chosen.prompt, chosen.raw, chosen.seed, Date.now() - t0, opts?.mood, { loras: chosen.loras });
     return {
       ...r,
       gate: { pass: chosen.verdict.pass, reasons: chosen.verdict.reasons, attempts, seed: chosen.seed, score: chosen.verdict.score },
