@@ -15,7 +15,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CLOTHING_NOTE, RESTRICTED_NOTE, SCOPE_NOTE, BODY_ONLY_NOTE, STATUS_LABEL, currentLayer, deriveDesignerStatus, designerReducer,
-  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE,
+  editScope, layersOf, possessiveFor, restoreDesigner, withNothingElse, EMPTY_DESIGNER, GATE_FLAGGED_NOTE, NOT_LOCALIZED_NOTE,
   type DesignerAction, type DesignerState, type EditTarget, type LayerKind,
 } from '@/lib/appearance-designer';
 import { C, F, ActionBar, DesignerStyles, Readout, SigilBorder } from './parts';
@@ -192,6 +192,7 @@ export default function AppearanceDesigner({
     }
     const layer = { imagePath: r.imagePath, text, kind, seed: r.seed, at: new Date().toISOString() };
     commit({ type: mode === 'edit' ? 'append' : 'replaceTop', layer, target }, { type: 'levers', levers: r.levers });
+    if (r.localized === 'none') setNote(NOT_LOCALIZED_NOTE);
     setView(target);
     newLayerLanded();
     return true;

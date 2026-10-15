@@ -53,6 +53,7 @@ import {
 } from '../qwen21-workflow';
 import { buildCorpusContentPrompt } from '../corpus-prompts';
 import { compositeEditWithMask } from '../mask-composite';
+import { LOCALIZE_FEATHER, localizeMask, type Localized } from '../edit-localize';
 import { finishEnabled, finishImage, inkImage, rawSiblingPath } from '../finish';
 import { resolveMoodKey } from '../style-config';
 import { checkBaseLock, lockGateEnabled, type LockGateMeta, type LockGateVerdict } from '../lock-gate';
@@ -411,9 +412,12 @@ export class Qwen21Provider extends ServerlessProvider {
   }
 
   /**
-   * Instruction edit on a base image. With a mask, the model still edits the
-   * whole frame (no mask input on TextEncodeQwenImage21) and the result is
-   * alpha-composited over the base so only the painted area changes.
+   * Instruction edit on a base image. The model always edits the WHOLE frame
+   * (no mask input on TextEncodeQwenImage21), so the canvas is pinned to the
+   * base's size and the result is alpha-composited over the base: through the
+   * painted mask when one is given, else — `localize` (designer edits, Mike
+   * 2026-10-15) — through a mask found by edit-localize (vision box → pixel
+   * diff → none, in which case the whole repaint is kept and reported).
    */
   async edit(
     characterId: string,
@@ -422,19 +426,34 @@ export class Qwen21Provider extends ServerlessProvider {
     seed: number,
     mask?: { dataUrl: string; feather?: number },
     mood?: string,
-  ): Promise<Qwen21StepResult> {
+    localize = false,
+  ): Promise<Qwen21StepResult & { localized?: Localized }> {
     // Edit the RAW base when one exists, so the finish is applied once, not compounded.
     const baseWeb = await this.preferRaw(await this.fullResWebPath(baseImage));
     const baseName = await this.uploadReferenceImage(baseWeb);
+    const baseBuf = await fs.readFile(this.publicAbs(baseWeb));
+    const baseMeta = await sharp(baseBuf).metadata();
+    const size = baseMeta.width && baseMeta.height ? { width: baseMeta.width, height: baseMeta.height } : undefined;
     const prompt = buildQwen21EditPrompt(instruction, mood);
     const t0 = Date.now();
-    let out = await this.runWorkflow(prompt, [baseName], seed);
+    let out = await this.runWorkflow(prompt, [baseName], seed, size);
+    let localized: Localized | undefined;
+    let stage = 'edit';
     if (mask?.dataUrl) {
-      const baseBuf = await fs.readFile(this.publicAbs(baseWeb));
       const maskBuf = Buffer.from(mask.dataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64');
       out = await compositeEditWithMask(baseBuf, out, maskBuf, mask.feather ?? 20);
+      stage = 'masked-edit';
+    } else if (localize) {
+      const found = await localizeMask(baseBuf, out, instruction);
+      localized = found.how;
+      if (found.mask) {
+        out = await compositeEditWithMask(baseBuf, out, found.mask, LOCALIZE_FEATHER);
+        stage = `local-edit-${found.how}`;
+      }
+      console.log(`[Qwen21] edit localized: ${found.how}`);
     }
-    return this.saveStep(characterId, 'finetune', mask ? 'masked-edit' : 'edit', prompt, out, seed, Date.now() - t0, mood);
+    const r = await this.saveStep(characterId, 'finetune', stage, prompt, out, seed, Date.now() - t0, mood);
+    return localized ? { ...r, localized } : r;
   }
 
   // ============================================================
@@ -502,6 +521,7 @@ export class Qwen21Provider extends ServerlessProvider {
       paintData?: { mode: string; dataUrl: string; feather?: number };
       objectRefImagePath?: string;
       mood?: string;
+      localize?: boolean;
     },
   ): Promise<PortraitResult> {
     const seed = options?.seed ?? Math.floor(Math.random() * 2147483647);
@@ -515,8 +535,13 @@ export class Qwen21Provider extends ServerlessProvider {
     const mask = options?.paintData?.mode === 'mask' && options.paintData.dataUrl
       ? { dataUrl: options.paintData.dataUrl, feather: options.paintData.feather }
       : undefined;
-    const r = await this.edit(options?.characterId ?? 'anonymous', sourceImagePath, editPrompt, seed, mask, resolveMoodKey(options?.mood));
-    return this.toResult(r, r.generationTimeMs, mask ? 'qwen21 masked edit (post-composite)' : 'qwen21 edit');
+    const r = await this.edit(options?.characterId ?? 'anonymous', sourceImagePath, editPrompt, seed, mask, resolveMoodKey(options?.mood), !!options?.localize && !mask);
+    return this.toResult(
+      r,
+      r.generationTimeMs,
+      mask ? 'qwen21 masked edit (post-composite)' : r.localized ? `qwen21 localized edit (${r.localized})` : 'qwen21 edit',
+      r.localized ? { localized: r.localized } : {},
+    );
   }
 
   // ============================================================

@@ -627,6 +627,8 @@ export class LocalProvider implements ImageGenerationProvider {
       objectRefImagePath?: string;
       /** Campaign MOOD key (style-config CAMPAIGN_MOODS). Used by the Qwen-Image-2.1 provider; ignored here. */
       mood?: string;
+      /** Keep the edit local (designer edits; Qwen-Image-2.1 provider only — FLUX edits already go through their own masks). */
+      localize?: boolean;
     },
   ): Promise<PortraitResult> {
     await this.ensureRunning();

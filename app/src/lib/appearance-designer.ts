@@ -327,6 +327,7 @@ export function gateLine(g: DesignerGate | null | undefined): string | null {
 }
 
 export const GATE_FLAGGED_NOTE = 'The base came back dressed or off-pose; tap regenerate.';
+export const NOT_LOCALIZED_NOTE = 'JEWL could not find where that edit landed, so the whole frame was repainted. Check it; ⊗ the layer if it drifted.';
 
 export interface DesignerState {
   /** The styled bust from LOCK IDENTITY (= layers[0].imagePath). */

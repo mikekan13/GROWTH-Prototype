@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
       objectRefImagePath: typeof objectRefImagePath === 'string' ? objectRefImagePath : undefined,
       // MOOD layer (Qwen provider only): the character's campaign genre → mood; default 'growth'.
       mood: await resolvePortraitMood({ characterId: typeof characterId === 'string' ? characterId : null }),
+      // A designer edit (target given) is kept LOCAL: the repaint is composited back only where it changed (Mike 2026-10-15).
+      localize: !!readEditTarget(target),
     });
 
     if (!result.success) {
@@ -97,6 +99,8 @@ export async function POST(request: NextRequest) {
         prompt: result.metadata.prompt,
         steps: result.metadata.steps ?? null,
         cfg: result.metadata.cfg ?? null,
+        // 'bbox' | 'diff' | 'none' on a localized edit (qwen21); absent otherwise.
+        localized: (result.metadata as { localized?: string }).localized ?? null,
       },
     });
   } catch (error) {
