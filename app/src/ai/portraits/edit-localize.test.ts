@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { boxMaskPng, diffMaskPng, locatePrompt, maskCoverage, padEditBox, parseEditBox, unionMasks } from './edit-localize';
+import { boxMaskPng, diffMaskPng, locatePrompt, maskCoverage, matchColorInRegion, padEditBox, parseEditBox, unionMasks } from './edit-localize';
 import { compositeEditWithMask } from './mask-composite';
 
 describe('parseEditBox', () => {
@@ -43,6 +43,17 @@ describe('masks', () => {
     expect(info.width).toBe(W); expect(info.height).toBe(H); // the base's canvas, not the edit's
     expect(px(100, 185)).toEqual([255, 0]); // inside the box: the edit
     expect(px(10, 10)).toEqual([0, 255]); // outside: the base
+  });
+
+  it('matchColorInRegion shifts the edit to the base\'s mean in the region (edit at another canvas size too)', async () => {
+    const W = 200; const H = 300;
+    const base = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 120, g: 100, b: 80 } } }).png().toBuffer();
+    const edited = await sharp({ create: { width: W, height: H + 32, channels: 3, background: { r: 100, g: 100, b: 100 } } }).png().toBuffer();
+    const out = await matchColorInRegion(base, edited, { x0: 0.4, y0: 0.4, x1: 0.6, y1: 0.6 }, W, H);
+    const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height]).toEqual([W, H]);
+    expect(Array.from(data.subarray(0, 3))).toEqual([120, 100, 80]);
+    expect(await matchColorInRegion(base, base, { x0: 0, y0: 0, x1: 1, y1: 1 }, W, H)).toBe(base); // no shift needed → untouched
   });
 
   it('diffMaskPng finds a strong local change and ignores a global drift; noise and whole-frame → null', async () => {

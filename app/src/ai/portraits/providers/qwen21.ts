@@ -436,7 +436,11 @@ export class Qwen21Provider extends ServerlessProvider {
     const size = baseMeta.width && baseMeta.height ? { width: baseMeta.width, height: baseMeta.height } : undefined;
     const prompt = buildQwen21EditPrompt(instruction, mood);
     const t0 = Date.now();
-    let out = await this.runWorkflow(prompt, [baseName], seed, size);
+    // NO style LoRA on an edit (Mike, 15 Oct: "maybe edits don't need it anyways"): the base already
+    // carries the look; the LoRA only restyles the patch and pulls the repaint away from the base.
+    // QWEN21_EDIT_LORA=on restores the active blend.
+    const loras = process.env.QWEN21_EDIT_LORA === 'on' ? undefined : [];
+    let out = await this.runWorkflow(prompt, [baseName], seed, size, loras);
     let localized: Localized | undefined;
     let stage = 'edit';
     if (mask?.dataUrl) {
@@ -444,10 +448,12 @@ export class Qwen21Provider extends ServerlessProvider {
       out = await compositeEditWithMask(baseBuf, out, maskBuf, mask.feather ?? 20);
       stage = 'masked-edit';
     } else if (localize) {
+      // Keep the pure repaint beside the result (lab reruns of the localizer need it).
+      await this.saveRepaint(characterId, seed, out);
       const found = await localizeMask(baseBuf, out, instruction);
       localized = found.how;
       if (found.mask) {
-        out = await compositeEditWithMask(baseBuf, out, found.mask, LOCALIZE_FEATHER);
+        out = await compositeEditWithMask(baseBuf, found.edited, found.mask, LOCALIZE_FEATHER);
         stage = `local-edit-${found.how}`;
       }
       console.log(`[Qwen21] edit localized: ${found.how}`);
@@ -551,6 +557,17 @@ export class Qwen21Provider extends ServerlessProvider {
   /** Style refs used when the caller passes none. */
   protected defaultStyleRefs(): Promise<string[]> {
     return resolveQwen21StyleRefs();
+  }
+
+  /** The pure, uncomposited repaint of a localized edit: public/portraits/<id>/finetune/repaint/<seed>.png. */
+  private async saveRepaint(characterId: string, seed: number, repaint: Buffer): Promise<void> {
+    try {
+      const abs = this.publicAbs(`/portraits/${characterId}/finetune/repaint/${seed}.png`);
+      await fs.mkdir(path.dirname(abs), { recursive: true });
+      await fs.writeFile(abs, repaint);
+    } catch (e) {
+      console.warn(`[Qwen21] could not keep the repaint: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   /** Write the RAW model output beside the finished one: public/<dir>/raw/<name>.png. */

@@ -111,40 +111,46 @@ export const DIFF_MAX_COVER = 0.35;
 const DIFF_WORK = 256;
 
 /**
- * Where the edited image differs strongly from the base: both to grayscale at a
- * small working size, absolute difference (minus the median, so a global
- * drift does not count), blur, threshold at `level`, back up to W×H as a PNG
- * mask. `within` limits the search to a window (coverage is then judged
- * against the window's area). Null when the result is noise or near the whole area.
+ * Where the edited image differs SHARPLY from the base. Both at a small
+ * working size; per-pixel colour distance (max over RGB — a purple scar on
+ * skin is a colour change more than a luminance one); minus a heavily blurred
+ * copy of that distance (a high-pass: tonal drift and soft re-shading fall
+ * out, a ring or a scar line stays); blur, threshold at `level`, dilate a
+ * little, back up to W×H as a PNG mask. `within` limits the search to a
+ * window (coverage is then judged against the window's area). Null when the
+ * result is noise or near the whole area.
  */
 export async function diffMaskPng(
-  base: Buffer, edited: Buffer, width: number, height: number, level = 48, within?: EditBox,
+  base: Buffer, edited: Buffer, width: number, height: number, level = 28, within?: EditBox,
 ): Promise<Buffer | null> {
   const scale = DIFF_WORK / Math.max(width, height);
   const w = Math.max(8, Math.round(width * scale));
   const h = Math.max(8, Math.round(height * scale));
-  const gray = (b: Buffer) => sharp(b).resize(w, h, { fit: 'fill' }).grayscale().blur(1.5).raw().toBuffer();
-  const [a, b] = await Promise.all([gray(base), gray(edited)]);
-  const diff = Buffer.alloc(w * h);
+  const rgb = (b: Buffer) => sharp(b).resize(w, h, { fit: 'fill' }).removeAlpha().blur(1).raw().toBuffer();
+  const [a, b] = await Promise.all([rgb(base), rgb(edited)]);
+  const dist = Buffer.alloc(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const j = i * 3;
+    dist[i] = Math.max(Math.abs(a[j] - b[j]), Math.abs(a[j + 1] - b[j + 1]), Math.abs(a[j + 2] - b[j + 2]));
+  }
+  // High-pass: take away the slow, wide drift so only sharp local change remains.
+  const low = await sharp(dist, { raw: { width: w, height: h, channels: 1 } }).blur(Math.max(4, DIFF_WORK / 24)).raw().toBuffer();
   const win = within ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
   const wx0 = Math.floor(win.x0 * w); const wx1 = Math.ceil(win.x1 * w);
   const wy0 = Math.floor(win.y0 * h); const wy1 = Math.ceil(win.y1 * h);
-  const inside: number[] = [];
+  const hp = Buffer.alloc(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
-      if (x < wx0 || x >= wx1 || y < wy0 || y >= wy1) { diff[i] = 0; continue; }
-      diff[i] = Math.abs(a[i] - b[i]);
-      inside.push(diff[i]);
+      if (x < wx0 || x >= wx1 || y < wy0 || y >= wy1) continue;
+      hp[i] = Math.max(0, dist[i] - low[i]);
     }
   }
-  if (inside.length === 0) return null;
-  inside.sort((x, y) => x - y);
-  const median = inside[Math.floor(inside.length / 2)];
-  for (let i = 0; i < diff.length; i++) diff[i] = Math.max(0, diff[i] - median);
-  const mask = await sharp(diff, { raw: { width: w, height: h, channels: 1 } })
-    .blur(2)
+  const mask = await sharp(hp, { raw: { width: w, height: h, channels: 1 } })
+    .blur(1.2)
     .threshold(level)
+    .blur(2.5)
+    .threshold(1) // dilate ≈ 2 work px each way
     .resize(width, height, { fit: 'fill' })
     .png()
     .toBuffer();
@@ -152,6 +158,33 @@ export async function diffMaskPng(
   const cover = (await maskCoverage(mask)) / winArea;
   if (cover < DIFF_MIN_COVER || cover > DIFF_MAX_COVER) return null;
   return mask;
+}
+
+/**
+ * Shift the edited image's colour so its mean over `region` matches the
+ * base's there (per channel). The repaint runs a little cooler or warmer than
+ * the base every time; without this the pasted area shows as a tonal patch
+ * on a flat background even through the feather.
+ */
+export async function matchColorInRegion(base: Buffer, edited: Buffer, region: EditBox, width: number, height: number): Promise<Buffer> {
+  const left = Math.max(0, Math.round(region.x0 * width));
+  const top = Math.max(0, Math.round(region.y0 * height));
+  const w = Math.max(1, Math.min(width - left, Math.round((region.x1 - region.x0) * width)));
+  const h = Math.max(1, Math.min(height - top, Math.round((region.y1 - region.y0) * height)));
+  const mean = async (b: Buffer) => {
+    // Two passes: sharp runs extract before resize inside one pipeline.
+    const sized = await sharp(b).resize(width, height, { fit: 'fill' }).removeAlpha().png().toBuffer();
+    const { data } = await sharp(sized).extract({ left, top, width: w, height: h })
+      .resize(32, 32, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+    const m = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 3) { m[0] += data[i]; m[1] += data[i + 1]; m[2] += data[i + 2]; }
+    const n = data.length / 3;
+    return m.map(v => v / n);
+  };
+  const [mb, me] = await Promise.all([mean(base), mean(edited)]);
+  const delta = mb.map((v, i) => Math.max(-40, Math.min(40, v - me[i])));
+  if (delta.every(d => Math.abs(d) < 0.5)) return edited;
+  return sharp(edited).resize(width, height, { fit: 'fill' }).removeAlpha().linear([1, 1, 1], delta).png().toBuffer();
 }
 
 /** Union of two masks (PNG, same size): lighter-of. */
@@ -198,30 +231,39 @@ export async function locateEdit(
   }
 }
 
+export type LocalizeResult =
+  | { mask: Buffer; how: 'bbox' | 'diff'; /** the edited image, colour-matched to the base round the region */ edited: Buffer }
+  | { mask: null; how: 'none'; edited: Buffer };
+
 /**
- * The mask for a localized edit. With a vision box: the pixel difference
- * inside a generous window round it (where the change really is) unioned
- * with the tight padded box (a floor, in case the diff is faint); no diff
- * there → the window itself. No box → the frame-wide diff. Nothing → null.
+ * The mask for a localized edit. With a vision box: the sharp pixel
+ * difference inside a generous window round it (where the change really is)
+ * unioned with the tight padded box (a floor, in case the diff is faint); no
+ * diff there → the tight box alone — NEVER the window (15 Oct: a window
+ * pasted whole showed as a rectangle of the repaint's backdrop). No box →
+ * the frame-wide diff. Nothing → null. The edited image comes back
+ * colour-matched to the base over the region so the seam does not read.
  */
 export async function localizeMask(
   base: Buffer,
   edited: Buffer,
   instruction: string,
   opts?: { timeoutMs?: number; provider?: VisionProvider; model?: string },
-): Promise<{ mask: Buffer; how: 'bbox' | 'diff' } | { mask: null; how: 'none' }> {
+): Promise<LocalizeResult> {
   const meta = await sharp(base).metadata();
   const W = meta.width ?? 1024;
   const H = meta.height ?? 1024;
   const box = await locateEdit(edited, instruction, opts);
   if (box) {
     const window = padEditBox(box, WINDOW_PAD_SELF, WINDOW_PAD_FRAME);
+    const matched = await matchColorInRegion(base, edited, window, W, H);
     const tight = await boxMaskPng(padEditBox(box), W, H);
-    const diffIn = await diffMaskPng(base, edited, W, H, 40, window);
-    if (diffIn) return { mask: await unionMasks(diffIn, tight), how: 'bbox' };
-    return { mask: await boxMaskPng(window, W, H), how: 'bbox' };
+    const diffIn = await diffMaskPng(base, matched, W, H, undefined, window);
+    console.log(`[EditLocalize] mask = ${diffIn ? 'diff-in-window ∪ tight box' : 'tight box only'}`);
+    return { mask: diffIn ? await unionMasks(diffIn, tight) : tight, how: 'bbox', edited: matched };
   }
-  const diff = await diffMaskPng(base, edited, W, H);
-  if (diff) return { mask: diff, how: 'diff' };
-  return { mask: null, how: 'none' };
+  const matched = await matchColorInRegion(base, edited, { x0: 0, y0: 0, x1: 1, y1: 1 }, W, H);
+  const diff = await diffMaskPng(base, matched, W, H);
+  if (diff) return { mask: diff, how: 'diff', edited: matched };
+  return { mask: null, how: 'none', edited };
 }
