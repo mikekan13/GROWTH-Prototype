@@ -51,7 +51,9 @@ export interface LockGateMeta {
   bypassed?: boolean;
 }
 
-export const LOCK_GATE_TIMEOUT_MS = 45_000; // verified ~20 s warm, 33 s cold on qwen2.5vl:7b at 768 px — 20 s fail-opened too easily; a cold pod (~100 s) fails open
+// 45 s fail-opened on a cold text lane (14 Oct: a clothed, chest-down lock slipped through as "gate unavailable");
+// a cold serverless worker needs ~100 s, so the gate now waits long enough to actually judge.
+export const LOCK_GATE_TIMEOUT_MS = 120_000;
 /** Ollama model tag (VISION_PROVIDER=ollama only); pod/claude use their lane model. */
 export const LOCK_GATE_DEFAULT_MODEL = 'qwen2.5vl:7b';
 /** Longest side sent to the VL model. 768 = the size verified 2026-10-13 (~20 s warm on qwen2.5vl:7b); LOCK_GATE_DIM lowers it for speed. */
@@ -68,7 +70,7 @@ export function lockGateEnabled(): boolean {
 export const LOCK_GATE_PROMPT = `You are checking a generated portrait against a fixed passport-photo composition. Look only at the image. Answer four questions:
 - clothed: true if ANY clothing, fabric, garment, strap, collar, neckline, choker, necklace, earring or other jewellery is visible on the person; false if the shoulders and chest are bare skin.
 - tilted: true if the head is tilted, turned, leaning, in three-quarter or profile view, or the body is seated/turned; false if the face and shoulders are square to the camera and the head is upright.
-- framing_ok: true if it is a head-and-shoulders crop with the whole head visible and a little space above the head; false if it is full body, half body, cropped through the head, or the head touches the top edge.
+- framing_ok: true if it is a tight face crop: the face large and centred, the whole head visible with a little space above it, and the picture ending anywhere between the neck and just below the collarbones (the tops of the shoulders may show); false if the chest, bust, breasts, torso, waist or arms are in view, if it is a wide bust, half body or full body, if it is cropped through the head, or if the head touches the top edge.
 - eyes_ok: true if both eyes are open and looking at the camera.
 Reply with ONLY this JSON, no other text: {"clothed": true|false, "tilted": true|false, "framing_ok": true|false, "eyes_ok": true|false}`;
 
@@ -76,7 +78,7 @@ type Check = { key: 'clothed' | 'tilted' | 'framing_ok' | 'eyes_ok'; failWhen: b
 const CHECKS: Check[] = [
   { key: 'clothed', failWhen: true, reason: 'clothed (garment, strap or jewellery visible)' },
   { key: 'tilted', failWhen: true, reason: 'off-pose (tilt, turn, lean or three-quarter)' },
-  { key: 'framing_ok', failWhen: false, reason: 'framing (not head-and-shoulders with headroom)' },
+  { key: 'framing_ok', failWhen: false, reason: 'framing (not a tight face crop ending by the collarbones, with headroom)' },
   { key: 'eyes_ok', failWhen: false, reason: 'eyes (closed or not to camera)' },
 ];
 

@@ -23,6 +23,12 @@ export const QWEN21_STEPS = 25;
 export const QWEN21_RESOLUTION = 1024;
 /** Body canvas: EmptyLatentImage replaces the encoder latent (A/B run C, worked). */
 export const QWEN21_BODY_SIZE = { width: 832, height: 1216 } as const;
+/**
+ * The base lock's own canvas (Mike, 14 Oct: "we need everyone to be same framing and pose"). Without an explicit
+ * size the output copies the reference photo's aspect — a tall 2:3 phone shot invites a chest-down bust and every
+ * character got a different frame. 4:5 is the passport head-and-shoulders ratio; /16 on both sides.
+ */
+export const QWEN21_LOCK_SIZE = { width: 832, height: 1040 } as const;
 
 type Workflow = Record<string, Record<string, unknown>>;
 
@@ -52,20 +58,40 @@ const LOCK_BACKDROP = 'Blank flat uniform mid-grey backdrop, nothing else.';
  * what Qwen obeys most reliably.
  */
 // Trimmed (sheet 8): the binding text had grown long enough to drown the style words.
+// Mike (14 Oct, LoRA at 0.9 with the medium stripped): the style LoRA's prior pulls wider, chest-down busts and the
+// gate passed one — the crop's BOTTOM edge is now stated outright ("ends just below the collarbones") in both the
+// composition and the closer, and the gate checks it.
 export const LOCK_COMPOSITION =
   'Composed exactly like a passport photo: facing the camera squarely, head upright and centred, both ears visible, shoulders level, ' +
-  'head and shoulders with a little space above the head, neutral expression, closed mouth, eyes straight into the camera; no tilt, no lean, no three-quarter view. ' +
+  // "the frame ending just below the collarbones" painted a literal grey bar across the bottom (seed 8 sweep) — say "cropped".
+  'head and shoulders with a little space above the head, cropped just below the collarbones so no chest or torso is in view, ' +
+  'neutral expression, closed mouth, eyes straight into the camera; no tilt, no lean, no three-quarter view. ' +
   'Nothing is worn: bare skin from the collarbones up, no clothing, no choker, no jewellery.';
 
 /** Short restatement appended at the very END of the lock prompt (recency wins against style words). */
-export const LOCK_CLOSER = 'Unclothed with bare shoulders, facing the camera squarely, head level.';
+export const LOCK_CLOSER = 'Unclothed with bare shoulders, facing the camera squarely, head level, cropped just below the collarbones.';
 
-export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?: string, medium: string = GROWTH_MEDIUM): string {
-  const n = Math.max(1, Math.min(photoCount, QWEN21_MAX_IMAGES));
+/**
+ * POSE / FRAME REFERENCE clause (Mike, 14 Oct: "We need it to be solid for the base. Do the reference"). Qwen-Image-Edit
+ * 2509+ (and 2.1) natively take a ControlNet-style KEYPOINT MAP as an input image ("Make the person in Image 1 copy the
+ * exact pose from Image 2"). The lock feeds an OpenPose skeleton of the passport bust as its LAST image. A photoreal
+ * mannequin in that slot became the subject (14 Oct test) — a coloured stick figure cannot. `tag` is that image's <imageN>.
+ */
+export function lockFrameRefClause(tag: string): string {
+  // v2 wording (14 Oct): the first run inset the portrait inside a grey border — the painting must fill the canvas.
+  return `Make the person copy the exact pose and framing of the pose skeleton in ${tag}: the head, eyes, ears and shoulders exactly where the skeleton's keypoints are, the same head size, the same head-and-shoulders crop. The painting fills the whole canvas edge to edge, no border, no inset, no inner frame. ${tag} is a keypoint map only; draw no skeleton, lines or dots in the picture.`;
+}
+
+export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?: string, medium: string = GROWTH_MEDIUM, opts: { frameRef?: boolean } = {}): string {
+  // With a frame reference the photos are <image1>..<imageN-1> and the mannequin is <imageN>.
+  const total = Math.max(1, Math.min(photoCount, QWEN21_MAX_IMAGES));
+  const n = opts.frameRef ? Math.max(1, total - 1) : total;
+  const frameTag = opts.frameRef ? `<image${total}>` : '';
   if (!painted) {
     return (
       `A head-and-shoulders portrait of the person in ${imageTagList(1, n)}. ` +
       LOCK_COMPOSITION + ' ' +
+      (frameTag ? lockFrameRefClause(frameTag) + ' ' : '') +
       LOCK_BACKDROP
     );
   }
@@ -76,6 +102,7 @@ export function buildQwen21LockPrompt(photoCount: number, painted = false, mood?
     `A painted character illustration of the person in ${imageTagList(1, n)}, head and shoulders.`,
     'Match their exact facial identity from the photos.',
     LOCK_COMPOSITION,
+    frameTag ? lockFrameRefClause(frameTag) : '',
     medium.trim(),
     getCampaignMood(mood),
     LOCK_BACKDROP,
@@ -238,8 +265,8 @@ export function qwen21LoraLabel(loras: readonly Qwen21Lora[] | undefined): strin
  */
 export const GROWTH_STYLE_LORA_TRIGGER = 'grwthpaint';
 export const GROWTH_STYLE_LORA_FILE = 'grwthpaint_v1.safetensors';
-/** Mike (14 Oct, after the seed-21499 check): "just set the lora to 90% for every gen", then "90 was too much. Lets try 70%", then "bring the lora down to 65%", then with the finish layer OFF "crank the lora back to 90%" — one strength, every step. */
-export const GROWTH_STYLE_LORA: Qwen21Lora = { file: GROWTH_STYLE_LORA_FILE, strength: 0.9, trigger: GROWTH_STYLE_LORA_TRIGGER };
+/** Mike (14 Oct, after the seed-21499 check): "just set the lora to 90% for every gen", then "90 was too much. Lets try 70%", then "bring the lora down to 65%", then with the finish layer OFF "crank the lora back to 90%", then with the pose skeleton in "drop our lora to 70%" — one strength, every step. */
+export const GROWTH_STYLE_LORA: Qwen21Lora = { file: GROWTH_STYLE_LORA_FILE, strength: 0.7, trigger: GROWTH_STYLE_LORA_TRIGGER };
 
 /** True when the blend carries the GROWTH style LoRA (any strength). */
 export function hasGrowthStyleLora(loras: readonly Qwen21Lora[] | undefined): boolean {
@@ -247,7 +274,7 @@ export function hasGrowthStyleLora(loras: readonly Qwen21Lora[] | undefined): bo
 }
 
 /**
- * The env default (QWEN21_LORAS). UNSET → [GROWTH_STYLE_LORA] (grwthpaint_v1 at 0.9, the 14 Oct
+ * The env default (QWEN21_LORAS). UNSET → [GROWTH_STYLE_LORA] (grwthpaint_v1 at 0.7, the 14 Oct
  * baseline, for every generation); set to "" / "none" → no LoRAs; any other value → that blend.
  */
 export function qwen21LorasFromEnv(): Qwen21Lora[] {
@@ -255,6 +282,20 @@ export function qwen21LorasFromEnv(): Qwen21Lora[] {
   if (env === undefined) return [GROWTH_STYLE_LORA];
   if (env.trim().toLowerCase() === 'none') return [];
   return parseQwen21Loras(env);
+}
+
+/** A LoRA start fraction clamped to [0, 0.9]; NaN/undefined → 0 (LoRA on for every step). */
+export function clampLoraStart(v: number | undefined): number {
+  if (v === undefined || !Number.isFinite(v) || v <= 0) return 0;
+  return Math.min(0.9, v);
+}
+
+/** The env default for the LoRA start (QWEN21_LORA_START, a fraction 0–0.9). Unset/invalid → QWEN21_LORA_START_DEFAULT. */
+export const QWEN21_LORA_START_DEFAULT = 0;
+export function qwen21LoraStartFromEnv(): number {
+  const env = process.env.QWEN21_LORA_START;
+  if (env === undefined || env.trim() === '') return QWEN21_LORA_START_DEFAULT;
+  return clampLoraStart(Number(env));
 }
 
 /** Prepend each LoRA trigger once, in order, as "<t1>, <t2>, <prompt>". Triggers already leading the prompt are not repeated. */
@@ -270,6 +311,13 @@ export interface Qwen21WorkflowOptions {
   prompt: string;
   /** Community style LoRAs, chained UNET → LORA_1 → … → (old UNET consumers). Omitted/[] = unchanged workflow. */
   loras?: Qwen21Lora[];
+  /**
+   * LoRA START (Mike, 14 Oct: "can the lora start later? after the base prompt has created the form"): the fraction
+   * of the denoising steps that run on the BARE model before the LoRA chain takes over. Composition is settled in the
+   * early high-noise steps, so 0.3 = the first 30% of steps frame the image without the style, the rest paint it.
+   * 0 / omitted = the LoRA is on for every step (single sampler, unchanged workflow).
+   */
+  loraStart?: number;
   /** Uploaded ComfyUI image names → images.image_1..N (in order). */
   images: string[];
   seed: number;
@@ -325,7 +373,8 @@ export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwe
     sample.latent_image = ['EMPTY_LATENT', 0];
   }
 
-  if (opts.loras && opts.loras.length > 0) {
+  const loraStart = clampLoraStart(opts.loraStart);
+  if (opts.loras && opts.loras.length > 0 && loraStart === 0) {
     if (!wf.UNET) throw new Error('qwen21 workflow template is missing node UNET (needed for LoRAs)');
     // Rewire every consumer of the DiT (CACHE.model today) to the end of the LoRA chain.
     const last = `LORA_${opts.loras.length}`;
@@ -342,6 +391,32 @@ export function buildQwen21Workflow(template: Record<string, unknown>, opts: Qwe
         inputs: { lora_name: l.file, strength_model: l.strength, model: [i === 0 ? 'UNET' : `LORA_${i}`, 0] },
       };
     });
+  } else if (opts.loras && opts.loras.length > 0) {
+    // TWO-STAGE sampling: SAMPLE_A runs steps [0, k) on the bare (cached) model and hands its leftover noise to
+    // SAMPLE, which runs [k, N) on the LoRA chain patched onto the SAME cached model (CACHE → LORA_1 → … → LORA_n),
+    // so the DiT is loaded once. Both stages share the conditioning, seed, sampler and schedule.
+    if (!wf.CACHE) throw new Error('qwen21 workflow template is missing node CACHE (needed for a LoRA start)');
+    const last = `LORA_${opts.loras.length}`;
+    opts.loras.forEach((l, i) => {
+      wf[`LORA_${i + 1}`] = {
+        class_type: 'LoraLoaderModelOnly',
+        inputs: { lora_name: l.file, strength_model: l.strength, model: [i === 0 ? 'CACHE' : `LORA_${i}`, 0] },
+      };
+    });
+    const steps = Number(sample.steps);
+    const k = Math.min(steps - 1, Math.max(1, Math.round(steps * loraStart)));
+    const shared = {
+      positive: sample.positive, negative: sample.negative, cfg: sample.cfg,
+      sampler_name: sample.sampler_name, scheduler: sample.scheduler, steps, noise_seed: sample.seed,
+    };
+    wf.SAMPLE_A = {
+      class_type: 'KSamplerAdvanced',
+      inputs: { ...shared, model: ['CACHE', 0], latent_image: sample.latent_image, add_noise: 'enable', start_at_step: 0, end_at_step: k, return_with_leftover_noise: 'enable' },
+    };
+    wf.SAMPLE = {
+      class_type: 'KSamplerAdvanced',
+      inputs: { ...shared, model: [last, 0], latent_image: ['SAMPLE_A', 0], add_noise: 'disable', start_at_step: k, end_at_step: 10000, return_with_leftover_noise: 'disable' },
+    };
   }
 
   if (opts.filenamePrefix) (wf.SAVE.inputs as Record<string, unknown>).filename_prefix = opts.filenamePrefix;

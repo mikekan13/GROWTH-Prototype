@@ -142,32 +142,50 @@ describe('Qwen21Provider.generatePortrait (transport stubbed)', () => {
     (p as unknown as { uploadStyleRef: (a: string, i: number) => Promise<string> }).uploadStyleRef = async (a, i) => `style${i + 1}:${a}`;
     return p;
   };
-  // These cases exercise the prompt stack WITHOUT the GROWTH style LoRA (env unset = grwthpaint 0.6 since 14 Oct).
-  beforeEach(() => { process.env.QWEN21_LORAS = 'none'; });
-  afterEach(() => { delete process.env.QWEN21_LORAS; });
+  // These cases exercise the prompt stack WITHOUT the GROWTH style LoRA and WITHOUT the pose skeleton
+  // (env unset = grwthpaint 0.7 + lock-pose-grey.png since 14 Oct).
+  beforeEach(() => { process.env.QWEN21_LORAS = 'none'; process.env.QWEN21_LOCK_POSE_REF = 'off'; });
+  afterEach(() => { delete process.env.QWEN21_LORAS; delete process.env.QWEN21_LOCK_POSE_REF; });
 
-  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.9 on every gen, trigger first, lock MEDIUM stripped', async () => {
-    delete process.env.QWEN21_LORAS; delete process.env.QWEN21_STYLE_MODE;
+  it('QWEN21_LOCK_POSE_REF=off → photos only, no skeleton clause', async () => {
+    delete process.env.QWEN21_STYLE_MODE;
+    const p = patch(new TestQwen());
+    await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg', '/uploads/references/c/b.jpg'] }));
+    const wf = p.queued[0];
+    expect(wf.LOAD_REF2.inputs.image).toBe('ref:/uploads/references/c/b.jpg');
+    expect(wf.LOAD_REF3).toBeUndefined();
+    expect(String(wf.TEXT_ENCODE.inputs.prompt)).not.toContain('pose skeleton');
+  });
+
+  it('env unset (the 14 Oct baseline): grwthpaint_v1 at 0.7 on every gen, trigger first, lock MEDIUM stripped, pose skeleton last', async () => {
+    delete process.env.QWEN21_LORAS; delete process.env.QWEN21_STYLE_MODE; delete process.env.QWEN21_LOCK_POSE_REF;
     const p = patch(new TestQwen());
     const r = await p.generatePortrait(input({ refs: ['/uploads/references/c/a.jpg'] }));
     expect(r.success).toBe(true);
     const wf = p.queued[0];
     expect(wf.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
-    expect(wf.LORA_1.inputs.strength_model).toBe(0.9);
+    expect(wf.LORA_1.inputs.strength_model).toBe(0.7);
+    // The shipped pose skeleton rides as the LAST image and the prompt points at it.
+    expect(wf.LOAD_REF1.inputs.image).toBe('ref:/uploads/references/c/a.jpg');
+    expect(String(wf.LOAD_REF2.inputs.image)).toMatch(/^buf:qwen21-lock-pose-/);
+    expect(wf.LOAD_REF3).toBeUndefined();
     const prompt = String(wf.TEXT_ENCODE.inputs.prompt);
     expect(prompt).toMatch(/^grwthpaint, A painted character illustration of the person in <image1>, head and shoulders\./);
+    expect(prompt).toContain('pose skeleton in <image2>:');
+    expect(wf.EMPTY_LATENT.inputs).toMatchObject({ width: 832, height: 1040 }); // fixed 4:5 lock canvas
+    expect(wf.SAMPLE.inputs.latent_image).toEqual(['EMPTY_LATENT', 0]);
     expect(prompt).not.toContain(GROWTH_MEDIUM);
     expect(prompt).not.toMatch(/no grain, no noise/);
     expect(prompt).toContain(getCampaignMood('growth'));
-    expect(p.metas[0]?.loras).toBe('grwthpaint_v1.safetensors:0.9:grwthpaint');
+    expect(p.metas[0]?.loras).toBe('grwthpaint_v1.safetensors:0.7:grwthpaint');
 
     // A later alteration (body from the bust) carries the same LoRA at the same strength.
     await p.generateBody('c', p.saved[0], 3);
     const body = p.queued[1];
     expect(body.LORA_1.inputs.lora_name).toBe('grwthpaint_v1.safetensors');
-    expect(body.LORA_1.inputs.strength_model).toBe(0.9);
+    expect(body.LORA_1.inputs.strength_model).toBe(0.7);
     expect(String(body.TEXT_ENCODE.inputs.prompt).startsWith('grwthpaint, ')).toBe(true);
-    expect(p.metas[1]?.loras).toBe('grwthpaint_v1.safetensors:0.9:grwthpaint');
+    expect(p.metas[1]?.loras).toBe('grwthpaint_v1.safetensors:0.7:grwthpaint');
   });
 
   it('default (single mode): photos → one painted lock pass, no second pass', async () => {

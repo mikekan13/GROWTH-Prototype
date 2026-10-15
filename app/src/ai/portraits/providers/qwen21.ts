@@ -33,6 +33,7 @@ import { ServerlessProvider } from './serverless';
 import { PortraitEndpointError } from '@/lib/errors';
 import {
   QWEN21_BODY_SIZE,
+  QWEN21_LOCK_SIZE,
   QWEN21_MAX_IMAGES,
   QWEN21_MAX_STYLE_REFS,
   QWEN21_STEPS,
@@ -46,6 +47,7 @@ import {
   getQwen21StyleLine,
   hasGrowthStyleLora,
   qwen21LorasFromEnv,
+  qwen21LoraStartFromEnv,
   type Qwen21Lora,
 } from '../qwen21-workflow';
 import { buildCorpusContentPrompt } from '../corpus-prompts';
@@ -59,6 +61,10 @@ export const LOCK_GATE_MAX_RETRIES = 2;
 
 const WORKFLOW_NAME = 'qwen21-edit';
 const MODEL_NAME = 'qwen-image-2.1-int8';
+/** The lock's pose skeleton (OpenPose keypoint map of the face-tight passport frame), drawn by scripts/lock-pose-skeleton.ts. */
+const LOCK_POSE_REF_PATH = 'src/ai/portraits/refs/lock-pose-grey.png';
+/** undefined = not read yet; null = missing (warned once). */
+let lockPoseRefCache: Buffer | null | undefined;
 const STYLE_REF_DIM = 1024;
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 
@@ -144,9 +150,27 @@ export class Qwen21Provider extends ServerlessProvider {
     this.loraOverride = loras;
   }
 
-  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env (unset = grwthpaint_v1 at 0.9). */
+  /** The LoRA blend a call uses: explicit per-call → instance override → QWEN21_LORAS env (unset = grwthpaint_v1 at 0.7). */
   activeLoras(explicit?: Qwen21Lora[]): Qwen21Lora[] {
     return explicit ?? this.loraOverride ?? qwen21LorasFromEnv();
+  }
+
+  /**
+   * The lock's default POSE REFERENCE: src/ai/portraits/refs/lock-pose-grey.png (drawn by scripts/lock-pose-skeleton.ts),
+   * an OpenPose keypoint map of the face-tight passport frame on mid-grey. Read once; missing file or
+   * QWEN21_LOCK_POSE_REF=off → no reference (the old prompt-only lock). Overridable for tests.
+   */
+  protected async defaultLockPoseRef(): Promise<Buffer | undefined> {
+    if ((process.env.QWEN21_LOCK_POSE_REF ?? 'on').trim().toLowerCase() === 'off') return undefined;
+    if (lockPoseRefCache === undefined) {
+      try {
+        lockPoseRefCache = await fs.readFile(path.join(process.cwd(), LOCK_POSE_REF_PATH));
+      } catch (e) {
+        console.warn(`[Qwen21] lock pose reference missing (${LOCK_POSE_REF_PATH}): ${(e as Error).message} — locking without it`);
+        lockPoseRefCache = null;
+      }
+    }
+    return lockPoseRefCache ?? undefined;
   }
 
   // ============================================================
@@ -160,14 +184,20 @@ export class Qwen21Provider extends ServerlessProvider {
   async renderLock(
     photos: Qwen21Image[],
     seed: number,
-    opts?: { painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[] },
+    opts?: { painted?: boolean; mood?: string; medium?: string; loras?: Qwen21Lora[]; size?: { width: number; height: number }; frameRef?: Qwen21Image | false },
   ): Promise<{ raw: Buffer; prompt: string; loras: Qwen21Lora[] }> {
-    const used = photos.slice(0, QWEN21_MAX_IMAGES);
+    // POSE REFERENCE (Mike, 14 Oct): the OpenPose skeleton of the fixed face-tight passport frame rides as the LAST
+    // image by default (QWEN21_LOCK_POSE_REF=off or opts.frameRef=false disables; an explicit image replaces it).
+    const frameRef: Qwen21Image | undefined = opts?.frameRef === false ? undefined : (opts?.frameRef ?? await this.defaultLockPoseRef());
+    const used = photos.slice(0, frameRef ? QWEN21_MAX_IMAGES - 1 : QWEN21_MAX_IMAGES);
     if (used.length === 0) throw new Error('lockIdentity needs at least one reference photo');
     const names: string[] = [];
     for (let i = 0; i < used.length; i++) {
       const p = used[i];
       names.push(Buffer.isBuffer(p) ? await this.uploadImage(p, `qwen21-photo-${i + 1}`) : await this.uploadReferenceImage(p));
+    }
+    if (frameRef) {
+      names.push(Buffer.isBuffer(frameRef) ? await this.uploadImage(frameRef, 'qwen21-lock-pose') : await this.uploadReferenceImage(frameRef));
     }
     // QWEN21_STYLE_MODE=single → the lock pass carries the painted look itself (no second pass).
     const painted = opts?.painted ?? qwen21StyleMode() === 'single';
@@ -175,8 +205,9 @@ export class Qwen21Provider extends ServerlessProvider {
     // carries the look, and the medium words only pull costume/pose at low strengths (Violet seed-8 sheet).
     const loras = this.activeLoras(opts?.loras);
     const medium = opts?.medium ?? (hasGrowthStyleLora(loras) ? '' : undefined);
-    const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, medium);
-    return { raw: await this.runWorkflow(prompt, names, seed, undefined, loras), prompt, loras };
+    const prompt = buildQwen21LockPrompt(names.length, painted, opts?.mood, medium, { frameRef: !!frameRef });
+    // Fixed canvas: the lock never inherits the photo's aspect (QWEN21_LOCK_SIZE, 4:5 passport frame).
+    return { raw: await this.runWorkflow(prompt, names, seed, opts?.size ?? QWEN21_LOCK_SIZE, loras), prompt, loras };
   }
 
   /**
@@ -442,8 +473,9 @@ export class Qwen21Provider extends ServerlessProvider {
   ): Promise<Buffer> {
     const template = await this.loadWorkflow(WORKFLOW_NAME);
     const used = this.activeLoras(loras);
-    const wf = buildQwen21Workflow(template, { prompt, images, seed, size, loras: used, filenamePrefix: 'qwen21' });
-    const loraNote = used.length ? `, loras=${formatQwen21Loras(used)}` : '';
+    const loraStart = used.length ? qwen21LoraStartFromEnv() : 0;
+    const wf = buildQwen21Workflow(template, { prompt, images, seed, size, loras: used, loraStart, filenamePrefix: 'qwen21' });
+    const loraNote = used.length ? `, loras=${formatQwen21Loras(used)}${loraStart ? ` start=${loraStart}` : ''}` : '';
     console.log(`[Qwen21] queueing — ${images.length} image(s), seed=${seed}${size ? `, ${size.width}x${size.height}` : ''}${loraNote}, prompt="${prompt.slice(0, 100)}…"`);
     const queued = await this.queuePrompt(wf, crypto.randomUUID());
     const out = await this.waitForCompletion(queued.prompt_id);
@@ -486,6 +518,7 @@ export class Qwen21Provider extends ServerlessProvider {
     const { imagePath, thumbnailPath } = await this.savePortrait(characterId, imageData, folder, seed, {
       provider: 'qwen21', stage, prompt, model: MODEL_NAME, mood: mood ?? null, finish: finished ? 'on' : 'off',
       loras: formatQwen21Loras(this.activeLoras(opts?.loras)) || null,
+      loraStart: this.activeLoras(opts?.loras).length ? qwen21LoraStartFromEnv() : 0,
     });
     const rawPath = await this.saveRaw(imagePath, rawData);
     const m = await sharp(imageData).metadata();

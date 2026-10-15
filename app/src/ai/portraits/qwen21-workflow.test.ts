@@ -16,6 +16,7 @@ import {
   qwen21LorasFromEnv,
   hasGrowthStyleLora,
   GROWTH_STYLE_LORA,
+  clampLoraStart,
 } from './qwen21-workflow';
 import { GROWTH_MEDIUM, getCampaignMood, getFlux2Backdrop, getFlux2StyleProse } from './style-config';
 
@@ -53,7 +54,8 @@ describe('qwen21 prompt builders', () => {
     expect(iMedium).toBeGreaterThan(0);
     expect(iMood).toBeGreaterThan(iMedium);
     expect(p).toContain('Blank flat uniform mid-grey backdrop, nothing else.');
-    expect(p.endsWith('Unclothed with bare shoulders, facing the camera squarely, head level.')).toBe(true); // LOCK_CLOSER
+    expect(p.endsWith('Unclothed with bare shoulders, facing the camera squarely, head level, cropped just below the collarbones.')).toBe(true); // LOCK_CLOSER
+    expect(p).toContain('cropped just below the collarbones so no chest or torso is in view'); // Mike 14 Oct: bottom edge stated
     expect(buildQwen21LockPrompt(1, true)).toContain(getCampaignMood('growth'));
     expect(buildQwen21LockPrompt(1, true, 'gothic horror')).toContain(getCampaignMood('gothic'));
     expect(buildQwen21LockPrompt(1, true, undefined, 'CUSTOM MEDIUM.')).toContain(' CUSTOM MEDIUM. ');
@@ -167,12 +169,12 @@ describe('community LoRA blend', () => {
     expect(parseQwen21Loras('')).toEqual([]);
   });
 
-  it('QWEN21_LORAS unset → the GROWTH style LoRA at 0.9 (Mike, 14 Oct); "none"/"" → []; a spec → that blend', () => {
+  it('QWEN21_LORAS unset → the GROWTH style LoRA at 0.7 (Mike, 14 Oct); "none"/"" → []; a spec → that blend', () => {
     const saved = process.env.QWEN21_LORAS;
     try {
       delete process.env.QWEN21_LORAS;
       expect(qwen21LorasFromEnv()).toEqual([GROWTH_STYLE_LORA]);
-      expect(GROWTH_STYLE_LORA).toEqual({ file: 'grwthpaint_v1.safetensors', strength: 0.9, trigger: 'grwthpaint' });
+      expect(GROWTH_STYLE_LORA).toEqual({ file: 'grwthpaint_v1.safetensors', strength: 0.7, trigger: 'grwthpaint' });
       process.env.QWEN21_LORAS = 'none';
       expect(qwen21LorasFromEnv()).toEqual([]);
       process.env.QWEN21_LORAS = '';
@@ -236,6 +238,45 @@ describe('community LoRA blend', () => {
     const wf2 = buildQwen21Workflow(t2, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS.slice(0, 1) }) as Record<string, Node>;
     expect(wf2.EXTRA.inputs.model).toEqual(['LORA_1', 0]);
     expect(wf2.CACHE.inputs.model).toEqual(['LORA_1', 0]);
+  });
+
+  it('frameRef: the last image is the framing guide; identity tags stop before it', () => {
+    const p = buildQwen21LockPrompt(3, true, undefined, '', { frameRef: true });
+    expect(p.startsWith('A painted character illustration of the person in <image1> and <image2>, head and shoulders.')).toBe(true);
+    expect(p).toContain('pose skeleton in <image3>:');
+    expect(p).toContain('<image3> is a keypoint map only');
+    expect(p).not.toContain('<image3>, head and shoulders');
+    const plain = buildQwen21LockPrompt(2, false, undefined, undefined, { frameRef: true });
+    expect(plain.startsWith('A head-and-shoulders portrait of the person in <image1>. ')).toBe(true);
+    expect(plain).toContain('pose skeleton in <image2>:');
+    expect(buildQwen21LockPrompt(2, true)).not.toContain('pose skeleton');
+  });
+
+  it('loraStart > 0 → two-stage sampling: bare CACHE for the first k steps, LoRA chain (patched onto CACHE) for the rest', () => {
+    const wf = buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS, loraStart: 0.3 }) as Record<string, Node>;
+    // The DiT is loaded once: CACHE stays on UNET and the LoRAs patch the cached model.
+    expect(wf.CACHE.inputs.model).toEqual(['UNET', 0]);
+    expect(wf.LORA_1.inputs.model).toEqual(['CACHE', 0]);
+    expect(wf.LORA_2.inputs.model).toEqual(['LORA_1', 0]);
+    // 25 steps × 0.3 → the LoRA joins at step 8.
+    expect(wf.SAMPLE_A.class_type).toBe('KSamplerAdvanced');
+    expect(wf.SAMPLE_A.inputs).toMatchObject({ model: ['CACHE', 0], latent_image: ['TEXT_ENCODE', 2], add_noise: 'enable', start_at_step: 0, end_at_step: 8, return_with_leftover_noise: 'enable', noise_seed: 3, steps: 25, cfg: 1, sampler_name: 'euler', scheduler: 'simple' });
+    expect(wf.SAMPLE.class_type).toBe('KSamplerAdvanced');
+    expect(wf.SAMPLE.inputs).toMatchObject({ model: ['LORA_2', 0], latent_image: ['SAMPLE_A', 0], add_noise: 'disable', start_at_step: 8, end_at_step: 10000, return_with_leftover_noise: 'disable', noise_seed: 3, steps: 25 });
+    expect(wf.SAMPLE.inputs.positive).toEqual(['TEXT_ENCODE', 0]);
+    expect(wf.DECODE.inputs.samples).toEqual(['SAMPLE', 0]);
+    expect(wf.TEXT_ENCODE.inputs.prompt).toBe('cine1p, Inklingv2, P'); // triggers still lead the shared prompt
+    // An explicit canvas feeds stage A.
+    const wf2 = buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS, loraStart: 0.5, size: QWEN21_BODY_SIZE }) as Record<string, Node>;
+    expect(wf2.SAMPLE_A.inputs.latent_image).toEqual(['EMPTY_LATENT', 0]);
+    expect(wf2.SAMPLE_A.inputs.end_at_step).toBe(13);
+    // 0 / no LoRAs → the single-sampler workflow, no SAMPLE_A.
+    expect((buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, loras: LORAS, loraStart: 0 }) as Record<string, Node>).SAMPLE_A).toBeUndefined();
+    expect((buildQwen21Workflow(template, { prompt: 'P', images: ['a.png'], seed: 3, loraStart: 0.5 }) as Record<string, Node>).SAMPLE_A).toBeUndefined();
+    expect(clampLoraStart(undefined)).toBe(0);
+    expect(clampLoraStart(-1)).toBe(0);
+    expect(clampLoraStart(2)).toBe(0.9);
+    expect(clampLoraStart(0.4)).toBe(0.4);
   });
 
   it('prepends triggers once, in order, deduped', () => {

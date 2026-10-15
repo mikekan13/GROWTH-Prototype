@@ -13,11 +13,12 @@
  *   --seed-start S       first seed (default 7, the 13 Oct live seed); seeds S, S+1, ...
  *   --mood KEY|GENRE     mood key or free-text genre (default growth)
  *   --photos DIR         identity photos (jpg/png/webp, first 16); default = Violet's two
+ *   --frame-ref PATH     pose skeleton fed as the last image (default: the shipped lock-pose-grey.png); --no-frame-ref = none
  *   --out DIR            default <repo>/style-refs/lab/<timestamp>-<mood>/
  *   --medium-file PATH   replace the MEDIUM prose with this file's text (no code edit)
  *   --no-finish          skip the FINISH layer (raw only)
  *   --loras SPEC         LoRA blend, file:strength[:trigger],... (overrides QWEN21_LORAS; "" = none). Default
- *                        (env unset) = the GROWTH style LoRA grwthpaint_v1 at 0.9 (every gen), which also strips
+ *                        (env unset) = the GROWTH style LoRA grwthpaint_v1 at 0.7 (every gen), which also strips
  *                        the MEDIUM paragraph from the prompt (Mike, 14 Oct)
  *   --gate               run the BASE-LOCK GATE (lock-gate.ts; vision = VISION_PROVIDER, pod
  *                        default — never localhost) on each raw seed; PASS/FAIL + reasons
@@ -86,6 +87,11 @@ async function main() {
     : VIOLET_PHOTOS.map(p => path.resolve(p));
   if (photoPaths.length === 0) throw new Error(`no photos in ${photosDir}`);
   const photos = await Promise.all(photoPaths.map(p => fs.readFile(p)));
+  // --frame-ref PATH: a pose skeleton (OpenPose keypoint map) fed as the LAST image; default = the shipped
+  // src/ai/portraits/refs/lock-pose-grey.png (same as the live lock); --no-frame-ref = none.
+  const frameRefPath = arg('frame-ref');
+  const frameRef: Buffer | false | undefined = process.argv.includes('--no-frame-ref') ? false : frameRefPath ? await fs.readFile(path.resolve(frameRefPath)) : undefined;
+  console.log(`pose ref: ${frameRef === false ? 'none' : frameRefPath ? path.resolve(frameRefPath) : 'default (src/ai/portraits/refs/lock-pose-grey.png)'}`);
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const outDir = path.resolve(arg('out') ?? path.join('..', 'style-refs', 'lab', `${stamp}-${mood.replace(/\s+/g, '-')}`));
@@ -103,7 +109,7 @@ async function main() {
   for (let k = 0; k < n; k++) {
     const seed = seedStart + k;
     const t0 = Date.now();
-    const r = await provider.renderLock(photos, seed, { painted: true, mood, medium });
+    const r = await provider.renderLock(photos, seed, { painted: true, mood, medium, frameRef });
     prompt = r.prompt;
     await fs.writeFile(path.join(outDir, 'raw', `seed-${seed}.png`), r.raw);
     // Gate the RAW (what lockIdentity judges) — local vision only (privacy wall).
