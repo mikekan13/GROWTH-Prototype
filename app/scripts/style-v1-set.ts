@@ -46,9 +46,9 @@ export const V1_SET: { id: string; group: string; size: { width: number; height:
   { id: 'v1-07-group', group: 'groups', size: LANDSCAPE,
     prompt: 'Full-length view of four travellers crossing a rope bridge above a gorge in driving rain, cloaks whipping, the leader carrying a lantern on a pole, the last one looking back over a shoulder, lit by the lantern\'s yellow light and a flash of lightning behind the cliffs.' },
   // --- the bright seven ---
-  { id: 'v1-08-person', group: 'people', size: PORTRAIT, bright: true,
+  { id: 'v1-08-person', group: 'people', size: PORTRAIT, bright: true, reroll: 1, // Mike: "flopped completely" (seed 1544136507)
     prompt: 'Head-and-shoulders view of a young man with sun-bleached curly hair, freckles and a chipped front tooth, wearing a white linen shirt open at the collar and a thin cord necklace with a glass bead, grinning at the camera, on a white-plastered rooftop under a clear noon sky, lit by bright direct sunlight from above with the sky bouncing blue into the shadows.' },
-  { id: 'v1-09-being', group: 'beings', size: PORTRAIT, bright: true,
+  { id: 'v1-09-being', group: 'beings', size: PORTRAIT, bright: true, reroll: 1, // Mike: "flopped completely" (seed 1781312654)
     prompt: 'Three-quarter view of a slender figure with faintly iridescent pearl-coloured skin, close-cropped silver hair and large calm grey eyes, wearing a sleeveless tunic of pale green silk, standing among tall ferns inside a glass greenhouse flooded with soft morning sunlight from the left.' },
   { id: 'v1-10-creature', group: 'creatures', size: LANDSCAPE, bright: true,
     prompt: 'A white fox-like animal with six legs and a long plumed tail standing alert on a snowfield, its fur glittering, under a cloudless deep-blue sky with distant white mountains, lit by hard bright sunlight from the right casting a crisp blue shadow.' },
