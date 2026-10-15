@@ -16,8 +16,10 @@ const VIEWS: PreviewView[] = ['face', 'body', 'portrait'];
  * edit stack tells the history.
  */
 export function Preview({
-  view, onView, layer, bodyImagePath, portraitImagePath, busyLine, error, note, peekLine, onRegenerate, canRegenerate, glitchKey,
+  view, onView, layer, bodyImagePath, portraitImagePath, portraitLocked, busyLine, error, note, peekLine, onRegenerate, canRegenerate, glitchKey,
 }: {
+  /** PORTRAIT waits until the face is approved AND the body exists (Mike 2026-10-15). */
+  portraitLocked: boolean;
   /** Set while an older stack layer is being looked at. */
   peekLine: string | null;
   view: PreviewView;
@@ -47,7 +49,14 @@ export function Preview({
     <div data-testid="designer-preview">
       <div className="grid grid-cols-3 gap-1" role="tablist" aria-label="Preview view">
         {VIEWS.map(v => (
-          <Chip key={v} label={v.toUpperCase()} on={view === v} onClick={() => onView(v)} testId={`designer-view-${v}`} />
+          <Chip
+            key={v}
+            label={v === 'portrait' && portraitLocked ? 'PORTRAIT ⌧' : v.toUpperCase()}
+            on={view === v}
+            onClick={() => onView(v)}
+            disabled={v === 'portrait' && portraitLocked}
+            testId={`designer-view-${v}`}
+          />
         ))}
       </div>
 

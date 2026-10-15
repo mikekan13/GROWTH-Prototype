@@ -302,6 +302,7 @@ export default function AppearanceDesigner({
                 layer={shownFace}
                 bodyImagePath={shownBody}
                 portraitImagePath={designer.approvedImagePath ?? null}
+                portraitLocked={!designer.approvedImagePath || !bodyPath}
                 busyLine={busy ? BUSY_LINE[busy] : null}
                 error={error}
                 note={note}
