@@ -9,11 +9,13 @@
  *   table   → the local lane, or WallViolationError. Never cloud.
  *   real    → the local lane, or WallViolationError. Never cloud.
  *
- * route() turns a TaskDescriptor into a ResolvedLane using three signals:
+ * route() turns a TaskDescriptor into a ResolvedLane using two signals:
  *   (a) content class — table/real never cross (above);
- *   (b) content maturity flags — flagged generation prefers the local lane
- *       when it is live;
- *   (c) task weight — the caller's requested lane.
+ *   (b) task weight — the caller's requested lane.
+ * Maturity flags are AUDIENCE control only (Mike 2026-10-16: "Mental health
+ * shouldn't be flagging our internals. The only thing that should be
+ * flagging our internals is something that would flag a cloud model.") —
+ * they never pick a lane; they ride along on traces.
  *
  * enforceWall() is the identifier seam (INV-119: no real names/emails/
  * account identifiers in cloud prompts). prepareCloudText() is what a
@@ -55,12 +57,7 @@ function pickLane(task: TaskDescriptor): ResolvedLane {
     return resolveLane('local');
   }
 
-  // (b) mature-flagged generation prefers local latitude when available.
-  if ((task.maturityFlags?.length ?? 0) > 0 && localLive) {
-    return resolveLane('local');
-  }
-
-  // (c) the caller's requested lane.
+  // (b) the caller's requested lane. (Maturity flags never route — 2026-10-16.)
   return resolveLane(task.lane);
 }
 

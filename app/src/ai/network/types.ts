@@ -48,8 +48,9 @@ export interface TaskDescriptor {
    *  override based on flags/content class (never silently downgrading the wall). */
   lane: LaneName;
   campaignId?: string;
-  /** Content maturity flags (forge vocab) — a routing signal: flagged
-   *  generation prefers the local lane when it is live. */
+  /** Content maturity flags (forge vocab) — AUDIENCE control that rides on
+   *  traces. Never a routing signal (Mike 2026-10-16: "Mental health
+   *  shouldn't be flagging our internals"). */
   maturityFlags?: string[];
   /** REQUIRED: what the payload is. table/real never leave the wall. */
   contentClass: ContentClass;
