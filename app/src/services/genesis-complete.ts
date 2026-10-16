@@ -42,7 +42,9 @@ export function isBorn(c: { genesisTier: string | null; dayaStatus: string | nul
   return c.finishedGenesis || c.genesisTier === 'SKETCH' || c.dayaStatus === 'ACTIVE';
 }
 
-export async function completeCharacter(characterId: string, actor: { id: string; role: string }) {
+export type GenesisMode = 'coax' | 'sail';
+
+export async function completeCharacter(characterId: string, actor: { id: string; role: string }, opts: { mode?: GenesisMode } = {}) {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
     select: { id: true, name: true, campaignId: true, genesisTier: true, data: true, daya: { select: { status: true } } },
@@ -98,6 +100,7 @@ export async function completeCharacter(characterId: string, actor: { id: string
     createdBy: actor.id,
     stage: stages[0],
     continueUnattended: true,
+    mode: opts.mode ?? 'coax',
   });
   const { kickWorkLoop } = await import('@/ai/copilot/work-loop');
   kickWorkLoop();

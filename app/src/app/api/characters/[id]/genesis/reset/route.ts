@@ -23,7 +23,8 @@ export async function POST(
     const actor = { id: session.user.id, role: session.user.role };
     const reset = await resetCompletionStages(id, actor);
     const open = request.nextUrl.searchParams.get('open') !== '0';
-    const completion = open ? await completeCharacter(id, actor) : null;
+    const mode = request.nextUrl.searchParams.get('mode') === 'sail' ? 'sail' as const : 'coax' as const;
+    const completion = open ? await completeCharacter(id, actor, { mode }) : null;
     return NextResponse.json({ reset, completion });
   } catch (error) {
     return errorResponse(error);

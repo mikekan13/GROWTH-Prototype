@@ -635,17 +635,20 @@ export async function announceGenesisProd(
 }
 
 /** JEWL's one-line acknowledgement when the GM decides a prod. Pure. */
-export function prodDecisionAck(name: string, decision: 'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE', resumed: boolean): string {
+export type ProdDecision = 'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE' | 'SAIL';
+
+export function prodDecisionAck(name: string, decision: ProdDecision, resumed: boolean): string {
   const said = decision === 'ANSWER' ? 'Got it — I\'ll build on that.'
     : decision === 'LEAVE_OPEN' ? 'Left open — I won\'t fill it; it\'s for play.'
-      : 'Mine to decide — I\'ll tell you what I chose.';
+      : decision === 'SAIL' ? 'Understood — I\'ll fill in the rest and note what I assumed. No more questions this genesis.'
+        : 'Mine to decide — I\'ll tell you what I chose.';
   return resumed ? `${said} Back to ${name}.` : said;
 }
 
 /** Post JEWL's acknowledgement of a prod decision to the GM's chat. */
 export async function announceProdDecision(
   session: { id: string; campaignId: string; goal: string },
-  decision: 'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE',
+  decision: ProdDecision,
   resumed: boolean,
 ): Promise<string | null> {
   const parsed = parseGenesisGoal(session.goal);

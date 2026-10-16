@@ -674,6 +674,10 @@ model DayaWorkSession {
   stage              String?
   /// Prod round JEWL is currently raising (0 = none open). end_prod_round closes it.
   prodRound          Int       @default(0)
+  /// COAX (default): every completion stage opens with a question round;
+  /// SAIL: the table said "fill in the rest" (or play has no time to ask) —
+  /// JEWL builds without asking and notes his assumptions (Mike 2026-10-16).
+  mode               String    @default("coax")
 
   @@index([status, lastCycleAt])
   @@index([campaignId, status])
@@ -700,6 +704,10 @@ model GenesisProd {
   decidedById String?
   decidedAt   DateTime?
   createdAt   DateTime  @default(now())
+  /// The genesis stage the prod was raised in (2026-10-16: every completion
+  /// stage OPENS with a question round — Mike: "He hasn't asked for my input
+  /// one time"). Null = PRODDING / legacy.
+  stage       String?
 
   @@index([sessionId, round, order])
   @@index([campaignId, characterId])

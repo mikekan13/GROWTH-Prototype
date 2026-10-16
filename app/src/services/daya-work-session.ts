@@ -55,6 +55,8 @@ export async function openWorkSession(opts: {
   createdBy: string;
   /** Genesis opens in 'PRODDING' (JEWL asks the GM before building). */
   stage?: string;
+  /** 'coax' (default): stages open with questions; 'sail': fill in the rest. */
+  mode?: 'coax' | 'sail';
 }) {
   const session = await prisma.dayaWorkSession.create({
     data: {
@@ -62,6 +64,7 @@ export async function openWorkSession(opts: {
       goal: opts.goal,
       plan: opts.plan,
       ...(opts.stage ? { stage: opts.stage } : {}),
+      ...(opts.mode ? { mode: opts.mode } : {}),
       continueUnattended: opts.continueUnattended ?? false,
       createdBy: opts.createdBy,
     },

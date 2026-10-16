@@ -196,6 +196,7 @@ async function runCycle(session: {
   progress: string;
   cycleCount: number;
   stage?: string | null;
+  mode?: string | null;
 }): Promise<void> {
   // Player gates (Mike 2026-10-16): APPEARANCE and PORTRAIT are not JEWL's to
   // do. The session waits on the person at the designer; no model call.

@@ -20,6 +20,8 @@ export interface WorkCycleSession {
   goal: string;
   plan: string | null;
   cycleCount: number;
+  /** 'coax' (default) asks first; 'sail' builds without asking (2026-10-16). */
+  mode?: string | null;
 }
 
 export function buildWorkCycleText(session: WorkCycleSession, treasuryLine: string, recentNotes: string[]): string {
@@ -58,6 +60,8 @@ export interface CycleProd {
   status: string;
   answer: string | null;
   jewlFill: string | null;
+  /** The genesis stage it was raised in (null = PRODDING / legacy). */
+  stage?: string | null;
 }
 
 /** The law of the prod stage — carried verbatim in every PRODDING cycle. */
@@ -250,6 +254,71 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
   PORTRAIT: 'STAGE: PORTRAIT — her portrait is painted from her face, body, clothes and world, and approved at the designer. Not yours to do; the session waits.',
 };
 
+// ── Every stage OPENS WITH QUESTIONS (Mike 2026-10-16: "He hasn't asked for
+// my input one time") ──────────────────────────────────────────────────────
+// Humans drive the creativity, JEWL adds the scale. The first cycle of WORLD,
+// MEMORIES and VINES offers NO build tool: only raise_prod and reads. The
+// session then holds on the prods; the GM's answers ride into the plan and
+// the next cycle builds on them. A stage with a prod raised in it is open.
+
+/** The stages that open with a question round, and what to ask. */
+export const STAGE_ASK_LAW: Partial<Record<GenesisPostSheetStage, string>> = {
+  WORLD: [
+    'OPEN THIS STAGE WITH QUESTIONS — nothing is built until the person at the table has answered. Raise 3–5 prods (raise_prod) on the things only they can say, anchored to the brief:',
+    '- WHERE SHE LIVES and what it is like (your best guess as the question: "a fourth-floor walkup studio near the river — yes, or tell me?").',
+    '- WHAT SHE LIVES ON — the job, the money, the debt, in her currency.',
+    '- THE TWO OR THREE THINGS THAT MATTER MOST to her, and where they came from.',
+    '- WHO IS IN HER LIFE now (named people the brief implies but does not settle).',
+    '- Anything the budget line forces (over budget → what goes).',
+    'Then stop. The session waits for the answers; you build on them next cycle. Do NOT grant, seed, or establish anything this cycle.',
+  ].join('\n'),
+  MEMORIES: [
+    'OPEN THIS STAGE WITH QUESTIONS — the person at the table chooses how each mark and each keepsake is remembered. Raise up to 5 prods:',
+    '- For EACH MARK on her look (scar, tattoo, piercing…): "Shall I decide how this came to be, or will you tell me in a line?" — one prod per mark, or one prod listing them.',
+    '- Which things deserve a CHAIN (a thread across years) rather than a line — name your candidates and ask.',
+    '- Any person or place whose memory the brief leaves open.',
+    'Then stop. The session waits; you write the memories next cycle on their answers ("you decide" = invent from her life).',
+  ].join('\n'),
+  VINES: [
+    'OPEN THIS STAGE WITH QUESTIONS — propose her goals as questions, never as facts. Raise one prod per candidate goal (up to her slots): "Does she want X? Yes / no / tell me what she wants instead."',
+    'Then stop. The session waits; you write only the goals they accepted or handed to you.',
+  ].join('\n'),
+};
+
+/** Tools an ask cycle offers: questions and reads, no build. */
+export const STAGE_ASK_TOOLS: Partial<Record<GenesisPostSheetStage, readonly string[]>> = {
+  WORLD: ['raise_prod', 'update_work_session', 'read_life_budget', 'read_location', 'read_forge_item', 'search_catalog'],
+  MEMORIES: ['raise_prod', 'update_work_session', 'daya_ledger_read', 'read_location'],
+  VINES: ['raise_prod', 'update_work_session'],
+};
+
+/** The line a build cycle carries when the table told JEWL to fill in the rest. */
+export const SAIL_LAW =
+  'SAIL MODE: the table told you to fill in the rest — build this stage without asking. Make the choices a person who knows her would make, keep them modest and consistent with the brief, and list every assumption in your progress note as "assumed: …" so it can be overturned in play.';
+
+/** Has a question round been raised in this stage? Pure. */
+export function stageAsked(prods: CycleProd[], stage: string): boolean {
+  return prods.some(p => p.stage === stage);
+}
+
+/** The ask cycle's text. Pure. */
+export function buildAskCycleText(
+  session: WorkCycleSession & { stage: GenesisPostSheetStage },
+  recentNotes: string[],
+  ctx: CompletionContext,
+): string {
+  const stage = session.stage;
+  return [
+    `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}. GENESIS STAGE: ${stage} — QUESTION ROUND (genesis is a dialogue).`,
+    `GOAL: ${session.goal}`,
+    STAGE_ASK_LAW[stage] ?? '',
+    `HOW: raise_prod({sessionId: "${session.id}", anchorQuote, question, why, kind}) — anchor each to a line of the brief below; "kind" CREATIVE for taste, MECHANICAL_CHECK for budget/rules. At most 5. No report, no "done": the system holds the session until they answer.`,
+    ...(ctx.stageBrief ? [ctx.stageBrief] : []),
+    recentNotes.length ? `YOUR RECENT PROGRESS NOTES:\n${recentNotes.map(n => `- ${n}`).join('\n')}` : 'No progress notes in this stage yet.',
+    `THE BRIEF (her genome and the GM's decisions):\n${session.plan ?? '(no brief recorded)'}`,
+  ].join('\n\n');
+}
+
 /** What the completion stage cycles carry beyond the session. */
 export interface CompletionContext {
   /** The GM's typed world messages (WORLD). */
@@ -320,7 +389,18 @@ export function planWorkCycle(
     : session.plan;
   if (genesis && isPostSheetStage(session.stage)) {
     const stage = session.stage;
+    // Every stage opens with questions (2026-10-16): no prod of this stage
+    // yet → the ask cycle, with no build tool on offer. Unless the table
+    // said SAIL ("fill in the rest"): then he builds and notes assumptions.
+    const sailing = session.mode === 'sail';
+    if (!sailing && STAGE_ASK_LAW[stage] && !stageAsked(prods, stage)) {
+      return {
+        text: buildAskCycleText({ ...session, plan, stage }, recentNotes, { ...completion }),
+        allowedTools: [...(STAGE_ASK_TOOLS[stage] ?? ['raise_prod', 'update_work_session'])],
+      };
+    }
     const extras = [
+      ...(sailing ? [SAIL_LAW] : []),
       ...(stage === 'WORLD' && drafting ? [draftingGuidance(drafting)] : []),
       genesisQuestionLaw(session.id),
     ];

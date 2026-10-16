@@ -12,7 +12,7 @@ import { isWatcherOrAbove } from '@/lib/permissions';
 import { completeCharacter } from '@/services/genesis-complete';
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -24,7 +24,9 @@ export async function POST(
       return NextResponse.json({ error: 'Watcher or above only' }, { status: 403 });
     }
     const { id } = await params;
-    const result = await completeCharacter(id, { id: session.user.id, role: session.user.role });
+    // ?mode=sail — "fill in the rest" (Mike 2026-10-16); default coax (ask first).
+    const mode = request.nextUrl.searchParams.get('mode') === 'sail' ? 'sail' as const : 'coax' as const;
+    const result = await completeCharacter(id, { id: session.user.id, role: session.user.role }, { mode });
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error);

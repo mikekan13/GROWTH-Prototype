@@ -6,7 +6,7 @@ const { db, links } = vi.hoisted(() => ({
     character: { findUnique: vi.fn() },
     entityRelationship: { findMany: vi.fn() },
     campaignItem: { findMany: vi.fn() },
-    forgeItem: { findMany: vi.fn(async () => []) },
+    forgeItem: { findMany: vi.fn(async (): Promise<Array<{ id: string; karmicValue: bigint }>> => []) },
     currency: { findMany: vi.fn() },
   },
   links: vi.fn(),

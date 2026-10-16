@@ -139,6 +139,9 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
       question: p.question.trim(),
       why: clip(p.why, 300),
       kind: p.kind,
+      // The stage the question belongs to (2026-10-16): a completion stage
+      // opens with a question round, and the cycle knows one happened by this.
+      stage: session.stage ?? null,
     },
   });
   if (!prodding) await markBlockedOnProds(session, prod);
@@ -257,12 +260,17 @@ export const decideSchema = z.discriminatedUnion('decision', [
   z.object({ decision: z.literal('ANSWER'), answer: z.string().trim().min(1, 'Write an answer, or leave it open.').max(4000) }),
   z.object({ decision: z.literal('LEAVE_OPEN') }),
   z.object({ decision: z.literal('YOU_DECIDE') }),
+  /** "Fill in the rest" (Mike 2026-10-16): delegates THIS prod and every
+   *  other open one, and flips the session to SAIL — no more question
+   *  rounds; JEWL builds and notes his assumptions. */
+  z.object({ decision: z.literal('SAIL') }),
 ]);
 
-const DECISION_STATUS: Record<'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE', ProdStatus> = {
+const DECISION_STATUS: Record<'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE' | 'SAIL', ProdStatus> = {
   ANSWER: 'ANSWERED',
   LEAVE_OPEN: 'LEFT_OPEN',
   YOU_DECIDE: 'DELEGATED',
+  SAIL: 'DELEGATED',
 };
 
 /** GM decides one prod. A decision can be changed until Build. When the last
@@ -288,7 +296,15 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
     },
   });
   await logProdNote(session, 'prod · GM decided', `${prod.question}\n   → ${
-    d.decision === 'ANSWER' ? `answered: ${d.answer}` : d.decision === 'LEAVE_OPEN' ? 'left open (discovered in play)' : 'you decide (JEWL fills it)'}`);
+    d.decision === 'ANSWER' ? `answered: ${d.answer}` : d.decision === 'LEAVE_OPEN' ? 'left open (discovered in play)'
+      : d.decision === 'SAIL' ? 'fill in the rest (JEWL sails — no more questions this genesis)' : 'you decide (JEWL fills it)'}`);
+  if (d.decision === 'SAIL') {
+    await prisma.genesisProd.updateMany({
+      where: { sessionId: session.id, status: 'OPEN' },
+      data: { status: 'DELEGATED', decidedById: opts.user.id, decidedAt: new Date() },
+    });
+    await prisma.dayaWorkSession.update({ where: { id: session.id }, data: { mode: 'sail' } });
+  }
 
   let resumed = false;
   if (wasOpen && session.stage !== PRODDING_STAGE) {
