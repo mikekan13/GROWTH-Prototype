@@ -69,3 +69,12 @@ describe('normalizeSourceKey', () => {
     expect(normalizeSourceKey(' genesis:mark:body:3 ')).toBe('genesis:mark:body:3');
   });
 });
+
+describe('wardrobe line (2026-10-16)', () => {
+  it('an empty wardrobe is called out; a full one is listed', async () => {
+    const { renderWorldBrief } = await import('./genesis-brief-context');
+    const base = { budgetLine: 'b', look: [], items: [], places: [], people: [] };
+    expect(renderWorldBrief({ ...base, garments: [] })).toMatch(/WARDROBE: EMPTY/);
+    expect(renderWorldBrief({ ...base, garments: ['Winter Coat', 'Hoodie'] })).toContain('WARDROBE (2 garments): Winter Coat, Hoodie');
+  });
+});

@@ -115,6 +115,11 @@ export interface GrowthWorldItem {
    *  (r-2026-06-11-05). Seeds mark their own vitals; Human baseline marks
    *  Brain and Heart. */
   isVital?: boolean;
+  /** Internal part (Mike 2026-10-16): body parts are items that cannot be
+   *  unequipped; things go ON or OVER a part — never worn inside one beside
+   *  its organs (eating and the like are their own relationship, not a slot).
+   *  An internal part is never offered as a place to wear or carry a thing. */
+  isInternal?: boolean;
   /** Mike 2026-09-20: whether damage landing on this part depletes the
    *  bearer's attribute pool (Affinity Cycle path). Living tissue = true
    *  (default when absent); a horn, shell, carapace, hoof = false. */

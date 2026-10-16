@@ -28,7 +28,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { createCampaignItem } from './campaign-item';
-import { deriveRegions } from '@/lib/body-tree';
+import { wearableRegions } from '@/lib/body-tree';
 import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
 import type { GrowthCharacter } from '@/types/growth';
 import type { GrowthWorldItem } from '@/types/item';
@@ -59,10 +59,11 @@ export type GrantResult =
   | { ok: true; itemId: string; name: string; archetype: string; tier: PossessionTier; source: 'campaign' | 'stock'; deedId?: string; reused?: boolean; inside?: string }
   | { ok: false; reason: string; blueprintId?: string };
 
-/** Is this region key on her body? Pure. */
+/** The regions of her body a thing can be worn ON or OVER — surface parts
+ *  only, never an organ (Mike 2026-10-16: "things go on or over them"). Pure. */
 export function regionKeys(sheet: Partial<GrowthCharacter>): string[] {
   const anatomy = (sheet.bodyAnatomy as GrowthWorldItem | undefined) ?? (JSON.parse(JSON.stringify(HUMAN_BASELINE_ANATOMY)) as GrowthWorldItem);
-  return deriveRegions(anatomy).map(r => r.key);
+  return wearableRegions(anatomy).map(r => r.key);
 }
 
 /** A Location of this campaign by id or (case-insensitive) exact name. */

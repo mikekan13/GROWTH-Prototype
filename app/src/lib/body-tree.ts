@@ -52,6 +52,32 @@ export function deriveRegions(root: GrowthWorldItem): BodyRegion[] {
   return regions;
 }
 
+/** Organ names for anatomies saved before `isInternal` existed (2026-10-16). */
+const ORGAN_RE = /\b(brain|heart|lungs?|tongue|liver|kidneys?|stomach|intestines?|spleen|pancreas|bladder|gut|bowels?)\b/i;
+
+/** Can a thing be worn ON or OVER this part? Never an internal one. Pure. */
+export function isWearablePart(node: Pick<GrowthWorldItem, 'isInternal' | 'partName'>): boolean {
+  if (node.isInternal) return false;
+  return !ORGAN_RE.test(node.partName ?? '');
+}
+
+/** The regions a thing may be worn on: surface parts only, below no internal part (Mike 2026-10-16). Pure. */
+export function wearableRegions(root: GrowthWorldItem): BodyRegion[] {
+  const out: BodyRegion[] = [];
+  function walk(node: GrowthWorldItem, parentPath: string[], depth: number) {
+    if (!node.isBodyPart || !node.partName || !isWearablePart(node)) return;
+    const path = [...parentPath, node.partName];
+    out.push({
+      path, key: path.join('/'), partName: node.partName, depth,
+      baseResist: node.baseResist ?? 0, condition: node.condition ?? 3,
+      isVital: node.isVital, materialClass: node.materialClass, primaryMaterial: node.primaryMaterial,
+    });
+    for (const child of node.contains ?? []) walk(child, path, depth + 1);
+  }
+  walk(root, [], 0);
+  return out;
+}
+
 /** Find a part by its region key ('Body/Torso'). Returns null if absent. */
 export function findPartByKey(root: GrowthWorldItem, key: string): GrowthWorldItem | null {
   const segments = key.split('/');

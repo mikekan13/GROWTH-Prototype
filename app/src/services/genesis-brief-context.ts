@@ -42,6 +42,8 @@ export interface WorldBriefInput {
   items: Array<{ name: string; archetype: string | null; where: string | null; kv: number }>;
   places: Array<{ name: string; relation: string }>;
   people: Array<{ name: string; relation: string }>;
+  /** Names of the garments she owns (dress.ts isGarment). */
+  garments?: string[];
 }
 
 /** The WORLD cycle brief. Pure. */
@@ -55,6 +57,7 @@ export function renderWorldBrief(w: WorldBriefInput): string {
   const loose = w.items.filter(i => !i.where).length;
   if (loose) lines.push(`${loose} thing${loose === 1 ? ' has' : 's have'} no place — give each a room or a container (move_item).`);
   lines.push(w.people.length ? `PEOPLE: ${w.people.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PEOPLE: none seeded yet.');
+  if (w.garments) lines.push(w.garments.length ? `WARDROBE (${w.garments.length} garments): ${w.garments.join(', ')}` : 'WARDROBE: EMPTY — she owns no clothes. Build her wardrobe this stage; the portrait can only dress her from it.');
   return lines.join('\n');
 }
 
@@ -96,7 +99,7 @@ async function loadHerWorld(characterId: string) {
   ]);
   const items = await prisma.campaignItem.findMany({
     where: { campaignId, status: 'ACTIVE', OR: [{ holderId: characterId }, { id: { in: deeds.map(d => d.targetId) } }] },
-    select: { id: true, name: true, story: true, locationId: true, sourceForgeItemId: true },
+    select: { id: true, name: true, story: true, locationId: true, sourceForgeItemId: true, data: true },
   });
   const archIds = [...new Set(items.map(i => i.sourceForgeItemId).filter((x): x is string => !!x))];
   const archetypes = archIds.length ? await prisma.forgeItem.findMany({ where: { id: { in: archIds } }, select: { id: true, name: true, karmicValue: true } }) : [];
@@ -119,8 +122,17 @@ async function loadHerWorld(characterId: string) {
     const e = seedEdges.find(x => x.targetId === id);
     try { return (JSON.parse(e?.data ?? '{}') as { relation?: string }).relation ?? 'named'; } catch { return 'named'; }
   };
+  // Her wardrobe (2026-10-16): the portrait is dressed only from what WORLD builds.
+  const { isGarment } = await import('./dress');
+  const garments = items.filter(i => {
+    let d: Record<string, unknown> = {};
+    try { d = JSON.parse(i.data) as Record<string, unknown>; } catch { d = {}; }
+    const archName = i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null;
+    return isGarment(i.name, archName, d as { armorCategory?: string; tags?: unknown; itemType?: string });
+  }).map(i => i.name);
   return {
     wealth,
+    garments,
     look: lookLines(sheet.identity?.designer),
     items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: i.sourceForgeItemId ? Number(arch.get(i.sourceForgeItemId)?.karmicValue ?? 0) : 0, where: i.locationId ? (containerOf.get(i.id) ? `${locName.get(i.locationId) ?? '?'} › ${containerOf.get(i.id)}` : locName.get(i.locationId) ?? null) : null, story: i.story })),
     places: placeEdges.map(p => ({ id: p.targetId, name: locName.get(p.targetId) ?? p.targetId, relation: p.relationshipType })),
@@ -141,7 +153,7 @@ export async function buildWorldBrief(characterId: string): Promise<string | nul
       map = [`▣ ${home.name}`, ...renderTree(await contentsTree(home.id), 1)];
     } catch { map = []; }
   }
-  const brief = renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people });
+  const brief = renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people, garments: w.garments });
   // Her novels are worlds (Mike 2026-10-16): the doorway items on her shelf each point at a campaign.
   try {
     const { novelWorldsBriefLine } = await import('./novel-worlds');

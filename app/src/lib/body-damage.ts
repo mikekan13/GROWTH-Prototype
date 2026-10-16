@@ -386,12 +386,12 @@ export const HUMAN_BASELINE_ANATOMY: GrowthWorldItem = {
       condition: 3,
       materialClass: 'Hard',
       contains: [
-        { description: 'Seat of thought.', isBodyPart: true, partName: 'Brain', baseResist: 2, condition: 3, materialClass: 'Soft', isVital: true },
+        { description: 'Seat of thought.', isBodyPart: true, partName: 'Brain', baseResist: 2, condition: 3, materialClass: 'Soft', isVital: true, isInternal: true },
         { description: 'Left eye.', isBodyPart: true, partName: 'Left Eye', baseResist: 1, condition: 3, materialClass: 'Soft' },
         { description: 'Right eye.', isBodyPart: true, partName: 'Right Eye', baseResist: 1, condition: 3, materialClass: 'Soft' },
         { description: 'Left ear.', isBodyPart: true, partName: 'Left Ear', baseResist: 1, condition: 3, materialClass: 'Soft' },
         { description: 'Right ear.', isBodyPart: true, partName: 'Right Ear', baseResist: 1, condition: 3, materialClass: 'Soft' },
-        { description: 'Tongue — speech organ.', isBodyPart: true, partName: 'Tongue', baseResist: 1, condition: 3, materialClass: 'Soft' },
+        { description: 'Tongue — speech organ.', isBodyPart: true, partName: 'Tongue', baseResist: 1, condition: 3, materialClass: 'Soft', isInternal: true },
       ],
     },
     {
@@ -402,9 +402,9 @@ export const HUMAN_BASELINE_ANATOMY: GrowthWorldItem = {
       condition: 3,
       materialClass: 'Soft',
       contains: [
-        { description: 'Cardiac muscle — circulation.', isBodyPart: true, partName: 'Heart', baseResist: 2, condition: 3, materialClass: 'Soft', isVital: true },
-        { description: 'Left lung — respiration.', isBodyPart: true, partName: 'Left Lung', baseResist: 2, condition: 3, materialClass: 'Soft' },
-        { description: 'Right lung — respiration.', isBodyPart: true, partName: 'Right Lung', baseResist: 2, condition: 3, materialClass: 'Soft' },
+        { description: 'Cardiac muscle — circulation.', isBodyPart: true, partName: 'Heart', baseResist: 2, condition: 3, materialClass: 'Soft', isVital: true, isInternal: true },
+        { description: 'Left lung — respiration.', isBodyPart: true, partName: 'Left Lung', baseResist: 2, condition: 3, materialClass: 'Soft', isInternal: true },
+        { description: 'Right lung — respiration.', isBodyPart: true, partName: 'Right Lung', baseResist: 2, condition: 3, materialClass: 'Soft', isInternal: true },
       ],
     },
   ],
