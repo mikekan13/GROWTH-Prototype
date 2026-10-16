@@ -82,3 +82,19 @@ describe('applySeedToSheet — the seed Fate Die and Frequency win (Violet: d6 v
     expect(applySeedToSheet(sheet, { baseFateDie: 'd8', frequency: 40 }).corrections).toEqual([]);
   });
 });
+
+describe('a born character gets a real body from her seed (2026-10-16)', () => {
+  it('the Human seed gives the full baseline — fingers and toes included; an existing body is kept', async () => {
+    const { applySeedToSheet } = await import('./genesis-sheet-sync');
+    const bare = { attributes: {}, creation: { seed: { baseFateDie: 'd8' } } } as never;
+    const r = applySeedToSheet(bare, { baseFateDie: 'd8', bodyStructure: { parts: ['HEAD', 'TORSO'], vitals: [] } }, 'Human');
+    const names: string[] = [];
+    const walk = (n: { partName?: string; contains?: unknown[] }) => { if (n.partName) names.push(n.partName); (n.contains ?? []).forEach(c => walk(c as typeof n)); };
+    walk(r.sheet.bodyAnatomy as never);
+    expect(names).toContain('Left Little Finger');
+    expect(names).toContain('Right Big Toe');
+    expect(r.corrections).toContain('body spawned from seed "Human"');
+    const kept = applySeedToSheet({ ...r.sheet } as never, {}, 'Human');
+    expect(kept.corrections).not.toContain('body spawned from seed "Human"');
+  });
+});

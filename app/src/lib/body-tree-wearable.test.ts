@@ -7,7 +7,16 @@ import type { GrowthWorldItem } from '@/types/item';
 describe('wearableRegions', () => {
   it('the human baseline offers surface parts only — no brain, tongue, heart or lungs', () => {
     const keys = wearableRegions(HUMAN_BASELINE_ANATOMY).map(r => r.key);
-    expect(keys).toEqual(['Body', 'Body/Head', 'Body/Head/Left Eye', 'Body/Head/Right Eye', 'Body/Head/Left Ear', 'Body/Head/Right Ear', 'Body/Torso']);
+    expect(keys.slice(0, 7)).toEqual(['Body', 'Body/Head', 'Body/Head/Left Eye', 'Body/Head/Right Eye', 'Body/Head/Left Ear', 'Body/Head/Right Ear', 'Body/Torso']);
+    expect(keys.some(k => /Brain|Tongue|Heart|Lung/.test(k))).toBe(false);
+  });
+  it('a human has a neck, arms to every finger, legs to every toe (Mike 2026-10-16)', () => {
+    const keys = wearableRegions(HUMAN_BASELINE_ANATOMY).map(r => r.key);
+    expect(keys).toContain('Body/Neck');
+    expect(keys).toContain('Body/Left Upper Arm/Left Lower Arm/Left Hand/Left Ring Finger');
+    expect(keys).toContain('Body/Right Upper Leg/Right Lower Leg/Right Foot/Right Big Toe');
+    expect(keys.filter(k => /Finger|Thumb$/.test(k))).toHaveLength(10);
+    expect(keys.filter(k => /Toe$/.test(k))).toHaveLength(10);
   });
   it('anatomies saved before the flag existed are filtered by organ name', () => {
     const legacy: GrowthWorldItem = { isBodyPart: true, partName: 'Body', contains: [{ isBodyPart: true, partName: 'Torso', contains: [{ isBodyPart: true, partName: 'Heart' }, { isBodyPart: true, partName: 'Left Lung' }] }] } as GrowthWorldItem;

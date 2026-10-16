@@ -25,6 +25,26 @@ import type { GrowthWorldItem } from '@/types/item';
 
 const FULL_CONDITION = 3;
 
+/**
+ * The anatomy a seed gives its bearer (2026-10-16). Precedence: the seed's
+ * explicit bodyAnatomy tree > for the HUMAN seed, the full Human baseline
+ * (head with organs, neck, torso with organs, arms to every finger, legs to
+ * every toe — its bodyStructure is only a coarse limb list) > the
+ * bodyStructure template spawn > the Human baseline. Returns a deep copy.
+ * Pure — the baseline is passed in to keep this module free of body-damage.
+ */
+export function anatomyForSeed(
+  seed: { name?: string | null; data: { bodyAnatomy?: unknown; bodyStructure?: SeedBodyStructure | null; baseResist?: number } },
+  humanBaseline: GrowthWorldItem,
+): GrowthWorldItem {
+  const explicit = seed.data.bodyAnatomy as GrowthWorldItem | undefined;
+  const tree = explicit
+    ?? (/^human$/i.test((seed.name ?? '').replace(/\s*\[w:[^\]]*\]\s*$/i, '').trim()) ? humanBaseline : null)
+    ?? spawnBodyFromStructure(seed.data.bodyStructure, { baseResist: seed.data.baseResist ?? 0 })
+    ?? humanBaseline;
+  return JSON.parse(JSON.stringify(tree)) as GrowthWorldItem;
+}
+
 /** 'LEFT_UPPER_ARM' → 'Left Upper Arm' (partName display convention). */
 export function humanizePartToken(token: string): string {
   return token

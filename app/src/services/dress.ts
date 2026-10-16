@@ -100,6 +100,14 @@ export function isGarment(name: string, archetype: string | null, data: { armorC
  * rule: a full outfit / dress / robe goes on the root; a coat on the torso;
  * boots on the feet). Falls back to the torso, then the root. Pure.
  */
+/** The deepest region key both keys sit under ('Body/A/x' + 'Body/B/y' → 'Body'). Pure. */
+export function sharedRegion(a: string, b: string): string | null {
+  const pa = a.split('/'), pb = b.split('/');
+  const out: string[] = [];
+  for (let i = 0; i < Math.min(pa.length, pb.length) && pa[i] === pb[i]; i++) out.push(pa[i]);
+  return out.length ? out.join('/') : null;
+}
+
 export function guessRegion(name: string, regions: string[]): string | null {
   if (regions.length === 0) return null;
   const n = name.toLowerCase();
@@ -107,9 +115,23 @@ export function guessRegion(name: string, regions: string[]): string | null {
   const root = regions.find(r => !r.includes('/')) ?? regions[0];
   if (/\b(outfit|dress|gown|robe|suit|uniform|overalls|coveralls|pyjamas|pajamas|nightgown|kimono|sari)\b/.test(n)) return root;
   if (/\b(hat|cap|beanie|hood|helmet|scarf|glasses|earrings?)\b/.test(n)) return find(/^head$/i) ?? root;
-  if (/\b(boots?|shoes?|sneakers|trainers|sandals|heels|socks)\b/.test(n)) return find(/^(feet|foot|left foot|right foot|legs?)$/i) ?? root;
-  if (/\b(jeans|trousers|pants|slacks|shorts|skirt|leggings|tights|stockings)\b/.test(n)) return find(/^(legs?|hips|waist)$/i) ?? find(/^torso$/i) ?? root;
-  if (/\b(gloves?|mittens|ring|watch|bracelet)\b/.test(n)) return find(/^(hands?|left hand|right hand|arms?)$/i) ?? root;
+  // PAIRS cover both sides → the outermost region both sides share (the
+  // outermost-shared-region rule): boots span both feet, so they sit on the
+  // root when the feet meet only there. SINGLES go on one side (a ring on the
+  // left ring finger, a watch on the left wrist). 2026-10-16: the Human body
+  // now has limbs to every finger and toe.
+  const pair = (side: RegExp) => {
+    const left = regions.find(r => side.test(r.split('/').pop() ?? '') && /left/i.test(r.split('/').pop() ?? ''));
+    const right = regions.find(r => side.test(r.split('/').pop() ?? '') && /right/i.test(r.split('/').pop() ?? ''));
+    if (left && right) return sharedRegion(left, right) ?? root;
+    return left ?? right ?? null;
+  };
+  if (/\b(boots?|shoes?|sneakers|trainers|sandals|heels|socks)\b/.test(n)) return pair(/foot$/i) ?? find(/^(feet|foot)$/i) ?? root;
+  if (/\b(jeans|trousers|pants|slacks|shorts|skirt|leggings|tights|stockings)\b/.test(n)) return pair(/upper leg$/i) ?? find(/^(legs?|hips|waist)$/i) ?? root;
+  if (/\b(gloves?|mittens)\b/.test(n)) return pair(/hand$/i) ?? root;
+  if (/\bring\b/.test(n)) return find(/^left ring finger$/i) ?? find(/hand$/i) ?? root;
+  if (/\b(watch|bracelet)\b/.test(n)) return find(/^left lower arm$/i) ?? find(/hand$/i) ?? root;
+  if (/\b(necklace|choker|pendant|collar|tie)\b/.test(n)) return find(/^neck$/i) ?? find(/^torso$/i) ?? root;
   return find(/^torso$/i) ?? root;
 }
 

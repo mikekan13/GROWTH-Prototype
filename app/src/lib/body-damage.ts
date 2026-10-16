@@ -364,11 +364,30 @@ export function routeDamage(
   return { next, events, anyDestroyed: destroyedAny, wornDamage: worn };
 }
 
+// ── Limbs (Mike 2026-10-16: "A human seed should have head and body and arms
+// and everything a human has… fingers and toes"). Outer parts are Soft
+// flesh; things are worn ON or OVER them (rings on fingers, shoes on feet).
+const part = (partName: string, description: string, contains?: GrowthWorldItem[], extra: Partial<GrowthWorldItem> = {}): GrowthWorldItem => ({
+  description, isBodyPart: true, partName, baseResist: 3, condition: 3, materialClass: 'Soft', ...(contains ? { contains } : {}), ...extra,
+});
+const DIGITS = ['Thumb', 'Index Finger', 'Middle Finger', 'Ring Finger', 'Little Finger'];
+const TOES = ['Big Toe', 'Second Toe', 'Third Toe', 'Fourth Toe', 'Little Toe'];
+const hand = (side: 'Left' | 'Right') => part(`${side} Hand`, `${side} hand.`, DIGITS.map(d => part(`${side} ${d}`, `${side} ${d.toLowerCase()}.`, undefined, { baseResist: 1 })), { baseResist: 2 });
+const foot = (side: 'Left' | 'Right') => part(`${side} Foot`, `${side} foot.`, TOES.map(t => part(`${side} ${t}`, `${side} ${t.toLowerCase()}.`, undefined, { baseResist: 1 })), { baseResist: 2 });
+const arm = (side: 'Left' | 'Right') => part(`${side} Upper Arm`, `${side} upper arm — shoulder to elbow.`, [
+  part(`${side} Lower Arm`, `${side} forearm — elbow to wrist.`, [hand(side)]),
+]);
+const leg = (side: 'Left' | 'Right') => part(`${side} Upper Leg`, `${side} thigh — hip to knee.`, [
+  part(`${side} Lower Leg`, `${side} shin and calf — knee to ankle.`, [foot(side)]),
+]);
+
 /**
- * Human baseline anatomy — the core parts that enable life, thought, speech,
- * and perception. Per canon, finer anatomy lazy-spawns when narrative requires.
- * Each seed declares its own anatomy from scratch — this is the Human default,
- * not a base class for other seeds to extend.
+ * Human baseline anatomy — every part a human has: head (with brain, eyes,
+ * ears, tongue), neck, torso (with heart and lungs), both arms down to each
+ * finger, both legs down to each toe. Organs are `isInternal` (nothing is
+ * worn on them). Finer internals still lazy-spawn when a scene demands it
+ * (ensureInternalPath). Each seed declares its own anatomy — this is the
+ * Human default, not a base class for other seeds to extend.
  */
 export const HUMAN_BASELINE_ANATOMY: GrowthWorldItem = {
   description: 'Human baseline anatomy',
@@ -407,5 +426,10 @@ export const HUMAN_BASELINE_ANATOMY: GrowthWorldItem = {
         { description: 'Right lung — respiration.', isBodyPart: true, partName: 'Right Lung', baseResist: 2, condition: 3, materialClass: 'Soft', isInternal: true },
       ],
     },
+    part('Neck', 'Neck — joins head to torso.', undefined, { baseResist: 3 }),
+    arm('Left'),
+    arm('Right'),
+    leg('Left'),
+    leg('Right'),
   ],
 };

@@ -11,7 +11,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import type { GrowthCharacter, FateDie, SkillGovernor, SeedBodyStructure } from '@/types/growth';
 import { SKILL_GOVERNORS } from '@/types/growth';
 import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
-import { spawnBodyFromStructure, hasSpawnedBody } from '@/services/body-spawn';
+import { anatomyForSeed, hasSpawnedBody } from '@/services/body-spawn';
 import type { GrowthWorldItem } from '@/types/item';
 import type { BlockCondition } from '@/services/forge-schemas';
 import {
@@ -143,12 +143,8 @@ export function applyCreationGrants(
     hasSpawnedBody(character.bodyAnatomy) &&
     character.creation?.seedForgeItemId === seed.id;
   if (!keepExistingBody) {
-    const spawned = seed.data.bodyAnatomy
-      ? null
-      : spawnBodyFromStructure(seed.data.bodyStructure, { baseResist: seed.data.baseResist });
-    const baseline = (seed.data.bodyAnatomy ?? spawned ?? HUMAN_BASELINE_ANATOMY) as GrowthWorldItem;
-    // Deep copy so per-character damage doesn't mutate a shared tree.
-    next.bodyAnatomy = JSON.parse(JSON.stringify(baseline));
+    // Deep copy inside anatomyForSeed so per-character damage never mutates a shared tree.
+    next.bodyAnatomy = anatomyForSeed({ name: seed.name, data: seed.data as Parameters<typeof anatomyForSeed>[0]['data'] }, HUMAN_BASELINE_ANATOMY as GrowthWorldItem);
   }
 
   // Seed augments (positive only by canon; thorns drive negatives)

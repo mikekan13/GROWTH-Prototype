@@ -21,6 +21,9 @@ import 'server-only';
 import { prisma } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
 import type { GrowthCharacter, GrowthTrait } from '@/types/growth';
+import type { GrowthWorldItem } from '@/types/item';
+import { anatomyForSeed } from './body-spawn';
+import { HUMAN_BASELINE_ANATOMY } from '@/lib/body-damage';
 
 /** A link row joined with its block, as sync + dedupe read it. */
 export interface LinkWithBlock {
@@ -111,9 +114,15 @@ const FATE_DICE = new Set(['d4', 'd6', 'd8', 'd12', 'd20']);
  * already spent below the old max keeps what is left (clamped to the new
  * max). Returns one line per correction made.
  */
-export function applySeedToSheet(sheet: GrowthCharacter, seedData: Record<string, unknown>): { sheet: GrowthCharacter; corrections: string[] } {
+export function applySeedToSheet(sheet: GrowthCharacter, seedData: Record<string, unknown>, seedName?: string): { sheet: GrowthCharacter; corrections: string[] } {
   const next: GrowthCharacter = JSON.parse(JSON.stringify(sheet));
   const corrections: string[] = [];
+  // A born character always has a REAL body from her seed (2026-10-16: genesis
+  // never spawned one, so Violet fell back to a head-and-torso baseline).
+  if (!next.bodyAnatomy && seedName) {
+    next.bodyAnatomy = anatomyForSeed({ name: seedName, data: seedData as Parameters<typeof anatomyForSeed>[0]['data'] }, HUMAN_BASELINE_ANATOMY as GrowthWorldItem);
+    corrections.push(`body spawned from seed "${seedName}"`);
+  }
   next.creation = next.creation ?? { seed: { baseFateDie: 'd6' } };
   next.creation.seed = next.creation.seed ?? { baseFateDie: 'd6' };
   const die = str(seedData.baseFateDie);
@@ -209,7 +218,7 @@ export async function syncCreationFromBlockLinks(characterId: string): Promise<{
   const seed = links.find(l => l.block.type === 'seed');
   let corrections: string[] = [];
   if (seed) {
-    const fixed = applySeedToSheet(next, parse(seed.block.data));
+    const fixed = applySeedToSheet(next, parse(seed.block.data), seed.block.name);
     next = fixed.sheet;
     corrections = fixed.corrections;
     if (corrections.length) {
