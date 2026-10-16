@@ -12,7 +12,8 @@ config({ path: '.env', quiet: true });
 
 async function main() {
   const args = process.argv.slice(2);
-  const id = args.find(a => !a.startsWith('--')) ?? 'cms60ndtn0000kw48ioq10i68';
+  const seedIdx = args.indexOf('--seed');
+  const id = args.find((a, i) => !a.startsWith('--') && i !== seedIdx + 1) ?? 'cms60ndtn0000kw48ioq10i68';
   const run = args.includes('--run');
   const jewl = args.includes('--jewl');
   const seedArg = args.indexOf('--seed');
