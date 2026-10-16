@@ -81,7 +81,7 @@ async function resolveArchetype(campaignId: string, ref: string, actor: { id: st
     orderBy: { updatedAt: 'desc' },
   });
   if (local) return { row: local, source: 'campaign' as const };
-  const stock = await prisma.forgeItem.findFirst({ where: { isGlobal: true, ...where }, select: { id: true } });
+  const stock = await prisma.forgeItem.findFirst({ where: { isGlobal: true, status: { not: 'superseded' }, ...where }, select: { id: true } });
   if (!stock) return null;
   const { pullFromGlobalCatalog } = await import('./forge');
   const copy = await pullFromGlobalCatalog(stock.id, campaignId, actor.id, actor.role);

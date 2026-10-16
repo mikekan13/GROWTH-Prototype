@@ -52,6 +52,7 @@ import './genesis-prods';
 import './genesis-completion';
 import './sketch-npc';
 import './move-item';
+import './stock-goods';
 import './move-items';
 import './organize-place';
 

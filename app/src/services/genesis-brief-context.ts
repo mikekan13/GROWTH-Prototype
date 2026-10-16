@@ -133,6 +133,8 @@ async function loadHerWorld(characterId: string) {
   return {
     wealth,
     garments,
+    // Floor-tier goods (stock_goods, tag mundane) carry a memory only when they have a story.
+    mundaneIds: items.filter(i => { try { const d = JSON.parse(i.data) as { tags?: unknown }; return Array.isArray(d.tags) && d.tags.includes('mundane'); } catch { return false; } }).map(i => i.id),
     look: lookLines(sheet.identity?.designer),
     items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: i.sourceForgeItemId ? Number(arch.get(i.sourceForgeItemId)?.karmicValue ?? 0) : 0, where: i.locationId ? (containerOf.get(i.id) ? `${locName.get(i.locationId) ?? '?'} › ${containerOf.get(i.id)}` : locName.get(i.locationId) ?? null) : null, story: i.story })),
     places: placeEdges.map(p => ({ id: p.targetId, name: locName.get(p.targetId) ?? p.targetId, relation: p.relationshipType })),
@@ -153,7 +155,11 @@ export async function buildWorldBrief(characterId: string): Promise<string | nul
       map = [`▣ ${home.name}`, ...renderTree(await contentsTree(home.id), 1)];
     } catch { map = []; }
   }
-  const brief = renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people, garments: w.garments });
+  const { lifeCoverage, coverageLine } = await import('./life-goods');
+  const coverage = coverageLine(lifeCoverage(w.items.map(i => `${i.name} ${i.archetype ?? ''}`)));
+  const brief0 = renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people, garments: w.garments });
+  const brief = `${brief0}
+${coverage}`;
   // Her novels are worlds (Mike 2026-10-16): the doorway items on her shelf each point at a campaign.
   try {
     const { novelWorldsBriefLine } = await import('./novel-worlds');
@@ -174,7 +180,8 @@ export async function buildMemoriesBrief(characterId: string): Promise<string | 
     rows.forEach(r => done.add(normalizeSourceKey(r.source)));
   }
   return renderMemoriesBrief({
-    items: w.items.map(i => ({ id: i.id, name: i.name, archetype: i.archetype, story: i.story, where: i.where, done: done.has(`genesis:item:${i.id}`) })),
+    // Mundane goods without a story need no memory (a simulation-level home has hundreds of them).
+    items: w.items.filter(i => !w.mundaneIds.includes(i.id) || !!i.story).map(i => ({ id: i.id, name: i.name, archetype: i.archetype, story: i.story, where: i.where, done: done.has(`genesis:item:${i.id}`) })),
     marks: w.look.filter(l => MARK_KINDS.has(l.kind)).map(l => ({ ...l, done: done.has(`genesis:mark:${l.where}:${l.index}`) })),
     places: w.places.map(p => ({ ...p, done: done.has(`genesis:place:${p.id}`) })),
     people: w.people.map(p => ({ ...p, done: done.has(`genesis:person:${p.id}`) })),
