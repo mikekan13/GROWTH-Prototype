@@ -43,6 +43,7 @@ import {
 import { WallViolationError } from '@/ai/network/errors';
 import { warnQuestionOutsideProd } from '@/lib/genesis-question';
 import { isGateStage } from '@/lib/genesis-stages';
+import { parseGenesisGoal } from '@/services/character-genesis-progress';
 import { planWorkCycle, type CycleProd, type CycleCatalog, type CycleDrafting, type CompletionContext } from './work-cycle-text';
 import { rejectedShapes } from '@/services/block-archetype';
 import { prisma } from '@/lib/db';
@@ -257,11 +258,25 @@ async function runCycle(session: {
   // The WORLD stage (2026-10-16; was SEEDS / WORLD_FACTS) reads the GM's own
   // typed world messages (fiction by the wall) as its sources.
   let completion: CompletionContext | null = null;
-  if (isGenesisGoal(session.goal) && session.stage === 'WORLD') {
+  if (isGenesisGoal(session.goal) && (session.stage === 'WORLD' || session.stage === 'MEMORIES')) {
+    const characterId = parseGenesisGoal(session.goal)?.characterId ?? null;
     try {
-      const { loadGmWorldMessages } = await import('@/services/genesis-stages');
-      completion = { worldMessages: await loadGmWorldMessages(session.campaignId) };
-    } catch { completion = null; }
+      const { buildWorldBrief, buildMemoriesBrief } = await import('@/services/genesis-brief-context');
+      const stageBrief = characterId
+        ? (session.stage === 'WORLD' ? await buildWorldBrief(characterId) : await buildMemoriesBrief(characterId))
+        : null;
+      completion = { stageBrief };
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[daya-work-loop] stage brief not built:', err instanceof Error ? err.message : err);
+      completion = {};
+    }
+    if (session.stage === 'WORLD') {
+      try {
+        const { loadGmWorldMessages } = await import('@/services/genesis-stages');
+        completion.worldMessages = await loadGmWorldMessages(session.campaignId);
+      } catch { /* the backstory and settled answers remain */ }
+    }
   }
   const { text, allowedTools, excludedTools, stageTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting, completion);
 

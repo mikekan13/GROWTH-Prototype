@@ -237,7 +237,7 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
   MEMORIES: [
     'STAGE: MEMORIES — one memory for every thing built: each item she owns, each mark on her face and body, each place, each person.',
     '- daya_seed_memory in batches: first-person lived experience in HER register, no game vocabulary. Three weights — fleeting (one line: "bought at the corner store, nothing to it"), held (how it came to her, 2–4 sentences), chain (a thread across years, cross-linked to a person or place). Salience follows the weight.',
-    '- Cite the source of each (which item, which mark, which place or person) in its content so the memory survives losing the thing. Memory belongs to the PERSON; the object keeps its own history.',
+    '- Each memory carries its KEY as `source` exactly as the brief prints it ([genesis:item:<id>], [genesis:mark:<face|body>:<n>], [genesis:place:<id>], [genesis:person:<id>]) so the brief can tick it off; name the thing in the content too so the memory survives losing it. Memory belongs to the PERSON; the object keeps its own history.',
     '- Marks (scars, tattoos, piercings, birthmarks, body mods, makeup) come from her approved look: how each came to be — invent from her life unless the brief or the settled answers say; never answer an OPEN THREAD.',
   ].join('\n'),
   VINES: [
@@ -251,10 +251,13 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
 
 /** What the completion stage cycles carry beyond the session. */
 export interface CompletionContext {
-  /** The GM's typed world messages (SEEDS / WORLD_FACTS). */
+  /** The GM's typed world messages (WORLD). */
   worldMessages?: GmWorldMessage[];
-  /** Stock item archetypes in the catalog (POSSESSIONS). */
+  /** Stock item archetypes in the catalog (WORLD). */
   stockItems?: number;
+  /** The stage's brief: her world so far (WORLD) / what was built and what
+   *  already carries a memory (MEMORIES). services/genesis-brief-context. */
+  stageBrief?: string | null;
 }
 
 /** One completion-stage cycle's text. Pure. */
@@ -280,6 +283,7 @@ export function buildCompletionStageText(
     `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}. GENESIS STAGE: ${stage} (${order} → Born).`,
     `GOAL: ${session.goal}`,
     COMPLETION_STAGE_LAW[stage],
+    ...(ctx.stageBrief ? [ctx.stageBrief] : []),
     `FINISH: when this stage is complete, call update_work_session({sessionId: "${session.id}", progressNote, status: "done"}) — the system moves genesis to the next stage (Born after the last). One progress line per cycle; quiet, never an inventory.`,
     ...extras,
     ...(catalog ? [catalog] : []),

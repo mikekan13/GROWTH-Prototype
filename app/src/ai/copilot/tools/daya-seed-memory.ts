@@ -29,6 +29,8 @@ const seedMemorySchema = z.object({
   salience: z.number().min(0).max(1).optional(),
   /** Narrative cycle this memory is anchored to; defaults to the campaign's current cycle. */
   cycle: z.number().optional(),
+  /** Provenance key (genesis MEMORIES stage: genesis:item:<id> etc.); defaults to "seed". */
+  source: z.string().max(80).optional(),
 });
 
 const dayaSeedMemoryInputSchema = z.object({
