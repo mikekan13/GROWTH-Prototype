@@ -46,12 +46,12 @@ beforeEach(() => {
 
 describe('completeCharacter', () => {
   it('opens a session at the first missing stage and lists only the missing ones', async () => {
-    detect.mockResolvedValue(new Set(['POSSESSIONS', 'VINES']));
+    detect.mockResolvedValue(new Set(['WORLD', 'VINES']));
     const r = await completeCharacter('v', GM);
-    expect(r).toMatchObject({ opened: true, sessionId: 'sess2', stages: ['POSSESSIONS', 'VINES'], removedDuplicateLinks: 1, seedCorrections: ['fate die d6 → d8 (seed)', 'frequency 1/1 → 40/40 (seed)'] });
+    expect(r).toMatchObject({ opened: true, sessionId: 'sess2', stages: ['WORLD', 'VINES'], removedDuplicateLinks: 1, seedCorrections: ['fate die d6 → d8 (seed)', 'frequency 1/1 → 40/40 (seed)'] });
     const opts = open.mock.calls[0][0];
-    expect(opts.stage).toBe('POSSESSIONS');
-    expect(opts.goal).toMatch(/^Character genesis: Violet \[v\] — complete the born character: POSSESSIONS → VINES/);
+    expect(opts.stage).toBe('WORLD');
+    expect(opts.goal).toMatch(/^Character genesis: Violet \[v\] — complete the born character: WORLD → VINES/);
     expect(opts.continueUnattended).toBe(true);
     expect(opts.plan).toContain(COMPLETION_HEADER);
     expect(opts.plan).toContain('AGE: 25');
@@ -84,9 +84,9 @@ describe('completeCharacter', () => {
   it('a sketch counts as born (the deepen-later hook)', async () => {
     db.character.findUnique.mockResolvedValue({ ...VIOLET, genesisTier: 'SKETCH', daya: null, data: JSON.stringify({ backstory: { backstory: 'A grumpy innkeeper.' }, identity: { age: 50 } }) });
     db.dayaWorkSession.findFirst.mockReset().mockResolvedValue(null);
-    detect.mockResolvedValue(new Set(['AGE', 'POSSESSIONS', 'SEEDS', 'WORLD_FACTS', 'VINES']));
+    detect.mockResolvedValue(new Set(['AGE', 'APPEARANCE', 'WORLD', 'MEMORIES', 'VINES']));
     const r = await completeCharacter('v', GM);
-    expect(r.stages).toEqual(['AGE', 'POSSESSIONS', 'SEEDS', 'WORLD_FACTS', 'VINES']);
+    expect(r.stages).toEqual(['AGE', 'APPEARANCE', 'WORLD', 'MEMORIES', 'VINES']);
     expect(open.mock.calls[0][0].plan).toContain('A grumpy innkeeper.');
   });
 });

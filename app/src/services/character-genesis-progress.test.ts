@@ -58,14 +58,14 @@ describe('deriveGenesisProgress', () => {
   it('no session → none, all pending', () => {
     const p = deriveGenesisProgress({ ...base, session: null });
     expect(p.state).toBe('none');
-    expect(statuses(p)).toBe('pppppppppppp');
+    expect(statuses(p)).toBe('ppppppppppppp');
   });
 
   it('fresh session past the prods (legacy / after Build) → expansion current', () => {
     const p = deriveGenesisProgress({ ...base, session: session() });
     expect(p.state).toBe('running');
     expect(p.current).toBe('expansion');
-    expect(statuses(p)).toBe('ddcppppppppp');
+    expect(statuses(p)).toBe('ddcpppppppppp');
     expect(p.step).toBe(3);
     expect(p.prodding).toBe(false);
     expect(p.total).toBe(GENESIS_STAGES.length);
@@ -75,7 +75,7 @@ describe('deriveGenesisProgress', () => {
     const p = deriveGenesisProgress({ ...base, session: session(), entityAuthored: true, memoryCount: 12 });
     expect(p.current).toBe('ledger');
     expect(p.counts.memories).toBe(12);
-    expect(statuses(p)).toBe('dddcpppppppp');
+    expect(statuses(p)).toBe('dddcppppppppp');
   });
 
   it('drafts forged → mechanics current, counts by kind', () => {
@@ -110,10 +110,10 @@ describe('deriveGenesisProgress', () => {
 
   it('a completion stage (2026-10-12) is the current step after the sheet', () => {
     const p = deriveGenesisProgress({
-      ...base, session: session({ stage: 'SEEDS' }), entityAuthored: true, forged: [{ type: 'root', status: 'published' }],
+      ...base, session: session({ stage: 'WORLD' }), entityAuthored: true, forged: [{ type: 'root', status: 'published' }],
     });
-    expect(p.current).toBe('seeds');
-    expect(statuses(p)).toBe('ddddddddcppp');
+    expect(p.current).toBe('world');
+    expect(statuses(p)).toBe('ddddddddcpppp');
   });
 
   it('done → every stage done, born', () => {
@@ -123,7 +123,7 @@ describe('deriveGenesisProgress', () => {
     });
     expect(p.state).toBe('done');
     expect(p.current).toBe('born');
-    expect(statuses(p)).toBe('dddddddddddd');
+    expect(statuses(p)).toBe('ddddddddddddd');
     expect(p.endedAt).toBe('2026-10-11T10:01:00.000Z');
   });
 
@@ -324,7 +324,7 @@ describe('genesis is a dialogue — the prod stage (2026-10-12)', () => {
     });
     expect(p.prodding).toBe(true);
     expect(p.current).toBe('prodding');
-    expect(statuses(p)).toBe('dcpppppppppp');
+    expect(statuses(p)).toBe('dcppppppppppp');
     expect(p.stages[1].label).toBe('Listening · 2 prods');
     expect(p.prods.map(x => x.id)).toEqual(['p1', 'p2']);
   });

@@ -7,6 +7,10 @@ Where things stand: FACE and BODY are locked and approved (clean re-rendered). T
 
 ---
 
+## 0. Where it sits (Mike, 16 Oct — the genesis order, BUILT)
+
+"1. Seed 2. Root 3. Branches 4. Appearance 5. Possessions and Item/building their physical world 6. Memories from all that building 7. Vines decided 8. Portrait generated 9. Done." Age is a sum of the blocks' years. In code: sheet → AGE (repair) → **APPEARANCE** (player gate: face approved + body) → **WORLD** (home, rooms, things from the life budget, people, facts) → **MEMORIES** (one per thing built) → VINES → **PORTRAIT** (gate) → Born. Steps A–D below are what the WORLD / MEMORIES / PORTRAIT stages do; the portrait gate switches on (`GENESIS_PORTRAIT_GATE=on`) when step C ships.
+
 ## 1. The stage in one line
 
 **PORTRAIT = JEWL reads everything the designer and the sheet know, asks the player the few things only they can say, dresses the character, places them in their scene, and paints them from the face + body references — then the tokens and the live portrait derive from that.**

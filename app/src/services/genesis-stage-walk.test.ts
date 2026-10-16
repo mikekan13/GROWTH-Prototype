@@ -53,7 +53,7 @@ describe('updateWorkSession done → next stage', () => {
   });
 
   it('a middle stage walks on to the next missing one', async () => {
-    db.dayaWorkSession.findUnique.mockResolvedValue({ id: 's1', campaignId: 'c1', goal: GOAL, status: 'active', stage: 'POSSESSIONS', progress: '[]' });
+    db.dayaWorkSession.findUnique.mockResolvedValue({ id: 's1', campaignId: 'c1', goal: GOAL, status: 'active', stage: 'WORLD', progress: '[]' });
     advance.mockResolvedValue('VINES');
     await updateWorkSession({ sessionId: 's1', status: 'done' });
     expect(db.dayaWorkSession.update.mock.calls[0][0].data.stage).toBe('VINES');
@@ -79,7 +79,7 @@ describe('completion stage cycles', () => {
   const base = { id: 's1', goal: GOAL, plan: 'GENESIS BRIEF\nAGE: 25', cycleCount: 4 };
 
   it('each stage offers only its own tools (+ the session / prod levers)', () => {
-    for (const stage of ['AGE', 'POSSESSIONS', 'SEEDS', 'WORLD_FACTS', 'VINES'] as const) {
+    for (const stage of ['AGE', 'WORLD', 'MEMORIES', 'VINES'] as const) {
       const r = planWorkCycle({ ...base, stage }, [], '', []);
       expect(r.allowedTools).toEqual(expect.arrayContaining([...COMPLETION_STAGE_TOOLS[stage], 'update_work_session', 'raise_prod']));
       expect(r.allowedTools).not.toContain('edit_character_sheet');
@@ -90,22 +90,22 @@ describe('completion stage cycles', () => {
 
   it('the laws: additive age, catalog-first paint, never fill open threads, goal-only vines', () => {
     expect(planWorkCycle({ ...base, stage: 'AGE' }, [], '', []).text).toMatch(/ADDITIVE/);
-    expect(planWorkCycle({ ...base, stage: 'POSSESSIONS' }, [], '', []).text).toMatch(/CATALOG FIRST/);
-    expect(planWorkCycle({ ...base, stage: 'SEEDS' }, [], '', []).text).toMatch(/NEVER FILLED/);
+    expect(planWorkCycle({ ...base, stage: 'WORLD' }, [], '', []).text).toMatch(/CATALOG FIRST/);
+    expect(planWorkCycle({ ...base, stage: 'WORLD' }, [], '', []).text).toMatch(/NEVER FILLED/);
     const vines = planWorkCycle({ ...base, stage: 'VINES' }, [], '', []).text;
     expect(vines).toMatch(/GOAL only/);
     expect(vines).toMatch(/never resistance, never opportunity/);
   });
 
-  it('SEEDS carries the GM\'s typed world messages with their ids', () => {
-    const r = planWorkCycle({ ...base, stage: 'SEEDS' }, [], '', [], null, null, {
+  it('WORLD carries the GM\'s typed world messages with their ids', () => {
+    const r = planWorkCycle({ ...base, stage: 'WORLD' }, [], '', [], null, null, {
       worldMessages: [{ id: 'm_apt', at: '2026-08-02', text: 'A fourth-floor walkup studio…' }],
     });
     expect(r.text).toContain('[m_apt] (2026-08-02) A fourth-floor walkup studio');
   });
 
-  it('POSSESSIONS withholds search_catalog when the catalog holds no items', () => {
-    const r = planWorkCycle({ ...base, stage: 'POSSESSIONS' }, [], '', [], { counts: { item: 0, seed: 1 }, total: 1 });
+  it('WORLD withholds search_catalog when the catalog holds no items', () => {
+    const r = planWorkCycle({ ...base, stage: 'WORLD' }, [], '', [], { counts: { item: 0, seed: 1 }, total: 1 });
     expect(r.allowedTools).not.toContain('search_catalog');
     expect(r.text).toMatch(/holds no items/);
   });

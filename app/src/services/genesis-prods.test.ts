@@ -336,7 +336,7 @@ describe('a question is a prod at ANY stage (2026-10-12)', () => {
       [{ id: 'p1', round: 2, order: 1, anchorQuote: 'Written Self', question: 'Fugue or bleed?', why: 'w', kind: 'MECHANICAL_CHECK', status: 'ANSWERED', answer: 'Fugue.', jewlFill: null }],
       '', [],
     );
-    expect(plan.stageTools).toEqual(['raise_prod']);
+    expect(plan.stageTools).toEqual(['raise_prod', 'set_starting_age']);
     expect(plan.allowedTools).toBeUndefined();
     expect(plan.text).toContain('Fugue or bleed? → Fugue.');
     expect(plan.text).toContain('QUESTIONS FOR THE GM');

@@ -72,5 +72,7 @@ export async function lockPortrait(input: LockPortraitInput): Promise<{ via: 'ge
     throw new NotFoundError('That portrait image does not exist on the server');
   }
   await prisma.character.update({ where: { id: characterId }, data: { portrait: webPath } });
+  // A genesis waiting at the PORTRAIT gate (2026-10-16) goes back to work.
+  void import('./genesis-gates').then(m => m.reopenGenesisGates(characterId)).catch(() => undefined);
   return { via: 'image', portrait: webPath };
 }

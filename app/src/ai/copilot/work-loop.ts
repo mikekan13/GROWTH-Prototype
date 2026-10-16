@@ -42,6 +42,7 @@ import {
 } from '@/services/character-genesis-progress';
 import { WallViolationError } from '@/ai/network/errors';
 import { warnQuestionOutsideProd } from '@/lib/genesis-question';
+import { isGateStage } from '@/lib/genesis-stages';
 import { planWorkCycle, type CycleProd, type CycleCatalog, type CycleDrafting, type CompletionContext } from './work-cycle-text';
 import { rejectedShapes } from '@/services/block-archetype';
 import { prisma } from '@/lib/db';
@@ -195,6 +196,13 @@ async function runCycle(session: {
   cycleCount: number;
   stage?: string | null;
 }): Promise<void> {
+  // Player gates (Mike 2026-10-16): APPEARANCE and PORTRAIT are not JEWL's to
+  // do. The session waits on the person at the designer; no model call.
+  if (isGenesisGoal(session.goal) && isGateStage(session.stage)) {
+    const { holdOrPassGate } = await import('@/services/genesis-gates');
+    await holdOrPassGate(session.id);
+    return;
+  }
   const jewl = await getJewlGodHead();
   await touchCycle(session.id);
 
@@ -246,10 +254,10 @@ async function runCycle(session: {
       drafting.feedback = await loadPendingFeedback(session.campaignId, session.id, jewl.characterUserId);
     } catch { /* feedback also rides in the progress notes */ }
   }
-  // Completion stages (2026-10-12): SEEDS / WORLD_FACTS read the GM's own
-  // typed world messages (fiction by the wall) as their sources.
+  // The WORLD stage (2026-10-16; was SEEDS / WORLD_FACTS) reads the GM's own
+  // typed world messages (fiction by the wall) as its sources.
   let completion: CompletionContext | null = null;
-  if (isGenesisGoal(session.goal) && (session.stage === 'SEEDS' || session.stage === 'WORLD_FACTS')) {
+  if (isGenesisGoal(session.goal) && session.stage === 'WORLD') {
     try {
       const { loadGmWorldMessages } = await import('@/services/genesis-stages');
       completion = { worldMessages: await loadGmWorldMessages(session.campaignId) };

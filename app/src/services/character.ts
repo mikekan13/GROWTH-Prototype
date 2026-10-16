@@ -193,6 +193,12 @@ export async function updateCharacter(
 
   const result = await prisma.character.update({ where: { id: characterId }, data: updateData });
 
+  // Genesis gates (2026-10-16): the designer saves her look through this
+  // path — a genesis waiting at APPEARANCE / PORTRAIT goes back to work.
+  if (input.data || input.portrait !== undefined) {
+    void import('./genesis-gates').then(m => m.reopenGenesisGates(characterId)).catch(() => undefined);
+  }
+
   // Log changes asynchronously (non-blocking)
   if (beforeData && input.data) {
     createChangeLogEntry({

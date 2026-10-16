@@ -15,6 +15,7 @@ import { prisma } from '@/lib/db';
 import { broadcastEvent } from '@/lib/campaign-stream';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { isProdsBlocked, warnQuestionOutsideProd } from '@/lib/genesis-question';
+import { isGateBlocked } from '@/lib/genesis-stages';
 
 export type WorkSessionStatus = 'active' | 'blocked' | 'done' | 'cancelled';
 
@@ -106,10 +107,10 @@ export async function updateWorkSession(opts: {
 
   const data: Record<string, unknown> = {};
   const stageNotes: string[] = [];
-  // Completion stages (2026-10-12): a genesis in a build-phase stage that
-  // says "done" walks to the next stage its character still lacks
-  // (AGE → POSSESSIONS → SEEDS → WORLD_FACTS → VINES); only after the last
-  // one is she Born.
+  // Completion stages (2026-10-12, order 2026-10-16): a genesis in a
+  // build-phase stage that says "done" walks to the next stage its character
+  // still lacks (AGE → APPEARANCE → WORLD → MEMORIES → VINES → PORTRAIT);
+  // only after the last one is she Born.
   if (opts.status === 'done' && session.goal.startsWith('Character genesis')) {
     const stages = await import('./genesis-stages');
     if (stages.isBuildPhaseStage(session.stage)) {
@@ -121,7 +122,7 @@ export async function updateWorkSession(opts: {
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('[daya-work-session] stage advance failed:', err);
-        next = stages.nextGenesisStage(session.stage, null);
+        next = stages.nextGenesisStage(session.stage, null, { portraitGate: stages.portraitGateOn() });
       }
       if (next) {
         data.stage = next;
@@ -220,7 +221,8 @@ export async function resumeBlockedWorkSessions(campaignId: string): Promise<num
   const blocked = (await prisma.dayaWorkSession.findMany({
     where: { campaignId, status: 'blocked' },
   })).filter(s => s.stage !== 'PRODDING' // prods wait on the GM's answers / Build, not the Forge
-    && !isProdsBlocked(s.blockedReason)); // blocked-on-prod resumes on the GM's decisions
+    && !isProdsBlocked(s.blockedReason) // blocked-on-prod resumes on the GM's decisions
+    && !isGateBlocked(s.blockedReason)); // gates reopen from the designer (genesis-gates.ts)
   for (const session of blocked) {
     await updateWorkSession({
       sessionId: session.id,

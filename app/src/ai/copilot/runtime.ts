@@ -157,6 +157,8 @@ const STAGE_ONLY_TOOLS = new Set([
   'raise_prod', 'end_prod_round',
   // Genesis completion stages (2026-10-12): offered only in their own stage cycle.
   'set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal',
+  // Material life (2026-10-16): WORLD stage only.
+  'read_life_budget', 'establish_currency', 'grant_cash', 'set_income',
 ]);
 
 /** Tools offered ONLY on the table lane — a live dispatch from the Watcher

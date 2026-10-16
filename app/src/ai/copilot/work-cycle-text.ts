@@ -175,8 +175,9 @@ export function draftingGuidance(d: CycleDrafting): string {
 // ── A question is a prod at ANY genesis stage (Mike 2026-10-12) ─────────
 // "Never should I have to go to the logs to answer a question jewl has."
 
-/** Stage-only tools a genesis build cycle still offers. */
-export const BUILD_STAGE_TOOLS = ['raise_prod'] as const;
+/** Stage-only tools a genesis build cycle still offers. Age is a SUM
+ *  (2026-10-16): her years per block are set while the sheet is written. */
+export const BUILD_STAGE_TOOLS = ['raise_prod', 'set_starting_age'] as const;
 
 /** The question law every genesis build cycle carries. */
 export function genesisQuestionLaw(sessionId: string): string {
@@ -190,9 +191,10 @@ export function genesisQuestionLaw(sessionId: string): string {
   ].join('\n');
 }
 
-// ── Completion stages: after the sheet, before Born (Mike 2026-10-12) ───
-// AGE → POSSESSIONS → SEEDS → WORLD_FACTS → VINES. Each stage's cycle offers
-// ONLY its own tools; "done" walks to the next missing stage (daya-work-session).
+// ── Completion stages: after the sheet, before Born (Mike 2026-10-12/16) ──
+// AGE (repair) → APPEARANCE (gate) → WORLD → MEMORIES → VINES → PORTRAIT
+// (gate). Each stage's cycle offers ONLY its own tools; "done" walks to the
+// next missing stage (daya-work-session). Gates never reach the model.
 
 /** Tools every completion stage keeps. */
 export const COMPLETION_COMMON_TOOLS = ['update_work_session', 'raise_prod', 'record_delegated_choice'] as const;
@@ -200,10 +202,15 @@ export const COMPLETION_COMMON_TOOLS = ['update_work_session', 'raise_prod', 're
 /** The tools of each completion stage. */
 export const COMPLETION_STAGE_TOOLS: Record<GenesisPostSheetStage, readonly string[]> = {
   AGE: ['set_starting_age'],
-  POSSESSIONS: ['read_life_budget', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item', 'read_location', 'establish_currency', 'grant_cash', 'set_income'],
-  SEEDS: ['seed_npc', 'seed_location', 'read_location'],
-  WORLD_FACTS: ['establish_world_facts', 'read_location'],
+  APPEARANCE: [],
+  WORLD: [
+    'read_life_budget', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item',
+    'seed_location', 'create_location', 'read_location', 'seed_npc', 'establish_world_facts',
+    'establish_currency', 'grant_cash', 'set_income',
+  ],
+  MEMORIES: ['daya_seed_memory', 'daya_ledger_read', 'read_location'],
   VINES: ['author_vine_goal'],
+  PORTRAIT: [],
 };
 
 /** The law of each completion stage — carried verbatim in its cycles. */
@@ -214,32 +221,32 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
     '- The brief\'s AGE is canon. If her blocks\' years do not sum to it, assign HER years per block from her chronology (set_starting_age years[]) — an archetype\'s default years are not hers, and her years never change the archetype.',
     '- A root covers at most 25 years. Call set_starting_age (it refuses a sum that misses the AGE), then finish the stage.',
   ].join('\n'),
-  POSSESSIONS: [
-    'STAGE: POSSESSIONS — her story\'s prose grants become real things.',
-    '- Read the backstory and settled answers for what she HAS: what she wears, what she carries, what she owns (keepsakes, the tools of her work, the things that name her life). Only what the story grants or her life plainly implies — no loot, no gear lists.',
-    '- CATALOG FIRST: where a stock or campaign item archetype fits, grant_possession it by exact name with HER paint (localName + story). Stock is free.',
-    '- Nothing fits → propose_forge_blueprint type "item": the ARCHETYPE stays campaign-agnostic ("Silver Butter Knife" — no proper nouns, no bearer), with characterId + attachmentStory + localName for her instance. The chain grades it; the Watcher\'s approval spends the KRMA. Grant it once published; while drafts wait, set status=blocked on the Forge.',
-    '- Tiers: equipped = worn on a region of HER body (slot = a region key the tool lists), carried = on her person, owned = the deed only (her home\'s contents she owns, a car, a box in storage — not on her). Weight in real pounds.',
+  APPEARANCE: 'STAGE: APPEARANCE — a person approves her face and body at the designer. Not yours to do; the session waits.',
+  WORLD: [
+    'STAGE: WORLD — her physical world: the things she owns, the place she lives, the people she names, the facts about it. (Her look is approved: build the life of THIS person.)',
     '- HER LIFE BUDGET (ruled 2026-10-16): read_life_budget first. Σ accumulated wealth over her roots and branches is the KRMA you have to build her material reality — stock blueprints are free, but every INSTANCE you grant is the Watcher\'s KRMA crystallized as that object, and it spends the budget at its KV. Named block grants are already priced in the block and do not spend it.',
-    '- WEALTH THAT IS NOT A THING: cash and income live on the sheet, never as items. A currency is a campaign object (establish_currency — anchor its rate on what objects cost in THIS time and place; many currencies may exist). When her things are placed, exchange what remains of the budget — or what her life plainly leaves her holding — into cash with grant_cash, and set_income from her current branch. Over budget = cut or re-rate, and say so in the progress note.',
-  ].join('\n'),
-  SEEDS: [
-    'STAGE: SEEDS — the people and places of her story become seeds for the Watcher.',
-    '- Every PERSON the backstory or the settled answers NAME → seed_npc: who they are to her, valence (-1..+1), what the story says of them, the open thread between them. Never create a person the story does not name. No sheets, no portraits.',
+    '- HER HOME first: seed_location for where she lives (and her hometown or workplace, where named) from the GM WORLD MESSAGES below and the backstory — cite the message ids; as specific as the sources, no further. Places are not forged. owned only if she holds the deed. Rooms are child Locations of the home (create_location, located_at the home).',
+    '- THEN HER THINGS, room by room: what she wears, carries and owns — keepsakes, the tools of her work, the furniture, the kitchen, the wardrobe, the drawer of junk. What the story grants or her life plainly implies at her means; no loot, no gear lists. CATALOG FIRST: grant_possession by exact archetype name with HER paint (localName + story); owned things name their location. Nothing fits → propose_forge_blueprint type "item" (campaign-agnostic archetype + her paint); the Watcher\'s approval spends the KRMA; grant it once published, and while drafts wait set status=blocked on the Forge.',
+    '- Tiers: equipped = worn on a region of HER body (slot = a region key the tool lists), carried = on her person, owned = the deed (located_at says where it sits). Weight in real pounds.',
+    '- HER PEOPLE: every PERSON the backstory or the settled answers NAME → seed_npc: who they are to her, valence (-1..+1), what the story says of them, the open thread between them. Never a person the story does not name. No sheets, no portraits — each is an entity and gets their own genesis later.',
     '- OPEN THREADS ARE NEVER FILLED: a thread the GM LEFT OPEN rides as openThreadProdId alone. Never write an answer, a hint or a guess for it anywhere.',
-    '- Her home (and her hometown or workplace, where named) → seed_location. Draw it from the GM WORLD MESSAGES below and the backstory and cite the message ids you used; be as specific as those sources, no further. Places are not forged. owned only if she holds the deed.',
+    '- THE FACTS: establish_world_facts for her home as it now stands (what is where, surfaces, the objects you placed, their states, sounds) and the standing facts about her people and places. Dotted stable subjectKeys ("violet_apartment.desk.laptop"), concrete, present tense; batch a place per call. Only from the sources; never a fact that answers an OPEN THREAD.',
+    '- WEALTH THAT IS NOT A THING: cash and income live on the sheet, never as items. A currency is a campaign object (establish_currency — anchor its rate on what objects cost in THIS time and place; many may exist). When her things are placed, exchange what remains of the budget — or what her life plainly leaves her holding — into cash with grant_cash, and set_income from her current branch. Over budget = cut or re-rate, and say so in the progress note.',
+    '- Ask, do not assume, where the choice is creative: the Watcher or the Trailblazer drives; you add the scale (raise_prod for what only they can say).',
   ].join('\n'),
-  WORLD_FACTS: [
-    'STAGE: WORLD FACTS — the substrate play will touch first.',
-    '- establish_world_facts for her home as the GM described it (what is where, surfaces, objects, their states, sounds), and the standing facts about the people and places you seeded. Dotted stable subjectKeys ("violet_apartment.desk.laptop"), concrete, present tense; batch a place per call.',
-    '- Facts come only from the sources: the GM WORLD MESSAGES below, the backstory, the settled answers. Never state a fact that answers an OPEN THREAD.',
+  MEMORIES: [
+    'STAGE: MEMORIES — one memory for every thing built: each item she owns, each mark on her face and body, each place, each person.',
+    '- daya_seed_memory in batches: first-person lived experience in HER register, no game vocabulary. Three weights — fleeting (one line: "bought at the corner store, nothing to it"), held (how it came to her, 2–4 sentences), chain (a thread across years, cross-linked to a person or place). Salience follows the weight.',
+    '- Cite the source of each (which item, which mark, which place or person) in its content so the memory survives losing the thing. Memory belongs to the PERSON; the object keeps its own history.',
+    '- Marks (scars, tattoos, piercings, birthmarks, body mods, makeup) come from her approved look: how each came to be — invent from her life unless the brief or the settled answers say; never answer an OPEN THREAD.',
   ].join('\n'),
   VINES: [
-    'STAGE: VINES — choose the GOALS of her GRO.vines.',
+    'STAGE: VINES — choose the GOALS of her GRO.vines, now that the whole person and her whole life stand.',
     '- A GRO.vine is a three-author contract: the Goal is the entity\'s, the Resistance is the Watcher\'s, the Opportunity is the godhead\'s. You write the GOAL only — never resistance, never opportunity.',
-    '- What she wants, in her own terms, as her history makes her want it — up to her seed\'s slots (the tool says how many). Fewer is fine. An open thread never becomes a goal\'s answer.',
+    '- What she wants, in her own terms, as her history, her world and her memories make her want it — up to her seed\'s slots (the tool says how many). Fewer is fine. An open thread never becomes a goal\'s answer.',
     '- These are AI-chosen, as simulation is: a Trailblazer seated in her overwrites them.',
   ].join('\n'),
+  PORTRAIT: 'STAGE: PORTRAIT — her portrait is painted from her face, body, clothes and world, and approved at the designer. Not yours to do; the session waits.',
 };
 
 /** What the completion stage cycles carry beyond the session. */
@@ -259,12 +266,12 @@ export function buildCompletionStageText(
 ): string {
   const stage = session.stage;
   const order = GENESIS_POST_SHEET_STAGES.map(s => (s === stage ? `[${s}]` : s)).join(' → ');
-  const world = (stage === 'SEEDS' || stage === 'WORLD_FACTS')
+  const world = stage === 'WORLD'
     ? (ctx.worldMessages?.length
       ? `GM WORLD MESSAGES (what the GM typed about the world — sources; cite ids):\n${ctx.worldMessages.map(m => `[${m.id}] (${m.at}) ${m.text}`).join('\n\n')}`
       : 'GM WORLD MESSAGES: none — the backstory and settled answers are your only sources.')
     : null;
-  const catalog = stage === 'POSSESSIONS' && ctx.stockItems != null
+  const catalog = stage === 'WORLD' && ctx.stockItems != null
     ? (ctx.stockItems > 0
       ? `CATALOG: ${ctx.stockItems} stock item archetype${ctx.stockItems === 1 ? '' : 's'}. Search ONCE (one search_catalog call with queries:[…] for every thing she has), then grant.`
       : 'CATALOG: the stock catalog holds no items — do not search it; reuse campaign items, draft the true gaps.')
@@ -309,16 +316,16 @@ export function planWorkCycle(
   if (genesis && isPostSheetStage(session.stage)) {
     const stage = session.stage;
     const extras = [
-      ...(stage === 'POSSESSIONS' && drafting ? [draftingGuidance(drafting)] : []),
+      ...(stage === 'WORLD' && drafting ? [draftingGuidance(drafting)] : []),
       genesisQuestionLaw(session.id),
     ];
     return {
       text: buildCompletionStageText({ ...session, plan, stage }, recentNotes, {
         ...completion,
-        ...(stage === 'POSSESSIONS' && catalog ? { stockItems: catalog.counts.item ?? 0 } : {}),
+        ...(stage === 'WORLD' && catalog ? { stockItems: catalog.counts.item ?? 0 } : {}),
       }, extras),
       allowedTools: [...COMPLETION_COMMON_TOOLS, ...COMPLETION_STAGE_TOOLS[stage]]
-        .filter(t => !(t === 'search_catalog' && stage === 'POSSESSIONS' && catalog && !(catalog.counts.item ?? 0))),
+        .filter(t => !(t === 'search_catalog' && stage === 'WORLD' && catalog && !(catalog.counts.item ?? 0))),
     };
   }
   const guide = catalog ? catalogGuidance(catalog) : null;

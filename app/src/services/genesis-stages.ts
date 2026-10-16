@@ -41,13 +41,14 @@ export async function detectMissingStages(characterId: string): Promise<Set<Gene
   const character = await prisma.character.findUnique({ where: { id: characterId }, select: { data: true } });
   let sheet: Partial<GrowthCharacter> & { _genesisStages?: unknown } = {};
   try { sheet = JSON.parse(character?.data ?? '{}'); } catch { sheet = {}; }
-  const [links, heldItems, ownsEdges, npcSeeds, placeEdges, vines] = await Promise.all([
+  const [links, heldItems, ownsEdges, npcSeeds, placeEdges, vines, portraitRow] = await Promise.all([
     prisma.characterBlockLink.findMany({ where: { characterId }, select: { forgeItemId: true, ageAdded: true } }),
     prisma.campaignItem.count({ where: { holderId: characterId, status: 'ACTIVE' } }),
     prisma.entityRelationship.count({ where: { sourceId: characterId, relationshipType: 'owns' } }),
     prisma.character.count({ where: { seededFromId: characterId } }),
     prisma.entityRelationship.count({ where: { sourceId: characterId, targetType: 'LOCATION', relationshipType: { in: [...PLACE_RELATIONS] } } }),
     prisma.goal.count({ where: { characterId, status: { in: ['ACTIVE', 'DORMANT'] } } }),
+    prisma.character.findUnique({ where: { id: characterId }, select: { portrait: true } }),
   ]);
   const blocks = links.length
     ? await prisma.forgeItem.findMany({ where: { id: { in: links.map(l => l.forgeItemId) }, status: { not: 'superseded' } }, select: { id: true, type: true, data: true } })
@@ -63,7 +64,24 @@ export async function detectMissingStages(characterId: string): Promise<Set<Gene
   const age = sheet.identity?.age;
   const ageOk = typeof sheet.birthCycle === 'number' && typeof age === 'number'
     && (ageLinks.length === 0 || startingAgeFromLinks(ageLinks) === age);
-  return missingStages({ stamps: stagesDone(sheet), ageOk, heldItems, ownsEdges, npcSeeds, placeEdges, vines });
+  return missingStages({
+    stamps: stagesDone(sheet), ageOk, heldItems, ownsEdges, npcSeeds, placeEdges, vines,
+    lookOk: lookApproved(sheet.identity),
+    portraitOk: !!portraitRow?.portrait,
+    portraitGate: portraitGateOn(),
+  });
+}
+
+/** Is the look finalized — the designer's face approved and the body rendered? Pure. */
+export function lookApproved(identity: unknown): boolean {
+  const i = (identity ?? {}) as { designer?: { approvedImagePath?: unknown; bodyImagePath?: unknown }; generatedBust?: unknown; generatedFullBody?: unknown };
+  const d = i.designer ?? {};
+  return (!!d.approvedImagePath && !!d.bodyImagePath) || (!!i.generatedBust && !!i.generatedFullBody);
+}
+
+/** The PORTRAIT gate is enforced once the portrait step exists (env GENESIS_PORTRAIT_GATE=on). */
+export function portraitGateOn(): boolean {
+  return (process.env.GENESIS_PORTRAIT_GATE ?? 'off').toLowerCase() === 'on';
 }
 
 /** Stamp a completion stage on the character's sheet. */
@@ -91,12 +109,24 @@ export async function advanceGenesisStage(characterId: string, current: string):
       // eslint-disable-next-line no-console
       console.error('[genesis-stages] sheet sync failed:', err instanceof Error ? err.message : err);
     }
+    // Age is a SUM, not a stage (Mike 2026-10-16: "age comes from the root +
+    // branches"): stamp it from her blocks as the sheet closes. A mismatch
+    // with the brief leaves AGE missing and the repair stage runs.
+    try {
+      const row = await prisma.character.findUnique({ where: { id: characterId }, select: { campaignId: true } });
+      if (row?.campaignId) {
+        const { setStartingAge } = await import('./genesis-age');
+        await setStartingAge(row.campaignId, { characterId });
+      }
+    } catch (err) {
+      console.warn('[genesis-stages] age not settled from the blocks:', err instanceof Error ? err.message : err);
+    }
   } else if (isPostSheetStage(current)) {
     await stampStageDone(characterId, current).catch(() => undefined);
   }
   let missing: Set<GenesisPostSheetStage> | null = null;
   try { missing = await detectMissingStages(characterId); } catch { missing = null; }
-  return nextGenesisStage(current, missing);
+  return nextGenesisStage(current, missing, { portraitGate: portraitGateOn() });
 }
 
 // ── The GM's typed world messages (SEEDS / WORLD_FACTS sources) ─────────

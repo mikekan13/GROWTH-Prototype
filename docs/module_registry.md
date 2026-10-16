@@ -637,3 +637,13 @@ Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Unit 
 | `ai/copilot/tools/genesis-completion.ts` (+) | `read_life_budget`, `establish_currency`, `grant_cash`, `set_income` | POSSESSIONS-stage tools; the stage law in `work-cycle-text.ts` now reads the budget first and exchanges the remainder into cash. |
 | `GET/POST /api/campaigns/[id]/currencies` · `GET /api/characters/[id]/wealth` | — | Thin routes over the above. |
 | `forge-schemas.ts` / `forge-pricing.ts` / `ForgeWorkshop.tsx` | `accumulatedWealth` on root + branch data; priced 1:1 inside the TKV; shown as a gold "wealth N KV" fact chip | Mike: "a Root worth TKV 300 — some is in accumulated wealth, some in attributes, some in the gained objects." |
+
+## Genesis walk v2 — gates (Mike 2026-10-16)
+
+| Module | Exports | Purpose |
+|---|---|---|
+| `lib/genesis-stages.ts` (changed) | `GENESIS_POST_SHEET_STAGES` = AGE → APPEARANCE → WORLD → MEMORIES → VINES → PORTRAIT, `GATE_STAGES`, `isGateStage`, `normalizeStage` (legacy POSSESSIONS/SEEDS/WORLD_FACTS → WORLD), `missingStages` (+ `lookOk`, `portraitOk`, `portraitGate`), `nextGenesisStage(current, missing, {portraitGate})`, `GATE_BLOCKED_REASON`, `gateBlockedReason`, `isGateBlocked` | The pure walk in Mike's order; age is a sum. |
+| `services/genesis-stages.ts` (changed) | `detectMissingStages` reads the designer + `Character.portrait`; `lookApproved`, `portraitGateOn`; `advanceGenesisStage` stamps age from the blocks when the sheet closes | DB-side evidence. |
+| `services/genesis-gates.ts` | `gateSatisfied`, `holdOrPassGate(sessionId)`, `reopenGenesisGates(characterId)` | Player gates: the session waits at the designer, no model call; the designer save / portrait lock reopen it. |
+| `ai/copilot/work-loop.ts` / `work-cycle-text.ts` / `runtime.ts` (changed) | gate pre-check in `runCycle`; `COMPLETION_STAGE_TOOLS` / `COMPLETION_STAGE_LAW` for WORLD + MEMORIES (+ gate lines); `BUILD_STAGE_TOOLS` += `set_starting_age`; STAGE_ONLY += the four material-life tools | The cycles. |
+| `services/character-genesis-progress.ts` (changed) | ladder keys age · appearance · world · memories · vines · portrait · born | The GM's progress view. |
