@@ -54,6 +54,18 @@ function normalizeTraitRefs(refs: SeedTraitRef[] | undefined): Array<{ name: str
   );
 }
 
+/**
+ * Root break-even (r-2026-04-22-10: frequency cost = KV − break-even).
+ * Was 100 at age 18 (+5/yr). The material-life regrade (Mike 2026-10-16:
+ * "increase the TKV of Roots and Branches probably by around 50… all need
+ * to be rebalanced") lifts every root ~+50 at root scale, so the break-even
+ * moves with it — the material lines compete with attributes inside the
+ * TKV; they do not buy Frequency. [QUESTION Mike] 150/+8 are the assumed
+ * new anchors; overturn here and in scripts/seed-modern-earth.ts together.
+ */
+export const ROOT_BREAKEVEN_AT_18 = 150;
+export const ROOT_BREAKEVEN_PER_YEAR = 8;
+
 interface RootBranchShape {
   attributes?: Record<string, number>;
   skills?: Array<{ level?: number; isMagic?: boolean }>;
@@ -182,7 +194,7 @@ export function priceRootBranch(type: 'root' | 'branch', data: RootBranchShape):
   // branches are still under review (audit R2) — only roots get this.
   if (type === 'root' && typeof data.ageAdded === 'number' && data.ageAdded >= 0) {
     const startAge = data.ageAdded;
-    const breakeven = 100 + (startAge - 18) * 5;
+    const breakeven = ROOT_BREAKEVEN_AT_18 + (startAge - 18) * ROOT_BREAKEVEN_PER_YEAR;
     result.frequencyCost = Math.max(0, kv - breakeven);
     breakdown.push(`frequency cost max(0, ${kv} − ${breakeven}) = ${result.frequencyCost}`);
   }

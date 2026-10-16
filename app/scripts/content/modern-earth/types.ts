@@ -55,7 +55,28 @@ export interface RootBranchSkillGrant {
   level: number;                // 1-3 flat, 4-5 d4, 6-7 d6, 8-11 d8 (soft cap ~10 creation)
 }
 
-export interface RootTemplate {
+/** A NAMED thing those years put in the bearer's hands (block grant, rulings
+ *  2026-08-24/25 #13; priced in the block at its own KV). `name` is a stock
+ *  item archetype where one fits — genesis pulls it free and paints it. */
+export interface PossessionGrant {
+  name: string;
+  description: string;
+  kv: number;
+  unpackNote?: string;
+}
+
+/** The MATERIAL lines of a block (Mike ruling 2026-10-16): named grants at
+ *  their own KV, and ACCUMULATED WEALTH — a KRMA number INSIDE the block's
+ *  TKV for everything those years left the bearer that is not named (home,
+ *  wardrobe, pots and pans, the junk drawer); Σ over a character's blocks is
+ *  genesis's budget to build her material life; the remainder becomes cash
+ *  in a campaign currency. Both compete with attributes for the TKV. */
+export interface MaterialLines {
+  possessions?: PossessionGrant[];
+  accumulatedWealth?: number;
+}
+
+export interface RootTemplate extends MaterialLines {
   name: string;
   description: string;
   /** Age the character reaches through this Root (max 25 canon). */
@@ -70,7 +91,7 @@ export interface RootTemplate {
   thorns: string[];
 }
 
-export interface BranchTemplate {
+export interface BranchTemplate extends MaterialLines {
   name: string;
   description: string;
   /** Years this Branch adds to the character's age. */

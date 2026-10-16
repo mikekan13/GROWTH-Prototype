@@ -48,19 +48,22 @@ describe('forge-pricing (locked formulas, Seed_KV_Formulas.md)', () => {
     expect(priceRootBranch('branch', { accumulatedWealth: -9 }).kv).toBe(0);
   });
 
-  it('root breakeven rule: plain 18yo ~100 KV root has zero frequency cost', () => {
+  it('root breakeven rule: a plain 18yo root at the anchor (150 after the 2026-10-16 regrade) has zero frequency cost', () => {
     const priced = priceRootBranch('root', {
-      attributes: { clout: 50, wisdom: 50 },
+      attributes: { clout: 45, wisdom: 45 },
+      skills: [{ level: 10 }, { level: 10 }],
+      accumulatedWealth: 26,
+      possessions: [{ name: 'Laptop', kv: 14 }],
       ageAdded: 18,
     });
-    expect(priced.kv).toBe(100);
+    expect(priced.kv).toBe(150);
     expect(priced.frequencyCost).toBe(0);
   });
 
   it('root over breakeven pays the difference', () => {
     const priced = priceRootBranch('root', {
-      attributes: { clout: 60, wisdom: 60 }, // 120 KV
-      ageAdded: 18, // breakeven 100
+      attributes: { clout: 85, wisdom: 85 }, // 170 KV
+      ageAdded: 18, // breakeven 150
     });
     expect(priced.frequencyCost).toBe(20);
   });
