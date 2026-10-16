@@ -48,24 +48,25 @@ describe('forge-pricing (locked formulas, Seed_KV_Formulas.md)', () => {
     expect(priceRootBranch('branch', { accumulatedWealth: -9 }).kv).toBe(0);
   });
 
-  it('root breakeven rule: a plain 18yo root at the anchor (150 after the 2026-10-16 regrade) has zero frequency cost', () => {
+  it('break-even = 8 KRMA × years (Mike 2026-10-16): a plain 18yo root at 144 has zero frequency cost', () => {
     const priced = priceRootBranch('root', {
       attributes: { clout: 45, wisdom: 45 },
       skills: [{ level: 10 }, { level: 10 }],
-      accumulatedWealth: 26,
-      possessions: [{ name: 'Laptop', kv: 14 }],
+      accumulatedWealth: 24,
+      possessions: [{ name: 'Laptop', kv: 10 }],
       ageAdded: 18,
     });
-    expect(priced.kv).toBe(150);
+    expect(priced.kv).toBe(144);
     expect(priced.frequencyCost).toBe(0);
   });
 
-  it('root over breakeven pays the difference', () => {
+  it('root over breakeven pays the difference; a 17-year root breaks even at 136', () => {
     const priced = priceRootBranch('root', {
-      attributes: { clout: 85, wisdom: 85 }, // 170 KV
-      ageAdded: 18, // breakeven 150
+      attributes: { clout: 82, wisdom: 82 }, // 164 KV
+      ageAdded: 18, // breakeven 144
     });
     expect(priced.frequencyCost).toBe(20);
+    expect(priceRootBranch('root', { attributes: { clout: 68, wisdom: 68 }, ageAdded: 17 }).frequencyCost).toBe(0);
   });
 
   it('magic skill levels price at 2×', () => {

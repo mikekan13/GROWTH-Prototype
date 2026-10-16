@@ -8,7 +8,7 @@
 import './_server-only-shim';
 import { prisma } from '../src/lib/db';
 import { validateForgeData } from '../src/services/forge-schemas';
-import { ROOT_BREAKEVEN_AT_18, ROOT_BREAKEVEN_PER_YEAR } from '../src/services/forge-pricing';
+import { KRMA_PER_YEAR, breakevenForYears } from '../src/services/forge-pricing';
 import { MODERN_ROOTS } from './content/modern-earth/roots';
 import { MODERN_BRANCHES } from './content/modern-earth/branches';
 import { MODERN_NECTARS } from './content/modern-earth/nectars';
@@ -34,7 +34,7 @@ async function main() {
   lines.push('');
   lines.push('Mike (16 Oct): "increase the TKV of Roots and Branches probably by around 50… all need to be rebalanced… some of that 50 won\'t all be in the accumulated wealth but into attributes, possessions gained, items gained, skills, etc." Branches are tied to time, so they lift ~+2.8/yr (50/18). Named grants are stock item archetypes genesis pulls free and paints; accumulated wealth is the unnamed life\'s budget.');
   lines.push('');
-  lines.push(`**Assumption to overturn [QUESTION Mike]:** the root break-even moves with the lift — ${ROOT_BREAKEVEN_AT_18} at age 18 (+${ROOT_BREAKEVEN_PER_YEAR}/yr), branches ${ROOT_BREAKEVEN_PER_YEAR} KV/yr — so a plain root still costs no Frequency. Otherwise every root would pay ~50 Frequency for its pots and pans.`);
+  lines.push(`**Break-even:** RULED (Mike): break-even = ${KRMA_PER_YEAR} KRMA × years for roots and branches alike — an 18-year root breaks even at ${breakevenForYears(18)}, a 17-year one at ${breakevenForYears(17)}.`);
   lines.push('');
   lines.push('Nothing below is seeded yet. On approval: `npx tsx scripts/seed-modern-earth.ts` (idempotent upsert) re-publishes these; Violet\'s three campaign blocks are patched separately (§3).');
   lines.push('');
@@ -48,7 +48,7 @@ async function main() {
     const traits = [...r.nectars, ...r.thorns].reduce((a, n) => a + (TRAIT_KV.get(n) ?? 0), 0);
     const { grants, wealth } = mat(r);
     const kv = attrs + skills + traits + grants + wealth;
-    const freq = kv - ROOT_BREAKEVEN_AT_18;
+    const freq = kv - breakevenForYears(r.age);
     const o = old.get(`root::${r.name}`);
     validateForgeData('root', { description: r.description, frequency: freq, ageAdded: r.age, attributes: r.attributes, skills: r.skills, nectars: r.nectars, thorns: r.thorns, seedRequirement: '', possessions: r.possessions, accumulatedWealth: r.accumulatedWealth ?? 0 });
     lines.push(`| ${r.name} | ${o ?? '—'} | ${attrs} | ${skills} | ${grants} | ${wealth} | **${kv}** | ${o != null ? (kv - o >= 0 ? '+' : '') + (kv - o) : '—'} | ${freq} | ${(r.possessions ?? []).map(p => `${p.name} (${p.kv})`).join(', ') || '—'} |`);
@@ -64,7 +64,7 @@ async function main() {
     const traits = [...b.nectars, ...b.thorns].reduce((a, n) => a + (TRAIT_KV.get(n) ?? 0), 0);
     const { grants, wealth } = mat(b);
     const kv = attrs + skills + traits + grants + wealth;
-    const freq = kv - b.ageAdded * ROOT_BREAKEVEN_PER_YEAR;
+    const freq = kv - breakevenForYears(b.ageAdded);
     const perYear = kv / Math.max(1, b.ageAdded);
     const o = old.get(`branch::${b.name}`);
     validateForgeData('branch', { description: b.description, frequency: freq, ageAdded: b.ageAdded, attributes: b.attributes, skills: b.skills, nectars: b.nectars, thorns: b.thorns, requirements: b.requirements, possessions: b.possessions, accumulatedWealth: b.accumulatedWealth ?? 0 });

@@ -2,7 +2,7 @@
 
 Mike (16 Oct): "increase the TKV of Roots and Branches probably by around 50… all need to be rebalanced… some of that 50 won't all be in the accumulated wealth but into attributes, possessions gained, items gained, skills, etc." Branches are tied to time, so they lift ~+2.8/yr (50/18). Named grants are stock item archetypes genesis pulls free and paints; accumulated wealth is the unnamed life's budget.
 
-**Assumption to overturn [QUESTION Mike]:** the root break-even moves with the lift — 150 at age 18 (+8/yr), branches 8 KV/yr — so a plain root still costs no Frequency. Otherwise every root would pay ~50 Frequency for its pots and pans.
+**Break-even:** RULED (Mike): break-even = 8 KRMA × years for roots and branches alike — an 18-year root breaks even at 144, a 17-year one at 136.
 
 Nothing below is seeded yet. On approval: `npx tsx scripts/seed-modern-earth.ts` (idempotent upsert) re-publishes these; Violet's three campaign blocks are patched separately (§3).
 
@@ -10,19 +10,19 @@ Nothing below is seeded yet. On approval: `npx tsx scripts/seed-modern-earth.ts`
 
 | Root | old KV | attrs | skills | grants | wealth | **new KV** | Δ | freq | named grants |
 |---|---|---|---|---|---|---|---|---|---|
-| Suburban Childhood | 94 | 90 | 19 | 10 | 26 | **145** | +51 | -5 | Laptop (10) |
-| Rural Upbringing | 96 | 90 | 20 | 11 | 24 | **145** | +49 | -5 | Toolbox (Stocked) (6), Pocket Knife (5) |
-| Inner-City Streets | 96 | 90 | 22 | 8 | 22 | **142** | +46 | -8 | Skateboard (3), Pocket Knife (5) |
-| Military Family | 94 | 90 | 19 | 11 | 26 | **146** | +52 | -4 | Hiking Backpack (65L) (6), Multitool (4), Duffel Bag (Large) (1) |
-| First-Generation Household | 96 | 89 | 21 | 5 | 28 | **143** | +47 | -7 | Kitchen Kit (3), Sewing Machine (2) |
-| Homeschooled | 96 | 89 | 21 | 6 | 26 | **142** | +46 | -8 | Bookshelf (2), Digital Keyboard (61-key) (3), Notebook & Pen (1) |
-| Academic Household | 96 | 89 | 21 | 12 | 26 | **148** | +52 | -2 | Laptop (10), Bookshelf (2) |
-| Athlete's Youth | 96 | 90 | 21 | 15 | 20 | **146** | +50 | -4 | Mountain Bike (12), Adjustable Dumbbells (2), Athletic Wear Set (1) |
-| Artist's Household | 95 | 90 | 20 | 11 | 16 | **137** | +42 | -13 | DSLR Camera (6), Acoustic Guitar (3), Paint & Supplies Kit (2) |
-| Working-Class Grind | 95 | 90 | 20 | 9 | 24 | **143** | +48 | -7 | Toolbox (Stocked) (6), Work Boots (Steel Toe) (3) |
-| Coastal Childhood | 96 | 90 | 21 | 11 | 24 | **146** | +50 | -4 | Fishing Rod & Tackle (2), Two-Person Tent (4), Pocket Knife (5) |
-| Faith Community | 95 | 90 | 20 | 8 | 26 | **144** | +49 | -6 | Business Suit (4), Acoustic Guitar (3), Everyday Outfit (1) |
-| Foster System | 95 | 94 | 23 | 6 | 12 | **135** | +40 | -15 | Duffel Bag (Large) (1), Burner Phone (5) |
+| Suburban Childhood | 94 | 90 | 19 | 10 | 26 | **145** | +51 | 1 | Laptop (10) |
+| Rural Upbringing | 96 | 90 | 20 | 11 | 24 | **145** | +49 | 1 | Toolbox (Stocked) (6), Pocket Knife (5) |
+| Inner-City Streets | 96 | 90 | 22 | 8 | 22 | **142** | +46 | -2 | Skateboard (3), Pocket Knife (5) |
+| Military Family | 94 | 90 | 19 | 11 | 26 | **146** | +52 | 2 | Hiking Backpack (65L) (6), Multitool (4), Duffel Bag (Large) (1) |
+| First-Generation Household | 96 | 89 | 21 | 5 | 28 | **143** | +47 | -1 | Kitchen Kit (3), Sewing Machine (2) |
+| Homeschooled | 96 | 89 | 21 | 6 | 26 | **142** | +46 | -2 | Bookshelf (2), Digital Keyboard (61-key) (3), Notebook & Pen (1) |
+| Academic Household | 96 | 89 | 21 | 12 | 26 | **148** | +52 | 4 | Laptop (10), Bookshelf (2) |
+| Athlete's Youth | 96 | 90 | 21 | 15 | 20 | **146** | +50 | 2 | Mountain Bike (12), Adjustable Dumbbells (2), Athletic Wear Set (1) |
+| Artist's Household | 95 | 90 | 20 | 11 | 16 | **137** | +42 | -7 | DSLR Camera (6), Acoustic Guitar (3), Paint & Supplies Kit (2) |
+| Working-Class Grind | 95 | 90 | 20 | 9 | 24 | **143** | +48 | -1 | Toolbox (Stocked) (6), Work Boots (Steel Toe) (3) |
+| Coastal Childhood | 96 | 90 | 21 | 11 | 24 | **146** | +50 | 2 | Fishing Rod & Tackle (2), Two-Person Tent (4), Pocket Knife (5) |
+| Faith Community | 95 | 90 | 20 | 8 | 26 | **144** | +49 | 0 | Business Suit (4), Acoustic Guitar (3), Everyday Outfit (1) |
+| Foster System | 95 | 94 | 23 | 6 | 12 | **135** | +40 | -9 | Duffel Bag (Large) (1), Burner Phone (5) |
 
 ## 2. Branches (per year)
 
@@ -45,7 +45,7 @@ Nothing below is seeded yet. On approval: `npx tsx scripts/seed-modern-earth.ts`
 
 ## 3. Violet's own blocks (campaign instances; patched on approval, not by the seeder)
 
-Her blocks were authored by genesis at the old scale and sit well under it (root 61 vs the ~95 stock anchor). Proposed, same spread:
+Her blocks were authored by genesis at the old scale and sit well under it (root 61 vs the ~95 stock anchor). Proposed, same spread. Break-even for her 17-year root = 8 × 17 = **136**; at 107 she pays no Frequency and sits under the line — a deprived, loved, quiet household, by design.
 
 | Block | yrs | old KV | proposed lines | **new KV** | Δ | KV/yr |
 |---|---|---|---|---|---|---|
@@ -57,8 +57,8 @@ Her life budget after this: 18 + 1 + 6 = **25 KV** of accumulated wealth, minus 
 
 ## 4. Open before seeding
 
-1. **Break-even** (§0): 150 at age 18 and 8 KV/yr for branches — yes, or a different anchor?
-2. **Foster System (135) and Artist's Household (137)** land under the +50 on purpose (materially poorer upbringings; the lift went to skills and attributes). Keep, or level everyone to ~145?
+1. **Foster System (135) and Artist's Household (137)** land under the 144 line on purpose (materially poorer upbringings; the lift went to skills and attributes). Keep, or level everyone to 144?
+2. **Violet's root at 107** against a 136 line: keep her deliberately under it, or lift her toward it?
 3. **Violet's income** (§3).
 
-On "yes": `cd app && npx tsx scripts/seed-modern-earth.ts` re-publishes the 27 stock blocks (idempotent), and I patch Violet's three with a one-off script that also marks the stamped KV.
+On "yes": `cd app && npx tsx scripts/seed-modern-earth.ts` re-publishes the 27 stock blocks (idempotent), and I patch Violet's three with a one-off script.

@@ -33,7 +33,7 @@ import type { ItemTemplate, TraitTemplate } from './content/modern-earth/types';
 import { ALL_THORNS } from './content/modern-earth/thorns';
 import { MODERN_NECTARS } from './content/modern-earth/nectars';
 import { ALL_BLOSSOMS } from './content/modern-earth/blossoms';
-import { ROOT_BREAKEVEN_AT_18, ROOT_BREAKEVEN_PER_YEAR } from '../src/services/forge-pricing';
+import { KRMA_PER_YEAR, breakevenForYears } from '../src/services/forge-pricing';
 import { MODERN_ROOTS } from './content/modern-earth/roots';
 import { MODERN_BRANCHES } from './content/modern-earth/branches';
 import { MODERN_SKILLS } from './content/modern-earth/skills';
@@ -158,12 +158,12 @@ async function main() {
   //    attributes, skills, named grants and accumulated wealth, so the
   //    break-even moves with it (150 at age 18) — the lines compete with
   //    attributes, they do not buy Frequency.
-  const ROOT_BREAKEVEN = ROOT_BREAKEVEN_AT_18;
+  // Break-even = 8 KRMA × years (Mike 2026-10-16: "1 year = 8 KRMA… 18 would put you at 144").
   const materialKv = (m: { possessions?: Array<{ kv: number }>; accumulatedWealth?: number }) =>
     (m.possessions ?? []).reduce((a, p) => a + Math.max(0, p.kv), 0) + Math.max(0, m.accumulatedWealth ?? 0);
   for (const r of MODERN_ROOTS) {
     const kv = sum(r.attributes) + r.skills.reduce((a, s) => a + s.level, 0) + netTraitKV(r.nectars, r.thorns) + materialKv(r);
-    const frequency = kv - ROOT_BREAKEVEN;
+    const frequency = kv - breakevenForYears(r.age);
     const data = {
       description: r.description,
       frequency,
@@ -183,10 +183,10 @@ async function main() {
 
   // ── Branches (freq = KV − ageAdded×8; the material lines lifted the
   //    per-year weight from ~5 to ~8, time-proportional to the root's +50/18) ──
-  const BRANCH_BREAKEVEN_PER_YEAR = ROOT_BREAKEVEN_PER_YEAR;
+
   for (const b of MODERN_BRANCHES) {
     const kv = sum(b.attributes) + b.skills.reduce((a, s) => a + s.level, 0) + netTraitKV(b.nectars, b.thorns) + materialKv(b);
-    const frequency = kv - b.ageAdded * BRANCH_BREAKEVEN_PER_YEAR;
+    const frequency = kv - breakevenForYears(b.ageAdded);
     const kvPerYear = kv / Math.max(1, b.ageAdded);
     if (kvPerYear < 3 || kvPerYear > 15) {
       console.warn(`  ⚠ Kai norm gauge: ${b.name} = ${kvPerYear.toFixed(1)} KV/yr (outside 3-15)`);
