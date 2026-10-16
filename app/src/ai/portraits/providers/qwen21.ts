@@ -123,16 +123,30 @@ export function isStoredPortraitPath(webPath: string): boolean {
 /** The character PORTRAIT canvas (plan 2026-10-15 §4 C): 4:5, head to knees. */
 export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
 
-const PORTRAIT_FRAMING = 'Framed from the head to the knees, the face unmistakably the person in <image1>, the figure as in <image2>.';
+// 2026-10-16 first paints: the body reference's blank studio backdrop and the
+// mood's "dark moody ground behind" won over the setting (she stood on a
+// teal void), and "the figure as in <image2>" copied the whole full-length
+// reference. The portrait takes ONLY her build and marks from <image2>; the
+// place is around her and in the frame.
+const PORTRAIT_FRAMING = 'Framed from the head to the knees, the face unmistakably the person in <image1>; take only her build, skin and every mark from <image2>, never its plain background or its clothing. The room she is in fills the background around her, lit as described.';
+
+/** The campaign mood minus its backdrop clause — a portrait has a place behind her. Pure. */
+export function portraitMood(moodText: string): string {
+  return moodText
+    .replace(/,?\s*a dark moody ground behind/gi, '')
+    .replace(/,?\s*a (dark|plain|blank|neutral)[^,.]*(ground|backdrop|background)[^,.]*/gi, '')
+    .replace(/\s+,/g, ',')
+    .trim();
+}
 
 /**
  * The PORTRAIT prompt: JEWL's brief (plain content, already naming <image1> =
  * the face and <image2> = the body) + the fixed framing + the realism dial +
- * the campaign mood — the v1 recipe's prompt shape (no medium paragraph; the
- * LoRA trigger is added by the workflow builder). Pure.
+ * the campaign mood without its backdrop — the v1 recipe's prompt shape (no
+ * medium paragraph; the LoRA trigger is added by the workflow builder). Pure.
  */
 export function buildQwen21PortraitPrompt(briefPrompt: string, mood?: string): string {
-  return [briefPrompt.trim(), PORTRAIT_FRAMING, LOCK_REALISM, getCampaignMood(mood)].filter(Boolean).join(' ');
+  return [briefPrompt.trim(), PORTRAIT_FRAMING, LOCK_REALISM, portraitMood(getCampaignMood(mood))].filter(Boolean).join(' ');
 }
 
 export interface Qwen21StepResult {

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import sharp from 'sharp';
-import { Qwen21Provider, QWEN21_PORTRAIT_SIZE, buildQwen21PortraitPrompt } from './qwen21';
+import { Qwen21Provider, QWEN21_PORTRAIT_SIZE, buildQwen21PortraitPrompt, portraitMood } from './qwen21';
 import type { ComfyUIQueueResponse } from '../types';
 import { GROWTH_MEDIUM, getCampaignMood } from '../style-config';
 import { LOCK_REALISM } from '../qwen21-workflow';
@@ -62,7 +62,8 @@ describe('Qwen21Provider.renderPortrait', () => {
     expect(prompt).toMatch(/^grwthpaint, A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey wool coat/);
     expect(prompt).toContain('Framed from the head to the knees');
     expect(prompt).toContain(LOCK_REALISM);
-    expect(prompt).toContain(getCampaignMood('growth'));
+    expect(prompt).toContain(portraitMood(getCampaignMood('growth')));
+    expect(prompt).not.toContain('a dark moody ground behind'); // a portrait has a place behind her (2026-10-16)
     expect(prompt).not.toContain(GROWTH_MEDIUM);
     expect(p.saved[0]).toEqual({ characterId: 'ch1', step: 'portrait' });
     expect(p.metas[0]).toMatchObject({ provider: 'qwen21', stage: 'portrait', inkAt: 0 });
@@ -97,6 +98,6 @@ describe('Qwen21Provider.renderPortrait', () => {
   it('buildQwen21PortraitPrompt is pure: brief + framing + realism + mood', () => {
     const s = buildQwen21PortraitPrompt('  x <image1> <image2>  ', 'noir');
     expect(s.startsWith('x <image1> <image2> Framed from the head to the knees')).toBe(true);
-    expect(s).toContain(getCampaignMood('noir'));
+    expect(s).toContain(portraitMood(getCampaignMood('noir')));
   });
 });
