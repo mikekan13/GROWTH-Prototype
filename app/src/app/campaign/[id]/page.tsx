@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import CampaignCanvas from '@/components/CampaignCanvas';
 import { locationDepths } from '@/components/canvas/canvas-lod';
+import { parseFootprint, parsePassageLinks, parseTokenPosition, footprintBounds, fractionToWorld, tokenArea, autoLayoutGrid, LOCATION_HEADER_ESTIMATE, TOKEN_CELL } from '@/lib/canvas-geometry';
 import { recomputeAugments } from '@/lib/character-actions';
 import { warmLocalLane } from '@/lib/local-warm';
 import { canEnterAdultCampaign } from '@/lib/permissions';
@@ -162,48 +163,94 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
     };
   });
 
-  // Transform items to CanvasNode format. Items without stored coords
-  // land in a tight grid INSIDE their room (near the room Location's
-  // anchor) instead of the global scatter — location folders are real
-  // AREAS (party-folder treatment) and their contents must sit in them.
+  // Relationship rows up front: items need their located_at edge (room,
+  // point inside it, container) before they become nodes.
+  const relationshipRows = await prisma.entityRelationship.findMany({
+    where: {
+      campaignId: campaign.id,
+      relationshipType: { in: ['owns', 'located_at'] },
+    },
+    orderBy: { createdAt: 'asc' }, // matches the possessions panel ordering
+    select: { id: true, sourceId: true, targetId: true, relationshipType: true, strength: true, data: true },
+  });
+
+  // The map (2026-10-16): things are TOKENS at a point inside their room.
+  //  - an item's located_at edge to a LOCATION is its room; `data.position`
+  //    (fractions of the room's footprint box) is where it stands;
+  //  - an item located_at another ITEM is INSIDE it — not drawn on the map,
+  //    reachable through the container token's contents;
+  //  - no stored point → a tidy grid inside the room's footprint (when the
+  //    room has one), else the token grid near the room anchor.
+  const itemIdSet = new Set(campaign.campaignItems.map(i => i.id));
+  const locFootprintById = new Map(locationNodes.map(n => [n.id, parseFootprint((n.locationData as { footprint?: unknown } | null)?.footprint)]));
+  const parentEdgeByChild = new Map<string, { id: string; targetId: string; data: string | null }>();
+  const containsCountByItem = new Map<string, number>();
+  for (const r of relationshipRows) {
+    if (r.relationshipType !== 'located_at') continue;
+    if (!parentEdgeByChild.has(r.sourceId)) parentEdgeByChild.set(r.sourceId, { id: r.id, targetId: r.targetId, data: r.data });
+    if (itemIdSet.has(r.targetId)) containsCountByItem.set(r.targetId, (containsCountByItem.get(r.targetId) ?? 0) + 1);
+  }
   const locPosById = new Map(locationNodes.map(n => [n.id, { x: n.x, y: n.y }]));
   const perRoomItemIndex = new Map<string, number>();
-  const itemNodes = campaign.campaignItems.map((item, index) => {
+  const itemNodes = campaign.campaignItems.flatMap((item, index) => {
     let itemData = null;
     try {
       itemData = JSON.parse(item.data);
     } catch { /* use null */ }
 
+    const edge = parentEdgeByChild.get(item.id);
+    if (edge && itemIdSet.has(edge.targetId)) return []; // inside a container: not on the map
+    const roomId = edge && locNameMap.has(edge.targetId) ? edge.targetId : (item.locationId && locNameMap.has(item.locationId) ? item.locationId : undefined);
+    const tokenEdgeId = edge && locNameMap.has(edge.targetId) ? edge.id : undefined;
+    let edgeData: { position?: unknown; positionAt?: unknown } = {};
+    try { edgeData = edge?.data ? JSON.parse(edge.data) : {}; } catch { /* ignore */ }
+    const tokenPos = tokenEdgeId ? parseTokenPosition(edgeData.position) : null;
+    const positionAt = typeof edgeData.positionAt === 'number' ? edgeData.positionAt : 0;
+    const footprint = roomId ? locFootprintById.get(roomId) ?? null : null;
+
     const storedX = typeof itemData?.x === 'number' ? itemData.x : null;
     const storedY = typeof itemData?.y === 'number' ? itemData.y : null;
+    const storedAt = typeof itemData?.placedAt === 'number' ? itemData.placedAt as number : 0;
 
-    let fallbackItemX = 600 + index * 280;
-    let fallbackItemY = 300 + index * 80;
-    if (storedX == null && item.locationId && locPosById.has(item.locationId)) {
-      const base = locPosById.get(item.locationId)!;
-      const idx = perRoomItemIndex.get(item.locationId) ?? 0;
-      perRoomItemIndex.set(item.locationId, idx + 1);
-      // Item cards are 300×160 (FolderGroup CARD_SIZES) — the grid must be
-      // wider than the card or every card is clipped by its neighbour
-      // (measured 2026-10-01 at 260×150).
-      fallbackItemX = base.x - 250 + (idx % 3) * 320;
-      fallbackItemY = base.y + 160 + Math.floor(idx / 3) * 180;
+    let x: number | null = null, y: number | null = null, placedAt: number | undefined;
+    if (footprint && tokenPos && positionAt >= storedAt) {
+      const p = fractionToWorld(tokenPos, footprintBounds(footprint.points));
+      x = p.x; y = p.y; placedAt = positionAt;
+    } else if (storedX != null && storedY != null) {
+      x = storedX; y = storedY; placedAt = storedAt || undefined;
+    } else if (roomId) {
+      const idx = perRoomItemIndex.get(roomId) ?? 0;
+      perRoomItemIndex.set(roomId, idx + 1);
+      if (footprint) {
+        const area = tokenArea(footprintBounds(footprint.points), LOCATION_HEADER_ESTIMATE);
+        const p = autoLayoutGrid(idx + 1, area)[idx];
+        x = p.x; y = p.y;
+      } else if (locPosById.has(roomId)) {
+        // No footprint yet: a token grid near the room anchor (4 across).
+        const base = locPosById.get(roomId)!;
+        x = base.x - 200 + (idx % 4) * TOKEN_CELL;
+        y = base.y + LOCATION_HEADER_ESTIMATE + 60 + Math.floor(idx / 4) * TOKEN_CELL;
+      }
     }
+    if (x == null || y == null) { x = 600 + index * 120; y = 300 + index * 40; }
 
-    return {
+    return [{
       id: item.id,
       type: 'item' as const,
       name: item.name,
-      x: storedX ?? fallbackItemX,
-      y: storedY ?? fallbackItemY,
-      ...(typeof itemData?.placedAt === 'number' ? { placedAt: itemData.placedAt as number } : {}),
+      x,
+      y,
+      ...(placedAt != null ? { placedAt } : {}),
       status: item.status,
       itemType: item.type,
       itemData: itemData,
       holderId: item.holderId || null,
       holderName: item.holderId ? charNameMap.get(item.holderId) : undefined,
       locationName: item.locationId ? locNameMap.get(item.locationId) : undefined,
-    };
+      ...(tokenEdgeId ? { tokenEdgeId } : {}),
+      ...(roomId ? { roomId } : {}),
+      ...(containsCountByItem.has(item.id) ? { containsCount: containsCountByItem.get(item.id) } : {}),
+    }];
   });
 
   const allNodes = [...characterNodes, ...locationNodes, ...itemNodes];
@@ -213,14 +260,6 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
   // dashed tether from owner to possession; located_at = subtle purple tether
   // from child to parent.
   const nodeIdSet = new Set(allNodes.map(n => n.id));
-  const relationshipRows = await prisma.entityRelationship.findMany({
-    where: {
-      campaignId: campaign.id,
-      relationshipType: { in: ['owns', 'located_at'] },
-    },
-    orderBy: { createdAt: 'asc' }, // matches the possessions panel ordering
-    select: { sourceId: true, targetId: true, relationshipType: true, strength: true },
-  });
   // Owns connections survive even when the target became an auto-folder
   // (parent Location removed from the canvas as a standalone node). The
   // client connection renderer looks up the matching folder by id when
@@ -337,6 +376,12 @@ export default async function CampaignCanvasPage({ params }: { params: Promise<{
             notes: typeof loc.data.notes === 'string' ? loc.data.notes : undefined,
             tags: Array.isArray(loc.data.tags) ? (loc.data.tags as unknown[]).filter((t): t is string => typeof t === 'string') : undefined,
             timescaleId: typeof loc.data.timescaleId === 'string' ? loc.data.timescaleId : undefined,
+            // The map (2026-10-16): shape + story; a passage's links.
+            ...((): { footprint?: NonNullable<ReturnType<typeof parseFootprint>>; connects?: ReturnType<typeof parsePassageLinks> } => {
+              const fp = parseFootprint(loc.data.footprint);
+              const connects = parsePassageLinks(loc.data.connects);
+              return { ...(fp ? { footprint: fp } : {}), ...(connects.length > 0 ? { connects } : {}) };
+            })(),
           }
         : undefined,
     };

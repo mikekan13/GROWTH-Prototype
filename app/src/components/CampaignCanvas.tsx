@@ -11,6 +11,7 @@ import { calculateCharacterTKV, calculateItemKV, calculateLocationKV, type HeldI
 import { recomputeAugments } from '@/lib/character-actions';
 import { BOARD_CHANGED_EVENT } from '@/components/terminal/PlanningChips';
 import type { CanvasFolder } from '@/types/canvas';
+import { defaultFootprintFromRect, fitPolygonToRect, footprintBounds } from '@/lib/canvas-geometry';
 import { useCampaignStream } from '@/hooks/useCampaignStream';
 import CampaignHeader from '@/components/canvas/CampaignHeader';
 import { JewlStatusButton } from '@/components/jewl/JewlWorkPopup';
@@ -55,6 +56,10 @@ interface CanvasNode {
   holderId?: string | null;
   holderName?: string;
   locationName?: string;
+  /** The map (2026-10-16): the item's located_at edge to its room, the room, and how many things it holds. */
+  tokenEdgeId?: string;
+  roomId?: string;
+  containsCount?: number;
 }
 
 interface Connection {
@@ -1787,6 +1792,47 @@ export default function CampaignCanvas({ campaign, nodes: initialNodes, connecti
                 }
                 requestRefresh();
               } catch { /* drop persist failed — next refresh shows truth */ }
+            }}
+            onTokenMoved={async ({ itemId, edgeId, roomId, position, roomRect, footprint }) => {
+              // The map (2026-10-16): a token's point is a fraction of its
+              // room's footprint box. The box must be the rect the GM sees, so
+              // a room with no footprint gets the DEFAULT one (its rectangle)
+              // and a room whose box drifted (dragged/resized locally) has its
+              // shape re-fitted — then the fraction means the same thing on
+              // every screen and after every refresh.
+              if (!isGM) return;
+              try {
+                const bbox = footprint ? footprintBounds(footprint.points) : null;
+                const drifted = !bbox || Math.abs(bbox.x - roomRect.x) > 1 || Math.abs(bbox.y - roomRect.y) > 1
+                  || Math.abs(bbox.width - roomRect.width) > 1 || Math.abs(bbox.height - roomRect.height) > 1;
+                if (drifted) {
+                  const next = footprint
+                    ? { ...footprint, points: fitPolygonToRect(footprint.points, roomRect) }
+                    : defaultFootprintFromRect(roomRect);
+                  await fetch(`/api/campaigns/${campaign.id}/locations/${roomId}/footprint`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ footprint: next }),
+                  });
+                }
+                let edge = edgeId;
+                if (!edge) {
+                  // The drop changed rooms: the new edge was just written — look it up.
+                  const res = await fetch(`/api/entities/${roomId}/contents`, { cache: 'no-store' });
+                  if (res.ok) {
+                    const j = await res.json() as { contents?: Array<{ id: string; childId: string }> };
+                    edge = j.contents?.find(c => c.childId === itemId)?.id;
+                  }
+                }
+                if (edge) {
+                  await fetch(`/api/entities/${roomId}/contents/${edge}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position }),
+                  });
+                }
+                requestRefresh();
+              } catch { /* position persist failed — the local drag still shows; next refresh shows truth */ }
             }}
             isGM={isGM}
             contestedAttackerId={contestedState?.phase === 'selecting_defender' ? contestedState.attackerId : undefined}

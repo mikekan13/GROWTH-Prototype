@@ -7,6 +7,7 @@ import { lodForZoom, folderLabelSize, depthHeaderFill, depthBodyFill, depthPrefi
 import { ComplexTooltip } from '@/components/ui/ComplexTooltip';
 import { locationTitleTooltip, countTooltip, characterChipTooltip, detailsTooltip, memberNames, subLocationNames } from './folder-tooltips';
 import type { GrowthCharacter } from '@/types/growth';
+import { TOKEN_DIAMETER, isRectangular, fitPolygonToRect, polygonPointsAttr, footprintSizeLabel, levelLabel } from '@/lib/canvas-geometry';
 
 interface NodePosition {
   x: number;
@@ -27,7 +28,8 @@ interface NodeDimensions {
 const CARD_SIZES: Record<string, { compact: NodeDimensions; expanded: NodeDimensions }> = {
   character: { compact: { width: 520, topH: 120, bottomH: 120 }, expanded: { width: 1920, topH: 250, bottomH: 480 } },
   location:  { compact: { width: 340, topH: 90, bottomH: 90 },   expanded: { width: 500, topH: 350, bottomH: 350 } },
-  item:      { compact: { width: 300, topH: 80, bottomH: 80 },   expanded: { width: 440, topH: 300, bottomH: 300 } },
+  // Things are TOKENS on the map (2026-10-16), never expanded cards.
+  item:      { compact: { width: TOKEN_DIAMETER, topH: TOKEN_DIAMETER / 2, bottomH: TOKEN_DIAMETER / 2 }, expanded: { width: TOKEN_DIAMETER, topH: TOKEN_DIAMETER / 2, bottomH: TOKEN_DIAMETER / 2 } },
   npc:       { compact: { width: 80, topH: 40, bottomH: 40 },    expanded: { width: 80, topH: 40, bottomH: 40 } },
   quest:     { compact: { width: 80, topH: 40, bottomH: 40 },    expanded: { width: 80, topH: 40, bottomH: 40 } },
 };
@@ -474,6 +476,18 @@ export function FolderGroupRect({
   // In collapsed mode, only show header bar (no body, no resize handles)
   const displayHeight = collapsed ? HEADER_HEIGHT : bounds.height;
 
+  // The map (2026-10-16): a place's FOOTPRINT is drawn as the folder's outline.
+  // The drawn rect is the footprint's bounding box; a shaped polygon is fitted
+  // into it so drags/resizes (bounding-box gestures) keep the shape. A
+  // rectangular or absent footprint is exactly today's rect.
+  const footprint = li?.footprint;
+  const shapedPoints = footprint && !isRectangular(footprint.points)
+    ? fitPolygonToRect(footprint.points, { x: bounds.x, y: bounds.y, width: bounds.width, height: displayHeight })
+    : null;
+  const mapCaption = footprint
+    ? `${levelLabel(footprint.level)} · ${footprintSizeLabel(footprint)}${li?.connects && li.connects.length > 0 ? ` · ⇅ ${li.connects.map(c => levelLabel(c.level)).join(' ')}` : ''}`
+    : li?.connects && li.connects.length > 0 ? `⇅ ${li.connects.map(c => levelLabel(c.level)).join(' ')}` : null;
+
   // Drag handler for header
   const handleHeaderDrag = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -487,8 +501,20 @@ export function FolderGroupRect({
 
   return (
     <g>
-      {/* Background rect — hidden when collapsed, pointerEvents none so cards on top receive clicks */}
-      {!collapsed && (
+      {/* Background — the footprint polygon when the place has a shape, else the rect.
+          Hidden when collapsed, pointerEvents none so cards on top receive clicks */}
+      {!collapsed && shapedPoints && (
+        <polygon
+          points={polygonPointsAttr(shapedPoints)}
+          fill={isDropTarget ? '#22ab9440' : bodyFill}
+          stroke={isDropTarget ? '#22ab94cc' : '#22ab9477'}
+          strokeWidth={isDropTarget ? 4 : 3}
+          strokeLinejoin="round"
+          data-footprint-polygon={li?.locationId || undefined}
+          style={{ pointerEvents: 'none', ...(isDropTarget ? { filter: 'drop-shadow(0 0 16px rgba(34,171,148,0.6))' } : undefined) }}
+        />
+      )}
+      {!collapsed && !shapedPoints && (
         <rect
           x={bounds.x}
           y={bounds.y}
@@ -547,6 +573,21 @@ export function FolderGroupRect({
             ⤵ dROP iNTO <span style={{ color: 'var(--terminal-prime, #22ab94)' }}>{folder.name}</span>
           </div>
         </foreignObject>
+      )}
+      {/* Map caption (2026-10-16): story · size in feet · passage links. Near only. */}
+      {!collapsed && mapCaption && lod === 'near' && (
+        <text
+          x={bounds.x + 14}
+          y={bounds.y + displayHeight - 12}
+          fontSize={18}
+          fill="var(--krma-gold, #ffcc78)"
+          opacity={0.8}
+          fontFamily="var(--font-terminal), Consolas, monospace"
+          data-map-caption={li?.locationId || undefined}
+          style={{ pointerEvents: 'none' }}
+        >
+          {mapCaption}
+        </text>
       )}
       {/* Bottom corners square off where header meets body */}
       {!collapsed && (

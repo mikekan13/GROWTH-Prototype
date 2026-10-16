@@ -8,7 +8,10 @@
  */
 import type { CanvasFolder } from '@/types/canvas';
 import type { GrowthCharacter, GrowthAttribute } from '@/types/growth';
+import type { GrowthWorldItem } from '@/types/item';
+import { formatDamage, getConditionLabel, getRarityLabel } from '@/types/item';
 import type { TooltipModifier } from '@/components/ui/ComplexTooltip';
+import { footprintSizeLabel, levelLabel, type Footprint, type PassageLink } from '@/lib/canvas-geometry';
 
 type LocationInfo = NonNullable<CanvasFolder['locationInfo']>;
 
@@ -95,6 +98,13 @@ export function locationTitleTooltip(
   if (li.population) m.push(info(`Population: ${li.population}`));
   if (li.controlledBy) m.push(info(`Controlled by: ${li.controlledBy}`));
   if (li.tags && li.tags.length > 0) m.push(info(`Tags: ${li.tags.join(', ')}`));
+  // The map (2026-10-16): shape, story, ceiling; a passage lists what it links.
+  if (li.footprint) m.push(info(`Footprint: ${footprintLine(li.footprint)}`, {
+    name: 'Footprint',
+    type: 'top-down map',
+    description: `${li.footprint.points.length} corners · 1 unit = ${li.footprint.scale} ft · level ${levelLabel(li.footprint.level)}${li.footprint.height ? ` · ${li.footprint.height} ft ceiling` : ''}`,
+  }));
+  if (li.connects && li.connects.length > 0) m.push(info(`Passage: links ${passageLine(li.connects)}`));
 
   const cc = li.contentCounts ?? {};
   const subCount = cc.locations ?? subNames?.length ?? 0;
@@ -207,6 +217,96 @@ export function characterChipTooltip(c: TooltipCharacter): TooltipModel {
     modifiers: m,
     totalLabel: 'TKV:',
     totalText: d?.tkv != null ? d.tkv.toLocaleString() : '—',
+  };
+}
+
+function footprintLine(fp: Footprint): string {
+  return `${footprintSizeLabel(fp)} · ${levelLabel(fp.level)}${fp.height ? ` · ${fp.height} ft` : ''}`;
+}
+function passageLine(links: PassageLink[]): string {
+  return links.map(l => levelLabel(l.level)).join(' ⇅ ');
+}
+
+export interface TooltipItem {
+  id: string;
+  name: string;
+  type: string;
+  data: GrowthWorldItem | null;
+  holderName?: string;
+  locationName?: string;
+  /** Things inside this thing (a bookcase, a box). */
+  containsCount?: number;
+}
+
+/**
+ * A thing's token (Mike 2026-10-16: "things should just be tokens for now…
+ * all that info could be done using our complex dynamic tooltips"). Everything
+ * the WorldItemCard showed, as rows with inception layers.
+ */
+export function itemTokenTooltip(it: TooltipItem): TooltipModel {
+  const d = it.data ?? ({} as GrowthWorldItem);
+  const m: TooltipModifier[] = [];
+  const typeLabel = titleCase(it.type || 'misc');
+  m.push(info(`Type: ${typeLabel}${d.rarity != null ? ` · ${getRarityLabel(d.rarity)}` : ''}${d.quality != null ? ` · Q${d.quality}` : ''}`));
+  if (d.condition != null) m.push(info(`Condition: ${getConditionLabel(d.condition)}`));
+  const material = d.primaryMaterial || d.material;
+  const props = d.properties ?? d.weaponProperties ?? d.materialModifiers ?? [];
+  if (material || props.length > 0) {
+    m.push(info(`Material: ${material ?? '—'}${d.baseResist != null ? ` · R${d.baseResist}` : d.resistance != null ? ` · R${d.resistance}` : ''}`, {
+      name: material ?? 'Materials',
+      type: d.materialClass ? `${d.materialClass} material` : 'material',
+      description: [
+        d.subordinateMaterials && d.subordinateMaterials.length > 0 ? `With ${d.subordinateMaterials.join(', ')}` : null,
+        props.length > 0 ? `Properties: ${props.join(', ')}` : null,
+      ].filter(Boolean).join('\n') || undefined,
+    }));
+  }
+  if (d.weightLbs != null) m.push(info(`Weight: ${d.weightLbs} lbs`));
+  else if (d.weightLevel != null) m.push(info(`Weight level: ${d.weightLevel}`));
+  if (d.damage && Object.values(d.damage).some(v => v > 0)) {
+    m.push(info(`Damage: ${formatDamage(d.damage)}`, {
+      name: 'Damage · P:S:H/D\\C:B:E',
+      type: it.type === 'weapon' ? 'weapon' : 'item',
+      stats: {
+        Piercing: d.damage.piercing, Slashing: d.damage.slashing, Heat: d.damage.heat, Decay: d.damage.decay,
+        Cold: d.damage.cold, Bashing: d.damage.bashing, Energy: d.damage.energy,
+        ...(d.range ? { Range: d.range } : {}),
+        ...(d.targetAttribute ? { Target: d.targetAttribute } : {}),
+      },
+    }));
+  }
+  if (d.armorCategory || d.armorLayer) m.push(info(`Armor: ${d.armorCategory ?? titleCase(d.armorLayer ?? '')}`));
+  if (d.primaMateria) {
+    m.push(info(`Prima Materia · ${d.primaMateria.school} L${d.primaMateria.level}`, {
+      name: 'Prima Materia', type: d.primaMateria.school,
+      stats: { Level: d.primaMateria.level, State: d.primaMateria.stable ? 'Stable' : 'Unstable', ...(d.primaMateria.charges != null ? { Charges: d.primaMateria.charges } : {}) },
+    }));
+  }
+  if (d.itemAbilities && d.itemAbilities.length > 0) {
+    m.push(info(`Abilities: ${d.itemAbilities.length}`, {
+      name: 'Abilities', type: 'item abilities',
+      description: d.itemAbilities.map(a => `• ${a.name}${a.description ? ` — ${a.description}` : ''}`).join('\n'),
+    }));
+  }
+  if (it.containsCount && it.containsCount > 0) {
+    m.push(info(`Contains: ${it.containsCount} thing${it.containsCount === 1 ? '' : 's'}`, {
+      name: 'Inside', type: 'container', description: 'Tap the token to open its contents.',
+    }));
+  }
+  if (it.holderName) m.push(info(`Held by: ${it.holderName}`));
+  else if (it.locationName) m.push(info(`At: ${it.locationName}`));
+  if (d.description) {
+    const short = d.description.length > 90 ? `${d.description.slice(0, 89)}…` : d.description;
+    m.push(info(short, { name: it.name, type: 'description', description: d.description }));
+  }
+  if (d.notes) m.push(info('GM Notes', { name: 'GM Notes', type: 'Watcher-only', description: d.notes }));
+  if (m.length === 0) m.push(info('No details recorded yet.'));
+  return {
+    title: it.name,
+    modifiers: m,
+    totalLabel: 'Value:',
+    totalText: d.value != null ? `${d.value} KV` : undefined,
+    hideTotal: d.value == null,
   };
 }
 

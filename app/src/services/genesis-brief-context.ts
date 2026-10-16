@@ -141,7 +141,13 @@ export async function buildWorldBrief(characterId: string): Promise<string | nul
       map = [`▣ ${home.name}`, ...renderTree(await contentsTree(home.id), 1)];
     } catch { map = []; }
   }
-  return renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people });
+  const brief = renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, map, look: w.look, items: w.items, places: w.places, people: w.people });
+  // Her novels are worlds (Mike 2026-10-16): the doorway items on her shelf each point at a campaign.
+  try {
+    const { novelWorldsBriefLine } = await import('./novel-worlds');
+    const novels = await novelWorldsBriefLine(characterId);
+    return novels ? `${brief}\n${novels}` : brief;
+  } catch { return brief; }
 }
 
 export async function buildMemoriesBrief(characterId: string): Promise<string | null> {

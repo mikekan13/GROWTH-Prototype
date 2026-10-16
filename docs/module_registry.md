@@ -663,3 +663,24 @@ Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Unit 
 | `services/genesis-brief-context.ts` | `buildWorldBrief`, `buildMemoriesBrief`, pure `lookLines`, `renderWorldBrief`, `renderMemoriesBrief` | The WORLD cycle's brief (life budget line, her approved look, places, things with archetype KV, people — "never grant twice") and the MEMORIES brief (every built thing with its `source` key `genesis:item|mark|place|person:<id>` and ✓/○). Rendered via `CompletionContext.stageBrief`. |
 | `scripts/genesis-progress.ts` | — | Terminal watch of a walk: session status/stage/notes + evidence counts. |
 | `ai/copilot/tools/daya-seed-memory.ts` (+) | `source` on each memory | The MEMORIES stage ticks items off by source key. |
+
+## PORTRAIT stage — dress + paint (Mike 2026-10-16)
+
+| Module | Exports | Purpose |
+|---|---|---|
+| `services/dress.ts` | `listWardrobe`, `setDressState`, `proposeOutfit`, `applyOutfit`, pure `isGarment`, `guessRegion`, `draftOutfit`, `parseOutfitAnswer`, `renderWardrobe` | DRESS step: her own garments and carried things (held or deeded) — equip by body region, carry, or JEWL proposes an outfit FROM HER THINGS ONLY (nothing invented at dress time; empty wardrobe → back to WORLD). Player/GM approves. |
+| `GET/POST /api/characters/[id]/dress`, `POST …/dress/propose`, `POST …/dress/apply` | — | Thin routes over dress.ts. |
+| `services/portrait-brief.ts` | `buildPortraitBrief` (stored when the input hash matches), `gatherPortraitInputs`, `readPortraitRefs`, `askJewlForBrief`, pure `draftBrief`, `composePrompt`, `clothesLine`, `outermostPerRegion`, `markSentence(s)`, `lightLine`, `settingLine`, `poseLine`, `expressionLine`, `briefInputHash` | The PORTRAIT BRIEF from setting, persona, affect, EQUIPPED clothes, marks and light facts; JEWL writes it in one text call (local lane, fiction), deterministic draft as fallback; stored at identity.portraitBrief. |
+| `POST /api/portraits/paint` | — | brief → `Qwen21Provider.renderPortrait` (approved face = image1, body = image2, v1 recipe, 4:5). |
+| `ai/portraits/providers/qwen21.ts` (+) | `renderPortrait`, `buildQwen21PortraitPrompt` | The base-portrait render; reusable for the LIVE portrait (brief in, image out). |
+| `components/character/designer/Dress.tsx` (+ Preview/EditStack/AppearanceDesigner/api.ts) | `DressSection`, `BriefReadout` | PORTRAIT tab: 1 · DRESS → 2 · PAINT → APPROVE (Character.portrait = the canvas image); portrait stack in identity.designer.portraitLayers. |
+| `scripts/lab-paint-portrait.ts` | — | Dry run by default (inputs, brief, prompt, refs); `--jewl` lets JEWL write the brief; `--run` paints (BILLABLE). |
+
+## Canvas map unit — footprints, levels, tokens (Mike 2026-10-16)
+
+| Module | Exports | Purpose |
+|---|---|---|
+| `lib/canvas-geometry.ts` | `parseFootprint`, `defaultFootprintFromRect`, `footprintBounds`, `isRectangular`, `fitPolygonToRect`, `pointInPolygon`, `polygonPointsAttr`, `footprintSizeLabel`, `levelLabel`, `parseTokenPosition`, `fractionToWorld`, `worldToFraction`, `tokenArea`, `autoLayoutGrid`, `tokenMark`, `tokenRingColor`, `levelsPresent`, `visibleOnLevel`, `parsePassageLinks` | Pure geometry: every Location has a footprint (polygon + scale + level), default from its folder rect; items are tokens at a fraction of their room. |
+| `services/placement-geometry.ts` | `setLocationGeometry`, `setTokenPosition` | Writes Location.data.footprint / level and the located_at edge's data.position. |
+| `PATCH /api/campaigns/[id]/locations/[locationId]/footprint`, `PATCH /api/entities/[id]/contents/[edgeId]` | — | Thin routes over placement-geometry. |
+| `components/canvas/ItemToken.tsx`, `LevelSwitcher.tsx` (+ RelationsCanvas, FolderGroup, folder-tooltips) | — | Items render as tokens inside rooms (card content in the dynamic tooltip); one level shown at a time. |

@@ -16,7 +16,11 @@ export type LocationType =
   /** Cosmic-landmark — the seeded type for Tree of Life / River Styx etc. */
   | 'cosmic_landmark'
   /** A force/army/collective — Undead Army etc. */
-  | 'force';
+  | 'force'
+  /** Stairs / fire escape / elevator — a place that links two levels
+   *  (`data.connects`). Not yet creatable through services/location's
+   *  schema; a passage is recognised by `data.connects` too (2026-10-16). */
+  | 'passage';
 
 export interface GrowthLocation {
   description: string;
@@ -72,6 +76,14 @@ export interface GrowthLocation {
    */
   canvasX?: number;
   canvasY?: number;
+  /**
+   * The place's shape on the top-down map (2026-10-16): polygon in canvas
+   * units + feet per unit + story index (+ ceiling height). Absent = the
+   * folder rectangle. See lib/canvas-geometry.ts.
+   */
+  footprint?: { points: { x: number; y: number }[]; scale: number; level: number; height?: number };
+  /** A passage's links: which Locations / levels these stairs reach. */
+  connects?: { locationId: string; level: number }[];
 }
 
 export interface LocationConnection {
@@ -98,6 +110,7 @@ export const LOCATION_TYPE_ICONS: Record<LocationType, string> = {
   meta: '\u{1F310}',           // globe with meridians — meta-tier
   cosmic_landmark: '\u{2734}', // eight-pointed star
   force: '\u{2694}️',     // crossed swords
+  passage: '\u{21C5}',         // ⇅ — stairs / fire escape / elevator between levels
 };
 
 export const LOCATION_TYPE_COLORS: Record<LocationType, string> = {
@@ -110,4 +123,5 @@ export const LOCATION_TYPE_COLORS: Record<LocationType, string> = {
   meta: '#ffffff',             // White — Terminal / out-of-world
   cosmic_landmark: '#ffcc78',  // KRMA gold
   force: '#E8585A',            // Body red — armies/forces
+  passage: '#ffcc78',          // KRMA gold — the map's level links
 };

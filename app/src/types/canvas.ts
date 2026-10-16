@@ -2,6 +2,8 @@
  * Canvas Folder — groups cards on the Relations Canvas.
  * Persisted to localStorage per campaign.
  */
+import type { Footprint, PassageLink } from '@/lib/canvas-geometry';
+
 export interface CanvasFolder {
   id: string;
   name: string;
@@ -62,5 +64,10 @@ export interface CanvasFolder {
     /** Per-Location timescale override (slow-time realms etc.). Absent =
      *  inherit up the located_at chain to the campaign default. */
     timescaleId?: string;
+    /** The place's shape on the map (2026-10-16): polygon + feet/unit +
+     *  story. Absent = the folder rectangle (default footprint). */
+    footprint?: Footprint;
+    /** A passage (stairs, fire escape, elevator): the levels it links. */
+    connects?: PassageLink[];
   };
 }

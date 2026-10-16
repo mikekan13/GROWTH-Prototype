@@ -23,8 +23,10 @@ import PossessionsCard from "./PossessionsCard";
 // same as the retired die menu. Excise in a dedicated cleanup PR.
 import LocationCard from "./LocationCard";
 import type { LocationNodeData } from "./LocationCard";
-import WorldItemCard from "./WorldItemCard";
-import type { WorldItemNodeData } from "./WorldItemCard";
+// Things are TOKENS on the map (2026-10-16); WorldItemCard stays for drawers/inspectors.
+import ItemToken from "./ItemToken";
+import LevelSwitcher from "./LevelSwitcher";
+import { TOKEN_DIAMETER, levelsPresent, visibleOnLevel, worldToFraction, type LeveledPlace, type Footprint, type TokenPosition, type Rect as GeoRect } from "@/lib/canvas-geometry";
 import type { GrowthLocation } from "@/types/location";
 import type { GrowthWorldItem } from "@/types/item";
 import type { CanvasFolder } from "@/types/canvas";
@@ -65,6 +67,23 @@ interface CanvasNode {
   holderId?: string | null;
   holderName?: string;
   locationName?: string;
+  /** The map (2026-10-16): the item's located_at edge to its ROOM (a Location), the room id, and how many things it holds. */
+  tokenEdgeId?: string;
+  roomId?: string;
+  containsCount?: number;
+}
+
+/** A token was dropped inside a room: persist its point (fraction of the room box) — and the room's footprint box when it has moved. */
+export interface TokenMove {
+  itemId: string;
+  /** The edge to the room when the drop did not change rooms; else undefined (the parent resolves it after the room write). */
+  edgeId?: string;
+  roomId: string;
+  position: TokenPosition;
+  /** The room's drawn rect at drop time (world units). */
+  roomRect: GeoRect;
+  /** The room's stored footprint, if any. */
+  footprint: Footprint | null;
 }
 
 interface CanvasConnection {
@@ -147,6 +166,8 @@ interface RelationsCanvasProps {
   /** A card was dropped into (locationId) or out of (null) a location
    *  folder — the parent persists it server-side (located_at edges). */
   onDropIntoLocation?: (nodeId: string, nodeType: 'character' | 'item', locationId: string | null) => void;
+  /** A token came to rest inside a room — the parent writes the edge's position (+ footprint box). Chained after the drop write for that item. */
+  onTokenMoved?: (move: TokenMove) => void | Promise<void>;
   onSkillCheck?: (characterId: string, skillName: string | undefined, attributeName: string | undefined, dr: number, revealDR: boolean) => void;
   onContestedCheck?: (characterId: string, characterName: string, skillName: string, governors: string[], revealDR: boolean) => void;
   /** When set, canvas is in contested check mode â€” waiting for defender click */
@@ -200,6 +221,7 @@ export default function RelationsCanvas({
   onRestComplete,
   onLocationReparented,
   onDropIntoLocation,
+  onTokenMoved,
   onSkillCheck,
   onContestedCheck,
   contestedAttackerId,
@@ -469,6 +491,49 @@ export default function RelationsCanvas({
     }
     return rects;
   }, [folders, nodes, nodePositions, dragOffsets, expandedNodes, zoom]);
+
+  // ── Levels (the map, 2026-10-16): one story at a time ──
+  // A place's level = its footprint's; without one it inherits the nearest
+  // ancestor's, else ground. Passages show on every level they link. The
+  // filter is RENDER-ONLY: settle, rects and membership still see every place.
+  const [activeLevel, setActiveLevel] = useState<number | null>(null);
+  const leveledPlaces = useMemo<LeveledPlace[]>(() => {
+    const autos = folders.filter(f => f.id.startsWith('auto-') && f.locationInfo);
+    const parentOf = new Map<string, string>();
+    for (const f of autos) for (const id of f.nodeIds) if (autos.some(a => a.locationInfo!.locationId === id)) parentOf.set(id, f.locationInfo!.locationId);
+    const own = new Map(autos.map(f => [f.locationInfo!.locationId, f.locationInfo!.footprint?.level]));
+    const levelOf = (id: string): number => {
+      let cur: string | undefined = id;
+      for (let i = 0; cur && i < 12; i++) {
+        const l = own.get(cur);
+        if (l != null) return l;
+        cur = parentOf.get(cur);
+      }
+      return 0;
+    };
+    return autos.map(f => ({
+      id: f.id,
+      level: levelOf(f.locationInfo!.locationId),
+      connects: f.locationInfo!.connects?.map(c => c.level),
+    }));
+  }, [folders]);
+  const levels = useMemo(() => levelsPresent(leveledPlaces), [leveledPlaces]);
+  const hiddenFolderIds = useMemo(() => {
+    const s = new Set<string>();
+    if (activeLevel === null) return s;
+    for (const p of leveledPlaces) if (!visibleOnLevel(p, activeLevel)) s.add(p.id);
+    return s;
+  }, [leveledPlaces, activeLevel]);
+  const hiddenNodeIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const f of folders) if (hiddenFolderIds.has(f.id)) for (const id of f.nodeIds) s.add(id);
+    return s;
+  }, [folders, hiddenFolderIds]);
+  const visibleFolders = useMemo(() => hiddenFolderIds.size === 0 ? folders : folders.filter(f => !hiddenFolderIds.has(f.id)), [folders, hiddenFolderIds]);
+  useEffect(() => {
+    // A level that no longer exists (places re-levelled) falls back to ALL.
+    if (activeLevel !== null && !levels.includes(activeLevel)) setActiveLevel(null);
+  }, [levels, activeLevel]);
 
   // Committed-geometry variant (no live drag offsets) — the live physics
   // (reflow/bumping) MUST measure against committed state or the
@@ -4265,10 +4330,10 @@ export default function RelationsCanvas({
         {/* Creation Toolbox moved to HTML overlay (always visible in viewport) */}
 
         {/* â”€â”€ Connections (behind nodes) â”€â”€ */}
-        {connections.map((c) => renderConnection(c))}
+        {connections.filter(c => !hiddenNodeIds.has(c.from) && !hiddenNodeIds.has(c.to)).map((c) => renderConnection(c))}
 
         {/* â”€â”€ Folder backgrounds (behind cards) â”€â”€ */}
-        {folders.map(folder => {
+        {visibleFolders.map(folder => {
           const nodeTypes = new Map(nodes.map(n => [n.id, n.type]));
           const folderChars = nodes
             .filter(n => folder.nodeIds.includes(n.id) && n.type === 'character' && n.characterData)
@@ -4407,7 +4472,7 @@ export default function RelationsCanvas({
         {/* â”€â”€ Character nodes (foreignObject cards) â€” sorted by z-index â”€â”€ */}
         {/* Hide nodes inside collapsed folders */}
         {nodes
-          .filter((n) => n.type === "character")
+          .filter((n) => n.type === "character" && !hiddenNodeIds.has(n.id))
           .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
@@ -4533,17 +4598,16 @@ export default function RelationsCanvas({
             );
           })}
 
-        {/* â”€â”€ Item nodes (foreignObject cards) â€” only unassigned items, sorted by z-index â”€â”€ */}
+        {/* â”€â”€ Item nodes â€” TOKENS on the map (2026-10-16); only unassigned items, sorted by z-index â”€â”€ */}
         {nodes
-          .filter((n) => n.type === "item" && n.itemData && !n.holderId)
+          .filter((n) => n.type === "item" && n.itemData && !n.holderId && !hiddenNodeIds.has(n.id))
           .filter((n) => !folders.some(f => f.collapsed && f.nodeIds.includes(n.id)))
           .sort((a, b) => (nodeZIndices.get(a.id) || 0) - (nodeZIndices.get(b.id) || 0))
           .map((node) => {
             const position = getNodePosition(node.id, node.x, node.y);
-            const isNodeExpanded = expandedNodes.has(node.id);
             const isDraggingNode = dragOffsets.has(node.id);
-            const cardWidth = isNodeExpanded ? 420 : 280;
-            const cardHeight = isNodeExpanded ? 600 : 160;
+            const cardWidth = TOKEN_DIAMETER;
+            const cardHeight = TOKEN_DIAMETER;
 
             // Margin scales with viewport so culling works at all zoom levels
             const cullMarginX = viewBox.width * 0.5 + cardWidth;
@@ -4566,18 +4630,9 @@ export default function RelationsCanvas({
             const itemShowGlow = itemHasCrossed || isShimmering;
             const itemGlowPulse = 0.4 + Math.sin(animationTime * 3) * 0.25;
 
-            // Zoomed out: an item is a gold dot (far) or a name chip (mid) — the room keeps its texture without the noise.
+            // Zoomed far out: a token is a gold dot — the room keeps its texture without the noise.
             if (lod === 'far') {
               return <circle key={`item-dot-${node.id}`} cx={visualX} cy={visualY} r={14} fill="var(--krma-gold)" opacity={0.55} style={{ pointerEvents: 'none' }} />;
-            }
-            if (lod === 'mid') {
-              const label = node.name.length > 14 ? node.name.slice(0, 13) + '…' : node.name;
-              return (
-                <g key={`item-chip-${node.id}`} style={{ pointerEvents: 'none' }}>
-                  <rect x={visualX - 110} y={visualY - 26} width={220} height={52} rx={10} fill="#0d0d1a" stroke="rgba(255,204,120,0.55)" strokeWidth={3} />
-                  <text x={visualX} y={visualY + 9} textAnchor="middle" fontSize={26} fill="#CBD9E8" fontFamily="var(--font-terminal), Consolas, monospace">{label}</text>
-                </g>
-              );
             }
             return (
               <g key={`item-group-${node.id}`}>
@@ -4604,21 +4659,21 @@ export default function RelationsCanvas({
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{ padding: `${viewBox.height}px ${viewBox.width}px`, pointerEvents: "none" }}>
-                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto", transform: isDraggingNode ? 'scale(1.05)' : 'scale(1)', transformOrigin: 'center center', transition: isDraggingNode ? 'none' : 'transform 0.15s ease-out' }}>
-                  <WorldItemCard
+                <div data-card-wrapper data-node-id={node.id} style={{ pointerEvents: "auto" }}>
+                  <ItemToken
                     node={{
                       id: node.id,
                       name: node.name,
-                      type: (node.itemType || 'misc') as WorldItemNodeData['type'],
+                      type: node.itemType || 'misc',
                       status: node.status || 'ACTIVE',
-                      data: node.itemData!,
+                      data: node.itemData ?? null,
                       holderName: node.holderName,
                       locationName: node.locationName,
+                      containsCount: node.containsCount,
                       x: visualX,
                       y: visualY,
                     }}
-                    isExpanded={isNodeExpanded}
-                    onToggleExpand={toggleExpand}
+                    isDraggingNode={isDraggingNode}
                     onDelete={onDeleteItem}
                     onPositionChange={(nodeId, x, y) => {
                       beginTx('move'); // undo (2026-10-06)
@@ -4671,8 +4726,28 @@ export default function RelationsCanvas({
                         // out" action, never a drag side-effect (Mike 2026-08-03).
                         const itemAutoHit = pickAutoDropTarget(x, y);
                         const itemCurParent = membershipOf(nodeId);
-                        if (itemAutoHit && itemAutoHit !== itemCurParent) {
+                        const roomChanged = !!itemAutoHit && itemAutoHit !== itemCurParent;
+                        if (roomChanged) {
                           dropIntoLocation(nodeId, 'item', itemAutoHit);
+                        }
+                        // The map (2026-10-16): the token's point inside its room,
+                        // as a fraction of the room's drawn box, persists on the
+                        // located_at edge — chained after the drop write so a
+                        // room change never races its own position.
+                        const roomId = itemAutoHit ?? itemCurParent;
+                        const roomRect = roomId ? folderRectById.get(roomId) : undefined;
+                        if (roomId && roomRect && onTokenMoved) {
+                          const roomFolder = foldersRef.current.find(f => f.id === `auto-${roomId}`);
+                          const move: TokenMove = {
+                            itemId: nodeId,
+                            edgeId: !roomChanged && node.roomId === roomId ? node.tokenEdgeId : undefined,
+                            roomId,
+                            position: worldToFraction({ x, y }, roomRect),
+                            roomRect: { ...roomRect },
+                            footprint: roomFolder?.locationInfo?.footprint ?? null,
+                          };
+                          const prev = dropChainRef.current.get(nodeId) ?? Promise.resolve();
+                          dropChainRef.current.set(nodeId, prev.then(() => onTokenMoved(move)).catch(() => {}));
                         }
                       }
                       setDraggingItemId(null);
@@ -4843,6 +4918,11 @@ export default function RelationsCanvas({
           />
         )}
       </svg>
+
+      {/* The map's level switcher (2026-10-16): one story at a time. */}
+      {levels.length > 0 && (
+        <LevelSwitcher levels={levels} active={activeLevel} onChange={setActiveLevel} />
+      )}
 
       {/* Carry mode (touch): what you hold rides along; the world moves under it. */}
       {carried && (
@@ -5056,7 +5136,7 @@ export default function RelationsCanvas({
       />
 
       {/* â”€â”€ Folder header overlays â”€â”€ */}
-      {folders.map(folder => {
+      {visibleFolders.map(folder => {
         const folderChars = nodes
           .filter(n => folder.nodeIds.includes(n.id) && n.type === 'character' && n.characterData)
           .map(n => ({
