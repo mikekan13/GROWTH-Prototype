@@ -642,7 +642,10 @@ export async function dispatchPrompt(prompt: JewlPrompt): Promise<JewlResponse> 
       }
     : callClaudeWithTools;
 
-  for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+  // A cycle may be capped below the default (genesis coax passes, 2026-10-16:
+  // one pass per cycle, then a check-in with the table).
+  const maxToolIterations = Math.max(1, Math.min(MAX_TOOL_ITERATIONS, prompt.maxToolIterations ?? MAX_TOOL_ITERATIONS));
+  for (let iter = 0; iter < maxToolIterations; iter++) {
     // The wall's last check before every cloud round: nothing table/real in
     // the system prompt, the history or any tool result (throws, never sends).
     if (toCloud) assertNoTableContent([fullSystemPrompt, ...messageTexts(messages)], 'jewl-dispatch');

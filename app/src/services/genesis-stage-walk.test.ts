@@ -34,7 +34,7 @@ import { planWorkCycle, COMPLETION_STAGE_TOOLS } from '@/ai/copilot/work-cycle-t
 
 const GOAL = 'Character genesis: Violet [v] — gestate the person';
 // A stage builds only after its question round (2026-10-16): one prod of the stage opens it.
-const asked = (stage: string) => [{ id: 'p0', round: 1, order: 1, anchorQuote: 'a', question: 'q?', why: 'w', kind: 'CREATIVE', status: 'ANSWERED', answer: 'a', jewlFill: null, stage }];
+const asked = (stage: string, createdAt: Date = new Date()) => [{ id: 'p0', round: 1, order: 1, anchorQuote: 'a', question: 'q?', why: 'w', kind: 'CREATIVE', status: 'ANSWERED', answer: 'a', jewlFill: null, stage, createdAt }];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -120,7 +120,8 @@ describe('every stage opens with questions (Mike 2026-10-16: "He hasn\'t asked f
   it('WORLD with no prod raised in it is a question round: raise_prod + reads only, no grant', () => {
     const r = planWorkCycle({ ...base, stage: 'WORLD' }, [], '', []);
     expect(r.text).toMatch(/QUESTION ROUND/);
-    expect(r.text).toMatch(/WHERE SHE LIVES/);
+    expect(r.text).toMatch(/OPENING/);
+    expect(r.text).toMatch(/where she lives/);
     expect(r.allowedTools).toContain('raise_prod');
     expect(r.allowedTools).not.toContain('grant_possession');
     expect(r.allowedTools).not.toContain('seed_location');
@@ -141,7 +142,7 @@ describe('every stage opens with questions (Mike 2026-10-16: "He hasn\'t asked f
 
   it('VINES proposes goals as questions first', () => {
     const r = planWorkCycle({ ...base, stage: 'VINES' }, [], '', []);
-    expect(r.text).toMatch(/propose her goals as questions/);
+    expect(r.text).toMatch(/FIRST goal as a question/);
     expect(r.allowedTools).not.toContain('author_vine_goal');
   });
 });
@@ -157,5 +158,32 @@ describe('coax vs sail (Mike 2026-10-16: "he has to know when to coax and when t
   it('a COAX session (the default) asks first', () => {
     const r = planWorkCycle({ ...base, stage: 'WORLD', mode: 'coax' }, [], '', []);
     expect(r.text).toMatch(/QUESTION ROUND/);
+  });
+});
+
+describe('a conversation the length of the build (Mike 2026-10-16: passes with check-ins, not a shotgun)', () => {
+  const base = { id: 's1', goal: GOAL, plan: 'GENESIS BRIEF\nAGE: 25', cycleCount: 3, lastCycleAt: new Date('2026-10-16T03:00:00Z') };
+  it('a build cycle is ONE pass with a small tool cap and must end in a check-in', () => {
+    const r = planWorkCycle({ ...base, stage: 'WORLD' }, asked('WORLD', new Date('2026-10-16T03:05:00Z')), '', []);
+    expect(r.text).toMatch(/THIS CYCLE IS ONE PASS/);
+    expect(r.text).toMatch(/keep \/ change \/ cut/);
+    expect(r.maxToolIterations).toBe(5);
+    expect(r.allowedTools).toContain('grant_possession');
+  });
+  it('a pass built without a check-in gets no build tools until the check-in is raised', () => {
+    const r = planWorkCycle({ ...base, stage: 'WORLD' }, asked('WORLD', new Date('2026-10-16T02:00:00Z')), '', []);
+    expect(r.text).toMatch(/CHECK-IN DUE/);
+    expect(r.allowedTools).toContain('raise_prod');
+    expect(r.allowedTools).not.toContain('grant_possession');
+  });
+  it('the opening asks the few things he cannot start without and names who owns the answer', () => {
+    const r = planWorkCycle({ ...base, stage: 'WORLD', cycleCount: 0, lastCycleAt: null }, [], '', []);
+    expect(r.text).toMatch(/1–3 prods/);
+    expect(r.text).toMatch(/another player when the thing is theirs/);
+  });
+  it('SAIL has no passes, no cap, no check-ins', () => {
+    const r = planWorkCycle({ ...base, stage: 'WORLD', mode: 'sail' }, [], '', []);
+    expect(r.text).not.toMatch(/ONE PASS/);
+    expect(r.maxToolIterations).toBeUndefined();
   });
 });

@@ -197,6 +197,8 @@ async function runCycle(session: {
   cycleCount: number;
   stage?: string | null;
   mode?: string | null;
+  /** As read before this cycle touches it = the previous cycle's start. */
+  lastCycleAt?: Date | null;
 }): Promise<void> {
   // Player gates (Mike 2026-10-16): APPEARANCE and PORTRAIT are not JEWL's to
   // do. The session waits on the person at the designer; no model call.
@@ -279,7 +281,7 @@ async function runCycle(session: {
       } catch { /* the backstory and settled answers remain */ }
     }
   }
-  const { text, allowedTools, excludedTools, stageTools } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting, completion);
+  const { text, allowedTools, excludedTools, stageTools, maxToolIterations } = planWorkCycle(session, prods, treasuryLine, recentNotes, catalog, drafting, completion);
 
   // Dynamic import: runtime imports the tools barrel, which includes the
   // work-session tools, which import this module — static would cycle.
@@ -303,6 +305,7 @@ async function runCycle(session: {
       ...(allowedTools ? { allowedTools } : {}),
       ...(excludedTools ? { excludedTools } : {}),
       ...(stageTools ? { stageTools } : {}),
+      ...(maxToolIterations ? { maxToolIterations } : {}),
       kind: genesis ? 'GENESIS' : 'WORK_CYCLE',
       ...(genesis ? { replyUsername: GENESIS_CHAT_USERNAME, toneRef: { table: 'DayaWorkSession', id: session.id } } : {}),
     });

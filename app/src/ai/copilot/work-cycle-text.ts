@@ -22,6 +22,8 @@ export interface WorkCycleSession {
   cycleCount: number;
   /** 'coax' (default) asks first; 'sail' builds without asking (2026-10-16). */
   mode?: string | null;
+  /** Start of the PREVIOUS cycle (the row as read before this cycle touches it). */
+  lastCycleAt?: Date | string | null;
 }
 
 export function buildWorkCycleText(session: WorkCycleSession, treasuryLine: string, recentNotes: string[]): string {
@@ -62,6 +64,8 @@ export interface CycleProd {
   jewlFill: string | null;
   /** The genesis stage it was raised in (null = PRODDING / legacy). */
   stage?: string | null;
+  /** When it was raised — a check-in newer than the last cycle proves the pass was shown. */
+  createdAt?: Date | string | null;
 }
 
 /** The law of the prod stage — carried verbatim in every PRODDING cycle. */
@@ -254,36 +258,51 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
   PORTRAIT: 'STAGE: PORTRAIT — her portrait is painted from her face, body, clothes and world, and approved at the designer. Not yours to do; the session waits.',
 };
 
-// ── Every stage OPENS WITH QUESTIONS (Mike 2026-10-16: "He hasn't asked for
-// my input one time") ──────────────────────────────────────────────────────
-// Humans drive the creativity, JEWL adds the scale. The first cycle of WORLD,
-// MEMORIES and VINES offers NO build tool: only raise_prod and reads. The
-// session then holds on the prods; the GM's answers ride into the plan and
-// the next cycle builds on them. A stage with a prod raised in it is open.
+// ── A CONVERSATION THE LENGTH OF THE BUILD (Mike 2026-10-16) ─────────────
+// "He hasn't asked for my input one time" — then: "a shotgun of questions
+// at the beginning before a process that seems like it could have many
+// questions in the middle of it… things can come up during the generation
+// of an entire life that a couple questions in the beginning don't really
+// answer… a player should know their character… a GM needs to know how a
+// character fits into his story." So, in COAX mode, a stage runs in PASSES:
+//   opening  — the one to three things he cannot start without (ask-only)
+//   pass     — build ONE pass (a few tool rounds), then raise ONE check-in
+//              ("here is the kitchen — keep / change / cut?") and stop; the
+//              session holds until whoever owns the answer has answered
+//   check-in — a cycle that built without showing its pass gets no build
+//              tool next time until the check-in is raised
+// Enforced by withheld tools and a per-cycle tool cap, not by prose alone.
+// SAIL mode skips all of it ("fill in the rest").
 
-/** The stages that open with a question round, and what to ask. */
+/** What the opening of a stage may ask — the few things he cannot start without. */
 export const STAGE_ASK_LAW: Partial<Record<GenesisPostSheetStage, string>> = {
   WORLD: [
-    'OPEN THIS STAGE WITH QUESTIONS — nothing is built until the person at the table has answered. Raise 3–5 prods (raise_prod) on the things only they can say, anchored to the brief:',
-    '- WHERE SHE LIVES and what it is like (your best guess as the question: "a fourth-floor walkup studio near the river — yes, or tell me?").',
-    '- WHAT SHE LIVES ON — the job, the money, the debt, in her currency.',
-    '- THE TWO OR THREE THINGS THAT MATTER MOST to her, and where they came from.',
-    '- WHO IS IN HER LIFE now (named people the brief implies but does not settle).',
-    '- Anything the budget line forces (over budget → what goes).',
-    'Then stop. The session waits for the answers; you build on them next cycle. Do NOT grant, seed, or establish anything this cycle.',
+    'OPENING — before the first pass, ask ONLY what you cannot start without (1–3 prods, raise_prod, anchored to the brief). Usually: where she lives and what it is like (your best guess as the question); what she lives on. Everything else is asked pass by pass as you build. Address each prod to whoever owns the answer — the player for her own life, the GM for how she fits the story, another player when the thing is theirs.',
+    'Then stop. The session waits for the answers; the first pass builds on them. Do NOT grant, seed, or establish anything this cycle.',
   ].join('\n'),
   MEMORIES: [
-    'OPEN THIS STAGE WITH QUESTIONS — the person at the table chooses how each mark and each keepsake is remembered. Raise up to 5 prods:',
-    '- For EACH MARK on her look (scar, tattoo, piercing…): "Shall I decide how this came to be, or will you tell me in a line?" — one prod per mark, or one prod listing them.',
-    '- Which things deserve a CHAIN (a thread across years) rather than a line — name your candidates and ask.',
-    '- Any person or place whose memory the brief leaves open.',
-    'Then stop. The session waits; you write the memories next cycle on their answers ("you decide" = invent from her life).',
+    'OPENING — before the first pass, ask ONLY what you cannot start without (1–3 prods): the first mark or keepsake you would remember — "shall I decide how it came to be, or will you tell me?" — and whether any memory should be a chain across years. The rest is asked pass by pass.',
+    'Then stop. The session waits; the first pass writes on their answers ("you decide" = invent from her life).',
   ].join('\n'),
   VINES: [
-    'OPEN THIS STAGE WITH QUESTIONS — propose her goals as questions, never as facts. Raise one prod per candidate goal (up to her slots): "Does she want X? Yes / no / tell me what she wants instead."',
+    'OPENING — propose her FIRST goal as a question, never as a fact: "Does she want X? Yes / no / tell me what she wants instead." (1–2 prods.) The next goals come one per pass.',
     'Then stop. The session waits; you write only the goals they accepted or handed to you.',
   ].join('\n'),
 };
+
+/** The build-cycle law in COAX: one pass, then a check-in, then stop. */
+export const PASS_LAW = [
+  'THIS CYCLE IS ONE PASS. Name it in your progress note (e.g. "pass: kitchen", "pass: her people", "pass: the tattoo"). Build only that pass — a room\'s things, one person, one or two memories, one goal — with the few tool rounds you have.',
+  'THEN SHOW IT: raise exactly ONE check-in prod (raise_prod, kind CREATIVE) that lists what you just built in plain words and asks keep / change / cut — addressed to whoever owns the answer (the player for her own life; the GM for how it fits the story; the other player when the thing is theirs — say so in the prod). Then stop; the session holds until they answer.',
+  'Never two passes in a cycle. Never build without the check-in — a cycle that does gets no build tools next time.',
+].join('\n');
+
+/** The ask-only cycle after a pass that was not shown. */
+export const CHECK_IN_LAW =
+  'CHECK-IN DUE: your last cycle built a pass and did not show it. Raise ONE prod now that lists what you built and asks keep / change / cut (addressed to whoever owns the answer), and stop. No build tools until they answer.';
+
+/** Tool rounds a COAX pass gets (the runtime cap is 12). */
+export const PASS_TOOL_ITERATIONS = 5;
 
 /** Tools an ask cycle offers: questions and reads, no build. */
 export const STAGE_ASK_TOOLS: Partial<Record<GenesisPostSheetStage, readonly string[]>> = {
@@ -301,6 +320,12 @@ export function stageAsked(prods: CycleProd[], stage: string): boolean {
   return prods.some(p => p.stage === stage);
 }
 
+/** Was a check-in (any prod of the stage) raised since the previous cycle began? Pure. */
+export function checkedInSince(prods: CycleProd[], stage: string, lastCycleAt: Date | string | null | undefined): boolean {
+  const since = lastCycleAt ? new Date(lastCycleAt).getTime() : 0;
+  return prods.some(p => p.stage === stage && (p.createdAt ? new Date(p.createdAt).getTime() : 0) >= since);
+}
+
 /** The ask cycle's text. Pure. */
 export function buildAskCycleText(
   session: WorkCycleSession & { stage: GenesisPostSheetStage },
@@ -308,10 +333,11 @@ export function buildAskCycleText(
   ctx: CompletionContext,
 ): string {
   const stage = session.stage;
+  const law = ctx.checkIn ? CHECK_IN_LAW : STAGE_ASK_LAW[stage] ?? '';
   return [
-    `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}. GENESIS STAGE: ${stage} — QUESTION ROUND (genesis is a dialogue).`,
+    `[SYSTEM] Work cycle ${session.cycleCount + 1} — work session ${session.id}. GENESIS STAGE: ${stage} — ${ctx.checkIn ? 'CHECK-IN' : 'QUESTION ROUND'} (genesis is a dialogue).`,
     `GOAL: ${session.goal}`,
-    STAGE_ASK_LAW[stage] ?? '',
+    law,
     `HOW: raise_prod({sessionId: "${session.id}", anchorQuote, question, why, kind}) — anchor each to a line of the brief below; "kind" CREATIVE for taste, MECHANICAL_CHECK for budget/rules. At most 5. No report, no "done": the system holds the session until they answer.`,
     ...(ctx.stageBrief ? [ctx.stageBrief] : []),
     recentNotes.length ? `YOUR RECENT PROGRESS NOTES:\n${recentNotes.map(n => `- ${n}`).join('\n')}` : 'No progress notes in this stage yet.',
@@ -328,6 +354,8 @@ export interface CompletionContext {
   /** The stage's brief: her world so far (WORLD) / what was built and what
    *  already carries a memory (MEMORIES). services/genesis-brief-context. */
   stageBrief?: string | null;
+  /** This ask cycle is a check-in for an unshown pass (not the opening). */
+  checkIn?: boolean;
 }
 
 /** One completion-stage cycle's text. Pure. */
@@ -379,7 +407,7 @@ export function planWorkCycle(
   catalog?: CycleCatalog | null,
   drafting?: CycleDrafting | null,
   completion?: CompletionContext | null,
-): { text: string; allowedTools?: string[]; excludedTools?: string[]; stageTools?: string[] } {
+): { text: string; allowedTools?: string[]; excludedTools?: string[]; stageTools?: string[]; maxToolIterations?: number } {
   if (session.stage === 'PRODDING') {
     return { text: buildProdCycleText(session, prods), allowedTools: [...PROD_STAGE_TOOLS] };
   }
@@ -389,18 +417,27 @@ export function planWorkCycle(
     : session.plan;
   if (genesis && isPostSheetStage(session.stage)) {
     const stage = session.stage;
-    // Every stage opens with questions (2026-10-16): no prod of this stage
-    // yet → the ask cycle, with no build tool on offer. Unless the table
-    // said SAIL ("fill in the rest"): then he builds and notes assumptions.
+    // A conversation the length of the build (2026-10-16): in COAX a stage
+    // opens with the few questions he cannot start without, then runs in
+    // passes — build one, show it, wait. A pass not shown costs him the
+    // build tools until he raises the check-in. SAIL skips all of it.
     const sailing = session.mode === 'sail';
-    if (!sailing && STAGE_ASK_LAW[stage] && !stageAsked(prods, stage)) {
+    const conversational = !sailing && !!STAGE_ASK_LAW[stage];
+    if (conversational && !stageAsked(prods, stage)) {
       return {
         text: buildAskCycleText({ ...session, plan, stage }, recentNotes, { ...completion }),
         allowedTools: [...(STAGE_ASK_TOOLS[stage] ?? ['raise_prod', 'update_work_session'])],
       };
     }
+    if (conversational && session.cycleCount > 0 && !checkedInSince(prods, stage, session.lastCycleAt)) {
+      return {
+        text: buildAskCycleText({ ...session, plan, stage }, recentNotes, { ...completion, checkIn: true }),
+        allowedTools: [...(STAGE_ASK_TOOLS[stage] ?? ['raise_prod', 'update_work_session'])],
+      };
+    }
     const extras = [
       ...(sailing ? [SAIL_LAW] : []),
+      ...(conversational ? [PASS_LAW] : []),
       ...(stage === 'WORLD' && drafting ? [draftingGuidance(drafting)] : []),
       genesisQuestionLaw(session.id),
     ];
@@ -411,6 +448,7 @@ export function planWorkCycle(
       }, extras),
       allowedTools: [...COMPLETION_COMMON_TOOLS, ...COMPLETION_STAGE_TOOLS[stage]]
         .filter(t => !(t === 'search_catalog' && stage === 'WORLD' && catalog && !(catalog.counts.item ?? 0))),
+      ...(conversational ? { maxToolIterations: PASS_TOOL_ITERATIONS } : {}),
     };
   }
   const guide = catalog ? catalogGuidance(catalog) : null;

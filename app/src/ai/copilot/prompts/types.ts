@@ -83,6 +83,8 @@ export interface JewlPrompt {
    *  raise_prod in a genesis BUILDING cycle: a question is a prod at any
    *  genesis stage (2026-10-12). */
   stageTools?: string[];
+  /** Cap on tool rounds for this dispatch (≤ the runtime default). Genesis coax passes use a small one (2026-10-16). */
+  maxToolIterations?: number;
   /** The dispatch kind (tool set + persona addendum + history policy). Derived
    *  from the source when omitted: work cycles → WORK_CYCLE (GENESIS when the
    *  reply goes to '[genesis]'), everything else → TABLE_CHAT. */
