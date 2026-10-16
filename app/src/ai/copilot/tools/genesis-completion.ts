@@ -13,7 +13,7 @@
  */
 import 'server-only';
 import { setStartingAge, setStartingAgeSchema } from '@/services/genesis-age';
-import { grantPossession, grantPossessionSchema } from '@/services/genesis-possessions';
+import { dropPossession, dropPossessionSchema, grantPossession, grantPossessionSchema } from '@/services/genesis-possessions';
 import { seedLocation, seedLocationSchema, seedNpc, seedNpcSchema } from '@/services/genesis-seeds';
 import { authorVineGoals, authorVineGoalSchema } from '@/services/genesis-vines';
 import { establishCurrency, establishCurrencySchema, listCurrencies } from '@/services/currency';
@@ -50,6 +50,20 @@ export const grantPossessionTool: JewlTool = {
     const r = await grantPossession(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
     return r.ok
       ? { output: r, affected: { items: [{ id: r.itemId }], characters: [{ id: grantPossessionSchema.parse(input).characterId, changes: ['possessions'] }] } }
+      : { output: r };
+  },
+};
+
+export const dropPossessionTool: JewlTool = {
+  name: 'drop_possession',
+  description:
+    'Genesis WORLD stage. Take back a thing YOU granted her — granted twice, over budget, or cut by the GM. ' +
+    'By her local name (exact) or the item id; it and its deed are removed. Only things she holds or owns.',
+  inputSchema: dropPossessionSchema,
+  handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
+    const r = await dropPossession(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
+    return r.ok
+      ? { output: r, affected: { items: [{ id: r.itemId }], characters: [{ id: dropPossessionSchema.parse(input).characterId, changes: ['possessions'] }] } }
       : { output: r };
   },
 };
@@ -155,6 +169,7 @@ export const setIncomeTool: JewlTool = {
 
 registerJewlTool(setStartingAgeTool);
 registerJewlTool(grantPossessionTool);
+registerJewlTool(dropPossessionTool);
 registerJewlTool(readLifeBudgetTool);
 registerJewlTool(establishCurrencyTool);
 registerJewlTool(grantCashTool);

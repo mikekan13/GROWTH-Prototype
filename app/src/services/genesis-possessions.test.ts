@@ -5,8 +5,8 @@ const { db, pull, createItem } = vi.hoisted(() => ({
   db: {
     character: { findUnique: vi.fn() },
     forgeItem: { findFirst: vi.fn(), findUnique: vi.fn() },
-    campaignItem: { findFirst: vi.fn() },
-    entityRelationship: { create: vi.fn(), findFirst: vi.fn() },
+    campaignItem: { findFirst: vi.fn(), delete: vi.fn() },
+    entityRelationship: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn() },
     location: { findMany: vi.fn() },
   },
   pull: vi.fn(),
@@ -88,5 +88,26 @@ describe('tiers', () => {
     db.forgeItem.findFirst.mockResolvedValue({ ...KNIFE, data: '{}' });
     await expect(grantPossession('c1', ACTOR, { characterId: 'v', item: 'Silver Butter Knife', tier: 'carried', story: 's' }))
       .rejects.toThrow(/weightLbs in real pounds/);
+  });
+});
+
+describe('drop_possession (2026-10-16): JEWL takes back his own grant', () => {
+  it('removes a thing she holds, by her local name, with its edges', async () => {
+    db.entityRelationship.findMany.mockResolvedValue([]);
+    db.entityRelationship.deleteMany.mockResolvedValue({ count: 1 });
+    db.campaignItem.findFirst.mockResolvedValueOnce({ id: 'it2', name: 'Her phone' });
+    db.campaignItem.delete.mockResolvedValue({});
+    const { dropPossession } = await import('./genesis-possessions');
+    const r = await dropPossession('c1', ACTOR, { characterId: 'v', item: 'Her phone', reason: 'granted twice' });
+    expect(r).toEqual({ ok: true, itemId: 'it2', name: 'Her phone' });
+    expect(db.campaignItem.delete).toHaveBeenCalledWith({ where: { id: 'it2' } });
+    expect(db.entityRelationship.deleteMany).toHaveBeenCalled();
+  });
+  it('refuses a thing that is not hers', async () => {
+    db.entityRelationship.findMany.mockResolvedValue([]);
+    db.campaignItem.findFirst.mockResolvedValueOnce(null);
+    const { dropPossession } = await import('./genesis-possessions');
+    const r = await dropPossession('c1', ACTOR, { characterId: 'v', item: 'Ruth\'s phone', reason: 'x' });
+    expect(r.ok).toBe(false);
   });
 });

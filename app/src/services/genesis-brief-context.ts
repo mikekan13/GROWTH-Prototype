@@ -29,6 +29,8 @@ export function lookLines(designer: Partial<DesignerState> | undefined): LookLin
 
 export interface WorldBriefInput {
   budgetLine: string;
+  /** Cash + income already on the sheet ("$800 USD (checking) · $28,000 USD/yr — fiction author"). */
+  wealth?: string[];
   look: LookLine[];
   items: Array<{ name: string; archetype: string | null; where: string | null; kv: number }>;
   places: Array<{ name: string; relation: string }>;
@@ -38,6 +40,7 @@ export interface WorldBriefInput {
 /** The WORLD cycle brief. Pure. */
 export function renderWorldBrief(w: WorldBriefInput): string {
   const lines = ['HER WORLD SO FAR (build on it; never grant twice):', w.budgetLine];
+  lines.push(w.wealth?.length ? `CASH + INCOME ON THE SHEET: ${w.wealth.join(' · ')}` : 'CASH + INCOME ON THE SHEET: none yet.');
   lines.push(w.look.length ? `HER LOOK (approved): ${w.look.map(l => `${l.kind}: ${l.text}`).join(' · ')}` : 'HER LOOK: approved at the designer (no marks).');
   lines.push(w.places.length ? `PLACES: ${w.places.map(p => `${p.name} (${p.relation})`).join(', ')}` : 'PLACES: none yet — seed her home first.');
   lines.push(w.items.length ? `THINGS (${w.items.length}): ${w.items.map(i => `${i.name}${i.archetype && i.archetype !== i.name ? ` [${i.archetype}]` : ''}${i.where ? ` @ ${i.where}` : ''} ${i.kv} KV`).join('; ')}` : 'THINGS: none yet.');
@@ -71,7 +74,11 @@ async function loadHerWorld(characterId: string) {
   const c = await prisma.character.findUnique({ where: { id: characterId }, select: { campaignId: true, data: true } });
   if (!c?.campaignId) return null;
   const campaignId = c.campaignId;
-  const sheet = (() => { try { return JSON.parse(c.data) as { identity?: { designer?: Partial<DesignerState> } }; } catch { return {}; } })();
+  const sheet = (() => { try { return JSON.parse(c.data) as { identity?: { designer?: Partial<DesignerState> }; wealth?: { holdings?: Array<{ amount: number; code: string; where?: string }>; income?: Array<{ amountPerYear: number; code: string; source: string }> } }; } catch { return {}; } })();
+  const wealth = [
+    ...(sheet.wealth?.holdings ?? []).map(h => `${h.amount} ${h.code} (${h.where ?? 'cash'})`),
+    ...(sheet.wealth?.income ?? []).map(i => `${i.amountPerYear} ${i.code}/yr — ${i.source}`),
+  ];
   const [deeds, placeEdges, seeds] = await Promise.all([
     prisma.entityRelationship.findMany({ where: { sourceId: characterId, relationshipType: DEED_RELATIONSHIP, targetType: 'CAMPAIGN_ITEM' }, select: { targetId: true } }),
     prisma.entityRelationship.findMany({ where: { sourceId: characterId, targetType: 'LOCATION', relationshipType: { in: [...PLACE_RELATIONS] } }, select: { targetId: true, relationshipType: true } }),
@@ -95,6 +102,7 @@ async function loadHerWorld(characterId: string) {
     try { return (JSON.parse(e?.data ?? '{}') as { relation?: string }).relation ?? 'named'; } catch { return 'named'; }
   };
   return {
+    wealth,
     look: lookLines(sheet.identity?.designer),
     items: items.map(i => ({ id: i.id, name: i.name, archetype: i.sourceForgeItemId ? arch.get(i.sourceForgeItemId)?.name ?? null : null, kv: i.sourceForgeItemId ? Number(arch.get(i.sourceForgeItemId)?.karmicValue ?? 0) : 0, where: i.locationId ? locName.get(i.locationId) ?? null : null, story: i.story })),
     places: placeEdges.map(p => ({ id: p.targetId, name: locName.get(p.targetId) ?? p.targetId, relation: p.relationshipType })),
@@ -106,7 +114,7 @@ export async function buildWorldBrief(characterId: string): Promise<string | nul
   const w = await loadHerWorld(characterId);
   if (!w) return null;
   const budget = await lifeBudget(characterId);
-  return renderWorldBrief({ budgetLine: budget.line, look: w.look, items: w.items, places: w.places, people: w.people });
+  return renderWorldBrief({ budgetLine: budget.line, wealth: w.wealth, look: w.look, items: w.items, places: w.places, people: w.people });
 }
 
 export async function buildMemoriesBrief(characterId: string): Promise<string | null> {

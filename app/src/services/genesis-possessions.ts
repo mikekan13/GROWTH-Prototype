@@ -201,3 +201,42 @@ export async function grantPossession(
   }
   return { ok: true, itemId: item.id, name, archetype: row.name, tier: p.tier, source, deedId };
 }
+
+// ── drop_possession (2026-10-16) — JEWL corrects his own grants ──────────
+// The rerun's first WORLD cycle granted a phone twice and then blocked,
+// having no way to take one back. A drop removes a thing she holds or holds
+// the deed to (and its edges); nothing else — never another character's.
+export const dropPossessionSchema = z.object({
+  characterId: z.string().min(1).max(64),
+  item: z.string().min(1).max(200).describe('The CampaignItem: id or her local name for it (exact).'),
+  reason: z.string().min(1).max(200).describe('Why it goes ("granted twice", "over budget", "the GM cut it").'),
+});
+export type DropPossessionInput = z.infer<typeof dropPossessionSchema>;
+
+export async function dropPossession(
+  campaignId: string,
+  actor: { id: string; role: string },
+  input: unknown,
+): Promise<{ ok: true; itemId: string; name: string } | { ok: false; reason: string }> {
+  const p = dropPossessionSchema.parse(input);
+  const character = await prisma.character.findUnique({ where: { id: p.characterId }, select: { campaignId: true } });
+  if (!character || character.campaignId !== campaignId) throw new NotFoundError('Character not found in this campaign');
+  void actor;
+  const deeds = await prisma.entityRelationship.findMany({
+    where: { sourceId: p.characterId, relationshipType: DEED_RELATIONSHIP, targetType: 'CAMPAIGN_ITEM' },
+    select: { targetId: true },
+  });
+  const ref = p.item.trim();
+  const item = await prisma.campaignItem.findFirst({
+    where: {
+      campaignId, status: 'ACTIVE',
+      OR: [{ id: ref }, { name: ref }],
+      AND: [{ OR: [{ holderId: p.characterId }, { id: { in: deeds.map(d => d.targetId) } }] }],
+    },
+    select: { id: true, name: true },
+  });
+  if (!item) return { ok: false, reason: `No "${p.item}" among the things she holds or owns (exact local name or id).` };
+  await prisma.entityRelationship.deleteMany({ where: { OR: [{ sourceId: item.id }, { targetId: item.id }] } });
+  await prisma.campaignItem.delete({ where: { id: item.id } });
+  return { ok: true, itemId: item.id, name: item.name };
+}

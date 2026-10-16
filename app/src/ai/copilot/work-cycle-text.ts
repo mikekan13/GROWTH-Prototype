@@ -204,7 +204,7 @@ export const COMPLETION_STAGE_TOOLS: Record<GenesisPostSheetStage, readonly stri
   AGE: ['set_starting_age'],
   APPEARANCE: [],
   WORLD: [
-    'read_life_budget', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item',
+    'read_life_budget', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'drop_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item',
     'seed_location', 'create_location', 'read_location', 'seed_npc', 'establish_world_facts',
     'establish_currency', 'grant_cash', 'set_income',
   ],
@@ -233,6 +233,7 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
     '- THE FACTS: establish_world_facts for her home as it now stands (what is where, surfaces, the objects you placed, their states, sounds) and the standing facts about her people and places. Dotted stable subjectKeys ("violet_apartment.desk.laptop"), concrete, present tense; batch a place per call. Only from the sources; never a fact that answers an OPEN THREAD.',
     '- WEALTH THAT IS NOT A THING: cash and income live on the sheet, never as items. A currency is a campaign object (establish_currency — anchor its rate on what objects cost in THIS time and place; many may exist). When her things are placed, exchange what remains of the budget — or what her life plainly leaves her holding — into cash with grant_cash, and set_income from her current branch. Over budget = cut or re-rate, and say so in the progress note.',
     '- Ask, do not assume, where the choice is creative: the Watcher or the Trailblazer drives; you add the scale (raise_prod for what only they can say).',
+    '- Read the brief before every grant: a thing listed under THINGS exists — never grant it again; drop_possession takes back one you granted twice or cannot afford. Cash and income already on the sheet are listed too — set_income once per job.',
   ].join('\n'),
   MEMORIES: [
     'STAGE: MEMORIES — one memory for every thing built: each item she owns, each mark on her face and body, each place, each person.',

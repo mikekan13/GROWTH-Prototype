@@ -31,6 +31,7 @@ describe('renderWorldBrief', () => {
   it('shows the budget, look, places, things and people; never-grant-twice', () => {
     const t = renderWorldBrief({
       budgetLine: 'LIFE BUDGET: 25 − 0 − 0 = 25 KV left',
+      wealth: ['800 USD (checking)', '28000 USD/yr — fiction author'],
       look: lookLines(designer as never),
       items: [{ name: 'Henry', archetype: 'Handmade Stuffed Animal', where: null, kv: 0 }, { name: 'Smartphone', archetype: 'Smartphone', where: 'Her flat', kv: 10 }],
       places: [{ name: 'Her flat', relation: 'home' }],
@@ -38,6 +39,7 @@ describe('renderWorldBrief', () => {
     });
     expect(t).toMatch(/never grant twice/);
     expect(t).toMatch(/25 KV left/);
+    expect(t).toContain('CASH + INCOME ON THE SHEET: 800 USD (checking) · 28000 USD/yr — fiction author');
     expect(t).toMatch(/scar: Add a thin pale scar/);
     expect(t).toMatch(/Henry \[Handmade Stuffed Animal\] 0 KV; Smartphone @ Her flat 10 KV/);
     expect(t).toMatch(/PEOPLE: none seeded yet/);

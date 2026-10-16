@@ -58,7 +58,7 @@ describe('WORK_CYCLE / GENESIS tool sets (as before)', () => {
     expect(work).not.toContain('sketch_npc');
     expect(work).not.toContain(REQUEST_TOOL);
     expect(work).toContain('create_location');
-    expect(work.length).toBe(listJewlTools().filter(t => !['sketch_npc', 'raise_prod', 'end_prod_round', 'set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal', 'read_life_budget', 'establish_currency', 'grant_cash', 'set_income'].includes(t.name)).length);
+    expect(work.length).toBe(listJewlTools().filter(t => !['sketch_npc', 'raise_prod', 'end_prod_round', 'set_starting_age', 'grant_possession', 'seed_npc', 'seed_location', 'author_vine_goal', 'read_life_budget', 'establish_currency', 'grant_cash', 'set_income', 'drop_possession'].includes(t.name)).length);
   });
 
   it('a genesis prod stage is still restricted to its allow-list', () => {
