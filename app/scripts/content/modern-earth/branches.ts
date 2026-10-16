@@ -53,7 +53,8 @@ export const MODERN_BRANCHES: BranchTemplate[] = [
     requirements: 'Age 16+',
     possessions: [
       { name: 'Toolbox (Stocked)', description: 'Bought tool by tool as the master allowed each one.', kv: 6 },
-      { name: 'Work Boots (Steel Toe)', description: 'Second pair; the first did not survive.', kv: 3 },
+      { name: 'Work Boot (Steel Toe)', description: 'Left boot of the second pair; the first did not survive.', kv: 2 },
+      { name: 'Work Boot (Steel Toe)', description: 'Right boot of the second pair; its lace is newer.', kv: 2 },
     ],
     accumulatedWealth: 6,
   },

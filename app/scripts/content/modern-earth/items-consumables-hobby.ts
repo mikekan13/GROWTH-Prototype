@@ -68,11 +68,14 @@ export const CONSUMABLE_HOBBY_ITEMS: ItemTemplate[] = [
   gear('Tennis Racket', 'Strung precision with a sweet spot.', 0.7, 1, { primaryMaterial: 'Graphite' }),
   gear('Golf Club Set', 'Fourteen specialized ways to be humbled.', 30, 2, { primaryMaterial: 'Steel', subordinateMaterials: ['Graphite'] }),
   gear('Yoga Mat', 'Six feet of intentional floor.', 2.5, 1, { primaryMaterial: 'Foam Padding', materialClass: 'Soft' }),
-  gear('Adjustable Dumbbells', 'Five to fifty pounds of optional difficulty.', 100, 2, {
+  gear('Adjustable Dumbbell', 'One dumbbell for one hand: five to fifty pounds of optional difficulty.', 50, 1, {
     primaryMaterial: 'Steel',
     itemAbilities: [{ name: 'Home Gym', description: 'Supports strength training between sessions (trainable-mechanic flavor).', kv: 1 }],
   }),
-  gear('Boxing Gloves & Heavy Bag', 'An argument you can have alone.', 82, 2, {
+  gear('Boxing Glove', 'One padded glove for one fist.', 1, 1, {
+    primaryMaterial: 'Leather', materialClass: 'Soft',
+  }),
+  gear('Heavy Bag', 'An argument you can have alone.', 80, 1, {
     primaryMaterial: 'Leather', materialClass: 'Soft',
     itemAbilities: [{ name: 'Sparring Setup', description: 'Supports Unarmed Combat practice; training montages welcome.', kv: 1 }],
   }),

@@ -56,9 +56,18 @@ export const HOUSEHOLD_ITEMS_2: ItemTemplate[] = [
   hard('55" Smart TV', 'The hearth, updated.', 35, 3, { primaryMaterial: 'Glass', subordinateMaterials: ['Polymer'], properties: ['Fragile', 'Electric Vulnerable'] }),
   hard('Game Console', 'A dedicated portal to elsewhere.', 9, 3, { primaryMaterial: 'Polymer', properties: ['Electric Vulnerable'] }),
   hard('Bluetooth Speaker', 'Room-filling sound from a soda-can footprint.', 1.5, 2, { primaryMaterial: 'Polymer' }),
-  hard('Wireless Earbuds', 'Private soundtrack; polite isolation. (Counterplay: Misophonia triggers.)', 0.1, 3, {
-    primaryMaterial: 'Polymer', properties: ['Fragile'],
-    itemAbilities: [{ name: 'Noise Isolation', description: 'Blocks ambient triggers and distractions; wearer takes −1 to hearing-based awareness.', kv: 2 }],
+  hard('Earbud Case', 'A pocket-sized charging case; it holds the earbuds when they are not in the ears.', 0.08, 1, {
+    primaryMaterial: 'Polymer', properties: ['Electric Vulnerable'],
+    contains: [
+      hard('Wireless Earbud', 'One ear\'s private soundtrack; polite isolation. (Counterplay: Misophonia triggers.)', 0.01, 2, {
+        primaryMaterial: 'Polymer', properties: ['Fragile'],
+        itemAbilities: [{ name: 'Noise Isolation', description: 'Blocks ambient triggers and distractions for its ear; with both in, wearer takes −1 to hearing-based awareness.', kv: 1 }],
+      }),
+      hard('Wireless Earbud', 'One ear\'s private soundtrack; polite isolation. (Counterplay: Misophonia triggers.)', 0.01, 2, {
+        primaryMaterial: 'Polymer', properties: ['Fragile'],
+        itemAbilities: [{ name: 'Noise Isolation', description: 'Blocks ambient triggers and distractions for its ear; with both in, wearer takes −1 to hearing-based awareness.', kv: 1 }],
+      }),
+    ],
   }),
   hard('Desktop PC & Monitor', 'More capable than the laptop, less willing to travel.', 30, 3, {
     primaryMaterial: 'Steel', subordinateMaterials: ['Glass'], properties: ['Electric Vulnerable'],
@@ -80,9 +89,10 @@ export const HOUSEHOLD_ITEMS_2: ItemTemplate[] = [
   soft('Hoodie', 'Portable comfort with a hood-shaped privacy setting.', 1.5, 1, { itemType: 'armor', primaryMaterial: 'Cotton', armorCategory: 'Clothing', baseResist: 1, tags: ['clothing', 'modern'] }),
   soft('Athletic Wear Set', 'Clothes that mean business about sweat.', 1.5, 1, { itemType: 'armor', primaryMaterial: 'Polyester', armorCategory: 'Clothing', tags: ['clothing', 'modern'] }),
   soft('Rain Jacket', 'A personal roof.', 1, 1, { itemType: 'armor', primaryMaterial: 'Nylon', armorCategory: 'Clothing', properties: ['Absorbent'], tags: ['clothing', 'modern'] }),
-  soft('Hiking Boots', 'Ankle-armored miles.', 3.5, 2, { itemType: 'armor', primaryMaterial: 'Leather', armorCategory: 'Clothing', baseResist: 2, tags: ['clothing', 'modern'] }),
-  soft('Dress Shoes', 'Leather diplomacy.', 2.5, 1, { itemType: 'armor', primaryMaterial: 'Leather', armorCategory: 'Clothing', tags: ['clothing', 'modern'] }),
-  soft('Winter Gloves & Hat', 'Extremity insurance.', 0.8, 1, { primaryMaterial: 'Wool', properties: ['Cold Resistant'], tags: ['clothing', 'modern'] }),
+  soft('Hiking Boot', 'One ankle-armored boot for one foot of the miles.', 1.75, 1, { itemType: 'armor', primaryMaterial: 'Leather', armorCategory: 'Clothing', baseResist: 2, tags: ['clothing', 'modern'] }),
+  soft('Dress Shoe', 'One leather diplomat for one foot.', 1.25, 1, { itemType: 'armor', primaryMaterial: 'Leather', armorCategory: 'Clothing', tags: ['clothing', 'modern'] }),
+  soft('Winter Glove', 'One knit glove: extremity insurance for one hand.', 0.2, 1, { primaryMaterial: 'Wool', properties: ['Cold Resistant'], tags: ['clothing', 'modern'] }),
+  soft('Winter Hat', 'A knit hat: extremity insurance for the head and ears.', 0.4, 1, { primaryMaterial: 'Wool', properties: ['Cold Resistant'], tags: ['clothing', 'modern'] }),
   hard('Sunglasses', 'Glare management and plausible mystique.', 0.1, 1, { itemType: 'accessory', primaryMaterial: 'Polycarbonate', properties: ['Fragile'], tags: ['clothing', 'modern'] }),
   soft('Baseball Cap', 'Shade, team allegiance, and camera-angle management.', 0.2, 1, { itemType: 'accessory', primaryMaterial: 'Cotton', tags: ['clothing', 'modern'] }),
   soft('High-Vis Vest', 'The universal costume of belonging on a worksite.', 0.4, 1, {

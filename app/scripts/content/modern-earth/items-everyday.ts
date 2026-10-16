@@ -218,11 +218,11 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     kv: 3, tags: ['clothing', 'modern'],
   },
   {
-    name: 'Work Boots (Steel Toe)', itemType: 'armor',
-    description: 'OSHA-approved and kick-rated.',
+    name: 'Work Boot (Steel Toe)', itemType: 'armor',
+    description: 'One OSHA-approved, kick-rated boot for one foot; its mate is its own thing.',
     primaryMaterial: 'Leather', subordinateMaterials: ['Steel'], materialClass: 'Soft',
-    weightLbs: 4, rarity: 1, baseResist: 3, armorCategory: 'Clothing', properties: ['Protective'],
-    kv: 3, tags: ['clothing', 'modern'],
+    weightLbs: 2, rarity: 1, baseResist: 3, armorCategory: 'Clothing', properties: ['Protective'],
+    kv: 2, tags: ['clothing', 'modern'],
   },
   {
     name: 'Motorcycle Jacket & Gear', itemType: 'armor',

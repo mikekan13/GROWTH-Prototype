@@ -179,7 +179,8 @@ export const MODERN_ROOTS: RootTemplate[] = [
     thorns: [],
     possessions: [
       { name: 'Mountain Bike', description: 'Cross-training that became the way to get anywhere.', kv: 12 },
-      { name: 'Adjustable Dumbbells', description: 'The garage gym, what is left of it.', kv: 2 },
+      { name: 'Adjustable Dumbbell', description: 'The garage gym, what is left of it.', kv: 1 },
+      { name: 'Adjustable Dumbbell', description: 'Its mate; the collar sticks.', kv: 1 },
       { name: 'Athletic Wear Set', description: 'Team colors, faded.', kv: 1 },
     ],
     accumulatedWealth: 20,
@@ -221,7 +222,8 @@ export const MODERN_ROOTS: RootTemplate[] = [
     thorns: [],
     possessions: [
       { name: 'Toolbox (Stocked)', description: 'Assembled one paycheck at a time.', kv: 6 },
-      { name: 'Work Boots (Steel Toe)', description: 'The first pair bought with own money.', kv: 3 },
+      { name: 'Work Boot (Steel Toe)', description: 'Left boot of the first pair bought with own money.', kv: 2 },
+      { name: 'Work Boot (Steel Toe)', description: 'Right boot of the same pair; the toe cap shows through.', kv: 2 },
     ],
     accumulatedWealth: 24,
   },

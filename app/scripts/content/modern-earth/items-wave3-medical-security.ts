@@ -18,9 +18,9 @@ const misc = (name: string, description: string, lbs: number, kv: number, extra:
 
 export const WAVE3_MEDICAL_SECURITY: ItemTemplate[] = [
   // ── Medical depth ──
-  med('Forearm Crutches', 'Mobility with attitude and better ergonomics.', 3, 4, {
+  med('Forearm Crutch', 'One cuffed crutch for one arm: mobility with attitude and better ergonomics.', 1.5, 2, {
     primaryMaterial: 'Aluminum',
-    itemAbilities: [{ name: 'Mobility Aid', description: 'Restores walking movement with an injured or weak leg (half pace, hands occupied).', kv: 3 }],
+    itemAbilities: [{ name: 'Mobility Aid', description: 'Used with its mate, restores walking movement with an injured or weak leg (half pace, hands occupied); one alone steadies a limp.', kv: 2 }],
   }),
   med('Cane', 'Support, reach, and in practiced hands, a point well made.', 1, 5, {
     primaryMaterial: 'Hardwood',

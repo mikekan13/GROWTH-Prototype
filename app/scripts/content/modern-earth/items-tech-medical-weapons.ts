@@ -140,12 +140,12 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     kv: 8, tags: ['medical', 'mobility', 'modern'],
   },
   {
-    name: 'Hearing Aids', itemType: 'accessory',
-    description: 'The soundtrack, restored in high fidelity. (Counterplay: Hard of Hearing.)',
+    name: 'Hearing Aid', itemType: 'accessory',
+    description: 'One ear\'s soundtrack, restored in high fidelity; one per ear. (Counterplay: Hard of Hearing.)',
     primaryMaterial: 'Polymer', materialClass: 'Hard',
-    weightLbs: 0.05, rarity: 2, properties: ['Fragile', 'Electric Vulnerable'],
-    itemAbilities: [{ name: 'Amplification', description: 'Negates Hard of Hearing penalties while worn and charged.', kv: 4 }],
-    kv: 5, tags: ['medical', 'modern'],
+    weightLbs: 0.025, rarity: 2, properties: ['Fragile', 'Electric Vulnerable'],
+    itemAbilities: [{ name: 'Amplification', description: 'Negates Hard of Hearing penalties for its ear while worn and charged.', kv: 2 }],
+    kv: 3, tags: ['medical', 'modern'],
   },
   {
     name: 'Prosthetic Hand (Body-Powered)', itemType: 'tool',
