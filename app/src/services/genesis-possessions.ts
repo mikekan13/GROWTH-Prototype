@@ -50,6 +50,7 @@ export const grantPossessionSchema = z.object({
   story: z.string().min(1).max(600).describe('NARRATIVE PAINT: this object\'s story with her — whose it was, how she came by it.'),
   weightLbs: z.number().min(0).max(1_000_000).optional().describe('Real pounds. Required for equipped/carried when the archetype has none.'),
   location: z.string().max(200).optional().describe('owned only: WHERE it sits — a room (Location name/id) or a CONTAINER item (its local name/id: a bookcase, a drawer, a closet). The world is a top-down map; everything has a place.'),
+  allowDuplicate: z.boolean().optional().describe('She already holds or owns an instance of this archetype → the grant is refused unless this is true (two mugs are fine; the same laptop twice is not).'),
 });
 
 export type GrantPossessionInput = z.infer<typeof grantPossessionSchema>;
@@ -155,6 +156,19 @@ export async function grantPossession(
     const deed = await prisma.entityRelationship.findFirst({ where: { sourceId: p.characterId, targetId: prior.id, relationshipType: DEED_RELATIONSHIP }, select: { id: true } });
     if (prior.holderId === p.characterId || deed) {
       return { ok: true, itemId: prior.id, name, archetype: row.name, tier: p.tier, source, deedId: deed?.id, reused: true };
+    }
+  }
+  // Never grant twice (2026-10-16: the rerun gave her two lamps, two baskets,
+  // two laptops under different paint): the same ARCHETYPE already hers
+  // under another name is refused unless the caller says duplicates are meant.
+  if (!p.allowDuplicate) {
+    const deedsAll = await prisma.entityRelationship.findMany({ where: { sourceId: p.characterId, relationshipType: DEED_RELATIONSHIP, targetType: 'CAMPAIGN_ITEM' }, select: { targetId: true } });
+    const same = await prisma.campaignItem.findFirst({
+      where: { campaignId, sourceForgeItemId: row.id, status: 'ACTIVE', OR: [{ holderId: p.characterId }, { id: { in: deedsAll.map(d => d.targetId) } }] },
+      select: { id: true, name: true },
+    });
+    if (same) {
+      return { ok: false, reason: `She already has a "${row.name}" — "${same.name}" (${same.id}). Not granted again. If she truly owns two, pass allowDuplicate: true; to move or re-place it, use move_item.` };
     }
   }
 

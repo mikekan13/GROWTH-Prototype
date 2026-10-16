@@ -30,6 +30,7 @@ beforeEach(() => {
   db.entityRelationship.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: `e_${data.relationshipType}`, ...data }));
   createItem.mockImplementation(async (_c: string, _u: string, _r: string, input: Record<string, unknown>) => ({ id: 'item1', ...input }));
   db.location.findMany.mockResolvedValue([{ id: 'loc1', name: "Violet's Apartment" }]);
+  db.entityRelationship.findMany.mockResolvedValue([]);
 });
 
 describe('catalog first: pull stock + paint the instance', () => {
