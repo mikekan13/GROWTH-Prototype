@@ -61,3 +61,11 @@ describe('renderMemoriesBrief', () => {
     expect(renderMemoriesBrief({ items: [], marks: [], places: [], people: [] })).toMatch(/finish the stage/);
   });
 });
+
+describe('normalizeSourceKey', () => {
+  it('strips the brackets JEWL copies from the brief', async () => {
+    const { normalizeSourceKey } = await import('./genesis-brief-context');
+    expect(normalizeSourceKey('[genesis:item:x]')).toBe('genesis:item:x');
+    expect(normalizeSourceKey(' genesis:mark:body:3 ')).toBe('genesis:mark:body:3');
+  });
+});

@@ -26,7 +26,7 @@ async function main() {
     prisma.location.findMany({ where: { campaignId: c.campaignId }, select: { id: true, name: true }, orderBy: { createdAt: 'desc' }, take: 12 }),
   ]);
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId: id }, select: { id: true } });
-  const mem = entity ? await prisma.dayaMemoryEntry.count({ where: { entityId: entity.id, source: { startsWith: 'genesis:' } } }) : 0;
+  const mem = entity ? await prisma.dayaMemoryEntry.count({ where: { entityId: entity.id, source: { contains: 'genesis:' } } }) : 0;
   const facts = await prisma.worldFact.count({ where: { campaignId: c.campaignId, subjectKey: { startsWith: c.name.split(' ')[0].toLowerCase() }, supersededById: null } });
   const sheet = JSON.parse(c.data) as { wealth?: unknown; _genesisStages?: unknown };
   const locName = new Map(locs.map(l => [l.id, l.name]));

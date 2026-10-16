@@ -16,6 +16,11 @@ const LOOK_KINDS = new Set([...MARK_KINDS, 'hair', 'build', 'underwear']);
 
 export interface LookLine { kind: string; where: 'face' | 'body'; text: string; index: number }
 
+/** "[genesis:item:x]" → "genesis:item:x". Pure. */
+export function normalizeSourceKey(source: string): string {
+  return source.trim().replace(/^\[|\]$/g, '');
+}
+
 /** The sentences of her approved look, marks first. Pure. */
 export function lookLines(designer: Partial<DesignerState> | undefined): LookLine[] {
   const out: LookLine[] = [];
@@ -123,8 +128,10 @@ export async function buildMemoriesBrief(characterId: string): Promise<string | 
   const entity = await prisma.dayaEntity.findUnique({ where: { characterId }, select: { id: true } });
   const done = new Set<string>();
   if (entity) {
-    const rows = await prisma.dayaMemoryEntry.findMany({ where: { entityId: entity.id, source: { startsWith: 'genesis:' } }, select: { source: true } });
-    rows.forEach(r => done.add(r.source));
+    // JEWL copies the key as the brief prints it — brackets included — so
+    // both "genesis:item:x" and "[genesis:item:x]" count.
+    const rows = await prisma.dayaMemoryEntry.findMany({ where: { entityId: entity.id, source: { contains: 'genesis:' } }, select: { source: true } });
+    rows.forEach(r => done.add(normalizeSourceKey(r.source)));
   }
   return renderMemoriesBrief({
     items: w.items.map(i => ({ id: i.id, name: i.name, archetype: i.archetype, story: i.story, where: i.where, done: done.has(`genesis:item:${i.id}`) })),
