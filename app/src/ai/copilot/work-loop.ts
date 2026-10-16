@@ -16,10 +16,14 @@
  * spoken hand-off question (continueUnattended), or it is a character
  * genesis (background by default, perf pass 2026-10-12).
  *
- * Concurrency (2026-10-12): up to JEWL_WORK_CONCURRENCY (default 2) cycles
- * run at once, never two on one character; each session takes its own
- * breather between cycles. SQLite single-writer holds: every write is a
- * small transaction under the WAL + busy timeout (lib/db).
+ * Concurrency (2026-10-12; default 3 since 2026-10-16 — JEWL is a swarm,
+ * [[ruling-world-building-recursion-jewl-swarm-personality-2026-10-16]]):
+ * up to JEWL_WORK_CONCURRENCY cycles run at once, never two on one
+ * character; each session takes its own breather between cycles. Spawned
+ * child geneses (genesis-spawn.ts) are ordinary sessions here: the
+ * oldest-lastCycleAt-first order keeps the parent ahead of its children.
+ * SQLite single-writer holds: every write is a small transaction under the
+ * WAL + busy timeout (lib/db).
  *
  * Guarded-global singleton (pod-keepalive pattern) — survives HMR.
  * Runtime is imported dynamically to keep the tools-barrel module graph
@@ -110,7 +114,7 @@ export function kickWorkLoop(): void {
 
 /**
  * One scheduling pass: start every session that may run now, up to
- * JEWL_WORK_CONCURRENCY in flight (default 2). Background sessions
+ * JEWL_WORK_CONCURRENCY in flight (default 3). Background sessions
  * (continueUnattended, every genesis) run with no SSE connection open;
  * attended ones only while their campaign has one. Never two cycles on one
  * character. Exported for tests.

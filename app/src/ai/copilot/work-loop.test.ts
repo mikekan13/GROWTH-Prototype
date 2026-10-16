@@ -63,6 +63,7 @@ beforeEach(() => {
 
 describe('workLoopTick', () => {
   it('two sessions advance in the same tick; a third waits for a slot', async () => {
+    process.env.JEWL_WORK_CONCURRENCY = '2'; // the default is 3 since 2026-10-16 (JEWL is a swarm); this test pins two slots
     const releases = deferredDispatches();
     sessions.push(session('a'), session('b'), session('c'));
     const t1 = await workLoopTick();

@@ -9,7 +9,7 @@ const db = vi.hoisted(() => ({
   seq: 0,
   kicks: 0,
   logs: [] as Array<Record<string, unknown>>,
-  chat: [] as Array<{ sessionId: string; prodId: string; question: string }>,
+  chat: [] as Array<{ sessionId: string; prodId: string; question: string; audience?: string }>,
   acks: [] as Array<{ d: string; resumed: boolean }>,
   userMsgs: [] as Array<Record<string, unknown>>,
 }));
@@ -30,6 +30,19 @@ vi.mock('@/lib/db', () => ({
     campaign: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         (where.id === 'c1' ? { id: 'c1', gmUserId: 'gm' } : where.id === 'c2' ? { id: 'c2', gmUserId: 'gm2' } : null)),
+    },
+    // ch1 = Violet (owned by player 'pl'); ch2 = Kai (owned by 'pl2'); npc1 = the GM's NPC; other = another campaign's.
+    character: {
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => ({
+        ch1: { id: 'ch1', userId: 'pl', campaignId: 'c1' },
+        ch2: { id: 'ch2', userId: 'pl2', campaignId: 'c1' },
+        npc1: { id: 'npc1', userId: 'gm', campaignId: 'c1' },
+        other: { id: 'other', userId: 'px', campaignId: 'c2' },
+      } as Record<string, unknown>)[where.id] ?? null),
+    },
+    userNotification: {
+      findMany: vi.fn(async () => []),
+      updateMany: vi.fn(async () => ({ count: 0 })),
     },
     dayaWorkSession: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => db.sessions.find(s => s.id === where.id) ?? null),
@@ -73,6 +86,11 @@ vi.mock('./character-genesis-progress', () => ({
   announceGenesisProd: vi.fn(async (s: { id: string }, p: { id: string; question: string }) => {
     db.chat.push({ sessionId: s.id, prodId: p.id, question: p.question });
     return 'line';
+  }),
+  // Routing (gm chat vs player notification) is tested in genesis-prod-delivery.test.ts.
+  deliverGenesisProd: vi.fn(async (s: { id: string }, p: { id: string; question: string; audience?: string }) => {
+    db.chat.push({ sessionId: s.id, prodId: p.id, question: p.question, ...(p.audience ? { audience: p.audience } : {}) });
+    return { channel: 'chat', userId: 'gm' };
   }),
   announceProdDecision: vi.fn(async (_s: unknown, d: string, resumed: boolean) => { db.acks.push({ d, resumed }); return `ack ${d}`; }),
   logGenesisReport: vi.fn(async (o: Record<string, unknown>) => { db.logs.push(o); return 'ev'; }),
@@ -296,7 +314,7 @@ describe('a question is a prod at ANY stage (2026-10-12)', () => {
     await raise(1);
     expect(session()).toMatchObject({ stage: 'BUILDING', status: 'blocked' });
     expect(session().blockedReason).toBe('waiting on the GM — prods [p1]');
-    expect(db.chat).toEqual([{ sessionId: 's1', prodId: 'p1', question: 'Who set the fire? (1)' }]);
+    expect(db.chat).toEqual([{ sessionId: 's1', prodId: 'p1', question: 'Who set the fire? (1)', audience: 'gm' }]);
     await raise(2);
     expect(session().blockedReason).toBe('waiting on the GM — prods [p1,p2]');
     expect(db.chat).toHaveLength(2);
@@ -349,10 +367,82 @@ describe('a question is a prod at ANY stage (2026-10-12)', () => {
   });
 });
 
+describe('prods carry an AUDIENCE — whoever owns the answer (2026-10-16)', () => {
+  const PLAYER = { id: 'pl', role: 'TRAILBLAZER' };
+  const PLAYER2 = { id: 'pl2', role: 'TRAILBLAZER' };
+
+  it('defaults to gm; player and player:<id> are stored and delivered with the prod', async () => {
+    await raise(1);
+    await raise(2, { audience: 'player' });
+    await raise(3, { audience: 'player:ch2' });
+    expect(db.prods.map(p => p.audience)).toEqual(['gm', 'player', 'player:ch2']);
+    expect(db.chat.map(c => c.audience)).toEqual(['gm', 'player', 'player:ch2']);
+  });
+
+  it('player:<her own id> is plain player; player:<not of this campaign> is refused; a bad shape is refused', async () => {
+    await raise(1, { audience: 'player:ch1' });
+    expect(db.prods[0].audience).toBe('player');
+    await expect(raise(2, { audience: 'player:other' })).rejects.toThrow(/not a character of this campaign/);
+    await expect(raise(3, { audience: 'watcher' })).rejects.toThrow();
+    expect(db.prods).toHaveLength(1);
+  });
+
+  describe('mayDecideProd (pure)', () => {
+    const ctx = { gmUserId: 'gm', ownerUserId: 'pl', namedOwnerUserId: 'pl2' };
+    it('the GM and ADMIN decide everything', () => {
+      for (const a of ['gm', 'player', 'player:ch2']) {
+        expect(svc.mayDecideProd(GM, { ...ctx, audience: a })).toBe(true);
+        expect(svc.mayDecideProd({ id: 'adm', role: 'ADMIN' }, { ...ctx, audience: a })).toBe(true);
+      }
+    });
+    it("the character's owner decides only 'player'; the named owner only 'player:<id>'", () => {
+      expect(svc.mayDecideProd(PLAYER, { ...ctx, audience: 'gm' })).toBe(false);
+      expect(svc.mayDecideProd(PLAYER, { ...ctx, audience: 'player' })).toBe(true);
+      expect(svc.mayDecideProd(PLAYER, { ...ctx, audience: 'player:ch2' })).toBe(false);
+      expect(svc.mayDecideProd(PLAYER2, { ...ctx, audience: 'player:ch2' })).toBe(true);
+      expect(svc.mayDecideProd(PLAYER2, { ...ctx, audience: 'player' })).toBe(false);
+      expect(svc.mayDecideProd(PLAYER, { ...ctx, audience: null })).toBe(false);
+      expect(svc.mayDecideProd(PLAYER, { ...ctx, ownerUserId: null, audience: 'player' })).toBe(false);
+    });
+  });
+
+  it("Violet's player decides a 'player' prod and the session resumes; not a 'gm' one; never SAIL", async () => {
+    session().stage = 'WORLD';
+    await raise(1, { audience: 'player' });
+    await raise(2);
+    await expect(svc.decideProd({ campaignId: 'c1', prodId: 'p2', user: PLAYER, body: { decision: 'LEAVE_OPEN' } }))
+      .rejects.toBeInstanceOf(ForbiddenError);
+    await expect(svc.decideProd({ campaignId: 'c1', prodId: 'p1', user: PLAYER, body: { decision: 'SAIL' } }))
+      .rejects.toThrow(/Only the campaign GM can tell JEWL/);
+    const r = await svc.decideProd({ campaignId: 'c1', prodId: 'p1', user: PLAYER, body: { decision: 'ANSWER', answer: 'A fourth-floor walkup.' } });
+    expect(db.prods[0]).toMatchObject({ status: 'ANSWERED', decidedById: 'pl' });
+    expect(r.resumed).toBe(false); // p2 still waits on the GM
+    await svc.decideProd({ campaignId: 'c1', prodId: 'p2', user: GM, body: { decision: 'YOU_DECIDE' } });
+    expect(session().status).toBe('active');
+    expect(db.logs.some(l => l.heading === 'prod · player decided')).toBe(true);
+  });
+
+  it("another player decides only a prod addressed to their character", async () => {
+    session().stage = 'WORLD';
+    await raise(1, { audience: 'player:ch2' });
+    await expect(svc.decideProd({ campaignId: 'c1', prodId: 'p1', user: PLAYER, body: { decision: 'LEAVE_OPEN' } }))
+      .rejects.toBeInstanceOf(ForbiddenError);
+    await svc.decideProd({ campaignId: 'c1', prodId: 'p1', user: PLAYER2, body: { decision: 'ANSWER', answer: 'We grew up on the same stair.' } });
+    expect(db.prods[0]).toMatchObject({ status: 'ANSWERED', decidedById: 'pl2' });
+  });
+
+  it("the owner reads her character's prods; a stranger does not", async () => {
+    await raise(1, { audience: 'player' });
+    const mine = await svc.getCharacterProds({ campaignId: 'c1', characterId: 'ch1', user: PLAYER });
+    expect(mine.prods).toHaveLength(1);
+    await expect(svc.getCharacterProds({ campaignId: 'c1', characterId: 'ch1', user: PLAYER2 })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
 describe('JEWL asks in the chat; the chat reply answers (2026-10-12)', () => {
   it('every raised prod — PRODDING too — goes to the chat as its own message', async () => {
     await raise(1);
-    expect(db.chat).toEqual([{ sessionId: 's1', prodId: 'p1', question: 'Who set the fire? (1)' }]);
+    expect(db.chat).toEqual([{ sessionId: 's1', prodId: 'p1', question: 'Who set the fire? (1)', audience: 'gm' }]);
   });
 
   it("the Watcher's plain reply answers the open prod, JEWL acks, the session resumes", async () => {

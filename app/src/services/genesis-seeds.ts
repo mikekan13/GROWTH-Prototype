@@ -10,6 +10,8 @@
  * the character whose genesis seeded it, the relation/valence/open thread on
  * the edge and in the shell's `_seed`. NO sheet, NO sketch, NO model call —
  * the Watcher deepens a seed when the story needs it (completeCharacter).
+ * Since 2026-10-16 the seed ALSO gets her own genesis in the background
+ * (genesis-spawn.ts: sketch + sail walk, depth 1 only, campaign setting).
  *
  * OPEN THREADS FROM PRODS ARE NEVER FILLED
  * ([[ruling-genesis-is-a-dialogue-jewl-prods-gm-2026-10-12]]): a seed whose
@@ -30,6 +32,7 @@ import { createLocation } from './location';
 import { DEED_RELATIONSHIP, findCampaignLocation } from './genesis-possessions';
 import { findGenesisSession } from './block-attachment';
 import { PLACE_RELATIONS, loadGmWorldMessages } from './genesis-stages';
+import { seedDepth, spawnSeedGenesisLater } from './genesis-spawn';
 
 export const SEED_TIER = 'SEED';
 /** The edge from the character to a person her genesis seeded. */
@@ -78,10 +81,12 @@ async function gmOf(campaignId: string): Promise<string> {
   return c.gmUserId;
 }
 
-/** Seed a named person from her backstory as an NPC shell. No model call. */
-export async function seedNpc(campaignId: string, input: unknown) {
+/** Seed a named person from her backstory as an NPC shell. No model call
+ *  here — her own genesis (sketch + sail walk) is scheduled in the background
+ *  when the campaign allows it (`noSpawn` for callers that must not). */
+export async function seedNpc(campaignId: string, input: unknown, opts: { noSpawn?: boolean } = {}) {
   const p = seedNpcSchema.parse(input);
-  const bearer = await prisma.character.findUnique({ where: { id: p.characterId }, select: { id: true, name: true, campaignId: true } });
+  const bearer = await prisma.character.findUnique({ where: { id: p.characterId }, select: { id: true, name: true, campaignId: true, data: true } });
   if (!bearer || bearer.campaignId !== campaignId) throw new NotFoundError('Character not found in this campaign');
   const name = p.name.trim();
   if (name.toLowerCase() === bearer.name.toLowerCase()) throw new ValidationError('That is the character herself — seed the people around her.');
@@ -104,6 +109,9 @@ export async function seedNpc(campaignId: string, input: unknown) {
     ...(thread.prodId ? { openThreadProdId: thread.prodId } : {}),
     sessionId: session?.id ?? null,
     seededAt: new Date().toISOString(),
+    // Recursive genesis (2026-10-16): one deeper than the bearer. Depth 1
+    // gets her own (sketch + sail walk); depth 2 stays a shell.
+    genesisDepth: seedDepth(bearer.data) + 1,
   };
 
   // Reuse a person already in the campaign (another genesis may have seeded them).
@@ -147,7 +155,17 @@ export async function seedNpc(campaignId: string, input: unknown) {
     },
     update: { data: edgeData },
   });
-  return { npcId, name, created, relation: p.relation, valence: p.valence, openThread: thread.text, unresolved: thread.unresolved };
+  // Every built person gets the same genesis (Mike 2026-10-16) — in the
+  // background, bounded (genesis-spawn.ts); the bearer's cycle never waits.
+  let spawn: 'scheduled' | 'skipped' = 'skipped';
+  if (created && !opts.noSpawn) {
+    spawnSeedGenesisLater({
+      campaignId, npcId, created,
+      parent: { characterId: bearer.id, name: bearer.name, sessionId: session?.id ?? null },
+    });
+    spawn = 'scheduled';
+  }
+  return { npcId, name, created, relation: p.relation, valence: p.valence, openThread: thread.text, unresolved: thread.unresolved, genesis: spawn };
 }
 
 /** Seed a place from her story + the GM's typed world messages. */

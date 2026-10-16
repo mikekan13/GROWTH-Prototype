@@ -21,7 +21,7 @@ import { requireCampaignGM } from './campaign-access';
 import { openWorkSession } from './daya-work-session';
 import { buildGenesisPlan, buildProdSections, type PlanProd } from './character-genesis-plan';
 import { dedupeBlockLinks, syncCreationFromBlockLinks } from './genesis-sheet-sync';
-import { GENESIS_POST_SHEET_STAGES, detectMissingStages, type GenesisPostSheetStage } from './genesis-stages';
+import { GENESIS_POST_SHEET_STAGES, detectMissingStages, isGateStage, type GenesisPostSheetStage } from './genesis-stages';
 
 export const COMPLETION_HEADER = '== COMPLETION — this character is already BORN ==';
 
@@ -44,7 +44,28 @@ export function isBorn(c: { genesisTier: string | null; dayaStatus: string | nul
 
 export type GenesisMode = 'coax' | 'sail';
 
-export async function completeCharacter(characterId: string, actor: { id: string; role: string }, opts: { mode?: GenesisMode } = {}) {
+/** Recursive genesis (2026-10-16): the genesis this one was spawned from. */
+export interface SpawnedFrom {
+  characterId: string;
+  name: string;
+  sessionId: string | null;
+}
+
+export interface CompleteOptions {
+  mode?: GenesisMode;
+  /** Skip the player gates (APPEARANCE / PORTRAIT) — a spawned NPC's look is
+   *  nobody's to approve at the designer; the walk would hold forever. */
+  skipGates?: boolean;
+  spawnedFrom?: SpawnedFrom;
+}
+
+/** The goal suffix a spawned genesis carries. Pure. NEVER brackets the parent
+ *  id — `[id]` in a goal is how a character's own sessions are found. */
+export function spawnedGoalSuffix(from: SpawnedFrom): string {
+  return ` (spawned from ${from.name}'s genesis · parent ${from.characterId})`;
+}
+
+export async function completeCharacter(characterId: string, actor: { id: string; role: string }, opts: CompleteOptions = {}) {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
     select: { id: true, name: true, campaignId: true, genesisTier: true, data: true, daya: { select: { status: true } } },
@@ -75,7 +96,7 @@ export async function completeCharacter(characterId: string, actor: { id: string
   const { corrections } = await syncCreationFromBlockLinks(characterId);
 
   const missing = await detectMissingStages(characterId);
-  const stages = GENESIS_POST_SHEET_STAGES.filter(s => missing.has(s));
+  const stages = GENESIS_POST_SHEET_STAGES.filter(s => missing.has(s) && !(opts.skipGates && isGateStage(s)));
   if (!stages.length) return { opened: false as const, sessionId: null, stages, removedDuplicateLinks: removed.length, seedCorrections: corrections };
 
   const prods: PlanProd[] = lastDone
@@ -93,10 +114,13 @@ export async function completeCharacter(characterId: string, actor: { id: string
     brief = buildGenesisPlan({ backstory: story, desiredAge: sheet.identity?.age }, character.name, characterId);
   }
 
+  const spawnLine = opts.spawnedFrom
+    ? `SPAWNED GENESIS: ${character.name} is a person ${opts.spawnedFrom.name}'s genesis seeded. Keep her consistent with what ${opts.spawnedFrom.name}'s story already says of her; the people SHE names are seeds only (no further genesis).\n`
+    : '';
   const session = await openWorkSession({
     campaignId,
-    goal: `Character genesis: ${character.name} [${characterId}] — complete the born character: ${stages.join(' → ')}.`,
-    plan: buildCompletionPlan(brief, prods, stages),
+    goal: `Character genesis: ${character.name} [${characterId}] — complete the born character: ${stages.join(' → ')}.${opts.spawnedFrom ? spawnedGoalSuffix(opts.spawnedFrom) : ''}`,
+    plan: spawnLine + buildCompletionPlan(brief, prods, stages),
     createdBy: actor.id,
     stage: stages[0],
     continueUnattended: true,

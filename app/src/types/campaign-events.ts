@@ -199,6 +199,20 @@ export interface DayaWorkSessionEvent {
   note?: string;
 }
 
+/**
+ * JEWL needs a person's answer (2026-10-16): a genesis prod was raised for
+ * `audience` — 'gm' goes to the whole table's GM surface (untargeted);
+ * 'player' / 'player:<characterId>' is sent ONLY to the owning user
+ * (targetUserId). The header badge re-reads /api/notifications on it.
+ */
+export interface NeedsInputEvent {
+  kind: 'needs_input';
+  characterId: string;
+  prodId: string;
+  audience: string;
+  question: string;
+}
+
 // ── JEWL stage direction (C2/C3 — the storytelling-OS gestures) ──────────
 
 /** JEWL pans the GM's camera to an entity ("let me show you..."). */
@@ -280,6 +294,7 @@ export type StreamEventData =
   | TerminalEventRelay
   | JewlWorkingEvent
   | DayaWorkSessionEvent
+  | NeedsInputEvent
   | JewlFocusEvent
   | JewlHighlightEvent
   | BeingSpeakingStreamEvent

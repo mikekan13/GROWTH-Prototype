@@ -1,7 +1,7 @@
 /** SEEDS stage (2026-10-12): NPC seed shells (no model call), open threads never filled, location seed from the GM's typed messages. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { db, createLoc, modelCall } = vi.hoisted(() => ({
+const { db, createLoc, modelCall, spawn } = vi.hoisted(() => ({
   db: {
     character: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn() },
     campaign: { findUnique: vi.fn() },
@@ -13,9 +13,15 @@ const { db, createLoc, modelCall } = vi.hoisted(() => ({
   },
   createLoc: vi.fn(),
   modelCall: vi.fn(),
+  spawn: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({ prisma: db }));
+// Recursive genesis is scheduled, never run, inside seed_npc (its own tests: genesis-spawn.test.ts).
+vi.mock('./genesis-spawn', async (orig) => ({
+  ...(await orig<typeof import('./genesis-spawn')>()),
+  spawnSeedGenesisLater: (o: unknown) => spawn(o),
+}));
 vi.mock('./location', () => ({ createLocation: (...a: unknown[]) => createLoc(...a) }));
 // Any model path would go through these — a seed must touch none of them.
 vi.mock('@/ai/copilot/runtime', () => ({ dispatchPrompt: modelCall }));
@@ -65,8 +71,24 @@ describe('seed_npc — a shell, no model call', () => {
   it('reuses a person already in the campaign instead of duplicating', async () => {
     db.character.findMany.mockResolvedValue([{ id: 'v', name: 'Violet' }, { id: 'old', name: 'Rosemary Marsh' }]);
     const r = await seedNpc('c1', { characterId: 'v', name: 'rosemary marsh', relation: 'grandmother', valence: 1 });
-    expect(r).toMatchObject({ npcId: 'old', created: false });
+    expect(r).toMatchObject({ npcId: 'old', created: false, genesis: 'skipped' });
     expect(db.character.create).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('a NEW seed schedules her own genesis (depth = bearer + 1), linked to the bearer and her session', async () => {
+    const r = await seedNpc('c1', { characterId: 'v', name: 'Rosemary Marsh', relation: 'grandmother', valence: 0.9 });
+    expect(r.genesis).toBe('scheduled');
+    expect(JSON.parse(db.character.create.mock.calls[0][0].data.data)._seed.genesisDepth).toBe(1);
+    expect(spawn).toHaveBeenCalledWith({ campaignId: 'c1', npcId: 'npc1', created: true, parent: { characterId: 'v', name: 'Violet', sessionId: 's1' } });
+  });
+
+  it("a seed of a seed is stamped depth 2 (the spawn decides it gets no genesis); noSpawn callers schedule nothing", async () => {
+    db.character.findUnique.mockResolvedValue({ id: 'r', name: 'Rosemary', campaignId: 'c1', data: JSON.stringify({ _seed: { genesisDepth: 1 } }) });
+    db.character.findMany.mockResolvedValue([{ id: 'r', name: 'Rosemary' }]);
+    await seedNpc('c1', { characterId: 'r', name: 'The Miller', relation: 'neighbour', valence: 0 }, { noSpawn: true });
+    expect(JSON.parse(db.character.create.mock.calls[0][0].data.data)._seed.genesisDepth).toBe(2);
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it('refuses to seed the character herself', async () => {

@@ -708,9 +708,30 @@ model GenesisProd {
   /// stage OPENS with a question round — Mike: "He hasn't asked for my input
   /// one time"). Null = PRODDING / legacy.
   stage       String?
+  /// Who owns the answer (2026-10-16, [[ruling-coax-vs-sail-every-stage-opens-with-questions-2026-10-16]]):
+  /// 'gm' (the Watcher, story fit) | 'player' (the character's owner — her own
+  /// life) | 'player:<characterId>' (another player's character, when the
+  /// thing is theirs). Delivery: gm → GM chat; player → UserNotification.
+  audience    String    @default("gm")
 
   @@index([sessionId, round, order])
   @@index([campaignId, characterId])
+}
+
+/// A thing a person must be told (2026-10-16): JEWL needs the Trailblazer's
+/// answer (kind 'genesis_prod'); the header badge lists the unread ones.
+/// payload = JSON {prodId, sessionId, characterId, characterName, question,
+/// why, audience}. readAt null = unread.
+model UserNotification {
+  id         String    @id @default(cuid())
+  userId     String
+  campaignId String?
+  kind       String
+  payload    String // JSON
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
 }
 
 /// Character ↔ block link (2026-10-12, [[story-attachment-two-ledgers-2026-08-19]]):

@@ -16,7 +16,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { requireCampaignGM } from './campaign-access';
 import { updateWorkSession } from './daya-work-session';
 import { parseGenesisGoal } from './character-genesis-progress';
@@ -51,6 +51,27 @@ export interface GenesisProdRow {
   decidedById: string | null;
   decidedAt: Date | null;
   createdAt: Date;
+  /** 'gm' | 'player' | 'player:<characterId>' — who owns the answer (2026-10-16). */
+  audience?: string;
+}
+
+/** `gm`, `player`, or `player:<characterId>`. */
+export const PROD_AUDIENCE_RE = /^(gm|player|player:[A-Za-z0-9_-]{1,64})$/;
+
+/**
+ * May this user decide this prod? Pure. The campaign GM and ADMIN decide
+ * everything; the character's owner decides prods addressed to 'player';
+ * the named character's owner decides 'player:<id>'.
+ */
+export function mayDecideProd(
+  user: { id: string; role: string },
+  ctx: { gmUserId: string; audience: string | null | undefined; ownerUserId: string | null; namedOwnerUserId?: string | null },
+): boolean {
+  if (user.role === 'ADMIN' || user.id === ctx.gmUserId) return true;
+  const a = (ctx.audience ?? 'gm').trim();
+  if (a === 'player') return !!ctx.ownerUserId && user.id === ctx.ownerUserId;
+  if (a.startsWith('player:')) return !!ctx.namedOwnerUserId && user.id === ctx.namedOwnerUserId;
+  return false;
 }
 
 function clip(text: string, max: number): string {
@@ -95,6 +116,9 @@ export const raiseProdSchema = z.object({
   question: z.string().min(5).max(600),
   why: z.string().min(3).max(300),
   kind: z.enum(PROD_KINDS),
+  /** Who owns the answer (2026-10-16): gm (default) | player | player:<characterId>. */
+  audience: z.string().regex(PROD_AUDIENCE_RE, 'audience = gm | player | player:<characterId>').default('gm')
+    .describe('gm (story fit, default) | player (her own life — the Trailblazer who plays her) | player:<characterId> (another player\'s character).'),
 });
 
 /** JEWL raises one prod — at ANY genesis stage (2026-10-12: "Never should I
@@ -128,6 +152,17 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
       ? `Round ${round} already holds ${PRODS_PER_ROUND} prods — the most load-bearing ones. Call end_prod_round.`
       : `${PRODS_PER_ROUND} prods already wait on the GM — no more until he answers. Assume what you can and note it.`);
   }
+  // player:<id> must name a character of THIS campaign (never her own id —
+  // that is plain 'player').
+  let audience = p.audience;
+  if (audience.startsWith('player:')) {
+    const namedId = audience.slice('player:'.length);
+    if (namedId === parsed.characterId) audience = 'player';
+    else {
+      const named = await prisma.character.findUnique({ where: { id: namedId }, select: { campaignId: true } });
+      if (!named || named.campaignId !== campaignId) throw new ValidationError(`audience player:${namedId} is not a character of this campaign — use "player" for her own life, "gm" for the world.`);
+    }
+  }
   const prod = await prisma.genesisProd.create({
     data: {
       sessionId: session.id,
@@ -142,17 +177,19 @@ export async function raiseProd(input: unknown, campaignId: string): Promise<Gen
       // The stage the question belongs to (2026-10-16): a completion stage
       // opens with a question round, and the cycle knows one happened by this.
       stage: session.stage ?? null,
+      audience,
     },
   });
   if (!prodding) await markBlockedOnProds(session, prod);
   // The chat IS the question, at every stage (Mike 2026-10-12): full text +
-  // why, with Answer / Leave open / You decide attached.
+  // why, with Answer / Leave open / You decide attached. Since 2026-10-16 the
+  // question goes to whoever owns the answer: GM chat, or a notification to
+  // the Trailblazer (deliverGenesisProd), plus a needs_input stream event.
   try {
-    const { announceGenesisProd } = await import('./character-genesis-progress');
-    await announceGenesisProd(session, prod);
+    const { deliverGenesisProd } = await import('./character-genesis-progress');
+    await deliverGenesisProd(session, prod);
   } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[genesis-prods] chat message not posted:', err);
+    console.error('[genesis-prods] prod not delivered:', err);
   }
   return prod;
 }
@@ -244,9 +281,15 @@ export async function recordDelegatedChoice(input: unknown, campaignId: string):
 
 type User = { id: string; role: string };
 
-/** GM: the prods of a character's latest genesis session. */
+/** GM — or the character's owner (2026-10-16: her prods reach her) — the
+ *  prods of a character's latest genesis session. */
 export async function getCharacterProds(opts: { campaignId: string; characterId: string; user: User }) {
-  await requireCampaignGM(opts.campaignId, opts.user);
+  try {
+    await requireCampaignGM(opts.campaignId, opts.user);
+  } catch (err) {
+    const owner = await prisma.character.findUnique({ where: { id: opts.characterId }, select: { userId: true, campaignId: true } });
+    if (!owner || owner.campaignId !== opts.campaignId || owner.userId !== opts.user.id) throw err;
+  }
   const session = await prisma.dayaWorkSession.findFirst({
     where: { campaignId: opts.campaignId, goal: { contains: `[${opts.characterId}]` } },
     orderBy: { startedAt: 'desc' },
@@ -273,13 +316,31 @@ const DECISION_STATUS: Record<'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE' | 'SAIL', P
   SAIL: 'DELEGATED',
 };
 
-/** GM decides one prod. A decision can be changed until Build. When the last
- *  OPEN prod is decided, JEWL wakes for a possible follow-up round. */
+/** The GM decides one prod — or, since 2026-10-16, the person it was
+ *  addressed to (mayDecideProd). A decision can be changed until Build. When
+ *  the last OPEN prod is decided, JEWL wakes for a possible follow-up round. */
 export async function decideProd(opts: { campaignId: string; prodId: string; user: User; body: unknown }) {
-  await requireCampaignGM(opts.campaignId, opts.user);
+  const campaign = await prisma.campaign.findUnique({ where: { id: opts.campaignId }, select: { id: true, gmUserId: true } });
+  if (!campaign) throw new NotFoundError('Campaign not found');
   const d = decideSchema.parse(opts.body);
   const prod = await prisma.genesisProd.findUnique({ where: { id: opts.prodId } });
   if (!prod || prod.campaignId !== opts.campaignId) throw new NotFoundError('Prod not found');
+  const audience = prod.audience ?? 'gm';
+  const owner = await prisma.character.findUnique({ where: { id: prod.characterId }, select: { userId: true } });
+  const namedId = audience.startsWith('player:') ? audience.slice('player:'.length) : null;
+  const named = namedId ? await prisma.character.findUnique({ where: { id: namedId }, select: { userId: true, campaignId: true } }) : null;
+  if (!mayDecideProd(opts.user, {
+    gmUserId: campaign.gmUserId,
+    audience,
+    ownerUserId: owner?.userId ?? null,
+    namedOwnerUserId: named && named.campaignId === opts.campaignId ? named.userId : null,
+  })) {
+    throw new ForbiddenError(audience === 'gm' ? 'Only the campaign GM can do this' : 'Only the campaign GM or the player this question was addressed to can decide it');
+  }
+  // "Fill in the rest" flips the whole genesis to sail — the GM's call only.
+  if (d.decision === 'SAIL' && !(opts.user.role === 'ADMIN' || opts.user.id === campaign.gmUserId)) {
+    throw new ForbiddenError('Only the campaign GM can tell JEWL to fill in the rest');
+  }
   const session = await prisma.dayaWorkSession.findUnique({ where: { id: prod.sessionId } });
   if (!session) throw new NotFoundError('Work session not found');
   requireOpenSession(session);
@@ -295,7 +356,12 @@ export async function decideProd(opts: { campaignId: string; prodId: string; use
       decidedAt: new Date(),
     },
   });
-  await logProdNote(session, 'prod · GM decided', `${prod.question}\n   → ${
+  // Its notification (if a player was told) is read now. Best-effort.
+  try {
+    const { markProdNotificationsRead } = await import('./notifications');
+    await markProdNotificationsRead(prod.id);
+  } catch { /* the badge re-reads on the next poll */ }
+  await logProdNote(session, audience === 'gm' ? 'prod · GM decided' : 'prod · player decided', `${prod.question}\n   → ${
     d.decision === 'ANSWER' ? `answered: ${d.answer}` : d.decision === 'LEAVE_OPEN' ? 'left open (discovered in play)'
       : d.decision === 'SAIL' ? 'fill in the rest (JEWL sails — no more questions this genesis)' : 'you decide (JEWL fills it)'}`);
   if (d.decision === 'SAIL') {

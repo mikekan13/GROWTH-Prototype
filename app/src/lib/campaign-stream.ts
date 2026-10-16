@@ -37,7 +37,8 @@ interface SSEConnection {
  *   - being_speaking (the growing line): never;
  *   - check / cast / death-save / wager / check-request results: only its own character's;
  *   - character_update of another: the refresh signal without the name;
- *   - jewl_working: the phase/tool only (its label names what was built); DAYA work sessions: never.
+ *   - jewl_working: the phase/tool only (its label names what was built); DAYA work sessions: never;
+ *   - needs_input: only when addressed to this viewer (targetUserId).
  * Everything else (connection presence, heartbeats, its own targeted nudges, portrait / focus ids) passes.
  */
 export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, event: CampaignStreamEvent): CampaignStreamEvent | null {
@@ -70,6 +71,9 @@ export function deliveryFor(conn: Pick<SSEConnection, 'userId' | 'perceived'>, e
       return mine(data.characterId) ? event : withData({ ...data, characterName: '' });
     case 'jewl_working':
       return withData({ kind: 'jewl_working', phase: data.phase, ...(data.tool ? { tool: data.tool } : {}) });
+    case 'needs_input':
+      // A question carries story; a perceived-feed viewer gets only the ones addressed to them.
+      return event.targetUserId === conn.userId ? event : null;
     default:
       return event;
   }

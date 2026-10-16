@@ -634,6 +634,87 @@ export async function announceGenesisProd(
   return line;
 }
 
+// ── Who is asked (2026-10-16: prods carry an AUDIENCE) ───────────────────
+
+export type ProdAudienceKind = 'gm' | 'player' | 'player:character';
+
+/** Parse an audience string. Pure. `player:<id>` names another character. */
+export function parseProdAudience(audience: string | null | undefined): { kind: ProdAudienceKind; characterId?: string } {
+  const a = (audience ?? 'gm').trim();
+  if (a === 'player') return { kind: 'player' };
+  if (a.startsWith('player:') && a.length > 'player:'.length) return { kind: 'player:character', characterId: a.slice('player:'.length) };
+  return { kind: 'gm' };
+}
+
+/**
+ * Who receives a prod, and how. Pure.
+ *  - 'gm' → the GM's chat (as always);
+ *  - 'player' → the character's owner; 'player:<id>' → that character's owner.
+ * A player audience whose owner IS the GM (an NPC the GM owns) falls back to
+ * the GM chat — there is nobody else to notify.
+ */
+export function prodRecipient(
+  audience: string | null | undefined,
+  ctx: { gmUserId: string | null; ownerUserId: string | null; namedOwnerUserId?: string | null },
+): { channel: 'chat' | 'notification'; userId: string | null; audience: string } {
+  const parsed = parseProdAudience(audience);
+  const gm = ctx.gmUserId ?? null;
+  if (parsed.kind === 'gm') return { channel: 'chat', userId: gm, audience: 'gm' };
+  const target = parsed.kind === 'player' ? ctx.ownerUserId : (ctx.namedOwnerUserId ?? null);
+  if (!target || target === gm) return { channel: 'chat', userId: gm, audience: parsed.kind === 'player' ? 'player' : `player:${parsed.characterId}` };
+  return { channel: 'notification', userId: target, audience: parsed.kind === 'player' ? 'player' : `player:${parsed.characterId}` };
+}
+
+/**
+ * Deliver one raised prod to whoever owns the answer: GM chat for 'gm' (as
+ * today), a UserNotification for a player audience, and a `needs_input`
+ * campaign-stream event either way (targeted when it is a player's). Never
+ * throws into raise_prod — the prod row already stands.
+ */
+export async function deliverGenesisProd(
+  session: { id: string; campaignId: string; goal: string },
+  prod: { id: string; question: string; why?: string; audience?: string | null },
+): Promise<{ channel: 'chat' | 'notification'; userId: string | null } | null> {
+  const parsed = parseGenesisGoal(session.goal);
+  if (!parsed) return null;
+  const audience = parseProdAudience(prod.audience);
+  const [campaign, owner, named] = await Promise.all([
+    prisma.campaign.findUnique({ where: { id: session.campaignId }, select: { gmUserId: true } }),
+    prisma.character.findUnique({ where: { id: parsed.characterId }, select: { userId: true } }),
+    audience.characterId
+      ? prisma.character.findUnique({ where: { id: audience.characterId }, select: { userId: true, campaignId: true } })
+      : Promise.resolve(null),
+  ]);
+  const to = prodRecipient(prod.audience, {
+    gmUserId: campaign?.gmUserId ?? null,
+    ownerUserId: owner?.userId ?? null,
+    namedOwnerUserId: named && named.campaignId === session.campaignId ? named.userId : null,
+  });
+  if (to.channel === 'chat') {
+    await announceGenesisProd(session, prod);
+  } else {
+    const { createNotification, GENESIS_PROD_NOTIFICATION } = await import('./notifications');
+    await createNotification({
+      userId: to.userId!,
+      campaignId: session.campaignId,
+      kind: GENESIS_PROD_NOTIFICATION,
+      payload: {
+        prodId: prod.id, sessionId: session.id, characterId: parsed.characterId, characterName: parsed.name,
+        question: prod.question.trim(), why: (prod.why ?? '').trim(), audience: to.audience,
+      },
+    });
+  }
+  try {
+    const { broadcastEvent } = await import('@/lib/campaign-stream');
+    broadcastEvent(
+      session.campaignId,
+      { kind: 'needs_input', characterId: parsed.characterId, prodId: prod.id, audience: to.audience, question: prod.question.trim() },
+      to.channel === 'notification' ? to.userId! : undefined,
+    );
+  } catch { /* presence is best-effort */ }
+  return { channel: to.channel, userId: to.userId };
+}
+
 /** JEWL's one-line acknowledgement when the GM decides a prod. Pure. */
 export type ProdDecision = 'ANSWER' | 'LEAVE_OPEN' | 'YOU_DECIDE' | 'SAIL';
 

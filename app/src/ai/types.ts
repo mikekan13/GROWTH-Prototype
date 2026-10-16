@@ -38,6 +38,18 @@ export interface CampaignAISettings {
   localVisionModel?: string;
   /** Local model name for text tasks (e.g. 'gemma2:9b') */
   localTextModel?: string;
+  /**
+   * Recursive genesis (Mike 2026-10-16, [[ruling-world-building-recursion-jewl-swarm-personality-2026-10-16]]):
+   * every person JEWL seeds during a character's WORLD stage gets her own
+   * SKETCH-tier genesis in the background (sail mode, depth 1). Default ON;
+   * the Watcher may turn it off per campaign.
+   */
+  recursiveGenesis?: boolean;
+}
+
+/** Is recursive genesis on for these settings? Pure — default ON. */
+export function recursiveGenesisEnabled(settings: Pick<CampaignAISettings, 'recursiveGenesis'> | null | undefined): boolean {
+  return settings?.recursiveGenesis !== false;
 }
 
 /** Features that MUST use cloud (Claude) — GM cannot override */

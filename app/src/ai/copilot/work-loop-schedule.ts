@@ -6,10 +6,14 @@
  *   genesis is background by default) OR attended (a live SSE connection on
  *   its campaign).
  * - Up to `concurrency` cycles in flight at once (JEWL_WORK_CONCURRENCY,
- *   default 2); a session already in flight or cooling down (its breather,
- *   or a transient-provider pause) waits.
+ *   default 3 — JEWL is a swarm, Mike 2026-10-16: many things at once); a
+ *   session already in flight or cooling down (its breather, or a
+ *   transient-provider pause) waits.
  * - One character never runs twice at once (the per-character guard).
- * - Order is the caller's: least-recently-cycled first (round-robin).
+ * - Order is the caller's: least-recently-cycled first (round-robin). That
+ *   is the fairness law too: a parent genesis that has waited longest goes
+ *   before the child geneses it spawned (genesis-spawn.ts) — children never
+ *   starve the parent, and a never-cycled session goes first of all.
  */
 import { isGenesisGoal, parseGenesisGoal } from '@/services/character-genesis-progress';
 
@@ -20,11 +24,12 @@ export interface SchedulableSession {
   continueUnattended: boolean;
 }
 
-export const DEFAULT_WORK_CONCURRENCY = 2;
+export const DEFAULT_WORK_CONCURRENCY = 3;
+export const MAX_WORK_CONCURRENCY = 8;
 
 export function workConcurrency(env: Record<string, string | undefined> = process.env): number {
   const n = Number(env.JEWL_WORK_CONCURRENCY);
-  return Number.isInteger(n) && n >= 1 ? Math.min(n, 8) : DEFAULT_WORK_CONCURRENCY;
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, MAX_WORK_CONCURRENCY) : DEFAULT_WORK_CONCURRENCY;
 }
 
 /** Background sessions run with nobody at the table. */

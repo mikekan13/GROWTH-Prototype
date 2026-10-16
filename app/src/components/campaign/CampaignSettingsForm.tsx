@@ -85,6 +85,9 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
   );
   const [aiVisionModel, setAiVisionModel] = useState(initialData.aiSettings.localVisionModel ?? '');
   const [aiTextModel, setAiTextModel] = useState(initialData.aiSettings.localTextModel ?? '');
+  // Recursive genesis (2026-10-16): every person JEWL seeds gets her own
+  // sketch + sail walk in the background. Default ON.
+  const [aiRecursiveGenesis, setAiRecursiveGenesis] = useState(initialData.aiSettings.recursiveGenesis !== false);
   const [savingAI, setSavingAI] = useState(false);
 
   function setOverride(feature: AIFeature, choice: 'default' | AIProviderChoice) {
@@ -109,6 +112,7 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
           overrides: aiOverrides,
           localVisionModel: aiVisionModel.trim() || undefined,
           localTextModel: aiTextModel.trim() || undefined,
+          recursiveGenesis: aiRecursiveGenesis,
         }),
       });
       if (!res.ok) {
@@ -554,6 +558,22 @@ export default function CampaignSettingsForm({ campaignId, initialData }: Campai
             />
           </div>
         </div>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={aiRecursiveGenesis}
+            onChange={e => setAiRecursiveGenesis(e.target.checked)}
+            className="mt-0.5 accent-[var(--accent-teal)]"
+          />
+          <span>
+            <span className={labelClass}>Recursive genesis</span>
+            <span className="block text-[10px] text-white/40 leading-snug">
+              Every person JEWL seeds in a character&apos;s world gets a genesis of her own in the background
+              (a sketch, then the walk in sail mode — one level deep). Off = seeds stay shells until you deepen them.
+            </span>
+          </span>
+        </label>
 
         <button
           type="button"

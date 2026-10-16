@@ -243,25 +243,48 @@ export async function sketchNpc(opts: {
   }
 
   const characterId = opts.characterId ?? newCharacterId();
+  // Recursive genesis (2026-10-16): the id may name an NPC SEED shell another
+  // character's genesis seeded (genesis-seeds.ts). Then the sketch FILLS the
+  // shell — its name, `_seed` (relation, depth, spawnedFrom) and seededFromId
+  // stand; only the sheet, tier and status change — and a failed investment
+  // restores the shell instead of deleting a person the story already names.
+  const shell = opts.characterId
+    ? await prisma.character.findUnique({ where: { id: opts.characterId }, select: { id: true, name: true, data: true, status: true, genesisTier: true } })
+    : null;
+  if (shell && shell.genesisTier !== 'SEED') throw new ValidationError('That character already has a sheet — only an NPC seed shell can be sketched in place.');
+  let shellSeed: Record<string, unknown> | null = null;
+  if (shell) {
+    proposal.name = shell.name;
+    try { shellSeed = (JSON.parse(shell.data) as { _seed?: Record<string, unknown> })._seed ?? null; } catch { shellSeed = null; }
+  }
   const noteClamp = (f: typeof fit) => (f.clamped ? `clamped ${f.proposedTkv} → ${f.tkv} KRMA to fit the wallet` : null);
   const stamp = (f: typeof fit) => {
     const d = f.sheet as unknown as Record<string, unknown>;
     d._sketch = { ...(d._sketch as Record<string, unknown>), tkv: f.tkv, proposedTkv: f.proposedTkv, clamped: f.clamped, sketchedAt: new Date().toISOString() };
+    if (shellSeed) d._seed = shellSeed;
     return JSON.stringify(d);
   };
+  const unmake = async () => {
+    if (shell) await prisma.character.update({ where: { id: characterId }, data: { data: shell.data, status: shell.status, genesisTier: 'SEED' } }).catch(() => undefined);
+    else await prisma.character.delete({ where: { id: characterId } }).catch(() => undefined);
+  };
 
-  await prisma.character.create({
-    data: {
-      id: characterId,
-      name: proposal.name,
-      entityType: 'NPC',
-      status: 'DRAFT',
-      userId: campaign.gmUserId,
-      campaignId,
-      data: stamp(fit),
-      genesisTier: 'SKETCH',
-    },
-  });
+  if (shell) {
+    await prisma.character.update({ where: { id: characterId }, data: { data: stamp(fit), genesisTier: 'SKETCH' } });
+  } else {
+    await prisma.character.create({
+      data: {
+        id: characterId,
+        name: proposal.name,
+        entityType: 'NPC',
+        status: 'DRAFT',
+        userId: campaign.gmUserId,
+        campaignId,
+        data: stamp(fit),
+        genesisTier: 'SKETCH',
+      },
+    });
+  }
 
   // Price it: the TKV moves campaign → character wallet through the
   // existing crystallization debit (never bypassed). A concurrent spend can
@@ -274,7 +297,7 @@ export async function sketchNpc(opts: {
   } catch (first) {
     const again = fitToBudget(sheet, await walletBudget(campaignId));
     if (!again.affordable || again.tkv === fit.tkv) {
-      await prisma.character.delete({ where: { id: characterId } }).catch(() => undefined);
+      await unmake();
       throw first;
     }
     fit = again;
@@ -282,7 +305,7 @@ export async function sketchNpc(opts: {
     try {
       await invest(fit.tkv);
     } catch (second) {
-      await prisma.character.delete({ where: { id: characterId } }).catch(() => undefined);
+      await unmake();
       throw second;
     }
   }

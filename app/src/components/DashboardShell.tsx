@@ -6,6 +6,7 @@ import Link from 'next/link';
 import GrowthLogo from './GrowthLogo';
 import GlitchText from './GlitchText';
 import EyetehrnetLogo from './EyetehrnetLogo';
+import NotificationBell from './NotificationBell';
 
 interface DashboardShellProps {
   username: string;
@@ -239,7 +240,9 @@ export default function DashboardShell({ username, role, realRole, children }: D
             })}
           </nav>
 
-          {/* Right: User dropdown */}
+          {/* Right: notifications (JEWL needs you) + user dropdown */}
+          <div className="flex items-center gap-3">
+          <NotificationBell />
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -292,6 +295,7 @@ export default function DashboardShell({ username, role, realRole, children }: D
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
 
