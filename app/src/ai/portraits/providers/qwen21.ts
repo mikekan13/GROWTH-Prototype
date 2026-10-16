@@ -133,17 +133,18 @@ export const QWEN21_PORTRAIT_SIZE = { width: 832, height: 1040 } as const;
  * Two framings (Mike 2026-10-16: "We have different definitions of portrait…
  * this is a clothed full body — cool, we will need it for things like
  * inventory — but I meant the portrait"):
- *  - BUST = the PORTRAIT: head and shoulders, the face the subject, the
- *    clothes at the collar and shoulders, the room soft behind. The canvas image.
+ *  - BUST = the PORTRAIT: WAIST UP (Mike: "Portrait is like waist up… not a
+ *    headshot, not a full length… a portrait"), 4:5, the face the subject,
+ *    the clothes from shoulders to waist, the room behind. The canvas image.
  *  - FIGURE = the clothed full body (inventory / paperdoll).
  */
 export type PortraitFrame = 'bust' | 'figure';
 export const QWEN21_PORTRAIT_SIZES: Record<PortraitFrame, { width: number; height: number }> = {
-  bust: { width: 1024, height: 1024 },
+  bust: { width: 832, height: 1040 },
   figure: { width: 832, height: 1040 },
 };
 const PORTRAIT_FRAMINGS: Record<PortraitFrame, string> = {
-  bust: 'A head-and-shoulders PORTRAIT: from the top of the head to the upper chest, the face of the person in <image1> is the subject, large in the upper middle of the frame, looking at the viewer. Her clothes show only at the collar and shoulders; her skin and every mark on the neck and collarbone as in <image2>, never its plain background. The room she is in is behind her, softly out of focus, lit as described.',
+  bust: 'A waist-up PORTRAIT: from the top of the head to the waist, the face of the person in <image1> the clear subject in the upper third of the frame, looking at the viewer; arms and hands in the frame. Her clothes as described from the shoulders to the waist; her build, skin and every visible mark as in <image2>, never its plain background. The room she is in is behind her, lit as described.',
   figure: 'Framed from the head to the feet, the face unmistakably the person in <image1>; take only her build, skin and every mark from <image2>, never its plain background or its clothing. The room she is in fills the background around her, lit as described.',
 };
 const PORTRAIT_FRAMING = PORTRAIT_FRAMINGS.bust;
