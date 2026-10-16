@@ -29,8 +29,8 @@ function component(name: string, description: string, opts: Partial<ItemTemplate
   };
 }
 
-const wheels = (n: number, lbs: number) => component(`Wheels & Tires (${n})`, 'Where the machine meets the road.', { primaryMaterial: 'Rubber', subordinateMaterials: ['Steel'], materialClass: 'Soft', weightLbs: lbs, baseResist: 4 });
-const battery = () => component('Battery', 'Stored ignition; famously mortal in winter.', { weightLbs: 40, baseResist: 3, properties: ['Electric Vulnerable'] });
+const wheels = (n: number, lbs: number, extra: Partial<ItemTemplate> = {}) => component(`Wheels & Tires (${n})`, 'Where the machine meets the road.', { primaryMaterial: 'Rubber', subordinateMaterials: ['Steel'], materialClass: 'Soft', weightLbs: lbs, baseResist: 4, ...extra });
+const battery = (extra: Partial<ItemTemplate> = {}) => component('Battery', 'Stored ignition; famously mortal in winter.', { weightLbs: 40, baseResist: 3, properties: ['Electric Vulnerable'], ...extra });
 
 export const VEHICLES: ItemTemplate[] = [
   {
@@ -42,15 +42,15 @@ export const VEHICLES: ItemTemplate[] = [
       { name: 'Road Travel', description: 'Carries 5 people and cargo at highway speed (Driving to operate).', kv: 25 },
       { name: 'Shelter', description: 'Lockable cover from weather; uncomfortable but real sleep for two.', kv: 5 },
     ],
-    kv: 70,
+    kv: 167, volumeCuFt: 410, capacityCuFt: 111, capacityLbs: 900,
     tags: ['possession', 'vehicle', 'multi-component', 'modern'],
     contains: [
-      component('Engine (I4)', 'The vital heart: no engine, no vehicle.', { weightLbs: 350, baseResist: 8 }),
-      battery(),
-      component('Fuel Tank', 'Twelve gallons of range.', { weightLbs: 90, baseResist: 4, properties: ['Combustible'] }),
-      wheels(4, 190),
-      component('Cabin & Controls', 'Seats, wheel, pedals, dash — the interface.', { subordinateMaterials: ['Fabric'], weightLbs: 400, baseResist: 5 }),
-      component('Trunk', 'Sixteen cubic feet of plausible deniability.', { weightLbs: 60, baseResist: 5 }),
+      component('Engine (I4)', 'The vital heart: no engine, no vehicle.', { volumeCuFt: 12, weightLbs: 350, baseResist: 8 }),
+      battery({ volumeCuFt: 0.4 }),
+      component('Fuel Tank', 'Twelve gallons of range.', { volumeCuFt: 3, weightLbs: 90, baseResist: 4, properties: ['Combustible'] }),
+      wheels(4, 190, { volumeCuFt: 14 }),
+      component('Cabin & Controls', 'Seats, wheel, pedals, dash — the interface.', { volumeCuFt: 100, capacityCuFt: 95, capacityLbs: 600, subordinateMaterials: ['Fabric'], weightLbs: 400, baseResist: 5 }),
+      component('Trunk', 'Sixteen cubic feet of plausible deniability.', { volumeCuFt: 17, capacityCuFt: 16, capacityLbs: 300, weightLbs: 60, baseResist: 5 }),
     ],
   },
   {
@@ -62,15 +62,15 @@ export const VEHICLES: ItemTemplate[] = [
       { name: 'Haul & Tow', description: 'Carries 3 (6 crew cab), beds 1,500 lbs, tows 8,000. Off-road capable (Driving).', kv: 32 },
       { name: 'Work Rig', description: 'Powers tools from the bed; counts as an anchor point for winching.', kv: 6 },
     ],
-    kv: 85,
+    kv: 333, volumeCuFt: 840, capacityCuFt: 208, capacityLbs: 2100,
     tags: ['possession', 'vehicle', 'multi-component', 'modern'],
     contains: [
-      component('Engine (V8)', 'The vital heart, sized for stubborn loads.', { weightLbs: 550, baseResist: 10 }),
-      battery(),
-      component('Fuel Tank', 'Twenty-six gallons of keep-going.', { weightLbs: 170, baseResist: 5, properties: ['Combustible'] }),
-      wheels(4, 280),
-      component('Cabin & Controls', 'Bench seats and a dashboard dusted in job site.', { subordinateMaterials: ['Fabric'], weightLbs: 450, baseResist: 6 }),
-      component('Truck Bed', 'Eight feet of open cargo argument-settler.', { weightLbs: 350, baseResist: 8 }),
+      component('Engine (V8)', 'The vital heart, sized for stubborn loads.', { volumeCuFt: 22, weightLbs: 550, baseResist: 10 }),
+      battery({ volumeCuFt: 0.4 }),
+      component('Fuel Tank', 'Twenty-six gallons of keep-going.', { volumeCuFt: 5, weightLbs: 170, baseResist: 5, properties: ['Combustible'] }),
+      wheels(4, 280, { volumeCuFt: 24 }),
+      component('Cabin & Controls', 'Bench seats and a dashboard dusted in job site.', { volumeCuFt: 140, capacityCuFt: 130, capacityLbs: 600, subordinateMaterials: ['Fabric'], weightLbs: 450, baseResist: 6 }),
+      component('Truck Bed', 'Eight feet of open cargo argument-settler.', { volumeCuFt: 82, capacityCuFt: 78, capacityLbs: 1500, weightLbs: 350, baseResist: 8 }),
     ],
   },
   {
@@ -82,15 +82,15 @@ export const VEHICLES: ItemTemplate[] = [
       { name: 'People Mover', description: 'Carries 7 with gear, or 2 with a small apartment\'s worth of cargo (seats fold flat).', kv: 28 },
       { name: 'Camp Ready', description: 'Flat-folded interior sleeps two adults in genuine comfort.', kv: 5 },
     ],
-    kv: 75,
+    kv: 267, volumeCuFt: 650, capacityCuFt: 173, capacityLbs: 1300,
     tags: ['possession', 'vehicle', 'multi-component', 'modern'],
     contains: [
-      component('Engine (V6)', 'The vital heart, tuned for patience.', { weightLbs: 450, baseResist: 8 }),
-      battery(),
-      component('Fuel Tank', 'Twenty gallons.', { weightLbs: 130, baseResist: 4, properties: ['Combustible'] }),
-      wheels(4, 210),
-      component('Cabin & Controls', 'Cupholders beyond counting.', { subordinateMaterials: ['Fabric'], weightLbs: 500, baseResist: 5 }),
-      component('Cargo Bay', 'The seats vanish; the volume remains.', { weightLbs: 100, baseResist: 5 }),
+      component('Engine (V6)', 'The vital heart, tuned for patience.', { volumeCuFt: 16, weightLbs: 450, baseResist: 8 }),
+      battery({ volumeCuFt: 0.4 }),
+      component('Fuel Tank', 'Twenty gallons.', { volumeCuFt: 4, weightLbs: 130, baseResist: 4, properties: ['Combustible'] }),
+      wheels(4, 210, { volumeCuFt: 16 }),
+      component('Cabin & Controls', 'Cupholders beyond counting.', { volumeCuFt: 150, capacityCuFt: 140, capacityLbs: 900, subordinateMaterials: ['Fabric'], weightLbs: 500, baseResist: 5 }),
+      component('Cargo Bay', 'The seats vanish; the volume remains.', { volumeCuFt: 35, capacityCuFt: 33, capacityLbs: 400, weightLbs: 100, baseResist: 5 }),
     ],
   },
   {
@@ -102,14 +102,14 @@ export const VEHICLES: ItemTemplate[] = [
       { name: 'Split & Sprint', description: 'Carries 2 at highway speed; ignores car-scale congestion; +2 on urban chase checks (Driving).', kv: 22 },
       { name: 'Exposed', description: 'The rider IS the crumple zone: crashes deal full damage to the rider (gear mitigates).', kv: -6 },
     ],
-    kv: 45,
+    kv: 53.3, volumeCuFt: 60, capacityCuFt: 1, capacityLbs: 400,
     tags: ['possession', 'vehicle', 'multi-component', 'modern'],
     contains: [
-      component('Engine (Twin)', 'The vital heart between the rider\'s knees.', { weightLbs: 160, baseResist: 6 }),
-      battery(),
-      component('Fuel Tank', 'Four gallons, worn like a belt buckle.', { weightLbs: 30, baseResist: 3, properties: ['Combustible'] }),
-      wheels(2, 60),
-      component('Controls & Saddle', 'Bars, levers, seat: the whole interface, weather included.', { subordinateMaterials: ['Leather'], weightLbs: 40, baseResist: 3 }),
+      component('Engine (Twin)', 'The vital heart between the rider\'s knees.', { volumeCuFt: 4, weightLbs: 160, baseResist: 6 }),
+      battery({ volumeCuFt: 0.4 }),
+      component('Fuel Tank', 'Four gallons, worn like a belt buckle.', { volumeCuFt: 1, weightLbs: 30, baseResist: 3, properties: ['Combustible'] }),
+      wheels(2, 60, { volumeCuFt: 6 }),
+      component('Controls & Saddle', 'Bars, levers, seat: the whole interface, weather included.', { volumeCuFt: 4, capacityCuFt: 1, capacityLbs: 400, subordinateMaterials: ['Leather'], weightLbs: 40, baseResist: 3 }),
     ],
   },
   {
@@ -120,11 +120,11 @@ export const VEHICLES: ItemTemplate[] = [
     itemAbilities: [
       { name: 'Pedal Power', description: 'Triple walking pace on roads and trails; silent; never needs fuel (Athletics for hard riding).', kv: 8 },
     ],
-    kv: 12,
+    kv: 5.33, volumeCuFt: 15,
     tags: ['possession', 'vehicle', 'multi-component', 'modern'],
     contains: [
-      component('Frame & Drivetrain', 'The vital heart is the rider; this is everything else.', { primaryMaterial: 'Aluminum', weightLbs: 22, baseResist: 4 }),
-      wheels(2, 8),
+      component('Frame & Drivetrain', 'The vital heart is the rider; this is everything else.', { volumeCuFt: 10, primaryMaterial: 'Aluminum', weightLbs: 22, baseResist: 4 }),
+      wheels(2, 8, { volumeCuFt: 5 }),
     ],
   },
   {
@@ -136,15 +136,15 @@ export const VEHICLES: ItemTemplate[] = [
       { name: 'Bulk Haul', description: 'Carries 3 up front and ~5,000 lbs / 800 cubic feet in the box (Driving; wide turns are canon).', kv: 35 },
       { name: 'Rolling Room', description: 'The box is standing-height shelter, lockable, power-connectable.', kv: 8 },
     ],
-    kv: 90,
+    kv: 467, volumeCuFt: 2100, capacityCuFt: 880, capacityLbs: 5600,
     tags: ['possession', 'vehicle', 'multi-component', 'modern'],
     contains: [
-      component('Engine (Diesel)', 'The vital heart, rated in decades.', { weightLbs: 700, baseResist: 10 }),
-      battery(),
-      component('Fuel Tank', 'Thirty-three gallons of diesel patience.', { weightLbs: 230, baseResist: 5, properties: ['Combustible'] }),
-      wheels(6, 420),
-      component('Cab & Controls', 'Two seats, one radio, a million miles of stories.', { subordinateMaterials: ['Fabric'], weightLbs: 500, baseResist: 6 }),
-      component('Cargo Box', 'Sixteen feet of empty, waiting to matter.', { primaryMaterial: 'Aluminum', weightLbs: 1500, baseResist: 8 }),
+      component('Engine (Diesel)', 'The vital heart, rated in decades.', { volumeCuFt: 35, weightLbs: 700, baseResist: 10 }),
+      battery({ volumeCuFt: 0.4 }),
+      component('Fuel Tank', 'Thirty-three gallons of diesel patience.', { volumeCuFt: 7, weightLbs: 230, baseResist: 5, properties: ['Combustible'] }),
+      wheels(6, 420, { volumeCuFt: 42 }),
+      component('Cab & Controls', 'Two seats, one radio, a million miles of stories.', { volumeCuFt: 120, capacityCuFt: 80, capacityLbs: 600, subordinateMaterials: ['Fabric'], weightLbs: 500, baseResist: 6 }),
+      component('Cargo Box', 'Sixteen feet of empty, waiting to matter.', { volumeCuFt: 960, capacityCuFt: 800, capacityLbs: 5000, primaryMaterial: 'Aluminum', weightLbs: 1500, baseResist: 8 }),
     ],
   },
 ];

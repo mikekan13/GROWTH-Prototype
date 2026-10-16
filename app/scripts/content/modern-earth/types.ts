@@ -16,8 +16,8 @@
  *   individually KV'd.
  * - KV anchors: +1 flat roll mod ≈ 5 KV; First-Born nectar = +50;
  *   Diminishing thorn = −200 (severe). Attribute/skill levels 1 KV each
- *   (2× magic). Item KV = material floor + damage (1:1 at natural ring
- *   targeting) + 2×resist + graded abilities.
+ *   (2× magic). Item KV = its PRICE in KRMA (ruling 2026-10-16; see
+ *   ItemTemplate.kv) — damage/resist/abilities no longer sum into it.
  */
 
 export type Pillar = 'body' | 'spirit' | 'soul';
@@ -133,8 +133,21 @@ export interface ItemTemplate {
   reload?: string;
   // Armor-only
   armorCategory?: 'Clothing' | 'Light' | 'Heavy';
-  /** Graded total KV (material floor + damage + 2×resist + abilities). */
+  /** KV IS THE PRICE in KRMA (Mike ruling 2026-10-16): graded by real
+   *  modern-US retail price RELATIVE to the anchor — a three-seat couch
+   *  (~$300) = 2 KV, i.e. the stock catalog's internal scale is ~$150/KV.
+   *  Fractional (sub-1 KRMA items allowed), 3 significant figures. There is
+   *  NO fixed dollar rate — each table calculates its own currency rate; this
+   *  scale only keeps global stock consistent relative to itself. Ability
+   *  KVs stay on the abilities; this total stays coherent with price. */
   kv: number;
+  /** The item's own bulk in cubic feet (what it takes up inside a holder). */
+  volumeCuFt?: number;
+  /** For things that HOLD things (storage furniture, appliances, bags, boxes,
+   *  cases, vehicles, buildings): interior volume in cubic feet… */
+  capacityCuFt?: number;
+  /** …and the load it can bear in lbs. Placement refuses over-capacity. */
+  capacityLbs?: number;
   tags?: string[];
   /** Multi-component possessions (vehicles/buildings, Mike ruling
    *  2026-08-04): components nested per the body-comp contains chain. */

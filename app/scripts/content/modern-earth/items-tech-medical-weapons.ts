@@ -23,7 +23,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
       { name: 'Camera & Records', description: 'Capture and store evidence; documented facts can\'t be plausibly denied.', kv: 3 },
       { name: 'Dead Battery', description: 'Requires daily charging; GM may declare it dead at a dramatic moment once per session if uncharged.', kv: -2 },
     ],
-    kv: 10, tags: ['electronics', 'modern'],
+    kv: 3.33, volumeCuFt: 0.004, tags: ['electronics', 'modern'],
   },
   {
     name: 'Burner Phone', itemType: 'accessory',
@@ -31,7 +31,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 0.3, rarity: 1,
     itemAbilities: [{ name: 'Untraceable Line', description: 'Calls and texts that don\'t tie back to the owner. Attempts to trace it take −3.', kv: 4 }],
-    kv: 5, tags: ['electronics', 'modern'],
+    kv: 0.267, volumeCuFt: 0.003, tags: ['electronics', 'modern'],
   },
   {
     name: 'Laptop', itemType: 'tool',
@@ -39,7 +39,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Aluminum', subordinateMaterials: ['Glass'], materialClass: 'Hard',
     weightLbs: 3, rarity: 2, properties: ['Fragile', 'Electric Vulnerable'],
     itemAbilities: [{ name: 'Workstation', description: 'Enables Programming, deep Research, and document work in the field; such checks gain +1.', kv: 8 }],
-    kv: 10, tags: ['electronics', 'modern'],
+    kv: 6, volumeCuFt: 0.07, tags: ['electronics', 'modern'],
   },
   {
     name: 'Tablet', itemType: 'accessory',
@@ -47,7 +47,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Glass', subordinateMaterials: ['Aluminum'], materialClass: 'Hard',
     weightLbs: 1, rarity: 1, properties: ['Fragile'],
     itemAbilities: [{ name: 'Reference Screen', description: 'Maps, manuals, and media at hand; +1 to checks that benefit from live reference.', kv: 4 }],
-    kv: 5, tags: ['electronics', 'modern'],
+    kv: 2.67, volumeCuFt: 0.03, tags: ['electronics', 'modern'],
   },
   {
     name: 'DSLR Camera', itemType: 'tool',
@@ -55,7 +55,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', subordinateMaterials: ['Glass'], materialClass: 'Hard',
     weightLbs: 2, rarity: 2, properties: ['Fragile'],
     itemAbilities: [{ name: 'Professional Optics', description: 'Photography checks gain +2; usable evidence at distances phones can\'t reach.', kv: 5 }],
-    kv: 6, tags: ['electronics', 'modern'],
+    kv: 6, volumeCuFt: 0.15, tags: ['electronics', 'modern'],
   },
   {
     name: 'Consumer Drone', itemType: 'tool',
@@ -63,7 +63,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 2, rarity: 3, properties: ['Fragile', 'Electric Vulnerable'],
     itemAbilities: [{ name: 'Eye in the Sky', description: 'Aerial reconnaissance within a mile (Piloting to fly); 20 minutes per charge.', kv: 8 }],
-    kv: 9, tags: ['electronics', 'modern'],
+    kv: 5.33, volumeCuFt: 0.2, tags: ['electronics', 'modern'],
   },
   {
     name: 'Walkie-Talkie Pair', itemType: 'tool',
@@ -71,7 +71,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 1, rarity: 1,
     itemAbilities: [{ name: 'Off-Grid Comms', description: 'Team communication within ~2 miles, no signal infrastructure needed.', kv: 4 }],
-    kv: 5, tags: ['electronics', 'modern'],
+    kv: 0.4, volumeCuFt: 0.04, tags: ['electronics', 'modern'],
   },
   {
     name: 'Power Bank', itemType: 'accessory',
@@ -79,7 +79,7 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 0.8, rarity: 1,
     itemAbilities: [{ name: 'Reserve Charge', description: 'Negates one Dead Battery declaration; recharges overnight.', kv: 2 }],
-    kv: 3, tags: ['electronics', 'modern'],
+    kv: 0.267, volumeCuFt: 0.01, tags: ['electronics', 'modern'],
   },
   {
     name: 'GPS Unit (Handheld)', itemType: 'tool',
@@ -87,14 +87,14 @@ export const TECH_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 0.5, rarity: 2, properties: ['Strong'],
     itemAbilities: [{ name: 'Waypoint', description: 'Navigation checks auto-succeed under open sky; works where phones die.', kv: 4 }],
-    kv: 5, tags: ['electronics', 'outdoor', 'modern'],
+    kv: 1.67, volumeCuFt: 0.01, tags: ['electronics', 'outdoor', 'modern'],
   },
   {
     name: 'Laptop-Grade External Drive', itemType: 'accessory',
     description: 'Two terabytes of secrets, pocket-sized.',
     primaryMaterial: 'Aluminum', materialClass: 'Hard',
     weightLbs: 0.2, rarity: 1,
-    kv: 2, tags: ['electronics', 'modern'],
+    kv: 0.533, volumeCuFt: 0.005, tags: ['electronics', 'modern'],
   },
 ];
 
@@ -105,7 +105,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polycarbonate', subordinateMaterials: ['Titanium'], materialClass: 'Hard',
     weightLbs: 0.1, rarity: 1, properties: ['Fragile'],
     itemAbilities: [{ name: 'Correction', description: 'Negates the Severely Nearsighted penalty while worn intact.', kv: 3 }],
-    kv: 4, tags: ['medical', 'modern'],
+    kv: 1.67, volumeCuFt: 0.005, tags: ['medical', 'modern'],
   },
   {
     name: 'Inhaler', itemType: 'consumable',
@@ -113,7 +113,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 0.1, rarity: 2,
     itemAbilities: [{ name: 'Rescue Dose', description: 'Instantly clears an Asthma flare. ~20 doses; losing it matters.', kv: 4 }],
-    kv: 5, tags: ['medical', 'modern'],
+    kv: 0.4, volumeCuFt: 0.002, tags: ['medical', 'modern'],
   },
   {
     name: 'EpiPen', itemType: 'consumable',
@@ -121,7 +121,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 0.1, rarity: 2,
     itemAbilities: [{ name: 'Epinephrine', description: 'Immediately ends a Severe Allergy reaction. Single use.', kv: 4 }],
-    kv: 5, tags: ['medical', 'modern'],
+    kv: 2, volumeCuFt: 0.002, tags: ['medical', 'modern'],
   },
   {
     name: 'Insulin Kit', itemType: 'consumable',
@@ -129,7 +129,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Glass', subordinateMaterials: ['Polymer'], materialClass: 'Hard',
     weightLbs: 1, rarity: 3, properties: ['Fragile'],
     itemAbilities: [{ name: 'Daily Doses', description: '30 daily doses for Type 1 Diabetes. Spoils if kept hot for days (GM call).', kv: 4 }],
-    kv: 5, tags: ['medical', 'modern'],
+    kv: 2, volumeCuFt: 0.05, tags: ['medical', 'modern'],
   },
   {
     name: 'Wheelchair (Everyday)', itemType: 'tool',
@@ -137,7 +137,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Aluminum', materialClass: 'Hard',
     weightLbs: 30, rarity: 2, baseResist: 5, properties: ['Strong'],
     itemAbilities: [{ name: 'Mobility', description: 'Normal movement on accessible ground; trained users take no penalty in a chase on pavement.', kv: 6 }],
-    kv: 8, tags: ['medical', 'mobility', 'modern'],
+    kv: 3.33, volumeCuFt: 6, tags: ['medical', 'mobility', 'modern'],
   },
   {
     name: 'Hearing Aid', itemType: 'accessory',
@@ -145,7 +145,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 0.025, rarity: 2, properties: ['Fragile', 'Electric Vulnerable'],
     itemAbilities: [{ name: 'Amplification', description: 'Negates Hard of Hearing penalties for its ear while worn and charged.', kv: 2 }],
-    kv: 3, tags: ['medical', 'modern'],
+    kv: 10, volumeCuFt: 0.0002, tags: ['medical', 'modern'],
   },
   {
     name: 'Prosthetic Hand (Body-Powered)', itemType: 'tool',
@@ -153,7 +153,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', subordinateMaterials: ['Steel'], materialClass: 'Hard',
     weightLbs: 1.5, rarity: 3, baseResist: 4,
     itemAbilities: [{ name: 'Grip Restored', description: 'Two-handed actions become possible; fine-motor tasks with this hand take −1.', kv: 6 }],
-    kv: 8, tags: ['medical', 'modern'],
+    kv: 40, volumeCuFt: 0.1, tags: ['medical', 'modern'],
   },
   {
     name: 'Trauma Kit', itemType: 'consumable',
@@ -161,7 +161,7 @@ export const MEDICAL_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Fabric', subordinateMaterials: ['Polymer'], materialClass: 'Soft',
     weightLbs: 3, rarity: 3,
     itemAbilities: [{ name: 'Stabilize', description: 'First Aid on serious wounds gains +3; once per kit, keep a character at Death\'s Door stable without a check. 3 uses.', kv: 6 }],
-    kv: 7, tags: ['medical', 'modern'],
+    kv: 1, volumeCuFt: 0.15, tags: ['medical', 'modern'],
   },
 ];
 
@@ -172,7 +172,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Stainless Steel', materialClass: 'Hard',
     weightLbs: 0.2, rarity: 1, properties: ['Sharp'],
     damage: { slashing: 4 }, range: 'melee', targetAttribute: 'celerity',
-    kv: 5, tags: ['weapon', 'tool', 'modern'],
+    kv: 0.2, volumeCuFt: 0.005, tags: ['weapon', 'tool', 'modern'],
   },
   {
     name: 'Hunting Knife', itemType: 'weapon',
@@ -180,7 +180,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Leather'], materialClass: 'Hard',
     weightLbs: 0.8, rarity: 1, properties: ['Sharp', 'Strong'],
     damage: { slashing: 8, piercing: 4 }, range: 'melee', targetAttribute: 'celerity',
-    kv: 13, tags: ['weapon', 'outdoor', 'modern'],
+    kv: 0.4, volumeCuFt: 0.02, tags: ['weapon', 'outdoor', 'modern'],
   },
   {
     name: 'Machete', itemType: 'weapon',
@@ -188,7 +188,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', materialClass: 'Hard',
     weightLbs: 1.5, rarity: 2, properties: ['Sharp'],
     damage: { slashing: 12 }, range: 'melee', targetAttribute: 'celerity',
-    kv: 13, tags: ['weapon', 'outdoor', 'modern'],
+    kv: 0.2, volumeCuFt: 0.08, tags: ['weapon', 'outdoor', 'modern'],
   },
   {
     name: 'Baseball Bat (Aluminum)', itemType: 'weapon',
@@ -196,7 +196,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Aluminum', materialClass: 'Hard',
     weightLbs: 2, rarity: 1, properties: ['Strong'],
     damage: { bashing: 10 }, range: 'melee', targetAttribute: 'wisdom',
-    kv: 11, tags: ['weapon', 'sport', 'modern'],
+    kv: 0.533, volumeCuFt: 0.1, tags: ['weapon', 'sport', 'modern'],
   },
   {
     name: 'Pepper Spray', itemType: 'consumable',
@@ -205,7 +205,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     weightLbs: 0.2, rarity: 1,
     damage: { decay: 4 }, range: 'short', targetAttribute: 'focus',
     itemAbilities: [{ name: 'Blind & Burn', description: 'Target passes DR5 Constitution or takes −3 to all checks for the scene. ~5 uses.', kv: 3 }],
-    kv: 8, tags: ['weapon', 'defense', 'modern'],
+    kv: 0.1, volumeCuFt: 0.003, tags: ['weapon', 'defense', 'modern'],
   },
   {
     name: 'Taser (Civilian)', itemType: 'weapon',
@@ -214,7 +214,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     weightLbs: 0.5, rarity: 3,
     damage: { energy: 8 }, range: 'short', targetAttribute: 'wit', shots: 1, reload: 'replace cartridge (1 action)',
     itemAbilities: [{ name: 'Incapacitate', description: 'On a hit, target passes DR7 Constitution or loses their next action.', kv: 5 }],
-    kv: 14, tags: ['weapon', 'defense', 'modern'],
+    kv: 3, volumeCuFt: 0.02, tags: ['weapon', 'defense', 'modern'],
   },
   {
     name: 'Compound Bow', itemType: 'weapon',
@@ -222,7 +222,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Aluminum', subordinateMaterials: ['Carbon Fiber'], materialClass: 'Hard',
     weightLbs: 4, rarity: 2, properties: ['Strong'],
     damage: { piercing: 14 }, range: 'medium', targetAttribute: 'clout',
-    kv: 16, tags: ['weapon', 'sport', 'modern'],
+    kv: 4.67, volumeCuFt: 1, tags: ['weapon', 'sport', 'modern'],
   },
   {
     name: '.38 Revolver', itemType: 'weapon',
@@ -230,7 +230,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Walnut'], materialClass: 'Hard',
     weightLbs: 1.5, rarity: 4, properties: ['Strong'],
     damage: { piercing: 18 }, range: 'short', targetAttribute: 'clout', shots: 6, reload: 'speedloader (1 action)',
-    kv: 20, tags: ['weapon', 'firearm', 'restricted', 'modern'],
+    kv: 3.33, volumeCuFt: 0.03, tags: ['weapon', 'firearm', 'restricted', 'modern'],
   },
   {
     name: '.45 Revolver', itemType: 'weapon',
@@ -238,7 +238,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Walnut'], materialClass: 'Hard',
     weightLbs: 2.2, rarity: 4, properties: ['Strong'],
     damage: { piercing: 22 }, range: 'short', targetAttribute: 'clout', shots: 6, reload: 'speedloader (1 action)',
-    kv: 24, tags: ['weapon', 'firearm', 'restricted', 'modern'],
+    kv: 6, volumeCuFt: 0.05, tags: ['weapon', 'firearm', 'restricted', 'modern'],
   },
   {
     name: '9mm Pistol', itemType: 'weapon',
@@ -247,7 +247,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     weightLbs: 1.6, rarity: 4, properties: ['Strong'],
     damage: { piercing: 19 }, range: 'short', targetAttribute: 'clout', shots: 15, reload: 'magazine (1 action)',
     itemAbilities: [{ name: 'High Capacity', description: 'Rarely counts rounds in a single scene.', kv: 2 }],
-    kv: 23, tags: ['weapon', 'firearm', 'restricted', 'modern'],
+    kv: 3.67, volumeCuFt: 0.03, tags: ['weapon', 'firearm', 'restricted', 'modern'],
   },
   {
     name: 'Pump Shotgun (12ga)', itemType: 'weapon',
@@ -256,7 +256,7 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     weightLbs: 7.5, rarity: 4, properties: ['Strong'],
     damage: { piercing: 24 }, range: 'short', targetAttribute: 'clout', shots: 5, reload: 'shell by shell',
     itemAbilities: [{ name: 'Spread', description: 'At short range, +2 to hit; at medium+, −4 damage.', kv: 3 }],
-    kv: 28, tags: ['weapon', 'firearm', 'restricted', 'modern'],
+    kv: 3, volumeCuFt: 0.6, tags: ['weapon', 'firearm', 'restricted', 'modern'],
   },
   {
     name: 'Hunting Rifle (Bolt-Action)', itemType: 'weapon',
@@ -265,6 +265,6 @@ export const WEAPON_ITEMS: ItemTemplate[] = [
     weightLbs: 8, rarity: 4, properties: ['Strong'],
     damage: { piercing: 28 }, range: 'long', targetAttribute: 'clout', shots: 5, reload: 'bolt cycle (free), magazine (1 action)',
     itemAbilities: [{ name: 'Scoped', description: 'Aimed shots at long range take no range penalty after one round of aiming.', kv: 4 }],
-    kv: 33, tags: ['weapon', 'firearm', 'restricted', 'modern'],
+    kv: 4.67, volumeCuFt: 0.6, tags: ['weapon', 'firearm', 'restricted', 'modern'],
   },
 ];

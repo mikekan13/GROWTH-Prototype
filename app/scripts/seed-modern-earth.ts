@@ -106,7 +106,11 @@ function itemPayload(t: ItemTemplate): Record<string, unknown> {
     weightLbs: t.weightLbs,
     rarity: t.rarity,
     condition: 3,
+    // KV IS the price (Mike 2026-10-16) — fractional; karmicValue mirrors it rounded.
     value: t.kv,
+    ...(t.volumeCuFt != null ? { volumeCuFt: t.volumeCuFt } : {}),
+    ...(t.capacityCuFt != null ? { capacityCuFt: t.capacityCuFt } : {}),
+    ...(t.capacityLbs != null ? { capacityLbs: t.capacityLbs } : {}),
     ...(t.baseResist != null ? { baseResist: t.baseResist } : {}),
     ...(t.properties ? { properties: t.properties } : {}),
     ...(t.itemAbilities ? { itemAbilities: t.itemAbilities } : {}),
@@ -239,7 +243,7 @@ async function main() {
   for (const it of allItems) {
     const data = itemPayload(it);
     validateForgeData('item', data);
-    track(await upsertGlobalItem({ type: 'item', name: it.name, data, karmicValue: BigInt(it.kv), adminId: admin.id }));
+    track(await upsertGlobalItem({ type: 'item', name: it.name, data, karmicValue: BigInt(Math.round(it.kv)), adminId: admin.id }));
     rows.push({ type: 'item', name: it.name, kv: it.kv });
   }
 

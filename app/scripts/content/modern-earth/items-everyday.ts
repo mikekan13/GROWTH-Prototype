@@ -1,11 +1,11 @@
 /**
  * Modern-Earth items — household, kitchen, tools, office, outdoor, clothing.
  *
- * Grading method (r-2026-04-22-15: case-by-case, material floor):
- *   KV = material floor (0.5-2, rounded into total) + damage (1:1 at natural
- *   ring targeting) + 2×baseResist (protective role only) + graded abilities.
- * Mundane items land KV 1-3 by design — a household is cheap; its STORY is
- * carried by facts and traits, not gear price. Real weights in lbs.
+ * Grading (Mike ruling 2026-10-16, supersedes the material-floor method):
+ *   KV = PRICE — real modern-US retail relative to the anchor couch ($300 =
+ *   2 KV, ~$150/KV), 3 sig figs, sub-1 allowed. Ability KVs stay on the
+ *   abilities. volumeCuFt = own bulk; holders carry capacityCuFt/Lbs.
+ *   Real weights in lbs.
  */
 
 import type { ItemTemplate } from './types';
@@ -18,7 +18,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Stainless Steel', subordinateMaterials: ['Polymer'], materialClass: 'Hard',
     weightLbs: 0.6, rarity: 1, properties: ['Sharp'],
     damage: { slashing: 5 }, range: 'melee', targetAttribute: 'celerity',
-    kv: 6, tags: ['kitchen', 'modern'],
+    kv: 0.333, volumeCuFt: 0.02, tags: ['kitchen', 'modern'],
   },
   {
     name: 'Cast-Iron Skillet', itemType: 'tool',
@@ -26,7 +26,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Cast Iron', materialClass: 'Hard',
     weightLbs: 6, rarity: 1, baseResist: 6, properties: ['Strong', 'Heat Resistant'],
     damage: { bashing: 6 }, range: 'melee', targetAttribute: 'wisdom',
-    kv: 8, tags: ['kitchen', 'modern'],
+    kv: 0.233, volumeCuFt: 0.1, tags: ['kitchen', 'modern'],
   },
   {
     name: 'Kitchen Kit', itemType: 'tool',
@@ -34,7 +34,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Stainless Steel', subordinateMaterials: ['Wood'], materialClass: 'Hard',
     weightLbs: 25, rarity: 1,
     itemAbilities: [{ name: 'Full Kitchen', description: 'Cooking checks made with a proper kitchen setup gain +1.', kv: 2 }],
-    kv: 3, tags: ['kitchen', 'modern'],
+    kv: 1.67, volumeCuFt: 2.5, tags: ['kitchen', 'modern'],
   },
   {
     name: 'Refrigerator', itemType: 'misc',
@@ -42,13 +42,13 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Polymer'], materialClass: 'Hard',
     weightLbs: 250, rarity: 1, baseResist: 6,
     itemAbilities: [{ name: 'Preservation', description: 'Perishables stored inside keep for their full natural span.', kv: 1 }],
-    kv: 3, tags: ['household', 'appliance', 'modern'],
+    kv: 9.33, volumeCuFt: 44, capacityCuFt: 21, capacityLbs: 250, tags: ['household', 'appliance', 'modern'],
   },
   {
     name: 'Microwave Oven', itemType: 'misc',
     description: 'Ninety seconds from cold to edible. Civilization\'s quiet triumph.',
     primaryMaterial: 'Steel', subordinateMaterials: ['Glass'], materialClass: 'Hard',
-    weightLbs: 25, rarity: 1, kv: 2, tags: ['household', 'appliance', 'modern'],
+    weightLbs: 25, rarity: 1, kv: 0.8, volumeCuFt: 2.2, capacityCuFt: 1.1, capacityLbs: 10, tags: ['household', 'appliance', 'modern'],
   },
   {
     name: 'Coffee Maker', itemType: 'misc',
@@ -56,7 +56,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', subordinateMaterials: ['Glass'], materialClass: 'Hard',
     weightLbs: 7, rarity: 1,
     itemAbilities: [{ name: 'Morning Ritual', description: 'Grants the Caffeinated blossom to one character per brew cycle.', kv: 1 }],
-    kv: 2, tags: ['household', 'appliance', 'modern'],
+    kv: 0.4, volumeCuFt: 0.6, tags: ['household', 'appliance', 'modern'],
   },
   {
     name: 'Flashlight (LED)', itemType: 'tool',
@@ -64,7 +64,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Aluminum', materialClass: 'Hard',
     weightLbs: 0.5, rarity: 1,
     itemAbilities: [{ name: 'Beam', description: 'Negates darkness penalties in its cone; can dazzle at close range (DR5 resist or −1 next check).', kv: 2 }],
-    kv: 3, tags: ['household', 'tool', 'modern'],
+    kv: 0.167, volumeCuFt: 0.01, tags: ['household', 'tool', 'modern'],
   },
   {
     name: 'First Aid Kit', itemType: 'consumable',
@@ -72,7 +72,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Fabric', subordinateMaterials: ['Polymer'], materialClass: 'Soft',
     weightLbs: 2, rarity: 1,
     itemAbilities: [{ name: 'Field Care', description: 'First Aid checks using the kit gain +2. Ten uses.', kv: 3 }],
-    kv: 4, tags: ['medical', 'modern'],
+    kv: 0.2, volumeCuFt: 0.1, tags: ['medical', 'modern'],
   },
   {
     name: 'Fire Extinguisher', itemType: 'tool',
@@ -80,14 +80,14 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', materialClass: 'Hard',
     weightLbs: 10, rarity: 1,
     itemAbilities: [{ name: 'Suppress', description: 'Extinguishes a room-scale fire in one action (one full discharge).', kv: 3 }],
-    kv: 4, tags: ['household', 'safety', 'modern'],
+    kv: 0.333, volumeCuFt: 0.25, tags: ['household', 'safety', 'modern'],
   },
   {
     name: 'Lighter', itemType: 'tool',
     description: 'Fire on demand, pocket-sized.',
     primaryMaterial: 'Steel', materialClass: 'Hard',
     weightLbs: 0.1, rarity: 1, properties: ['Flammable'],
-    kv: 1, tags: ['household', 'modern'],
+    kv: 0.0133, volumeCuFt: 0.002, tags: ['household', 'modern'],
   },
   {
     name: 'Sleeping Bag', itemType: 'misc',
@@ -95,7 +95,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Nylon', subordinateMaterials: ['Down'], materialClass: 'Soft',
     weightLbs: 3, rarity: 1,
     itemAbilities: [{ name: 'Shelter Sleep', description: 'Permits a full night\'s rest outdoors in non-extreme weather.', kv: 2 }],
-    kv: 3, tags: ['outdoor', 'modern'],
+    kv: 0.533, volumeCuFt: 0.5, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Duct Tape', itemType: 'consumable',
@@ -103,7 +103,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', subordinateMaterials: ['Fabric'], materialClass: 'Soft',
     weightLbs: 0.8, rarity: 1,
     itemAbilities: [{ name: 'Field Fix', description: 'Once per scene, temporarily restore a Broken (condition 1) item to Worn (2) until scene\'s end.', kv: 3 }],
-    kv: 4, tags: ['tool', 'modern'],
+    kv: 0.0533, volumeCuFt: 0.03, tags: ['tool', 'modern'],
   },
 
   // ── Tools ──
@@ -113,7 +113,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Fiberglass'], materialClass: 'Hard',
     weightLbs: 1.5, rarity: 1, properties: ['Strong'],
     damage: { bashing: 7 }, range: 'melee', targetAttribute: 'wisdom',
-    kv: 9, tags: ['tool', 'modern'],
+    kv: 0.133, volumeCuFt: 0.05, tags: ['tool', 'modern'],
   },
   {
     name: 'Toolbox (Stocked)', itemType: 'tool',
@@ -121,7 +121,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', materialClass: 'Hard',
     weightLbs: 20, rarity: 1, baseResist: 5,
     itemAbilities: [{ name: 'Right Tool', description: 'Mechanics and repair checks with the box at hand gain +2.', kv: 4 }],
-    kv: 6, tags: ['tool', 'modern'],
+    kv: 1.33, volumeCuFt: 1.2, capacityCuFt: 1, capacityLbs: 40, tags: ['tool', 'modern'],
   },
   {
     name: 'Power Drill', itemType: 'tool',
@@ -129,7 +129,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', subordinateMaterials: ['Steel'], materialClass: 'Hard',
     weightLbs: 3.5, rarity: 1,
     itemAbilities: [{ name: 'Fast Assembly', description: 'Construction and disassembly tasks take half the time.', kv: 2 }],
-    kv: 3, tags: ['tool', 'modern'],
+    kv: 0.667, volumeCuFt: 0.15, tags: ['tool', 'modern'],
   },
   {
     name: 'Circular Saw', itemType: 'tool',
@@ -138,7 +138,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     weightLbs: 9, rarity: 2, properties: ['Sharp'],
     damage: { slashing: 10 }, range: 'melee', targetAttribute: 'celerity',
     itemAbilities: [{ name: 'Unwieldy', description: 'As a weapon: −2 to hit, requires both hands and a power source or charge.', kv: -3 }],
-    kv: 9, tags: ['tool', 'modern'],
+    kv: 0.8, volumeCuFt: 0.5, tags: ['tool', 'modern'],
   },
   {
     name: 'Crowbar', itemType: 'tool',
@@ -147,7 +147,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     weightLbs: 5, rarity: 1, baseResist: 8, properties: ['Strong'],
     damage: { bashing: 8 }, range: 'melee', targetAttribute: 'wisdom',
     itemAbilities: [{ name: 'Pry', description: 'Forcing checks (doors, lids, crates) gain +2.', kv: 3 }],
-    kv: 12, tags: ['tool', 'modern'],
+    kv: 0.167, volumeCuFt: 0.08, tags: ['tool', 'modern'],
   },
   {
     name: 'Bolt Cutters', itemType: 'tool',
@@ -155,7 +155,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', materialClass: 'Hard',
     weightLbs: 8, rarity: 2, properties: ['Strong', 'Sharp'],
     itemAbilities: [{ name: 'Shear', description: 'Cuts chain, padlock shackles, and wire fencing without a check (hardened locks: DR5 Clout).', kv: 4 }],
-    kv: 5, tags: ['tool', 'modern'],
+    kv: 0.267, volumeCuFt: 0.2, tags: ['tool', 'modern'],
   },
   {
     name: 'Chainsaw', itemType: 'tool',
@@ -167,7 +167,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
       { name: 'Timber', description: 'Fells trees and cuts structural lumber without a check.', kv: 3 },
       { name: 'Unwieldy', description: 'As a weapon: −2 to hit, loud, needs fuel, both hands.', kv: -4 },
     ],
-    kv: 14, tags: ['tool', 'modern'],
+    kv: 2, volumeCuFt: 1.5, tags: ['tool', 'modern'],
   },
   {
     name: 'Extension Ladder (16ft)', itemType: 'tool',
@@ -175,7 +175,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Aluminum', materialClass: 'Hard',
     weightLbs: 30, rarity: 1,
     itemAbilities: [{ name: 'Access', description: 'Reach second-story height without a climbing check.', kv: 2 }],
-    kv: 3, tags: ['tool', 'modern'],
+    kv: 1.33, volumeCuFt: 4, tags: ['tool', 'modern'],
   },
   {
     name: 'Shovel', itemType: 'tool',
@@ -183,7 +183,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Wood'], materialClass: 'Hard',
     weightLbs: 5, rarity: 1,
     damage: { bashing: 6 }, range: 'melee', targetAttribute: 'wisdom',
-    kv: 7, tags: ['tool', 'modern'],
+    kv: 0.2, volumeCuFt: 0.4, tags: ['tool', 'modern'],
   },
   {
     name: 'Axe (Felling)', itemType: 'tool',
@@ -191,7 +191,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', subordinateMaterials: ['Hickory'], materialClass: 'Hard',
     weightLbs: 4, rarity: 1, properties: ['Sharp', 'Strong'],
     damage: { slashing: 12 }, range: 'melee', targetAttribute: 'celerity',
-    kv: 13, tags: ['tool', 'weapon', 'modern'],
+    kv: 0.4, volumeCuFt: 0.3, tags: ['tool', 'weapon', 'modern'],
   },
 
   // ── Clothing & worn protection ──
@@ -200,7 +200,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     description: 'Jeans, shirt, jacket, sneakers: the urban default loadout.',
     primaryMaterial: 'Cotton', subordinateMaterials: ['Denim'], materialClass: 'Soft',
     weightLbs: 4, rarity: 1, baseResist: 1, armorCategory: 'Clothing',
-    kv: 1, tags: ['clothing', 'modern'],
+    kv: 0.533, volumeCuFt: 0.15, tags: ['clothing', 'modern'],
   },
   {
     name: 'Business Suit', itemType: 'armor',
@@ -208,49 +208,49 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Wool', materialClass: 'Soft',
     weightLbs: 4, rarity: 2, baseResist: 1, armorCategory: 'Clothing',
     itemAbilities: [{ name: 'Dressed the Part', description: 'First-impression checks in formal or corporate settings gain +1.', kv: 3 }],
-    kv: 4, tags: ['clothing', 'modern'],
+    kv: 2.67, volumeCuFt: 0.3, tags: ['clothing', 'modern'],
   },
   {
     name: 'Winter Coat', itemType: 'armor',
     description: 'A wearable furnace with pockets.',
     primaryMaterial: 'Nylon', subordinateMaterials: ['Down'], materialClass: 'Soft',
     weightLbs: 3.5, rarity: 1, baseResist: 2, armorCategory: 'Clothing', properties: ['Cold Resistant'],
-    kv: 3, tags: ['clothing', 'modern'],
+    kv: 1.33, volumeCuFt: 0.5, tags: ['clothing', 'modern'],
   },
   {
     name: 'Work Boot (Steel Toe)', itemType: 'armor',
     description: 'One OSHA-approved, kick-rated boot for one foot; its mate is its own thing.',
     primaryMaterial: 'Leather', subordinateMaterials: ['Steel'], materialClass: 'Soft',
     weightLbs: 2, rarity: 1, baseResist: 3, armorCategory: 'Clothing', properties: ['Protective'],
-    kv: 2, tags: ['clothing', 'modern'],
+    kv: 0.5, volumeCuFt: 0.15, tags: ['clothing', 'modern'],
   },
   {
     name: 'Motorcycle Jacket & Gear', itemType: 'armor',
     description: 'Armored leather and pads engineered for the argument between rider and road.',
     primaryMaterial: 'Leather', subordinateMaterials: ['Polymer'], materialClass: 'Soft',
     weightLbs: 8, rarity: 2, baseResist: 5, armorCategory: 'Light', properties: ['Protective', 'Flexible'],
-    kv: 12, tags: ['clothing', 'armor', 'modern'],
+    kv: 3.33, volumeCuFt: 1, tags: ['clothing', 'armor', 'modern'],
   },
   {
     name: 'Kevlar Vest', itemType: 'armor',
     description: 'Soft body armor, concealable under a loose shirt. Rated for the worst minute of someone\'s life.',
     primaryMaterial: 'Kevlar', materialClass: 'Soft',
     weightLbs: 5.5, rarity: 5, baseResist: 8, armorCategory: 'Light', properties: ['Protective', 'Flexible'],
-    kv: 20, tags: ['armor', 'restricted', 'modern'],
+    kv: 4.67, volumeCuFt: 0.4, tags: ['armor', 'restricted', 'modern'],
   },
   {
     name: 'Riot Armor Set', itemType: 'armor',
     description: 'Hard shells over padding, helmet to shins. Built for bottles, batons, and bad nights.',
     primaryMaterial: 'Polycarbonate', subordinateMaterials: ['Foam Padding'], materialClass: 'Hard',
     weightLbs: 18, rarity: 6, baseResist: 10, armorCategory: 'Heavy', properties: ['Protective', 'Restrictive'],
-    kv: 24, tags: ['armor', 'restricted', 'modern'],
+    kv: 8, volumeCuFt: 3, tags: ['armor', 'restricted', 'modern'],
   },
   {
     name: 'Motorcycle Helmet', itemType: 'armor',
     description: 'The last disagreement your skull ever needs to win.',
     primaryMaterial: 'Polycarbonate', subordinateMaterials: ['Foam Padding'], materialClass: 'Hard',
     weightLbs: 3.5, rarity: 1, baseResist: 6, armorCategory: 'Light', properties: ['Protective'],
-    kv: 13, tags: ['clothing', 'armor', 'modern'],
+    kv: 1.67, volumeCuFt: 0.6, tags: ['clothing', 'armor', 'modern'],
   },
 
   // ── Outdoor ──
@@ -260,7 +260,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Nylon', subordinateMaterials: ['Aluminum'], materialClass: 'Soft',
     weightLbs: 5, rarity: 1,
     itemAbilities: [{ name: 'Load Bearing', description: 'Carried gear up to 50 lbs doesn\'t count against encumbrance while worn properly.', kv: 5 }],
-    kv: 6, tags: ['outdoor', 'modern'],
+    kv: 1.67, volumeCuFt: 0.5, capacityCuFt: 2.3, capacityLbs: 50, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Two-Person Tent', itemType: 'misc',
@@ -268,7 +268,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Nylon', subordinateMaterials: ['Aluminum'], materialClass: 'Soft',
     weightLbs: 5, rarity: 1,
     itemAbilities: [{ name: 'Shelter', description: 'Permits full rest outdoors; negates weather penalties for sleep in non-extreme conditions.', kv: 3 }],
-    kv: 4, tags: ['outdoor', 'modern'],
+    kv: 1, volumeCuFt: 0.3, capacityCuFt: 100, capacityLbs: 500, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Camp Stove', itemType: 'tool',
@@ -276,7 +276,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Steel', materialClass: 'Hard',
     weightLbs: 1, rarity: 1,
     itemAbilities: [{ name: 'Hot Food Anywhere', description: 'Cooking in the field without fire-building checks.', kv: 1 }],
-    kv: 2, tags: ['outdoor', 'modern'],
+    kv: 0.333, volumeCuFt: 0.15, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Water Filter (Pump)', itemType: 'tool',
@@ -284,7 +284,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', materialClass: 'Hard',
     weightLbs: 1, rarity: 2,
     itemAbilities: [{ name: 'Clean Water', description: 'Renders any freshwater source safe; removes water-sourcing survival checks.', kv: 3 }],
-    kv: 4, tags: ['outdoor', 'modern'],
+    kv: 0.6, volumeCuFt: 0.05, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Binoculars (10x42)', itemType: 'tool',
@@ -292,7 +292,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Polymer', subordinateMaterials: ['Glass'], materialClass: 'Hard',
     weightLbs: 1.5, rarity: 1,
     itemAbilities: [{ name: 'Long Sight', description: 'Visual observation at distance carries no range penalty.', kv: 3 }],
-    kv: 4, tags: ['outdoor', 'modern'],
+    kv: 1.33, volumeCuFt: 0.08, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Multitool', itemType: 'tool',
@@ -300,14 +300,14 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Stainless Steel', materialClass: 'Hard',
     weightLbs: 0.5, rarity: 1,
     itemAbilities: [{ name: 'Improvise', description: 'Counts as basic tools for field repairs; such checks avoid the no-tools penalty.', kv: 3 }],
-    kv: 4, tags: ['tool', 'outdoor', 'modern'],
+    kv: 0.533, volumeCuFt: 0.005, tags: ['tool', 'outdoor', 'modern'],
   },
   {
     name: 'Paracord (100ft)', itemType: 'consumable',
     description: 'A hundred feet of yes-you-can.',
     primaryMaterial: 'Nylon', materialClass: 'Soft',
     weightLbs: 0.7, rarity: 1, properties: ['Strong', 'Flexible'],
-    kv: 1, tags: ['outdoor', 'modern'],
+    kv: 0.0667, volumeCuFt: 0.02, tags: ['outdoor', 'modern'],
   },
   {
     name: 'Bear Spray', itemType: 'consumable',
@@ -316,7 +316,7 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     weightLbs: 0.8, rarity: 2,
     damage: { decay: 6 }, range: 'short', targetAttribute: 'focus',
     itemAbilities: [{ name: 'Deterrent Cloud', description: 'Target (beast or person) must pass DR7 Constitution or disengage, blinded −3 for the scene. Single use.', kv: 4 }],
-    kv: 11, tags: ['outdoor', 'defense', 'modern'],
+    kv: 0.3, volumeCuFt: 0.02, tags: ['outdoor', 'defense', 'modern'],
   },
 
   // ── Office & misc ──
@@ -325,21 +325,21 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     description: 'The oldest external memory that never needs charging.',
     primaryMaterial: 'Paper', materialClass: 'Soft',
     weightLbs: 0.5, rarity: 1, properties: ['Flammable'],
-    kv: 1, tags: ['office', 'modern'],
+    kv: 0.0667, volumeCuFt: 0.01, tags: ['office', 'modern'],
   },
   {
     name: 'Briefcase', itemType: 'accessory',
     description: 'A portable office that doubles as a statement.',
     primaryMaterial: 'Leather', subordinateMaterials: ['Aluminum'], materialClass: 'Soft',
     weightLbs: 4, rarity: 1, baseResist: 3,
-    kv: 2, tags: ['office', 'modern'],
+    kv: 1, volumeCuFt: 0.65, capacityCuFt: 0.5, capacityLbs: 15, tags: ['office', 'modern'],
   },
   {
     name: 'Umbrella', itemType: 'misc',
     description: 'A collapsible ceiling with delusions of swordhood.',
     primaryMaterial: 'Nylon', subordinateMaterials: ['Steel'], materialClass: 'Soft',
     weightLbs: 1, rarity: 1,
-    kv: 1, tags: ['household', 'modern'],
+    kv: 0.133, volumeCuFt: 0.05, tags: ['household', 'modern'],
   },
   {
     name: 'Skateboard', itemType: 'misc',
@@ -347,6 +347,6 @@ export const EVERYDAY_ITEMS: ItemTemplate[] = [
     primaryMaterial: 'Maple', subordinateMaterials: ['Steel'], materialClass: 'Hard',
     weightLbs: 8, rarity: 1,
     itemAbilities: [{ name: 'Roll', description: 'On pavement, move at double walking pace (Athletics for tricks and speed).', kv: 2 }],
-    kv: 3, tags: ['transport', 'modern'],
+    kv: 0.8, volumeCuFt: 0.6, tags: ['transport', 'modern'],
   },
 ];

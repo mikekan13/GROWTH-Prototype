@@ -58,6 +58,9 @@ function itemPayload(t: ItemTemplate): Record<string, unknown> {
     rarity: t.rarity,
     condition: 3,
     value: t.kv,
+    ...(t.volumeCuFt != null ? { volumeCuFt: t.volumeCuFt } : {}),
+    ...(t.capacityCuFt != null ? { capacityCuFt: t.capacityCuFt } : {}),
+    ...(t.capacityLbs != null ? { capacityLbs: t.capacityLbs } : {}),
     ...(t.baseResist != null ? { baseResist: t.baseResist } : {}),
     ...(t.properties ? { properties: t.properties } : {}),
     ...(t.itemAbilities ? { itemAbilities: t.itemAbilities } : {}),
@@ -107,7 +110,7 @@ async function main() {
           type: 'item', name, data: JSON.stringify(data),
           status: 'published', campaignId: null, isGlobal: true,
           createdBy: admin.id, authorUserId: admin.id,
-          karmicValue: BigInt(t.kv),
+          karmicValue: BigInt(Math.round(t.kv)),
           royaltyRate: 0,
         },
       });
