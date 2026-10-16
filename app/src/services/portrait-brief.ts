@@ -30,7 +30,9 @@ import { renderDispositionLine } from './daya-affect';
 import { factPrefix } from './genesis-reset';
 import { extractJson } from './sketch-genesis-rules';
 import { getConditionLabel } from '@/types/item';
-import { clothesClause, marksClause, viewBody, PORTRAIT_CAMERA, type Visibility } from '@/lib/portrait-visibility';
+import { clothesClause, marksClause, readPose, viewBody, type Camera, type Visibility } from '@/lib/portrait-visibility';
+
+export type PortraitFrame = 'bust' | 'figure';
 
 export const PORTRAIT_BRIEF_TIMEOUT_MS = 25_000;
 const BACKSTORY_CHARS = 700;
@@ -285,16 +287,45 @@ export function composePrompt(b: Omit<PortraitBrief, 'prompt'>): string {
   return `${bits.join(', ')}${marks ? `, ${marks}` : ''}.`;
 }
 
+/**
+ * What the camera sees for THIS pose: the pose sets the camera (a half-turn
+ * hides the far arm) and how the clothes lie (sleeves pushed up, a cardigan
+ * pulled closed); clothes and marks follow. The pose comes back with the
+ * turned shoulder named when it did not say. Pure.
+ */
+export function seenForPose(
+  pose: string,
+  i: Pick<PortraitInputs, 'equipped' | 'marks' | 'pronoun'>,
+  frame: PortraitFrame = 'bust',
+): { pose: string; clothes: string; marks: string; camera: Camera; view: Visibility } {
+  const r = readPose(pose, frame);
+  const view = viewBody(i.equipped, i.marks, r.camera, r.effects);
+  return { pose: r.pose, clothes: clothesClause(view, i.pronoun), marks: marksClause(view), camera: r.camera, view };
+}
+
 /** The deterministic brief (no model). Pure. */
 export function draftBrief(inputs: PortraitInputs): PortraitBrief {
+  const seen = seenForPose(poseLine(inputs), inputs);
   const parts = {
     setting: settingLine(inputs.location, inputs.pronoun),
-    pose: poseLine(inputs),
+    pose: seen.pose,
     expression: expressionLine(inputs.disposition, inputs.bodyState),
-    clothes: clothesLine(inputs.equipped, inputs.pronoun),
-    marks: marksClause(viewBody(inputs.equipped, inputs.marks, PORTRAIT_CAMERA)),
+    clothes: seen.clothes,
+    marks: seen.marks,
     light: lightLine(inputs.facts, inputs.location),
   };
+  return { ...parts, prompt: composePrompt(parts) };
+}
+
+/**
+ * The brief re-seen for another frame: the FIGURE (head to feet, for the
+ * inventory) keeps the bust's pose, place and light, but its own camera names
+ * the boots and the jeans and the marks the legs carry. Pure.
+ */
+export function briefForFrame(brief: PortraitBrief, i: Pick<PortraitInputs, 'equipped' | 'marks' | 'pronoun'>, frame: PortraitFrame): PortraitBrief {
+  if (frame === 'bust') return brief;
+  const seen = seenForPose(brief.pose, i, frame);
+  const parts = { ...brief, pose: seen.pose, clothes: seen.clothes, marks: seen.marks };
   return { ...parts, prompt: composePrompt(parts) };
 }
 
@@ -319,25 +350,30 @@ const answerSchema = z.object({
  * that forgets the references is recomposed from the fields. Null = no JSON.
  * Pure.
  */
-export function parseBriefAnswer(text: string, draft: PortraitBrief, equippedCount: number): PortraitBrief | null {
+export function parseBriefAnswer(
+  text: string,
+  draft: PortraitBrief,
+  inputs: Pick<PortraitInputs, 'equipped' | 'marks' | 'pronoun'>,
+): PortraitBrief | null {
   const json = extractJson(text);
   if (!json || typeof json !== 'object') return null;
   const r = answerSchema.safeParse(json);
   if (!r.success) return null;
   const pick = (v: string | undefined, fallback: string) => (v && v.trim() ? v.trim().replace(/\s+/g, ' ') : fallback);
+  // Clothes and marks are TRUTH (inventory + designer), never JEWL's prose:
+  // 2026-10-16 his rewrite dropped the tee under her open cardigan and the
+  // painter filled the gap with the body reference's bra; a rewritten marks
+  // clause can name a mark her clothes cover (it then shows through the cloth).
+  // They are re-seen for HIS pose — his half-turn or pushed-up sleeves change what shows.
+  const seen = seenForPose(pick(r.data.pose, draft.pose), inputs);
   const fields = {
     setting: pick(r.data.setting, draft.setting),
-    pose: pick(r.data.pose, draft.pose),
+    pose: seen.pose,
     expression: pick(r.data.expression, draft.expression),
-    // Clothes and marks are TRUTH (inventory + designer), never JEWL's prose:
-    // 2026-10-16 his rewrite dropped the tee under her open cardigan and the
-    // painter filled the gap with the body reference's bra; a rewritten marks
-    // clause can name a mark her clothes cover (it then shows through the cloth).
-    clothes: draft.clothes,
-    marks: draft.marks,
+    clothes: seen.clothes,
+    marks: seen.marks,
     light: pick(r.data.light, draft.light),
   };
-  void equippedCount;
   // The prompt is always composed from the fields — his free prompt could drop a layer.
   return { ...fields, prompt: composePrompt(fields) };
 }
@@ -556,13 +592,14 @@ export function renderBriefContext(i: PortraitInputs, draft: PortraitBrief): str
       ? `EQUIPPED (the only clothes that may be painted; outermost per region):\n${outermostPerRegion(i.equipped).map(p => `- ${p.name}${p.archetype && p.archetype !== p.name ? ` [${p.archetype}]` : ''} over ${p.region}${p.material ? `, ${p.material}` : ''}${p.description ? ` — ${p.description}` : ''}`).join('\n')}`
       : `EQUIPPED: nothing. Paint ${i.pronoun} "${draft.clothes}" — do not invent garments.`,
     (() => {
-      const v = viewBody(i.equipped, i.marks, PORTRAIT_CAMERA);
+      const { view: v, camera } = seenForPose(draft.pose, i);
       const bare = v.marks.filter(m => m.view !== 'hidden').map(m => m.view === 'edge' && m.by ? `${m.mark} (half-hidden by ${m.by.name.toLowerCase()})` : m.mark);
       const under = v.marks.filter(m => m.view === 'hidden').map(m => m.mark);
+      const angle = camera.facing === 'back' ? 'back to the viewer' : camera.near ? `half-turned, the ${camera.near} shoulder toward the viewer` : 'facing the viewer';
       return [
-        `CAMERA: waist up, facing the viewer. IN FRAME: ${v.seen.map(s => s.piece.name).join(', ') || 'no clothes'}.${v.unseen.length ? ` OUT OF SIGHT: ${v.unseen.map(p => p.name).join(', ')}.` : ''}`,
+        `CAMERA (for the draft's pose): waist up, ${angle}. IN FRAME: ${v.seen.map(s => s.piece.name).join(', ') || 'no clothes'}.${v.unseen.length ? ` OUT OF SIGHT: ${v.unseen.map(p => p.name).join(', ')}.` : ''}`,
         bare.length ? `MARKS THE CAMERA SEES: ${bare.join('; ')}` : 'MARKS THE CAMERA SEES: none.',
-        under.length ? `MARKS UNDER HER CLOTHES (never mention them): ${under.join('; ')}` : '',
+        under.length ? `MARKS UNDER HER CLOTHES OR TURNED AWAY (never mention them): ${under.join('; ')}` : '',
       ].filter(Boolean).join('\n');
     })(),
     i.means.length ? `MEANS: ${i.means.join(' · ')}` : '',
@@ -579,6 +616,8 @@ const SYSTEM =
   'then let BODY NOW and MOOD NOW shape how they carry it (tired, hurt, tense, low, bright); it must read from the waist up, use only things in the place, and never be a named or posed-for-the-camera stance; ' +
   'expression = one clause from MOOD NOW and BODY NOW; light = one clause of light and hour from the facts. ' +
   'Clothes and marks are fixed by the engine — do not write them, and never mention a mark under the clothes. ' +
+  'The engine re-reads your pose to see what shows: if you turn them, say which shoulder is toward the viewer; ' +
+  'if the moment changes how a garment lies (sleeves pushed up, a cardigan pulled closed or hanging open), say it in the pose. ' +
   'Plain content words only — no style words, no medium, no game terms, no names of real people.';
 
 /** The ONE local-lane call. Throws on timeout / transport error. */
@@ -656,7 +695,7 @@ export async function buildPortraitBrief(
     modelCalled = true;
     try {
       const text = await askJewlForBrief(inputs, draft);
-      const parsed = parseBriefAnswer(text, draft, inputs.equipped.length);
+      const parsed = parseBriefAnswer(text, draft, inputs);
       if (parsed) { brief = parsed; byJewl = true; }
       else console.warn('[portrait-brief] JEWL answer unparseable — the draft stands');
     } catch (e) {

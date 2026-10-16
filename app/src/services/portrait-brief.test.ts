@@ -41,7 +41,7 @@ vi.mock('@/ai/network', () => ({
 
 const mod = await import('./portrait-brief');
 const {
-  buildPortraitBrief, clothesLine, composePrompt, draftBrief, lightLine, markSentence, markSentences, outermostPerRegion, parseBriefAnswer,
+  briefForFrame, buildPortraitBrief, clothesLine, composePrompt, draftBrief, lightLine, markSentence, markSentences, outermostPerRegion, parseBriefAnswer,
   readPortraitRefs, briefInputHash, gatherPortraitInputs, poseLine, expressionLine, readBodyState,
 } = mod;
 
@@ -84,17 +84,45 @@ describe('pure composition', () => {
   it('parseBriefAnswer: JEWL writes setting/pose/expression/light; clothes and marks are the engine\'s; the prompt is always composed', () => {
     const inputs = { ...baseInputs(), equipped: [piece('The big cardigan', 'Body/Torso', null, 'Wool'), piece('The black tee', 'Body/Torso', null, 'Cotton')] };
     const draft = draftBrief(inputs);
-    expect(parseBriefAnswer('no json here', draft, 2)).toBeNull();
-    const a = parseBriefAnswer('```json\n{"pose":"leaning on the sill","prompt":"forgot the refs"}\n```', draft, 2)!;
+    expect(parseBriefAnswer('no json here', draft, inputs)).toBeNull();
+    const a = parseBriefAnswer('```json\n{"pose":"leaning on the sill","prompt":"forgot the refs"}\n```', draft, inputs)!;
     expect(a.pose).toBe('leaning on the sill');
     expect(a.prompt).toContain('<image1>');
     expect(a.prompt).toContain('leaning on the sill');
     // 2026-10-16: his rewrite dropped the tee and the bra showed — he no longer writes clothes or marks.
-    const b = parseBriefAnswer(JSON.stringify({ clothes: 'wearing the big cardigan', marks: 'a navel piercing', prompt: 'x <image1> y <image2> wearing the big cardigan' }), draft, 2)!;
+    const b = parseBriefAnswer(JSON.stringify({ clothes: 'wearing the big cardigan', marks: 'a navel piercing', prompt: 'x <image1> y <image2> wearing the big cardigan' }), draft, inputs)!;
     expect(b.clothes).toBe(draft.clothes);
     expect(b.clothes).toContain('hanging open over the black tee');
     expect(b.marks).toBe(draft.marks);
     expect(b.prompt).toContain('the black tee');
+  });
+  it('his pose is re-seen: a half-turn hides the far arm\'s tattoo; pushed-up sleeves bare it; a cardigan pulled closed hides the tee', () => {
+    const inputs = {
+      ...baseInputs(),
+      equipped: [piece('The big cardigan', 'Body/Torso', null, 'Wool'), piece('The black tee', 'Body/Torso', null, 'Cotton')],
+      marks: ['a tattoo down the left forearm'],
+    };
+    const draft = draftBrief(inputs);
+    expect(draft.marks).toBe('');
+    const pushed = parseBriefAnswer(JSON.stringify({ pose: 'typing at the desk, sleeves pushed up to the elbows' }), draft, inputs)!;
+    expect(pushed.marks).toContain('a tattoo down the left forearm');
+    const turned = parseBriefAnswer(JSON.stringify({ pose: 'half-turned at the desk, right shoulder toward the viewer, sleeves pushed up' }), draft, inputs)!;
+    expect(turned.marks).toBe('');
+    const unnamed = parseBriefAnswer(JSON.stringify({ pose: 'standing a half-turn from the viewer, sleeves pushed up' }), draft, inputs)!;
+    expect(unnamed.pose).toBe('standing a half-turn from the viewer, sleeves pushed up, the left shoulder toward the viewer');
+    expect(unnamed.marks).toContain('left forearm');
+    const closed = parseBriefAnswer(JSON.stringify({ pose: 'by the window, the cardigan pulled tight around her' }), draft, inputs)!;
+    expect(closed.clothes).toBe('wearing the big cardigan of wool');
+  });
+  it('the FIGURE re-sees the same pose head to feet: the boots are named', () => {
+    const inputs = { ...baseInputs(), equipped: [piece('The black tee', 'Body/Torso', null, 'Cotton'), piece('Black boots', 'Body/Left Foot', null, 'Leather')] };
+    const bust = draftBrief(inputs);
+    expect(bust.clothes).not.toContain('boots');
+    const fig = briefForFrame(bust, inputs, 'figure');
+    expect(fig.clothes).toContain('black boots');
+    expect(fig.pose).toBe(bust.pose);
+    expect(fig.prompt).toContain('black boots');
+    expect(briefForFrame(bust, inputs, 'bust')).toBe(bust);
   });
   it('the pose comes from her day, then her body and mood carry it', () => {
     const atDesk = { ...baseInputs(), day: { now: ['Laptop open, the screen shows the current draft.'], lived: [], habits: [] } };
@@ -172,7 +200,7 @@ describe('buildPortraitBrief (prisma + JEWL mocked)', () => {
     const r1 = await buildPortraitBrief('ch1');
     expect(r1.modelCalled).toBe(true);
     expect(r1.brief.byJewl).toBe(true);
-    expect(r1.brief.pose).toBe('half-turned from the window, arms folded');
+    expect(r1.brief.pose).toBe('half-turned from the window, arms folded, the left shoulder toward the viewer');
     expect(h.updates).toHaveLength(1);
     expect((h.sheet.identity as { portraitBrief: { hash: string } }).portraitBrief.hash).toBe(r1.brief.hash);
     const r2 = await buildPortraitBrief('ch1');
