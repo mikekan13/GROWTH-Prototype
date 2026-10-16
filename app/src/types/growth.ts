@@ -532,9 +532,32 @@ export interface GrowthBackstory {
   notes?: string;           // GM/player session notes
 }
 
+/**
+ * WEALTH LEDGER (Mike 2026-10-16) — wealth is a ledger, never a level (the
+ * 10-level Wealth stat is dead). Cash is denominated in a campaign Currency
+ * (a stored-KRMA vehicle, many per campaign, AI-managed); income is what
+ * she brings in, per year of the campaign clock, from the simulation.
+ * Her material THINGS are CampaignItems (deeds/holdings), not here.
+ */
+export interface GrowthWealthHolding {
+  currencyId: string;
+  /** Denormalized for display ("USD", "$"). */
+  code: string;
+  amount: number;
+  /** Where it sits ("checking", "cash in the tin", "savings"). */
+  where?: string;
+}
+export interface GrowthWealth {
+  holdings: GrowthWealthHolding[];
+  /** Per campaign year. Empty = no income (or not yet simulated). */
+  income?: Array<{ currencyId: string; code: string; amountPerYear: number; source: string }>;
+}
+
 // Complete Character Interface
 export interface GrowthCharacter {
   identity: GrowthIdentity;
+  /** Cash and income — see GrowthWealth. Absent until genesis builds her life. */
+  wealth?: GrowthWealth;
   fatedAge: number;            // Natural lifespan from seed — META CYCLES (≈ years; humans 80)
   /** Campaign clock (meta cycles) at birth. age = currentCycle − birthCycle.
    *  Stamped at assignMechanics; legacy characters without it fall back to

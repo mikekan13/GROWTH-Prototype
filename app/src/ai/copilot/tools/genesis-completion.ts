@@ -16,6 +16,10 @@ import { setStartingAge, setStartingAgeSchema } from '@/services/genesis-age';
 import { grantPossession, grantPossessionSchema } from '@/services/genesis-possessions';
 import { seedLocation, seedLocationSchema, seedNpc, seedNpcSchema } from '@/services/genesis-seeds';
 import { authorVineGoals, authorVineGoalSchema } from '@/services/genesis-vines';
+import { establishCurrency, establishCurrencySchema, listCurrencies } from '@/services/currency';
+import { grantCash, grantCashSchema, setIncome, setIncomeSchema } from '@/services/wealth';
+import { lifeBudget } from '@/services/life-budget';
+import { z } from 'zod';
 import { registerJewlTool } from './registry';
 import type { JewlTool, JewlToolHandlerResult } from './types';
 
@@ -89,8 +93,72 @@ export const authorVineGoalTool: JewlTool = {
   },
 };
 
+// ── Material life (Mike 2026-10-16) ──────────────────────────────────────
+// Her whole material reality is built from Σ accumulatedWealth over her
+// roots + branches; stock blueprints are free, the instances are the GM's
+// KRMA crystallized; the remainder is exchanged into a campaign currency.
+
+export const readLifeBudgetTool: JewlTool = {
+  name: 'read_life_budget',
+  description:
+    'Genesis POSSESSIONS stage. Her LIFE BUDGET: Σ accumulated wealth over her roots and branches, minus the KV of the ' +
+    'things she already holds or owns, minus her cash. Read it before building her life and again before you exchange ' +
+    'the remainder into cash. Also lists the campaign\'s currencies.',
+  inputSchema: z.object({ characterId: z.string().min(1).max(64) }),
+  handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
+    const { characterId } = z.object({ characterId: z.string() }).parse(input);
+    const [budget, currencies] = await Promise.all([lifeBudget(characterId), listCurrencies(ctx.campaignId)]);
+    return { output: { ok: true, ...budget, currencies: currencies.map(c => ({ id: c.id, code: c.code, name: c.name, symbol: c.symbol, krmaPerUnit: c.krmaPerUnit, scope: c.scope })) } };
+  },
+};
+
+export const establishCurrencyTool: JewlTool = {
+  name: 'establish_currency',
+  description:
+    'Genesis POSSESSIONS stage (and world-keeping). A currency is a campaign object — a stored-KRMA vehicle; a campaign ' +
+    'may have many (earth alone has ~180). A unit has NO fixed value: anchor krmaPerUnit on the KRMA value of objects ' +
+    'in THIS campaign\'s time and place (a 1 KV skillet sells for 30 units there → krmaPerUnit ≈ 0.033). Say the anchor ' +
+    'objects in note. Re-calling with the same code re-rates it. Never invent currency ITEMS — cash lives on the sheet.',
+  inputSchema: establishCurrencySchema,
+  handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
+    const r = await establishCurrency(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
+    return { output: { ok: true, created: r.created, currency: { id: r.currency.id, code: r.currency.code, name: r.currency.name, symbol: r.currency.symbol, krmaPerUnit: r.currency.krmaPerUnit } } };
+  },
+};
+
+export const grantCashTool: JewlTool = {
+  name: 'grant_cash',
+  description:
+    'Genesis POSSESSIONS stage. Give her cash in a campaign currency — what remains of her accumulated wealth once her ' +
+    'things are placed, or what her life plainly leaves her holding (a checking account, the tin on the shelf). ' +
+    'Negative amounts take. Read read_life_budget first: cash counts against the budget at the currency\'s rate.',
+  inputSchema: grantCashSchema,
+  handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
+    const r = await grantCash(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
+    const id = grantCashSchema.parse(input).characterId;
+    return { output: { ok: true, ...r }, affected: { characters: [{ id, changes: ['wealth'] }] } };
+  },
+};
+
+export const setIncomeTool: JewlTool = {
+  name: 'set_income',
+  description:
+    'Genesis POSSESSIONS stage. What she brings in per campaign year, in a campaign currency, and from what ("barista, ' +
+    'Midtown Grounds"). From her current branch and the backstory only. 0 removes the line.',
+  inputSchema: setIncomeSchema,
+  handler: async (input, ctx): Promise<JewlToolHandlerResult> => {
+    const r = await setIncome(ctx.campaignId, { id: ctx.actorId, role: ctx.actorRole }, input);
+    const id = setIncomeSchema.parse(input).characterId;
+    return { output: { ok: true, ...r }, affected: { characters: [{ id, changes: ['wealth'] }] } };
+  },
+};
+
 registerJewlTool(setStartingAgeTool);
 registerJewlTool(grantPossessionTool);
+registerJewlTool(readLifeBudgetTool);
+registerJewlTool(establishCurrencyTool);
+registerJewlTool(grantCashTool);
+registerJewlTool(setIncomeTool);
 registerJewlTool(seedNpcTool);
 registerJewlTool(seedLocationTool);
 registerJewlTool(authorVineGoalTool);

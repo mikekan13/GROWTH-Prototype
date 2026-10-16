@@ -626,3 +626,14 @@ Rulings: memory `ruling-passive-active-perception-familiarity-2026-10-08`. Unit 
 | AdultOnlyNotice / DateOfBirthPrompt / AdultOnlyToggle | `components/maturity/` | "This table is 18+" panel (canvas page, hub listing); blocking one-time DOB modal on /hub, /trailblazer, /watcher (never ADMIN); Watcher 18+ toggle on campaign settings. |
 | Routes | `api/auth/date-of-birth` (POST), `api/campaigns/[id]/adult-only` (PUT) | Set-once DOB; Watcher toggle. Registration (`api/auth/register`) now requires `dateOfBirth`. |
 | Follow-up (2026-10-12) | `lib/age.ts`, `services/maturity.ts`, `api/campaigns/[id]/adult-only/clear` (POST), `components/maturity/AdultOnlyAdminPanel.tsx` | GODHEAD exempt from DOB + 18+ checks like ADMIN (`isAgeExemptRole`). `clearAdultOnly(campaignId, adminUser)` — ADMIN only; clears an AUTO 18+ (not watcher-set) when no content carries `sexual`; dismisses earlier tone-filter notes (audit `MATURITY_NOTES_CLEARED`); records `adultOnlySetBy='admin:<id>'` + `adultOnlyAt`. Terminal "18+ Tables" panel with "Clear 18+". |
+
+## Material life — currencies, wealth ledger, life budget (Mike 2026-10-16)
+
+| Module | Exports | Purpose |
+|---|---|---|
+| `services/currency.ts` | `establishCurrencySchema`, `establishCurrency`, `listCurrencies`, `findCurrency`, `retireCurrency`, pure `normalizeCode`, `unitsForKrma`, `krmaForUnits`, `formatUnits` | Campaign currencies = stored-KRMA vehicles, many per campaign, each with its own `krmaPerUnit` anchored on object KV; GM / ADMIN / JEWL (GODHEAD) manage them. |
+| `services/wealth.ts` | `grantCashSchema`, `grantCash`, `setIncomeSchema`, `setIncome`, `readWealth`, pure `applyHolding`, `applyIncome`, `holdingsKrma` | The sheet's wealth LEDGER (`GrowthWealth`): cash per currency+where, income per year. Never a level. |
+| `services/life-budget.ts` | `lifeBudget`, pure `sumAccumulatedWealth`, `itemKv`, `fromNamedGrant`, `budgetLine` | Σ `accumulatedWealth` over her live roots + branches − KV of the things she holds/owns (named block grants excluded) − cash at the rate = what JEWL has left to place or exchange. |
+| `ai/copilot/tools/genesis-completion.ts` (+) | `read_life_budget`, `establish_currency`, `grant_cash`, `set_income` | POSSESSIONS-stage tools; the stage law in `work-cycle-text.ts` now reads the budget first and exchanges the remainder into cash. |
+| `GET/POST /api/campaigns/[id]/currencies` · `GET /api/characters/[id]/wealth` | — | Thin routes over the above. |
+| `forge-schemas.ts` / `forge-pricing.ts` / `ForgeWorkshop.tsx` | `accumulatedWealth` on root + branch data; priced 1:1 inside the TKV; shown as a gold "wealth N KV" fact chip | Mike: "a Root worth TKV 300 — some is in accumulated wealth, some in attributes, some in the gained objects." |

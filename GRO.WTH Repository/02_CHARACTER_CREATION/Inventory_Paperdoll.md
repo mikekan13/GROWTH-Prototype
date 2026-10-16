@@ -3,7 +3,7 @@
 **Status:** #validated
 **Source:** GROWTH-DESIGN-TRUTH §13.5 (Inventory); memory `inventory-paperdoll.md`; Mike's confirmation 2026-03-13; finalized 2026-05-23 in alignment with [[Body_Composition_System]] (body-parts-as-items) and [[Inventory_and_Encumbrance_System]] (Carry Level = Clout, global cap).
 **Security:** PUBLIC
-**Last Updated:** 2026-05-23
+**Last Updated:** 2026-10-15 (Mike: equipped items are worn OVER a body region, never nested inside the part beside its organs — matches the code's `equippedTo`)
 
 ---
 
@@ -32,15 +32,15 @@ GROWTH inventory is split into **three categories**: Equipped, Carried, and Poss
 
 ## Equipped is the anatomy tree
 
-The old paperdoll had a fixed list of slots ("Head, Body, Upper Left Arm, ..."). The new model **doesn't have a slot list at all**. Equipped items are nested inside body-part items in the anatomy tree.
+The old paperdoll had a fixed list of slots ("Head, Body, Upper Left Arm, ..."). The new model **doesn't have a slot list at all**. Equipped items are attached to body-part regions of the anatomy tree — worn **over** the part, as outer layers.
 
-Example: a character wearing a helmet has the helmet item inside the `Head` container in their `bodyAnatomy`. Their Head's `contains` array holds: `[helmet, brain, left_eye, right_eye, left_ear, right_ear, tongue]`. The helmet is no different structurally from an organ — it's just an item attached to that body region.
+Example: a character wearing a helmet has the helmet attached to the `Head` region of their `bodyAnatomy`. The helmet is **not** inside the head beside the brain and eyes (Mike, 2026-10-15: "a helmet would go over that"); it is a worn layer on the outside of that region. The anatomy tree still decides *where* things can be worn, and the organs stay inside the part.
 
-This is the point: armor and organs share the same damage cascade. Damage to the head hits the helmet first (outer-most), then passes through to the head's other contents per the cascade rules ([[Body_Composition_System]] §"Damage cascade").
+This is the point: armor and organs share the same damage cascade. Damage to the head hits the helmet first (the outer-most worn layer), then passes through to the head and its contents per the cascade rules ([[Body_Composition_System]] §"Damage cascade").
 
 ### Authoring view
 
-When the player equips an item, the UI inserts it into the appropriate body-part's `contains` array. The player picks the body part (or the UI infers one based on the item's `properties` — e.g., "Helmet" property auto-targets Head). Two characters of the same Seed share the same anatomy *template*, but each character's tree is mutable: parts can be lost, replaced, modified.
+When the player equips an item, the UI attaches it to the appropriate body-part region (in code: the item instance's `equippedTo` = that region; equipped items form the region's `wornLayers`, outer-most first). The player picks the body part (or the UI infers one based on the item's `properties` — e.g., "Helmet" property auto-targets Head). Two characters of the same Seed share the same anatomy *template*, but each character's tree is mutable: parts can be lost, replaced, modified.
 
 ### Non-humanoid bodies
 
@@ -54,7 +54,7 @@ Each Seed declares its own anatomy from scratch ([[Body_Composition_System]] §"
 
 ## Multi-region items
 
-Items that span multiple body parts (e.g., a plate cuirass covering torso + upper arms, or a full-body robe) are represented by **placing the item in the OUTERMOST shared container**. A cuirass spanning the upper body sits in `Torso.contains`; armor that covers an entire humanoid sits in `Body.contains` (the root of the anatomy tree).
+Items that span multiple body parts (e.g., a plate cuirass covering torso + upper arms, or a full-body robe) are represented by **attaching the item to the OUTERMOST shared region**. A cuirass spanning the upper body is worn on `Torso`; armor that covers an entire humanoid is worn on `Body` (the root of the anatomy tree).
 
 Damage cascading down then sees the cuirass first regardless of where the strike lands within its coverage area, because the cascade descends from outermost to innermost.
 
@@ -72,10 +72,10 @@ For items whose coverage is genuinely multiple non-overlapping regions (e.g. pai
 The character sheet's "Inventory" panel is **not** a static layout. It must:
 
 1. Render the character's `bodyAnatomy` tree.
-2. Walk each body part's `contains` array.
-3. For each child, classify as **organ** (`isBodyPart: true`) or **equipment** (not flagged).
-4. Render equipment in slot-like UI; render organs in an internal-anatomy UI.
-5. Allow drag-equip: dropping a Carried item onto a body part inserts it into that part's `contains`.
+2. For each body part, gather the items worn on it (`equippedTo` = that region) — the worn layers, outer-most first.
+3. Organs (`isBodyPart: true`, inside the part's `contains`) are the internal anatomy; equipment is never inside a part.
+4. Render equipment in slot-like UI over the region; render organs in an internal-anatomy UI.
+5. Allow drag-equip: dropping a Carried item onto a body part attaches it to that region.
 
 The UI is dynamic on every render. Items moving in or out of the tree affect downstream calculations (ActionMod, total Carry weight, damage cascade routing).
 
@@ -84,7 +84,7 @@ The UI is dynamic on every render. Items moving in or out of the tree affect dow
 | Game term | Code surface |
 |---|---|
 | Body anatomy | `character.bodyAnatomy` (top-level on `GrowthCharacter`) |
-| Equipped item | a `GrowthWorldItem` inside any body-part container's `contains` array |
+| Equipped item | a CampaignItem held by the character with `data.equippedTo` = a body-part region (worn over it; `services/inventory.ts`) |
 | Carried items | `character.inventory` (existing field for non-equipped carry) |
 | Possessions | `character.identity.possessions` (free-form text + future structured items) |
 | Carry Level | `Clout × 10 lbs` — see [[Inventory_and_Encumbrance_System]] |

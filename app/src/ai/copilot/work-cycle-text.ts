@@ -200,7 +200,7 @@ export const COMPLETION_COMMON_TOOLS = ['update_work_session', 'raise_prod', 're
 /** The tools of each completion stage. */
 export const COMPLETION_STAGE_TOOLS: Record<GenesisPostSheetStage, readonly string[]> = {
   AGE: ['set_starting_age'],
-  POSSESSIONS: ['search_catalog', 'pull_from_catalog', 'grant_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item', 'read_location'],
+  POSSESSIONS: ['read_life_budget', 'search_catalog', 'pull_from_catalog', 'grant_possession', 'propose_forge_blueprint', 'list_forge_drafts', 'read_forge_item', 'read_location', 'establish_currency', 'grant_cash', 'set_income'],
   SEEDS: ['seed_npc', 'seed_location', 'read_location'],
   WORLD_FACTS: ['establish_world_facts', 'read_location'],
   VINES: ['author_vine_goal'],
@@ -220,7 +220,8 @@ export const COMPLETION_STAGE_LAW: Record<GenesisPostSheetStage, string> = {
     '- CATALOG FIRST: where a stock or campaign item archetype fits, grant_possession it by exact name with HER paint (localName + story). Stock is free.',
     '- Nothing fits → propose_forge_blueprint type "item": the ARCHETYPE stays campaign-agnostic ("Silver Butter Knife" — no proper nouns, no bearer), with characterId + attachmentStory + localName for her instance. The chain grades it; the Watcher\'s approval spends the KRMA. Grant it once published; while drafts wait, set status=blocked on the Forge.',
     '- Tiers: equipped = worn on a region of HER body (slot = a region key the tool lists), carried = on her person, owned = the deed only (her home\'s contents she owns, a car, a box in storage — not on her). Weight in real pounds.',
-    '- Wealth that is not a thing (savings, income) is not a possession — say so in your progress note; never invent currency items.',
+    '- HER LIFE BUDGET (ruled 2026-10-16): read_life_budget first. Σ accumulated wealth over her roots and branches is the KRMA you have to build her material reality — stock blueprints are free, but every INSTANCE you grant is the Watcher\'s KRMA crystallized as that object, and it spends the budget at its KV. Named block grants are already priced in the block and do not spend it.',
+    '- WEALTH THAT IS NOT A THING: cash and income live on the sheet, never as items. A currency is a campaign object (establish_currency — anchor its rate on what objects cost in THIS time and place; many currencies may exist). When her things are placed, exchange what remains of the budget — or what her life plainly leaves her holding — into cash with grant_cash, and set_income from her current branch. Over budget = cut or re-rate, and say so in the progress note.',
   ].join('\n'),
   SEEDS: [
     'STAGE: SEEDS — the people and places of her story become seeds for the Watcher.',

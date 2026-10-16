@@ -366,6 +366,14 @@ const forgeSkillEntrySchema = z.object({
 // from; allocatable skills are player-choice levels under a governor or
 // domain constraint (choice recorded on the block-instance at attach).
 const blockGrantFields = {
+  /** ACCUMULATED WEALTH (Mike ruling 2026-10-16): a KRMA number INSIDE the
+   *  block's TKV — what those years left her materially beyond the named
+   *  grants. Σ over her roots + branches = JEWL's budget to build her whole
+   *  material life at the end of genesis (home, wardrobe, pots and pans,
+   *  the junk drawer); the remainder is exchanged into a campaign currency
+   *  as cash. It competes with attribute levels for the block's TKV — that
+   *  is the balance. Named `possessions` grants are priced separately. */
+  accumulatedWealth: z.number().int().min(0).max(1000).default(0),
   possessions: z.array(z.object({
     name: z.string().min(1).max(100),
     description: z.string().max(300),

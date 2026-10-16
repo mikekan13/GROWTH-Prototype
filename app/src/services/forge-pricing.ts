@@ -64,6 +64,8 @@ interface RootBranchShape {
   possessions?: Array<{ name?: string; kv?: number }>;
   kits?: Array<{ name?: string; kvBudget?: number }>;
   allocatableSkills?: Array<{ levels?: number }>;
+  /** KRMA the years left her materially beyond the named grants (2026-10-16). */
+  accumulatedWealth?: number;
 }
 
 function sumPositive(values: Record<string, number> | undefined): number {
@@ -150,6 +152,10 @@ export function priceRootBranch(type: 'root' | 'branch', data: RootBranchShape):
   if (kitKv) { kv += kitKv; breakdown.push(`kit budget(s) +${kitKv}`); }
   const allocKv = (data.allocatableSkills ?? []).reduce((a, g) => a + Math.max(0, g.levels ?? 0), 0);
   if (allocKv) { kv += allocKv; breakdown.push(`allocatable skill level(s) +${allocKv} (Kai may premium)`); }
+  // Accumulated wealth (Mike 2026-10-16): inside the TKV, 1:1 — the GM's
+  // KRMA crystallizes as her material life when genesis builds it.
+  const wealthKv = Math.max(0, data.accumulatedWealth ?? 0);
+  if (wealthKv) { kv += wealthKv; breakdown.push(`accumulated wealth +${wealthKv} (her material life's budget; remainder → cash)`); }
 
   // Negative frequency is a LEVER (Mike ruling 2026-08-24 #1/#14): it
   // reduces the block's net price, which forces the author to service the

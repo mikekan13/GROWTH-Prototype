@@ -16,7 +16,7 @@ Four steps, each its own unit of work, each testable on Violet:
 | # | Step | What the player sees | What JEWL does | Build size |
 |---|---|---|---|---|
 | A | **Marks become memories** | A list of the marks from the edit stacks (scar, tattoo, piercing, birthmark, body mod, makeup). Per mark: **JEWL decides** or **one line from me** → JEWL expands it. | Writes the mark as an appearance FACT on the sheet and a MEMORY in DAYA (how it came to be). | 1 session |
-| B | **Dress** | JEWL's outfit proposal from the inventory (and, for a character with no clothes yet, from who they are). Player/GM approve, swap, or say "something else". | Picks EQUIPPED items; when there are none, drafts an outfit as Forge item archetypes + campaign instances (the narrative-paint rule) and equips them on approval. | 1–2 sessions |
+| B | **Her life** (Mike, 16 Oct: not just what she wears — "every possession and item she owns has some sort of memory attached to it… Her apartment, her full wardrobe, pots and pans, the junk in her junk drawer. All of it placed and tied to her with memories of where and how they came to be.") | JEWL builds out the character's whole material life, room by room: home → rooms → furniture → containers → contents; wardrobe; the carried kit; the junk. Player/GM walk it, keep / change / cut, and approve. Dress is just the last pass over the wardrobe. | Places (Locations, not forged), pulls stock archetypes + paints instances, links every item to her by `owns` and `located_at`, and writes a memory per item (fleeting one-liners to long chains). | 2–4 sessions |
 | C | **Scene + bearing + paint** | The flashy veil (built), then the portrait. REGENERATE re-rolls; APPROVE makes it `Character.portrait`. | Writes the PORTRAIT BRIEF (setting, pose from persona, expression from mood, clothes, light) and renders from face + body refs on the v1 recipe. | 1–2 sessions |
 | D | **Derivatives in the background** | Token appears on the canvas card; later the mini. | RGBA token crop with the pillar ring from the portrait; 3D later. | 0.5 session (token) |
 
@@ -43,11 +43,35 @@ Then a card: the story (2–4 sentences, in the character's own register) + **KE
 
 ---
 
-## 3. Step B — dress (the one that needs Mike)
+## 3. Step B — her life: possessions, places, memories (the final step of character creation)
 
-**The rule we have:** clothing and gear come from inventory, never from the designer. **The gap:** a new character usually has NOTHING equipped, so "paint what's equipped" paints underwear. Mike (bedtime): "JEWL would need to clothe them with appropriate clothes that the AI or player would approve of."
+**Mike, 16 Oct (verbatim):** "it isn't just what they are currently wearing. He should build out all the possessions for her. This may seem trivial but it isn't. Every possession and item she owns has some sort of memory attached to it. perhaps some fleeting but some could be extensive chains. this would be the final step in character creation. Her apartment, her full wardrobe, pots and pans, the junk in her junk drawer. All of it placed and tied to her with memories of where and how they came to be."
 
-**Proposal:**
+**What this is:** a character is not finished until her material life exists in the campaign. Everything she owns is a real entity, placed somewhere real, deeded to her, and remembered. The portrait then paints from a life, not from a prompt.
+
+**The laws it stands on (all ruled):**
+- Possessions are links (`owns`), placement is `located_at`; the two are orthogonal ([[possessions-are-links-not-containment-2026-06-06]]). The apartment is a Location (locations are not forged); the "City Apartment" stock possession is the deed object and links to it (seam noted in `scripts/content/modern-earth/buildings.ts`, unwired).
+- Narrative paint: stock archetype first ("Cast-Iron Skillet"), campaign instance carries the local name, story, provenance and memory refs ([[ruling-narrative-paint-global-archetype-local-instance-2026-10-12]]). The modern-Earth stock library (418 entries: furniture, appliances, clothing, kitchen, tools, consumables, buildings) is public and KRMA-free, so JEWL pulls freely and only authors what is missing.
+- Two ledgers: the item carries the fact; DAYA carries the memory (`seedEntityMemories`, source `possession`).
+- **Crystallized, not free (Mike, 16 Oct):** the KV of the life's instances is GM KRMA crystallized as those objects. Stock blueprints cost nothing to use; the instances still carry KV the GM appoints. The apartment also commits a room-scale Location reserve ([[location-krma-reserve-2026-06-02]]).
+- **The allotment comes out of the Root's existing KV** (balance; "it can make you weaker" — debate deferred). **Roots and Branches gain two lines inside their TKV:** `possessionsGained[]` (named items at their own KV, memory attached) and `accumulatedWealth` (a KRMA number). Sum of accumulatedWealth over all Roots+Branches = JEWL's budget for the unnamed life; the remainder is exchanged to campaign currency as cash. **Stock Roots/Branches get +~50 TKV (root scale, time-proportional for Branches) and a full rebalance** across attributes/skills/gained objects/wealth. Roots scaling with time = to investigate.
+- **Currencies are campaign objects, many per campaign, AI-managed.** "It is basically just a stored KRMA vehicle." A Currency = world fact {name, symbol, where/when used, krmaPerUnit, era note}; JEWL creates and adjusts them as world facts to keep the world believable (1985 dollar ≠ 2060 dollar); anchored on the KRMA value of objects. Cash on the sheet is denominated in one. Wealth is a ledger (given / bought / broke / bank / income), never a level.
+- JEWL suggests, Godheads decide: the walk-through is approvals, JEWL never self-approves.
+
+**Shape of the walk (UI, section "2 · Her life"):** JEWL works outward from the character, in passes the player can stop and correct at any point:
+1. **Home** — where she lives (from backstory/genome/means): a Location with rooms as child Locations, each with a one-line character ("kitchen: small, clean, one window over the alley"). The deed possession is pulled from stock and linked.
+2. **Rooms, one at a time** — furniture and containers placed in the room; each container's contents (the junk drawer is a container with contents). Each item: stock pull + paint, `owns` → her, `located_at` → the container or room.
+3. **Wardrobe** — the full wardrobe as items in the closet/dresser, and the one outfit she has on now: EQUIPPED from among them, worn over the regions. This is the old "dress" step, now a pass over what exists.
+4. **Carried kit** — what is on her person: bag, keys, phone, wallet, whatever the era gives.
+5. **Memories** — every item gets one. Three weights: **fleeting** (one line: "bought at the corner store, nothing to it"), **held** (2–4 sentences: how it came to her), **chain** (a thread of memories across years, cross-linked to people/places — the grandmother's skillet, the ring from the ex). JEWL assigns the weight from the item and the character; the player can promote or demote. Chains link to existing backstory memories and to each other.
+
+The player keeps / changes / cuts at any level ("no, she rents a room, not a flat"; "the skillet was her mother's"). "Tell JEWL" one line, JEWL redraws the branch. Approve the whole life at the end; approval creates everything in one batch (Locations, CampaignItems, relationships, memories).
+
+**Scale and cost:** a life is 80–300 items. Bulk comes from the small local model in passes per room (the design-for-the-small-model rule); the character-level choices (home, chains, what matters) from the stronger lane. Generation is per pass, so the player sees the kitchen fill before the bedroom starts, and the veil machinery already built shows progress.
+
+**Server:** `services/life-build.ts` — `proposeHome`, `proposeRoom(roomId)`, `proposeWardrobe`, `proposeKit`, `storyForItem(itemId, weight)`, `applyLife(proposal, approverRole)`; JEWL via `routedChatText` lane `local`/`fiction`, JSON per pass; writes via `services/location.ts`, `services/inventory.ts` (create + equip), `forge.ts pullFromGlobalCatalog`, `daya/authoring.ts seedEntityMemories`. Routes under `POST /api/characters/[id]/life/*`. Each pass idempotent by room so a redo replaces only that branch.
+
+**Old dress proposal (now pass 3 of the walk):**
 1. JEWL reads: seed, age, era/garment norms from the genome (`style-profile.ts` already derives era, underclothing, garment norms, materials from the backstory), persona, current location type, campaign mood, KRMA means (a pauper does not get a brocade coat), and what is already EQUIPPED / CARRIED / possessed.
 2. JEWL proposes an OUTFIT: 3–6 pieces, each as a Forge archetype (catalog reuse first: "Linen Shirt", "Wool Cloak", "Leather Boots") with the campaign instance's paint (local name/description, materials, colours) and the body region it is worn on (outermost-shared-region rule).
 3. The player (or the GM, or the AI for an NPC) **approves, swaps a piece, or asks for another take**. Approval = the items are created as CampaignItems (`sourceForgeItemId` set), equipped via the inventory service, and priced in KRMA like any item (JEWL never approves — the Forge consent law).
@@ -80,7 +104,8 @@ Then a card: the story (2–4 sentences, in the character's own register) + **KE
 
 ## 5. Questions for Mike (answer in the morning, in order)
 
-1. **Dress approval:** is the flow in §3 right — JEWL proposes, player/GM/AI-for-NPC approves, approval creates + equips real items? And does an approved outfit cost KRMA from the GM's wallet, or is starting clothing free (sketch-tier) up to some means?
+0. **Her life (16 Oct) — ANSWERED:** the character sets the scale (her Roots/Branches); the life's KV is GM KRMA crystallized as the objects (stock blueprints free, instances not); the allotment comes out of the Root's KV; dollars are era-dependent, anchored on object KV. **OPEN:** does the unspent remainder become her bank balance in dollars (cash = crystallized KRMA held on her sheet)? Is debt a thorn lien? Who grades the material line on existing stock roots (Kai regrade pass vs JEWL derives it from the root's prose at genesis)?
+1. **Dress approval:** is the wardrobe pass right — JEWL proposes, player/GM/AI-for-NPC approves, approval creates + equips real items?
 2. **What paints:** EQUIPPED only, or also CARRIED items in hand (a slung bow, a drawn sword)? My default: equipped only, plus anything JEWL's brief calls "in hand" from carried.
 3. **Marks with no story:** can the portrait paint before every mark has its memory, or is the memory step a gate?
 4. **Makeup:** a memory or just an appearance fact? (It is temporary by nature.)

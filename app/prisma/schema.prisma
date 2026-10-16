@@ -1543,3 +1543,30 @@ model LawfulnessFlag {
   @@index([campaignId, createdAt])
   @@index([status, createdAt])
 }
+
+// CURRENCY (Mike 2026-10-16): "campaign might have 100 currencies… it is
+// basically just a stored KRMA vehicle… something the AI should manage for
+// the GM to keep the world believable." A campaign object, never forged; a
+// dollar has no fixed value — 1985 ≠ 2060 — so each row carries its own
+// KRMA-per-unit, anchored on the KRMA value of objects. Cash on a sheet is
+// denominated in one (GrowthWealth in types/growth.ts).
+model Currency {
+  id          String   @id @default(cuid())
+  campaignId  String
+  name        String   // "United States dollar"
+  code        String   // "USD" — unique per campaign (case-insensitive by convention)
+  symbol      String   @default("") // "$"
+  /// KRMA stored in one unit. 1 KV ≈ this many units' worth of object.
+  krmaPerUnit Float
+  /// Where and when it is tender ("Sacramento, 2026"; "the Tiberoak marches").
+  scope       String   @default("")
+  /// Why the rate is what it is (the anchor objects JEWL priced it against).
+  note        String   @default("")
+  status      String   @default("ACTIVE") // ACTIVE | RETIRED
+  createdBy   String   // userId or 'jewl'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([campaignId, code])
+  @@index([campaignId, status])
+}

@@ -37,6 +37,17 @@ describe('forge-pricing (locked formulas, Seed_KV_Formulas.md)', () => {
     expect(kv).toBe(4 + 9 + 5 - 5);
   });
 
+  it('accumulated wealth (2026-10-16) is a line INSIDE the block TKV, 1:1', () => {
+    const priced = priceRootBranch('root', {
+      attributes: { clout: 40, wisdom: 40 },
+      accumulatedWealth: 25,
+      ageAdded: 18,
+    });
+    expect(priced.kv).toBe(105);
+    expect(priced.breakdown.join(' ')).toMatch(/accumulated wealth \+25/);
+    expect(priceRootBranch('branch', { accumulatedWealth: -9 }).kv).toBe(0);
+  });
+
   it('root breakeven rule: plain 18yo ~100 KV root has zero frequency cost', () => {
     const priced = priceRootBranch('root', {
       attributes: { clout: 50, wisdom: 50 },

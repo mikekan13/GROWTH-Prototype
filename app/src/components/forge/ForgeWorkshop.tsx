@@ -435,7 +435,7 @@ const HANDLED_KEYS = new Set([
   'school', 'schools', 'dr', 'manaCost', 'castingMethod', 'betaDraft', 'source',
   'attributes', 'skills', 'nectars', 'thorns', 'requirements', 'seedRequirement',
   'itemAbilities', 'contains', 'frequency', 'subordinateMaterials', 'value', 'notes',
-  'requires', 'restricted', 'maturityFlags', 'expiry',
+  'requires', 'restricted', 'maturityFlags', 'expiry', 'accumulatedWealth',
 ]);
 
 const CONDITION_NAMES = ['Destroyed', 'Broken', 'Worn', 'Undamaged', 'Indestructible'];
@@ -480,6 +480,10 @@ function BlockDetail({ type, data, kv, traitLookup = {} }: { type: string; data:
   }
   if (typeof data.frequency === 'number' && data.frequency !== 0 && (type === 'root' || type === 'branch')) {
     facts.push({ label: `frequency cost ${data.frequency}`, color: '#8e7cc3' });
+  }
+  // Accumulated wealth (2026-10-16): the KRMA those years left her materially — her life's budget.
+  if (typeof data.accumulatedWealth === 'number' && data.accumulatedWealth > 0 && (type === 'root' || type === 'branch')) {
+    facts.push({ label: `wealth ${data.accumulatedWealth} KV`, color: '#D0A030' });
   }
   if (typeof data.seedRequirement === 'string' && data.seedRequirement) facts.push({ label: `requires: ${data.seedRequirement}` });
   if (typeof data.requirements === 'string' && data.requirements) facts.push({ label: `requires: ${data.requirements}` });
