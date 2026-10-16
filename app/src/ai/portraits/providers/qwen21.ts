@@ -144,7 +144,11 @@ export const QWEN21_PORTRAIT_SIZES: Record<PortraitFrame, { width: number; heigh
   figure: { width: 832, height: 1040 },
 };
 const PORTRAIT_FRAMINGS: Record<PortraitFrame, string> = {
-  bust: 'A waist-up PORTRAIT: from the top of the head to the waist, the face of the person in <image1> the clear subject in the upper third of the frame, looking at the viewer; arms and hands in the frame. Her clothes as described from the shoulders to the waist; her build, skin and every visible mark as in <image2>, never its plain background. The room she is in is behind her, lit as described.',
+  // 2026-10-16 (Mike: "framing is still a little low"; the bra and the forearm tattoo showed
+  // through her tee and cardigan): the bottom edge sits ABOVE the waist, the head and shoulders
+  // fill the upper half, and <image2> lends only build and skin — she is dressed as described,
+  // and nothing on <image2>'s bare skin shows through her clothes.
+  bust: 'A PORTRAIT framed from just above the top of the head down to just above the waist — the bottom edge of the picture crosses her body at the lower ribs; her head and shoulders fill the upper half of the frame, the face of the person in <image1> the clear subject, close to the viewer. She is fully dressed exactly as described, the clothes opaque and covering her as they would; <image2> is only the build and skin tone under them — none of its underwear, bare skin or marks show through the cloth, and only the marks named here are seen. The room she is in is behind her, lit as described.',
   figure: 'Framed from the head to the feet, the face unmistakably the person in <image1>; take only her build, skin and every mark from <image2>, never its plain background or its clothing. The room she is in fills the background around her, lit as described.',
 };
 const PORTRAIT_FRAMING = PORTRAIT_FRAMINGS.bust;

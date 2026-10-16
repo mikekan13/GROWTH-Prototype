@@ -7,7 +7,8 @@ const h = vi.hoisted(() => ({
   edges: [] as Array<{ targetId: string; relationshipType: string }>,
   location: null as null | { name: string; type: string; data: string },
   facts: [] as Array<{ subjectKey: string; fact: string }>,
-  entity: null as null | { personaProfile: string; affect: { morale: number; stress: number; grief: number } | null },
+  entity: null as null | { id?: string; personaProfile: string; affect: { morale: number; stress: number; grief: number } | null },
+  memories: [] as Array<{ source: string; content: string; salience: number }>,
   items: [] as Array<{ id: string; name: string; data: string; sourceForgeItemId: string | null }>,
   updates: [] as string[],
   answer: '' as string,
@@ -25,6 +26,7 @@ vi.mock('@/lib/db', () => ({
     location: { findUnique: vi.fn(async () => h.location) },
     worldFact: { findMany: vi.fn(async () => h.facts) },
     dayaEntity: { findUnique: vi.fn(async () => h.entity) },
+    dayaMemoryEntry: { findMany: vi.fn(async () => h.memories) },
     campaignItem: { findMany: vi.fn(async () => h.items) },
     forgeItem: { findMany: vi.fn(async () => [{ id: 'f_coat', name: 'Winter Coat' }]) },
   },
@@ -40,7 +42,7 @@ vi.mock('@/ai/network', () => ({
 const mod = await import('./portrait-brief');
 const {
   buildPortraitBrief, clothesLine, composePrompt, draftBrief, lightLine, markSentence, markSentences, outermostPerRegion, parseBriefAnswer,
-  readPortraitRefs, briefInputHash, gatherPortraitInputs,
+  readPortraitRefs, briefInputHash, gatherPortraitInputs, poseLine, expressionLine, readBodyState,
 } = mod;
 
 const piece = (name: string, region: string, category: string | null = 'Clothing', material: string | null = null) =>
@@ -53,8 +55,11 @@ describe('pure composition', () => {
   });
   it('clothesLine: nothing equipped → the at-home line, never an invented wardrobe', () => {
     expect(clothesLine([], 'she')).toBe('in the clothes she would wear at home');
+    // Waist up: the shoes are out of frame and never named (they pulled the frame down to the feet).
     expect(clothesLine([piece('Winter Coat', 'Body/Torso', 'Clothing', 'Nylon'), piece('Dress Shoes', 'Body/Feet')], 'she'))
-      .toBe('wearing a winter coat of nylon on the torso and dress shoes on the feet');
+      .toBe('wearing a winter coat of nylon');
+    expect(clothesLine([piece('Winter Coat', 'Body/Torso', 'Clothing', 'Nylon'), piece('Dress Shoes', 'Body/Feet')], 'she', 'figure'))
+      .toBe('wearing a winter coat of nylon and dress shoes');
     expect(clothesLine([piece('Everyday Outfit', 'Body')], 'he')).toBe('wearing an everyday outfit');
   });
   it('markSentence turns the designer sentence into a clause; markSentences reads both stacks', () => {
@@ -76,25 +81,47 @@ describe('pure composition', () => {
     const p = composePrompt({ setting: 'a room', pose: 'standing', expression: 'calm', clothes: 'wearing a coat', marks: 'keeping the scar', light: 'dusk' });
     expect(p).toBe('A painted character illustration of the person in <image1> with the body in <image2>, wearing a coat, standing, calm, in a room, dusk, keeping the scar.');
   });
-  it('parseBriefAnswer: fills gaps from the draft, recomposes a prompt that lost the references, never lets JEWL dress an undressed character', () => {
-    const inputs = baseInputs();
+  it('parseBriefAnswer: JEWL writes setting/pose/expression/light; clothes and marks are the engine\'s; the prompt is always composed', () => {
+    const inputs = { ...baseInputs(), equipped: [piece('The big cardigan', 'Body/Torso', null, 'Wool'), piece('The black tee', 'Body/Torso', null, 'Cotton')] };
     const draft = draftBrief(inputs);
-    expect(parseBriefAnswer('no json here', draft, 0)).toBeNull();
-    const a = parseBriefAnswer('```json\n{"pose":"leaning on the sill","prompt":"forgot the refs"}\n```', draft, 0)!;
+    expect(parseBriefAnswer('no json here', draft, 2)).toBeNull();
+    const a = parseBriefAnswer('```json\n{"pose":"leaning on the sill","prompt":"forgot the refs"}\n```', draft, 2)!;
     expect(a.pose).toBe('leaning on the sill');
-    expect(a.clothes).toBe(draft.clothes);
     expect(a.prompt).toContain('<image1>');
     expect(a.prompt).toContain('leaning on the sill');
-    const b = parseBriefAnswer(JSON.stringify({ clothes: 'wearing a ballgown', prompt: 'x <image1> y <image2> wearing a ballgown' }), draft, 0)!;
+    // 2026-10-16: his rewrite dropped the tee and the bra showed — he no longer writes clothes or marks.
+    const b = parseBriefAnswer(JSON.stringify({ clothes: 'wearing the big cardigan', marks: 'a navel piercing', prompt: 'x <image1> y <image2> wearing the big cardigan' }), draft, 2)!;
     expect(b.clothes).toBe(draft.clothes);
-    expect(b.prompt).not.toContain('ballgown');
+    expect(b.clothes).toContain('hanging open over the black tee');
+    expect(b.marks).toBe(draft.marks);
+    expect(b.prompt).toContain('the black tee');
+  });
+  it('the pose comes from her day, then her body and mood carry it', () => {
+    const atDesk = { ...baseInputs(), day: { now: ['Laptop open, the screen shows the current draft.'], lived: [], habits: [] } };
+    expect(poseLine(atDesk)).toMatch(/^seated at her desk/);
+    const tired = { ...atDesk, bodyState: ['exhausted', 'hurt: Left Hand (Worn)'], affect: { morale: 0, stress: 0.7, grief: 0 } };
+    expect(poseLine(tired)).toBe('seated at her desk, turned from the work toward the viewer, one forearm resting on the desk, shoulders heavy with tiredness, favouring her left hand, shoulders tight');
+    expect(expressionLine(null, ['exhausted'])).toBe('the face at rest, tired eyes, eyes on the viewer');
+    // A lived memory outranks the standing facts.
+    expect(poseLine({ ...baseInputs(), day: { now: [], lived: ['I was chopping onions when the phone rang.'], habits: [] } })).toMatch(/^standing at the counter/);
+    // Nothing says what she is doing → the persona's bearing.
+    expect(poseLine({ ...baseInputs(), persona: { identityNarrative: 'A guarded author.', voiceNotes: null } })).toMatch(/^standing a half-turn/);
+  });
+  it('readBodyState: conditions, hurt parts and pools at half or less', () => {
+    const s = readBodyState({
+      conditions: { exhausted: true, weak: false },
+      attributes: { constitution: { level: 9, current: 3, augmentPositive: 0, augmentNegative: 0 }, clout: { level: 8, current: 8 }, frequency: { level: 40, current: 2 } },
+      bodyAnatomy: { partName: 'Body', condition: 3, contains: [{ partName: 'Left Hand', condition: 2 }] },
+    } as never);
+    expect(s).toEqual(['exhausted', 'hurt: Left Hand (Worn)', 'Constitution low (3/9)']);
   });
 });
 
 function baseInputs(): Parameters<typeof draftBrief>[0] {
   return {
     characterId: 'ch1', campaignId: 'c1', name: 'Violet Okafor', possessive: 'her', pronoun: 'she', seed: 'Human', age: 25, backstory: '',
-    location: null, facts: [], persona: { identityNarrative: null, voiceNotes: null }, disposition: null, equipped: [], marks: [], underclothing: null, means: [],
+    location: null, facts: [], persona: { identityNarrative: null, voiceNotes: null }, disposition: null, affect: null,
+    day: { now: [], lived: [], habits: [] }, bodyState: [], equipped: [], marks: [], underclothing: null, means: [],
     refs: { face: '/portraits/ch1/faces/f.png', body: '/portraits/ch1/bodies/b.png' },
   };
 }
@@ -123,6 +150,7 @@ describe('buildPortraitBrief (prisma + JEWL mocked)', () => {
       { id: 'i_phone', name: 'Phone', data: JSON.stringify({}), sourceForgeItemId: null },
     ];
     h.updates = [];
+    h.memories = [];
     h.calls = 0;
     h.fail = false;
     h.answer = JSON.stringify({ setting: 'The studio, pages everywhere.', pose: 'half-turned from the window, arms folded', expression: 'wary, mouth set', clothes: 'wearing her grey wool coat', marks: 'keeping the short pale scar at the clavicle', light: 'grey morning light from the alley window', prompt: 'A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey wool coat, half-turned from the window, arms folded, wary, mouth set, in the studio, pages everywhere, grey morning light from the alley window, keeping the short pale scar at the clavicle.' });
@@ -162,9 +190,9 @@ describe('buildPortraitBrief (prisma + JEWL mocked)', () => {
     h.fail = true;
     const r = await buildPortraitBrief('ch1');
     expect(r.brief.byJewl).toBe(false);
-    expect(r.brief.clothes).toBe('wearing her grey coat of wool on the torso');
+    expect(r.brief.clothes).toBe('wearing her grey coat of wool');
     expect(r.brief.light).toBe('Grey morning light through the alley window');
-    expect(r.brief.prompt).toMatch(/^A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey coat of wool on the torso, /);
+    expect(r.brief.prompt).toMatch(/^A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey coat of wool, /);
     expect(r.brief.prompt).toContain('a scar on her neck');
     expect(h.updates).toHaveLength(1);
   });
@@ -201,7 +229,7 @@ describe('clothes layers (2026-10-16: the tee under the open cardigan)', () => {
       { name: 'The big cardigan', region: 'Body/Torso', category: 'Clothing' },
       { name: 'The everyday bra', region: 'Body/Torso', category: 'Clothing' },
     ] as never, 'she');
-    expect(line).toContain('the big cardigan over the black tee on the torso');
+    expect(line).toContain('the big cardigan hanging open over the black tee');
     expect(line).not.toContain('bra');
     expect(clothesLine([{ name: 'The everyday bra', region: 'Body/Torso', category: 'Clothing' }] as never, 'she')).toContain('bra');
   });

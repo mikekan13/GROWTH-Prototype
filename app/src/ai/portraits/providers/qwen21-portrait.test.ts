@@ -60,7 +60,7 @@ describe('Qwen21Provider.renderPortrait', () => {
     expect(wf.EMPTY_LATENT.inputs).toMatchObject({ width: 832, height: 1040 }); // the portrait is waist up (2026-10-16)
     const prompt = String(wf.TEXT_ENCODE.inputs.prompt);
     expect(prompt).toMatch(/^grwthpaint, A painted character illustration of the person in <image1> with the body in <image2>, wearing her grey wool coat/);
-    expect(prompt).toContain('A waist-up PORTRAIT');
+    expect(prompt).toContain('A PORTRAIT framed from just above the top of the head down to just above the waist');
     expect(prompt).toContain(LOCK_REALISM);
     expect(prompt).toContain(portraitMood(getCampaignMood('growth')));
     expect(prompt).not.toContain('a dark moody ground behind'); // a portrait has a place behind her (2026-10-16)
@@ -97,7 +97,7 @@ describe('Qwen21Provider.renderPortrait', () => {
 
   it('buildQwen21PortraitPrompt is pure: brief + framing + realism + mood', () => {
     const s = buildQwen21PortraitPrompt('  x <image1> <image2>  ', 'noir');
-    expect(s.startsWith('x <image1> <image2> A waist-up PORTRAIT')).toBe(true);
+    expect(s.startsWith('x <image1> <image2> A PORTRAIT framed')).toBe(true);
     expect(buildQwen21PortraitPrompt('x <image1> <image2>', 'noir', 'figure')).toContain('Framed from the head to the feet');
     expect(s).toContain(portraitMood(getCampaignMood('noir')));
   });

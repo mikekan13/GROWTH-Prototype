@@ -29,6 +29,8 @@ import { possessiveFor, restoreDesigner, type DesignerState, type Possessive } f
 import { renderDispositionLine } from './daya-affect';
 import { factPrefix } from './genesis-reset';
 import { extractJson } from './sketch-genesis-rules';
+import { getConditionLabel } from '@/types/item';
+import { clothesClause, marksClause, viewBody, PORTRAIT_CAMERA, type Visibility } from '@/lib/portrait-visibility';
 
 export const PORTRAIT_BRIEF_TIMEOUT_MS = 25_000;
 const BACKSTORY_CHARS = 700;
@@ -84,6 +86,17 @@ export interface PortraitInputs {
   persona: { identityNarrative: string | null; voiceNotes: string | null };
   /** renderDispositionLine, null at baseline. */
   disposition: string | null;
+  /** The raw drives (null = no DAYA entity) — posture reads them. */
+  affect: { morale: number; stress: number; grief: number } | null;
+  /**
+   * HER DAY (Mike 2026-10-16: "her pose… should be based on her day, mood,
+   * condition"): `now` = the live facts that say what is happening at this
+   * hour; `lived` = her latest memories from play (newest first); `habits` =
+   * routines from her genesis memories (what she does at this hour).
+   */
+  day: { now: string[]; lived: string[]; habits: string[] };
+  /** Her body now: active conditions, hurt parts, drained pools (empty = whole and rested). */
+  bodyState: string[];
   equipped: EquippedPiece[];
   /** The marks' sentences from the FACE + BODY stacks. */
   marks: string[];
@@ -114,13 +127,6 @@ export function regionLabel(key: string): string {
   return last.toLowerCase();
 }
 
-function article(name: string): string {
-  const n = name.trim();
-  if (!n) return '';
-  if (/^(a|an|the|her|his|their|some)\s/i.test(n) || /s$/i.test(n)) return n.toLowerCase();
-  return `${/^[aeiou]/i.test(n) ? 'an' : 'a'} ${n.toLowerCase()}`;
-}
-
 /** How far out a garment sits by its words: coats 0 … sweaters 1 … shirts 2 … underwear 3. Pure. */
 export function layerRank(p: Pick<EquippedPiece, 'name' | 'category'>): number {
   const base = OUTER_RANK[p.category ?? ''] ?? 3;
@@ -133,24 +139,14 @@ export function layerRank(p: Pick<EquippedPiece, 'name' | 'category'>): number {
 }
 
 /**
- * The clothes clause from what is EQUIPPED, LAYERS INCLUDED (2026-10-16: the
- * first dressed paint dropped the tee under her open cardigan): per region
- * outermost first, "X over Y"; underwear is named only when it is all she
- * wears there. Nothing equipped → the at-home line. Pure.
+ * The clothes clause: ONLY what the camera sees (lib/portrait-visibility —
+ * Mike 2026-10-16: "determine what will be showing based on camera angle and
+ * layers / how they lay"). Waist up by default: boots are out of frame, the
+ * jeans show at the waist, an open cardigan hangs open over the tee, the bra
+ * under the tee is never named. Nothing equipped → the at-home line. Pure.
  */
-export function clothesLine(pieces: EquippedPiece[], pronoun: PortraitInputs['pronoun']): string {
-  if (pieces.length === 0) return `in the clothes ${pronoun} would wear at home`;
-  const byRegion = new Map<string, EquippedPiece[]>();
-  for (const p of pieces) byRegion.set(p.region, [...(byRegion.get(p.region) ?? []), p]);
-  const parts = [...byRegion.entries()].map(([region, ps]) => {
-    const sorted = [...ps].sort((a, b) => layerRank(a) - layerRank(b));
-    const shown = sorted.filter((p, i) => i === 0 || layerRank(p) % 10 < 3);
-    const names = shown.map(p => `${article(p.name)}${p.material ? ` of ${p.material.toLowerCase()}` : ''}`);
-    const over = region.toLowerCase() === 'body' ? '' : ` on the ${regionLabel(region)}`;
-    return `${names.join(' over ')}${over}`;
-  });
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-  return `wearing ${list}`;
+export function clothesLine(pieces: EquippedPiece[], pronoun: PortraitInputs['pronoun'], frame: 'bust' | 'figure' = 'bust'): string {
+  return clothesClause(viewBody(pieces, [], { frame, facing: 'front' }), pronoun);
 }
 
 /**
@@ -176,6 +172,11 @@ export function markSentences(designer: Partial<DesignerState> | null | undefine
     if (MARK_KINDS.has(l.kind) && l.text.trim()) out.push(markSentence(l.text));
   }
   return out;
+}
+
+/** Which marks the camera sees through her clothes: shown, half-hidden at an edge, or hidden (never named). Pure. */
+export function markVisibility(marks: string[], equipped: EquippedPiece[], frame: 'bust' | 'figure' = 'bust'): Visibility['marks'] {
+  return viewBody(equipped, marks, { frame, facing: 'front' }).marks;
 }
 
 /** The marks clause for the prompt. Pure. */
@@ -210,19 +211,64 @@ export function settingLine(location: PortraitInputs['location'], pronoun: Portr
   return first ? `${location.name} — ${first}` : location.name;
 }
 
-/** The bearing from the persona text, deterministic (JEWL rewrites it when he answers). Pure. */
-export function poseLine(persona: PortraitInputs['persona']): string {
-  const text = `${persona.identityNarrative ?? ''} ${persona.voiceNotes ?? ''}`.toLowerCase();
-  if (/\b(shy|withdrawn|solitary|quiet|guarded|reserved|anxious)\b/.test(text)) return 'standing a half-turn from the viewer, shoulders drawn in, hands close to the body';
-  if (/\b(bold|confident|loud|brash|commanding|proud|fierce)\b/.test(text)) return 'standing square to the viewer, chin level, weight forward, hands easy';
-  if (/\b(tired|weary|grieving|heavy|slow)\b/.test(text)) return 'standing with the weight settled on one leg, shoulders low, one hand resting on something near';
-  return 'standing square to the viewer, weight settled, arms loose at the sides';
+/**
+ * What she is DOING at this hour, from today's facts and her lived memories
+ * (never from what merely exists in the room). Null = nothing says. Pure.
+ */
+export function activityLine(day: PortraitInputs['day'], possessive: Possessive): string | null {
+  const today = [...day.lived.slice(0, 2), ...day.now].join(' ').toLowerCase();
+  if (/\b(writing|typing|draft|manuscript|laptop|chapter|editing)\b/.test(today)) return `seated at ${possessive} desk, turned from the work toward the viewer, one forearm resting on the desk`;
+  if (/\b(cooking|chopping|stirring|stove|baking|dishes)\b/.test(today)) return `standing at the counter, turned from it toward the viewer`;
+  if (/\b(woke|waking|asleep|in bed|getting up)\b/.test(today)) return `sitting on the edge of the bed, just up`;
+  if (/\b(reading)\b/.test(today)) return `settled in a seat with a book lowered to ${possessive} lap`;
+  if (/\b(arriv|came home|just got (home|in)|coming in|leaving|on (her|his|their) way)\b/.test(today)) return `just inside the door, not yet settled`;
+  return null;
 }
 
-/** The expression from affect (baseline = the resting face). Pure. */
-export function expressionLine(disposition: string | null): string {
-  if (!disposition) return 'the face at rest, eyes on the viewer';
-  return `the face showing it — ${disposition}`;
+/** How her body is carried now: conditions, hurt parts, drained pools, then the drives. Pure. */
+export function bearingLine(bodyState: string[], affect: PortraitInputs['affect'], possessive: Possessive): string[] {
+  const s = bodyState.join(' ').toLowerCase();
+  const out: string[] = [];
+  if (/exhausted|constitution low/.test(s)) out.push('shoulders heavy with tiredness');
+  if (/weak|clout low/.test(s)) out.push('arms hanging heavy');
+  const hurt = bodyState.find(b => /^hurt:/i.test(b));
+  if (hurt) out.push(`favouring ${possessive} ${hurt.replace(/^hurt:\s*/i, '').split(' (')[0].toLowerCase()}`);
+  if (/overwhelmed|confused|incoherent/.test(s)) out.push('a little unmoored, attention drifting');
+  if (affect) {
+    if (affect.stress >= 0.5) out.push('shoulders tight');
+    if (affect.grief >= 0.5) out.push('head a little bowed');
+    if (affect.morale >= 0.5) out.push('chin lifted');
+    else if (affect.morale <= -0.5) out.push('shoulders curled in');
+  }
+  return out;
+}
+
+/**
+ * The pose: what her day has her doing (else the persona's bearing), then
+ * how her body and mood carry it. Deterministic — JEWL rewrites it from the
+ * same day, body and mood when he answers. Pure.
+ */
+export function poseLine(i: Pick<PortraitInputs, 'persona' | 'day' | 'bodyState' | 'affect' | 'possessive'>): string {
+  const text = `${i.persona.identityNarrative ?? ''} ${i.persona.voiceNotes ?? ''}`.toLowerCase();
+  const base = activityLine(i.day, i.possessive)
+    ?? (/\b(shy|withdrawn|solitary|quiet|guarded|reserved|anxious)\b/.test(text) ? 'standing a half-turn from the viewer, shoulders drawn in, hands close to the body'
+      : /\b(bold|confident|loud|brash|commanding|proud|fierce)\b/.test(text) ? 'standing square to the viewer, chin level, weight forward, hands easy'
+        : 'standing square to the viewer, weight settled, arms loose at the sides');
+  const bearing = bearingLine(i.bodyState, i.affect, i.possessive);
+  return bearing.length ? `${base}, ${bearing.join(', ')}` : base;
+}
+
+/** The expression from mood and body (baseline = the resting face). Pure. */
+export function expressionLine(disposition: string | null, bodyState: string[] = []): string {
+  const tired = /exhausted|constitution low/i.test(bodyState.join(' ')) ? 'tired eyes' : '';
+  if (!disposition) return tired ? `the face at rest, ${tired}, eyes on the viewer` : 'the face at rest, eyes on the viewer';
+  return `the face showing it — ${disposition}${tired ? `, ${tired}` : ''}`;
+}
+
+/** JEWL's sentences as one clause: "The desk sits … window. The fire escape …" → "the desk sits … window; the fire escape …". Pure. */
+function asClause(s: string): string {
+  return s.trim().replace(/[.!]+\s+(?=[A-Z])/g, '; ').replace(/[.!]+$/, '').replace(/^(The|A|An)\b/, w => w.toLowerCase())
+    .replace(/; (The|A|An)\b/g, (_, w: string) => `; ${w.toLowerCase()}`);
 }
 
 /** The fixed paint prompt. Pure. */
@@ -232,8 +278,8 @@ export function composePrompt(b: Omit<PortraitBrief, 'prompt'>): string {
     b.clothes.trim(),
     b.pose.trim(),
     b.expression.trim(),
-    `in ${b.setting.trim()}`,
-    b.light.trim(),
+    `in ${asClause(b.setting)}`,
+    asClause(b.light),
   ].filter(Boolean);
   const marks = b.marks.trim();
   return `${bits.join(', ')}${marks ? `, ${marks}` : ''}.`;
@@ -243,10 +289,10 @@ export function composePrompt(b: Omit<PortraitBrief, 'prompt'>): string {
 export function draftBrief(inputs: PortraitInputs): PortraitBrief {
   const parts = {
     setting: settingLine(inputs.location, inputs.pronoun),
-    pose: poseLine(inputs.persona),
-    expression: expressionLine(inputs.disposition),
+    pose: poseLine(inputs),
+    expression: expressionLine(inputs.disposition, inputs.bodyState),
     clothes: clothesLine(inputs.equipped, inputs.pronoun),
-    marks: marksLine(inputs.marks),
+    marks: marksClause(viewBody(inputs.equipped, inputs.marks, PORTRAIT_CAMERA)),
     light: lightLine(inputs.facts, inputs.location),
   };
   return { ...parts, prompt: composePrompt(parts) };
@@ -283,14 +329,17 @@ export function parseBriefAnswer(text: string, draft: PortraitBrief, equippedCou
     setting: pick(r.data.setting, draft.setting),
     pose: pick(r.data.pose, draft.pose),
     expression: pick(r.data.expression, draft.expression),
-    // Clothes are the inventory's: with nothing equipped JEWL may not dress her.
-    clothes: equippedCount > 0 ? pick(r.data.clothes, draft.clothes) : draft.clothes,
-    marks: pick(r.data.marks, draft.marks),
+    // Clothes and marks are TRUTH (inventory + designer), never JEWL's prose:
+    // 2026-10-16 his rewrite dropped the tee under her open cardigan and the
+    // painter filled the gap with the body reference's bra; a rewritten marks
+    // clause can name a mark her clothes cover (it then shows through the cloth).
+    clothes: draft.clothes,
+    marks: draft.marks,
     light: pick(r.data.light, draft.light),
   };
-  const prompt = r.data.prompt?.trim() ?? '';
-  const ok = prompt.includes('<image1>') && prompt.includes('<image2>') && (equippedCount > 0 || prompt.includes(draft.clothes));
-  return { ...fields, prompt: ok ? prompt.replace(/\s+/g, ' ') : composePrompt(fields) };
+  void equippedCount;
+  // The prompt is always composed from the fields — his free prompt could drop a layer.
+  return { ...fields, prompt: composePrompt(fields) };
 }
 
 // ── Gather ──────────────────────────────────────────────────────────────
@@ -300,7 +349,44 @@ type SheetJson = {
   creation?: { seed?: { name?: string } };
   backstory?: { backstory?: string };
   wealth?: { holdings?: Array<{ amount: number; code: string; where?: string }>; income?: Array<{ amountPerYear: number; code: string; source: string }> };
+  conditions?: Record<string, boolean>;
+  attributes?: Record<string, { level?: number; current?: number; augmentPositive?: number | null; augmentNegative?: number | null }>;
+  bodyAnatomy?: unknown;
 } & Record<string, unknown>;
+
+const NOW_KEY = /(atmosphere|time|hour|now|today|tonight)$/i;
+const NOW_TEXT = /\b(now|today|tonight|this (morning|afternoon|evening)|current(ly)?|forgot|~?\d{1,2}(:\d{2})?\s?(am|pm))\b/i;
+const ROUTINE = /\b(every (day|morning|night|evening)|most (mornings|nights|days|evenings)|always|when I (sit|get|wake|come|go)|uniform|habit|routine)\b/i;
+
+function clip(s: string, n: number): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+}
+
+const CONDITION_WORDS: Record<string, string> = {
+  weak: 'weak', clumsy: 'clumsy', exhausted: 'exhausted', deafened: 'deafened', deathsDoor: "at death's door",
+  muted: 'muted', overwhelmed: 'overwhelmed', confused: 'confused', incoherent: 'incoherent',
+};
+
+/** Her body now from the sheet: active conditions, hurt parts (condition below whole), pools at half or less. Pure. */
+export function readBodyState(sheet: SheetJson): string[] {
+  const out: string[] = [];
+  for (const [k, on] of Object.entries(sheet.conditions ?? {})) if (on && CONDITION_WORDS[k]) out.push(CONDITION_WORDS[k]);
+  type Part = { partName?: string; condition?: number; isInternal?: boolean; contains?: Part[] };
+  const walk = (n: Part | undefined) => {
+    if (!n) return;
+    if (n.partName && typeof n.condition === 'number' && n.condition < 3) out.push(`hurt: ${n.partName} (${getConditionLabel(n.condition)})`);
+    for (const c of n.contains ?? []) walk(c);
+  };
+  walk(sheet.bodyAnatomy as Part | undefined);
+  for (const [k, a] of Object.entries(sheet.attributes ?? {})) {
+    const max = (a.level ?? 0) + (a.augmentPositive ?? 0) - (a.augmentNegative ?? 0);
+    if (k !== 'frequency' && max > 0 && typeof a.current === 'number' && a.current <= max / 2) {
+      out.push(`${k[0].toUpperCase()}${k.slice(1)} low (${a.current}/${max})`);
+    }
+  }
+  return out;
+}
 
 function parseSheet(raw: string): SheetJson {
   try { return JSON.parse(raw) as SheetJson; } catch { return {}; }
@@ -348,13 +434,15 @@ export async function gatherPortraitInputs(characterId: string): Promise<Portrai
 
   // Live world facts under her first-name prefix; light/time keys first.
   let facts: PortraitInputs['facts'] = [];
+  let allFacts: PortraitInputs['facts'] = [];
   if (campaignId) {
     const rows = await prisma.worldFact.findMany({
       where: { campaignId, supersededById: null, subjectKey: { startsWith: factPrefix(c.name) } },
       select: { subjectKey: true, fact: true },
       orderBy: { establishedAtCycle: 'asc' },
     });
-    const all = rows.map(r => ({ key: r.subjectKey, fact: r.fact }));
+    const all = rows.map(r => ({ key: r.subjectKey, fact: r.fact })).filter(f => !/^\(removed\)/i.test(f.fact));
+    allFacts = all;
     const light = lightFacts(all);
     const rest = all.filter(f => !light.includes(f));
     facts = [...light, ...rest].slice(0, MAX_FACT_LINES);
@@ -363,7 +451,7 @@ export async function gatherPortraitInputs(characterId: string): Promise<Portrai
   // Persona + affect (one row).
   const entity = await prisma.dayaEntity.findUnique({
     where: { characterId },
-    select: { personaProfile: true, affect: { select: { morale: true, stress: true, grief: true } } },
+    select: { id: true, personaProfile: true, affect: { select: { morale: true, stress: true, grief: true } } },
   });
   let persona: PortraitInputs['persona'] = { identityNarrative: null, voiceNotes: null };
   if (entity) {
@@ -373,6 +461,29 @@ export async function gatherPortraitInputs(characterId: string): Promise<Portrai
     } catch { /* unreadable persona */ }
   }
   const disposition = renderDispositionLine(entity?.affect ?? null);
+
+  // Her day: what the live facts say is happening now, her latest lived
+  // memories, and her routines (genesis memories that say when she does what).
+  // Light facts are the light line's (and a dark bathroom bulb says nothing about her hour).
+  const nowScore = (f: { key: string; fact: string }) => (/light/i.test(f.key) ? 0 : NOW_KEY.test(f.key) ? 2 : NOW_TEXT.test(f.fact) ? 1 : 0);
+  const now = allFacts.map(f => ({ f, s: nowScore(f) })).filter(x => x.s > 0)
+    .sort((a, b) => b.s - a.s).slice(0, 5).map(x => clip(x.f.fact, 200));
+  let lived: string[] = [];
+  let habits: string[] = [];
+  if (entity?.id) {
+    const mems = (await prisma.dayaMemoryEntry.findMany({
+      where: { entityId: entity.id },
+      orderBy: [{ narrativeCycle: 'desc' }, { realTime: 'desc' }],
+      take: 80,
+      select: { source: true, content: true, salience: true, narrativeCycle: true },
+    })) ?? [];
+    // Lived = after play began (clock > 0); everything at 0 was written at creation (her past).
+    lived = mems.filter(m => (m.narrativeCycle ?? 0) > 0).slice(0, 4).map(m => clip(m.content, 220));
+    habits = mems.filter(m => (m.narrativeCycle ?? 0) <= 0 && ROUTINE.test(m.content))
+      .sort((a, b) => b.salience - a.salience).slice(0, 3).map(m => clip(m.content, 220));
+  }
+
+  const bodyState = readBodyState(sheet);
 
   // EQUIPPED = held + data.equippedTo (inventory law: worn OVER a region).
   const held = await prisma.campaignItem.findMany({
@@ -412,6 +523,9 @@ export async function gatherPortraitInputs(characterId: string): Promise<Portrai
     facts,
     persona,
     disposition,
+    affect: entity?.affect ? { morale: entity.affect.morale, stress: entity.affect.stress, grief: entity.affect.grief } : null,
+    day: { now, lived, habits },
+    bodyState,
     equipped,
     marks: markSentences(designer),
     underclothing: sheet.identity?.underclothing ?? null,
@@ -430,6 +544,10 @@ export function renderBriefContext(i: PortraitInputs, draft: PortraitBrief): str
     i.persona.identityNarrative ? `WHO ${i.pronoun.toUpperCase()} IS (persona): ${i.persona.identityNarrative}` : '',
     i.persona.voiceNotes ? `VOICE: ${i.persona.voiceNotes}` : '',
     `MOOD NOW: ${i.disposition ?? 'at baseline (the resting face)'}.`,
+    `BODY NOW: ${i.bodyState.length ? i.bodyState.join('; ') : 'whole and rested'}.`,
+    i.day.now.length ? `HER DAY — what is happening at this hour:\n${i.day.now.map(s => `- ${s}`).join('\n')}` : 'HER DAY: nothing recorded for this hour.',
+    i.day.lived.length ? `WHAT SHE JUST LIVED (newest first):\n${i.day.lived.map(s => `- ${s}`).join('\n')}` : '',
+    i.day.habits.length ? `HER ROUTINES (in her words):\n${i.day.habits.map(s => `- ${s}`).join('\n')}` : '',
     i.location
       ? `WHERE (${i.location.relation}): ${i.location.name} [${i.location.type}] — ${i.location.description || 'no description'}${i.location.environment ? ` · ${i.location.environment}` : ''}`
       : 'WHERE: no place recorded — a plain interior.',
@@ -437,7 +555,16 @@ export function renderBriefContext(i: PortraitInputs, draft: PortraitBrief): str
     i.equipped.length
       ? `EQUIPPED (the only clothes that may be painted; outermost per region):\n${outermostPerRegion(i.equipped).map(p => `- ${p.name}${p.archetype && p.archetype !== p.name ? ` [${p.archetype}]` : ''} over ${p.region}${p.material ? `, ${p.material}` : ''}${p.description ? ` — ${p.description}` : ''}`).join('\n')}`
       : `EQUIPPED: nothing. Paint ${i.pronoun} "${draft.clothes}" — do not invent garments.`,
-    i.marks.length ? `MARKS (must stay): ${i.marks.join('; ')}` : 'MARKS: none.',
+    (() => {
+      const v = viewBody(i.equipped, i.marks, PORTRAIT_CAMERA);
+      const bare = v.marks.filter(m => m.view !== 'hidden').map(m => m.view === 'edge' && m.by ? `${m.mark} (half-hidden by ${m.by.name.toLowerCase()})` : m.mark);
+      const under = v.marks.filter(m => m.view === 'hidden').map(m => m.mark);
+      return [
+        `CAMERA: waist up, facing the viewer. IN FRAME: ${v.seen.map(s => s.piece.name).join(', ') || 'no clothes'}.${v.unseen.length ? ` OUT OF SIGHT: ${v.unseen.map(p => p.name).join(', ')}.` : ''}`,
+        bare.length ? `MARKS THE CAMERA SEES: ${bare.join('; ')}` : 'MARKS THE CAMERA SEES: none.',
+        under.length ? `MARKS UNDER HER CLOTHES (never mention them): ${under.join('; ')}` : '',
+      ].filter(Boolean).join('\n');
+    })(),
     i.means.length ? `MEANS: ${i.means.join(' · ')}` : '',
   ];
   return lines.filter(Boolean).join('\n');
@@ -446,11 +573,12 @@ export function renderBriefContext(i: PortraitInputs, draft: PortraitBrief): str
 const SYSTEM =
   'You are JEWL, the AI in a tabletop game. You write the PORTRAIT BRIEF for a character portrait painted from two reference images: ' +
   '<image1> is the approved face, <image2> the body. Answer with ONE JSON object and nothing else: ' +
-  '{"setting","pose","expression","clothes","marks","light","prompt"}. ' +
-  'setting = two short sentences of the place as it is now; pose = one clause of bearing that fits who they are (never a named pose, never a prop they do not own); ' +
-  'expression = one clause from the mood; clothes = a clause naming ONLY the equipped pieces (materials, colours), outermost per region — with nothing equipped, repeat the given at-home line; ' +
-  'marks = a clause restating every mark so the painter keeps them; light = one clause of light and hour from the facts. ' +
-  'prompt = exactly: "A painted character illustration of the person in <image1> with the body in <image2>, <clothes>, <pose>, <expression>, in <setting>, <light>, <marks>." ' +
+  '{"setting","pose","expression","light"}. The picture is a WAIST-UP portrait in the place where they are. ' +
+  'setting = two short sentences of the place as it is now; ' +
+  'pose = one clause of what their body is doing AT THIS MOMENT OF THEIR DAY — read HER DAY, WHAT SHE JUST LIVED and HER ROUTINES for where they are and what they are in the middle of, ' +
+  'then let BODY NOW and MOOD NOW shape how they carry it (tired, hurt, tense, low, bright); it must read from the waist up, use only things in the place, and never be a named or posed-for-the-camera stance; ' +
+  'expression = one clause from MOOD NOW and BODY NOW; light = one clause of light and hour from the facts. ' +
+  'Clothes and marks are fixed by the engine — do not write them, and never mention a mark under the clothes. ' +
   'Plain content words only — no style words, no medium, no game terms, no names of real people.';
 
 /** The ONE local-lane call. Throws on timeout / transport error. */
